@@ -7,7 +7,14 @@ const vod = require("./vod");
 const { google } = require("googleapis");
 const OAuth2 = google.auth.OAuth2;
 const app = express();
-
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+const rawBodySaver = function (req, res, buf, encoding) {
+  if (buf && buf.length) {
+    req.rawBody = buf.toString(encoding || "utf8");
+  }
+};
+app.use(express.raw({ verify: rawBodySaver(), type: "*/*" }));
 const fs = require("fs");
 const path = require("path");
 const oauth2Client = new OAuth2(

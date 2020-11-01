@@ -75,7 +75,7 @@ const uploadVideo = async (path, vodData, app) => {
             categoryId: "20",
           },
           status: {
-            privacyStatus: "public",
+            privacyStatus: "unlisted",
           },
         },
         media: {
