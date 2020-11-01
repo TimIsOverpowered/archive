@@ -1,0 +1,23 @@
+{
+    "twitch": {
+        "client_id": "YOUR_CLIENT_ID",
+        "client_secret": "YOUR_CLIENT_SECRET",
+        "webhook_secret": "YOUR_WEBHOOK_SECRET",
+        "webhook_callback": "YOUR_CALLBACK_URL",
+        "access_token": ""
+    },
+    "google": {
+        "client_id": "YOUR_CLIENT_ID",
+        "client_secret": "YOUR_CLIENT_SECRET",
+        "redirect_url": "YOUR_CALLBACK_URL",
+        "scopes": [
+            "https://www.googleapis.com/auth/youtube",
+            "https://www.googleapis.com/auth/youtube.upload"
+        ]
+    },
+    "youtube": {},
+    "port": "3030",
+    "twitchId": "YOUR_TWITCH_ID",
+    "channel": "YOUR_TWITCH_CHANNEL",
+    "vodPath": "YOUR_VOD_PATH"
+}
