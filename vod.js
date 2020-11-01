@@ -41,6 +41,11 @@ const downloadAsMP4 = async (m3u8, path) => {
       .audioCodec("copy")
       .outputOptions(["-bsf:a aac_adtstoasc"])
       .toFormat("mp4")
+      .on("progress", (progress) => {
+        readline.clearLine(process.stdout, 0);
+        readline.cursorTo(process.stdout, 0, null);
+        process.stdout.write(`DOWNLOAD PROGRESS: ${Math.round(progress.percent)}%`);
+      })
       .on("start", (cmd) => {
         //console.info(cmd);
         console.info(`Starting m3u8 download for ${m3u8} in ${path}`);
@@ -57,7 +62,17 @@ const downloadAsMP4 = async (m3u8, path) => {
 };
 
 const uploadVideo = async (path, vodData, app) => {
-  await app.googleClient.getTokenInfo(config.youtube.access_token);
+  await app.googleClient.getTokenInfo(config.youtube.access_token)
+  .catch(async e => {
+    //Change once they fix this problem, not being able to update using getTokenInfo?
+    const youtube = google.youtube('v3');
+    await youtube.search.list({
+      auth: app.googleClient,
+      part: 'id,snippet',
+      q: 'Check if token is valid',
+    });
+  });
+
   const fileSize = fs.statSync(path).size;
   const youtube = google.youtube("v3");
   await youtube.videos
@@ -87,7 +102,7 @@ const uploadVideo = async (path, vodData, app) => {
           const progress = (evt.bytesRead / fileSize) * 100;
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
-          process.stdout.write(`${Math.round(progress)}% complete`);
+          process.stdout.write(`UPLOAD PROGRESS: ${Math.round(progress)}%`);
         },
       }
     )

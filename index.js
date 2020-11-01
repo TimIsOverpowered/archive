@@ -22,7 +22,7 @@ const oauth2Client = new OAuth2(
   config.google.client_secret,
   config.google.redirect_url
 );
-oauth2Client.credentials = config.youtube;
+oauth2Client.setCredentials(config.youtube);
 oauth2Client.on("tokens", (tokens) => {
   if (tokens.refresh_token) {
     config.youtube.refresh_token = tokens.refresh_token;
@@ -72,7 +72,6 @@ const main = async () => {
       continue;
     }
   }
-
   //manual
   //vod.download(config.twitchId, app);
 };
