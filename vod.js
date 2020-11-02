@@ -4,6 +4,7 @@ const config = require("./config");
 const fs = require("fs");
 const readline = require("readline");
 const { google } = require("googleapis");
+const moment = require("moment");
 
 module.exports.download = async (userId, app) => {
   await twitch.checkToken();
@@ -12,6 +13,10 @@ module.exports.download = async (userId, app) => {
     return console.error("Failed to get latest vod in webhook");
 
   const vodId = latestVodData.id;
+
+  const duration = moment
+    .duration("PT" + vodData.duration.toUpperCase())
+    .asSeconds();
 
   const tokenSig = await twitch.getVodTokenSig(vodId);
   if (!tokenSig)
@@ -25,18 +30,50 @@ module.exports.download = async (userId, app) => {
   m3u8 = twitch.getParsedM3u8(m3u8);
   if (!m3u8) return console.error("failed to parse m3u8");
 
-  const vodPath = config.vodPath + latestVodData.id + ".mp4";
+  let data = [];
+  if (duration > 43200) {
+    let part = 1;
+    for (let start = 0; start < duration; start += 43200) {
+      const date = new Date(vodData.created_at).toLocaleDateString();
+      const vodPath = config.vodPath + latestVodData.id + `-part${part}.mp4`;
+      data.push({
+        path: vodPath,
+        title: `${vodData.title} (${date} VOD) PART ${part}`,
+        date: date,
+      });
+      let cut = duration - start;
+      if (cut > 43200) {
+        cut = 43200;
+      }
+      await downloadAsMP4(m3u8, vodPath, start, cut).catch((e) => {
+        return console.error("ffmpeg error occurred: " + e);
+      });
+      part++;
+    }
+  } else {
+    const date = new Date(vodData.created_at).toLocaleDateString();
+    const vodPath = config.vodPath + latestVodData.id + ".mp4";
+    data.push({
+      path: vodPath,
+      title: `${vodData.title} (${date} VOD) PART ${part}`,
+      date: date,
+    });
+    await downloadAsMP4(m3u8, vodPath).catch((e) => {
+      return console.error("ffmpeg error occurred: " + e);
+    });
+  }
 
-  await downloadAsMP4(m3u8, vodPath).catch((e) => {
-    return console.error("ffmpeg error occurred: " + e);
-  });
-
-  await uploadVideo(vodPath, latestVodData, app);
+  await uploadVideo(data, app);
 };
 
-const downloadAsMP4 = async (m3u8, path) => {
+const downloadAsMP4 = async (m3u8, path, start, duration) => {
   return new Promise((resolve, reject) => {
-    const ffmpeg_process = ffmpeg(m3u8)
+    const ffmpeg_process = ffmpeg(m3u8);
+    if (start) {
+      ffmpeg_process.seekInput(start);
+      ffmpeg_process.duration(duration);
+    }
+    ffmpeg_process
       .videoCodec("copy")
       .audioCodec("copy")
       .outputOptions(["-bsf:a aac_adtstoasc"])
@@ -63,7 +100,7 @@ const downloadAsMP4 = async (m3u8, path) => {
   });
 };
 
-const uploadVideo = async (path, vodData, app) => {
+const uploadVideo = async (datas, app) => {
   await app.googleClient
     .getTokenInfo(config.youtube.access_token)
     .catch(async (e) => {
@@ -75,46 +112,46 @@ const uploadVideo = async (path, vodData, app) => {
         q: "Check if token is valid",
       });
     });
-
-  const date = new Date(vodData.created_at).toLocaleDateString();
-  const fileSize = fs.statSync(path).size;
-  const youtube = google.youtube("v3");
-  await youtube.videos
-    .insert(
-      {
-        auth: app.googleClient,
-        part: "id,snippet,status",
-        notifySubscribers: true,
-        requestBody: {
-          snippet: {
-            title: `${vodData.title} (${date} VOD)`,
-            description: `Watch Poke live on Twitch! https://twitch.tv/pokelawls\n\nThis vod was on ${date} \n\nSocial Media \nTwitter - https://twitter.com/pokelawls \nDiscord - https://discord.gg/pokelawls \nInstagram - https://instagram.com/pokelawls \nReddit - https://reddit.com/r/pokelawls \nMain Channel - https://www.youtube.com/c/pokelawls`,
-            categoryId: "20",
+  for (let data of datas) {
+    const fileSize = fs.statSync(data.path).size;
+    const youtube = google.youtube("v3");
+    await youtube.videos
+      .insert(
+        {
+          auth: app.googleClient,
+          part: "id,snippet,status",
+          notifySubscribers: true,
+          requestBody: {
+            snippet: {
+              title: data.title,
+              description: `Watch Poke live on Twitch! https://twitch.tv/pokelawls\n\nThis vod was on ${data.date} \n\nSocial Media \nTwitter - https://twitter.com/pokelawls \nDiscord - https://discord.gg/pokelawls \nInstagram - https://instagram.com/pokelawls \nReddit - https://reddit.com/r/pokelawls \nMain Channel - https://www.youtube.com/c/pokelawls`,
+              categoryId: "20",
+            },
+            status: {
+              privacyStatus: "unlisted",
+            },
           },
-          status: {
-            privacyStatus: "unlisted",
+          media: {
+            body: fs.createReadStream(data.path),
           },
         },
-        media: {
-          body: fs.createReadStream(path),
-        },
-      },
-      {
-        onUploadProgress: (evt) => {
-          const progress = (evt.bytesRead / fileSize) * 100;
-          readline.clearLine(process.stdout, 0);
-          readline.cursorTo(process.stdout, 0, null);
-          process.stdout.write(`UPLOAD PROGRESS: ${Math.round(progress)}%`);
-        },
-      }
-    )
-    .then((res) => {
-      console.log("\n\n");
-      console.log(res.data.status);
-    })
-    .catch((error) => {
-      console.log("\n\n");
-      console.error(error);
-    });
-  fs.unlinkSync(path);
+        {
+          onUploadProgress: (evt) => {
+            const progress = (evt.bytesRead / fileSize) * 100;
+            readline.clearLine(process.stdout, 0);
+            readline.cursorTo(process.stdout, 0, null);
+            process.stdout.write(`UPLOAD PROGRESS: ${Math.round(progress)}%`);
+          },
+        }
+      )
+      .then((res) => {
+        console.log("\n\n");
+        console.log(res.data.status);
+        fs.unlinkSync(data.path);
+      })
+      .catch((error) => {
+        console.log("\n\n");
+        console.error(error);
+      });
+  }
 };
