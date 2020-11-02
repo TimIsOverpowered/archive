@@ -44,10 +44,12 @@ const downloadAsMP4 = async (m3u8, path) => {
       .on("progress", (progress) => {
         readline.clearLine(process.stdout, 0);
         readline.cursorTo(process.stdout, 0, null);
-        process.stdout.write(`DOWNLOAD PROGRESS: ${Math.round(progress.percent)}%`);
+        process.stdout.write(
+          `DOWNLOAD PROGRESS: ${Math.round(progress.percent)}%`
+        );
       })
       .on("start", (cmd) => {
-        //console.info(cmd);
+        console.info(cmd);
         console.info(`Starting m3u8 download for ${m3u8} in ${path}`);
       })
       .on("error", function (err) {
@@ -62,17 +64,19 @@ const downloadAsMP4 = async (m3u8, path) => {
 };
 
 const uploadVideo = async (path, vodData, app) => {
-  await app.googleClient.getTokenInfo(config.youtube.access_token)
-  .catch(async e => {
-    //Change once they fix this problem, not being able to update using getTokenInfo?
-    const youtube = google.youtube('v3');
-    await youtube.search.list({
-      auth: app.googleClient,
-      part: 'id,snippet',
-      q: 'Check if token is valid',
+  await app.googleClient
+    .getTokenInfo(config.youtube.access_token)
+    .catch(async (e) => {
+      //Change once they fix this problem, not being able to update using getTokenInfo?
+      const youtube = google.youtube("v3");
+      await youtube.search.list({
+        auth: app.googleClient,
+        part: "id,snippet",
+        q: "Check if token is valid",
+      });
     });
-  });
 
+  const date = new Date(vodData.created_at).toLocaleDateString();
   const fileSize = fs.statSync(path).size;
   const youtube = google.youtube("v3");
   await youtube.videos
@@ -83,10 +87,8 @@ const uploadVideo = async (path, vodData, app) => {
         notifySubscribers: true,
         requestBody: {
           snippet: {
-            title: vodData.title,
-            description: `Watch Poke live on Twitch! https://twitch.tv/pokelawls\n\nThis vod was on ${new Date(
-              vodData.created_at
-            ).toLocaleDateString()} \n\nSocial Media \nTwitter - https://twitter.com/pokelawls \nDiscord - https://discord.gg/pokelawls \nInstagram - https://instagram.com/pokelawls \nReddit - https://reddit.com/r/pokelawls \nMain Channel - https://www.youtube.com/c/pokelawls`,
+            title: `${vodData.title} (${date} VOD)`,
+            description: `Watch Poke live on Twitch! https://twitch.tv/pokelawls\n\nThis vod was on ${date} \n\nSocial Media \nTwitter - https://twitter.com/pokelawls \nDiscord - https://discord.gg/pokelawls \nInstagram - https://instagram.com/pokelawls \nReddit - https://reddit.com/r/pokelawls \nMain Channel - https://www.youtube.com/c/pokelawls`,
             categoryId: "20",
           },
           status: {
