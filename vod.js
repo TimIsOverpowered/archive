@@ -15,7 +15,7 @@ module.exports.download = async (userId, app) => {
   const vodId = latestVodData.id;
 
   const duration = moment
-    .duration("PT" + vodData.duration.toUpperCase())
+    .duration("PT" + latestVodData.duration.toUpperCase())
     .asSeconds();
 
   const tokenSig = await twitch.getVodTokenSig(vodId);
@@ -34,11 +34,11 @@ module.exports.download = async (userId, app) => {
   if (duration > 43200) {
     let part = 1;
     for (let start = 0; start < duration; start += 43200) {
-      const date = new Date(vodData.created_at).toLocaleDateString();
+      const date = new Date(latestVodData.created_at).toLocaleDateString();
       const vodPath = config.vodPath + latestVodData.id + `-part${part}.mp4`;
       data.push({
         path: vodPath,
-        title: `${vodData.title} (${date} VOD) PART ${part}`,
+        title: `${latestVodData.title} (${date} VOD) PART ${part}`,
         date: date,
       });
       let cut = duration - start;
@@ -51,11 +51,11 @@ module.exports.download = async (userId, app) => {
       part++;
     }
   } else {
-    const date = new Date(vodData.created_at).toLocaleDateString();
+    const date = new Date(latestVodData.created_at).toLocaleDateString();
     const vodPath = config.vodPath + latestVodData.id + ".mp4";
     data.push({
       path: vodPath,
-      title: `${vodData.title} (${date} VOD) PART ${part}`,
+      title: `${latestVodData.title} (${date} VOD)`,
       date: date,
     });
     await downloadAsMP4(m3u8, vodPath).catch((e) => {
