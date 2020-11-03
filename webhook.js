@@ -42,7 +42,7 @@ module.exports.stream = function (app) {
 
     if (data.length === 0) {
       console.log(`${userId} went offline.`);
-      vod.download(app);
+      vod.download(userId, app);
     }
   };
 };
