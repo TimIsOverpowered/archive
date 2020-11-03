@@ -21,7 +21,7 @@ module.exports.download = async (userId, app) => {
   const tokenSig = await twitch.getVodTokenSig(vodId);
   if (!tokenSig)
     return console.error(
-      `failed to get token/sig for ${vodId} under volume collection`
+      `failed to get token/sig for ${vodId}`
     );
 
   let m3u8 = await twitch.getM3u8(vodId, tokenSig.token, tokenSig.sig);
@@ -62,7 +62,7 @@ module.exports.download = async (userId, app) => {
       return console.error("ffmpeg error occurred: " + e);
     });
   }
-
+  console.log("\n");
   await uploadVideo(data, app);
 };
 
@@ -86,7 +86,7 @@ const downloadAsMP4 = async (m3u8, path, start, duration) => {
         );
       })
       .on("start", (cmd) => {
-        console.info(cmd);
+        //console.info(cmd);
         console.info(`Starting m3u8 download for ${m3u8} in ${path}`);
       })
       .on("error", function (err) {
