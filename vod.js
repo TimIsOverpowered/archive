@@ -111,47 +111,49 @@ const uploadVideo = async (datas, app) => {
         part: "id,snippet",
         q: "Check if token is valid",
       });
-    });
-  for (let data of datas) {
-    const fileSize = fs.statSync(data.path).size;
-    const youtube = google.youtube("v3");
-    await youtube.videos
-      .insert(
-        {
-          auth: app.googleClient,
-          part: "id,snippet,status",
-          notifySubscribers: true,
-          requestBody: {
-            snippet: {
-              title: data.title,
-              description: `Watch Poke live on Twitch! https://twitch.tv/pokelawls\n\nThis vod was on ${data.date} \n\nSocial Media \nTwitter - https://twitter.com/pokelawls \nDiscord - https://discord.gg/pokelawls \nInstagram - https://instagram.com/pokelawls \nReddit - https://reddit.com/r/pokelawls \nMain Channel - https://www.youtube.com/c/pokelawls`,
-              categoryId: "20",
+  });
+  setTimeout(async () => {
+    for (let data of datas) {
+      const fileSize = fs.statSync(data.path).size;
+      const youtube = google.youtube("v3");
+      await youtube.videos
+        .insert(
+          {
+            auth: app.googleClient,
+            part: "id,snippet,status",
+            notifySubscribers: true,
+            requestBody: {
+              snippet: {
+                title: data.title,
+                description: `Watch Poke live on Twitch! https://twitch.tv/pokelawls\n\nThis vod was on ${data.date} \n\nSocial Media \nTwitter - https://twitter.com/pokelawls \nDiscord - https://discord.gg/pokelawls \nInstagram - https://instagram.com/pokelawls \nReddit - https://reddit.com/r/pokelawls \nMain Channel - https://www.youtube.com/c/pokelawls`,
+                categoryId: "20",
+              },
+              status: {
+                privacyStatus: "unlisted",
+              },
             },
-            status: {
-              privacyStatus: "unlisted",
+            media: {
+              body: fs.createReadStream(data.path),
             },
           },
-          media: {
-            body: fs.createReadStream(data.path),
-          },
-        },
-        {
-          onUploadProgress: (evt) => {
-            const progress = (evt.bytesRead / fileSize) * 100;
-            readline.clearLine(process.stdout, 0);
-            readline.cursorTo(process.stdout, 0, null);
-            process.stdout.write(`UPLOAD PROGRESS: ${Math.round(progress)}%`);
-          },
-        }
-      )
-      .then((res) => {
-        console.log("\n\n");
-        console.log(res.data.status);
-        fs.unlinkSync(data.path);
-      })
-      .catch((error) => {
-        console.log("\n\n");
-        console.error(error);
-      });
-  }
+          {
+            onUploadProgress: (evt) => {
+              const progress = (evt.bytesRead / fileSize) * 100;
+              readline.clearLine(process.stdout, 0);
+              readline.cursorTo(process.stdout, 0, null);
+              process.stdout.write(`UPLOAD PROGRESS: ${Math.round(progress)}%`);
+            },
+          }
+        )
+        .then((res) => {
+          console.log("\n\n");
+          console.log(res.data.status);
+          fs.unlinkSync(data.path);
+        })
+        .catch((error) => {
+          console.log("\n\n");
+          console.error(error);
+        });
+    }
+  }, 1000)
 };
