@@ -78,13 +78,14 @@ const downloadAsMP4 = async (m3u8, path, start, duration) => {
       .audioCodec("copy")
       .outputOptions(["-bsf:a aac_adtstoasc"])
       .toFormat("mp4")
+      /*
       .on("progress", (progress) => {
         readline.clearLine(process.stdout, 0);
         readline.cursorTo(process.stdout, 0, null);
         process.stdout.write(
           `DOWNLOAD PROGRESS: ${Math.round(progress.percent)}%`
         );
-      })
+      })*/
       .on("start", (cmd) => {
         //console.info(cmd);
         console.info(`Starting m3u8 download for ${m3u8} in ${path}`);
@@ -114,7 +115,7 @@ const uploadVideo = async (datas, app) => {
   });
   setTimeout(async () => {
     for (let data of datas) {
-      const fileSize = fs.statSync(data.path).size;
+      //const fileSize = fs.statSync(data.path).size;
       const youtube = google.youtube("v3");
       await youtube.videos
         .insert(
@@ -135,7 +136,7 @@ const uploadVideo = async (datas, app) => {
             media: {
               body: fs.createReadStream(data.path),
             },
-          },
+          }/*,
           {
             onUploadProgress: (evt) => {
               const progress = (evt.bytesRead / fileSize) * 100;
@@ -143,7 +144,7 @@ const uploadVideo = async (datas, app) => {
               readline.cursorTo(process.stdout, 0, null);
               process.stdout.write(`UPLOAD PROGRESS: ${Math.round(progress)}%`);
             },
-          }
+          }*/
         )
         .then((res) => {
           console.log("\n\n");
