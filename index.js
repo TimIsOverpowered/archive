@@ -22,7 +22,7 @@ const oauth2Client = new OAuth2(
   config.google.client_secret,
   config.google.redirect_url
 );
-oauth2Client.setCredentials(config.youtube);
+oauth2Client.credentials = config.youtube;
 oauth2Client.on("tokens", (tokens) => {
   if (tokens.refresh_token) {
     config.youtube.refresh_token = tokens.refresh_token;
@@ -36,7 +36,7 @@ oauth2Client.on("tokens", (tokens) => {
       console.info("Refreshed Google Token");
     }
   );
-  oauth2Client.setCredentials(tokens);
+  oauth2Client.credentials = tokens;
 });
 app.googleClient = oauth2Client;
 
@@ -73,7 +73,7 @@ const main = async () => {
     }
   }
   //manual
-  //vod.download(config.twitchId, app);
+  vod.download(config.twitchId, app);
 };
 
 main();
