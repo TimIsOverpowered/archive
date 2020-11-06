@@ -73,7 +73,7 @@ const main = async () => {
     }
   }
   //manual
-  vod.download(config.twitchId, app);
+  //vod.download(config.twitchId, app);
 };
 
 main();
