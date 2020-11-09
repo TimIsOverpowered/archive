@@ -60,6 +60,6 @@ module.exports = async function (app) {
     }
   }
   //manual testing
-  //vod.download("796431591", app);
-  //vod.getLogs("796431591", app);
+  //vod.download("793917510", app);
+  //vod.getLogs("793917510", app);
 };

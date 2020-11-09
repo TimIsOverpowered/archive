@@ -5,33 +5,36 @@ const DataTypes = Sequelize.DataTypes;
 
 module.exports = function (app) {
   const sequelizeClient = app.get('sequelizeClient');
-  const vods = sequelizeClient.define('vods', {
+  const logs = sequelizeClient.define('logs', {
     id: {
       type: DataTypes.TEXT,
       allowNull: false,
       primaryKey: true
     },
-    chapters: {
-      type: DataTypes.ARRAY(DataTypes.JSON)
+    vod_id: {
+      type: DataTypes.TEXT,
+      allowNull: false
     },
-    title: {
-      type: DataTypes.TEXT
+    display_name: {
+      type: DataTypes.TEXT,
+      allowNull: false
     },
-    duration: {
-      type: DataTypes.TEXT
+    content_offset_seconds: {
+      type: DataTypes.TEXT,
+      allowNull: false
     },
-    date: {
-      type: DataTypes.TEXT
+    message: {
+      type: DataTypes.ARRAY(DataTypes.JSON),
+      allowNull: false
     },
-    video_link: {
-      type: DataTypes.TEXT
+    user_badges: {
+      type: DataTypes.ARRAY(DataTypes.JSON),
+      allowNull: false
     },
-    thumbnail_url: {
-      type: DataTypes.TEXT
+    user_color: {
+      type: DataTypes.TEXT,
+      allowNull: false,
     },
-    youtube_id: {
-      type: DataTypes.TEXT
-    }
   }, {
     hooks: {
       beforeCount(options) {
@@ -41,10 +44,10 @@ module.exports = function (app) {
   });
 
   // eslint-disable-next-line no-unused-vars
-  vods.associate = function (models) {
+  logs.associate = function (models) {
     // Define associations here
     // See http://docs.sequelizejs.com/en/latest/docs/associations/
   };
 
-  return vods;
+  return logs;
 };

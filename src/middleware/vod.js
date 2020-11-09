@@ -82,7 +82,7 @@ const downloadAsMP4 = async (m3u8, path, start, duration) => {
       .outputOptions(["-bsf:a aac_adtstoasc"])
       .toFormat("mp4")
       .on("progress", (progress) => {
-        if ((process.env.NODE_ENV || '').trim() !== 'production') {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
           process.stdout.write(
@@ -146,7 +146,7 @@ const uploadVideo = async (datas, app) => {
         },
         {
           onUploadProgress: (evt) => {
-            if ((process.env.NODE_ENV || '').trim() !== 'production') {
+            if ((process.env.NODE_ENV || "").trim() !== "production") {
               const progress = (evt.bytesRead / fileSize) * 100;
               readline.clearLine(process.stdout, 0);
               readline.cursorTo(process.stdout, 0, null);
@@ -179,11 +179,12 @@ const uploadVideo = async (datas, app) => {
 
 module.exports.getLogs = async (vodId, app) => {
   let start_time = new Date();
-  const comments = [];
+  let comments = [];
   let response = await twitch.fetchComments(vodId);
   for (let comment of response.comments) {
     comments.push({
       id: comment._id,
+      vod_id: vodId,
       display_name: comment.commenter.display_name,
       content_offset_seconds: comment.content_offset_seconds,
       message: comment.message.fragments,
@@ -198,13 +199,32 @@ module.exports.getLogs = async (vodId, app) => {
       readline.clearLine(process.stdout, 0);
       readline.cursorTo(process.stdout, 0, null);
       process.stdout.write(
-        `Current Log position: ${response.comments[0].content_offset_seconds}`
+        `Current Log position: ${moment
+          .utc(response.comments[0].content_offset_seconds * 1000)
+          .format("HH:mm:ss")}`
       );
     }
     response = await twitch.fetchNextComments(vodId, cursor);
     for (let comment of response.comments) {
+      if (comments.length >= 2500) {
+        await app
+          .service("logs")
+          .create(comments)
+          .then(() => {
+            if ((process.env.NODE_ENV || "").trim() !== "production") {
+              console.info(
+                `\nSaved ${comments.length} comments in DB for vod ${vodId}`
+              );
+            }
+          })
+          .catch((e) => {
+            console.error(e);
+          });
+        comments = [];
+      }
       comments.push({
         id: comment._id,
+        vod_id: vodId,
         display_name: comment.commenter.display_name,
         content_offset_seconds: comment.content_offset_seconds,
         message: comment.message.fragments,
@@ -223,12 +243,10 @@ module.exports.getLogs = async (vodId, app) => {
   );
 
   await app
-    .service("vods")
-    .patch(vodId, {
-      logs: comments,
-    })
+    .service("logs")
+    .create(comments)
     .then(() => {
-      console.info(`Saved logs in DB for vod ${vodId}`);
+      console.info(`Saved all comments in DB for vod ${vodId}`);
     })
     .catch((e) => {
       console.error(e);
