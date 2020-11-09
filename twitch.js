@@ -223,3 +223,24 @@ module.exports.getLatestVodData = async (userId) => {
     });
   return vodData;
 };
+
+module.exports.getVodData = async (vod_id) => {
+  let vodData;
+  await axios
+    .get(`https://api.twitch.tv/helix/videos?id=${vod_id}`, {
+      headers: {
+        Authorization: `Bearer ${config.twitch.access_token}`,
+        "Client-Id": config.twitch.client_id,
+      },
+    })
+    .then((response) => {
+      const data = response.data.data;
+      if (data.length > 0) {
+        vodData = data[0];
+      }
+    })
+    .catch((e) => {
+      console.error(e.response.data);
+    });
+  return vodData;
+};

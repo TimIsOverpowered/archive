@@ -74,6 +74,7 @@ const main = async () => {
   }
   //manual
   //vod.download(config.twitchId, app);
+  //vod.downloadCertainVod(793917510,app)
 };
 
 main();
