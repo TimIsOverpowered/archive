@@ -6,13 +6,11 @@ const readline = require("readline");
 const { google } = require("googleapis");
 const moment = require("moment");
 
-module.exports.download = async (vodData, app) => {
-  const vodId = vodData.id;
-
+module.exports.download = async (vodId, app) => {
   let vod;
   await app
     .service("vods")
-    .get(vodData.id)
+    .get(vodId)
     .then((data) => {
       vod = data;
     })
@@ -23,9 +21,7 @@ module.exports.download = async (vodData, app) => {
   if (!vod)
     return console.error("Failed to download video: no VOD in database");
 
-  const duration = moment
-    .duration("PT" + vodData.duration.toUpperCase())
-    .asSeconds();
+  const duration = moment.duration(vod.duration).asSeconds();
 
   const tokenSig = await twitch.getVodTokenSig(vodId);
   if (!tokenSig) return console.error(`failed to get token/sig for ${vodId}`);
@@ -85,14 +81,15 @@ const downloadAsMP4 = async (m3u8, path, start, duration) => {
       .audioCodec("copy")
       .outputOptions(["-bsf:a aac_adtstoasc"])
       .toFormat("mp4")
-      /*
       .on("progress", (progress) => {
-        readline.clearLine(process.stdout, 0);
-        readline.cursorTo(process.stdout, 0, null);
-        process.stdout.write(
-          `DOWNLOAD PROGRESS: ${Math.round(progress.percent)}%`
-        );
-      })*/
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
+          readline.clearLine(process.stdout, 0);
+          readline.cursorTo(process.stdout, 0, null);
+          process.stdout.write(
+            `DOWNLOAD PROGRESS: ${Math.round(progress.percent)}%`
+          );
+        }
+      })
       .on("start", (cmd) => {
         //console.info(cmd);
         console.info(`Starting m3u8 download for ${m3u8} in ${path}`);
@@ -146,15 +143,17 @@ const uploadVideo = async (datas, app) => {
           media: {
             body: fs.createReadStream(data.path),
           },
-        } /*,
-          {
-            onUploadProgress: (evt) => {
+        },
+        {
+          onUploadProgress: (evt) => {
+            if ((process.env.NODE_ENV || '').trim() !== 'production') {
               const progress = (evt.bytesRead / fileSize) * 100;
               readline.clearLine(process.stdout, 0);
               readline.cursorTo(process.stdout, 0, null);
               process.stdout.write(`UPLOAD PROGRESS: ${Math.round(progress)}%`);
-            },
-          }*/
+            }
+          },
+        }
       );
       console.log("\n\n");
       console.log(res.data);
@@ -179,23 +178,54 @@ const uploadVideo = async (datas, app) => {
 };
 
 module.exports.getLogs = async (vodId, app) => {
+  let start_time = new Date();
   const comments = [];
   let response = await twitch.fetchComments(vodId);
-  comments.concat(response.comments);
-  let cursor = response._next;
-  let start_time = new Date();
-  while (cursor) {
-    response = await twitch.fetchNextComments(vodId, cursor);
-    comments.concat(response.comments);
-    cursor = response._next;
-    await sleep(150); //don't bombarade the api
+  for (let comment of response.comments) {
+    comments.push({
+      id: comment._id,
+      display_name: comment.commenter.display_name,
+      content_offset_seconds: comment.content_offset_seconds,
+      message: comment.message.fragments,
+      user_badges: comment.message.user_badges,
+      user_color: comment.message.user_color,
+    });
   }
-  console.info(`Total Time to get logs for ${vodId}: ${(new Date() - start_time)/1000}`);
+  let cursor = response._next;
+  let howMany = 1;
+  while (cursor) {
+    if ((process.env.NODE_ENV || "").trim() !== "production") {
+      readline.clearLine(process.stdout, 0);
+      readline.cursorTo(process.stdout, 0, null);
+      process.stdout.write(
+        `Current Log position: ${response.comments[0].content_offset_seconds}`
+      );
+    }
+    response = await twitch.fetchNextComments(vodId, cursor);
+    for (let comment of response.comments) {
+      comments.push({
+        id: comment._id,
+        display_name: comment.commenter.display_name,
+        content_offset_seconds: comment.content_offset_seconds,
+        message: comment.message.fragments,
+        user_badges: comment.message.user_badges,
+        user_color: comment.message.user_color,
+      });
+    }
+    cursor = response._next;
+    await sleep(100); //don't bombarade the api
+    howMany++;
+  }
+  console.info(
+    `\nTotal API Calls: ${howMany} | Total Time to get logs for ${vodId}: ${
+      (new Date() - start_time) / 1000
+    } seconds`
+  );
 
   await app
     .service("vods")
     .patch(vodId, {
-      logs: comments
+      logs: comments,
     })
     .then(() => {
       console.info(`Saved logs in DB for vod ${vodId}`);
@@ -203,4 +233,8 @@ module.exports.getLogs = async (vodId, app) => {
     .catch((e) => {
       console.error(e);
     });
+};
+
+const sleep = (ms) => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 };

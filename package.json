@@ -28,7 +28,9 @@
     "lint": "eslint src/. test/. --config .eslintrc.json --fix",
     "dev": "nodemon src/",
     "start": "node src/",
-    "mocha": "mocha test/ --recursive --exit"
+    "mocha": "mocha test/ --recursive --exit",
+    "production": "NODE_ENV=production node src",
+    "production-windows": "set NODE_ENV=production&&node src"
   },
   "standard": {
     "env": [

@@ -48,7 +48,7 @@ module.exports.stream = function (app) {
     if (data.length === 0) {
       console.log(`${config.channel} went offline.`);
       saveDuration(vodData);
-      vod.download(vodData, app);
+      vod.download(vodData.id, app);
       vod.getLogs(vodData.id);
       return;
     }

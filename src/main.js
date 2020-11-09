@@ -59,7 +59,7 @@ module.exports = async function (app) {
       continue;
     }
   }
-  //manual
-  //vod.download(config.twitchId, app);
-  //vod.downloadCertainVod(793917510,app)
+  //manual testing
+  //vod.download("796431591", app);
+  //vod.getLogs("796431591", app);
 };
