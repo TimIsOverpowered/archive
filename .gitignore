@@ -110,6 +110,6 @@ $RECYCLE.BIN/
 lib/
 data/
 
-config/config.json
-config/default.json
-config/production.json
+config/*
+!config/template_config.json
+!config/template_default.json
