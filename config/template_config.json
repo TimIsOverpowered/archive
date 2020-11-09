@@ -24,5 +24,6 @@
     "twitchId": "YOUR_TWITCH_ID",
     "channel": "YOUR_TWITCH_CHANNEL",
     "vodPath": "YOUR_VOD_PATH",
-    "youtube_description": "YOUR YOUTUBE DESCRIPTION GOES HERE"
+    "youtube_description": "YOUR YOUTUBE DESCRIPTION GOES HERE",
+    "ADMIN_API_KEY": "YOUR_ADMIN_API_KEY"
 }

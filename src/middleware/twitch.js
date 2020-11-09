@@ -244,3 +244,27 @@ module.exports.getVodData = async (vod_id) => {
     });
   return vodData;
 };
+
+module.exports.getGameData = async (gameId) => {
+  let gameData;
+  await axios
+    .get(`https://api.twitch.tv/helix/games?id=${gameId}`, {
+      headers: {
+        Authorization: `Bearer ${config.twitch.access_token}`,
+        "Client-Id": config.twitch.client_id,
+      },
+    })
+    .then((response) => {
+      let data = response.data.data;
+      if (data.length > 0) {
+        gameData = data[0];
+      }
+    })
+    .catch(async (e) => {
+      if (!e.response) {
+        return console.error(e);
+      }
+      console.error(e.response.data);
+    });
+  return gameData;
+};
