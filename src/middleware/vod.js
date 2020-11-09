@@ -6,68 +6,22 @@ const readline = require("readline");
 const { google } = require("googleapis");
 const moment = require("moment");
 
-module.exports.download = async (userId, app) => {
-  await twitch.checkToken();
-  const latestVodData = await twitch.getLatestVodData(userId);
-  if (!latestVodData)
-    return console.error("Failed to get latest vod in webhook");
+module.exports.download = async (vodData, app) => {
+  const vodId = vodData.id;
 
-  const vodId = latestVodData.id;
-
-  const duration = moment
-    .duration("PT" + latestVodData.duration.toUpperCase())
-    .asSeconds();
-
-  const tokenSig = await twitch.getVodTokenSig(vodId);
-  if (!tokenSig) return console.error(`failed to get token/sig for ${vodId}`);
-
-  let m3u8 = await twitch.getM3u8(vodId, tokenSig.token, tokenSig.sig);
-  if (!m3u8) return console.error("failed to get m3u8");
-
-  m3u8 = twitch.getParsedM3u8(m3u8);
-  if (!m3u8) return console.error("failed to parse m3u8");
-
-  let data = [];
-  if (duration > 43200) {
-    let part = 1;
-    for (let start = 0; start < duration; start += 43200) {
-      const date = new Date(latestVodData.created_at).toLocaleDateString();
-      const vodPath = config.vodPath + latestVodData.id + `-part${part}.mp4`;
-      data.push({
-        path: vodPath,
-        title: `${latestVodData.title} (${date} VOD) PART ${part}`,
-        date: date,
-      });
-      let cut = duration - start;
-      if (cut > 43200) {
-        cut = 43200;
-      }
-      await downloadAsMP4(m3u8, vodPath, start, cut).catch((e) => {
-        return console.error("ffmpeg error occurred: " + e);
-      });
-      part++;
-    }
-  } else {
-    const date = new Date(latestVodData.created_at).toLocaleDateString();
-    const vodPath = config.vodPath + latestVodData.id + ".mp4";
-    data.push({
-      path: vodPath,
-      title: `${latestVodData.title} (${date} VOD)`,
-      date: date,
+  let vod;
+  await app
+    .service("vods")
+    .get(vodData.id)
+    .then((data) => {
+      vod = data;
+    })
+    .catch((e) => {
+      console.error(e);
     });
-    await downloadAsMP4(m3u8, vodPath).catch((e) => {
-      return console.error("ffmpeg error occurred: " + e);
-    });
-  }
-  console.log("\n");
-  await uploadVideo(data, app);
-};
 
-module.exports.downloadCertainVod = async (vodId, app) => {
-  await twitch.checkToken();
-  const vodData = await twitch.getVodData(vodId);
-  if (!vodData)
-    return console.error("Failed to get latest vod in webhook");
+  if (!vod)
+    return console.error("Failed to download video: no VOD in database");
 
   const duration = moment
     .duration("PT" + vodData.duration.toUpperCase())
@@ -86,12 +40,12 @@ module.exports.downloadCertainVod = async (vodId, app) => {
   if (duration > 43200) {
     let part = 1;
     for (let start = 0; start < duration; start += 43200) {
-      const date = new Date(vodData.created_at).toLocaleDateString();
-      const vodPath = config.vodPath + vodData.id + `-part${part}.mp4`;
+      const vodPath = config.vodPath + vodId + `-part${part}.mp4`;
       data.push({
         path: vodPath,
-        title: `${vodData.title} (${date} VOD) PART ${part}`,
-        date: date,
+        title: `${vod.title} (${vod.date} VOD) PART ${part}`,
+        date: vod.date,
+        vodId: vodId,
       });
       let cut = duration - start;
       if (cut > 43200) {
@@ -103,12 +57,13 @@ module.exports.downloadCertainVod = async (vodId, app) => {
       part++;
     }
   } else {
-    const date = new Date(vodData.created_at).toLocaleDateString();
-    const vodPath = config.vodPath + vodData.id + ".mp4";
+    const vodPath = config.vodPath + vodId + ".mp4";
     data.push({
       path: vodPath,
-      title: `${vodData.title} (${date} VOD)`,
-      date: date,
+      title: `${vod.title} (${vod.date} VOD)`,
+      date: vod.date,
+      chapters: vod.chapters,
+      vodId: vodId,
     });
     await downloadAsMP4(m3u8, vodPath).catch((e) => {
       return console.error("ffmpeg error occurred: " + e);
@@ -169,6 +124,10 @@ const uploadVideo = async (datas, app) => {
     for (let data of datas) {
       //const fileSize = fs.statSync(data.path).size;
       const youtube = google.youtube("v3");
+      let description = config.youtube_description;
+      for (let chapter of data.chapters) {
+        description += `${chapter.duration} - ${chapter.name} - ${chapter.title}\n`;
+      }
       const res = await youtube.videos.insert(
         {
           auth: app.googleClient,
@@ -177,7 +136,7 @@ const uploadVideo = async (datas, app) => {
           requestBody: {
             snippet: {
               title: data.title,
-              description: config.youtube_description,
+              description: description,
               categoryId: "20",
             },
             status: {
@@ -197,10 +156,22 @@ const uploadVideo = async (datas, app) => {
             },
           }*/
       );
-      //get thumbnail (res.data.snippet.thumbnails.medium.url) and link (`youtube.com/watch?v=${res.data.id}`) and id (res.data.id)
-      
       console.log("\n\n");
       console.log(res.data);
+
+      await app.service("vods")
+      .patch(data.vodId, {
+        thumbnail_url: res.data.snippet.thumbnails.medium.url,
+        video_url: `youtube.com/watch?v=${res.data.id}`,
+        youtube_id: res.data.id
+      })
+      .then(() => {
+        console.info(`Saved youtube data in DB for vod ${vodId}`)
+      })
+      .catch(e => {
+        console.error(e);
+      });
+
       fs.unlinkSync(data.path);
     }
   }, 1000);
