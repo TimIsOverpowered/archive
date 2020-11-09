@@ -159,20 +159,48 @@ const uploadVideo = async (datas, app) => {
       console.log("\n\n");
       console.log(res.data);
 
-      await app.service("vods")
-      .patch(data.vodId, {
-        thumbnail_url: res.data.snippet.thumbnails.medium.url,
-        video_url: `youtube.com/watch?v=${res.data.id}`,
-        youtube_id: res.data.id
-      })
-      .then(() => {
-        console.info(`Saved youtube data in DB for vod ${vodId}`)
-      })
-      .catch(e => {
-        console.error(e);
-      });
+      await app
+        .service("vods")
+        .patch(data.vodId, {
+          thumbnail_url: res.data.snippet.thumbnails.medium.url,
+          video_url: `youtube.com/watch?v=${res.data.id}`,
+          youtube_id: res.data.id,
+        })
+        .then(() => {
+          console.info(`Saved youtube data in DB for vod ${vodId}`);
+        })
+        .catch((e) => {
+          console.error(e);
+        });
 
       fs.unlinkSync(data.path);
     }
   }, 1000);
+};
+
+module.exports.getLogs = async (vodId, app) => {
+  const comments = [];
+  let response = await twitch.fetchComments(vodId);
+  comments.concat(response.comments);
+  let cursor = response._next;
+  let start_time = new Date();
+  while (cursor) {
+    response = await twitch.fetchNextComments(vodId, cursor);
+    comments.concat(response.comments);
+    cursor = response._next;
+    await sleep(150); //don't bombarade the api
+  }
+  console.info(`Total Time to get logs for ${vodId}: ${(new Date() - start_time)/1000}`);
+
+  await app
+    .service("vods")
+    .patch(vodId, {
+      logs: comments
+    })
+    .then(() => {
+      console.info(`Saved logs in DB for vod ${vodId}`);
+    })
+    .catch((e) => {
+      console.error(e);
+    });
 };

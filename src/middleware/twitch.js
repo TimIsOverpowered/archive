@@ -268,3 +268,43 @@ module.exports.getGameData = async (gameId) => {
     });
   return gameData;
 };
+
+module.exports.fetchComments = async (vodId) => {
+  let data;
+  await axios
+    .get(`https://api.twitch.tv/v5/videos/${vodId}/comments?content_offset_seconds=0`, {
+      headers: {
+        "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko"
+      },
+    })
+    .then((response) => {
+      data = response.data;
+    })
+    .catch(async (e) => {
+      if (!e.response) {
+        return console.error(e);
+      }
+      console.error(e.response.data);
+    });
+  return data;
+};
+
+module.exports.fetchNextComments = async (vodId, cursor) => {
+  let data;
+  await axios
+    .get(`https://api.twitch.tv/v5/videos/${vodId}/comments?cursor=${cursor}`, {
+      headers: {
+        "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko"
+      },
+    })
+    .then((response) => {
+      data = response.data;
+    })
+    .catch(async (e) => {
+      if (!e.response) {
+        return console.error(e);
+      }
+      console.error(e.response.data);
+    });
+  return data;
+};
