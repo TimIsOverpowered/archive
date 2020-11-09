@@ -1,20 +1,8 @@
-const config = require("./config.json");
-const twitch = require("./twitch");
-const express = require("express");
+const twitch = require("./middleware/twitch");
 const moment = require("moment");
-const webhook = require("./webhook");
-const vod = require("./vod");
+const config = require('../config/config.json');
 const { google } = require("googleapis");
 const OAuth2 = google.auth.OAuth2;
-const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-const rawBodySaver = function (req, res, buf, encoding) {
-  if (buf && buf.length) {
-    req.rawBody = buf.toString(encoding || "utf8");
-  }
-};
-app.use(express.raw({ verify: rawBodySaver(), type: "*/*" }));
 const fs = require("fs");
 const path = require("path");
 const oauth2Client = new OAuth2(
@@ -29,7 +17,7 @@ oauth2Client.on("tokens", (tokens) => {
   }
   config.youtube.access_token = tokens.access_token;
   fs.writeFile(
-    path.resolve(__dirname, "./config.json"),
+    path.resolve(__dirname, "../config/config.json"),
     JSON.stringify(config, null, 4),
     (err) => {
       if (err) return console.error(err);
@@ -38,13 +26,12 @@ oauth2Client.on("tokens", (tokens) => {
   );
   oauth2Client.credentials = tokens;
 });
-app.googleClient = oauth2Client;
 
-app.listen(config.port, () =>
-  console.log(`${config.channel}-archives listening on port ${config.port}!`)
-);
+const vod = require("./middleware/vod");
 
-const main = async () => {
+module.exports = async function (app) {
+  app.googleClient = oauth2Client;
+
   await twitch.checkToken();
   const webhooks = await twitch.getWebhooks();
   if (!webhooks) return console.error("failed to retrieve webhooks");
@@ -76,8 +63,3 @@ const main = async () => {
   //vod.download(config.twitchId, app);
   //vod.downloadCertainVod(793917510,app)
 };
-
-main();
-
-app.get("/twitch/webhook/*", webhook.verify(app));
-app.post("/twitch/webhook/stream/:userId", webhook.stream(app));

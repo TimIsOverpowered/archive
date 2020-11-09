@@ -1,5 +1,5 @@
 const axios = require("axios");
-const config = require("./config.json");
+const config = require("../../config/config.json");
 const fs = require("fs");
 const path = require("path");
 const HLS = require("hls-parser");
@@ -36,7 +36,7 @@ module.exports.refreshToken = async () => {
       const data = response.data;
       config.twitch.access_token = data.access_token;
       fs.writeFile(
-        path.resolve(__dirname, "./config.json"),
+        path.resolve(__dirname, "../../config/config.json"),
         JSON.stringify(config, null, 4),
         (err) => {
           if (err) return console.error(err);

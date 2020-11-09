@@ -21,7 +21,6 @@
         "expires_in": 3599,
         "refresh_token": "YOUR_YOUTUBE_REFRESH_TOKEN"
     },
-    "port": "3030",
     "twitchId": "YOUR_TWITCH_ID",
     "channel": "YOUR_TWITCH_CHANNEL",
     "vodPath": "YOUR_VOD_PATH",

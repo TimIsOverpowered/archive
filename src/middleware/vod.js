@@ -1,6 +1,6 @@
 const ffmpeg = require("fluent-ffmpeg");
 const twitch = require("./twitch");
-const config = require("./config");
+const config = require("../../config/config.json");
 const fs = require("fs");
 const readline = require("readline");
 const { google } = require("googleapis");
@@ -197,6 +197,8 @@ const uploadVideo = async (datas, app) => {
             },
           }*/
       );
+      //get thumbnail (res.data.snippet.thumbnails.medium.url) and link (`youtube.com/watch?v=${res.data.id}`) and id (res.data.id)
+      
       console.log("\n\n");
       console.log(res.data);
       fs.unlinkSync(data.path);

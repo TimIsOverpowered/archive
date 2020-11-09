@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const config = require("./config");
+const config = require("../../config/config.json");
 const vod = require("./vod");
 
 module.exports.verify = function (app) {
@@ -41,8 +41,11 @@ module.exports.stream = function (app) {
     const data = req.body.data;
 
     if (data.length === 0) {
-      console.log(`${userId} went offline.`);
+      console.log(`${config.channel} went offline.`);
+      //save duration
       vod.download(userId, app);
+    } else {
+      //save chapters and create in db (if not created already)
     }
   };
 };
