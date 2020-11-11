@@ -6,6 +6,11 @@ const readline = require("readline");
 const { google } = require("googleapis");
 const moment = require("moment");
 
+process.on('unhandledRejection', function(reason, p){
+  console.log("Possibly Unhandled Rejection at: Promise ", p, " reason: ", reason);
+  // application specific logging here
+});
+
 module.exports.download = async (vodId, app) => {
   let vod;
   await app
@@ -14,8 +19,7 @@ module.exports.download = async (vodId, app) => {
     .then((data) => {
       vod = data;
     })
-    .catch((e) => {
-      console.error(e);
+    .catch(() => {
     });
 
   if (!vod)
@@ -248,8 +252,7 @@ module.exports.getLogs = async (vodId, app) => {
     .then(() => {
       console.info(`Saved all comments in DB for vod ${vodId}`);
     })
-    .catch((e) => {
-      console.error(e);
+    .catch(() => {
     });
 };
 

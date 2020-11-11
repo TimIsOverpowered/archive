@@ -49,11 +49,11 @@ module.exports.stream = function (app) {
       console.log(`${config.channel} went offline.`);
       saveDuration(vodData);
       vod.download(vodData.id, app);
-      vod.getLogs(vodData.id);
+      vod.getLogs(vodData.id, app);
       return;
     }
 
-    if (!exists(vodData)) {
+    if (!await exists(vodData)) {
       createVod(data, vodData);
       return;
     }
