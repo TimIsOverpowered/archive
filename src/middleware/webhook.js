@@ -3,6 +3,11 @@ const config = require("../../config/config.json");
 const vod = require("./vod");
 const twitch = require("./twitch");
 
+process.on('unhandledRejection', function(reason, p){
+  console.log("Possibly Unhandled Rejection at: Promise ", p, " reason: ", reason);
+  // application specific logging here
+});
+
 module.exports.verify = function (app) {
   return async function (req, res, next) {
     if (req.query["hub.challenge"]) {

@@ -6,11 +6,6 @@ const readline = require("readline");
 const { google } = require("googleapis");
 const moment = require("moment");
 
-process.on('unhandledRejection', function(reason, p){
-  console.log("Possibly Unhandled Rejection at: Promise ", p, " reason: ", reason);
-  // application specific logging here
-});
-
 module.exports.download = async (vodId, app) => {
   let vod;
   await app
@@ -123,11 +118,13 @@ const uploadVideo = async (datas, app) => {
     });
   setTimeout(async () => {
     for (let data of datas) {
-      //const fileSize = fs.statSync(data.path).size;
+      const fileSize = fs.statSync(data.path).size;
       const youtube = google.youtube("v3");
       let description = config.youtube_description;
-      for (let chapter of data.chapters) {
-        description += `${chapter.duration} - ${chapter.name} - ${chapter.title}\n`;
+      if(data.chapters) {
+        for (let chapter of data.chapters) {
+          description += `${chapter.duration} - ${chapter.name} - ${chapter.title}\n`;
+        }
       }
       const res = await youtube.videos.insert(
         {
@@ -166,11 +163,11 @@ const uploadVideo = async (datas, app) => {
         .service("vods")
         .patch(data.vodId, {
           thumbnail_url: res.data.snippet.thumbnails.medium.url,
-          video_url: `youtube.com/watch?v=${res.data.id}`,
+          video_link: `youtube.com/watch?v=${res.data.id}`,
           youtube_id: res.data.id,
         })
         .then(() => {
-          console.info(`Saved youtube data in DB for vod ${vodId}`);
+          console.info(`Saved youtube data in DB for vod ${data.vodId}`);
         })
         .catch((e) => {
           console.error(e);
