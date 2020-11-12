@@ -2,6 +2,9 @@ const crypto = require("crypto");
 const config = require("../../config/config.json");
 const vod = require("./vod");
 const twitch = require("./twitch");
+const moment = require('moment');
+const momentDurationFormatSetup = require("moment-duration-format");
+momentDurationFormatSetup(moment);
 
 process.on('unhandledRejection', function(reason, p){
   console.log("Possibly Unhandled Rejection at: Promise ", p, " reason: ", reason);
@@ -53,7 +56,7 @@ module.exports.stream = function (app) {
     if (data.length === 0) {
       console.log(`${config.channel} went offline.`);
       saveDuration(vodData);
-      vod.download(vodData.id, app);
+      vod.upload(vodData.id, app);
       vod.getLogs(vodData.id, app);
       return;
     }
@@ -70,7 +73,7 @@ const saveDuration = async (vodData) => {
   await app
     .service("vods")
     .patch(vodData.id, {
-      duration: vodData.duration,
+      duration: moment.duration("PT" + vodData.duration.toUpperCase()).format("HH:mm:ss", { trim: false }),
     })
     .catch((e) => {
       console.error(e);

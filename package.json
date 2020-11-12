@@ -53,6 +53,7 @@
     "googleapis": "^64.0.0",
     "helmet": "^4.2.0",
     "hls-parser": "^0.6.4",
+    "moment-duration-format": "^2.3.2",
     "pg": "^8.4.2",
     "sequelize": "^6.3.5",
     "serve-favicon": "^2.5.0",

@@ -6,7 +6,7 @@ const readline = require("readline");
 const { google } = require("googleapis");
 const moment = require("moment");
 
-module.exports.download = async (vodId, app) => {
+module.exports.upload = async (vodId, app) => {
   let vod;
   await app
     .service("vods")
@@ -14,14 +14,110 @@ module.exports.download = async (vodId, app) => {
     .then((data) => {
       vod = data;
     })
-    .catch(() => {
-    });
+    .catch(() => {});
 
   if (!vod)
     return console.error("Failed to download video: no VOD in database");
 
+  const vodPath = await this.download(vodId);
+
   const duration = moment.duration(vod.duration).asSeconds();
 
+  if (duration > 43200) {
+    let paths = await this.splitVideo(vodPath, duration, vodId);
+
+    if (!paths)
+      return console.error("Something went wrong trying to split the video");
+
+    for (let i = 0; i < paths.length; i++) {
+      let chapters;
+      if(vod.chapters) {
+        for (let chapter of vod.chapters) {
+          const chapterDuration = moment.duration(chapter.duration).asSeconds();
+          if (chapterDuration > 43200 * i) {
+            chapter.duration = moment
+              .utc((chapterDuration - 43200 * i) * 1000)
+              .format("HH:mm:ss");
+          }
+          chapters.push(chapter);
+        }
+      }
+      const data = {
+        path: paths[i],
+        title: `${vod.title} (${vod.date} VOD) PART ${i + 1}`,
+        date: vod.date,
+        chapters: chapters,
+        vodId: vodId,
+      };
+      await this.uploadVideo(data, app);
+    }
+    return;
+  }
+
+  const data = {
+    path: vodPath,
+    title: `${vod.title} (${vod.date} VOD)`,
+    date: vod.date,
+    chapters: vod.chapters,
+    vodId: vodId,
+  };
+
+  await this.uploadVideo(data, app);
+};
+
+module.exports.splitVideo = async (vodPath, duration, vodId) => {
+  console.log(`Trying to split ${vodPath} with duration ${duration}`);
+  const paths = [];
+  for (let start = 0; start < duration; start += 43200) {
+    await new Promise((resolve, reject) => {
+      let cut = duration - start;
+      if (cut > 43200) {
+        cut = 43200;
+      }
+      const ffmpeg_process = ffmpeg(vodPath);
+      ffmpeg_process
+        .seekInput(start)
+        .duration(cut)
+        .videoCodec("copy")
+        .audioCodec("copy")
+        .toFormat("mp4")
+        .on("progress", (progress) => {
+          if ((process.env.NODE_ENV || "").trim() !== "production") {
+            readline.clearLine(process.stdout, 0);
+            readline.cursorTo(process.stdout, 0, null);
+            process.stdout.write(
+              `SPLIT VIDEO PROGRESS: ${Math.round(progress.percent)}%`
+            );
+          }
+        })
+        .on("start", (cmd) => {
+          //console.info(cmd);
+          console.info(`Splitting ${vodPath}. ${cut + start} / ${duration}`);
+        })
+        .on("error", function (err) {
+          ffmpeg_process.kill("SIGKILL");
+          reject(err);
+        })
+        .on("end", function () {
+          resolve(`${config.vodPath}${start}-${vodId}.mp4`);
+        })
+        .saveToFile(`${config.vodPath}${start}-${vodId}.mp4`);
+    })
+      .then((path) => {
+        paths.push(path);
+        console.log("\n");
+      })
+      .catch((e) => {
+        console.error("\nffmpeg error occurred: " + e);
+      });
+  }
+  if (paths.length > 0) {
+    fs.unlinkSync(vodPath);
+  }
+  return paths;
+};
+
+module.exports.download = async (vodId) => {
   const tokenSig = await twitch.getVodTokenSig(vodId);
   if (!tokenSig) return console.error(`failed to get token/sig for ${vodId}`);
 
@@ -31,50 +127,22 @@ module.exports.download = async (vodId, app) => {
   m3u8 = twitch.getParsedM3u8(m3u8);
   if (!m3u8) return console.error("failed to parse m3u8");
 
-  let data = [];
-  if (duration > 43200) {
-    let part = 1;
-    for (let start = 0; start < duration; start += 43200) {
-      const vodPath = config.vodPath + vodId + `-part${part}.mp4`;
-      data.push({
-        path: vodPath,
-        title: `${vod.title} (${vod.date} VOD) PART ${part}`,
-        date: vod.date,
-        vodId: vodId,
-      });
-      let cut = duration - start;
-      if (cut > 43200) {
-        cut = 43200;
-      }
-      await downloadAsMP4(m3u8, vodPath, start, cut).catch((e) => {
-        return console.error("ffmpeg error occurred: " + e);
-      });
-      part++;
-    }
-  } else {
-    const vodPath = config.vodPath + vodId + ".mp4";
-    data.push({
-      path: vodPath,
-      title: `${vod.title} (${vod.date} VOD)`,
-      date: vod.date,
-      chapters: vod.chapters,
-      vodId: vodId,
+  const vodPath = config.vodPath + vodId + ".mp4";
+
+  await downloadAsMP4(m3u8, vodPath)
+    .then(() => {
+      console.log("\n");
+    })
+    .catch((e) => {
+      return console.error("\nffmpeg error occurred: " + e);
     });
-    await downloadAsMP4(m3u8, vodPath).catch((e) => {
-      return console.error("ffmpeg error occurred: " + e);
-    });
-  }
-  console.log("\n");
-  await uploadVideo(data, app);
+
+  return vodPath;
 };
 
-const downloadAsMP4 = async (m3u8, path, start, duration) => {
+const downloadAsMP4 = async (m3u8, path) => {
   return new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(m3u8);
-    if (start) {
-      ffmpeg_process.seekInput(start);
-      ffmpeg_process.duration(duration);
-    }
     ffmpeg_process
       .videoCodec("copy")
       .audioCodec("copy")
@@ -104,7 +172,7 @@ const downloadAsMP4 = async (m3u8, path, start, duration) => {
   });
 };
 
-const uploadVideo = async (datas, app) => {
+module.exports.uploadVideo = async (data, app) => {
   await app.googleClient
     .getTokenInfo(config.youtube.access_token)
     .catch(async (e) => {
@@ -117,64 +185,62 @@ const uploadVideo = async (datas, app) => {
       });
     });
   setTimeout(async () => {
-    for (let data of datas) {
-      const fileSize = fs.statSync(data.path).size;
-      const youtube = google.youtube("v3");
-      let description = config.youtube_description;
-      if(data.chapters) {
-        for (let chapter of data.chapters) {
-          description += `${chapter.duration} - ${chapter.name} - ${chapter.title}\n`;
-        }
+    const fileSize = fs.statSync(data.path).size;
+    const youtube = google.youtube("v3");
+    let description = config.youtube_description;
+    if (data.chapters) {
+      for (let chapter of data.chapters) {
+        description += `${chapter.duration} - ${chapter.name} - ${chapter.title}\n`;
       }
-      const res = await youtube.videos.insert(
-        {
-          auth: app.googleClient,
-          part: "id,snippet,status",
-          notifySubscribers: true,
-          requestBody: {
-            snippet: {
-              title: data.title,
-              description: description,
-              categoryId: "20",
-            },
-            status: {
-              privacyStatus: "public",
-            },
+    }
+    const res = await youtube.videos.insert(
+      {
+        auth: app.googleClient,
+        part: "id,snippet,status",
+        notifySubscribers: true,
+        requestBody: {
+          snippet: {
+            title: data.title,
+            description: description,
+            categoryId: "20",
           },
-          media: {
-            body: fs.createReadStream(data.path),
+          status: {
+            privacyStatus: "public",
           },
         },
-        {
-          onUploadProgress: (evt) => {
-            if ((process.env.NODE_ENV || "").trim() !== "production") {
-              const progress = (evt.bytesRead / fileSize) * 100;
-              readline.clearLine(process.stdout, 0);
-              readline.cursorTo(process.stdout, 0, null);
-              process.stdout.write(`UPLOAD PROGRESS: ${Math.round(progress)}%`);
-            }
-          },
-        }
-      );
-      console.log("\n\n");
-      console.log(res.data);
+        media: {
+          body: fs.createReadStream(data.path),
+        },
+      },
+      {
+        onUploadProgress: (evt) => {
+          if ((process.env.NODE_ENV || "").trim() !== "production") {
+            const progress = (evt.bytesRead / fileSize) * 100;
+            readline.clearLine(process.stdout, 0);
+            readline.cursorTo(process.stdout, 0, null);
+            process.stdout.write(`UPLOAD PROGRESS: ${Math.round(progress)}%`);
+          }
+        },
+      }
+    );
+    console.log("\n\n");
+    console.log(res.data);
 
-      await app
-        .service("vods")
-        .patch(data.vodId, {
-          thumbnail_url: res.data.snippet.thumbnails.medium.url,
-          video_link: `youtube.com/watch?v=${res.data.id}`,
-          youtube_id: res.data.id,
-        })
-        .then(() => {
-          console.info(`Saved youtube data in DB for vod ${data.vodId}`);
-        })
-        .catch((e) => {
-          console.error(e);
-        });
+    await app
+      .service("vods")
+      .patch(data.vodId, {
+        thumbnail_url: res.data.snippet.thumbnails.medium.url,
+        video_link: `youtube.com/watch?v=${res.data.id}`,
+        youtube_id: res.data.id,
+      })
+      .then(() => {
+        console.info(`Saved youtube data in DB for vod ${data.vodId}`);
+      })
+      .catch((e) => {
+        console.error(e);
+      });
 
-      fs.unlinkSync(data.path);
-    }
+    fs.unlinkSync(data.path);
   }, 1000);
 };
 
@@ -249,8 +315,7 @@ module.exports.getLogs = async (vodId, app) => {
     .then(() => {
       console.info(`Saved all comments in DB for vod ${vodId}`);
     })
-    .catch(() => {
-    });
+    .catch(() => {});
 };
 
 const sleep = (ms) => {

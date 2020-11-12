@@ -1,5 +1,8 @@
 const vod = require("./vod");
-const twitch = require('./twitch');
+const twitch = require("./twitch");
+const moment = require('moment');
+const momentDurationFormatSetup = require("moment-duration-format");
+momentDurationFormatSetup(moment);
 
 module.exports.verify = function (app) {
   return async function (req, res, next) {
@@ -35,7 +38,7 @@ module.exports.download = function (app) {
         exists = false;
       });
     if (exists) {
-      vod.download(req.body.vodId, app);
+      vod.upload(req.body.vodId, app);
       res.status(200).json({ error: false, message: "Starting download.." });
       return;
     }
@@ -43,20 +46,21 @@ module.exports.download = function (app) {
     const vodData = await twitch.getVodData(req.body.vodId);
 
     await app
-    .service("vods")
-    .create({
-      id: vodData.id,
-      title: vodData.title,
-      date: new Date(vodData.created_at).toLocaleDateString()
-    })
-    .then(() => {
-      console.info(`Created vod ${vodData.id} for ${vodData.user_name}`);
-    })
-    .catch((e) => {
-      console.error(e);
-    });
+      .service("vods")
+      .create({
+        id: vodData.id,
+        title: vodData.title,
+        date: new Date(vodData.created_at).toLocaleDateString(),
+        duration: moment.duration("PT" + vodData.duration.toUpperCase()).format("HH:mm:ss", { trim: false }),
+      })
+      .then(() => {
+        console.info(`Created vod ${vodData.id} for ${vodData.user_name}`);
+      })
+      .catch((e) => {
+        console.error(e);
+      });
 
-    vod.download(req.body.vodId, app);
+    vod.upload(req.body.vodId, app);
     res.status(200).json({ error: false, message: "Starting download.." });
   };
 };
@@ -87,5 +91,31 @@ module.exports.logs = function (app) {
 
     vod.getLogs(req.body.vodId, app);
     res.status(200).json({ error: false, message: "Getting logs.." });
+  };
+};
+
+module.exports.delete = function (app) {
+  return async function (req, res, next) {
+    if (!req.body.vodId)
+      return res.status(400).json({ error: true, message: "No VodId" });
+
+    app
+      .service("logs")
+      .delete(req.body.vodId)
+      .then(() => {
+        console.info(`Deleted ${req.body.vodId}`);
+        res.status(200).json({ error: false, message: "Deleted" });
+      })
+      .catch((e) => {
+        console.error(e);
+        res.status(500).json({ error: true, message: "Server encountered an error.." });
+      });
+  };
+};
+
+module.exports.dmca = function (app) {
+  return async function (req, res, next) {
+    if (!req.body.receivedClaims)
+      return res.status(400).json({ error: true, message: "No claims" });
   };
 };
