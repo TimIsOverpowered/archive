@@ -3,7 +3,7 @@ const twitch = require("./twitch");
 const moment = require("moment");
 const momentDurationFormatSetup = require("moment-duration-format");
 momentDurationFormatSetup(moment);
-const fs = require('fs');
+const fs = require("fs");
 
 module.exports.verify = function (app) {
   return async function (req, res, next) {
@@ -102,18 +102,32 @@ module.exports.delete = function (app) {
     if (!req.body.vodId)
       return res.status(400).json({ error: true, message: "No VodId" });
 
-    app
-      .service("logs")
-      .delete(req.body.vodId)
+    res
+      .status(200)
+      .json({ error: false, message: "Starting deletion process.." });
+
+    await app
+      .service("vods")
+      .remove(req.body.vodId)
       .then(() => {
-        console.info(`Deleted ${req.body.vodId}`);
-        res.status(200).json({ error: false, message: "Deleted" });
+        console.info(`Deleted vod for ${req.body.vodId}`);
       })
       .catch((e) => {
         console.error(e);
-        res
-          .status(500)
-          .json({ error: true, message: "Server encountered an error.." });
+      });
+
+    await app
+      .service("logs")
+      .remove(null, {
+        query: {
+          vod_id: req.body.vodId,
+        },
+      })
+      .then(() => {
+        console.info(`Deleted logs for ${req.body.vodId}`);
+      })
+      .catch((e) => {
+        console.error(e);
       });
   };
 };
@@ -140,27 +154,35 @@ module.exports.dmca = function (app) {
     if (!vod_data)
       return console.error("Failed to download video: no VOD in database");
 
-    res
-      .status(200)
-      .json({
-        error: false,
-        message: `Muting the DMCA content for ${vodId}...`,
-      });
+    res.status(200).json({
+      error: false,
+      message: `Muting the DMCA content for ${vodId}...`,
+    });
 
     const vodPath = await vod.download(vodId);
 
     let muteSection = [];
-    for(let dmca of req.body.receivedClaims) {
+    for (let dmca of req.body.receivedClaims) {
       const policyType = dmca.claimPolicy.primaryPolicy.policyType;
-      if(policyType === "POLICY_TYPE_GLOBAL_BLOCK" || policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK") {
-        muteSection.push(`volume=0:enable='between(t,${dmca.matchDetails.longestMatchStartTimeSeconds},${dmca.matchDetails.longestMatchDurationSeconds+dmca.matchDetails.longestMatchStartTimeSeconds})'`)
+      if (
+        policyType === "POLICY_TYPE_GLOBAL_BLOCK" ||
+        policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK"
+      ) {
+        muteSection.push(
+          `volume=0:enable='between(t,${
+            dmca.matchDetails.longestMatchStartTimeSeconds
+          },${
+            dmca.matchDetails.longestMatchDurationSeconds +
+            dmca.matchDetails.longestMatchStartTimeSeconds
+          })'`
+        );
       }
     }
 
     console.info(`Trying to mute ${vodPath}`);
     const newVodPath = await vod.mute(vodPath, muteSection, vodId);
 
-    if(!newVodPath) return console.error("failed to mute video");
+    if (!newVodPath) return console.error("failed to mute video");
     fs.unlinkSync(vodPath);
 
     const duration = moment.duration(vod_data.duration).asSeconds();
