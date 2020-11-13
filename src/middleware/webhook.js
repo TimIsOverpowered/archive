@@ -61,7 +61,7 @@ module.exports.stream = function (app) {
       return;
     }
 
-    if (!await exists(vodData)) {
+    if (!await exists(vodData, app)) {
       createVod(data, vodData);
       return;
     }
@@ -80,7 +80,7 @@ const saveDuration = async (vodData) => {
     });
 };
 
-const exists = async (vodData) => {
+const exists = async (vodData, app) => {
   await app
     .service("vods")
     .get(vodData.id)
@@ -98,11 +98,6 @@ const createVod = async (data, vodData) => {
   if (!gameData) return console.error("Failed to get game data");
 
   const chapters = [
-    {
-      title: "Start of stream",
-      name: gameData.name,
-      duration: "00:00",
-    },
     {
       gameId: gameData.id,
       name: gameData.name,

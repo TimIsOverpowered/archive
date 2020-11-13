@@ -189,8 +189,9 @@ module.exports.uploadVideo = async (data, app) => {
     const youtube = google.youtube("v3");
     let description = config.youtube_description;
     if (data.chapters) {
+      description += `00:00 "Start of stream"\n`
       for (let chapter of data.chapters) {
-        description += `${chapter.duration} - ${chapter.name} - ${chapter.title}\n`;
+        description += `${chapter.duration} ${chapter.name}\n`;
       }
     }
     const res = await youtube.videos.insert(
