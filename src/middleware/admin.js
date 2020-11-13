@@ -153,7 +153,7 @@ module.exports.dmca = function (app) {
     for(let dmca of req.body.receivedClaims) {
       const policyType = dmca.claimPolicy.primaryPolicy.policyType;
       if(policyType === "POLICY_TYPE_GLOBAL_BLOCK" || policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK") {
-        muteSection.push(`volume=0:enable='between(t,${dmca.matchDetails.longestMatchStartTimeSeconds},${dmca.matchDetails.longestMatchDurationSeconds})'`)
+        muteSection.push(`volume=0:enable='between(t,${dmca.matchDetails.longestMatchStartTimeSeconds},${dmca.matchDetails.longestMatchDurationSeconds+dmca.matchDetails.longestMatchStartTimeSeconds})'`)
       }
     }
 
