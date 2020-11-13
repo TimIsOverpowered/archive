@@ -31,7 +31,7 @@ module.exports.upload = async (vodId, app) => {
 
     for (let i = 0; i < paths.length; i++) {
       let chapters;
-      if(vod.chapters) {
+      if (vod.chapters) {
         for (let chapter of vod.chapters) {
           const chapterDuration = moment.duration(chapter.duration).asSeconds();
           if (chapterDuration > 43200 * i) {
@@ -117,6 +117,45 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
   return paths;
 };
 
+module.exports.mute = async (vodPath, muteSection, vodId) => {
+  let path;
+  await new Promise((resolve, reject) => {
+    const ffmpeg_process = ffmpeg(vodPath);
+    ffmpeg_process
+      .videoCodec("copy")
+      .audioFilters(muteSection)
+      .toFormat("mp4")
+      .on("progress", (progress) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          readline.clearLine(process.stdout, 0);
+          readline.cursorTo(process.stdout, 0, null);
+          process.stdout.write(
+            `MUTE VIDEO PROGRESS: ${Math.round(progress.percent)}%`
+          );
+        }
+      })
+      .on("start", (cmd) => {
+        console.info(cmd);
+      })
+      .on("error", function (err) {
+        ffmpeg_process.kill("SIGKILL");
+        reject(err);
+      })
+      .on("end", function () {
+        resolve(`${config.vodPath}${vodId}-muted.mp4`);
+      })
+      .saveToFile(`${config.vodPath}${vodId}-muted.mp4`);
+  })
+    .then((result) => {
+      path = result;
+      console.log("\n");
+    })
+    .catch((e) => {
+      console.error("\nffmpeg error occurred: " + e);
+    });
+  return path;
+};
+
 module.exports.download = async (vodId) => {
   const tokenSig = await twitch.getVodTokenSig(vodId);
   if (!tokenSig) return console.error(`failed to get token/sig for ${vodId}`);
@@ -189,7 +228,7 @@ module.exports.uploadVideo = async (data, app) => {
     const youtube = google.youtube("v3");
     let description = config.youtube_description;
     if (data.chapters) {
-      description += `00:00 "Start of stream"\n`
+      description += `00:00 "Start of stream"\n`;
       for (let chapter of data.chapters) {
         description += `${chapter.duration} ${chapter.name}\n`;
       }

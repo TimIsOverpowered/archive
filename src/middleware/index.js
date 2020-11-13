@@ -6,4 +6,5 @@ module.exports = function (app) {
   app.post("/twitch/webhook/stream/:userId", webhook.stream(app));
   app.post("/admin/download", admin.verify(app), admin.download(app));
   app.post("/admin/logs", admin.verify(app), admin.logs(app));
+  app.post("/admin/dmca", admin.verify(app), admin.dmca(app));
 };
