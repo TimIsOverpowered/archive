@@ -135,7 +135,7 @@ module.exports.mute = async (vodPath, muteSection, vodId) => {
         }
       })
       .on("start", (cmd) => {
-        console.info(cmd);
+        //console.info(cmd);
       })
       .on("error", function (err) {
         ffmpeg_process.kill("SIGKILL");
