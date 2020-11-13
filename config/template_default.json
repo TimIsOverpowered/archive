@@ -6,6 +6,7 @@
       "default": 10,
       "max": 50
     },
-    "postgres": "YOUR_POSTGRES_CONNECTION_URI"
+    "postgres": "YOUR_POSTGRES_CONNECTION_URI",
+    "ADMIN_API_KEY": "YOUR_ADMIN_API_KEY"
 }
   

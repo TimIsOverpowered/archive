@@ -281,7 +281,26 @@ module.exports.uploadVideo = async (data, app) => {
       });
 
     fs.unlinkSync(data.path);
+    this.addPinnedComment(res.data.id, vodId, app);
   }, 1000);
+};
+
+module.exports.addPinnedComment = async (videoId, vodId, app) => {
+  const res = await youtube.commentThreads.insert({
+    part: "id,snippet",
+    requestBody: {
+      snippet: {
+        channelId: app.get('youtube_channel_id'),
+        topLevelComment: {
+          snippet: {
+            textOriginal: app.get('youtube_pinned_comment') + vodId,
+            videoId: videoId,
+          },
+        },
+      },
+    },
+  });
+  console.log(res.data);
 };
 
 module.exports.getLogs = async (vodId, app) => {
