@@ -1,5 +1,5 @@
 const axios = require("axios");
-const config = require("./config.json");
+const config = require("../../config/config.json");
 const fs = require("fs");
 const path = require("path");
 const HLS = require("hls-parser");
@@ -36,7 +36,7 @@ module.exports.refreshToken = async () => {
       const data = response.data;
       config.twitch.access_token = data.access_token;
       fs.writeFile(
-        path.resolve(__dirname, "./config.json"),
+        path.resolve(__dirname, "../../config/config.json"),
         JSON.stringify(config, null, 4),
         (err) => {
           if (err) return console.error(err);
@@ -243,4 +243,68 @@ module.exports.getVodData = async (vod_id) => {
       console.error(e.response.data);
     });
   return vodData;
+};
+
+module.exports.getGameData = async (gameId) => {
+  let gameData;
+  await axios
+    .get(`https://api.twitch.tv/helix/games?id=${gameId}`, {
+      headers: {
+        Authorization: `Bearer ${config.twitch.access_token}`,
+        "Client-Id": config.twitch.client_id,
+      },
+    })
+    .then((response) => {
+      let data = response.data.data;
+      if (data.length > 0) {
+        gameData = data[0];
+      }
+    })
+    .catch(async (e) => {
+      if (!e.response) {
+        return console.error(e);
+      }
+      console.error(e.response.data);
+    });
+  return gameData;
+};
+
+module.exports.fetchComments = async (vodId) => {
+  let data;
+  await axios
+    .get(`https://api.twitch.tv/v5/videos/${vodId}/comments?content_offset_seconds=0`, {
+      headers: {
+        "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko"
+      },
+    })
+    .then((response) => {
+      data = response.data;
+    })
+    .catch(async (e) => {
+      if (!e.response) {
+        return console.error(e);
+      }
+      console.error(e.response.data);
+    });
+  return data;
+};
+
+module.exports.fetchNextComments = async (vodId, cursor) => {
+  let data;
+  await axios
+    .get(`https://api.twitch.tv/v5/videos/${vodId}/comments?cursor=${cursor}`, {
+      headers: {
+        "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko"
+      },
+    })
+    .then((response) => {
+      data = response.data;
+    })
+    .catch(async (e) => {
+      if (!e.response) {
+        return console.error(e);
+      }
+      console.error(e.response.data);
+    });
+  return data;
 };
