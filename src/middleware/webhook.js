@@ -55,21 +55,21 @@ module.exports.stream = function (app) {
 
     if (data.length === 0) {
       console.log(`${config.channel} went offline.`);
-      await saveDuration(vodData);
+      await saveDuration(vodData, app);
       vod.upload(vodData.id, app);
       vod.getLogs(vodData.id, app);
       return;
     }
 
     if (!await exists(vodData, app)) {
-      createVod(data, vodData);
+      createVod(data, vodData, app);
       return;
     }
-    saveChapters(data, vodData);
+    saveChapters(data, vodData, app);
   };
 };
 
-const saveDuration = async (vodData) => {
+const saveDuration = async (vodData, app) => {
   await app
     .service("vods")
     .patch(vodData.id, {
@@ -93,7 +93,7 @@ const exists = async (vodData, app) => {
   return false;
 };
 
-const createVod = async (data, vodData) => {
+const createVod = async (data, vodData, app) => {
   const gameData = await twitch.getGameData(data.game_id);
   if (!gameData) return console.error("Failed to get game data");
 
@@ -125,7 +125,7 @@ const createVod = async (data, vodData) => {
     });
 };
 
-const saveChapters = async (data, vodData) => {
+const saveChapters = async (data, vodData, app) => {
   let vod;
   await app
     .service("vods")
