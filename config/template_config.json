@@ -11,7 +11,8 @@
         "client_secret": "YOUR_CLIENT_SECRET",
         "redirect_url": "YOUR_CALLBACK_URL",
         "scopes": [
-            "https://www.googleapis.com/auth/youtube.upload"
+            "https://www.googleapis.com/auth/youtube.upload",
+            "https://www.googleapis.com/auth/youtube.force-ssl"
         ]
     },
     "youtube": {
@@ -24,6 +25,7 @@
     "twitchId": "YOUR_TWITCH_ID",
     "channel": "YOUR_TWITCH_CHANNEL",
     "vodPath": "YOUR_VOD_PATH",
+    "youtube_channel_id": "UCJ1VWGzvlJKIXiUgsDAUu_Q",
     "youtube_description": "YOUR YOUTUBE DESCRIPTION GOES HERE",
-    "ADMIN_API_KEY": "YOUR_ADMIN_API_KEY"
+    "youtube_pinned_comment": "YOUR PINNED COMMENT GOES HERE"
 }
