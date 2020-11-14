@@ -27,8 +27,6 @@ oauth2Client.on("tokens", (tokens) => {
   oauth2Client.credentials = tokens;
 });
 
-const vod = require("./middleware/vod");
-
 module.exports = async function (app) {
   app.googleClient = oauth2Client;
 
@@ -59,7 +57,4 @@ module.exports = async function (app) {
       continue;
     }
   }
-  //manual testing
-  //vod.download("793917510", app);
-  //vod.getLogs("793917510", app);
 };

@@ -281,19 +281,20 @@ module.exports.uploadVideo = async (data, app) => {
       });
 
     fs.unlinkSync(data.path);
-    this.addPinnedComment(res.data.id, vodId, app);
+    this.addComment(res.data.id, data.vodId, app);
   }, 1000);
 };
 
-module.exports.addPinnedComment = async (videoId, vodId, app) => {
+module.exports.addComment = async (videoId, vodId, app) => {
+  const youtube = google.youtube("v3");
   const res = await youtube.commentThreads.insert({
+    auth: app.googleClient,
     part: "id,snippet",
     requestBody: {
       snippet: {
-        channelId: app.get('youtube_channel_id'),
         topLevelComment: {
           snippet: {
-            textOriginal: app.get('youtube_pinned_comment') + vodId,
+            textOriginal: config.youtube_comment + vodId,
             videoId: videoId,
           },
         },
