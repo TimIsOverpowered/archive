@@ -27,5 +27,5 @@
     "vodPath": "YOUR_VOD_PATH",
     "youtube_channel_id": "UCJ1VWGzvlJKIXiUgsDAUu_Q",
     "youtube_description": "YOUR YOUTUBE DESCRIPTION GOES HERE",
-    "youtube_pinned_comment": "YOUR PINNED COMMENT GOES HERE"
+    "youtube_comment": "YOUR PINNED COMMENT GOES HERE"
 }
