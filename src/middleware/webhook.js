@@ -2,12 +2,17 @@ const crypto = require("crypto");
 const config = require("../../config/config.json");
 const vod = require("./vod");
 const twitch = require("./twitch");
-const moment = require('moment');
+const moment = require("moment");
 const momentDurationFormatSetup = require("moment-duration-format");
 momentDurationFormatSetup(moment);
 
-process.on('unhandledRejection', function(reason, p){
-  console.log("Possibly Unhandled Rejection at: Promise ", p, " reason: ", reason);
+process.on("unhandledRejection", function (reason, p) {
+  console.log(
+    "Possibly Unhandled Rejection at: Promise ",
+    p,
+    " reason: ",
+    reason
+  );
   // application specific logging here
 });
 
@@ -61,7 +66,7 @@ module.exports.stream = function (app) {
       return;
     }
 
-    if (!await exists(vodData.id, app)) {
+    if (!(await exists(vodData.id, app))) {
       createVod(data[0], vodData, app);
       return;
     }
@@ -73,7 +78,9 @@ const saveDuration = async (vodData, app) => {
   await app
     .service("vods")
     .patch(vodData.id, {
-      duration: moment.duration("PT" + vodData.duration.toUpperCase()).format("HH:mm:ss", { trim: false }),
+      duration: moment
+        .duration("PT" + vodData.duration.toUpperCase())
+        .format("HH:mm:ss", { trim: false }),
     })
     .catch((e) => {
       console.error(e);
@@ -105,8 +112,8 @@ const createVod = async (data, vodData, app) => {
       image: gameData.box_art_url,
       title: data.title,
       duration: moment
-        .duration(moment.utc().diff(moment.utc(data.started_at)), "seconds")
-        .format("HH:mm:ss", { trim: true }),
+        .duration(moment.utc().diff(moment.utc(data.started_at)), "milliseconds")
+        .format("HH:mm:ss", { trim: false }),
     },
   ];
 
@@ -152,8 +159,8 @@ const saveChapters = async (data, vodData, app) => {
     image: gameData.box_art_url,
     title: data.title,
     duration: moment
-      .duration(moment.utc().diff(moment.utc(data.started_at)), "seconds")
-      .format("HH:mm:ss", { trim: true }),
+      .duration(moment.utc().diff(moment.utc(data.started_at)), "milliseconds")
+      .format("HH:mm:ss", { trim: false }),
   };
 
   //don't push chapter if the last chapter was the same game.
