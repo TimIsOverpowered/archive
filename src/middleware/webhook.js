@@ -61,11 +61,11 @@ module.exports.stream = function (app) {
       return;
     }
 
-    if (!await exists(vodData, app)) {
-      createVod(data, vodData, app);
+    if (!await exists(vodData.id, app)) {
+      createVod(data[0], vodData, app);
       return;
     }
-    saveChapters(data, vodData, app);
+    saveChapters(data[0], vodData, app);
   };
 };
 
@@ -80,17 +80,18 @@ const saveDuration = async (vodData, app) => {
     });
 };
 
-const exists = async (vodData, app) => {
+const exists = async (vodId, app) => {
+  let exists;
   await app
     .service("vods")
-    .get(vodData.id)
+    .get(vodId)
     .then(() => {
-      return true;
+      exists = true;
     })
-    .catch((e) => {
-      console.error(e);
+    .catch(() => {
+      exists = false;
     });
-  return false;
+  return exists;
 };
 
 const createVod = async (data, vodData, app) => {
@@ -126,21 +127,21 @@ const createVod = async (data, vodData, app) => {
 };
 
 const saveChapters = async (data, vodData, app) => {
-  let vod;
+  let vod_data;
   await app
     .service("vods")
     .get(vodData.id)
     .then((data) => {
-      vod = data;
+      vod_data = data;
     })
     .catch((e) => {
       console.error(e);
     });
 
-  if (!vod)
+  if (!vod_data)
     return console.error("Failed to save chapters: No vod in database..?");
 
-  const chapters = vod.chapters;
+  const chapters = vod_data.chapters;
 
   const gameData = await twitch.getGameData(data.game_id);
   if (!gameData) return console.error("Failed to get game data");
