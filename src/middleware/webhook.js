@@ -112,7 +112,10 @@ const createVod = async (data, vodData, app) => {
       image: gameData.box_art_url,
       title: data.title,
       duration: moment
-        .duration(moment.utc().diff(moment.utc(data.started_at)), "milliseconds")
+        .duration(
+          moment.utc().diff(moment.utc(data.started_at)),
+          "milliseconds"
+        )
         .format("HH:mm:ss", { trim: false }),
     },
   ];
@@ -164,7 +167,7 @@ const saveChapters = async (data, vodData, app) => {
   };
 
   //don't push chapter if the last chapter was the same game.
-  if (chapters[chapters.length - 1] !== chapter.gameId) {
+  if (chapters[chapters.length - 1].gameId !== chapter.gameId) {
     chapters.push(chapter);
   }
 
