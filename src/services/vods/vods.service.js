@@ -16,8 +16,10 @@ module.exports = function (app) {
     rateLimit({
       windowMs: 30 * 1000,
       max: 10,
-      message:
-        "API rate limit exceeded",
+      message: "API rate limit exceeded",
+      keyGenerator: function (req) {
+        return req.headers["x-forwarded-for"] || req.connection.remoteAddress;
+      },
     }),
     new Vods(options, app)
   );
