@@ -25,7 +25,6 @@
     "twitchId": "YOUR_TWITCH_ID",
     "channel": "YOUR_TWITCH_CHANNEL",
     "vodPath": "YOUR_VOD_PATH",
-    "youtube_channel_id": "UCJ1VWGzvlJKIXiUgsDAUu_Q",
     "youtube_description": "YOUR YOUTUBE DESCRIPTION GOES HERE",
     "youtube_comment": "YOUR PINNED COMMENT GOES HERE"
 }
