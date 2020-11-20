@@ -80,7 +80,7 @@ const saveDuration = async (vodData, app) => {
     .patch(vodData.id, {
       duration: moment
         .duration("PT" + vodData.duration.toUpperCase())
-        .format("HH:mm:ss", { trim: true }),
+        .format("HH:mm:ss", { trim: false }),
     })
     .catch((e) => {
       console.error(e);
@@ -116,7 +116,7 @@ const createVod = async (data, vodData, app) => {
           moment.utc().diff(moment.utc(data.started_at)),
           "milliseconds"
         )
-        .format("HH:mm:ss", { trim: true }),
+        .format("HH:mm:ss", { trim: false }),
     },
   ];
 
