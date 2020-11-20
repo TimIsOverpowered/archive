@@ -18,11 +18,11 @@ module.exports.checkToken = async () => {
       }
     })
     .catch(async (e) => {
+      if (!e.response) return console.error(e);
       if (e.response.status === 401) {
         console.info("Twitch App Token Expired");
         return await this.refreshToken();
       }
-      console.error(e.response.data);
     });
   return isValid;
 };
