@@ -1,10 +1,38 @@
 const ffmpeg = require("fluent-ffmpeg");
 const twitch = require("./twitch");
 const config = require("../../config/config.json");
+const util = require("util");
 const fs = require("fs");
+const writeFile = util.promisify(fs.writeFile);
 const readline = require("readline");
 const { google } = require("googleapis");
 const moment = require("moment");
+const OAuth2 = google.auth.OAuth2;
+const path = require("path");
+const oauth2Client = new OAuth2(
+  config.google.client_id,
+  config.google.client_secret,
+  config.google.redirect_url
+);
+oauth2Client.credentials = config.youtube;
+oauth2Client.on("tokens", (tokens) => {
+  if (tokens.refresh_token) {
+    config.youtube.refresh_token = tokens.refresh_token;
+  }
+  config.youtube.access_token = tokens.access_token;
+  fs.writeFile(
+    path.resolve(__dirname, "../../config/config.json"),
+    JSON.stringify(config, null, 4),
+    (err) => {
+      if (err) return console.error(err);
+      console.info("Refreshed Google Token");
+    }
+  );
+  oauth2Client.setCredentials({
+    refresh_token: tokens.refresh_token,
+    access_token: tokens.access_token,
+  });
+});
 
 module.exports.upload = async (vodId, app) => {
   let vod;
@@ -91,7 +119,6 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
           }
         })
         .on("start", (cmd) => {
-          //console.info(cmd);
           console.info(`Splitting ${vodPath}. ${cut + start} / ${duration}`);
         })
         .on("error", function (err) {
@@ -135,7 +162,9 @@ module.exports.mute = async (vodPath, muteSection, vodId) => {
         }
       })
       .on("start", (cmd) => {
-        //console.info(cmd);
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          console.info(cmd);
+        }
       })
       .on("error", function (err) {
         ffmpeg_process.kill("SIGKILL");
@@ -145,6 +174,277 @@ module.exports.mute = async (vodPath, muteSection, vodId) => {
         resolve(`${config.vodPath}${vodId}-muted.mp4`);
       })
       .saveToFile(`${config.vodPath}${vodId}-muted.mp4`);
+  })
+    .then((result) => {
+      path = result;
+      console.log("\n");
+    })
+    .catch((e) => {
+      console.error("\nffmpeg error occurred: " + e);
+    });
+  return path;
+};
+
+module.exports.trim = async (vodPath, vodId, start, duration, end) => {
+  
+  const start_video_path = await getStartVideo(vodPath, vodId, start);
+  if (!start_video_path) {
+    console.error("failed to get start video");
+    return null;
+  }
+  const clip_path = await getClip(vodPath, vodId, start, duration);
+  if (!clip_path) {
+    console.error("failed to get clip");
+    return null;
+  }
+  const trim_clip_path = await getTrimmedClip(clip_path, vodId);
+  if (!trim_clip_path) {
+    console.error("failed to get trimmed clip");
+    return null;
+  }
+  const end_video_path = await getEndVideo(vodPath, vodId, end);
+  if (!end_video_path) {
+    console.error("failed to get end video");
+    return null;
+  }
+  const list = await getTextList(
+    vodId,
+    start_video_path,
+    trim_clip_path,
+    end_video_path
+  );
+  if (!list) {
+    console.error("failed to get text list");
+    return null;
+  }
+  const path = await concat(vodId, list);
+  if (!path) {
+    console.error("failed to concat");
+    return null;
+  }
+  fs.unlinkSync(start_video_path);
+  fs.unlinkSync(trim_clip_path);
+  fs.unlinkSync(end_video_path);
+  fs.unlinkSync(list);
+  return path;
+};
+
+const getTextList = async (
+  vodId,
+  start_video_path,
+  trim_clip_path,
+  end_video_path
+) => {
+  const textPath = `${config.vodPath}${vodId}-list.txt`;
+  await writeFile(
+    textPath,
+    `file '${start_video_path}'\nfile '${trim_clip_path}'\nfile '${end_video_path}'`
+  ).catch((e) => {
+    console.error(e);
+  });
+  return textPath;
+};
+
+const concat = async (vodId, list) => {
+  let path;
+  await new Promise((resolve, reject) => {
+    const ffmpeg_process = ffmpeg(list);
+    ffmpeg_process
+      .inputOptions(["-f concat", "-safe 0"])
+      .videoCodec("copy")
+      .audioCodec("copy")
+      .on("progress", (progress) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          readline.clearLine(process.stdout, 0);
+          readline.cursorTo(process.stdout, 0, null);
+          process.stdout.write(
+            `CONCAT PROGRESS: ${Math.round(progress.percent)}%`
+          );
+        }
+      })
+      .on("start", (cmd) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          console.info(cmd);
+        }
+      })
+      .on("error", function (err) {
+        ffmpeg_process.kill("SIGKILL");
+        reject(err);
+      })
+      .on("end", function () {
+        resolve(`${config.vodPath}${vodId}-trimmed.mp4`);
+      })
+      .saveToFile(`${config.vodPath}${vodId}-trimmed.mp4`);
+  })
+    .then((result) => {
+      path = result;
+      console.log("\n");
+    })
+    .catch((e) => {
+      console.error("\nffmpeg error occurred: " + e);
+    });
+  return path;
+};
+
+const getStartVideo = async (vodPath, vodId, start) => {
+  let path;
+  await new Promise((resolve, reject) => {
+    const ffmpeg_process = ffmpeg(vodPath);
+    ffmpeg_process
+      .videoCodec("copy")
+      .audioCodec("copy")
+      .duration(start)
+      .toFormat("mp4")
+      .on("progress", (progress) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          readline.clearLine(process.stdout, 0);
+          readline.cursorTo(process.stdout, 0, null);
+          process.stdout.write(
+            `GET START VIDEO PROGRESS: ${Math.round(progress.percent)}%`
+          );
+        }
+      })
+      .on("start", (cmd) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          console.info(cmd);
+        }
+      })
+      .on("error", function (err) {
+        ffmpeg_process.kill("SIGKILL");
+        reject(err);
+      })
+      .on("end", function () {
+        resolve(`${config.vodPath}${vodId}-start.mp4`);
+      })
+      .saveToFile(`${config.vodPath}${vodId}-start.mp4`);
+  })
+    .then((result) => {
+      path = result;
+      console.log("\n");
+    })
+    .catch((e) => {
+      console.error("\nffmpeg error occurred: " + e);
+    });
+  return path;
+};
+
+const getClip = async (vodPath, vodId, start, duration) => {
+  let path;
+  await new Promise((resolve, reject) => {
+    const ffmpeg_process = ffmpeg(vodPath);
+    ffmpeg_process
+      .videoCodec("copy")
+      .audioCodec("copy")
+      .seekOutput(start)
+      .duration(duration)
+      .toFormat("mp4")
+      .on("progress", (progress) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          readline.clearLine(process.stdout, 0);
+          readline.cursorTo(process.stdout, 0, null);
+          process.stdout.write(
+            `GET CLIP PROGRESS: ${Math.round(progress.percent)}%`
+          );
+        }
+      })
+      .on("start", (cmd) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          console.info(cmd);
+        }
+      })
+      .on("error", function (err) {
+        ffmpeg_process.kill("SIGKILL");
+        reject(err);
+      })
+      .on("end", function () {
+        resolve(`${config.vodPath}${vodId}-clip.mp4`);
+      })
+      .saveToFile(`${config.vodPath}${vodId}-clip.mp4`);
+  })
+    .then((result) => {
+      path = result;
+      console.log("\n");
+    })
+    .catch((e) => {
+      console.error("\nffmpeg error occurred: " + e);
+    });
+  return path;
+};
+
+const getTrimmedClip = async (clipPath, vodId) => {
+  let path;
+  await new Promise((resolve, reject) => {
+    const ffmpeg_process = ffmpeg(clipPath);
+    ffmpeg_process
+      .audioCodec("copy")
+      .videoFilter("geq=0:128:128")
+      .toFormat("mp4")
+      .on("progress", (progress) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          readline.clearLine(process.stdout, 0);
+          readline.cursorTo(process.stdout, 0, null);
+          process.stdout.write(
+            `GET TRIMMED CLIP PROGRESS: ${Math.round(progress.percent)}%`
+          );
+        }
+      })
+      .on("start", (cmd) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          console.info(cmd);
+        }
+      })
+      .on("error", function (err) {
+        ffmpeg_process.kill("SIGKILL");
+        reject(err);
+      })
+      .on("end", function () {
+        resolve(`${config.vodPath}${vodId}-clip-muted.mp4`);
+        fs.unlinkSync(clipPath);
+      })
+      .saveToFile(`${config.vodPath}${vodId}-clip-muted.mp4`);
+  })
+    .then((result) => {
+      path = result;
+      console.log("\n");
+    })
+    .catch((e) => {
+      console.error("\nffmpeg error occurred: " + e);
+    });
+  return path;
+};
+
+const getEndVideo = async (vodPath, vodId, end) => {
+  let path;
+  await new Promise((resolve, reject) => {
+    const ffmpeg_process = ffmpeg(vodPath);
+    ffmpeg_process
+      .videoCodec("copy")
+      .audioCodec("copy")
+      .seekOutput(end)
+      .toFormat("mp4")
+      .on("progress", (progress) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          readline.clearLine(process.stdout, 0);
+          readline.cursorTo(process.stdout, 0, null);
+          process.stdout.write(
+            `GET END VIDEO PROGRESS: ${Math.round(progress.percent)}%`
+          );
+        }
+      })
+      .on("start", (cmd) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          console.info(cmd);
+        }
+      })
+      .on("error", function (err) {
+        ffmpeg_process.kill("SIGKILL");
+        reject(err);
+      })
+      .on("end", function () {
+        resolve(`${config.vodPath}${vodId}-end.mp4`);
+        fs.unlinkSync(vodPath);
+      })
+      .saveToFile(`${config.vodPath}${vodId}-end.mp4`);
   })
     .then((result) => {
       path = result;
@@ -197,7 +497,6 @@ const downloadAsMP4 = async (m3u8, path) => {
         }
       })
       .on("start", (cmd) => {
-        //console.info(cmd);
         console.info(`Starting m3u8 download for ${m3u8} in ${path}`);
       })
       .on("error", function (err) {
@@ -212,13 +511,13 @@ const downloadAsMP4 = async (m3u8, path) => {
 };
 
 module.exports.uploadVideo = async (data, app) => {
-  await app.googleClient
+  await oauth2Client
     .getTokenInfo(config.youtube.access_token)
     .catch(async (e) => {
       //Change once they fix this problem, not being able to update using getTokenInfo?
       const youtube = google.youtube("v3");
       await youtube.search.list({
-        auth: app.googleClient,
+        auth: oauth2Client,
         part: "id,snippet",
         q: "Check if token is valid",
       });
@@ -235,7 +534,7 @@ module.exports.uploadVideo = async (data, app) => {
     }
     const res = await youtube.videos.insert(
       {
-        auth: app.googleClient,
+        auth: oauth2Client,
         part: "id,snippet,status",
         notifySubscribers: true,
         requestBody: {
@@ -288,7 +587,7 @@ module.exports.uploadVideo = async (data, app) => {
 module.exports.addComment = async (videoId, vodId, app) => {
   const youtube = google.youtube("v3");
   const res = await youtube.commentThreads.insert({
-    auth: app.googleClient,
+    auth: oauth2Client,
     part: "id,snippet",
     requestBody: {
       snippet: {

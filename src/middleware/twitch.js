@@ -18,11 +18,11 @@ module.exports.checkToken = async () => {
       }
     })
     .catch(async (e) => {
+      if (!e.response) return console.error(e);
       if (e.response.status === 401) {
         console.info("Twitch App Token Expired");
         return await this.refreshToken();
       }
-      console.error(e.response.data);
     });
   return isValid;
 };
@@ -272,11 +272,14 @@ module.exports.getGameData = async (gameId) => {
 module.exports.fetchComments = async (vodId) => {
   let data;
   await axios
-    .get(`https://api.twitch.tv/v5/videos/${vodId}/comments?content_offset_seconds=0`, {
-      headers: {
-        "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko"
-      },
-    })
+    .get(
+      `https://api.twitch.tv/v5/videos/${vodId}/comments?content_offset_seconds=0`,
+      {
+        headers: {
+          "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko",
+        },
+      }
+    )
     .then((response) => {
       data = response.data;
     })
@@ -294,7 +297,7 @@ module.exports.fetchNextComments = async (vodId, cursor) => {
   await axios
     .get(`https://api.twitch.tv/v5/videos/${vodId}/comments?cursor=${cursor}`, {
       headers: {
-        "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko"
+        "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko",
       },
     })
     .then((response) => {
