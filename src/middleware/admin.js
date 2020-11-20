@@ -261,23 +261,19 @@ module.exports.dmcaVideo = function (app) {
 
     const vodPath = await vod.download(vodId);
 
-    let muteSection = [];
+    let newVodPath;
     for (let dmca of req.body.receivedClaims) {
       const policyType = dmca.claimPolicy.primaryPolicy.policyType;
       if (
         policyType === "POLICY_TYPE_GLOBAL_BLOCK" ||
         policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK"
       ) {
-        
+        console.info(`Trying to trim ${vodPath}. Claim: ${dmca.asset.metadata.tvEpisode.title}`);
+        newVodPath = await vod.trim(vodPath, vodId, dmca.matchDetails.longestMatchStartTimeSeconds, dmca.matchDetails.longestMatchDurationSeconds, parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) + parseInt(dmca.matchDetails.longestMatchDurationSeconds));
       }
     }
 
-    console.info(`Trying to trim ${vodPath}`);
-    /* WIP
-    const newVodPath = await vod.mute(vodPath, muteSection, vodId);
-
-    if (!newVodPath) return console.error("failed to mute video");
-    fs.unlinkSync(vodPath);*/
+    if(!newVodPath) return;
 
     const duration = moment.duration(vod_data.duration).asSeconds();
 
