@@ -5,6 +5,32 @@ const fs = require("fs");
 const readline = require("readline");
 const { google } = require("googleapis");
 const moment = require("moment");
+const OAuth2 = google.auth.OAuth2;
+const path = require("path");
+const oauth2Client = new OAuth2(
+  config.google.client_id,
+  config.google.client_secret,
+  config.google.redirect_url
+);
+oauth2Client.credentials = config.youtube;
+oauth2Client.on("tokens", (tokens) => {
+  if (tokens.refresh_token) {
+    config.youtube.refresh_token = tokens.refresh_token;
+  }
+  config.youtube.access_token = tokens.access_token;
+  fs.writeFile(
+    path.resolve(__dirname, "../../config/config.json"),
+    JSON.stringify(config, null, 4),
+    (err) => {
+      if (err) return console.error(err);
+      console.info("Refreshed Google Token");
+    }
+  );
+  oauth2Client.setCredentials({
+    refresh_token: tokens.refresh_token,
+    access_token: tokens.access_token
+  })
+});
 
 module.exports.upload = async (vodId, app) => {
   let vod;
@@ -212,13 +238,13 @@ const downloadAsMP4 = async (m3u8, path) => {
 };
 
 module.exports.uploadVideo = async (data, app) => {
-  await app.googleClient
+  await oauth2Client
     .getTokenInfo(config.youtube.access_token)
     .catch(async (e) => {
       //Change once they fix this problem, not being able to update using getTokenInfo?
       const youtube = google.youtube("v3");
       await youtube.search.list({
-        auth: app.googleClient,
+        auth: oauth2Client,
         part: "id,snippet",
         q: "Check if token is valid",
       });
@@ -235,7 +261,7 @@ module.exports.uploadVideo = async (data, app) => {
     }
     const res = await youtube.videos.insert(
       {
-        auth: app.googleClient,
+        auth: oauth2Client,
         part: "id,snippet,status",
         notifySubscribers: true,
         requestBody: {
@@ -288,7 +314,7 @@ module.exports.uploadVideo = async (data, app) => {
 module.exports.addComment = async (videoId, vodId, app) => {
   const youtube = google.youtube("v3");
   const res = await youtube.commentThreads.insert({
-    auth: app.googleClient,
+    auth: oauth2Client,
     part: "id,snippet",
     requestBody: {
       snippet: {
