@@ -52,6 +52,7 @@ module.exports.download = function (app) {
         id: vodData.id,
         title: vodData.title,
         date: new Date(vodData.created_at).toLocaleDateString(),
+        createdAt: vodData.created_at,
         duration: moment
           .duration("PT" + vodData.duration.toUpperCase())
           .format("HH:mm:ss", { trim: false }),
