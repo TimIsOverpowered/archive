@@ -195,7 +195,7 @@ module.exports.dmca = function (app) {
         return console.error("Something went wrong trying to split the video");
 
       for (let i = 0; i < paths.length; i++) {
-        let chapters;
+        let chapters = [];
         if (vod_data.chapters) {
           for (let chapter of vod_data.chapters) {
             const chapterDuration = moment
@@ -285,7 +285,7 @@ module.exports.dmcaVideo = function (app) {
         return console.error("Something went wrong trying to split the video");
 
       for (let i = 0; i < paths.length; i++) {
-        let chapters;
+        let chapters = [];
         if (vod_data.chapters) {
           for (let chapter of vod_data.chapters) {
             const chapterDuration = moment
