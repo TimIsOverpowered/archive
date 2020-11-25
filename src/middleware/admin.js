@@ -167,7 +167,8 @@ module.exports.dmca = function (app) {
       const policyType = dmca.claimPolicy.primaryPolicy.policyType;
       if (
         policyType === "POLICY_TYPE_GLOBAL_BLOCK" ||
-        policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK"
+        policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK" ||
+        policyType === "POLICY_TYPE_BLOCK"
       ) {
         muteSection.push(
           `volume=0:enable='between(t,${
@@ -267,14 +268,26 @@ module.exports.dmcaVideo = function (app) {
       const policyType = dmca.claimPolicy.primaryPolicy.policyType;
       if (
         policyType === "POLICY_TYPE_GLOBAL_BLOCK" ||
-        policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK"
+        policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK" ||
+        policyType === "POLICY_TYPE_BLOCK"
       ) {
-        console.info(`Trying to trim ${vodPath}. Claim: ${dmca.asset.metadata.tvEpisode.title}`);
-        newVodPath = await vod.trim(vodPath, vodId, dmca.matchDetails.longestMatchStartTimeSeconds, dmca.matchDetails.longestMatchDurationSeconds, parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) + parseInt(dmca.matchDetails.longestMatchDurationSeconds));
+        console.info(
+          `Trying to trim ${vodPath}. Claim: ${JSON.stringify(
+            dmca.asset.metadata
+          )}`
+        );
+        newVodPath = await vod.trim(
+          vodPath,
+          vodId,
+          dmca.matchDetails.longestMatchStartTimeSeconds,
+          dmca.matchDetails.longestMatchDurationSeconds,
+          parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
+            parseInt(dmca.matchDetails.longestMatchDurationSeconds)
+        );
       }
     }
 
-    if(!newVodPath) return;
+    if (!newVodPath) return;
 
     const duration = moment.duration(vod_data.duration).asSeconds();
 
