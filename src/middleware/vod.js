@@ -15,12 +15,12 @@ const oauth2Client = new OAuth2(
   config.google.redirect_url
 );
 oauth2Client.on("tokens", (tokens) => {
-  console.log(tokens);
+  //console.log(tokens);
   if (tokens.refresh_token) {
     config.youtube.refresh_token = tokens.refresh_token;
   }
   config.youtube.access_token = tokens.access_token;
-  console.log(config.youtube.refresh_token);
+  //console.log(config.youtube.refresh_token);
   fs.writeFile(
     path.resolve(__dirname, "../../config/config.json"),
     JSON.stringify(config, null, 4),
