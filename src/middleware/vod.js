@@ -14,12 +14,13 @@ const oauth2Client = new OAuth2(
   config.google.client_secret,
   config.google.redirect_url
 );
-oauth2Client.credentials = config.youtube;
 oauth2Client.on("tokens", (tokens) => {
+  console.log(tokens);
   if (tokens.refresh_token) {
     config.youtube.refresh_token = tokens.refresh_token;
   }
   config.youtube.access_token = tokens.access_token;
+  console.log(config.youtube.refresh_token);
   fs.writeFile(
     path.resolve(__dirname, "../../config/config.json"),
     JSON.stringify(config, null, 4),
@@ -58,7 +59,7 @@ module.exports.upload = async (vodId, app) => {
       return console.error("Something went wrong trying to split the video");
 
     for (let i = 0; i < paths.length; i++) {
-      let chapters;
+      let chapters = [];
       if (vod.chapters) {
         for (let chapter of vod.chapters) {
           const chapterDuration = moment.duration(chapter.duration).asSeconds();
@@ -186,7 +187,6 @@ module.exports.mute = async (vodPath, muteSection, vodId) => {
 };
 
 module.exports.trim = async (vodPath, vodId, start, duration, end) => {
-  
   const start_video_path = await getStartVideo(vodPath, vodId, start);
   if (!start_video_path) {
     console.error("failed to get start video");
@@ -511,20 +511,20 @@ const downloadAsMP4 = async (m3u8, path) => {
 };
 
 module.exports.uploadVideo = async (data, app) => {
+  oauth2Client.credentials = config.youtube;
+  const youtube = google.youtube("v3");
+  await youtube.search.list({
+    auth: oauth2Client,
+    part: "id,snippet",
+    q: "Check if token is valid",
+  });
+  /* Change once they fix this problem, not being able to update using getTokenInfo?
   await oauth2Client
     .getTokenInfo(config.youtube.access_token)
     .catch(async (e) => {
-      //Change once they fix this problem, not being able to update using getTokenInfo?
-      const youtube = google.youtube("v3");
-      await youtube.search.list({
-        auth: oauth2Client,
-        part: "id,snippet",
-        q: "Check if token is valid",
-      });
-    });
+    });*/
   setTimeout(async () => {
     const fileSize = fs.statSync(data.path).size;
-    const youtube = google.youtube("v3");
     let description = config.youtube_description;
     if (data.chapters) {
       description += `00:00 Start of stream\n`;
@@ -565,12 +565,20 @@ module.exports.uploadVideo = async (data, app) => {
     console.log("\n\n");
     console.log(res.data);
 
+    let youtube_ids;
+    await app.service("vods")
+    .get(data.vodId)
+    .then(data => {
+      youtube_ids = data.youtube_id;
+    });
+
+    youtube_ids.push(res.data.id);
+
     await app
       .service("vods")
       .patch(data.vodId, {
         thumbnail_url: res.data.snippet.thumbnails.medium.url,
-        video_link: `youtube.com/watch?v=${res.data.id}`,
-        youtube_id: res.data.id,
+        youtube_id: youtube_ids,
       })
       .then(() => {
         console.info(`Saved youtube data in DB for vod ${data.vodId}`);

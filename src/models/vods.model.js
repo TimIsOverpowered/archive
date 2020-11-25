@@ -30,7 +30,8 @@ module.exports = function (app) {
       type: DataTypes.TEXT
     },
     youtube_id: {
-      type: DataTypes.TEXT
+      type: DataTypes.ARRAY(DataTypes.TEXT),
+      defaultValue: []
     }
   }, {
     hooks: {
