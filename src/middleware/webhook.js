@@ -55,14 +55,18 @@ module.exports.stream = function (app) {
     const data = req.body.data;
 
     await twitch.checkToken();
-    const vodData = await twitch.getLatestVodData(userId);
+    let vodData = await twitch.getLatestVodData(userId);
     if (!vodData) return console.error("Failed to get latest vod in webhook");
 
     if (data.length === 0) {
       console.log(`${config.channel} went offline.`);
-      await saveDuration(vodData, app);
-      vod.upload(vodData.id, app);
-      vod.getLogs(vodData.id, app);
+      setTimeout(async () => {
+        vodData = await twitch.getLatestVodData(userId);
+        if (!vodData) return console.error("Failed to get latest vod in webhook");
+        await saveDuration(vodData, app);
+        vod.upload(vodData.id, app);
+        vod.getLogs(vodData.id, app);
+      }, 300 * 1000);
       return;
     }
 
