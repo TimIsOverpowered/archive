@@ -442,7 +442,6 @@ const getEndVideo = async (vodPath, vodId, end) => {
       })
       .on("end", function () {
         resolve(`${config.vodPath}${vodId}-end.mp4`);
-        fs.unlinkSync(vodPath);
       })
       .saveToFile(`${config.vodPath}${vodId}-end.mp4`);
   })
