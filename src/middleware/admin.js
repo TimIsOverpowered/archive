@@ -217,7 +217,7 @@ module.exports.dmca = function (app) {
           chapters: chapters,
           vodId: vodId,
         };
-        await vod.uploadVideo(data, app);
+        await vod.uploadVideo(data, app, true);
       }
       return;
     }
@@ -230,7 +230,7 @@ module.exports.dmca = function (app) {
       vodId: vodId,
     };
 
-    await vod.uploadVideo(data, app);
+    await vod.uploadVideo(data, app, true);
   };
 };
 
@@ -319,7 +319,7 @@ module.exports.dmcaVideo = function (app) {
           chapters: chapters,
           vodId: vodId,
         };
-        await vod.uploadVideo(data, app);
+        await vod.uploadVideo(data, app, true);
       }
       return;
     }
@@ -332,6 +332,6 @@ module.exports.dmcaVideo = function (app) {
       vodId: vodId,
     };
 
-    await vod.uploadVideo(data, app);
+    await vod.uploadVideo(data, app, true);
   };
 };

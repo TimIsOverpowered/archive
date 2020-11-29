@@ -510,7 +510,7 @@ const downloadAsMP4 = async (m3u8, path) => {
   });
 };
 
-module.exports.uploadVideo = async (data, app) => {
+module.exports.uploadVideo = async (data, app, replace = false) => {
   oauth2Client.credentials = config.youtube;
   const youtube = google.youtube("v3");
   await youtube.search.list({
@@ -566,13 +566,18 @@ module.exports.uploadVideo = async (data, app) => {
     console.log(res.data);
 
     let youtube_ids;
-    await app.service("vods")
-    .get(data.vodId)
-    .then(data => {
-      youtube_ids = data.youtube_id;
-    });
+    await app
+      .service("vods")
+      .get(data.vodId)
+      .then((data) => {
+        youtube_ids = data.youtube_id;
+      });
 
-    youtube_ids.push(res.data.id);
+    if (!replace) {
+      youtube_ids.push(res.data.id);
+    } else {
+      youtube_ids = [res.data.id];
+    }
 
     await app
       .service("vods")
