@@ -187,14 +187,13 @@ module.exports.dmca = function (app) {
             )}`
           );
           newVodPath = await vod.trim(
-            vodPath,
+            newVodPath,
             vodId,
             dmca.matchDetails.longestMatchStartTimeSeconds,
             dmca.matchDetails.longestMatchDurationSeconds,
             parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
               parseInt(dmca.matchDetails.longestMatchDurationSeconds)
           );
-          fs.unlinkSync(vodPath);
         }
       }
     }
@@ -205,7 +204,7 @@ module.exports.dmca = function (app) {
     }
 
     if (!newVodPath) return console.error("failed to mute video");
-    fs.unlinkSync(newVodPath);
+    fs.unlinkSync(vodPath);
 
     const duration = moment.duration(vod_data.duration).asSeconds();
 
