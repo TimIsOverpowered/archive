@@ -172,7 +172,6 @@ module.exports.mute = async (vodPath, muteSection, vodId) => {
         reject(err);
       })
       .on("end", function () {
-        fs.unlinkSync(vodPath);
         resolve(`${config.vodPath}${vodId}-muted.mp4`);
       })
       .saveToFile(`${config.vodPath}${vodId}-muted.mp4`);
