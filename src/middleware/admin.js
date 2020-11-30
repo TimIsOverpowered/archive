@@ -162,7 +162,7 @@ module.exports.dmca = function (app) {
 
     const vodPath = await vod.download(vodId);
 
-    let muteSection = [], newVodPath = vodPath;
+    let muteSection = [], newVodPath, trimmedPath;
     for (let dmca of req.body.receivedClaims) {
       const policyType = dmca.claimPolicy.primaryPolicy.policyType;
       //check if audio
@@ -186,8 +186,8 @@ module.exports.dmca = function (app) {
               dmca.asset.metadata
             )}`
           );
-          newVodPath = await vod.trim(
-            newVodPath,
+          trimmedPath = await vod.trim(
+            vodPath,
             vodId,
             dmca.matchDetails.longestMatchStartTimeSeconds,
             dmca.matchDetails.longestMatchDurationSeconds,
@@ -200,7 +200,7 @@ module.exports.dmca = function (app) {
 
     if(muteSection.length > 0) {
       console.info(`Trying to mute ${newVodPath}`);
-      newVodPath = await vod.mute(newVodPath, muteSection, vodId);
+      newVodPath = await vod.mute(trimmedPath ? trimmedPath : vodPath, muteSection, vodId);
     }
 
     if (!newVodPath) return console.error("failed to mute video");
