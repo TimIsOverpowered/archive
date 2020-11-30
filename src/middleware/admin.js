@@ -199,7 +199,7 @@ module.exports.dmca = function (app) {
     }
 
     if(muteSection.length > 0) {
-      console.info(`Trying to mute ${vodPath}`);
+      console.info(`Trying to mute ${newVodPath}`);
       newVodPath = await vod.mute(newVodPath, muteSection, vodId);
     }
 
