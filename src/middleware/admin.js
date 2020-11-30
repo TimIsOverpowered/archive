@@ -194,6 +194,7 @@ module.exports.dmca = function (app) {
             parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
               parseInt(dmca.matchDetails.longestMatchDurationSeconds)
           );
+          fs.unlinkSync(vodPath);
         }
       }
     }
@@ -204,7 +205,7 @@ module.exports.dmca = function (app) {
     }
 
     if (!newVodPath) return console.error("failed to mute video");
-    fs.unlinkSync(vodPath);
+    fs.unlinkSync(newVodPath);
 
     const duration = moment.duration(vod_data.duration).asSeconds();
 
