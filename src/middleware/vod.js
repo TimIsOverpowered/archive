@@ -3,6 +3,7 @@ const twitch = require("./twitch");
 const config = require("../../config/config.json");
 const util = require("util");
 const fs = require("fs");
+const readFile = util.promisify(fs.readFile);
 const writeFile = util.promisify(fs.writeFile);
 const readline = require("readline");
 const { google } = require("googleapis");
@@ -686,6 +687,61 @@ module.exports.getLogs = async (vodId, app) => {
     }
     cursor = response._next;
     await sleep(100); //don't bombarade the api
+    howMany++;
+  }
+  console.info(
+    `\nTotal API Calls: ${howMany} | Total Time to get logs for ${vodId}: ${
+      (new Date() - start_time) / 1000
+    } seconds`
+  );
+
+  await app
+    .service("logs")
+    .create(comments)
+    .then(() => {
+      console.info(`Saved all comments in DB for vod ${vodId}`);
+    })
+    .catch(() => {});
+};
+
+module.exports.manualLogs = async (commentsPath, vodId, app) => {
+  let start_time = new Date(),
+    comments = [],
+    responseComments, howMany = 1;
+  await readFile(commentsPath)
+    .then((data) => {
+      responseComments = JSON.parse(data).comments;
+    })
+    .catch((e) => {
+      console.error(e);
+    });
+
+  for (let comment of responseComments) {
+    if (comments.length >= 2500) {
+      await app
+        .service("logs")
+        .create(comments)
+        .then(() => {
+          if ((process.env.NODE_ENV || "").trim() !== "production") {
+            console.info(
+              `\nSaved ${comments.length} comments in DB for vod ${vodId}`
+            );
+          }
+        })
+        .catch((e) => {
+          console.error(e);
+        });
+      comments = [];
+    }
+    comments.push({
+      id: comment._id,
+      vod_id: vodId,
+      display_name: comment.commenter.display_name,
+      content_offset_seconds: comment.content_offset_seconds,
+      message: comment.message.fragments,
+      user_badges: comment.message.user_badges,
+      user_color: comment.message.user_color,
+    });
     howMany++;
   }
   console.info(
