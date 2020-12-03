@@ -162,7 +162,9 @@ module.exports.dmca = function (app) {
 
     const vodPath = await vod.download(vodId);
 
-    let muteSection = [], newVodPath, trimmedPath;
+    let muteSection = [],
+      newVodPath,
+      trimmedPath;
     for (let dmca of req.body.receivedClaims) {
       const policyType = dmca.claimPolicy.primaryPolicy.policyType;
       //check if audio
@@ -171,7 +173,7 @@ module.exports.dmca = function (app) {
         policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK" ||
         policyType === "POLICY_TYPE_BLOCK"
       ) {
-        if(dmca.type === "CLAIM_TYPE_AUDIO") {
+        if (dmca.type === "CLAIM_TYPE_AUDIO") {
           muteSection.push(
             `volume=0:enable='between(t,${
               dmca.matchDetails.longestMatchStartTimeSeconds
@@ -198,9 +200,13 @@ module.exports.dmca = function (app) {
       }
     }
 
-    if(muteSection.length > 0) {
+    if (muteSection.length > 0) {
       console.info(`Trying to mute ${newVodPath}`);
-      newVodPath = await vod.mute(trimmedPath ? trimmedPath : vodPath, muteSection, vodId);
+      newVodPath = await vod.mute(
+        trimmedPath ? trimmedPath : vodPath,
+        muteSection,
+        vodId
+      );
       if (!newVodPath) return console.error("failed to mute video");
     }
 
@@ -221,8 +227,8 @@ module.exports.dmca = function (app) {
             const chapterDuration = moment
               .duration(chapter.duration)
               .asSeconds();
-            if(i === 0) {
-              if(chapterDuration < 43200) {
+            if (i === 0) {
+              if (chapterDuration < 43200) {
                 chapters.push(chapter);
               }
             } else {
@@ -235,10 +241,11 @@ module.exports.dmca = function (app) {
         }
         const data = {
           path: paths[i],
-          title: `${vod_data.title} (${vod_data.date} VOD) PART ${i + 1}`,
-          date: vod_data.date,
+          title: `${vod.title} (${vod.date} VOD) PART ${i + 1}`,
+          date: vod.date,
           chapters: chapters,
           vodId: vodId,
+          index: i,
         };
         await vod.uploadVideo(data, app, true);
       }
@@ -251,6 +258,7 @@ module.exports.dmca = function (app) {
       date: vod_data.date,
       chapters: vod_data.chapters,
       vodId: vodId,
+      index: 0,
     };
 
     await vod.uploadVideo(data, app, true);
