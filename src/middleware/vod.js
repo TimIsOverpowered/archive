@@ -60,12 +60,18 @@ module.exports.upload = async (vodId, app) => {
 
     for (let i = 0; i < paths.length; i++) {
       let chapters = [];
-      if (vod.chapters) {
-        for (let chapter of vod.chapters) {
-          const chapterDuration = moment.duration(chapter.duration).asSeconds();
-          if (chapterDuration > 43200 * i) {
+      if (vod_data.chapters) {
+        for (let chapter of vod_data.chapters) {
+          const chapterDuration = moment
+            .duration(chapter.duration)
+            .asSeconds();
+          if(i === 0) {
+            if(chapterDuration < 43200) {
+              chapters.push(chapter);
+            }
+          } else {
             chapter.duration = moment
-              .utc((chapterDuration - 43200 * i) * 1000)
+              .utc((chapterDuration - 43200 * (i + 1)) * 1000)
               .format("HH:mm:ss");
           }
           chapters.push(chapter);

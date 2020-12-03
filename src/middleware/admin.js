@@ -201,9 +201,9 @@ module.exports.dmca = function (app) {
     if(muteSection.length > 0) {
       console.info(`Trying to mute ${newVodPath}`);
       newVodPath = await vod.mute(trimmedPath ? trimmedPath : vodPath, muteSection, vodId);
+      if (!newVodPath) return console.error("failed to mute video");
     }
 
-    if (!newVodPath) return console.error("failed to mute video");
     fs.unlinkSync(vodPath);
 
     const duration = moment.duration(vod_data.duration).asSeconds();
@@ -221,9 +221,13 @@ module.exports.dmca = function (app) {
             const chapterDuration = moment
               .duration(chapter.duration)
               .asSeconds();
-            if (chapterDuration > 43200 * i) {
+            if(i === 0) {
+              if(chapterDuration < 43200) {
+                chapters.push(chapter);
+              }
+            } else {
               chapter.duration = moment
-                .utc((chapterDuration - 43200 * i) * 1000)
+                .utc((chapterDuration - 43200 * (i + 1)) * 1000)
                 .format("HH:mm:ss");
             }
             chapters.push(chapter);
