@@ -98,6 +98,19 @@ module.exports.logs = function (app) {
   };
 };
 
+module.exports.manualLogs = function (app) {
+  return async function (req, res, next) {
+    if (!req.body.path)
+      return res.status(400).json({ error: true, message: "No log path" });
+    
+    if (!req.body.vodId)
+      return res.status(400).json({ error: true, message: "No vod id" });
+
+    vod.manualLogs(req.body.path, req.body.vodId, app);
+    res.status(200).json({ error: false, message: "Starting manual logs.." });
+  };
+};
+
 module.exports.delete = function (app) {
   return async function (req, res, next) {
     if (!req.body.vodId)
