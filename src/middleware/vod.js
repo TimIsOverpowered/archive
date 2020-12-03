@@ -60,13 +60,11 @@ module.exports.upload = async (vodId, app) => {
 
     for (let i = 0; i < paths.length; i++) {
       let chapters = [];
-      if (vod_data.chapters) {
-        for (let chapter of vod_data.chapters) {
-          const chapterDuration = moment
-            .duration(chapter.duration)
-            .asSeconds();
-          if(i === 0) {
-            if(chapterDuration < 43200) {
+      if (vod.chapters) {
+        for (let chapter of vod.chapters) {
+          const chapterDuration = moment.duration(chapter.duration).asSeconds();
+          if (i === 0) {
+            if (chapterDuration < 43200) {
               chapters.push(chapter);
             }
           } else {
@@ -83,6 +81,7 @@ module.exports.upload = async (vodId, app) => {
         date: vod.date,
         chapters: chapters,
         vodId: vodId,
+        index: i,
       };
       await this.uploadVideo(data, app);
     }
@@ -95,6 +94,7 @@ module.exports.upload = async (vodId, app) => {
     date: vod.date,
     chapters: vod.chapters,
     vodId: vodId,
+    index: 0,
   };
 
   await this.uploadVideo(data, app);
@@ -579,9 +579,17 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
       });
 
     if (!replace) {
-      youtube_ids.push(res.data.id);
+      if (data.index === 0) {
+        youtube_ids.unshift(res.data.id);
+      } else {
+        youtube_ids.push(res.data.id);
+      }
     } else {
-      youtube_ids = [res.data.id];
+      if (data.index === 0) {
+        youtube_ids = [res.data.id];
+      } else {
+        youtube_ids.push(res.data.ids);
+      }
     }
 
     await app
