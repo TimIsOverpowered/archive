@@ -191,8 +191,8 @@ module.exports.dmca = function (app) {
             `volume=0:enable='between(t,${
               dmca.matchDetails.longestMatchStartTimeSeconds
             },${
-              dmca.matchDetails.longestMatchDurationSeconds +
-              dmca.matchDetails.longestMatchStartTimeSeconds
+              parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
+              parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
             })'`
           );
         } else if (dmca.type === "CLAIM_TYPE_VISUAL") {
@@ -223,6 +223,7 @@ module.exports.dmca = function (app) {
       if (!newVodPath) return console.error("failed to mute video");
     }
 
+    /*
     fs.unlinkSync(vodPath);
 
     const duration = moment.duration(vod_data.duration).asSeconds();
@@ -274,6 +275,6 @@ module.exports.dmca = function (app) {
       index: 0,
     };
 
-    await vod.uploadVideo(data, app, true);
+    await vod.uploadVideo(data, app, true);*/
   };
 };
