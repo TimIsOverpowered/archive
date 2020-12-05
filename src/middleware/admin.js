@@ -223,7 +223,6 @@ module.exports.dmca = function (app) {
       if (!newVodPath) return console.error("failed to mute video");
     }
 
-    /*
     fs.unlinkSync(vodPath);
 
     const duration = moment.duration(vod_data.duration).asSeconds();
@@ -275,6 +274,6 @@ module.exports.dmca = function (app) {
       index: 0,
     };
 
-    await vod.uploadVideo(data, app, true);*/
+    await vod.uploadVideo(data, app, true);
   };
 };
