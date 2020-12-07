@@ -18,7 +18,9 @@ module.exports = function (app) {
       max: 10,
       message: "API rate limit exceeded",
       keyGenerator: function (req) {
-        return req.headers["x-forwarded-for"] || req.connection.remoteAddress;
+        //for cloudflare
+        //return req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+        return req.headers['x-forwarded-for'] || req.connection.remoteAddress;
       },
     }),
     new Vods(options, app)
