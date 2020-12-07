@@ -41,7 +41,7 @@
   "dependencies": {
     "@feathersjs/configuration": "^4.5.10",
     "@feathersjs/errors": "^4.5.10",
-    "@feathersjs/express": "^4.5.10",
+    "@feathersjs/express": "^4.5.11",
     "@feathersjs/feathers": "^4.5.10",
     "@feathersjs/transport-commons": "^4.5.10",
     "compression": "^1.7.4",
