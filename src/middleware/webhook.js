@@ -61,7 +61,10 @@ module.exports.stream = function (app) {
     if (data.length === 0) {
       console.log(`${config.channel} went offline.`);
       setTimeout(async () => {
+        const oldVodId = vodData.id;
         vodData = await twitch.getLatestVodData(userId);
+        //check if same id, if not it was deleted and won't be able to grab.
+        if (oldVodId !== vodData.id) return;
         if (
           moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds() <
           600
@@ -127,6 +130,7 @@ const createVod = async (data, vodData, app) => {
           "milliseconds"
         )
         .format("HH:mm:ss", { trim: false }),
+      createdAt: vodData.created_at,
     },
   ];
 
