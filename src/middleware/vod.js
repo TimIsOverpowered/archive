@@ -193,7 +193,50 @@ module.exports.mute = async (vodPath, muteSection, vodId) => {
   return path;
 };
 
-module.exports.trim = async (vodPath, vodId, start, duration, end) => {
+module.exports.trim = async (vodPath, vodId, start, end) => {
+  let path;
+  await new Promise((resolve, reject) => {
+    const ffmpeg_process = ffmpeg(vodPath);
+    ffmpeg_process
+      .seekInput(start)
+      .videoCodec("copy")
+      .audioCodec("copy")
+      .outputOptions([`-to ${end}`])
+      .toFormat("mp4")
+      .on("progress", (progress) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          readline.clearLine(process.stdout, 0);
+          readline.cursorTo(process.stdout, 0, null);
+          process.stdout.write(
+            `TRIM VIDEO PROGRESS: ${Math.round(progress.percent)}%`
+          );
+        }
+      })
+      .on("start", (cmd) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          console.info(cmd);
+        }
+      })
+      .on("error", function (err) {
+        ffmpeg_process.kill("SIGKILL");
+        reject(err);
+      })
+      .on("end", function () {
+        resolve(`${config.vodPath}${vodId}-${start}-${end}.mp4`);
+      })
+      .saveToFile(`${config.vodPath}${vodId}-${start}-${end}.mp4`);
+  })
+    .then((result) => {
+      path = result;
+      console.log("\n");
+    })
+    .catch((e) => {
+      console.error("\nffmpeg error occurred: " + e);
+    });
+  return path;
+};
+
+module.exports.blackoutVideo = async (vodPath, vodId, start, duration, end) => {
   const start_video_path = await getStartVideo(vodPath, vodId, start);
   if (!start_video_path) {
     console.error("failed to get start video");
@@ -611,6 +654,59 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
   }, 1000);
 };
 
+module.exports.trimUpload = async (path, game, date) => {
+  oauth2Client.credentials = config.youtube;
+  const youtube = google.youtube("v3");
+  await youtube.search.list({
+    auth: oauth2Client,
+    part: "id,snippet",
+    q: "Check if token is valid",
+  });
+  /* Change once they fix this problem, not being able to update using getTokenInfo?
+  await oauth2Client
+    .getTokenInfo(config.youtube.access_token)
+    .catch(async (e) => {
+    });*/
+  setTimeout(async () => {
+    const fileSize = fs.statSync(path).size;
+    const title = game === "Just Chatting" ? `${config.channel.charAt(0).toUpperCase() + config.channel.slice(1)} Hangs Out With Chat (${date})` : `${config.channel.charAt(0).toUpperCase() + config.channel.slice(1)} plays ${game} (${date})`;
+    const res = await youtube.videos.insert(
+      {
+        auth: oauth2Client,
+        part: "id,snippet,status",
+        notifySubscribers: false,
+        requestBody: {
+          snippet: {
+            title: title,
+            description: config.youtube_description,
+            categoryId: "20",
+          },
+          status: {
+            privacyStatus: "unlisted",
+          },
+        },
+        media: {
+          body: fs.createReadStream(path),
+        },
+      },
+      {
+        onUploadProgress: (evt) => {
+          if ((process.env.NODE_ENV || "").trim() !== "production") {
+            const progress = (evt.bytesRead / fileSize) * 100;
+            readline.clearLine(process.stdout, 0);
+            readline.cursorTo(process.stdout, 0, null);
+            process.stdout.write(`UPLOAD PROGRESS: ${Math.round(progress)}%`);
+          }
+        },
+      }
+    );
+    console.log("\n\n");
+    console.log(res.data);
+
+    fs.unlinkSync(path);
+  }, 1000);
+};
+
 module.exports.addComment = async (videoId, vodId, app) => {
   const youtube = google.youtube("v3");
   const res = await youtube.commentThreads.insert({
@@ -707,7 +803,8 @@ module.exports.getLogs = async (vodId, app) => {
 module.exports.manualLogs = async (commentsPath, vodId, app) => {
   let start_time = new Date(),
     comments = [],
-    responseComments, howMany = 1;
+    responseComments,
+    howMany = 1;
   await readFile(commentsPath)
     .then((data) => {
       responseComments = JSON.parse(data).comments;
