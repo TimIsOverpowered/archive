@@ -61,17 +61,38 @@ module.exports.stream = function (app) {
     if (data.length === 0) {
       console.log(`${config.channel} went offline.`);
       setTimeout(async () => {
-        const oldVodId = vodData.id;
-        vodData = await twitch.getLatestVodData(userId);
-        //check if same id, if not it was deleted and won't be able to grab.
-        if (oldVodId !== vodData.id) return;
+        let vod;
+        await app
+          .service("vods")
+          .find({
+            query: {
+              $limit: 1,
+              $sort: {
+                createdAt: -1,
+              },
+            },
+          })
+          .then((response) => {
+            vod = response.data[0];
+          })
+          .catch((e) => {
+            console.error(e);
+          });
+        if (!vod)
+          return console.error("Something went wrong trying to get latest vod");
+
+        vodData = await twitch.getVodData(vod.id);
+        if (!vodData)
+          return console.error(
+            "Something went wrong trying to get vod data in webhook"
+          );
+        if (vod.youtube_id.length !== 0)
+          return console.error("Youtube video already exists. Skipping..");
         if (
           moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds() <
           600
         )
           return;
-        if (!vodData)
-          return console.error("Failed to get latest vod in webhook");
         await saveDuration(vodData, app);
         vod.upload(vodData.id, app);
         vod.getLogs(vodData.id, app);
@@ -176,7 +197,10 @@ const saveChapters = async (data, vodData, app) => {
     image: gameData.box_art_url,
     title: data.title,
     duration: moment
-      .duration(moment.utc().diff(moment.utc(data.started_at)), "milliseconds")
+      .duration(
+        moment.utc().diff(moment.utc(data.started_at)) - 60 * 1000 * 2,
+        "milliseconds"
+      )
       .format("HH:mm:ss", { trim: false }),
   };
 
