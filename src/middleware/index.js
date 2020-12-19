@@ -9,4 +9,5 @@ module.exports = function (app) {
   app.post("/admin/logs/manual", admin.verify(app), admin.manualLogs(app));
   app.post("/admin/dmca", admin.verify(app), admin.dmca(app));
   app.delete("/admin/delete", admin.verify(app), admin.delete(app));
+  app.post("/admin/trim", admin.verify(app), admin.trim(app));
 };
