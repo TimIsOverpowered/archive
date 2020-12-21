@@ -94,8 +94,8 @@ module.exports.stream = function (app) {
         )
           return;
         await saveDuration(vodData, app);
-        vod.upload(vodData.id, app);
-        vod.getLogs(vodData.id, app);
+        this.vod.upload(vodData.id, app);
+        this.vod.getLogs(vodData.id, app);
       }, 300 * 1000);
       return;
     }
