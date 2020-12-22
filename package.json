@@ -60,7 +60,7 @@
     "winston": "^3.3.3"
   },
   "devDependencies": {
-    "axios": "^0.21.0",
+    "axios": "^0.21.1",
     "eslint": "^7.15.0",
     "mocha": "^8.2.1",
     "nodemon": "^2.0.6"
