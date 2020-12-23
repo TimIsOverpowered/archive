@@ -61,7 +61,7 @@ module.exports.stream = function (app) {
     if (data.length === 0) {
       console.log(`${config.channel} went offline.`);
       setTimeout(async () => {
-        let vod;
+        let vodDb;
         await app
           .service("vods")
           .find({
@@ -73,20 +73,20 @@ module.exports.stream = function (app) {
             },
           })
           .then((response) => {
-            vod = response.data[0];
+            vodDb = response.data[0];
           })
           .catch((e) => {
             console.error(e);
           });
-        if (!vod)
+        if (!vodDb)
           return console.error("Something went wrong trying to get latest vod");
 
-        vodData = await twitch.getVodData(vod.id);
+        vodData = await twitch.getVodData(vodDb.id);
         if (!vodData)
           return console.error(
             "Something went wrong trying to get vod data in webhook"
           );
-        if (vod.youtube_id.length !== 0)
+        if (vodDb.youtube_id.length !== 0)
           return console.error("Youtube video already exists. Skipping..");
         if (
           moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds() <
@@ -94,8 +94,8 @@ module.exports.stream = function (app) {
         )
           return;
         await saveDuration(vodData, app);
-        this.vod.upload(vodData.id, app);
-        this.vod.getLogs(vodData.id, app);
+        vod.upload(vodData.id, app);
+        vod.getLogs(vodData.id, app);
       }, 300 * 1000);
       return;
     }
