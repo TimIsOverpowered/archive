@@ -10,4 +10,5 @@ module.exports = function (app) {
   app.post("/admin/dmca", admin.verify(app), admin.dmca(app));
   app.delete("/admin/delete", admin.verify(app), admin.delete(app));
   app.post("/admin/trim", admin.verify(app), admin.trim(app));
+  app.post("/admin/trim/dmca", admin.verify(app), admin.trimDmca(app));
 };

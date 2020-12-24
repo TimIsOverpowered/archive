@@ -298,8 +298,7 @@ module.exports.trim = function (app) {
       })
       .catch(() => {});
 
-    if (!vod_data)
-      return console.error("Failed get vod: no VOD in database");
+    if (!vod_data) return console.error("Failed get vod: no VOD in database");
 
     res.status(200).json({ error: false, msg: "Starting trim process.." });
 
@@ -308,7 +307,7 @@ module.exports.trim = function (app) {
     for (let chapter of req.body.chapters) {
       if (!chapter.start) return console.error("Start time missing");
       if (!chapter.end) return console.error("End time missing");
-      if (!chapter.game) return console.error("Game missing");
+      if (!chapter.title) return console.error("Title missing");
 
       const trimmedPath = await vod.trim(
         vodPath,
@@ -316,10 +315,98 @@ module.exports.trim = function (app) {
         chapter.start,
         chapter.end
       );
-      
-      await vod.trimUpload(trimmedPath, chapter.game, vod_data.date);
+
+      await vod.trimUpload(trimmedPath, chapter.title, vod_data.date);
     }
-    
+
+    fs.unlinkSync(vodPath);
+  };
+};
+
+module.exports.trimDmca = function (app) {
+  return async function (req, res, next) {
+    if (!req.body.chapter)
+      return res
+        .status(400)
+        .json({ error: true, msg: "Invalid request: Missing chapter.." });
+    if (!req.body.vodId)
+      return res
+        .status(400)
+        .json({ error: true, msg: "Invalid request: Missing vod id.." });
+
+    let vod_data;
+    await app
+      .service("vods")
+      .get(req.body.vodId)
+      .then((data) => {
+        vod_data = data;
+      })
+      .catch(() => {});
+
+    if (!vod_data) return console.error("Failed get vod: no VOD in database");
+
+    res.status(200).json({ error: false, msg: "Starting trim dmca process.." });
+
+    const vodId = req.body.vodId;
+    const vodPath = await vod.download(vodId);
+    const chapter = req.body.chapter;
+
+    if (!chapter.start) return console.error("Start time missing");
+    if (!chapter.end) return console.error("End time missing");
+    if (!chapter.title) return console.error("Title missing");
+
+    const trimmedPath = await vod.trim(
+      vodPath,
+      vod_data.id,
+      chapter.start,
+      chapter.end
+    );
+
+    let muteSection = [],
+      newVodPath,
+      blackoutPath;
+    for (let dmca of req.body.receivedClaims) {
+      //check if audio
+      if (dmca.type === "CLAIM_TYPE_AUDIO") {
+        muteSection.push(
+          `volume=0:enable='between(t,${
+            dmca.matchDetails.longestMatchStartTimeSeconds
+          },${
+            parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
+            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
+          })'`
+        );
+      } else if (dmca.type === "CLAIM_TYPE_VISUAL") {
+        console.info(
+          `Trying to blackout ${trimmedPath}. Claim: ${JSON.stringify(
+            dmca.asset.metadata
+          )}`
+        );
+        blackoutPath = await vod.blackoutVideo(
+          trimmedPath,
+          vodId,
+          dmca.matchDetails.longestMatchStartTimeSeconds,
+          dmca.matchDetails.longestMatchDurationSeconds,
+          parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
+            parseInt(dmca.matchDetails.longestMatchDurationSeconds)
+        );
+      }
+    }
+
+    if (muteSection.length > 0) {
+      console.info(
+        `Trying to mute ${blackoutPath ? blackoutPath : trimmedPath}`
+      );
+      newVodPath = await vod.mute(
+        blackoutPath ? blackoutPath : trimmedPath,
+        muteSection,
+        vodId
+      );
+      if (!newVodPath) return console.error("failed to mute video");
+    }
+
+    await vod.trimUpload(newVodPath, chapter.title, vod_data.date);
+
     fs.unlinkSync(vodPath);
   };
 };

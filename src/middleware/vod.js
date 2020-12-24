@@ -112,7 +112,7 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
       }
       const ffmpeg_process = ffmpeg(vodPath);
       ffmpeg_process
-        .seekInput(start)
+        .seekOutput(start)
         .duration(cut)
         .videoCodec("copy")
         .audioCodec("copy")
@@ -198,7 +198,7 @@ module.exports.trim = async (vodPath, vodId, start, end) => {
   await new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
-      .seekInput(start)
+      .seekOutput(start)
       .videoCodec("copy")
       .audioCodec("copy")
       .outputOptions([`-to ${end}`])
@@ -585,7 +585,7 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
       {
         auth: oauth2Client,
         part: "id,snippet,status",
-        notifySubscribers: true,
+        notifySubscribers: false,
         requestBody: {
           snippet: {
             title: data.title,
@@ -593,7 +593,7 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
             categoryId: "20",
           },
           status: {
-            privacyStatus: "public",
+            privacyStatus: "unlisted",
           },
         },
         media: {
@@ -654,7 +654,7 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
   }, 1000);
 };
 
-module.exports.trimUpload = async (path, game, date) => {
+module.exports.trimUpload = async (path, title, date) => {
   oauth2Client.credentials = config.youtube;
   const youtube = google.youtube("v3");
   await youtube.search.list({
@@ -669,7 +669,6 @@ module.exports.trimUpload = async (path, game, date) => {
     });*/
   setTimeout(async () => {
     const fileSize = fs.statSync(path).size;
-    const title = game === "Just Chatting" ? `${config.channel.charAt(0).toUpperCase() + config.channel.slice(1)} Hangs Out With Chat (${date})` : `${config.channel.charAt(0).toUpperCase() + config.channel.slice(1)} plays ${game} (${date})`;
     const res = await youtube.videos.insert(
       {
         auth: oauth2Client,
