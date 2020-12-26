@@ -55,12 +55,12 @@ module.exports.stream = function (app) {
     const data = req.body.data;
 
     await twitch.checkToken();
-    let vodData = await twitch.getLatestVodData(userId);
-    if (!vodData) return console.error("Failed to get latest vod in webhook");
+    setTimeout(async () => {
+      let vodData = await twitch.getLatestVodData(userId);
+      if (!vodData) return console.error("Failed to get latest vod in webhook");
 
-    if (data.length === 0) {
-      console.log(`${config.channel} went offline.`);
-      setTimeout(async () => {
+      if (data.length === 0) {
+        console.log(`${config.channel} went offline.`);
         let vodDb;
         await app
           .service("vods")
@@ -96,15 +96,15 @@ module.exports.stream = function (app) {
         await saveDuration(vodData, app);
         vod.upload(vodData.id, app);
         vod.getLogs(vodData.id, app);
-      }, 300 * 1000);
-      return;
-    }
+        return;
+      }
 
-    if (!(await exists(vodData.id, app))) {
-      createVod(data[0], vodData, app);
-      return;
-    }
-    saveChapters(data[0], vodData, app);
+      if (!(await exists(vodData.id, app))) {
+        createVod(data[0], vodData, app);
+        return;
+      }
+      saveChapters(data[0], vodData, app);
+    }, 300 * 1000);
   };
 };
 
@@ -198,7 +198,7 @@ const saveChapters = async (data, vodData, app) => {
     title: data.title,
     duration: moment
       .duration(
-        moment.utc().diff(moment.utc(data.started_at)) - 60 * 1000 * 2,
+        moment.utc().diff(moment.utc(data.started_at)) - 60 * 1000 * 7,
         "milliseconds"
       )
       .format("HH:mm:ss", { trim: false }),
