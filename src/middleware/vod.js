@@ -593,7 +593,7 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
             categoryId: "20",
           },
           status: {
-            privacyStatus: "unlisted",
+            privacyStatus: config.youtube_public_vid ? "public" : "unlisted",
           },
         },
         media: {
