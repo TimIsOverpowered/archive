@@ -202,7 +202,7 @@ module.exports.dmca = function (app) {
             )}`
           );
           blackoutPath = await vod.blackoutVideo(
-            vodPath,
+            blackoutPath ? blackoutPath : vodPath,
             vodId,
             dmca.matchDetails.longestMatchStartTimeSeconds,
             dmca.matchDetails.longestMatchDurationSeconds,
