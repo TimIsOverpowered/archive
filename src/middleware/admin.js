@@ -197,7 +197,7 @@ module.exports.dmca = function (app) {
           );
         } else if (dmca.type === "CLAIM_TYPE_VISUAL") {
           console.info(
-            `Trying to blackout ${vodPath}. Claim: ${JSON.stringify(
+            `Trying to blackout ${blackoutPath ? blackoutPath : vodPath}. Claim: ${JSON.stringify(
               dmca.asset.metadata
             )}`
           );
@@ -266,7 +266,7 @@ module.exports.dmca = function (app) {
     }
 
     const data = {
-      path: newVodPath,
+      path: newVodPath ? newVodPath : blackoutPath,
       title: `${vod_data.title} (${vod_data.date} VOD)`,
       date: vod_data.date,
       chapters: vod_data.chapters,
@@ -378,12 +378,12 @@ module.exports.trimDmca = function (app) {
         );
       } else if (dmca.type === "CLAIM_TYPE_VISUAL") {
         console.info(
-          `Trying to blackout ${trimmedPath}. Claim: ${JSON.stringify(
+          `Trying to blackout ${blackoutPath ? blackoutPath : trimmedPath}. Claim: ${JSON.stringify(
             dmca.asset.metadata
           )}`
         );
         blackoutPath = await vod.blackoutVideo(
-          trimmedPath,
+          blackoutPath ? blackoutPath : trimmedPath,
           vodId,
           dmca.matchDetails.longestMatchStartTimeSeconds,
           dmca.matchDetails.longestMatchDurationSeconds,
@@ -405,7 +405,7 @@ module.exports.trimDmca = function (app) {
       if (!newVodPath) return console.error("failed to mute video");
     }
 
-    await vod.trimUpload(newVodPath, chapter.title, vod_data.date);
+    await vod.trimUpload(newVodPath ? newVodPath : blackoutPath, chapter.title, vod_data.date);
 
     fs.unlinkSync(vodPath);
   };
