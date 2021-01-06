@@ -209,6 +209,28 @@ module.exports.dmca = function (app) {
             parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
               parseInt(dmca.matchDetails.longestMatchDurationSeconds)
           );
+        } else if (dmca.type === "CLAIM_TYPE_AUDIOVISUAL") {
+          muteSection.push(
+            `volume=0:enable='between(t,${
+              dmca.matchDetails.longestMatchStartTimeSeconds
+            },${
+              parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
+              parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
+            })'`
+          );
+          console.info(
+            `Trying to blackout ${blackoutPath ? blackoutPath : vodPath}. Claim: ${JSON.stringify(
+              dmca.asset.metadata
+            )}`
+          );
+          blackoutPath = await vod.blackoutVideo(
+            blackoutPath ? blackoutPath : vodPath,
+            vodId,
+            dmca.matchDetails.longestMatchStartTimeSeconds,
+            dmca.matchDetails.longestMatchDurationSeconds,
+            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
+              parseInt(dmca.matchDetails.longestMatchDurationSeconds)
+          );
         }
       }
     }
@@ -265,6 +287,7 @@ module.exports.dmca = function (app) {
       return;
     }
 
+    if(!newVodPath && !blackoutPath) return console.error("nothing to mute or blackout. don't try to upload..");
     const data = {
       path: newVodPath ? newVodPath : blackoutPath,
       title: `${vod_data.title} (${vod_data.date} VOD)`,
@@ -390,6 +413,28 @@ module.exports.trimDmca = function (app) {
           parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
             parseInt(dmca.matchDetails.longestMatchDurationSeconds)
         );
+      } else if (dmca.type === "CLAIM_TYPE_AUDIOVISUAL") {
+        muteSection.push(
+          `volume=0:enable='between(t,${
+            dmca.matchDetails.longestMatchStartTimeSeconds
+          },${
+            parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
+            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
+          })'`
+        );
+        console.info(
+          `Trying to blackout ${blackoutPath ? blackoutPath : vodPath}. Claim: ${JSON.stringify(
+            dmca.asset.metadata
+          )}`
+        );
+        blackoutPath = await vod.blackoutVideo(
+          blackoutPath ? blackoutPath : vodPath,
+          vodId,
+          dmca.matchDetails.longestMatchStartTimeSeconds,
+          dmca.matchDetails.longestMatchDurationSeconds,
+          parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
+            parseInt(dmca.matchDetails.longestMatchDurationSeconds)
+        );
       }
     }
 
@@ -405,6 +450,7 @@ module.exports.trimDmca = function (app) {
       if (!newVodPath) return console.error("failed to mute video");
     }
 
+    if(!newVodPath && !blackoutPath) return console.error("nothing to mute or blackout. don't try to upload..");
     await vod.trimUpload(newVodPath ? newVodPath : blackoutPath, chapter.title, vod_data.date);
 
     fs.unlinkSync(vodPath);
