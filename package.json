@@ -51,8 +51,8 @@
     "feathers-sequelize": "^6.2.0",
     "fluent-ffmpeg": "^2.1.2",
     "googleapis": "^66.0.0",
-    "helmet": "^4.2.0",
-    "hls-parser": "^0.6.4",
+    "helmet": "^4.3.1",
+    "hls-parser": "^0.7.0",
     "moment-duration-format": "^2.3.2",
     "pg": "^8.5.1",
     "sequelize": "^6.3.5",
@@ -60,8 +60,8 @@
     "winston": "^3.3.3"
   },
   "devDependencies": {
-    "axios": "^0.21.0",
-    "eslint": "^7.15.0",
+    "axios": "^0.21.1",
+    "eslint": "^7.17.0",
     "mocha": "^8.2.1",
     "nodemon": "^2.0.6"
   }
