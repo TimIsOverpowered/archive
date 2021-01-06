@@ -243,6 +243,7 @@ module.exports.dmca = function (app) {
         vodId
       );
       if (!newVodPath) return console.error("failed to mute video");
+      if(blackoutPath) fs.unlinkSync(blackoutPath);
     }
 
     fs.unlinkSync(vodPath);
@@ -448,6 +449,7 @@ module.exports.trimDmca = function (app) {
         vodId
       );
       if (!newVodPath) return console.error("failed to mute video");
+      if(blackoutPath) fs.unlinkSync(blackoutPath);
     }
 
     if(!newVodPath && !blackoutPath) return console.error("nothing to mute or blackout. don't try to upload..");
