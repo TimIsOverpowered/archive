@@ -157,17 +157,37 @@ module.exports.subscribe = async (user_id) => {
     });
 };
 
-module.exports.getVodTokenSig = async (vodId) => {
+module.exports.getVodTokenSig = async (vodID) => {
   let data;
-  await axios
-    .get(`https://api.twitch.tv/api/vods/${vodId}/access_token`, {
+  await axios({
+      url: "https://gql.twitch.tv/gql",
+      method: "POST",
       headers: {
-        Accept: "application/vnd.twitchtv.v5+json; charset=UTF-8",
+        Accept: "*/*",
         "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko", //twitch's
+        "Content-Type": "text/plain;charset=UTF-8"
       },
+      data: {
+        operationName: "PlaybackAccessToken",
+        variables: {
+          isLive: false,
+          login: "",
+          isVod: true,
+          vodID: vodID,
+          platform: "web",
+          playerBackend: "mediaplayer",
+          playerType: "site"
+        },
+        extensions: {
+          persistedQuery: {
+            version: 1,
+            sha256Hash: "0828119ded1c13477966434e15800ff57ddacf13ba1911c129dc2200705b0712"
+          }
+        }
+      }
     })
     .then((response) => {
-      data = response.data;
+      data = response.data.data.videoPlaybackAccessToken;
     })
     .catch(async (e) => {
       if (!e.response) {
