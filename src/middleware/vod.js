@@ -509,7 +509,7 @@ module.exports.download = async (vodId) => {
   const tokenSig = await twitch.getVodTokenSig(vodId);
   if (!tokenSig) return console.error(`failed to get token/sig for ${vodId}`);
 
-  let m3u8 = await twitch.getM3u8(vodId, tokenSig.token, tokenSig.sig);
+  let m3u8 = await twitch.getM3u8(vodId, tokenSig.value, tokenSig.signature);
   if (!m3u8) return console.error("failed to get m3u8");
 
   m3u8 = twitch.getParsedM3u8(m3u8);
