@@ -160,7 +160,9 @@ const createVod = async (data, vodData, app) => {
     .create({
       id: vodData.id,
       title: vodData.title,
-      date: new Date(vodData.created_at).toLocaleDateString(),
+      date: new Date(vodData.created_at).toLocaleDateString("en-US", {
+        timeZone: config.timezone,
+      }),
       chapters: chapters,
     })
     .then(() => {

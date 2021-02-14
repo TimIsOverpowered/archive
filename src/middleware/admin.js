@@ -4,6 +4,7 @@ const moment = require("moment");
 const momentDurationFormatSetup = require("moment-duration-format");
 momentDurationFormatSetup(moment);
 const fs = require("fs");
+const config = require("../../config/config.json");
 
 module.exports.verify = function (app) {
   return async function (req, res, next) {
@@ -51,7 +52,9 @@ module.exports.download = function (app) {
       .create({
         id: vodData.id,
         title: vodData.title,
-        date: new Date(vodData.created_at).toLocaleDateString(),
+        date: new Date(vodData.created_at).toLocaleDateString("en-US", {
+          timeZone: config.timezone,
+        }),
         createdAt: vodData.created_at,
         duration: moment
           .duration("PT" + vodData.duration.toUpperCase())
@@ -197,9 +200,9 @@ module.exports.dmca = function (app) {
           );
         } else if (dmca.type === "CLAIM_TYPE_VISUAL") {
           console.info(
-            `Trying to blackout ${blackoutPath ? blackoutPath : vodPath}. Claim: ${JSON.stringify(
-              dmca.asset.metadata
-            )}`
+            `Trying to blackout ${
+              blackoutPath ? blackoutPath : vodPath
+            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
           );
           blackoutPath = await vod.blackoutVideo(
             blackoutPath ? blackoutPath : vodPath,
@@ -219,9 +222,9 @@ module.exports.dmca = function (app) {
             })'`
           );
           console.info(
-            `Trying to blackout ${blackoutPath ? blackoutPath : vodPath}. Claim: ${JSON.stringify(
-              dmca.asset.metadata
-            )}`
+            `Trying to blackout ${
+              blackoutPath ? blackoutPath : vodPath
+            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
           );
           blackoutPath = await vod.blackoutVideo(
             blackoutPath ? blackoutPath : vodPath,
@@ -243,7 +246,7 @@ module.exports.dmca = function (app) {
         vodId
       );
       if (!newVodPath) return console.error("failed to mute video");
-      if(blackoutPath) fs.unlinkSync(blackoutPath);
+      if (blackoutPath) fs.unlinkSync(blackoutPath);
     }
 
     fs.unlinkSync(vodPath);
@@ -288,7 +291,10 @@ module.exports.dmca = function (app) {
       return;
     }
 
-    if(!newVodPath && !blackoutPath) return console.error("nothing to mute or blackout. don't try to upload..");
+    if (!newVodPath && !blackoutPath)
+      return console.error(
+        "nothing to mute or blackout. don't try to upload.."
+      );
     const data = {
       path: newVodPath ? newVodPath : blackoutPath,
       title: `${vod_data.title} (${vod_data.date} VOD)`,
@@ -402,9 +408,9 @@ module.exports.trimDmca = function (app) {
         );
       } else if (dmca.type === "CLAIM_TYPE_VISUAL") {
         console.info(
-          `Trying to blackout ${blackoutPath ? blackoutPath : trimmedPath}. Claim: ${JSON.stringify(
-            dmca.asset.metadata
-          )}`
+          `Trying to blackout ${
+            blackoutPath ? blackoutPath : trimmedPath
+          }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
         );
         blackoutPath = await vod.blackoutVideo(
           blackoutPath ? blackoutPath : trimmedPath,
@@ -424,9 +430,9 @@ module.exports.trimDmca = function (app) {
           })'`
         );
         console.info(
-          `Trying to blackout ${blackoutPath ? blackoutPath : vodPath}. Claim: ${JSON.stringify(
-            dmca.asset.metadata
-          )}`
+          `Trying to blackout ${
+            blackoutPath ? blackoutPath : vodPath
+          }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
         );
         blackoutPath = await vod.blackoutVideo(
           blackoutPath ? blackoutPath : vodPath,
@@ -449,11 +455,18 @@ module.exports.trimDmca = function (app) {
         vodId
       );
       if (!newVodPath) return console.error("failed to mute video");
-      if(blackoutPath) fs.unlinkSync(blackoutPath);
+      if (blackoutPath) fs.unlinkSync(blackoutPath);
     }
 
-    if(!newVodPath && !blackoutPath) return console.error("nothing to mute or blackout. don't try to upload..");
-    await vod.trimUpload(newVodPath ? newVodPath : blackoutPath, chapter.title, vod_data.date);
+    if (!newVodPath && !blackoutPath)
+      return console.error(
+        "nothing to mute or blackout. don't try to upload.."
+      );
+    await vod.trimUpload(
+      newVodPath ? newVodPath : blackoutPath,
+      chapter.title,
+      vod_data.date
+    );
 
     fs.unlinkSync(vodPath);
   };
