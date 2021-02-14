@@ -27,5 +27,6 @@
     "vodPath": "YOUR_VOD_PATH",
     "youtube_description": "YOUR YOUTUBE DESCRIPTION GOES HERE",
     "youtube_comment": "YOUR PINNED COMMENT GOES HERE",
-    "youtube_public_vid": false
+    "youtube_public_vid": false,
+    "timezone": "UTC"
 }
