@@ -61,7 +61,7 @@
   },
   "devDependencies": {
     "axios": "^0.21.1",
-    "eslint": "^7.17.0",
+    "eslint": "^7.20.0",
     "mocha": "^8.2.1",
     "nodemon": "^2.0.6"
   }
