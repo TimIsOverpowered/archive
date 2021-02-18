@@ -253,7 +253,7 @@ module.exports.dmca = function (app) {
 
     const duration = moment.duration(vod_data.duration).asSeconds();
 
-    if (duration > 43200) {
+    if (duration > 43199) {
       let paths = await vod.splitVideo(newVodPath, duration, vodId);
 
       if (!paths)
@@ -267,12 +267,12 @@ module.exports.dmca = function (app) {
               .duration(chapter.duration)
               .asSeconds();
             if (i === 0) {
-              if (chapterDuration < 43200) {
+              if (chapterDuration < 43199) {
                 chapters.push(chapter);
               }
             } else {
               chapter.duration = moment
-                .utc((chapterDuration - 43200 * (i + 1)) * 1000)
+                .utc((chapterDuration - 43199 * (i + 1)) * 1000)
                 .format("HH:mm:ss");
             }
             chapters.push(chapter);
