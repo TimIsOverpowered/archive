@@ -280,7 +280,11 @@ module.exports.dmca = function (app) {
         }
         const data = {
           path: paths[i],
-          title: `${config.channel} ${vod.date} Vod PART ${i + 1}`,
+          title: config.showGameInTitle
+            ? `${config.channel} plays ${vod.chapters[0].name} ${
+                vod.date
+              } PART ${i + 1}`
+            : `${config.channel} ${vod.date} Vod PART ${i + 1}`,
           date: vod.date,
           chapters: chapters,
           vodId: vodId,
@@ -297,7 +301,9 @@ module.exports.dmca = function (app) {
       );
     const data = {
       path: newVodPath ? newVodPath : blackoutPath,
-      title: `${config.channel} ${vod.date} Vod`,
+      title: config.showGameInTitle
+        ? `${config.channel} plays ${vod.chapters[0].name} ${vod.date}`
+        : `${config.channel} ${vod.date} Vod`,
       date: vod_data.date,
       chapters: vod_data.chapters,
       vodId: vodId,
