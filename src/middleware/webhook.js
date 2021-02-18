@@ -55,55 +55,57 @@ module.exports.stream = function (app) {
     const data = req.body.data;
 
     await twitch.checkToken();
-    setTimeout(async () => {
+
+    if (data.length === 0) {
       let vodData = await twitch.getLatestVodData(userId);
-      if (!vodData) return console.error("Failed to get latest vod in webhook");
-
-      if (data.length === 0) {
-        console.log(`${config.channel} went offline.`);
-        let vodDb;
-        await app
-          .service("vods")
-          .find({
-            query: {
-              $limit: 1,
-              $sort: {
-                createdAt: -1,
-              },
-            },
-          })
-          .then((response) => {
-            vodDb = response.data[0];
-          })
-          .catch((e) => {
-            console.error(e);
-          });
-        if (!vodDb)
-          return console.error("Something went wrong trying to get latest vod");
-
-        vodData = await twitch.getVodData(vodDb.id);
-        if (!vodData)
-          return console.error(
-            "Something went wrong trying to get vod data in webhook"
-          );
-        if (vodDb.youtube_id.length !== 0)
-          return console.error("Youtube video already exists. Skipping..");
-        if (
-          moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds() <
-          600
-        )
-          return;
-        await saveDuration(vodData, app);
-        vod.upload(vodData.id, app);
-        vod.getLogs(vodData.id, app);
-        return;
-      }
-
+      vod.getLogs(vodData.id, app);
+    } else {
       if (!(await exists(vodData.id, app))) {
         createVod(data[0], vodData, app);
         return;
       }
       saveChapters(data[0], vodData, app);
+      return;
+    }
+
+    setTimeout(async () => {
+      let vodData = await twitch.getLatestVodData(userId);
+      if (!vodData) return console.error("Failed to get latest vod in webhook");
+
+      console.log(`${config.channel} went offline.`);
+      let vodDb;
+      await app
+        .service("vods")
+        .find({
+          query: {
+            $limit: 1,
+            $sort: {
+              createdAt: -1,
+            },
+          },
+        })
+        .then((response) => {
+          vodDb = response.data[0];
+        })
+        .catch((e) => {
+          console.error(e);
+        });
+      if (!vodDb)
+        return console.error("Something went wrong trying to get latest vod");
+
+      vodData = await twitch.getVodData(vodDb.id);
+      if (!vodData)
+        return console.error(
+          "Something went wrong trying to get vod data in webhook"
+        );
+      if (vodDb.youtube_id.length !== 0)
+        return console.error("Youtube video already exists. Skipping..");
+      if (
+        moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds() < 600
+      )
+        return;
+      await saveDuration(vodData, app);
+      vod.upload(vodData.id, app);
     }, 300 * 1000);
   };
 };
@@ -200,7 +202,7 @@ const saveChapters = async (data, vodData, app) => {
     title: data.title,
     duration: moment
       .duration(
-        moment.utc().diff(moment.utc(data.started_at)) - 60 * 1000 * 7,
+        moment.utc().diff(moment.utc(data.started_at)) - 60 * 1000 * 2,
         "milliseconds"
       )
       .format("HH:mm:ss", { trim: false }),
