@@ -17,10 +17,7 @@ module.exports = function (app) {
     await app
       .service("logs")
       .find({
-        paginate: {
-          default: "101",
-          max: "101",
-        },
+        paginate: false,
         query: {
           vod_id: vodId,
           content_offset_seconds: {
@@ -34,14 +31,14 @@ module.exports = function (app) {
           },
         },
       })
-      .then((response) => {
-        if (response.data.length === 0) return;
-        if (response.data.length === 101) {
+      .then((data) => {
+        if (data.length === 0) return;
+        if (data.length === 101) {
           cursor = Buffer.from(
-            response.data[100].content_offset_seconds.toString()
+            data[100].content_offset_seconds.toString()
           ).toString("base64");
         }
-        logs = response.data.slice(0, 100);
+        logs = data.slice(0, 100);
       })
       .catch((e) => {
         console.error(e);
