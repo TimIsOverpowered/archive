@@ -3,13 +3,13 @@ const modify = require('./modify');
 
 module.exports = {
   before: {
-    all: [],
+    all: [disallow("external")],
     find: [],
-    get: [disallow("external")],
-    create: [disallow("external")],
-    update: [disallow("external")],
-    patch: [disallow("external")],
-    remove: [disallow("external")]
+    get: [],
+    create: [],
+    update: [],
+    patch: [],
+    remove: []
   },
 
   after: {
