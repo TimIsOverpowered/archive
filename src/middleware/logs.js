@@ -12,7 +12,7 @@ module.exports = function (app) {
     const vodId = req.params.vodId,
       content_offset_seconds = req.query.content_offset_seconds;
 
-    let cursor, logs;
+    let cursor = null, logs;
 
     await app
       .service("logs")
