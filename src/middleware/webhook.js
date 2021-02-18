@@ -59,9 +59,16 @@ module.exports.stream = function (app) {
     let vodData = await twitch.getLatestVodData(userId);
     if (!vodData) return console.error("Failed to get latest vod in webhook");
     if (data.length === 0) {
+      console.log(`${config.channel} went offline.`);
+      console.log(`Getting logs for ${vodData.id}`);
       vod.getLogs(vodData.id, app);
     } else {
       if (!(await exists(vodData.id, app))) {
+        console.log(
+          `${
+            config.channel
+          } went online. Creating vod. ${new Date().toLocaleDateString()}`
+        );
         createVod(data[0], vodData, app);
         return;
       }
@@ -70,7 +77,7 @@ module.exports.stream = function (app) {
     }
 
     setTimeout(async () => {
-      console.log(`${config.channel} went offline.`);
+      console.log(`Starting downloading for ${vodData.id}`);
       let vodDb;
       await app
         .service("vods")
