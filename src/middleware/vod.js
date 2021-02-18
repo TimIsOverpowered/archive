@@ -781,7 +781,7 @@ module.exports.getLogs = async (vodId, app) => {
       });
     }
     cursor = response._next;
-    await sleep(100); //don't bombarade the api
+    await sleep(50); //don't bombarade the api
     howMany++;
   }
   console.info(

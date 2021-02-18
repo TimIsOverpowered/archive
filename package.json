@@ -55,6 +55,7 @@
     "hls-parser": "^0.7.0",
     "moment-duration-format": "^2.3.2",
     "pg": "^8.5.1",
+    "redis": "^3.0.2",
     "sequelize": "^6.3.5",
     "serve-favicon": "^2.5.0",
     "winston": "^3.3.3"
