@@ -366,3 +366,43 @@ module.exports.getChapters = async (vodID) => {
     });
   return data;
 };
+
+module.exports.getChapter = async (vodID) => {
+  let data;
+  await axios({
+      url: "https://gql.twitch.tv/gql",
+      method: "POST",
+      headers: {
+        Accept: "*/*",
+        "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko", //twitch's
+        "Content-Type": "text/plain;charset=UTF-8"
+      },
+      data: {
+        operationName: "NielsenContentMetadata",
+        variables: {
+          isCollectionContent: false,
+          isLiveContent: false,
+          isVODContent: true,
+          collectionID: "",
+          login: "",
+          vodID: vodID,
+        },
+        extensions: {
+          persistedQuery: {
+            version: 1,
+            sha256Hash: "2dbf505ee929438369e68e72319d1106bb3c142e295332fac157c90638968586"
+          }
+        }
+      }
+    })
+    .then((response) => {
+      data = response.data.data.video;
+    })
+    .catch(async (e) => {
+      if (!e.response) {
+        return console.error(e);
+      }
+      console.error(e.response.data);
+    });
+  return data;
+}

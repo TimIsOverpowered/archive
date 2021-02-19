@@ -29,5 +29,6 @@
     "youtube_comment": "YOUR PINNED COMMENT GOES HERE",
     "youtube_public_vid": false,
     "timezone": "UTC",
-    "showGameInTitle": false
+    "showGameInTitle": false,
+    "perGameUpload": false
 }
