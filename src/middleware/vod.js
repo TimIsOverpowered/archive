@@ -582,7 +582,6 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
     const fileSize = fs.statSync(data.path).size;
     let description = config.youtube_description;
     if (data.chapters) {
-      description += `00:00 Start of stream\n`;
       for (let chapter of data.chapters) {
         description += `${chapter.duration} ${chapter.name}\n`;
       }

@@ -331,3 +331,38 @@ module.exports.fetchNextComments = async (vodId, cursor) => {
     });
   return data;
 };
+
+module.exports.getChapters = async (vodID) => {
+  let data;
+  await axios({
+      url: "https://gql.twitch.tv/gql",
+      method: "POST",
+      headers: {
+        Accept: "*/*",
+        "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko", //twitch's
+        "Content-Type": "text/plain;charset=UTF-8"
+      },
+      data: {
+        operationName: "VideoPreviewCard__VideoMoments",
+        variables: {
+          videoId: vodID,
+        },
+        extensions: {
+          persistedQuery: {
+            version: 1,
+            sha256Hash: "0094e99aab3438c7a220c0b1897d144be01954f8b4765b884d330d0c0893dbde"
+          }
+        }
+      }
+    })
+    .then((response) => {
+      data = response.data.data.video.moments.edges;
+    })
+    .catch(async (e) => {
+      if (!e.response) {
+        return console.error(e);
+      }
+      console.error(e.response.data);
+    });
+  return data;
+};

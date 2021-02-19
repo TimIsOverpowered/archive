@@ -5,6 +5,7 @@ const momentDurationFormatSetup = require("moment-duration-format");
 momentDurationFormatSetup(moment);
 const fs = require("fs");
 const config = require("../../config/config.json");
+const webhook = require("./webhook");
 
 module.exports.verify = function (app) {
   return async function (req, res, next) {
@@ -475,5 +476,17 @@ module.exports.trimDmca = function (app) {
     );
 
     fs.unlinkSync(vodPath);
+  };
+};
+
+module.exports.saveChapters = function (app) {
+  return async function (req, res, next) {
+    if (!req.body.vodId)
+      return res.status(400).json({ error: true, message: "No vod id" });
+
+    webhook.saveChapters(req.body.vodId, app);
+    res
+      .status(200)
+      .json({ error: false, message: `Saving Chapters for ${req.body.vodId}` });
   };
 };

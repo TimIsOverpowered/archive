@@ -61,6 +61,7 @@ module.exports.stream = function (app) {
     if (data.length === 0) {
       console.log(`${config.channel} went offline.`);
       console.log(`Getting logs for ${vodData.id}`);
+      this.saveChapters(vodData.id, app);
       vod.getLogs(vodData.id, app);
     } else {
       if (!(await exists(vodData.id, app))) {
@@ -72,8 +73,6 @@ module.exports.stream = function (app) {
         createVod(data[0], vodData, app);
         return;
       }
-      saveChapters(data[0], vodData, app);
-      return;
     }
 
     setTimeout(async () => {
@@ -146,22 +145,6 @@ const createVod = async (data, vodData, app) => {
   const gameData = await twitch.getGameData(data.game_id);
   if (!gameData) return console.error("Failed to get game data");
 
-  const chapters = [
-    {
-      gameId: gameData.id,
-      name: gameData.name,
-      image: gameData.box_art_url,
-      title: data.title,
-      duration: moment
-        .duration(
-          moment.utc().diff(moment.utc(data.started_at)),
-          "milliseconds"
-        )
-        .format("HH:mm:ss", { trim: false }),
-      createdAt: vodData.created_at,
-    },
-  ];
-
   await app
     .service("vods")
     .create({
@@ -170,7 +153,6 @@ const createVod = async (data, vodData, app) => {
       date: new Date(vodData.created_at).toLocaleDateString("en-US", {
         timeZone: config.timezone,
       }),
-      chapters: chapters,
     })
     .then(() => {
       console.info(`Created vod ${vodData.id} for ${vodData.user_name}`);
@@ -180,11 +162,11 @@ const createVod = async (data, vodData, app) => {
     });
 };
 
-const saveChapters = async (data, vodData, app) => {
+module.exports.saveChapters = async (vodId, app) => {
   let vod_data;
   await app
     .service("vods")
-    .get(vodData.id)
+    .get(vodId)
     .then((data) => {
       vod_data = data;
     })
@@ -195,38 +177,27 @@ const saveChapters = async (data, vodData, app) => {
   if (!vod_data)
     return console.error("Failed to save chapters: No vod in database..?");
 
-  const chapters = vod_data.chapters;
+  const chapters = await twitch.getChapters(vodId);
 
-  const gameData = await twitch.getGameData(data.game_id);
-  if (!gameData) return console.error("Failed to get game data");
-
-  const chapter = {
-    gameId: gameData.id,
-    name: gameData.name,
-    image: gameData.box_art_url,
-    title: data.title,
-    duration: moment
-      .duration(
-        moment.utc().diff(moment.utc(data.started_at)) - 60 * 1000 * 2,
-        "milliseconds"
-      )
-      .format("HH:mm:ss", { trim: false }),
-  };
-
-  //don't push chapter if the last chapter was the same game.
-  if (chapters[chapters.length - 1].gameId !== chapter.gameId) {
-    chapters.push(chapter);
+  let newChapters = [];
+  for (let chapter of chapters) {
+    newChapters.push({
+      gameId: chapter.node.details.game.id,
+      name: chapter.node.details.game.displayName,
+      image: chapter.node.details.game.boxArtURL,
+      duration: moment
+        .utc(chapter.node.positionMilliseconds)
+        .format("HH:mm:ss"),
+    });
   }
 
   await app
     .service("vods")
-    .patch(vodData.id, {
-      chapters: chapters,
+    .patch(vodId, {
+      chapters: newChapters,
     })
     .then(() => {
-      console.info(
-        `Saved chapter: ${chapter.name} for ${vodData.user_name} in vod ${vodData.id}`
-      );
+      console.info(`Saved chapters for ${config.channel} in vod ${vodId}`);
     })
     .catch((e) => {
       console.error(e);
