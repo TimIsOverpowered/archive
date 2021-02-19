@@ -109,7 +109,10 @@ module.exports.stream = function (app) {
       )
         return;
       await saveDuration(vodData, app);
-      vod.upload(vodData.id, app);
+      await vod.upload(vodData.id, app);
+      if (config.perGameUpload) {
+        vod.gameUpload(vodData.id, app);
+      }
     }, 300 * 1000);
   };
 };
@@ -180,15 +183,28 @@ module.exports.saveChapters = async (vodId, app) => {
   const chapters = await twitch.getChapters(vodId);
 
   let newChapters = [];
-  for (let chapter of chapters) {
+  if (chapters.length === 0) {
+    const chapter = await twitch.getChapter(vodId);
     newChapters.push({
-      gameId: chapter.node.details.game.id,
-      name: chapter.node.details.game.displayName,
-      image: chapter.node.details.game.boxArtURL,
-      duration: moment
-        .utc(chapter.node.positionMilliseconds)
-        .format("HH:mm:ss"),
+      gameId: chapter.game.id,
+      name: chapter.game.displayName,
+      duration: "00:00:00",
+      start: 0,
+      end: moment.duration(vod_data.duration).asSeconds(),
     });
+  } else {
+    for (let chapter of chapters) {
+      newChapters.push({
+        gameId: chapter.node.details.game.id,
+        name: chapter.node.details.game.displayName,
+        image: chapter.node.details.game.boxArtURL,
+        duration: moment
+          .utc(chapter.node.positionMilliseconds)
+          .format("HH:mm:ss"),
+        start: chapter.node.positionMilliseconds === 0 ? chapter.node.positionMilliseconds / 1000 : (chapter.node.positionMilliseconds / 1000) - 120, //2mins prior bc streamers are dumb when setting game?
+        end: chapter.node.durationMilliseconds / 1000,
+      });
+    }
   }
 
   await app

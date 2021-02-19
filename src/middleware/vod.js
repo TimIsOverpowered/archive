@@ -78,11 +78,7 @@ module.exports.upload = async (vodId, app) => {
       }
       const data = {
         path: paths[i],
-        title: config.showGameInTitle
-          ? `${config.channel} plays ${vod.chapters[0].name} ${vod.date} PART ${
-              i + 1
-            }`
-          : `${config.channel} ${vod.date} Vod PART ${i + 1}`,
+        title: `${config.channel} ${vod.date} Vod PART ${i + 1}`,
         date: vod.date,
         chapters: chapters,
         vodId: vodId,
@@ -95,9 +91,7 @@ module.exports.upload = async (vodId, app) => {
 
   const data = {
     path: vodPath,
-    title: config.showGameInTitle
-      ? `${config.channel} plays ${vod.chapters[0].name} ${vod.date}`
-      : `${config.channel} ${vod.date} Vod`,
+    title: `${config.channel} ${vod.date} Vod`,
     date: vod.date,
     chapters: vod.chapters,
     vodId: vodId,
@@ -105,6 +99,34 @@ module.exports.upload = async (vodId, app) => {
   };
 
   await this.uploadVideo(data, app);
+};
+
+module.exports.gameUpload = async (vodId, app) => {
+  let vod;
+  await app
+    .service("vods")
+    .get(vodId)
+    .then((data) => {
+      vod = data;
+    })
+    .catch(() => {});
+
+  if (!vod)
+    return console.error("Failed to download video: no VOD in database");
+
+  const vodPath = await this.download(vodId);
+
+  for (let chapter of vod.chapters) {
+    console.info(`Trimming ${chapter.name} from ${vod.id} ${vod.date}`)
+    const trimmedPath = await this.trim(
+      vodPath,
+      vodId,
+      chapter.start,
+      chapter.end
+    );
+
+    await this.trimUpload(trimmedPath, `${config.channel} plays ${chapter.name} ${vod.date}`);
+  }
 };
 
 module.exports.splitVideo = async (vodPath, duration, vodId) => {
@@ -659,7 +681,7 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
   }, 1000);
 };
 
-module.exports.trimUpload = async (path, title, date) => {
+module.exports.trimUpload = async (path, title) => {
   oauth2Client.credentials = config.youtube;
   const youtube = google.youtube("v3");
   await youtube.search.list({
@@ -687,6 +709,7 @@ module.exports.trimUpload = async (path, title, date) => {
           },
           status: {
             privacyStatus: "unlisted",
+            //privacyStatus: config.youtube_public_vid ? "public" : "unlisted",
           },
         },
         media: {
