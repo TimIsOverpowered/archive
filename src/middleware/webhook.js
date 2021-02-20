@@ -182,6 +182,7 @@ module.exports.saveChapters = async (vodId, app) => {
     return console.error("Failed to save chapters: No vod in database..?");
 
   const chapters = await twitch.getChapters(vodId);
+  if(!chapters) return console.error("Failed to save chapters: Chapters is null");
 
   let newChapters = [];
   if (chapters.length === 0) {
