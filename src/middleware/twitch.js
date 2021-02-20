@@ -356,7 +356,7 @@ module.exports.getChapters = async (vodID) => {
       }
     })
     .then((response) => {
-      console.log(response.data);
+      if(!response.data.data.video) return null;
       data = response.data.data.video.moments.edges;
     })
     .catch(async (e) => {
