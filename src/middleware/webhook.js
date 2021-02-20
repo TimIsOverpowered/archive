@@ -59,12 +59,8 @@ module.exports.stream = function (app) {
 
     let vodData = await twitch.getLatestVodData(userId);
     if (!vodData) return console.error("Failed to get latest vod in webhook");
-    if (data.length === 0) {
-      console.log(`${config.channel} went offline.`);
-      console.log(`Getting logs for ${vodData.id}`);
-      self.saveChapters(vodData.id, app);
-      vod.getLogs(vodData.id, app);
-    } else {
+
+    if (data.length !== 0) {
       if (!(await exists(vodData.id, app))) {
         console.log(
           `${
@@ -72,9 +68,14 @@ module.exports.stream = function (app) {
           } went online. Creating vod. ${new Date().toLocaleDateString()}`
         );
         createVod(data[0], vodData, app);
-        return;
       }
+      return;
     }
+
+    console.log(`${config.channel} went offline.`);
+    console.log(`Getting logs for ${vodData.id}`);
+    self.saveChapters(vodData.id, app);
+    vod.getLogs(vodData.id, app);
 
     setTimeout(async () => {
       console.log(`Starting downloading for ${vodData.id}`);
@@ -182,7 +183,8 @@ module.exports.saveChapters = async (vodId, app) => {
     return console.error("Failed to save chapters: No vod in database..?");
 
   const chapters = await twitch.getChapters(vodId);
-  if(!chapters) return console.error("Failed to save chapters: Chapters is null");
+  if (!chapters)
+    return console.error("Failed to save chapters: Chapters is null");
 
   let newChapters = [];
   if (chapters.length === 0) {
@@ -203,7 +205,10 @@ module.exports.saveChapters = async (vodId, app) => {
         duration: moment
           .utc(chapter.node.positionMilliseconds)
           .format("HH:mm:ss"),
-        start: chapter.node.positionMilliseconds === 0 ? chapter.node.positionMilliseconds / 1000 : (chapter.node.positionMilliseconds / 1000) - 120, //2mins prior bc streamers are dumb when setting game?
+        start:
+          chapter.node.positionMilliseconds === 0
+            ? chapter.node.positionMilliseconds / 1000
+            : chapter.node.positionMilliseconds / 1000 - 120, //2mins prior bc streamers are dumb when setting game?
         end: chapter.node.durationMilliseconds / 1000,
       });
     }
