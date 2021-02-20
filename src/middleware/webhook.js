@@ -31,6 +31,7 @@ module.exports.verify = function (app) {
 };
 
 module.exports.stream = function (app) {
+  const self = this;
   return async function (req, res, next) {
     res.status(200).send("ok");
 
@@ -61,7 +62,7 @@ module.exports.stream = function (app) {
     if (data.length === 0) {
       console.log(`${config.channel} went offline.`);
       console.log(`Getting logs for ${vodData.id}`);
-      this.saveChapters(vodData.id, app);
+      self.saveChapters(vodData.id, app);
       vod.getLogs(vodData.id, app);
     } else {
       if (!(await exists(vodData.id, app))) {
