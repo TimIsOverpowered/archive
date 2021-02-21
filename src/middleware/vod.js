@@ -125,6 +125,8 @@ module.exports.gameUpload = async (vodId, app) => {
       chapter.end
     );
 
+    if(!trimmedPath) return console.error("Trim failed");
+
     await this.trimUpload(trimmedPath, `${config.channel} plays ${chapter.name} ${vod.date}`);
   }
 };
