@@ -110,7 +110,7 @@ module.exports.stream = function (app) {
       )
         return;
       await saveDuration(vodData, app);
-      self.saveChapters(vodData.id, app);
+      await self.saveChapters(vodData.id, app);
       await vod.upload(vodData.id, app);
       if (config.perGameUpload) {
         vod.gameUpload(vodData.id, app);
@@ -185,8 +185,6 @@ module.exports.saveChapters = async (vodId, app) => {
   const chapters = await twitch.getChapters(vodId);
   if (!chapters)
     return console.error("Failed to save chapters: Chapters is null");
-
-  vod_data.duration
 
   let newChapters = [];
   if (chapters.length === 0) {
