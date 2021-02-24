@@ -117,7 +117,7 @@ module.exports.gameUpload = async (vodId, app) => {
   const vodPath = await this.download(vodId);
 
   for (let chapter of vod.chapters) {
-    console.info(`Trimming ${chapter.name} from ${vod.id} ${vod.date}`)
+    console.info(`Trimming ${chapter.name} from ${vod.id} ${vod.date}`);
     const trimmedPath = await this.trim(
       vodPath,
       vodId,
@@ -125,9 +125,12 @@ module.exports.gameUpload = async (vodId, app) => {
       chapter.end
     );
 
-    if(!trimmedPath) return console.error("Trim failed");
+    if (!trimmedPath) return console.error("Trim failed");
 
-    await this.trimUpload(trimmedPath, `${config.channel} plays ${chapter.name} ${vod.date}`);
+    await this.trimUpload(
+      trimmedPath,
+      `${config.channel} plays ${chapter.name} ${vod.date}`
+    );
   }
 };
 
@@ -783,6 +786,23 @@ module.exports.getLogs = async (vodId, app) => {
       );
     }
     response = await twitch.fetchNextComments(vodId, cursor);
+    if (!response.comments) {
+      console.info(`No more comments left due to vod ${vodId} being deleted..`);
+      await app
+        .service("logs")
+        .create(comments)
+        .then(() => {
+          if ((process.env.NODE_ENV || "").trim() !== "production") {
+            console.info(
+              `\nSaved ${comments.length} comments in DB for vod ${vodId}`
+            );
+          }
+        })
+        .catch((e) => {
+          console.error(e);
+        });
+      return;
+    }
     for (let comment of response.comments) {
       if (comments.length >= 2500) {
         await app
