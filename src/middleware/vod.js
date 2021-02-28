@@ -51,6 +51,40 @@ module.exports.upload = async (vodId, app) => {
 
   const vodPath = await this.download(vodId);
 
+  if (config.perGameUpload) {
+    for (let chapter of vod.chapters) {
+      console.info(`Trimming ${chapter.name} from ${vod.id} ${vod.date}`);
+      const trimmedPath = await this.trim(
+        vodPath,
+        vodId,
+        chapter.start,
+        chapter.end
+      );
+
+      if (!trimmedPath) return console.error("Trim failed");
+
+      if (chapter.end > 43199) {
+        let paths = await this.splitVideo(trimmedPath, chapter.end, vodId);
+        if (!paths)
+          return console.error(
+            "Something went wrong trying to split the trimmed video"
+          );
+
+        for (let i = 0; i < paths.length; i++) {
+          await this.trimUpload(
+            paths[i],
+            `${config.channel} plays ${chapter.name} ${vod.date} PART ${i + 1}`
+          );
+        }
+      } else {
+        await this.trimUpload(
+          trimmedPath,
+          `${config.channel} plays ${chapter.name} ${vod.date}`
+        );
+      }
+    }
+  }
+
   const duration = moment.duration(vod.duration).asSeconds();
 
   if (duration > 43199) {
@@ -86,6 +120,7 @@ module.exports.upload = async (vodId, app) => {
       };
       await this.uploadVideo(data, app);
     }
+    fs.unlinkSync(vodPath);
     return;
   }
 
@@ -99,39 +134,6 @@ module.exports.upload = async (vodId, app) => {
   };
 
   await this.uploadVideo(data, app);
-};
-
-module.exports.gameUpload = async (vodId, app) => {
-  let vod;
-  await app
-    .service("vods")
-    .get(vodId)
-    .then((data) => {
-      vod = data;
-    })
-    .catch(() => {});
-
-  if (!vod)
-    return console.error("Failed to download video: no VOD in database");
-
-  const vodPath = await this.download(vodId);
-
-  for (let chapter of vod.chapters) {
-    console.info(`Trimming ${chapter.name} from ${vod.id} ${vod.date}`);
-    const trimmedPath = await this.trim(
-      vodPath,
-      vodId,
-      chapter.start,
-      chapter.end
-    );
-
-    if (!trimmedPath) return console.error("Trim failed");
-
-    await this.trimUpload(
-      trimmedPath,
-      `${config.channel} plays ${chapter.name} ${vod.date}`
-    );
-  }
 };
 
 module.exports.splitVideo = async (vodPath, duration, vodId) => {
@@ -178,9 +180,6 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
       .catch((e) => {
         console.error("\nffmpeg error occurred: " + e);
       });
-  }
-  if (paths.length > 0) {
-    fs.unlinkSync(vodPath);
   }
   return paths;
 };
@@ -234,7 +233,7 @@ module.exports.trim = async (vodPath, vodId, start, end) => {
       .seekOutput(start)
       .videoCodec("copy")
       .audioCodec("copy")
-      .outputOptions([`-to ${end}`])
+      .duration(end)
       .toFormat("mp4")
       .on("progress", (progress) => {
         if ((process.env.NODE_ENV || "").trim() !== "production") {
@@ -605,85 +604,88 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
     .getTokenInfo(config.youtube.access_token)
     .catch(async (e) => {
     });*/
-  setTimeout(async () => {
-    const fileSize = fs.statSync(data.path).size;
-    let description = config.youtube_description;
-    if (data.chapters) {
-      for (let chapter of data.chapters) {
-        description += `${chapter.duration} ${chapter.name}\n`;
+  await new Promise((resolve, reject) => {
+    setTimeout(async () => {
+      const fileSize = fs.statSync(data.path).size;
+      let description = config.youtube_description;
+      if (data.chapters) {
+        for (let chapter of data.chapters) {
+          description += `${chapter.duration} ${chapter.name}\n`;
+        }
       }
-    }
-    const res = await youtube.videos.insert(
-      {
-        auth: oauth2Client,
-        part: "id,snippet,status",
-        notifySubscribers: false,
-        requestBody: {
-          snippet: {
-            title: data.title,
-            description: description,
-            categoryId: "20",
+      const res = await youtube.videos.insert(
+        {
+          auth: oauth2Client,
+          part: "id,snippet,status",
+          notifySubscribers: false,
+          requestBody: {
+            snippet: {
+              title: data.title,
+              description: description,
+              categoryId: "20",
+            },
+            status: {
+              privacyStatus: config.youtube_public_vid ? "public" : "unlisted",
+            },
           },
-          status: {
-            privacyStatus: config.youtube_public_vid ? "public" : "unlisted",
+          media: {
+            body: fs.createReadStream(data.path),
           },
         },
-        media: {
-          body: fs.createReadStream(data.path),
-        },
-      },
-      {
-        onUploadProgress: (evt) => {
-          if ((process.env.NODE_ENV || "").trim() !== "production") {
-            const progress = (evt.bytesRead / fileSize) * 100;
-            readline.clearLine(process.stdout, 0);
-            readline.cursorTo(process.stdout, 0, null);
-            process.stdout.write(`UPLOAD PROGRESS: ${Math.round(progress)}%`);
-          }
-        },
-      }
-    );
-    console.log("\n\n");
-    console.log(res.data);
+        {
+          onUploadProgress: (evt) => {
+            if ((process.env.NODE_ENV || "").trim() !== "production") {
+              const progress = (evt.bytesRead / fileSize) * 100;
+              readline.clearLine(process.stdout, 0);
+              readline.cursorTo(process.stdout, 0, null);
+              process.stdout.write(`UPLOAD PROGRESS: ${Math.round(progress)}%`);
+            }
+          },
+        }
+      );
+      console.log("\n\n");
+      console.log(res.data);
 
-    let youtube_ids;
-    await app
-      .service("vods")
-      .get(data.vodId)
-      .then((data) => {
-        youtube_ids = data.youtube_id;
-      });
+      let youtube_ids;
+      await app
+        .service("vods")
+        .get(data.vodId)
+        .then((data) => {
+          youtube_ids = data.youtube_id;
+        });
 
-    if (!replace) {
-      if (data.index === 0) {
-        youtube_ids.unshift(res.data.id);
+      if (!replace) {
+        if (data.index === 0) {
+          youtube_ids.unshift(res.data.id);
+        } else {
+          youtube_ids.push(res.data.id);
+        }
       } else {
-        youtube_ids.push(res.data.id);
+        if (data.index === 0) {
+          youtube_ids = [res.data.id];
+        } else {
+          youtube_ids.push(res.data.ids);
+        }
       }
-    } else {
-      if (data.index === 0) {
-        youtube_ids = [res.data.id];
-      } else {
-        youtube_ids.push(res.data.ids);
-      }
-    }
 
-    await app
-      .service("vods")
-      .patch(data.vodId, {
-        thumbnail_url: res.data.snippet.thumbnails.medium.url,
-        youtube_id: youtube_ids,
-      })
-      .then(() => {
-        console.info(`Saved youtube data in DB for vod ${data.vodId}`);
-      })
-      .catch((e) => {
-        console.error(e);
-      });
+      await app
+        .service("vods")
+        .patch(data.vodId, {
+          thumbnail_url: res.data.snippet.thumbnails.medium.url,
+          youtube_id: youtube_ids,
+        })
+        .then(() => {
+          console.info(`Saved youtube data in DB for vod ${data.vodId}`);
+        })
+        .catch((e) => {
+          console.error(e);
+        });
 
-    fs.unlinkSync(data.path);
-    this.addComment(res.data.id, data.vodId, app);
-  }, 1000);
+      fs.unlinkSync(data.path);
+      this.addComment(res.data.id, data.vodId, app);
+      resolve();
+    }, 1000);
+  });
 };
 
 module.exports.trimUpload = async (path, title) => {
@@ -699,44 +701,47 @@ module.exports.trimUpload = async (path, title) => {
     .getTokenInfo(config.youtube.access_token)
     .catch(async (e) => {
     });*/
-  setTimeout(async () => {
-    const fileSize = fs.statSync(path).size;
-    const res = await youtube.videos.insert(
-      {
-        auth: oauth2Client,
-        part: "id,snippet,status",
-        notifySubscribers: false,
-        requestBody: {
-          snippet: {
-            title: title,
-            description: config.youtube_description,
-            categoryId: "20",
+  await new Promise((resolve, reject) => {
+    setTimeout(async () => {
+      const fileSize = fs.statSync(path).size;
+      const res = await youtube.videos.insert(
+        {
+          auth: oauth2Client,
+          part: "id,snippet,status",
+          notifySubscribers: false,
+          requestBody: {
+            snippet: {
+              title: title,
+              description: config.youtube_description,
+              categoryId: "20",
+            },
+            status: {
+              privacyStatus: "unlisted",
+              //privacyStatus: config.youtube_public_vid ? "public" : "unlisted",
+            },
           },
-          status: {
-            privacyStatus: "unlisted",
-            //privacyStatus: config.youtube_public_vid ? "public" : "unlisted",
+          media: {
+            body: fs.createReadStream(path),
           },
         },
-        media: {
-          body: fs.createReadStream(path),
-        },
-      },
-      {
-        onUploadProgress: (evt) => {
-          if ((process.env.NODE_ENV || "").trim() !== "production") {
-            const progress = (evt.bytesRead / fileSize) * 100;
-            readline.clearLine(process.stdout, 0);
-            readline.cursorTo(process.stdout, 0, null);
-            process.stdout.write(`UPLOAD PROGRESS: ${Math.round(progress)}%`);
-          }
-        },
-      }
-    );
-    console.log("\n\n");
-    console.log(res.data);
+        {
+          onUploadProgress: (evt) => {
+            if ((process.env.NODE_ENV || "").trim() !== "production") {
+              const progress = (evt.bytesRead / fileSize) * 100;
+              readline.clearLine(process.stdout, 0);
+              readline.cursorTo(process.stdout, 0, null);
+              process.stdout.write(`UPLOAD PROGRESS: ${Math.round(progress)}%`);
+            }
+          },
+        }
+      );
+      console.log("\n\n");
+      console.log(res.data);
 
-    fs.unlinkSync(path);
-  }, 1000);
+      fs.unlinkSync(path);
+      resolve();
+    }, 1000);
+  });
 };
 
 module.exports.addComment = async (videoId, vodId, app) => {
