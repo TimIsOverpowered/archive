@@ -111,10 +111,7 @@ module.exports.stream = function (app) {
         return;
       await saveDuration(vodData, app);
       await self.saveChapters(vodData.id, app);
-      await vod.upload(vodData.id, app);
-      if (config.perGameUpload) {
-        vod.gameUpload(vodData.id, app);
-      }
+      vod.upload(vodData.id, app);
     }, 300 * 1000);
   };
 };
