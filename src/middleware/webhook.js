@@ -57,26 +57,28 @@ module.exports.stream = function (app) {
 
     await twitch.checkToken();
 
-    let vodData = await twitch.getLatestVodData(userId);
-    if (!vodData) return console.error("Failed to get latest vod in webhook");
-
-    if (data.length !== 0) {
-      if (!(await exists(vodData.id, app))) {
-        console.log(
-          `${
-            config.channel
-          } went online. Creating vod. ${new Date().toLocaleDateString()}`
-        );
-        createVod(data[0], vodData, app);
-      }
-      return;
-    }
-
-    console.log(`${config.channel} went offline.`);
-    console.log(`Getting logs for ${vodData.id}`);
-    vod.getLogs(vodData.id, app);
-
+    //Often gets wrong vod data off start. Wait a few minutes.
     setTimeout(async () => {
+      let vodData = await twitch.getLatestVodData(userId);
+      if (!vodData) return console.error("Failed to get latest vod in webhook");
+
+      if (data.length !== 0) {
+        const vodExists = await exists(vodData.id, app);
+        if (!vodExists) {
+          console.log(
+            `${
+              config.channel
+            } went online. Creating vod. ${new Date().toLocaleDateString()}`
+          );
+          await createVod(data[0], vodData, app);
+        }
+        return;
+      }
+
+      console.log(`${config.channel} went offline.`);
+      console.log(`Getting logs for ${vodData.id}`);
+      vod.getLogs(vodData.id, app);
+
       console.log(`Starting downloading for ${vodData.id}`);
       let vodDb;
       await app
@@ -112,7 +114,7 @@ module.exports.stream = function (app) {
       await saveDuration(vodData, app);
       await self.saveChapters(vodData.id, app);
       vod.upload(vodData.id, app);
-    }, 300 * 1000);
+    }, 1000 * 60 * 2);
   };
 };
 
