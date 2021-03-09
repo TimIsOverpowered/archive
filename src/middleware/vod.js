@@ -716,8 +716,7 @@ module.exports.trimUpload = async (path, title) => {
               categoryId: "20",
             },
             status: {
-              privacyStatus: "unlisted",
-              //privacyStatus: config.youtube_public_vid ? "public" : "unlisted",
+              privacyStatus: config.youtube_public_vid ? "public" : "unlisted",
             },
           },
           media: {
