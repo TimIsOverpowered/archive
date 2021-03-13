@@ -252,6 +252,42 @@ module.exports.dmca = function (app) {
 
     fs.unlinkSync(vodPath);
 
+    if (config.perGameUpload) {
+      for (let chapter of vod_data.chapters) {
+        console.info(`Trimming ${chapter.name} from ${vod_data.id} ${vod_data.date}`);
+        const trimmedPath = await vod.trim(
+          newVodPath ? newVodPath : blackoutPath,
+          vodId,
+          chapter.start,
+          chapter.end
+        );
+
+        if (!trimmedPath) return console.error("Trim failed");
+
+        if (chapter.end > 43199) {
+          let paths = await vod.splitVideo(trimmedPath, chapter.end, vodId);
+          if (!paths)
+            return console.error(
+              "Something went wrong trying to split the trimmed video"
+            );
+
+          for (let i = 0; i < paths.length; i++) {
+            await vod.trimUpload(
+              paths[i],
+              `${config.channel} plays ${chapter.name} ${vod_data.date} PART ${
+                i + 1
+              }`
+            );
+          }
+        } else {
+          await vod.trimUpload(
+            trimmedPath,
+            `${config.channel} plays ${chapter.name} ${vod_data.date}`
+          );
+        }
+      }
+    }
+
     const duration = moment.duration(vod_data.duration).asSeconds();
 
     if (duration > 43199) {
@@ -296,6 +332,7 @@ module.exports.dmca = function (app) {
       return console.error(
         "nothing to mute or blackout. don't try to upload.."
       );
+
     const data = {
       path: newVodPath ? newVodPath : blackoutPath,
       title: `${config.channel} ${vod_data.date} Vod`,
