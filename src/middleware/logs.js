@@ -12,7 +12,8 @@ module.exports = function (app) {
     const vodId = req.params.vodId,
       content_offset_seconds = req.query.content_offset_seconds;
 
-    let cursor = null, logs;
+    let cursor = null,
+      logs;
 
     await app
       .service("logs")
@@ -34,9 +35,7 @@ module.exports = function (app) {
       .then((data) => {
         if (data.length === 0) return;
         if (data.length === 101) {
-          cursor = Buffer.from(
-            data[100].content_offset_seconds.toString()
-          ).toString("base64");
+          cursor = Buffer.from(data[100].content_offset_seconds.toString()).toString("base64");
         }
         logs = data.slice(0, 100);
       })

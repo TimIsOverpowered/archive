@@ -7,7 +7,7 @@ module.exports = function (app) {
   const sequelizeClient = app.get('sequelizeClient');
   const logs = sequelizeClient.define('logs', {
     id: {
-      type: DataTypes.TEXT,
+      type: DataTypes.UUID,
       allowNull: false,
       primaryKey: true
     },
