@@ -117,7 +117,9 @@ module.exports.stream = function (app) {
       return;
     await saveDuration(vodData, app);
     await self.saveChapters(vodData.id, app);
-    vod.upload(vodData.id, app);
+    setTimeout(async () => {
+      vod.upload(vodData.id, app);
+    }, 1000 * 60 * 3)
   };
 };
 

@@ -36,7 +36,7 @@ oauth2Client.on("tokens", (tokens) => {
   });
 });
 
-module.exports.upload = async (vodId, app) => {
+module.exports.upload = async (vodId, app, manualPath = false) => {
   let vod;
   await app
     .service("vods")
@@ -49,7 +49,7 @@ module.exports.upload = async (vodId, app) => {
   if (!vod)
     return console.error("Failed to download video: no VOD in database");
 
-  const vodPath = await this.download(vodId);
+  const vodPath = manualPath ? manualPath : await this.download(vodId);
 
   if (config.perGameUpload) {
     for (let chapter of vod.chapters) {

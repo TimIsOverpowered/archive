@@ -41,7 +41,7 @@ module.exports.download = function (app) {
         exists = false;
       });
     if (exists) {
-      vod.upload(req.body.vodId, app);
+      vod.upload(req.body.vodId, app, req.body.path);
       res.status(200).json({ error: false, message: "Starting download.." });
       return;
     }
@@ -68,7 +68,7 @@ module.exports.download = function (app) {
         console.error(e);
       });
 
-    vod.upload(req.body.vodId, app);
+    vod.upload(req.body.vodId, app, req.body.path);
     res.status(200).json({ error: false, message: "Starting download.." });
   };
 };
