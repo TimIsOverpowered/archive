@@ -56,7 +56,7 @@
     "moment-duration-format": "^2.3.2",
     "pg": "^8.5.1",
     "redis": "^3.0.2",
-    "sequelize": "^6.3.5",
+    "sequelize": "^6.6.2",
     "serve-favicon": "^2.5.0",
     "winston": "^3.3.3"
   },
