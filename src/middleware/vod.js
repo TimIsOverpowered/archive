@@ -8,8 +8,12 @@ const writeFile = util.promisify(fs.writeFile);
 const readline = require("readline");
 const { google } = require("googleapis");
 const moment = require("moment");
+const momentDurationFormatSetup = require("moment-duration-format");
+momentDurationFormatSetup(moment);
 const OAuth2 = google.auth.OAuth2;
 const path = require("path");
+const HLS = require("hls-parser");
+const axios = require("axios");
 const oauth2Client = new OAuth2(
   config.google.client_id,
   config.google.client_secret,
@@ -763,6 +767,7 @@ module.exports.addComment = async (videoId, vodId, app) => {
 };
 
 module.exports.getLogs = async (vodId, app) => {
+  console.log(`Saving logs for ${vodData.id}`);
   let start_time = new Date();
   let comments = [];
   let response = await twitch.fetchComments(vodId);
@@ -911,4 +916,204 @@ module.exports.manualLogs = async (commentsPath, vodId, app) => {
 
 const sleep = (ms) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
+};
+
+module.exports.startDownload = async (vodId, app) => {
+  console.log(`Start download: ${vodId}`);
+  download(vodId, app);
+};
+
+//RETRY PARAM: Just to make sure whole vod is processed bc it takes awhile for twitch to update the vod even after a stream ends.
+//VOD TS FILES SEEMS TO UPDATE AROUND 5 MINUTES. DELAY IS TO CHECK EVERY 1MIN.
+const download = async (vodId, app, retry = 0, delay = 1) => {
+  const dir = `${config.vodPath}${vodId}`;
+  const m3u8Path = `${dir}/${vodId}.m3u8`;
+  const newVodData = await twitch.getVodData(vodId);
+
+  if ((!newVodData && (await fileExists(m3u8Path))) || retry >= 10) {
+    const duration = await getDuration(m3u8Path);
+    await saveDuration(vodId, duration, app);
+    const mp4Path = `${dir}/${vodId}.mp4`;
+    await convertToMp4(m3u8Path, vodId, mp4Path);
+    await this.upload(vodId, app, mp4Path);
+    fs.rmdirSync(dir, { recursive: true });
+    return;
+  }
+
+  const tokenSig = await twitch.getVodTokenSig(vodId);
+  if (!tokenSig) {
+    setTimeout(() => {
+      download(vodId, app, retry, delay);
+    }, 1000 * 60 * delay);
+    return console.error(`failed to get token/sig for ${vodId}`);
+  }
+
+  let newVideoM3u8 = await twitch.getM3u8(
+    vodId,
+    tokenSig.value,
+    tokenSig.signature
+  );
+  if (!newVideoM3u8) {
+    setTimeout(() => {
+      download(vodId, app, retry, delay);
+    }, 1000 * 60 * delay);
+    return console.error("failed to get m3u8");
+  }
+
+  newVideoM3u8 = await twitch.getParsedM3u8(newVideoM3u8);
+  if (!newVideoM3u8) {
+    setTimeout(() => {
+      download(vodId, app, retry, delay);
+    }, 1000 * 60 * delay);
+    return console.error("failed to parse m3u8");
+  }
+
+  const baseURL = newVideoM3u8.substring(0, newVideoM3u8.lastIndexOf("/"));
+
+  newVideoM3u8 = HLS.parse(await twitch.getVariantM3u8(newVideoM3u8));
+
+  if (!(await fileExists(m3u8Path))) {
+    if (!(await fileExists(dir))) {
+      fs.mkdirSync(dir);
+    }
+    await downloadTSFiles(newVideoM3u8, dir, baseURL, vodId);
+
+    setTimeout(() => {
+      download(vodId, app, retry, delay);
+    }, 1000 * 60 * delay);
+    return;
+  }
+
+  let videoM3u8;
+
+  await fs.promises
+    .readFile(m3u8Path, "utf8")
+    .then((data) => (videoM3u8 = data))
+    .catch((e) => console.error(e));
+
+  if (!videoM3u8) {
+    setTimeout(() => {
+      download(vodId, retry, app);
+    }, 1000 * 60 * delay);
+    return;
+  }
+
+  videoM3u8 = HLS.parse(videoM3u8);
+
+  //retry if last segment is the same as on file.
+  if (
+    newVideoM3u8.segments[newVideoM3u8.segments.length - 1].uri ===
+    videoM3u8.segments[videoM3u8.segments.length - 1].uri
+  ) {
+    retry++;
+    setTimeout(() => {
+      download(vodId, app, retry, delay);
+    }, 1000 * 60 * delay);
+    return;
+  }
+
+  //reset retry if downloading new ts files.
+  retry = 1;
+  await downloadTSFiles(newVideoM3u8, dir, baseURL, vodId);
+
+  setTimeout(() => {
+    download(vodId, app, retry, delay);
+  }, 1000 * 60 * 1);
+};
+
+const downloadTSFiles = async (m3u8, dir, baseURL, vodId) => {
+  try {
+    fs.writeFileSync(`${dir}/${vodId}.m3u8`, HLS.stringify(m3u8));
+  } catch (err) {
+    console.error(err);
+  }
+  for (let segment of m3u8.segments) {
+    if (await fileExists(`${dir}/${segment.uri}`)) continue;
+
+    await axios({
+      method: "get",
+      url: `${baseURL}/${segment.uri}`,
+      responseType: "stream",
+    })
+      .then((response) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          console.info(`Downloaded ${segment.uri}`);
+        }
+        response.data.pipe(fs.createWriteStream(`${dir}/${segment.uri}`));
+      })
+      .catch((e) => {
+        console.error(e);
+      });
+  }
+  if ((process.env.NODE_ENV || "").trim() !== "production") {
+    console.info(
+      `Done downloading.. Last segment was ${
+        m3u8.segments[m3u8.segments.length - 1].uri
+      }`
+    );
+  }
+};
+
+const convertToMp4 = async (m3u8, vodId, mp4Path) => {
+  await new Promise((resolve, reject) => {
+    const ffmpeg_process = ffmpeg(m3u8);
+    ffmpeg_process
+      .videoCodec("copy")
+      .audioCodec("copy")
+      .outputOptions(["-bsf:a aac_adtstoasc"])
+      .toFormat("mp4")
+      .on("progress", (progress) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          readline.clearLine(process.stdout, 0);
+          readline.cursorTo(process.stdout, 0, null);
+          process.stdout.write(
+            `M3U8 CONVERT TO MP4 PROGRESS: ${Math.round(progress.percent)}%`
+          );
+        }
+      })
+      .on("start", (cmd) => {
+        console.info(`Converting ${vodId} m3u8 to mp4`);
+      })
+      .on("error", function (err) {
+        ffmpeg_process.kill("SIGKILL");
+        reject(err);
+      })
+      .on("end", function () {
+        resolve();
+      })
+      .saveToFile(mp4Path);
+  });
+}
+
+const fileExists = async (file) => {
+  return fs.promises
+    .access(file, fs.constants.F_OK)
+    .then(() => true)
+    .catch(() => false);
+};
+
+const getDuration = async (video) => {
+  let duration;
+  await new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(video, (err, metadata) => {
+      if (err) {
+        console.error(err);
+        return reject();
+      }
+      duration = metadata.format.duration;
+      resolve();
+    });
+  });
+  return duration;
+};
+
+const saveDuration = async (vodId, duration, app) => {
+  await app
+    .service("vods")
+    .patch(vodId, {
+      duration: moment.duration(duration, "seconds").format("hh:mm:ss"),
+    })
+    .catch((e) => {
+      console.error(e);
+    });
 };
