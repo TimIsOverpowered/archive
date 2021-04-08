@@ -160,32 +160,33 @@ module.exports.subscribe = async (user_id) => {
 module.exports.getVodTokenSig = async (vodID) => {
   let data;
   await axios({
-      url: "https://gql.twitch.tv/gql",
-      method: "POST",
-      headers: {
-        Accept: "*/*",
-        "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko", //twitch's
-        "Content-Type": "text/plain;charset=UTF-8"
+    url: "https://gql.twitch.tv/gql",
+    method: "POST",
+    headers: {
+      Accept: "*/*",
+      "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko", //twitch's
+      "Content-Type": "text/plain;charset=UTF-8",
+    },
+    data: {
+      operationName: "PlaybackAccessToken",
+      variables: {
+        isLive: false,
+        login: "",
+        isVod: true,
+        vodID: vodID,
+        platform: "web",
+        playerBackend: "mediaplayer",
+        playerType: "site",
       },
-      data: {
-        operationName: "PlaybackAccessToken",
-        variables: {
-          isLive: false,
-          login: "",
-          isVod: true,
-          vodID: vodID,
-          platform: "web",
-          playerBackend: "mediaplayer",
-          playerType: "site"
+      extensions: {
+        persistedQuery: {
+          version: 1,
+          sha256Hash:
+            "0828119ded1c13477966434e15800ff57ddacf13ba1911c129dc2200705b0712",
         },
-        extensions: {
-          persistedQuery: {
-            version: 1,
-            sha256Hash: "0828119ded1c13477966434e15800ff57ddacf13ba1911c129dc2200705b0712"
-          }
-        }
-      }
-    })
+      },
+    },
+  })
     .then((response) => {
       data = response.data.data.videoPlaybackAccessToken;
     })
@@ -218,6 +219,22 @@ module.exports.getM3u8 = async (vodId, token, sig) => {
 
 module.exports.getParsedM3u8 = (m3u8) => {
   return HLS.parse(m3u8).variants[0].uri;
+};
+
+module.exports.getVariantM3u8 = async (M3U8_URL) => {
+  let data;
+  await axios
+    .get(M3U8_URL)
+    .then((response) => {
+      data = response.data;
+    })
+    .catch(async (e) => {
+      if (!e.response) {
+        return console.error(e);
+      }
+      console.error(e.response.data);
+    });
+  return data;
 };
 
 module.exports.getLatestVodData = async (userId) => {
@@ -335,28 +352,29 @@ module.exports.fetchNextComments = async (vodId, cursor) => {
 module.exports.getChapters = async (vodID) => {
   let data;
   await axios({
-      url: "https://gql.twitch.tv/gql",
-      method: "POST",
-      headers: {
-        Accept: "*/*",
-        "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko", //twitch's
-        "Content-Type": "text/plain;charset=UTF-8"
+    url: "https://gql.twitch.tv/gql",
+    method: "POST",
+    headers: {
+      Accept: "*/*",
+      "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko", //twitch's
+      "Content-Type": "text/plain;charset=UTF-8",
+    },
+    data: {
+      operationName: "VideoPreviewCard__VideoMoments",
+      variables: {
+        videoId: vodID,
       },
-      data: {
-        operationName: "VideoPreviewCard__VideoMoments",
-        variables: {
-          videoId: vodID,
+      extensions: {
+        persistedQuery: {
+          version: 1,
+          sha256Hash:
+            "0094e99aab3438c7a220c0b1897d144be01954f8b4765b884d330d0c0893dbde",
         },
-        extensions: {
-          persistedQuery: {
-            version: 1,
-            sha256Hash: "0094e99aab3438c7a220c0b1897d144be01954f8b4765b884d330d0c0893dbde"
-          }
-        }
-      }
-    })
+      },
+    },
+  })
     .then((response) => {
-      if(!response.data.data.video) return null;
+      if (!response.data.data.video) return null;
       data = response.data.data.video.moments.edges;
     })
     .catch(async (e) => {
@@ -371,31 +389,32 @@ module.exports.getChapters = async (vodID) => {
 module.exports.getChapter = async (vodID) => {
   let data;
   await axios({
-      url: "https://gql.twitch.tv/gql",
-      method: "POST",
-      headers: {
-        Accept: "*/*",
-        "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko", //twitch's
-        "Content-Type": "text/plain;charset=UTF-8"
+    url: "https://gql.twitch.tv/gql",
+    method: "POST",
+    headers: {
+      Accept: "*/*",
+      "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko", //twitch's
+      "Content-Type": "text/plain;charset=UTF-8",
+    },
+    data: {
+      operationName: "NielsenContentMetadata",
+      variables: {
+        isCollectionContent: false,
+        isLiveContent: false,
+        isVODContent: true,
+        collectionID: "",
+        login: "",
+        vodID: vodID,
       },
-      data: {
-        operationName: "NielsenContentMetadata",
-        variables: {
-          isCollectionContent: false,
-          isLiveContent: false,
-          isVODContent: true,
-          collectionID: "",
-          login: "",
-          vodID: vodID,
+      extensions: {
+        persistedQuery: {
+          version: 1,
+          sha256Hash:
+            "2dbf505ee929438369e68e72319d1106bb3c142e295332fac157c90638968586",
         },
-        extensions: {
-          persistedQuery: {
-            version: 1,
-            sha256Hash: "2dbf505ee929438369e68e72319d1106bb3c142e295332fac157c90638968586"
-          }
-        }
-      }
-    })
+      },
+    },
+  })
     .then((response) => {
       data = response.data.data.video;
     })
@@ -406,4 +425,25 @@ module.exports.getChapter = async (vodID) => {
       console.error(e.response.data);
     });
   return data;
-}
+};
+
+module.exports.checkIfLive = async (twitchId) => {
+  let live = false;
+  await axios
+    .get(`https://api.twitch.tv/helix/streams?user_id=${twitchId}`, {
+      headers: {
+        Authorization: `Bearer ${config.twitch.access_token}`,
+        "Client-Id": config.twitch.client_id,
+      },
+    })
+    .then((response) => {
+      const data = response.data.data;
+      if (data.length > 0) {
+        live = true;
+      }
+    })
+    .catch((e) => {
+      console.error(e.response.data);
+    });
+  return live;
+};

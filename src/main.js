@@ -1,6 +1,7 @@
 const twitch = require("./middleware/twitch");
 const moment = require("moment");
 const config = require('../config/config.json');
+const vod = require("./middleware/vod");
 
 module.exports = async function (app) {
   await twitch.checkToken();
@@ -29,5 +30,10 @@ module.exports = async function (app) {
       }, moment.utc(webhook.expires_at).diff(moment.utc()));
       continue;
     }
+  }
+  
+  if(await twitch.checkIfLive(config.twitchId)) {
+    const vodData = await twitch.getLatestVodData(config.twitchId);
+    vod.startDownload(vodData.id);
   }
 };
