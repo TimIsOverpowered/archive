@@ -34,6 +34,6 @@ module.exports = async function (app) {
   
   if(await twitch.checkIfLive(config.twitchId)) {
     const vodData = await twitch.getLatestVodData(config.twitchId);
-    vod.startDownload(vodData.id);
+    vod.startDownload(vodData.id, app);
   }
 };
