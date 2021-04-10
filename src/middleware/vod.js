@@ -865,6 +865,15 @@ module.exports.manualLogs = async (commentsPath, vodId, app) => {
     });
 
   for (let comment of responseComments) {
+    if ((process.env.NODE_ENV || "").trim() !== "production") {
+      readline.clearLine(process.stdout, 0);
+      readline.cursorTo(process.stdout, 0, null);
+      process.stdout.write(
+        `Current Log position: ${moment
+          .utc(comment.content_offset_seconds * 1000)
+          .format("HH:mm:ss")}`
+      );
+    }
     if (await commentExists(comment._id, app)) continue;
     if (comments.length >= 2500) {
       await app
