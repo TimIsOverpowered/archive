@@ -73,6 +73,16 @@ module.exports.download = function (app) {
   };
 };
 
+module.exports.downloadv2 = function (app) {
+  return async function (req, res, next) {
+    if (!req.body.vodId)
+      return res.status(400).json({ error: true, message: "Missing vod id.." });
+
+    vod.startDownload(req.body.vodId, app);
+    res.status(200).json({ error: false, message: "Starting download.." });
+  };
+};
+
 module.exports.logs = function (app) {
   return async function (req, res, next) {
     if (!req.body.vodId)

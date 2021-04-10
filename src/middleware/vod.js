@@ -767,20 +767,29 @@ module.exports.addComment = async (videoId, vodId, app) => {
 };
 
 module.exports.getLogs = async (vodId, app) => {
-  console.log(`Saving logs for ${vodData.id}`);
+  console.log(`Saving logs for ${vodId}`);
+  //check if offline.
   let start_time = new Date();
   let comments = [];
   let response = await twitch.fetchComments(vodId);
-  for (let comment of response.comments) {
-    comments.push({
-      id: comment._id,
-      vod_id: vodId,
-      display_name: comment.commenter.display_name,
-      content_offset_seconds: comment.content_offset_seconds,
-      message: comment.message.fragments,
-      user_badges: comment.message.user_badges,
-      user_color: comment.message.user_color,
-    });
+
+  if (
+    !(await commentExists(
+      response.comments[response.comments.length - 1]._id,
+      app
+    ))
+  ) {
+    for (let comment of response.comments) {
+      comments.push({
+        id: comment._id,
+        vod_id: vodId,
+        display_name: comment.commenter.display_name,
+        content_offset_seconds: comment.content_offset_seconds,
+        message: comment.message.fragments,
+        user_badges: comment.message.user_badges,
+        user_color: comment.message.user_color,
+      });
+    }
   }
   let cursor = response._next;
   let howMany = 1;
@@ -795,7 +804,7 @@ module.exports.getLogs = async (vodId, app) => {
       );
     }
     response = await twitch.fetchNextComments(vodId, cursor);
-    if (!response.comments) {
+    if (!response) {
       console.info(`No more comments left due to vod ${vodId} being deleted..`);
       await app
         .service("logs")
@@ -812,32 +821,39 @@ module.exports.getLogs = async (vodId, app) => {
         });
       return;
     }
-    for (let comment of response.comments) {
-      if (comments.length >= 2500) {
-        await app
-          .service("logs")
-          .create(comments)
-          .then(() => {
-            if ((process.env.NODE_ENV || "").trim() !== "production") {
-              console.info(
-                `\nSaved ${comments.length} comments in DB for vod ${vodId}`
-              );
-            }
-          })
-          .catch((e) => {
-            console.error(e);
-          });
-        comments = [];
+    if (
+      !(await commentExists(
+        response.comments[response.comments.length - 1]._id,
+        app
+      ))
+    ) {
+      for (let comment of response.comments) {
+        if (comments.length >= 2500) {
+          await app
+            .service("logs")
+            .create(comments)
+            .then(() => {
+              if ((process.env.NODE_ENV || "").trim() !== "production") {
+                console.info(
+                  `\nSaved ${comments.length} comments in DB for vod ${vodId}`
+                );
+              }
+            })
+            .catch((e) => {
+              console.error(e);
+            });
+          comments = [];
+        }
+        comments.push({
+          id: comment._id,
+          vod_id: vodId,
+          display_name: comment.commenter.display_name,
+          content_offset_seconds: comment.content_offset_seconds,
+          message: comment.message.fragments,
+          user_badges: comment.message.user_badges,
+          user_color: comment.message.user_color,
+        });
       }
-      comments.push({
-        id: comment._id,
-        vod_id: vodId,
-        display_name: comment.commenter.display_name,
-        content_offset_seconds: comment.content_offset_seconds,
-        message: comment.message.fragments,
-        user_badges: comment.message.user_badges,
-        user_color: comment.message.user_color,
-      });
     }
     cursor = response._next;
     await sleep(50); //don't bombarade the api
@@ -900,7 +916,7 @@ module.exports.manualLogs = async (commentsPath, vodId, app) => {
     howMany++;
   }
   console.info(
-    `\nTotal API Calls: ${howMany} | Total Time to get logs for ${vodId}: ${
+    `\nTotal Comments: ${howMany} | Total Time to get logs for ${vodId}: ${
       (new Date() - start_time) / 1000
     } seconds`
   );
@@ -914,13 +930,119 @@ module.exports.manualLogs = async (commentsPath, vodId, app) => {
     .catch(() => {});
 };
 
+const commentExists = async (id, app) => {
+  let exists;
+  await app
+    .service("comments")
+    .get(id)
+    .then(() => {
+      exists = true;
+    })
+    .catch(() => {
+      exists = false;
+    });
+  return exists;
+};
+
 const sleep = (ms) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
+};
+
+const downloadLogs = async (vodId, app, cursor = null) => {
+  let comments = [],
+    response;
+
+  if (!cursor) {
+    response = await twitch.fetchComments(vodId);
+
+    if (!response) return console.error(`No Comments found for ${vodId}`);
+
+    if (!(await commentExists(response.comments[0]._id, app))) {
+      for (let comment of response.comments) {
+        comments.push({
+          id: comment._id,
+          vod_id: vodId,
+          display_name: comment.commenter.display_name,
+          content_offset_seconds: comment.content_offset_seconds,
+          message: comment.message.fragments,
+          user_badges: comment.message.user_badges,
+          user_color: comment.message.user_color,
+        });
+      }
+    }
+    cursor = response._next;
+  }
+
+  while (cursor) {
+    if ((process.env.NODE_ENV || "").trim() !== "production") {
+      readline.clearLine(process.stdout, 0);
+      readline.cursorTo(process.stdout, 0, null);
+      process.stdout.write(
+        `Current Log position: ${moment
+          .utc(response.comments[0].content_offset_seconds * 1000)
+          .format("HH:mm:ss")}`
+      );
+    }
+    response = await twitch.fetchNextComments(vodId, cursor);
+    if (!response) {
+      console.info(`No more comments left due to vod ${vodId} being deleted..`);
+      break;
+    }
+    if (!(await commentExists(response.comments[0]._id, app))) {
+      for (let comment of response.comments) {
+        if (comments.length >= 2500) {
+          await app
+            .service("logs")
+            .create(comments)
+            .then(() => {
+              if ((process.env.NODE_ENV || "").trim() !== "production") {
+                console.info(
+                  `\nSaved ${comments.length} comments in DB for vod ${vodId}`
+                );
+              }
+            })
+            .catch((e) => {
+              console.error(e);
+            });
+          comments = [];
+        }
+        comments.push({
+          id: comment._id,
+          vod_id: vodId,
+          display_name: comment.commenter.display_name,
+          content_offset_seconds: comment.content_offset_seconds,
+          message: comment.message.fragments,
+          user_badges: comment.message.user_badges,
+          user_color: comment.message.user_color,
+        });
+      }
+    }
+    cursor = response._next;
+    await sleep(50); //don't bombarade the api
+  }
+
+  if (comments.length > 0) {
+    await app
+      .service("logs")
+      .create(comments)
+      .catch(() => {});
+  }
+
+  //if live, continue fetching logs.
+  if (await twitch.checkIfLive(config.twitchId)) {
+    setTimeout(() => {
+      downloadLogs(vodId, app, cursor);
+    }, 1000 * 60 * 1);
+  } else {
+    console.info(`Saved all comments in DB for vod ${vodId}`);
+  }
 };
 
 module.exports.startDownload = async (vodId, app) => {
   console.log(`Start download: ${vodId}`);
   download(vodId, app);
+  console.log(`Start Logs download: ${vodId}`);
+  downloadLogs(vodId, app);
 };
 
 //RETRY PARAM: Just to make sure whole vod is processed bc it takes awhile for twitch to update the vod even after a stream ends.
@@ -936,7 +1058,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
     const mp4Path = `${dir}/${vodId}.mp4`;
     await convertToMp4(m3u8Path, vodId, mp4Path);
     await this.upload(vodId, app, mp4Path);
-    fs.rmdirSync(dir, { recursive: true });
+    //fs.rmdirSync(dir, { recursive: true });
     return;
   }
 
@@ -1018,7 +1140,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
 
   setTimeout(() => {
     download(vodId, app, retry, delay);
-  }, 1000 * 60 * 1);
+  }, 1000 * 60 * delay);
 };
 
 const downloadTSFiles = async (m3u8, dir, baseURL, vodId) => {
@@ -1083,7 +1205,7 @@ const convertToMp4 = async (m3u8, vodId, mp4Path) => {
       })
       .saveToFile(mp4Path);
   });
-}
+};
 
 const fileExists = async (file) => {
   return fs.promises

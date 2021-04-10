@@ -58,13 +58,14 @@ module.exports.stream = function (app) {
     await twitch.checkToken();
 
     if (data.length != 0) {
-      //Often gets wrong vod data off start. Wait a few minutes.
+      //Have to wait a few minutes till the new vod gets populated.
       setTimeout(async () => {
         let vodData = await twitch.getLatestVodData(userId);
         if (!vodData)
           return console.error("Failed to get latest vod in webhook");
         const vodExists = await exists(vodData.id, app);
-        if (!vodExists) {
+        //Rare case: In case it was deleted and webhook was fired. Check if latest vod is relatively new.
+        if (!vodExists && moment.utc().diff(moment.utc(vodData.created_at), "seconds") <= 3600) {
           console.log(
             `${
               config.channel
@@ -81,7 +82,6 @@ module.exports.stream = function (app) {
     if (!vodData) return console.error("Failed to get latest vod in webhook");
 
     console.log(`${config.channel} went offline.`);
-    vod.getLogs(vodData.id, app);
     await self.saveChapters(vodData.id, app);
   };
 };
