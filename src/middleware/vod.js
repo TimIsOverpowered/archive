@@ -1077,7 +1077,6 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
   }
 
   const baseURL = newVideoM3u8.substring(0, newVideoM3u8.lastIndexOf("/"));
-  console.info(`Downloading from ${baseURL}`);
 
   newVideoM3u8 = HLS.parse(await twitch.getVariantM3u8(newVideoM3u8));
 
