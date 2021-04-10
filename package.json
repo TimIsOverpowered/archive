@@ -46,24 +46,24 @@
     "@feathersjs/transport-commons": "^4.5.11",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
-    "express-rate-limit": "^5.2.3",
-    "feathers-hooks-common": "^5.0.4",
+    "express-rate-limit": "^5.2.6",
+    "feathers-hooks-common": "^5.0.5",
     "feathers-sequelize": "^6.2.0",
     "fluent-ffmpeg": "^2.1.2",
-    "googleapis": "^66.0.0",
-    "helmet": "^4.3.1",
-    "hls-parser": "^0.7.0",
+    "googleapis": "^71.0.0",
+    "helmet": "^4.4.1",
+    "hls-parser": "^0.10.3",
     "moment-duration-format": "^2.3.2",
     "pg": "^8.5.1",
-    "redis": "^3.0.2",
-    "sequelize": "^6.3.5",
+    "redis": "^3.1.0",
+    "sequelize": "^6.6.2",
     "serve-favicon": "^2.5.0",
     "winston": "^3.3.3"
   },
   "devDependencies": {
     "axios": "^0.21.1",
-    "eslint": "^7.17.0",
-    "mocha": "^8.2.1",
-    "nodemon": "^2.0.6"
+    "eslint": "^7.23.0",
+    "mocha": "^8.3.2",
+    "nodemon": "^2.0.7"
   }
 }
