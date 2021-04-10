@@ -1046,9 +1046,9 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
   const dir = `${config.vodPath}${vodId}`;
   const m3u8Path = `${dir}/${vodId}.m3u8`;
   const newVodData = await twitch.getVodData(vodId);
-  const duration = await getDuration(m3u8Path);
 
   if ((!newVodData && (await fileExists(m3u8Path))) || retry >= 10) {
+    const duration = await getDuration(m3u8Path);
     await saveDuration(vodId, duration, app);
     const mp4Path = `${dir}/${vodId}.mp4`;
     await convertToMp4(m3u8Path, vodId, mp4Path);
