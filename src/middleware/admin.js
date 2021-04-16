@@ -47,6 +47,7 @@ module.exports.download = function (app) {
     }
 
     const vodData = await twitch.getVodData(req.body.vodId);
+    if (!vodData) return console.error("No vod data");
 
     await app
       .service("vods")
@@ -77,6 +78,45 @@ module.exports.downloadv2 = function (app) {
   return async function (req, res, next) {
     if (!req.body.vodId)
       return res.status(400).json({ error: true, message: "Missing vod id.." });
+
+    let exists;
+    await app
+      .service("vods")
+      .get(req.body.vodId)
+      .then(() => {
+        exists = true;
+      })
+      .catch(() => {
+        exists = false;
+      });
+    if (exists) {
+      vod.upload(req.body.vodId, app, req.body.path);
+      res.status(200).json({ error: false, message: "Starting download.." });
+      return;
+    }
+
+    const vodData = await twitch.getVodData(req.body.vodId);
+    if (!vodData) return console.error("No vod data");
+
+    await app
+      .service("vods")
+      .create({
+        id: vodData.id,
+        title: vodData.title,
+        date: new Date(vodData.created_at).toLocaleDateString("en-US", {
+          timeZone: config.timezone,
+        }),
+        createdAt: vodData.created_at,
+        duration: moment
+          .duration("PT" + vodData.duration.toUpperCase())
+          .format("HH:mm:ss", { trim: false }),
+      })
+      .then(() => {
+        console.info(`Created vod ${vodData.id} for ${vodData.user_name}`);
+      })
+      .catch((e) => {
+        console.error(e);
+      });
 
     vod.startDownload(req.body.vodId, app);
     res.status(200).json({ error: false, message: "Starting download.." });
