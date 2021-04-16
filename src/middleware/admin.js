@@ -90,7 +90,7 @@ module.exports.downloadv2 = function (app) {
         exists = false;
       });
     if (exists) {
-      vod.upload(req.body.vodId, app, req.body.path);
+      vod.startDownload(req.body.vodId, app, req.body.path);
       res.status(200).json({ error: false, message: "Starting download.." });
       return;
     }

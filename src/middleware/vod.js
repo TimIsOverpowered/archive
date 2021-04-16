@@ -110,8 +110,8 @@ module.exports.upload = async (vodId, app, manualPath = false) => {
             chapter.duration = moment
               .utc((chapterDuration - config.splitDuration * (i + 1)) * 1000)
               .format("HH:mm:ss");
+              chapters.push(chapter);
           }
-          chapters.push(chapter);
         }
       }
       const data = {
