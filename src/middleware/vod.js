@@ -67,7 +67,7 @@ module.exports.upload = async (vodId, app, manualPath = false) => {
 
       if (!trimmedPath) return console.error("Trim failed");
 
-      if (chapter.end > 43199) {
+      if (chapter.end > config.splitDuration) {
         let paths = await this.splitVideo(trimmedPath, chapter.end, vodId);
         if (!paths)
           return console.error(
@@ -91,7 +91,7 @@ module.exports.upload = async (vodId, app, manualPath = false) => {
 
   const duration = moment.duration(vod.duration).asSeconds();
 
-  if (duration > 43199) {
+  if (duration > config.splitDuration) {
     let paths = await this.splitVideo(vodPath, duration, vodId);
 
     if (!paths)
@@ -103,12 +103,12 @@ module.exports.upload = async (vodId, app, manualPath = false) => {
         for (let chapter of vod.chapters) {
           const chapterDuration = moment.duration(chapter.duration).asSeconds();
           if (i === 0) {
-            if (chapterDuration < 43199) {
+            if (chapterDuration < config.splitDuration) {
               chapters.push(chapter);
             }
           } else {
             chapter.duration = moment
-              .utc((chapterDuration - 43199 * (i + 1)) * 1000)
+              .utc((chapterDuration - config.splitDuration * (i + 1)) * 1000)
               .format("HH:mm:ss");
           }
           chapters.push(chapter);
@@ -143,11 +143,11 @@ module.exports.upload = async (vodId, app, manualPath = false) => {
 module.exports.splitVideo = async (vodPath, duration, vodId) => {
   console.log(`Trying to split ${vodPath} with duration ${duration}`);
   const paths = [];
-  for (let start = 0; start < duration; start += 43199) {
+  for (let start = 0; start < duration; start += config.splitDuration) {
     await new Promise((resolve, reject) => {
       let cut = duration - start;
-      if (cut > 43199) {
-        cut = 43199;
+      if (cut > config.splitDuration) {
+        cut = config.splitDuration;
       }
       const ffmpeg_process = ffmpeg(vodPath);
       ffmpeg_process

@@ -30,5 +30,6 @@
     "youtube_public_vid": false,
     "timezone": "UTC",
     "showGameInTitle": false,
-    "perGameUpload": false
+    "perGameUpload": false,
+    "splitDuration": 43199
 }
