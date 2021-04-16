@@ -110,7 +110,7 @@ module.exports.upload = async (vodId, app, manualPath = false) => {
             chapter.duration = moment
               .utc((chapterDuration - config.splitDuration * (i + 1)) * 1000)
               .format("HH:mm:ss");
-              chapters.push(chapter);
+            chapters.push(chapter);
           }
         }
       }
@@ -935,9 +935,10 @@ const sleep = (ms) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
-const downloadLogs = async (vodId, app, cursor = null) => {
+const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
   let comments = [],
-    response, lastCursor;
+    response,
+    lastCursor;
 
   if (!cursor) {
     response = await twitch.fetchComments(vodId);
@@ -1027,6 +1028,12 @@ const downloadLogs = async (vodId, app, cursor = null) => {
   if (await twitch.checkIfLive(config.twitchId)) {
     setTimeout(() => {
       downloadLogs(vodId, app, lastCursor);
+    }, 1000 * 60 * 1);
+  //retry for next 10 mins if not live anymore to catch remaining logs.
+  } else if (retry < 10) {
+    retry++;
+    setTimeout(() => {
+      downloadLogs(vodId, app, lastCursor, retry);
     }, 1000 * 60 * 1);
   } else {
     console.info(`Saved all comments in DB for vod ${vodId}`);
