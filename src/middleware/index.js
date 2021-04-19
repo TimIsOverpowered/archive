@@ -30,4 +30,18 @@ module.exports = function (app) {
 
     logs(app)
   );
+  app.get(
+    "/v2/vods/:vodId/comments",
+    rateLimit({
+      windowMs: 30 * 1000,
+      max: 15,
+      message: "API rate limit exceeded",
+      keyGenerator: function (req) {
+        //for cloudflare
+        //return req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        return req.headers["x-forwarded-for"] || req.socket.remoteAddress;
+      },
+    }),
+    logs.v2(app)
+  );
 };
