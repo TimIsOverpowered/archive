@@ -88,6 +88,9 @@ module.exports = function (app) {
             $gte: _id,
           },
           $limit: 101,
+          $sort: {
+            content_offset_seconds: 1,
+          },
         },
       })
       .then((data) => {
