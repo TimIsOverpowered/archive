@@ -41,12 +41,7 @@ module.exports = function (app) {
         .then((data) => {
           if (data.length === 0) return;
           if (data.length === 101) {
-            cursor = Buffer.from(
-              JSON.stringify({
-                id: data[100]._id,
-                content_offset_seconds: data[100].content_offset_seconds,
-              })
-            ).toString("base64");
+            cursor = Buffer.from(data[100]._id).toString("base64");
           }
           logs = data.slice(0, 100);
         })
@@ -67,10 +62,7 @@ module.exports = function (app) {
       });
     }
 
-    const cursorData = JSON.parse(
-      Buffer.from(req.query.cursor, "base64").toString("ascii")
-    );
-    const _id = parseInt(cursorData.id);
+    const _id = parseInt(Buffer.from(req.query.cursor, "base64").toString("ascii"));
 
     if (isNaN(_id))
       return res.status(400).json({
@@ -96,12 +88,7 @@ module.exports = function (app) {
       .then((data) => {
         if (data.length === 0) return;
         if (data.length === 101) {
-          cursor = Buffer.from(
-            JSON.stringify({
-              id: data[100]._id,
-              content_offset_seconds: data[100].content_offset_seconds,
-            })
-          ).toString("base64");
+          cursor = Buffer.from(data[100]._id).toString("base64");
         }
         logs = data.slice(0, 100);
       })
