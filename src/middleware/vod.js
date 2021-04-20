@@ -783,6 +783,8 @@ module.exports.getLogs = async (vodId, app) => {
       message: comment.message.fragments,
       user_badges: comment.message.user_badges,
       user_color: comment.message.user_color,
+      createdAt: comment.createdAt,
+      updatedAt: comment.updatedAt,
     });
   }
 
@@ -829,6 +831,8 @@ module.exports.getLogs = async (vodId, app) => {
         message: comment.message.fragments,
         user_badges: comment.message.user_badges,
         user_color: comment.message.user_color,
+        createdAt: comment.createdAt,
+        updatedAt: comment.updatedAt,
       });
     }
 
@@ -899,6 +903,8 @@ module.exports.manualLogs = async (commentsPath, vodId, app) => {
       message: comment.message.fragments,
       user_badges: comment.message.user_badges,
       user_color: comment.message.user_color,
+      createdAt: comment.createdAt,
+      updatedAt: comment.updatedAt,
     });
     howMany++;
   }
@@ -922,7 +928,7 @@ const commentExists = async (id, app) => {
   await app
     .service("logs")
     .get(id)
-    .then(() => {
+    .then((data) => {
       exists = true;
     })
     .catch(() => {
@@ -955,6 +961,8 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
         message: comment.message.fragments,
         user_badges: comment.message.user_badges,
         user_color: comment.message.user_color,
+        createdAt: comment.createdAt,
+        updatedAt: comment.updatedAt,
       });
     }
 
@@ -1001,6 +1009,8 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
         message: comment.message.fragments,
         user_badges: comment.message.user_badges,
         user_color: comment.message.user_color,
+        createdAt: comment.createdAt,
+        updatedAt: comment.updatedAt,
       });
     }
 
@@ -1021,7 +1031,9 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
           );
         }
       })
-      .catch(() => {});
+      .catch((e) => {
+        console.error(e);
+      });
   }
 
   //if live, continue fetching logs.
