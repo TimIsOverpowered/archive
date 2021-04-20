@@ -8,7 +8,11 @@ module.exports = function (app) {
   const logs = sequelizeClient.define('logs', {
     id: {
       type: DataTypes.UUID,
-      allowNull: false,
+      allowNull: false
+    },
+    _id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
       primaryKey: true
     },
     vod_id: {

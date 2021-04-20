@@ -1,4 +1,4 @@
-const redis = require("redis").createClient({return_buffers: true});
+const redis = require("redis").createClient({ return_buffers: true });
 const util = require("util");
 const asyncRedisGet = util.promisify(redis.get).bind(redis);
 const cppzst = require("cppzst");
@@ -22,18 +22,72 @@ module.exports = function (app) {
     let cursor = null,
       logs;
 
+    if (content_offset_seconds) {
+      await app
+        .service("logs")
+        .find({
+          paginate: false,
+          query: {
+            vod_id: vodId,
+            content_offset_seconds: {
+              $gte: content_offset_seconds,
+            },
+            $limit: 101,
+            $sort: {
+              content_offset_seconds: 1,
+            },
+          },
+        })
+        .then((data) => {
+          if (data.length === 0) return;
+          if (data.length === 101) {
+            cursor = Buffer.from(
+              JSON.stringify({
+                id: data[100]._id,
+                content_offset_seconds: data[100].content_offset_seconds,
+              })
+            ).toString("base64");
+          }
+          logs = data.slice(0, 100);
+        })
+        .catch((e) => {
+          console.error(e);
+        });
+
+      if (!logs) {
+        return res.status(500).json({
+          error: true,
+          msg: "Failed to retrieve logs from the database",
+        });
+      }
+
+      return res.json({
+        comments: logs,
+        cursor: cursor,
+      });
+    }
+
+    const cursorData = JSON.parse(
+      Buffer.from(req.query.cursor, "base64").toString("ascii")
+    );
+    const _id = parseInt(cursorData.id);
+
+    if (isNaN(_id))
+      return res.status(400).json({
+        error: true,
+        msg: "Cursor broken..",
+      });
+
     await app
       .service("logs")
       .find({
         paginate: false,
         query: {
           vod_id: vodId,
-          content_offset_seconds: {
-            $gte: content_offset_seconds
-              ? content_offset_seconds
-              : Buffer.from(req.query.cursor, "base64").toString("ascii"),
+          _id: {
+            $gte: _id,
           },
-          $limit: 201,
+          $limit: 101,
           $sort: {
             content_offset_seconds: 1,
           },
@@ -41,12 +95,15 @@ module.exports = function (app) {
       })
       .then((data) => {
         if (data.length === 0) return;
-        if (data.length === 201) {
+        if (data.length === 101) {
           cursor = Buffer.from(
-            data[200].content_offset_seconds.toString()
+            JSON.stringify({
+              id: data[100]._id,
+              content_offset_seconds: data[100].content_offset_seconds,
+            })
           ).toString("base64");
         }
-        logs = data.slice(0, 200);
+        logs = data.slice(0, 100);
       })
       .catch((e) => {
         console.error(e);
@@ -173,13 +230,9 @@ module.exports.v2 = function (app) {
       return res.json(response);
     }
 
-    let pastIndex = 0;
-    for (let comment of logs) {
-      if (parseFloat(comment.content_offset_seconds) > content_offset_seconds)
-        break;
-      pastIndex++;
-    }
-
+    let pastIndex = logs.findIndex(
+      (comment) => comment.content_offset_seconds > content_offset_seconds
+    );
     pastIndex = Math.floor(pastIndex / 100) * 100;
     comments = logs.slice(pastIndex, pastIndex + 100);
     const nextComment = logs[pastIndex + 100];
