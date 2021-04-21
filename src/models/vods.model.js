@@ -26,10 +26,6 @@ module.exports = function (app) {
     thumbnail_url: {
       type: DataTypes.TEXT
     },
-    youtube_id: {
-      type: DataTypes.ARRAY(DataTypes.TEXT),
-      defaultValue: []
-    },
     youtube: {
       type: DataTypes.ARRAY(DataTypes.JSON),
       defaultValue: []
