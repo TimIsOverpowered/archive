@@ -650,25 +650,36 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
       console.log("\n\n");
       console.log(res.data);
 
-      let youtube_ids;
+      let youtube_data;
       await app
         .service("vods")
         .get(data.vodId)
         .then((data) => {
-          youtube_ids = data.youtube_id;
+          youtube_data = data.youtube;
         });
 
       if (!replace) {
         if (data.index === 0) {
-          youtube_ids.unshift(res.data.id);
+          youtube_data.unshift(res.data.id);
         } else {
-          youtube_ids.push(res.data.id);
+          youtube_data.push({
+            id: res.data.id,
+            duration: await youtube.getDuration(res.data.id),
+          });
         }
       } else {
         if (data.index === 0) {
-          youtube_ids = [res.data.id];
+          youtube_data = [
+            {
+              id: res.data.id,
+              duration: await youtube.getDuration(res.data.id),
+            },
+          ];
         } else {
-          youtube_ids.push(res.data.ids);
+          youtube_data.push({
+            id: res.data.id,
+            duration: await youtube.getDuration(res.data.id),
+          });
         }
       }
 
@@ -676,7 +687,7 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
         .service("vods")
         .patch(data.vodId, {
           thumbnail_url: res.data.snippet.thumbnails.medium.url,
-          youtube_id: youtube_ids,
+          youtube: youtube_data,
         })
         .then(() => {
           console.info(`Saved youtube data in DB for vod ${data.vodId}`);
@@ -1041,7 +1052,7 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
     setTimeout(() => {
       downloadLogs(vodId, app, lastCursor);
     }, 1000 * 60 * 1);
-  //retry for next 10 mins if not live anymore to catch remaining logs.
+    //retry for next 10 mins if not live anymore to catch remaining logs.
   } else if (retry < 10) {
     retry++;
     setTimeout(() => {
