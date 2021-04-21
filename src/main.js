@@ -65,44 +65,4 @@ module.exports = async function (app) {
     }
     vod.startDownload(vodData.id, app);
   }
-
-  let vods;
-  await app
-    .service("vods")
-    .find({
-      paginate: false,
-    })
-    .then((data) => {
-      vods = data;
-    })
-    .catch((e) => {
-      console.error(e);
-    });
-  for (let vod of vods) {
-    vod.youtube = [];
-    for (let id of vod.youtube_id) {
-      const duration = await youtube.getDuration(id);
-      vod.youtube.push({
-        id: id,
-        duration: duration,
-      });
-    }
-    await app
-      .service("vods")
-      .patch(vod.id, {
-        youtube: vod.youtube,
-      })
-      .then(() => {
-        console.log(`saved ${vod.id}`);
-      })
-      .catch((e) => {
-        console.error(e);
-      });
-    await sleep(1000);
-  }
-  console.log('finished');
-};
-
-const sleep = (ms) => {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 };
