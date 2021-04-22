@@ -2,7 +2,6 @@ const twitch = require("./middleware/twitch");
 const moment = require("moment");
 const config = require("../config/config.json");
 const vod = require("./middleware/vod");
-const youtube = require("./middleware/youtube");
 
 module.exports = async function (app) {
   await twitch.checkToken();
