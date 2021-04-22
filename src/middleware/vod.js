@@ -41,7 +41,7 @@ oauth2Client.on("tokens", (tokens) => {
   });
 });
 
-module.exports.upload = async (vodId, app, manualPath = false) => {
+module.exports.upload = async (vodId, app, manualPath = false, dmca = false) => {
   let vod;
   await app
     .service("vods")
@@ -123,7 +123,7 @@ module.exports.upload = async (vodId, app, manualPath = false) => {
         vodId: vodId,
         index: i,
       };
-      await this.uploadVideo(data, app);
+      await this.uploadVideo(data, app, dmca);
     }
     fs.unlinkSync(vodPath);
     return;
@@ -138,7 +138,7 @@ module.exports.upload = async (vodId, app, manualPath = false) => {
     index: 0,
   };
 
-  await this.uploadVideo(data, app);
+  await this.uploadVideo(data, app, dmca);
 };
 
 module.exports.splitVideo = async (vodPath, duration, vodId) => {

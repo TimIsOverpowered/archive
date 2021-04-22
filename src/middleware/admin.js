@@ -302,7 +302,7 @@ module.exports.dmca = function (app) {
 
     fs.unlinkSync(vodPath);
 
-    vod.upload(vodId, app, newVodPath ? newVodPath : blackoutPath);
+    vod.upload(vodId, app, newVodPath ? newVodPath : blackoutPath, true);
   };
 };
 
