@@ -41,7 +41,12 @@ oauth2Client.on("tokens", (tokens) => {
   });
 });
 
-module.exports.upload = async (vodId, app, manualPath = false, dmca = false) => {
+module.exports.upload = async (
+  vodId,
+  app,
+  manualPath = false,
+  dmca = false
+) => {
   let vod;
   await app
     .service("vods")
@@ -661,7 +666,10 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
 
       if (!replace) {
         if (data.index === 0) {
-          youtube_data.unshift(res.data.id);
+          youtube_data.unshift({
+            id: res.data.id,
+            duration: await youtubeApi.getDuration(res.data.id),
+          });
         } else {
           youtube_data.push({
             id: res.data.id,
@@ -849,7 +857,7 @@ module.exports.getLogs = async (vodId, app) => {
     }
 
     cursor = response._next;
-    await sleep(50); //don't bombarade the api
+    await sleep(150); //don't bombarade the api
     howMany++;
   }
   console.info(
@@ -1027,7 +1035,7 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
     }
 
     cursor = response._next;
-    await sleep(50); //don't bombarade the api
+    await sleep(150); //don't bombarade the api
   }
 
   if (comments.length > 0) {

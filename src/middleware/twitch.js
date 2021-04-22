@@ -3,6 +3,7 @@ const config = require("../../config/config.json");
 const fs = require("fs");
 const path = require("path");
 const HLS = require("hls-parser");
+const rax = require('retry-axios');
 
 module.exports.checkToken = async () => {
   let isValid = false;
@@ -331,6 +332,7 @@ module.exports.fetchComments = async (vodId) => {
 };
 
 module.exports.fetchNextComments = async (vodId, cursor) => {
+  const interceptorId = rax.attach();
   let data;
   await axios
     .get(`https://api.twitch.tv/v5/videos/${vodId}/comments?cursor=${cursor}`, {
