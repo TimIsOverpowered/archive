@@ -277,6 +277,7 @@ module.exports.getVodData = async (vod_id) => {
       }
     })
     .catch((e) => {
+      if (!e.response) return console.error(e);
       console.error(e.response.data);
     });
   return vodData;
@@ -443,6 +444,7 @@ module.exports.checkIfLive = async (twitchId) => {
       }
     })
     .catch((e) => {
+      if (!e.response) return console.error(e);
       console.error(e.response.data);
     });
   return live;
