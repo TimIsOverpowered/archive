@@ -14,6 +14,7 @@ const OAuth2 = google.auth.OAuth2;
 const path = require("path");
 const HLS = require("hls-parser");
 const axios = require("axios");
+const youtubeApi = require("./youtube");
 const oauth2Client = new OAuth2(
   config.google.client_id,
   config.google.client_secret,
@@ -664,7 +665,7 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
         } else {
           youtube_data.push({
             id: res.data.id,
-            duration: await youtube.getDuration(res.data.id),
+            duration: await youtubeApi.getDuration(res.data.id),
           });
         }
       } else {
@@ -672,13 +673,13 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
           youtube_data = [
             {
               id: res.data.id,
-              duration: await youtube.getDuration(res.data.id),
+              duration: await youtubeApi.getDuration(res.data.id),
             },
           ];
         } else {
           youtube_data.push({
             id: res.data.id,
-            duration: await youtube.getDuration(res.data.id),
+            duration: await youtubeApi.getDuration(res.data.id),
           });
         }
       }
