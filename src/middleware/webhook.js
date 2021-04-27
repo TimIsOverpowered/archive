@@ -82,7 +82,7 @@ module.exports.stream = function (app) {
     if (!vodData) return console.error("Failed to get latest vod in webhook");
 
     console.log(`${config.channel} went offline.`);
-    await self.saveChapters(vodData.id, app);
+    await self.saveChapters(vodData, app);
   };
 };
 
@@ -118,19 +118,8 @@ const createVod = async (vodData, app) => {
     });
 };
 
-module.exports.saveChapters = async (vodId, app) => {
-  let vod_data;
-  await app
-    .service("vods")
-    .get(vodId)
-    .then((data) => {
-      vod_data = data;
-    })
-    .catch((e) => {
-      console.error(e);
-    });
-
-  if (!vod_data)
+module.exports.saveChapters = async (vodData, app) => {
+  if (!vodData)
     return console.error("Failed to save chapters: No vod in database..?");
 
   const chapters = await twitch.getChapters(vodId);
@@ -145,7 +134,7 @@ module.exports.saveChapters = async (vodId, app) => {
       name: chapter.game.displayName,
       duration: "00:00:00",
       start: 0,
-      end: moment.duration(vod_data.duration).asSeconds(),
+      end: moment.duration(vodData.duration).asSeconds(),
     });
   } else {
     for (let chapter of chapters) {
