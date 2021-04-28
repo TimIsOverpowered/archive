@@ -18,8 +18,8 @@ module.exports = function (app) {
   app.get(
     "/v1/vods/:vodId/comments",
     rateLimit({
-      windowMs: 30 * 1000,
-      max: 15,
+      windowMs: 5 * 1000,
+      max: 20,
       message: "API rate limit exceeded",
       keyGenerator: function (req) {
         //for cloudflare
