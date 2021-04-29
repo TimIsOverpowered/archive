@@ -475,7 +475,16 @@ module.exports.saveChapters = function (app) {
     if (!req.body.vodId)
       return res.status(400).json({ error: true, message: "No vod id" });
 
-    webhook.saveChapters(req.body.vodId, app);
+    const vodData = await twitch.getVodData(req.body.vodId);
+    if (!vodData)
+      return res
+        .status(500)
+        .json({
+          error: true,
+          message: `Failed to get vod data for ${req.body.vodId}`,
+        });
+
+    webhook.saveChapters(vodData, app);
     res
       .status(200)
       .json({ error: false, message: `Saving Chapters for ${req.body.vodId}` });
