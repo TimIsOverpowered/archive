@@ -57,15 +57,17 @@ module.exports.stream = function (app) {
 
     await twitch.checkToken();
 
-    if (data.length != 0) {
-      //Have to wait a few minutes till the new vod gets populated.
-      setTimeout(async () => {
-        let vodData = await twitch.getLatestVodData(userId);
-        if (!vodData)
-          return console.error("Failed to get latest vod in webhook");
+    //Have to wait a few minutes till the new vod gets populated. or end data is not correct.
+    setTimeout(async () => {
+      let vodData = await twitch.getLatestVodData(userId);
+      if (!vodData) return console.error("Failed to get latest vod in webhook");
+      if (data.length != 0) {
         const vodExists = await exists(vodData.id, app);
         //Rare case: In case it was deleted and webhook was fired. Check if latest vod is relatively new.
-        if (!vodExists && moment.utc().diff(moment.utc(vodData.created_at), "seconds") <= 3600) {
+        if (
+          !vodExists &&
+          moment.utc().diff(moment.utc(vodData.created_at), "seconds") <= 3600
+        ) {
           console.log(
             `${
               config.channel
@@ -74,15 +76,12 @@ module.exports.stream = function (app) {
           await createVod(vodData, app);
           vod.startDownload(vodData.id, app);
         }
-      }, 1000 * 60 * 2);
-      return;
-    }
+        return;
+      }
 
-    let vodData = await twitch.getLatestVodData(userId);
-    if (!vodData) return console.error("Failed to get latest vod in webhook");
-
-    console.log(`${config.channel} went offline.`);
-    await self.saveChapters(vodData, app);
+      console.log(`${config.channel} went offline.`);
+      await self.saveChapters(vodData, app);
+    }, 1000 * 60 * 2);
   };
 };
 
@@ -151,7 +150,10 @@ module.exports.saveChapters = async (vodData, app) => {
           chapter.node.positionMilliseconds === 0
             ? chapter.node.positionMilliseconds / 1000
             : chapter.node.positionMilliseconds / 1000 - 120, //2mins prior bc streamers are dumb when setting game?
-        end: chapter.node.durationMilliseconds / 1000,
+        end:
+          chapter.node.durationMilliseconds === 0
+            ? moment.duration(vodData.duration).asSeconds()
+            : chapter.node.durationMilliseconds / 1000,
       });
     }
   }
