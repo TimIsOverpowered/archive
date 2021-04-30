@@ -308,11 +308,11 @@ module.exports.getGameData = async (gameId) => {
   return gameData;
 };
 
-module.exports.fetchComments = async (vodId) => {
+module.exports.fetchComments = async (vodId, offset = 0) => {
   let data;
   await axios
     .get(
-      `https://api.twitch.tv/v5/videos/${vodId}/comments?content_offset_seconds=0`,
+      `https://api.twitch.tv/v5/videos/${vodId}/comments?content_offset_seconds=${offset}`,
       {
         headers: {
           "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko",
