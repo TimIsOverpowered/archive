@@ -34,7 +34,12 @@ module.exports = function (app) {
         .then((data) => {
           if (data.length === 0) return;
           if (data.length === 101) {
-            cursor = Buffer.from(data[100]._id).toString("base64");
+            cursor = Buffer.from(
+              JSON.stringify({
+                id: data[100]._id,
+                content_offset_seconds: data[100].content_offset_seconds,
+              })
+            ).toString("base64");
           }
           logs = data.slice(0, 100);
         })
@@ -55,13 +60,19 @@ module.exports = function (app) {
       });
     }
 
-    const _id = parseInt(Buffer.from(req.query.cursor, "base64").toString("ascii"));
+    let json;
 
-    if (isNaN(_id))
-      return res.status(400).json({
-        error: true,
-        msg: "Cursor broken..",
-      });
+    try {
+      json = JSON.parse(Buffer.from(req.query.cursor, "base64").toString());
+    } catch (e) {
+      console.error(`Cursor was: ${req.query.cursor}`);
+      console.error(Buffer.from(req.query.cursor, "base64").toString());
+    }
+
+    if (!json)
+      return res
+        .status(500)
+        .json({ error: true, msg: "Failed to parse cursor" });
 
     await app
       .service("logs")
@@ -70,7 +81,10 @@ module.exports = function (app) {
         query: {
           vod_id: vodId,
           _id: {
-            $gte: _id,
+            $gte: json.id,
+          },
+          content_offset_seconds: {
+            $gte: json.content_offset_seconds,
           },
           $limit: 101,
           $sort: {
@@ -81,7 +95,12 @@ module.exports = function (app) {
       .then((data) => {
         if (data.length === 0) return;
         if (data.length === 101) {
-          cursor = Buffer.from(data[100]._id).toString("base64");
+          cursor = Buffer.from(
+            JSON.stringify({
+              id: data[100]._id,
+              content_offset_seconds: data[100].content_offset_seconds,
+            })
+          ).toString("base64");
         }
         logs = data.slice(0, 100);
       })
