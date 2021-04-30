@@ -32,5 +32,6 @@
     "showGameInTitle": false,
     "perGameUpload": false,
     "splitDuration": 43199,
-    "youtube_api_key": "YOUR YOUTUBE API KEY"
+    "youtube_api_key": "YOUR YOUTUBE API KEY",
+    "liveUpload": false
 }

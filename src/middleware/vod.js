@@ -94,7 +94,7 @@ module.exports.upload = async (
     }
   }
 
-  const duration = moment.duration(vod.duration).asSeconds();
+  const duration = await getDuration(vodPath);
 
   if (duration > config.splitDuration) {
     let paths = await this.splitVideo(vodPath, duration, vodId);
@@ -143,6 +143,43 @@ module.exports.upload = async (
   };
 
   await this.uploadVideo(data, app, dmca);
+};
+
+module.exports.liveUploadPart = async (
+  app,
+  vodId,
+  m3u8Path,
+  start,
+  end,
+  part
+) => {
+  let vod;
+  await app
+    .service("vods")
+    .get(vodId)
+    .then((data) => {
+      vod = data;
+    })
+    .catch(() => {});
+
+  if (!vod)
+    return console.error("Failed in liveUploadPart: no VOD in database");
+
+  console.info(`Trimming ${vod.id} ${vod.date} | ${start} - ${end}`);
+  const trimmedPath = await this.trim(m3u8Path, vodId, start, end);
+
+  if (!trimmedPath) return console.error("Trim failed");
+
+  await this.trimUpload(
+    trimmedPath,
+    `${config.channel} ${vod.date} Vod Part ${part}`,
+    {
+      vodId: vodId,
+      youtube: vod.youtube,
+      part: part,
+    },
+    app
+  );
 };
 
 module.exports.splitVideo = async (vodPath, duration, vodId) => {
@@ -705,13 +742,13 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
         });
 
       fs.unlinkSync(data.path);
-      this.addComment(res.data.id, data.vodId, app);
+      this.addComment(res.data.id, data.vodId);
       resolve();
     }, 1000);
   });
 };
 
-module.exports.trimUpload = async (path, title) => {
+module.exports.trimUpload = async (path, title, data = false, app = null) => {
   oauth2Client.credentials = config.youtube;
   const youtube = google.youtube("v3");
   await youtube.search.list({
@@ -760,13 +797,34 @@ module.exports.trimUpload = async (path, title) => {
       console.log("\n\n");
       console.log(res.data);
 
+      if (data) {
+        data.youtube.push({
+          id: res.data.id,
+          duration: await getDuration(path),
+        });
+
+        await app
+          .service("vods")
+          .patch(data.vodId, {
+            thumbnail_url: res.data.snippet.thumbnails.medium.url,
+            youtube: data.youtube,
+          })
+          .then(() => {
+            console.info(`Saved youtube data in DB for vod ${data.vodId}`);
+          })
+          .catch((e) => {
+            console.error(e);
+          });
+        this.addComment(res.data.id, data.vodId, data.part);
+      }
+
       fs.unlinkSync(path);
       resolve();
     }, 1000);
   });
 };
 
-module.exports.addComment = async (videoId, vodId, app) => {
+module.exports.addComment = async (videoId, vodId, part = false) => {
   const youtube = google.youtube("v3");
   const res = await youtube.commentThreads.insert({
     auth: oauth2Client,
@@ -775,7 +833,8 @@ module.exports.addComment = async (videoId, vodId, app) => {
       snippet: {
         topLevelComment: {
           snippet: {
-            textOriginal: config.youtube_comment + vodId,
+            textOriginal:
+              config.youtube_comment + vodId + part ? `?part=${part}` : "",
             videoId: videoId,
           },
         },
@@ -856,7 +915,7 @@ module.exports.getLogs = async (vodId, app) => {
     }
 
     cursor = response._next;
-    await sleep(150); //don't bombarade the api
+    await sleep(50); //don't bombarade the api
     howMany++;
   }
   console.info(
@@ -950,7 +1009,7 @@ const commentExists = async (id, app) => {
     .then((data) => {
       exists = true;
     })
-    .catch(() => {
+    .catch((e) => {
       exists = false;
     });
   return exists;
@@ -966,7 +1025,22 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
     lastCursor;
 
   if (!cursor) {
-    response = await twitch.fetchComments(vodId);
+    let offset = 0;
+    await app
+      .service("logs")
+      .find({
+        paginate: false,
+        query: {
+          vod_id: vodId,
+        },
+      })
+      .then((data) => {
+        offset = data[data.length - 1].content_offset_seconds;
+      })
+      .catch((e) => {
+        console.error(e);
+      });
+    response = await twitch.fetchComments(vodId, offset);
 
     if (!response) return console.error(`No Comments found for ${vodId}`);
 
@@ -1003,7 +1077,8 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
       );
     }
     for (let comment of response.comments) {
-      if (await commentExists(comment._id, app)) continue;
+      const exists = await commentExists(comment._id, app);
+      if (exists) continue;
       if (comments.length >= 2500) {
         await app
           .service("logs")
@@ -1034,7 +1109,7 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
     }
 
     cursor = response._next;
-    await sleep(150); //don't bombarade the api
+    await sleep(50); //don't bombarade the api
   }
 
   if (comments.length > 0) {
@@ -1084,10 +1159,61 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
   const dir = `${config.vodPath}${vodId}`;
   const m3u8Path = `${dir}/${vodId}.m3u8`;
   const newVodData = await twitch.getVodData(vodId);
+  const m3u8Exists = await fileExists(m3u8Path);
+  let duration, vod;
+  await app
+    .service("vods")
+    .get(vodId)
+    .then((data) => {
+      vod = data;
+    })
+    .catch(() => {});
 
-  if ((!newVodData && (await fileExists(m3u8Path))) || retry >= 10) {
-    const duration = await getDuration(m3u8Path);
+  if (!vod)
+    return console.error("Failed to download video: no VOD in database");
+
+  if (m3u8Exists) {
+    duration = await getDuration(m3u8Path);
     await saveDuration(vodId, duration, app);
+  }
+
+  if (duration >= config.splitDuration && config.liveUpload) {
+    const noOfParts = Math.floor(duration / config.splitDuration);
+
+    if (vod.youtube.length < noOfParts) {
+      for (let i = 0; i < noOfParts; i++) {
+        if (vod.youtube[i]) continue;
+        await this.liveUploadPart(
+          app,
+          vodId,
+          m3u8Path,
+          config.splitDuration * i,
+          config.splitDuration,
+          i + 1
+        );
+      }
+    }
+  }
+
+  if ((!newVodData && m3u8Exists) || retry >= 10) {
+    if (config.liveUpload) {
+      //upload last part
+      let startTime = 0;
+      for (let i = 0; i < vod.youtube.length; i++) {
+        startTime += vod.youtube[i].duration;
+      }
+      await this.liveUploadPart(
+        app,
+        vodId,
+        m3u8Path,
+        startTime,
+        duration - vod.youtube[vod.youtube.length - 1]
+          ? vod.youtube[vod.youtube.length - 1].duration
+          : 0,
+        vod.youtube.length + 1
+      );
+      return;
+    }
     const mp4Path = `${dir}/${vodId}.mp4`;
     await convertToMp4(m3u8Path, vodId, mp4Path);
     await this.upload(vodId, app, mp4Path);
