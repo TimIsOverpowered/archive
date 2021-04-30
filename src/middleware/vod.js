@@ -1036,7 +1036,8 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
         },
       })
       .then((data) => {
-        offset = data[data.length - 1].content_offset_seconds;
+        if (data.length > 0)
+          offset = data[data.length - 1].content_offset_seconds;
       })
       .catch((e) => {
         console.error(e);
