@@ -14,7 +14,6 @@ module.exports = function (app) {
     _id: {
       type: DataTypes.INTEGER,
       autoIncrement: true,
-      primaryKey: true
     },
     vod_id: {
       type: DataTypes.TEXT,
