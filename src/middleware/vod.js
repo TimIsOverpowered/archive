@@ -833,8 +833,9 @@ module.exports.addComment = async (videoId, vodId, part = false) => {
       snippet: {
         topLevelComment: {
           snippet: {
-            textOriginal:
-              config.youtube_comment + vodId + part ? `?part=${part}` : "",
+            textOriginal: part
+              ? `${config.youtube_comment}${vodId}?part=${part}`
+              : `${config.youtube_comment}${vodId}`,
             videoId: videoId,
           },
         },
@@ -1202,14 +1203,15 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
       for (let i = 0; i < vod.youtube.length; i++) {
         startTime += vod.youtube[i].duration;
       }
+      console.log(duration - vod.youtube[vod.youtube.length - 1].duration);
       await this.liveUploadPart(
         app,
         vodId,
         m3u8Path,
         startTime,
-        duration - vod.youtube[vod.youtube.length - 1]
-          ? vod.youtube[vod.youtube.length - 1].duration
-          : 0,
+        vod.youtube[vod.youtube.length - 1]
+          ? duration - vod.youtube[vod.youtube.length - 1].duration
+          : duration,
         vod.youtube.length + 1
       );
       return;
