@@ -862,8 +862,8 @@ module.exports.getLogs = async (vodId, app) => {
       message: comment.message.fragments,
       user_badges: comment.message.user_badges,
       user_color: comment.message.user_color,
-      createdAt: comment.createdAt,
-      updatedAt: comment.updatedAt,
+      createdAt: comment.created_at,
+      updatedAt: comment.updated_at,
     });
   }
 
@@ -910,8 +910,8 @@ module.exports.getLogs = async (vodId, app) => {
         message: comment.message.fragments,
         user_badges: comment.message.user_badges,
         user_color: comment.message.user_color,
-        createdAt: comment.createdAt,
-        updatedAt: comment.updatedAt,
+        createdAt: comment.created_at,
+        updatedAt: comment.updated_at,
       });
     }
 
