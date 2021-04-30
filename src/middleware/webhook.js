@@ -135,7 +135,7 @@ module.exports.saveChapters = async (vodData, app) => {
       name: chapter.game.displayName,
       duration: "00:00:00",
       start: 0,
-      end: moment.duration(vodData.duration).asSeconds(),
+      end: moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds(),
     });
   } else {
     for (let chapter of chapters) {
@@ -152,7 +152,7 @@ module.exports.saveChapters = async (vodData, app) => {
             : chapter.node.positionMilliseconds / 1000 - 120, //2mins prior bc streamers are dumb when setting game?
         end:
           chapter.node.durationMilliseconds === 0
-            ? moment.duration(vodData.duration).asSeconds()
+            ? moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds()
             : chapter.node.durationMilliseconds / 1000,
       });
     }
