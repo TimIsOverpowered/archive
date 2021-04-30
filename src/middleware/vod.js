@@ -982,8 +982,8 @@ module.exports.manualLogs = async (commentsPath, vodId, app) => {
       message: comment.message.fragments,
       user_badges: comment.message.user_badges,
       user_color: comment.message.user_color,
-      createdAt: comment.createdAt,
-      updatedAt: comment.updatedAt,
+      createdAt: comment.created_at,
+      updatedAt: comment.updated_at,
     });
     howMany++;
   }
@@ -1055,8 +1055,8 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
         message: comment.message.fragments,
         user_badges: comment.message.user_badges,
         user_color: comment.message.user_color,
-        createdAt: comment.createdAt,
-        updatedAt: comment.updatedAt,
+        createdAt: comment.created_at,
+        updatedAt: comment.updated_at,
       });
     }
 
@@ -1104,8 +1104,8 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
         message: comment.message.fragments,
         user_badges: comment.message.user_badges,
         user_color: comment.message.user_color,
-        createdAt: comment.createdAt,
-        updatedAt: comment.updatedAt,
+        createdAt: comment.created_at,
+        updatedAt: comment.updated_at,
       });
     }
 
