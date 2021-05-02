@@ -320,10 +320,9 @@ module.exports.trimHLS = async (vodPath, vodId, start, end) => {
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
       .seekInput(start)
-      .inputOptions([`-t ${end}`])
       .videoCodec("copy")
       .audioCodec("copy")
-      .outputOptions(["-bsf:a aac_adtstoasc", "-copyts", "-start_at_zero"])
+      .outputOptions(["-bsf:a aac_adtstoasc", "-copyts", "-start_at_zero", `-t ${end}`])
       .toFormat("mp4")
       .on("progress", (progress) => {
         if ((process.env.NODE_ENV || "").trim() !== "production") {
