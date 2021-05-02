@@ -165,8 +165,8 @@ module.exports.liveUploadPart = async (
   if (!vod)
     return console.error("Failed in liveUploadPart: no VOD in database");
 
-  console.info(`Trimming ${vod.id} ${vod.date} | ${start} - ${end}`);
-  const trimmedPath = await this.trim(m3u8Path, vodId, start, end);
+  console.info(`Trimming ${vod.id} ${vod.date} | Start time: ${start} | Duration: ${end}`);
+  const trimmedPath = await this.trimHLS(m3u8Path, vodId, start, end);
 
   if (!trimmedPath) return console.error("Trim failed");
 
@@ -280,7 +280,6 @@ module.exports.trim = async (vodPath, vodId, start, end) => {
       .videoCodec("copy")
       .audioCodec("copy")
       .duration(end)
-      .outputOptions(["-bsf:a aac_adtstoasc"])
       .toFormat("mp4")
       .on("progress", (progress) => {
         if ((process.env.NODE_ENV || "").trim() !== "production") {
@@ -288,6 +287,50 @@ module.exports.trim = async (vodPath, vodId, start, end) => {
           readline.cursorTo(process.stdout, 0, null);
           process.stdout.write(
             `TRIM VIDEO PROGRESS: ${Math.round(progress.percent)}%`
+          );
+        }
+      })
+      .on("start", (cmd) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          console.info(cmd);
+        }
+      })
+      .on("error", function (err) {
+        ffmpeg_process.kill("SIGKILL");
+        reject(err);
+      })
+      .on("end", function () {
+        resolve(`${config.vodPath}${vodId}-${start}-${end}.mp4`);
+      })
+      .saveToFile(`${config.vodPath}${vodId}-${start}-${end}.mp4`);
+  })
+    .then((result) => {
+      path = result;
+      console.log("\n");
+    })
+    .catch((e) => {
+      console.error("\nffmpeg error occurred: " + e);
+    });
+  return path;
+};
+
+module.exports.trimHLS = async (vodPath, vodId, start, end) => {
+  let path;
+  await new Promise((resolve, reject) => {
+    const ffmpeg_process = ffmpeg(vodPath);
+    ffmpeg_process
+      .seekInput(start)
+      .inputOptions([`-t ${end}`])
+      .videoCodec("copy")
+      .audioCodec("copy")
+      .outputOptions(["-bsf:a aac_adtstoasc", "-copyts", "-start_at_zero"])
+      .toFormat("mp4")
+      .on("progress", (progress) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          readline.clearLine(process.stdout, 0);
+          readline.cursorTo(process.stdout, 0, null);
+          process.stdout.write(
+            `TRIM HLS VIDEO PROGRESS: ${Math.round(progress.percent)}%`
           );
         }
       })
@@ -613,7 +656,7 @@ const downloadAsMP4 = async (m3u8, path) => {
     ffmpeg_process
       .videoCodec("copy")
       .audioCodec("copy")
-      .outputOptions(["-bsf:a aac_adtstoasc"])
+      .outputOptions(["-bsf:a aac_adtstoasc", "-copyts", "-start_at_zero"])
       .toFormat("mp4")
       .on("progress", (progress) => {
         if ((process.env.NODE_ENV || "").trim() !== "production") {
@@ -1205,6 +1248,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
       for (let i = 0; i < vod.youtube.length; i++) {
         startTime += vod.youtube[i].duration;
       }
+      
       await this.liveUploadPart(
         app,
         vodId,
@@ -1358,7 +1402,7 @@ const convertToMp4 = async (m3u8, vodId, mp4Path) => {
     ffmpeg_process
       .videoCodec("copy")
       .audioCodec("copy")
-      .outputOptions(["-bsf:a aac_adtstoasc"])
+      .outputOptions(["-bsf:a aac_adtstoasc", "-copyts", "-start_at_zero"])
       .toFormat("mp4")
       .on("progress", (progress) => {
         if ((process.env.NODE_ENV || "").trim() !== "production") {
@@ -1370,6 +1414,9 @@ const convertToMp4 = async (m3u8, vodId, mp4Path) => {
         }
       })
       .on("start", (cmd) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          console.info(cmd);
+        }
         console.info(`Converting ${vodId} m3u8 to mp4`);
       })
       .on("error", function (err) {
