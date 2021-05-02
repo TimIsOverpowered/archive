@@ -165,7 +165,9 @@ module.exports.liveUploadPart = async (
   if (!vod)
     return console.error("Failed in liveUploadPart: no VOD in database");
 
-  console.info(`Trimming ${vod.id} ${vod.date} | Start time: ${start} | Duration: ${end}`);
+  console.info(
+    `Trimming ${vod.id} ${vod.date} | Start time: ${start} | Duration: ${end}`
+  );
   const trimmedPath = await this.trimHLS(m3u8Path, vodId, start, end);
 
   if (!trimmedPath) return console.error("Trim failed");
@@ -322,7 +324,12 @@ module.exports.trimHLS = async (vodPath, vodId, start, end) => {
       .seekInput(start)
       .videoCodec("copy")
       .audioCodec("copy")
-      .outputOptions(["-bsf:a aac_adtstoasc", "-copyts", "-start_at_zero", `-t ${end}`])
+      .outputOptions([
+        "-bsf:a aac_adtstoasc",
+        "-copyts",
+        "-start_at_zero",
+        `-t ${end}`,
+      ])
       .toFormat("mp4")
       .on("progress", (progress) => {
         if ((process.env.NODE_ENV || "").trim() !== "production") {
@@ -1247,7 +1254,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
       for (let i = 0; i < vod.youtube.length; i++) {
         startTime += vod.youtube[i].duration;
       }
-      
+
       await this.liveUploadPart(
         app,
         vodId,
@@ -1296,6 +1303,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
   const baseURL = newVideoM3u8.substring(0, newVideoM3u8.lastIndexOf("/"));
 
   newVideoM3u8 = HLS.parse(await twitch.getVariantM3u8(newVideoM3u8));
+  newVideoM3u8 = checkForUnmutedTS(newVideoM3u8);
 
   if (!(await fileExists(m3u8Path))) {
     if (!(await fileExists(dir))) {
@@ -1342,15 +1350,14 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
 
   //reset retry if downloading new ts files.
   retry = 1;
-  newVideoM3u8 = checkForUnmutedTS(newVideoM3u8, dir, vodId);
-  await downloadTSFiles(newVideoM3u8, dir, baseURL);
+  await downloadTSFiles(newVideoM3u8, dir, baseURL, vodId);
 
   setTimeout(() => {
     download(vodId, app, retry, delay);
   }, 1000 * 60 * delay);
 };
 
-const checkForUnmutedTS = (m3u8, dir, vodId) => {
+const checkForUnmutedTS = (m3u8) => {
   for (let segment of m3u8.segments) {
     if (segment.uri.includes("unmuted")) {
       m3u8.segments[segment] = `${segment.uri.substring(
@@ -1359,15 +1366,15 @@ const checkForUnmutedTS = (m3u8, dir, vodId) => {
       )}.ts`;
     }
   }
+  return m3u8;
+};
+
+const downloadTSFiles = async (m3u8, dir, baseURL, vodId) => {
   try {
     fs.writeFileSync(`${dir}/${vodId}.m3u8`, HLS.stringify(m3u8));
   } catch (err) {
     console.error(err);
   }
-  return m3u8;
-};
-
-const downloadTSFiles = async (m3u8, dir, baseURL) => {
   for (let segment of m3u8.segments) {
     if (await fileExists(`${dir}/${segment.uri}`)) continue;
 
