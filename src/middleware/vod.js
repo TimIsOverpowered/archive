@@ -321,7 +321,7 @@ module.exports.trimHLS = async (vodPath, vodId, start, end) => {
   await new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
-      .seekInput(start)
+      .seekOutput(start)
       .videoCodec("copy")
       .audioCodec("copy")
       .outputOptions([
