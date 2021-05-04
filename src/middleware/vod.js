@@ -713,7 +713,7 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
         {
           auth: oauth2Client,
           part: "id,snippet,status",
-          notifySubscribers: false,
+          notifySubscribers: true,
           requestBody: {
             snippet: {
               title: data.title,
@@ -818,7 +818,7 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
         {
           auth: oauth2Client,
           part: "id,snippet,status",
-          notifySubscribers: false,
+          notifySubscribers: true,
           requestBody: {
             snippet: {
               title: title,
