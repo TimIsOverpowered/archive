@@ -848,10 +848,17 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
       console.log(res.data);
 
       if (data) {
-        data.youtube.push({
-          id: res.data.id,
-          duration: await getDuration(path),
-        });
+        if (data.youtube[data.part - 1]) {
+          data.youtube[data.part - 1] = {
+            id: res.data.id,
+            duration: await getDuration(path),
+          };
+        } else {
+          data.youtube.push({
+            id: res.data.id,
+            duration: await getDuration(path),
+          });
+        }
 
         await app
           .service("vods")

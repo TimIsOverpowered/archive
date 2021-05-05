@@ -15,6 +15,7 @@ module.exports = function (app) {
   app.post("/admin/trim/dmca", admin.verify(app), admin.trimDmca(app));
   app.post("/admin/chapters", admin.verify(app), admin.saveChapters(app));
   app.post("/v2/admin/download", admin.verify(app), admin.downloadv2(app));
+  app.post("/v2/admin/reupload", admin.verify(app), admin.reUploadPart(app));
   app.get(
     "/v1/vods/:vodId/comments",
     rateLimit({
