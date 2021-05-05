@@ -477,16 +477,72 @@ module.exports.saveChapters = function (app) {
 
     const vodData = await twitch.getVodData(req.body.vodId);
     if (!vodData)
-      return res
-        .status(500)
-        .json({
-          error: true,
-          message: `Failed to get vod data for ${req.body.vodId}`,
-        });
+      return res.status(500).json({
+        error: true,
+        message: `Failed to get vod data for ${req.body.vodId}`,
+      });
 
     webhook.saveChapters(vodData, app);
     res
       .status(200)
       .json({ error: false, message: `Saving Chapters for ${req.body.vodId}` });
   };
+};
+
+module.exports.reUploadPart = function (app) {
+  return async function (req, res, next) {
+    if (!req.body.vodId)
+      return res.status(400).json({ error: true, message: "No vod id" });
+
+    if (!req.body.part)
+      return res.status(400).json({ error: true, message: "No part" });
+
+    const part = parseInt(req.body.part) - 1;
+    const dir = `${config.vodPath}${req.body.vodId}`;
+    const m3u8Path = `${dir}/${req.body.vodId}.m3u8`;
+    const m3u8Exists = await fileExists(m3u8Path);
+    if (m3u8Exists) {
+      vod.liveUploadPart(
+        app,
+        req.body.vodId,
+        m3u8Path,
+        config.splitDuration * part,
+        config.splitDuration,
+        req.body.part
+      );
+      return res.status(200).json({
+        error: false,
+        message: `Reuploading ${req.body.vodId} Vod Part ${req.body.part}`,
+      });
+    }
+
+    const mp4Video = await vod.download(req.body.vodId);
+
+    if (mp4Video) {
+      vod.liveUploadPart(
+        app,
+        req.body.vodId,
+        mp4Video,
+        config.splitDuration * part,
+        config.splitDuration,
+        req.body.part
+      );
+      return res.status(200).json({
+        error: false,
+        message: `Reuploading ${req.body.vodId} Vod Part ${req.body.part}`,
+      });
+    }
+
+    return res.status(500).json({
+      error: true,
+      message: `Could not find a download source for ${vodId}`,
+    });
+  };
+};
+
+const fileExists = async (file) => {
+  return fs.promises
+    .access(file, fs.constants.F_OK)
+    .then(() => true)
+    .catch(() => false);
 };
