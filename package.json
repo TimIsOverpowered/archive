@@ -48,7 +48,7 @@
     "cors": "^2.8.5",
     "cppzst": "^2.0.6",
     "express-rate-limit": "^5.2.6",
-    "feathers-hooks-common": "^5.0.5",
+    "feathers-hooks-common": "^5.0.6",
     "feathers-sequelize": "^6.2.0",
     "fluent-ffmpeg": "^2.1.2",
     "googleapis": "^71.0.0",
