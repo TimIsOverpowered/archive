@@ -2,6 +2,7 @@ const twitch = require("./middleware/twitch");
 const moment = require("moment");
 const config = require("../config/config.json");
 const vod = require("./middleware/vod");
+const fs = require("fs");
 
 module.exports = async function (app) {
   await twitch.checkToken();
@@ -62,6 +63,18 @@ module.exports = async function (app) {
           console.error(e);
         });
     }
+    const dir = `${config.vodPath}${vodData.id}`;
+    if (await fileExists(dir))
+      await fs.promises.rmdir(dir, {
+        recursive: true,
+      });
     vod.startDownload(vodData.id, app);
   }
+};
+
+const fileExists = async (file) => {
+  return fs.promises
+    .access(file, fs.constants.F_OK)
+    .then(() => true)
+    .catch(() => false);
 };
