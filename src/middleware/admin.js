@@ -507,7 +507,7 @@ module.exports.reUploadPart = function (app) {
     const m3u8Path = `${dir}/${req.body.vodId}.m3u8`;
     const m3u8Exists = await fileExists(m3u8Path);
     if (m3u8Exists) {
-      vod.liveUploadPart(
+      await vod.liveUploadPart(
         app,
         req.body.vodId,
         m3u8Path,
@@ -515,12 +515,13 @@ module.exports.reUploadPart = function (app) {
         config.splitDuration,
         req.body.part
       );
+      //fs.rmdirSync(dir, { recursive: true });
     }
 
     const mp4Video = await vod.download(req.body.vodId);
 
     if (mp4Video) {
-      vod.liveUploadPart(
+      await vod.liveUploadPart(
         app,
         req.body.vodId,
         mp4Video,
@@ -528,6 +529,7 @@ module.exports.reUploadPart = function (app) {
         config.splitDuration,
         req.body.part
       );
+      fs.unlinkSync(mp4Video);
     }
 
     console.error(`Could not find a download source for ${vodId}`);
