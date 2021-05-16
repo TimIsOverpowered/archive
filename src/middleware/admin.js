@@ -497,6 +497,11 @@ module.exports.reUploadPart = function (app) {
     if (!req.body.part)
       return res.status(400).json({ error: true, message: "No part" });
 
+    res.status(200).json({
+      error: false,
+      message: `Reuploading ${req.body.vodId} Vod Part ${req.body.part}`,
+    });
+
     const part = parseInt(req.body.part) - 1;
     const dir = `${config.vodPath}${req.body.vodId}`;
     const m3u8Path = `${dir}/${req.body.vodId}.m3u8`;
@@ -510,10 +515,6 @@ module.exports.reUploadPart = function (app) {
         config.splitDuration,
         req.body.part
       );
-      return res.status(200).json({
-        error: false,
-        message: `Reuploading ${req.body.vodId} Vod Part ${req.body.part}`,
-      });
     }
 
     const mp4Video = await vod.download(req.body.vodId);
@@ -527,16 +528,9 @@ module.exports.reUploadPart = function (app) {
         config.splitDuration,
         req.body.part
       );
-      return res.status(200).json({
-        error: false,
-        message: `Reuploading ${req.body.vodId} Vod Part ${req.body.part}`,
-      });
     }
 
-    return res.status(500).json({
-      error: true,
-      message: `Could not find a download source for ${vodId}`,
-    });
+    console.error(`Could not find a download source for ${vodId}`);
   };
 };
 
@@ -592,7 +586,9 @@ module.exports.partDmca = function (app) {
         );
         fs.unlinkSync(mp4Video);
       } else {
-        return console.error(`Could not find a download source for ${req.body.vodId}`);
+        return console.error(
+          `Could not find a download source for ${req.body.vodId}`
+        );
       }
     }
 
