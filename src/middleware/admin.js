@@ -516,6 +516,7 @@ module.exports.reUploadPart = function (app) {
         req.body.part
       );
       //fs.rmdirSync(dir, { recursive: true });
+      return;
     }
 
     const mp4Video = await vod.download(req.body.vodId);
@@ -530,6 +531,7 @@ module.exports.reUploadPart = function (app) {
         req.body.part
       );
       fs.unlinkSync(mp4Video);
+      return;
     }
 
     console.error(`Could not find a download source for ${vodId}`);
