@@ -1299,24 +1299,25 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
     return console.error("failed to get m3u8");
   }
 
-  newVideoM3u8 = await twitch.getParsedM3u8(newVideoM3u8);
-  if (!newVideoM3u8) {
+  let parsedM3u8 = twitch.getParsedM3u8(newVideoM3u8);
+  if (!parsedM3u8) {
     setTimeout(() => {
       download(vodId, app, retry, delay);
     }, 1000 * 60 * delay);
+    console.error(newVideoM3u8);
     return console.error("failed to parse m3u8");
   }
 
-  const baseURL = newVideoM3u8.substring(0, newVideoM3u8.lastIndexOf("/"));
+  const baseURL = parsedM3u8.substring(0, parsedM3u8.lastIndexOf("/"));
 
-  newVideoM3u8 = HLS.parse(await twitch.getVariantM3u8(newVideoM3u8));
-  newVideoM3u8 = checkForUnmutedTS(newVideoM3u8);
+  parsedM3u8 = HLS.parse(await twitch.getVariantM3u8(parsedM3u8));
+  parsedM3u8 = checkForUnmutedTS(parsedM3u8);
 
   if (!(await fileExists(m3u8Path))) {
     if (!(await fileExists(dir))) {
       fs.mkdirSync(dir);
     }
-    await downloadTSFiles(newVideoM3u8, dir, baseURL, vodId);
+    await downloadTSFiles(parsedM3u8, dir, baseURL, vodId);
 
     setTimeout(() => {
       download(vodId, app, retry, delay);
@@ -1342,10 +1343,10 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
 
   //retry if last segment is the same as on file m3u8 and if the actual segment exists.
   if (
-    newVideoM3u8.segments[newVideoM3u8.segments.length - 1].uri ===
+    parsedM3u8.segments[parsedM3u8.segments.length - 1].uri ===
       videoM3u8.segments[videoM3u8.segments.length - 1].uri &&
     (await fileExists(
-      `${dir}/${newVideoM3u8.segments[newVideoM3u8.segments.length - 1].uri}`
+      `${dir}/${parsedM3u8.segments[parsedM3u8.segments.length - 1].uri}`
     ))
   ) {
     retry++;
@@ -1357,7 +1358,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
 
   //reset retry if downloading new ts files.
   retry = 1;
-  await downloadTSFiles(newVideoM3u8, dir, baseURL, vodId);
+  await downloadTSFiles(parsedM3u8, dir, baseURL, vodId);
 
   setTimeout(() => {
     download(vodId, app, retry, delay);

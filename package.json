@@ -50,7 +50,7 @@
     "feathers-hooks-common": "^5.0.6",
     "feathers-sequelize": "^6.2.0",
     "fluent-ffmpeg": "^2.1.2",
-    "googleapis": "^73.0.0",
+    "googleapis": "^74.2.0",
     "helmet": "^4.6.0",
     "hls-parser": "^0.10.4",
     "moment-duration-format": "^2.3.2",
@@ -63,7 +63,7 @@
   },
   "devDependencies": {
     "axios": "^0.21.1",
-    "eslint": "^7.26.0",
+    "eslint": "^7.27.0",
     "mocha": "^8.4.0",
     "nodemon": "^2.0.7"
   }

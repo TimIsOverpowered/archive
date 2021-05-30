@@ -3,7 +3,7 @@ const config = require("../../config/config.json");
 const fs = require("fs");
 const path = require("path");
 const HLS = require("hls-parser");
-const rax = require('retry-axios');
+const rax = require("retry-axios");
 
 module.exports.checkToken = async () => {
   let isValid = false;
@@ -219,7 +219,14 @@ module.exports.getM3u8 = async (vodId, token, sig) => {
 };
 
 module.exports.getParsedM3u8 = (m3u8) => {
-  return HLS.parse(m3u8).variants[0].uri;
+  let parsedM3u8;
+  try {
+    parsedM3u8 = HLS.parse(m3u8);
+  } catch(e) {
+    console.error(e);
+  }
+  if (!parsedM3u8) return null;
+  return parsedM3u8.variants[0].uri;
 };
 
 module.exports.getVariantM3u8 = async (M3U8_URL) => {
