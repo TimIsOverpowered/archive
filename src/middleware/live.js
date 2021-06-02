@@ -45,7 +45,7 @@ module.exports = function (app) {
       vod.trimUpload(
         `${config.livePath}/${config.channel.toLowerCase()}/${
           req.body.streamId
-        }/${req.body.streamId}.mkv`,
+        }/${req.body.streamId}.mp4`,
         `${config.channel} ${vod_data.date} Live Vod`,
         false,
         app
