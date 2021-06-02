@@ -29,7 +29,7 @@ oauth2Client.on("tokens", (tokens) => {
     JSON.stringify(config, null, 4),
     (err) => {
       if (err) return console.error(err);
-      console.info("Refreshed Google Token");
+      console.info("Refreshed Youtube Token");
     }
   );
   oauth2Client.setCredentials({
@@ -37,6 +37,7 @@ oauth2Client.on("tokens", (tokens) => {
     access_token: tokens.access_token,
   });
 });
+const drive = require('./drive');
 
 module.exports.upload = async (
   vodId,
@@ -1255,6 +1256,11 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
   }
 
   if ((!newVodData && m3u8Exists) || retry >= 10) {
+    const mp4Path = `${dir}/${vodId}.mp4`;
+    await this.convertToMp4(m3u8Path, vodId, mp4Path);
+    if(config.drive.upload) {
+      await drive.upload(vodId, mp4Path);
+    }
     if (config.liveUpload) {
       //upload last part
       let startTime = 0;
@@ -1270,12 +1276,9 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
         duration - startTime,
         vod.youtube.length + 1
       );
-      await this.convertToMp4(m3u8Path, vodId, mp4Path);
       fs.unlinkSync(mp4Path);
       return;
     }
-    const mp4Path = `${dir}/${vodId}.mp4`;
-    await this.convertToMp4(m3u8Path, vodId, mp4Path);
     await this.upload(vodId, app, mp4Path);
     fs.rmdirSync(dir, { recursive: true });
     return;
