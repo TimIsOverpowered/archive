@@ -20,12 +20,10 @@ const oauth2Client = new OAuth2(
   config.google.redirect_url
 );
 oauth2Client.on("tokens", (tokens) => {
-  //console.log(tokens);
   if (tokens.refresh_token) {
     config.youtube.refresh_token = tokens.refresh_token;
   }
   config.youtube.access_token = tokens.access_token;
-  //console.log(config.youtube.refresh_token);
   fs.writeFile(
     path.resolve(__dirname, "../../config/config.json"),
     JSON.stringify(config, null, 4),
@@ -1190,7 +1188,8 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
   }
 
   //if live, continue fetching logs.
-  if (await twitch.checkIfLive(config.twitchId)) {
+  const stream = await twitch.getStream(config.twitchId);
+  if (stream.length > 0) {
     setTimeout(() => {
       downloadLogs(vodId, app, lastCursor);
     }, 1000 * 60 * 1);
@@ -1234,6 +1233,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
   if (m3u8Exists) {
     duration = await getDuration(m3u8Path);
     await saveDuration(vodId, duration, app);
+    if (newVodData) await this.saveChapters(vodId, app, duration);
   }
 
   if (duration >= config.splitDuration && config.liveUpload) {
@@ -1270,10 +1270,12 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
         duration - startTime,
         vod.youtube.length + 1
       );
+      await this.convertToMp4(m3u8Path, vodId, mp4Path);
+      fs.unlinkSync(mp4Path);
       return;
     }
     const mp4Path = `${dir}/${vodId}.mp4`;
-    await convertToMp4(m3u8Path, vodId, mp4Path);
+    await this.convertToMp4(m3u8Path, vodId, mp4Path);
     await this.upload(vodId, app, mp4Path);
     fs.rmdirSync(dir, { recursive: true });
     return;
@@ -1410,7 +1412,7 @@ const downloadTSFiles = async (m3u8, dir, baseURL, vodId) => {
   }
 };
 
-const convertToMp4 = async (m3u8, vodId, mp4Path) => {
+module.exports.convertToMp4 = async (m3u8, vodId, mp4Path) => {
   await new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(m3u8);
     ffmpeg_process
@@ -1471,6 +1473,52 @@ const saveDuration = async (vodId, duration, app) => {
     .service("vods")
     .patch(vodId, {
       duration: moment.duration(duration, "seconds").format("hh:mm:ss"),
+    })
+    .catch((e) => {
+      console.error(e);
+    });
+};
+
+module.exports.saveChapters = async (vodId, app, duration) => {
+  const chapters = await twitch.getChapters(vodId);
+  if (!chapters)
+    return console.error("Failed to save chapters: Chapters is null");
+
+  let newChapters = [];
+  if (chapters.length === 0) {
+    const chapter = await twitch.getChapter(vodId);
+    newChapters.push({
+      gameId: chapter.game.id,
+      name: chapter.game.displayName,
+      duration: "00:00:00",
+      start: 0,
+      end: duration,
+    });
+  } else {
+    for (let chapter of chapters) {
+      newChapters.push({
+        gameId: chapter.node.details.game.id,
+        name: chapter.node.details.game.displayName,
+        image: chapter.node.details.game.boxArtURL,
+        duration: moment
+          .utc(chapter.node.positionMilliseconds)
+          .format("HH:mm:ss"),
+        start:
+          chapter.node.positionMilliseconds === 0
+            ? chapter.node.positionMilliseconds / 1000
+            : chapter.node.positionMilliseconds / 1000 - 120, //2mins prior bc streamers are dumb when setting game?
+        end:
+          chapter.node.durationMilliseconds === 0
+            ? duration
+            : chapter.node.durationMilliseconds / 1000,
+      });
+    }
+  }
+
+  await app
+    .service("vods")
+    .patch(vodId, {
+      chapters: newChapters,
     })
     .catch((e) => {
       console.error(e);

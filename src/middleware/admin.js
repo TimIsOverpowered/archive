@@ -5,7 +5,6 @@ const momentDurationFormatSetup = require("moment-duration-format");
 momentDurationFormatSetup(moment);
 const fs = require("fs");
 const config = require("../../config/config.json");
-const webhook = require("./webhook");
 
 module.exports.verify = function (app) {
   return async function (req, res, next) {
@@ -47,7 +46,7 @@ module.exports.download = function (app) {
     }
 
     const vodData = await twitch.getVodData(req.body.vodId);
-    if (!vodData) return console.error("No vod data");
+    if (!vodData) return res.status(404).json({ error: true, message: "No Vod Data" });
 
     await app
       .service("vods")
@@ -482,7 +481,7 @@ module.exports.saveChapters = function (app) {
         message: `Failed to get vod data for ${req.body.vodId}`,
       });
 
-    webhook.saveChapters(vodData, app);
+    vod.saveChapters(vodData.id, app, moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds());
     res
       .status(200)
       .json({ error: false, message: `Saving Chapters for ${req.body.vodId}` });
@@ -519,7 +518,7 @@ module.exports.reUploadPart = function (app) {
       return;
     }
 
-    const mp4Video = await vod.download(req.body.vodId);
+    const mp4Video = req.body.path ? req.body.path : await vod.download(req.body.vodId);
 
     if (mp4Video) {
       await vod.liveUploadPart(

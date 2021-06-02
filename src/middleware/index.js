@@ -1,11 +1,9 @@
-const webhook = require("./webhook");
 const admin = require("./admin");
 const logs = require("./logs");
+const live = require("./live");
 const rateLimit = require("express-rate-limit");
 
 module.exports = function (app) {
-  app.get("/twitch/webhook/*", webhook.verify(app));
-  app.post("/twitch/webhook/stream/:userId", webhook.stream(app));
   app.post("/admin/download", admin.verify(app), admin.download(app));
   app.post("/admin/logs", admin.verify(app), admin.logs(app));
   app.post("/admin/logs/manual", admin.verify(app), admin.manualLogs(app));
@@ -17,6 +15,7 @@ module.exports = function (app) {
   app.post("/admin/chapters", admin.verify(app), admin.saveChapters(app));
   app.post("/v2/admin/download", admin.verify(app), admin.downloadv2(app));
   app.post("/v2/admin/reupload", admin.verify(app), admin.reUploadPart(app));
+  app.post("/v2/live", admin.verify(app), live(app));
   app.get(
     "/v1/vods/:vodId/comments",
     rateLimit({

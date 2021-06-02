@@ -222,7 +222,7 @@ module.exports.getParsedM3u8 = (m3u8) => {
   let parsedM3u8;
   try {
     parsedM3u8 = HLS.parse(m3u8);
-  } catch(e) {
+  } catch (e) {
     console.error(e);
   }
   if (!parsedM3u8) return null;
@@ -437,8 +437,8 @@ module.exports.getChapter = async (vodID) => {
   return data;
 };
 
-module.exports.checkIfLive = async (twitchId) => {
-  let live = false;
+module.exports.getStream = async (twitchId) => {
+  let stream;
   await axios
     .get(`https://api.twitch.tv/helix/streams?user_id=${twitchId}`, {
       headers: {
@@ -447,14 +447,11 @@ module.exports.checkIfLive = async (twitchId) => {
       },
     })
     .then((response) => {
-      const data = response.data.data;
-      if (data.length > 0) {
-        live = true;
-      }
+      stream = response.data.data;
     })
     .catch((e) => {
       if (!e.response) return console.error(e);
       console.error(e.response.data);
     });
-  return live;
+  return stream;
 };
