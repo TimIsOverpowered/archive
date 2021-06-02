@@ -1315,7 +1315,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
 
   const baseURL = parsedM3u8.substring(0, parsedM3u8.lastIndexOf("/"));
 
-  const variantM3u8 = await twitch.getVariantM3u8(parsedM3u8);
+  let variantM3u8 = await twitch.getVariantM3u8(parsedM3u8);
   if(!variantM3u8) {
     setTimeout(() => {
       download(vodId, app, retry, delay);
