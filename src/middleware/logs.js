@@ -64,10 +64,7 @@ module.exports = function (app) {
 
     try {
       json = JSON.parse(Buffer.from(req.query.cursor, "base64").toString());
-    } catch (e) {
-      console.error(`Cursor was: ${req.query.cursor}`);
-      console.error(Buffer.from(req.query.cursor, "base64").toString());
-    }
+    } catch (e) {}
 
     if (!json)
       return res

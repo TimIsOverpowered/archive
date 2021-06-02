@@ -29,6 +29,12 @@ module.exports = function (app) {
     youtube: {
       type: DataTypes.ARRAY(DataTypes.JSON),
       defaultValue: []
+    },
+    stream_id: {
+      type: DataTypes.TEXT
+    },
+    drive_id: {
+      type: DataTypes.TEXT
     }
   }, {
     hooks: {
