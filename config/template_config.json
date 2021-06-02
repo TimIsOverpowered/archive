@@ -35,5 +35,14 @@
     "youtube_api_key": "YOUR YOUTUBE API KEY",
     "liveUpload": false, //UPLOAD PARTS LIVE INSTEAD OF WAITING UNTIL VOD IS FINISHED
     "multiTrack": false, //IF STREAMER IS USING TWITCH VOD TRACK TO SEPERATE MUSIC
-    "livePath": "YOUR_LIVE_RECORDED_PATH" //LIVE PATH IF USING MY RECORDER APP
+    "livePath": "YOUR_LIVE_RECORDED_PATH", //LIVE PATH IF USING MY RECORDER APP
+    "drive": { //IF USING DRIVE.
+        "access_token": "",
+        "refresh_token": "",
+        "upload": false,
+        "parents": [
+            ""
+        ],
+        "token_type": "Bearer"
+    }
 }
