@@ -1315,14 +1315,22 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
 
   const baseURL = parsedM3u8.substring(0, parsedM3u8.lastIndexOf("/"));
 
-  parsedM3u8 = HLS.parse(await twitch.getVariantM3u8(parsedM3u8));
-  parsedM3u8 = checkForUnmutedTS(parsedM3u8);
+  const variantM3u8 = await twitch.getVariantM3u8(parsedM3u8);
+  if(!variantM3u8) {
+    setTimeout(() => {
+      download(vodId, app, retry, delay);
+    }, 1000 * 60 * delay);
+    return console.error("failed to get variant m3u8");
+  } 
+
+  variantM3u8 = HLS.parse(await twitch.getVariantM3u8(variantM3u8));
+  variantM3u8 = checkForUnmutedTS(variantM3u8);
 
   if (!(await fileExists(m3u8Path))) {
     if (!(await fileExists(dir))) {
       fs.mkdirSync(dir);
     }
-    await downloadTSFiles(parsedM3u8, dir, baseURL, vodId);
+    await downloadTSFiles(variantM3u8, dir, baseURL, vodId);
 
     setTimeout(() => {
       download(vodId, app, retry, delay);
@@ -1348,10 +1356,10 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
 
   //retry if last segment is the same as on file m3u8 and if the actual segment exists.
   if (
-    parsedM3u8.segments[parsedM3u8.segments.length - 1].uri ===
+    variantM3u8.segments[variantM3u8.segments.length - 1].uri ===
       videoM3u8.segments[videoM3u8.segments.length - 1].uri &&
     (await fileExists(
-      `${dir}/${parsedM3u8.segments[parsedM3u8.segments.length - 1].uri}`
+      `${dir}/${variantM3u8.segments[variantM3u8.segments.length - 1].uri}`
     ))
   ) {
     retry++;
@@ -1363,7 +1371,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
 
   //reset retry if downloading new ts files.
   retry = 1;
-  await downloadTSFiles(parsedM3u8, dir, baseURL, vodId);
+  await downloadTSFiles(variantM3u8, dir, baseURL, vodId);
 
   setTimeout(() => {
     download(vodId, app, retry, delay);
