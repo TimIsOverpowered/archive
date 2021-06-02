@@ -1323,7 +1323,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
     return console.error("failed to get variant m3u8");
   } 
 
-  variantM3u8 = HLS.parse(await twitch.getVariantM3u8(variantM3u8));
+  variantM3u8 = HLS.parse(variantM3u8);
   variantM3u8 = checkForUnmutedTS(variantM3u8);
 
   if (!(await fileExists(m3u8Path))) {
