@@ -678,6 +678,7 @@ module.exports.partDmca = function (app) {
     );
 
     fs.unlinkSync(newVodPath ? newVodPath : blackoutPath);
+    fs.unlinkSync(trimmedPath);
   };
 };
 

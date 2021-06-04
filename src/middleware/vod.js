@@ -1276,6 +1276,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
         duration - startTime,
         vod.youtube.length + 1
       );
+      fs.rmdirSync(dir, { recursive: true });
       fs.unlinkSync(mp4Path);
       return;
     }

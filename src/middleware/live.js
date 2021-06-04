@@ -42,7 +42,7 @@ module.exports = function (app) {
       });
 
     if (config.multiTrack)
-      vod.trimUpload(
+      await vod.trimUpload(
         `${config.livePath}/${config.channel.toLowerCase()}/${
           req.body.streamId
         }/${req.body.streamId}.mp4`,
@@ -50,5 +50,11 @@ module.exports = function (app) {
         false,
         app
       );
+    await fs.promises.rmdir(
+      `${config.livePath}/${config.channel.toLowerCase()}/${req.body.streamId}`,
+      {
+        recursive: true,
+      }
+    );
   };
 };
