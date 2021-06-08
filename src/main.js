@@ -16,7 +16,7 @@ process.on("unhandledRejection", function (reason, p) {
 module.exports = async function (app) {
   await twitch.checkToken();
   const stream = await twitch.getStream(config.twitchId);
-  if (stream.length > 0 && stream[0].type === "live") {
+  if (stream && stream.length > 0 && stream[0].type === "live") {
     const vodData = await twitch.getLatestVodData(config.twitchId);
     if (stream[0].id === vodData.stream_id) {
       let exists;
