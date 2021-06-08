@@ -1,5 +1,6 @@
 const vod = require("./vod");
 const config = require("../../config/config.json");
+const fs = require("fs");
 
 module.exports = function (app) {
   return async function (req, res, next) {
@@ -55,6 +56,6 @@ module.exports = function (app) {
       {
         recursive: true,
       }
-    );
+    ).catch((e) => console.error(e));
   };
 };
