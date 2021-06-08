@@ -49,6 +49,7 @@
     "express-rate-limit": "^5.2.6",
     "feathers-hooks-common": "^5.0.6",
     "feathers-sequelize": "^6.2.0",
+    "fluent-ffmpeg": "^2.1.2",
     "googleapis": "^75.0.0",
     "helmet": "^4.6.0",
     "pg": "^8.6.0",
