@@ -134,7 +134,7 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
 
   //if live, continue fetching logs.
   const stream = await twitch.getStream(config.twitchId);
-  if (stream.length > 0) {
+  if (stream && stream.length !== null && stream.length > 0 && stream[0] && stream[0].type === "live") {
     setTimeout(() => {
       downloadLogs(vodId, app, lastCursor);
     }, 1000 * 60 * 1);

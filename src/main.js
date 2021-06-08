@@ -1,7 +1,6 @@
 const twitch = require("./middleware/twitch");
 const config = require("../config/config.json");
 const vod = require("./middleware/vod");
-const fs = require("fs");
 
 process.on("unhandledRejection", function (reason, p) {
   console.log(
@@ -14,10 +13,11 @@ process.on("unhandledRejection", function (reason, p) {
 });
 
 module.exports = async function (app) {
+  await twitch.checkToken();
   const stream = await twitch.getStream(config.twitchId);
-  if (stream.length > 0 && stream[0].type === "live") {
+  if (stream && stream.length !== null && stream.length > 0 && stream[0] && stream[0].type === "live") {
     const vodData = await twitch.getLatestVodData(config.twitchId);
-    if (stream[0].id === vodData.stream_id) {
+    if (vodData && vodData.stream_id && stream[0].id === vodData.stream_id) {
       let exists;
       await app
         .service("vods")
@@ -53,20 +53,13 @@ module.exports = async function (app) {
   check(app);
 };
 
-const fileExists = async (file) => {
-  return fs.promises
-    .access(file, fs.constants.F_OK)
-    .then(() => true)
-    .catch(() => false);
-};
-
 const check = async (app) => {
   if ((process.env.NODE_ENV || "").trim() !== "production")
     console.info(`Checking if ${config.channel} is live..`);
   const stream = await twitch.getStream(config.twitchId);
-  if (stream.length > 0 && stream[0].type === "live") {
+  if (stream && stream.length !== null && stream.length > 0 && stream[0] && stream[0].type === "live") {
     const vodData = await twitch.getLatestVodData(config.twitchId);
-    if (stream[0].id === vodData.stream_id) {
+    if (vodData && vodData.stream_id && stream[0].id === vodData.stream_id) {
       let exists;
       await app
         .service("vods")

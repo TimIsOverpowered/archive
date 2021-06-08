@@ -4,7 +4,6 @@ const live = require("./live");
 const rateLimit = require("express-rate-limit");
 
 module.exports = function (app) {
-  app.post("/admin/download", admin.verify(app), admin.download(app));
   app.post("/admin/logs", admin.verify(app), admin.logs(app));
   app.delete("/admin/delete", admin.verify(app), admin.delete(app));
   app.post("/admin/chapters", admin.verify(app), admin.saveChapters(app));
