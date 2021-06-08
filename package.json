@@ -49,20 +49,15 @@
     "express-rate-limit": "^5.2.6",
     "feathers-hooks-common": "^5.0.6",
     "feathers-sequelize": "^6.2.0",
-    "fluent-ffmpeg": "^2.1.2",
     "googleapis": "^75.0.0",
     "helmet": "^4.6.0",
-    "hls-parser": "^0.10.4",
-    "moment-duration-format": "^2.3.2",
     "pg": "^8.6.0",
-    "redis": "^3.1.2",
-    "retry-axios": "^2.4.0",
     "sequelize": "^6.6.2",
     "serve-favicon": "^2.5.0",
-    "winston": "^3.3.3"
+    "winston": "^3.3.3",
+    "axios": "^0.21.1"
   },
   "devDependencies": {
-    "axios": "^0.21.1",
     "eslint": "^7.28.0",
     "mocha": "^9.0.0",
     "nodemon": "^2.0.7"

@@ -1,4 +1,3 @@
-const vod = require("./vod");
 const config = require("../../config/config.json");
 const fs = require("fs");
 
@@ -28,9 +27,6 @@ module.exports = function (app) {
     if (vods.length == 0)
       return res.status(404).json({ error: true, message: "No Vod found" });
 
-    res
-      .status(200)
-      .json({ error: false, message: "Starting upload to youtube" });
     const vod_data = vods[0];
 
     await app
@@ -42,15 +38,10 @@ module.exports = function (app) {
         console.error(e);
       });
 
-    if (config.multiTrack)
-      await vod.trimUpload(
-        `${config.livePath}/${config.channel.toLowerCase()}/${
-          req.body.streamId
-        }/${req.body.streamId}.mp4`,
-        `${config.channel} ${vod_data.date} Live Vod`,
-        false,
-        app
-      );
+    res
+      .status(200)
+      .json({ error: false, message: `Added Drive Id: ${req.body.drive_id} to vod ${vod_data.id}` });
+
     await fs.promises.rmdir(
       `${config.livePath}/${config.channel.toLowerCase()}/${req.body.streamId}`,
       {

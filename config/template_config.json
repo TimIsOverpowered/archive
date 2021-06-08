@@ -2,10 +2,7 @@
     "twitch": {
         "client_id": "YOUR_CLIENT_ID",
         "client_secret": "YOUR_CLIENT_SECRET",
-        "webhook_secret": "YOUR_WEBHOOK_SECRET",
-        "webhook_callback": "YOUR_CALLBACK_URL",
-        "access_token": "",
-        "oauth_key": "" //not needed, but if you do use this. have twitch turbo to avoid ads on live stream pulls.
+        "access_token": ""
     },
     "google": {
         "client_id": "YOUR_CLIENT_ID",
@@ -16,33 +13,7 @@
             "https://www.googleapis.com/auth/youtube.force-ssl"
         ]
     },
-    "youtube": {
-        "access_token": "YOUR_YOUTUBE_ACCESS_TOKEN",
-        "scope": "https://www.googleapis.com/auth/youtube.upload",
-        "token_type": "Bearer",
-        "expires_in": 3599,
-        "refresh_token": "YOUR_YOUTUBE_REFRESH_TOKEN"
-    },
     "twitchId": "YOUR_TWITCH_ID", //CHANNEL'S TWITCH ID YOU ARE MONITORING
     "channel": "YOUR_TWITCH_CHANNEL", //CHANNEL YOU ARE MONITORING VODS ON
-    "vodPath": "YOUR_VOD_PATH", //WHERE TO DOWNLOAD YOUR VODS AT.
-    "youtube_description": "YOUR YOUTUBE DESCRIPTION GOES HERE", //YOUTUBE DESCRIPTION
-    "youtube_comment": "YOUR PINNED COMMENT GOES HERE", //COMMENT ON VIDEO WHEN UPLOADED
-    "youtube_public_vid": false, //SET VIDEOS TO PUBLIC WHEN UPLOADED. OTHERWISE UNLISTED.
-    "timezone": "UTC", //TIMEZONE FOR STREAMER. DEFAULT: UTC
-    "perGameUpload": false, //UPLOADS EVERY GAME PLAYED IN THE VOD. (MAY BE BAD FOR PEOPLE WHO SWAP CHAPTERS CONSTANTLY)
-    "splitDuration": 43199, //NUMBER OF SECONDS TO SPLIT THE VIDEO. (EVERY 12 HOURS IS DEFAULT)
-    "youtube_api_key": "YOUR YOUTUBE API KEY",
-    "liveUpload": false, //UPLOAD PARTS LIVE INSTEAD OF WAITING UNTIL VOD IS FINISHED
-    "multiTrack": false, //IF STREAMER IS USING TWITCH VOD TRACK TO SEPERATE MUSIC
-    "livePath": "YOUR_LIVE_RECORDED_PATH", //LIVE PATH IF USING MY RECORDER APP
-    "drive": { //IF USING DRIVE.
-        "access_token": "",
-        "refresh_token": "",
-        "upload": false,
-        "parents": [
-            ""
-        ],
-        "token_type": "Bearer"
-    }
+    "timezone": "UTC" //TIMEZONE FOR STREAMER. DEFAULT: UTC
 }

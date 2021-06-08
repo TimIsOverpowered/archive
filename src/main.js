@@ -47,11 +47,6 @@ module.exports = async function (app) {
             console.error(e);
           });
       }
-      const dir = `${config.vodPath}${vodData.id}`;
-      if (await fileExists(dir))
-        await fs.promises.rmdir(dir, {
-          recursive: true,
-        });
       vod.startDownload(vodData.id, app);
     }
   }
@@ -105,11 +100,6 @@ const check = async (app) => {
             console.error(e);
           });
 
-        const dir = `${config.vodPath}${vodData.id}`;
-        if (await fileExists(dir))
-          await fs.promises.rmdir(dir, {
-            recursive: true,
-          });
         vod.startDownload(vodData.id, app);
       }
     }

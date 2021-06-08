@@ -7,10 +7,6 @@
     "max": 50
   },
   "postgres": "YOUR_POSTGRES_CONNECTION_URI",
-  "ADMIN_API_KEY": "YOUR_ADMIN_API_KEY",
-  "redis": {
-    "host": "127.0.0.1",
-    "port": 6379
-  }
+  "ADMIN_API_KEY": "YOUR_ADMIN_API_KEY"
 }
   
