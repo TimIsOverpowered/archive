@@ -2,10 +2,7 @@
     "twitch": {
         "client_id": "YOUR_CLIENT_ID",
         "client_secret": "YOUR_CLIENT_SECRET",
-        "webhook_secret": "YOUR_WEBHOOK_SECRET",
-        "webhook_callback": "YOUR_CALLBACK_URL",
-        "access_token": "",
-        "oauth_key": "" //not needed, but if you do use this. have twitch turbo to avoid ads on live stream pulls.
+        "access_token": ""
     },
     "google": {
         "client_id": "YOUR_CLIENT_ID",
