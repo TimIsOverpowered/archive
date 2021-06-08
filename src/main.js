@@ -16,7 +16,7 @@ process.on("unhandledRejection", function (reason, p) {
 module.exports = async function (app) {
   await twitch.checkToken();
   const stream = await twitch.getStream(config.twitchId);
-  if (stream && stream.length && stream.length > 0 && stream[0].type === "live") {
+  if (stream && stream.length !== null && stream.length > 0 && stream[0] && stream[0].type === "live") {
     const vodData = await twitch.getLatestVodData(config.twitchId);
     if (stream[0].id === vodData.stream_id) {
       let exists;
@@ -70,7 +70,7 @@ const check = async (app) => {
   if ((process.env.NODE_ENV || "").trim() !== "production")
     console.info(`Checking if ${config.channel} is live..`);
   const stream = await twitch.getStream(config.twitchId);
-  if (stream && stream.length && stream.length > 0 && stream[0].type === "live") {
+  if (stream && stream.length !== null && stream.length > 0 && stream[0] && stream[0].type === "live") {
     const vodData = await twitch.getLatestVodData(config.twitchId);
     if (stream[0].id === vodData.stream_id) {
       let exists;
