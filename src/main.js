@@ -18,7 +18,7 @@ module.exports = async function (app) {
   const stream = await twitch.getStream(config.twitchId);
   if (stream && stream.length !== null && stream.length > 0 && stream[0] && stream[0].type === "live") {
     const vodData = await twitch.getLatestVodData(config.twitchId);
-    if (stream[0].id === vodData.stream_id) {
+    if (vodData && vodData.stream_id && stream[0].id === vodData.stream_id) {
       let exists;
       await app
         .service("vods")
@@ -72,7 +72,7 @@ const check = async (app) => {
   const stream = await twitch.getStream(config.twitchId);
   if (stream && stream.length !== null && stream.length > 0 && stream[0] && stream[0].type === "live") {
     const vodData = await twitch.getLatestVodData(config.twitchId);
-    if (stream[0].id === vodData.stream_id) {
+    if (vodData && vodData.stream_id && stream[0].id === vodData.stream_id) {
       let exists;
       await app
         .service("vods")
