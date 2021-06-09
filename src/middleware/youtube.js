@@ -101,17 +101,17 @@ module.exports.saveChapters = async (vodId, app, type = "vod") => {
       .duration(video_data.contentDetails.duration)
       .asSeconds();
 
-    let description = snippet.description;
+    let description = snippet.description += "\n";
     for (let chapter of vod_data.chapters) {
       if (i === 0) {
         if (chapter.end < duration || chapter.start === 0) {
-          description += `\n\n${moment
+          description += `\n${moment
             .utc(chapter.start * 1000)
             .format("HH:mm:ss")} ${chapter.name}\n`;
         }
       } else {
         if (chapter.end < duration * (i + 1) || chapter.start === 0) {
-          description += `\n\n${moment
+          description += `\n${moment
             .utc(chapter.start * 1000)
             .format("HH:mm:ss")} ${chapter.name}\n`;
         }
@@ -190,7 +190,7 @@ module.exports.saveParts = async (vodId, app, type = "vod") => {
         type_youtube_data[i].id
       }\n`;
     }
-    description += snippet.description;
+    description += "\n" + snippet.description;
 
     const res = await youtube.videos.update({
       resource: {
