@@ -56,7 +56,7 @@ module.exports.chapters = function (app) {
         .status(400)
         .json({ error: true, message: "Missing type param..." });
 
-    _this.saveChapters(req.body.vodId, app, type);
+    _this.saveChapters(req.body.vodId, app, req.body.type);
 
     res
       .status(200)
@@ -94,7 +94,7 @@ module.exports.saveChapters = async (vodId, app, type = "vod") => {
     return data.type === type;
   });
   for (let i = 0; i < type_youtube_data.length; i++) {
-    const youtube_data = type_youtube_data.youtube[i];
+    const youtube_data = type_youtube_data[i];
     const video_data = await this.getVideo(youtube_data.id);
     const snippet = video_data.snippet;
     const duration = moment
@@ -143,7 +143,7 @@ module.exports.parts = function (app) {
         .status(400)
         .json({ error: true, message: "Missing Type param..." });
 
-    _this.saveParts(req.body.vodId, app, type);
+    _this.saveParts(req.body.vodId, app, req.body.type);
 
     res
       .status(200)
