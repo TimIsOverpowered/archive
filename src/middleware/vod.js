@@ -106,7 +106,10 @@ module.exports.upload = async (
     for (let i = 0; i < paths.length; i++) {
       const data = {
         path: paths[i],
-        title: vod.type === 'vod' ? `${config.channel} ${vod.date} Vod PART ${i + 1}` : `${config.channel} ${vod.date} Live Vod PART ${i + 1}`,
+        title:
+          vod.type === "vod"
+            ? `${config.channel} ${vod.date} Vod PART ${i + 1}`
+            : `${config.channel} ${vod.date} Live Vod PART ${i + 1}`,
         vodTitle: vod.title,
         date: vod.date,
         vodId: vodId,
@@ -123,7 +126,10 @@ module.exports.upload = async (
 
   const data = {
     path: vodPath,
-    title: vod.type === 'vod' ? `${config.channel} ${vod.date} Vod` : `${config.channel} ${vod.date} Live Vod`,
+    title:
+      type === "vod"
+        ? `${config.channel} ${vod.date} Vod`
+        : `${config.channel} ${vod.date} Live Vod`,
     vodTitle: vod.title,
     date: vod.date,
     vodId: vodId,
@@ -165,7 +171,9 @@ module.exports.liveUploadPart = async (
 
   await this.trimUpload(
     trimmedPath,
-    `${config.channel} ${vod.date} Vod Part ${part}`,
+    type === "vod"
+      ? `${config.channel} ${vod.date} Vod`
+      : `${config.channel} ${vod.date} Live Vod`,
     {
       vodId: vodId,
       youtube: vod.youtube,
@@ -697,8 +705,9 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
     setTimeout(async () => {
       const fileSize = fs.statSync(data.path).size;
       let description =
-        `VOD TITLE: ${data.vodTitle}\nChat Replay: https://moon2.tv/${data.type === 'live' ? "live" : "vods"}/${data.vodId}\n` +
-        config.youtube_description;
+        `VOD TITLE: ${data.vodTitle}\nChat Replay: https://moon2.tv/${
+          data.type === "live" ? "live" : "vods"
+        }/${data.vodId}\n` + config.youtube_description;
       const res = await youtube.videos.insert(
         {
           auth: oauth2Client,
@@ -817,7 +826,9 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
             snippet: {
               title: title,
               description: data
-                ? `VOD TITLE: ${data.vodTitle}\nChat Replay: https://${config.domain_name}/${data.type === 'live' ? "live" : "vods"}/${data.vodId}\n` +
+                ? `VOD TITLE: ${data.vodTitle}\nChat Replay: https://${
+                    config.domain_name
+                  }/${data.type === "live" ? "live" : "vods"}/${data.vodId}\n` +
                   config.youtube_description
                 : config.youtube_description,
               categoryId: "20",
@@ -1517,8 +1528,12 @@ module.exports.saveChapters = async (vodId, app, duration) => {
     for (let chapter of chapters) {
       newChapters.push({
         gameId: chapter.node.details.game ? chapter.node.details.game.id : null,
-        name: chapter.node.details.game ? chapter.node.details.game.displayName : null,
-        image: chapter.node.details.game ? chapter.node.details.game.boxArtURL : null,
+        name: chapter.node.details.game
+          ? chapter.node.details.game.displayName
+          : null,
+        image: chapter.node.details.game
+          ? chapter.node.details.game.boxArtURL
+          : null,
         duration: moment
           .utc(chapter.node.positionMilliseconds)
           .format("HH:mm:ss"),
