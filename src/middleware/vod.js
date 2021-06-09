@@ -694,7 +694,7 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
     setTimeout(async () => {
       const fileSize = fs.statSync(data.path).size;
       let description =
-        `VOD TITLE: ${data.vodTitle}\nChat Replay: https://moon2.tv/vods/${data.vodId}` +
+        `VOD TITLE: ${data.vodTitle}\nChat Replay: https://moon2.tv/vods/${data.vodId}\n` +
         config.youtube_description;
       const res = await youtube.videos.insert(
         {
@@ -814,7 +814,7 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
             snippet: {
               title: title,
               description: data
-                ? `VOD TITLE: ${data.vodTitle}\nChat Replay: https://moon2.tv/vods/${data.vodId}` +
+                ? `VOD TITLE: ${data.vodTitle}\nChat Replay: https://${config.domain_name}/vods/${data.vodId}\n` +
                   config.youtube_description
                 : config.youtube_description,
               categoryId: "20",
@@ -1282,7 +1282,6 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
       await youtube.saveChapters(vodId, app);
       await youtube.saveParts(vodId, app);
       fs.rmdirSync(dir, { recursive: true });
-      fs.unlinkSync(mp4Path);
       return;
     }
     await this.upload(vodId, app, mp4Path);

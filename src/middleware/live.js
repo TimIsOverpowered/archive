@@ -10,6 +10,9 @@ module.exports = function (app) {
     if (!req.body.streamId)
       return res.status(400).json({ error: true, message: "No streamId" });
 
+    if (!req.body.path)
+      return res.tatus(400).json({ error: true, message: "No Path" });
+
     let vods;
     await app
       .service("vods")
@@ -44,18 +47,15 @@ module.exports = function (app) {
 
     if (config.multiTrack)
       await vod.trimUpload(
-        `${config.livePath}/${config.channel.toLowerCase()}/${
-          req.body.streamId
-        }/${req.body.streamId}.mp4`,
+        path,
         `${config.channel} ${vod_data.date} Live Vod`,
         false,
         app
       );
-    await fs.promises.rmdir(
-      `${config.livePath}/${config.channel.toLowerCase()}/${req.body.streamId}`,
-      {
+    await fs.promises
+      .rmdir(path, {
         recursive: true,
-      }
-    ).catch((e) => console.error(e));
+      })
+      .catch((e) => console.error(e));
   };
 };
