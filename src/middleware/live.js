@@ -11,7 +11,7 @@ module.exports = function (app) {
       return res.status(400).json({ error: true, message: "No streamId" });
 
     if (!req.body.path)
-      return res.tatus(400).json({ error: true, message: "No Path" });
+      return res.status(400).json({ error: true, message: "No Path" });
 
     let vods;
     await app
