@@ -46,12 +46,8 @@ module.exports = function (app) {
       });
 
     if (config.multiTrack)
-      await vod.trimUpload(
-        req.body.path,
-        `${config.channel} ${vod_data.date} Live Vod`,
-        false,
-        app
-      );
+      await vod.upload(vod_data.id, app, req.body.path, false, "live");
+
     await fs.promises
       .rmdir(req.body.path, {
         recursive: true,
