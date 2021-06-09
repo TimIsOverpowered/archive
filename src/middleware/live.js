@@ -53,7 +53,7 @@ module.exports = function (app) {
         app
       );
     await fs.promises
-      .rmdir(path, {
+      .rmdir(req.body.path, {
         recursive: true,
       })
       .catch((e) => console.error(e));

@@ -73,8 +73,6 @@ const fileExists = async (file) => {
 };
 
 const check = async (app) => {
-  if ((process.env.NODE_ENV || "").trim() !== "production")
-    console.info(`Checking if ${config.channel} is live..`);
   const stream = await twitch.getStream(config.twitchId);
   if (
     stream &&
