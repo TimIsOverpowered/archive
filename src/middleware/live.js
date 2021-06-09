@@ -47,7 +47,7 @@ module.exports = function (app) {
 
     if (config.multiTrack)
       await vod.trimUpload(
-        path,
+        req.body.path,
         `${config.channel} ${vod_data.date} Live Vod`,
         false,
         app
