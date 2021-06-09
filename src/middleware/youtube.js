@@ -93,30 +93,35 @@ module.exports.saveChapters = async (vodId, app, type = "vod") => {
   const type_youtube_data = vod_data.youtube.filter(function (data) {
     return data.type === type;
   });
+  let totalDuration = 0;
   for (let i = 0; i < type_youtube_data.length; i++) {
     const youtube_data = type_youtube_data[i];
     const video_data = await this.getVideo(youtube_data.id);
     const snippet = video_data.snippet;
-    const duration = moment
+    const videoDuration = moment
       .duration(video_data.contentDetails.duration)
       .asSeconds();
 
-    let description = snippet.description += "\n";
+    let description = snippet.description += "\n\n";
     for (let chapter of vod_data.chapters) {
-      if (i === 0) {
-        if (chapter.end < duration || chapter.start === 0) {
-          description += `\n${moment
+      if(i === 0) {
+        if (chapter.start <= videoDuration && videoDuration >= chapter.end) {
+          description += `${moment
             .utc(chapter.start * 1000)
             .format("HH:mm:ss")} ${chapter.name}\n`;
         }
       } else {
-        if (chapter.end < duration * (i + 1) || chapter.start === 0) {
-          description += `\n${moment
-            .utc(chapter.start * 1000)
+        if ((totalDuration <= chapter.start && totalDuration >= chapter.end) || chapter.end + chapter.start >= totalDuration) {
+          let timestamp = chapter.start - totalDuration < 0 ? 0 : chapter.start - totalDuration;
+          description += `${moment
+            .utc(timestamp * 1000)
             .format("HH:mm:ss")} ${chapter.name}\n`;
         }
       }
     }
+
+    totalDuration += videoDuration
+
 
     const res = await youtube.videos.update({
       resource: {
