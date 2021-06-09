@@ -1506,8 +1506,8 @@ module.exports.saveChapters = async (vodId, app, duration) => {
   if (chapters.length === 0) {
     const chapter = await twitch.getChapter(vodId);
     newChapters.push({
-      gameId: chapter.game.id,
-      name: chapter.game.displayName,
+      gameId: chapter.game ? chapter.game.id : null,
+      name: chapter.game ? chapter.game.displayName : null,
       duration: "00:00:00",
       start: 0,
       end: duration,
@@ -1515,9 +1515,9 @@ module.exports.saveChapters = async (vodId, app, duration) => {
   } else {
     for (let chapter of chapters) {
       newChapters.push({
-        gameId: chapter.node.details.game.id,
-        name: chapter.node.details.game.displayName,
-        image: chapter.node.details.game.boxArtURL,
+        gameId: chapter.node.details.game ? chapter.node.details.game.id : null,
+        name: chapter.node.details.game ? chapter.node.details.game.displayName : null,
+        image: chapter.node.details.game ? chapter.node.details.game.boxArtURL : null,
         duration: moment
           .utc(chapter.node.positionMilliseconds)
           .format("HH:mm:ss"),
