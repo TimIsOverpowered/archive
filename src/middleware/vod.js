@@ -37,13 +37,15 @@ oauth2Client.on("tokens", (tokens) => {
     access_token: tokens.access_token,
   });
 });
-const drive = require('./drive');
+const drive = require("./drive");
+const youtube = require("./youtube");
 
 module.exports.upload = async (
   vodId,
   app,
   manualPath = false,
-  dmca = false
+  dmca = false,
+  type = "vod"
 ) => {
   let vod;
   await app
@@ -102,28 +104,13 @@ module.exports.upload = async (
       return console.error("Something went wrong trying to split the video");
 
     for (let i = 0; i < paths.length; i++) {
-      let chapters = [];
-      if (vod.chapters) {
-        for (let chapter of vod.chapters) {
-          const chapterDuration = moment.duration(chapter.duration).asSeconds();
-          if (i === 0) {
-            if (chapterDuration < config.splitDuration) {
-              chapters.push(chapter);
-            }
-          } else {
-            chapter.duration = moment
-              .utc((chapterDuration - config.splitDuration * (i + 1)) * 1000)
-              .format("HH:mm:ss");
-            chapters.push(chapter);
-          }
-        }
-      }
       const data = {
         path: paths[i],
-        title: `${config.channel} ${vod.date} Vod PART ${i + 1}`,
+        title: vod.type === 'vod' ? `${config.channel} ${vod.date} Vod PART ${i + 1}` : `${config.channel} ${vod.date} Live Vod PART ${i + 1}`,
+        vodTitle: vod.title,
         date: vod.date,
-        chapters: chapters,
         vodId: vodId,
+        type: type,
         index: i,
       };
       await this.uploadVideo(data, app, dmca);
@@ -134,10 +121,11 @@ module.exports.upload = async (
 
   const data = {
     path: vodPath,
-    title: `${config.channel} ${vod.date} Vod`,
+    title: vod.type === 'vod' ? `${config.channel} ${vod.date} Vod` : `${config.channel} ${vod.date} Live Vod`,
+    vodTitle: vod.title,
     date: vod.date,
-    chapters: vod.chapters,
     vodId: vodId,
+    type: type,
     index: 0,
   };
 
@@ -150,7 +138,8 @@ module.exports.liveUploadPart = async (
   m3u8Path,
   start,
   end,
-  part
+  part,
+  type = "vod"
 ) => {
   let vod;
   await app
@@ -178,6 +167,8 @@ module.exports.liveUploadPart = async (
       vodId: vodId,
       youtube: vod.youtube,
       part: part,
+      vodTitle: vod.title,
+      type: type,
     },
     app
   );
@@ -702,12 +693,9 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
   await new Promise((resolve, reject) => {
     setTimeout(async () => {
       const fileSize = fs.statSync(data.path).size;
-      let description = config.youtube_description;
-      if (data.chapters) {
-        for (let chapter of data.chapters) {
-          description += `${chapter.duration} ${chapter.name}\n`;
-        }
-      }
+      let description =
+        `VOD TITLE: ${data.vodTitle}\nChat Replay: https://moon2.tv/vods/${data.vodId}` +
+        config.youtube_description;
       const res = await youtube.videos.insert(
         {
           auth: oauth2Client,
@@ -753,11 +741,13 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
         if (data.index === 0) {
           youtube_data.unshift({
             id: res.data.id,
+            type: data.type,
             duration: await getDuration(data.path),
           });
         } else {
           youtube_data.push({
             id: res.data.id,
+            type: data.type,
             duration: await getDuration(data.path),
           });
         }
@@ -766,12 +756,14 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
           youtube_data = [
             {
               id: res.data.id,
+              type: data.type,
               duration: await getDuration(data.path),
             },
           ];
         } else {
           youtube_data.push({
             id: res.data.id,
+            type: data.type,
             duration: await getDuration(data.path),
           });
         }
@@ -821,7 +813,10 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
           requestBody: {
             snippet: {
               title: title,
-              description: config.youtube_description,
+              description: data
+                ? `VOD TITLE: ${data.vodTitle}\nChat Replay: https://moon2.tv/vods/${data.vodId}` +
+                  config.youtube_description
+                : config.youtube_description,
               categoryId: "20",
             },
             status: {
@@ -850,11 +845,13 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
         if (data.youtube[data.part - 1]) {
           data.youtube[data.part - 1] = {
             id: res.data.id,
+            type: data.type,
             duration: await getDuration(path),
           };
         } else {
           data.youtube.push({
             id: res.data.id,
+            type: data.type,
             duration: await getDuration(path),
           });
         }
@@ -1190,7 +1187,13 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
 
   //if live, continue fetching logs.
   const stream = await twitch.getStream(config.twitchId);
-  if (stream && stream.length !== null && stream.length > 0 && stream[0] && stream[0].type === "live") {
+  if (
+    stream &&
+    stream.length !== null &&
+    stream.length > 0 &&
+    stream[0] &&
+    stream[0].type === "live"
+  ) {
     setTimeout(() => {
       downloadLogs(vodId, app, lastCursor);
     }, 1000 * 60 * 1);
@@ -1258,7 +1261,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
   if ((!newVodData && m3u8Exists) || retry >= 10) {
     const mp4Path = `${dir}/${vodId}.mp4`;
     await this.convertToMp4(m3u8Path, vodId, mp4Path);
-    if(config.drive.upload) {
+    if (config.drive.upload) {
       await drive.upload(vodId, mp4Path);
     }
     if (config.liveUpload) {
@@ -1276,11 +1279,15 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
         duration - startTime,
         vod.youtube.length + 1
       );
+      await youtube.saveChapters(vodId, app);
+      await youtube.saveParts(vodId, app);
       fs.rmdirSync(dir, { recursive: true });
       fs.unlinkSync(mp4Path);
       return;
     }
     await this.upload(vodId, app, mp4Path);
+    await youtube.saveChapters(vodId, app);
+    await youtube.saveParts(vodId, app);
     fs.rmdirSync(dir, { recursive: true });
     return;
   }
@@ -1317,12 +1324,12 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
   const baseURL = parsedM3u8.substring(0, parsedM3u8.lastIndexOf("/"));
 
   let variantM3u8 = await twitch.getVariantM3u8(parsedM3u8);
-  if(!variantM3u8) {
+  if (!variantM3u8) {
     setTimeout(() => {
       download(vodId, app, retry, delay);
     }, 1000 * 60 * delay);
     return console.error("failed to get variant m3u8");
-  } 
+  }
 
   variantM3u8 = HLS.parse(variantM3u8);
   variantM3u8 = checkForUnmutedTS(variantM3u8);

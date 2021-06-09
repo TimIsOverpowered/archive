@@ -1,6 +1,7 @@
 const admin = require("./admin");
 const logs = require("./logs");
 const live = require("./live");
+const youtube = require("./youtube");
 const rateLimit = require("express-rate-limit");
 
 module.exports = function (app) {
@@ -15,6 +16,8 @@ module.exports = function (app) {
   app.post("/admin/chapters", admin.verify(app), admin.saveChapters(app));
   app.post("/v2/admin/download", admin.verify(app), admin.downloadv2(app));
   app.post("/v2/admin/reupload", admin.verify(app), admin.reUploadPart(app));
+  app.post("/v2/youtube/parts", admin.verify(app), youtube.parts(app));
+  app.post("/v2/youtube/chapters", admin.verify(app), youtube.chapters(app));
   app.post("/v2/live", admin.verify(app), live(app));
   app.get(
     "/v1/vods/:vodId/comments",

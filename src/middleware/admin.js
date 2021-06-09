@@ -46,7 +46,8 @@ module.exports.download = function (app) {
     }
 
     const vodData = await twitch.getVodData(req.body.vodId);
-    if (!vodData) return res.status(404).json({ error: true, message: "No Vod Data" });
+    if (!vodData)
+      return res.status(404).json({ error: true, message: "No Vod Data" });
 
     await app
       .service("vods")
@@ -481,7 +482,11 @@ module.exports.saveChapters = function (app) {
         message: `Failed to get vod data for ${req.body.vodId}`,
       });
 
-    vod.saveChapters(vodData.id, app, moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds());
+    vod.saveChapters(
+      vodData.id,
+      app,
+      moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds()
+    );
     res
       .status(200)
       .json({ error: false, message: `Saving Chapters for ${req.body.vodId}` });
@@ -518,7 +523,9 @@ module.exports.reUploadPart = function (app) {
       return;
     }
 
-    const mp4Video = req.body.path ? req.body.path : await vod.download(req.body.vodId);
+    const mp4Video = req.body.path
+      ? req.body.path
+      : await vod.download(req.body.vodId);
 
     if (mp4Video) {
       await vod.liveUploadPart(
@@ -673,6 +680,7 @@ module.exports.partDmca = function (app) {
         vodId: req.body.vodId,
         youtube: vod_data.youtube,
         part: req.body.part,
+        vodTitle: vod_data.title,
       },
       app
     );
