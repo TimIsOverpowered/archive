@@ -705,7 +705,7 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
     setTimeout(async () => {
       const fileSize = fs.statSync(data.path).size;
       let description =
-        `VOD TITLE: ${data.vodTitle}\nChat Replay: https://moon2.tv/${
+        `VOD TITLE: ${data.vodTitle}\nChat Replay: https://${config.domain_name}/${
           data.type === "live" ? "live" : "vods"
         }/${data.vodId}\n` + config.youtube_description;
       const res = await youtube.videos.insert(
