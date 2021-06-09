@@ -51,7 +51,12 @@ module.exports.chapters = function (app) {
     if (!req.body.vodId)
       return res.status(400).json({ error: true, message: "Missing vod id.." });
 
-    _this.saveChapters(req.body.vodId, app);
+    if (!req.body.type)
+      return res
+        .status(400)
+        .json({ error: true, message: "Missing type param..." });
+
+    _this.saveChapters(req.body.vodId, app, type);
 
     res
       .status(200)
@@ -59,7 +64,7 @@ module.exports.chapters = function (app) {
   };
 };
 
-module.exports.saveChapters = async (vodId, app) => {
+module.exports.saveChapters = async (vodId, app, type = "vod") => {
   oauth2Client.credentials = config.youtube;
   const youtube = google.youtube({
     version: "v3",
@@ -85,8 +90,11 @@ module.exports.saveChapters = async (vodId, app) => {
 
   console.log(`Saving chapters on youtube for ${vodId}`);
 
-  for (let i = 0; i < vod_data.youtube.length; i++) {
-    const youtube_data = vod_data.youtube[i];
+  const type_youtube_data = vod_data.youtube.filter(function (data) {
+    return data.type === type;
+  });
+  for (let i = 0; i < type_youtube_data.length; i++) {
+    const youtube_data = type_youtube_data.youtube[i];
     const video_data = await this.getVideo(youtube_data.id);
     const snippet = video_data.snippet;
     const duration = moment
@@ -121,8 +129,6 @@ module.exports.saveChapters = async (vodId, app) => {
       },
       part: "snippet",
     });
-
-    console.log(res.data);
   }
 };
 
@@ -132,7 +138,12 @@ module.exports.parts = function (app) {
     if (!req.body.vodId)
       return res.status(400).json({ error: true, message: "Missing vod id.." });
 
-    _this.saveParts(req.body.vodId, app);
+    if (!req.body.type)
+      return res
+        .status(400)
+        .json({ error: true, message: "Missing Type param..." });
+
+    _this.saveParts(req.body.vodId, app, type);
 
     res
       .status(200)
@@ -140,7 +151,7 @@ module.exports.parts = function (app) {
   };
 };
 
-module.exports.saveParts = async (vodId, app) => {
+module.exports.saveParts = async (vodId, app, type = "vod") => {
   oauth2Client.credentials = config.youtube;
   const youtube = google.youtube({
     version: "v3",
@@ -165,15 +176,18 @@ module.exports.saveParts = async (vodId, app) => {
 
   console.log(`Saving parts on youtube for ${vodId}`);
 
-  for (let youtube_data of vod_data.youtube) {
+  const type_youtube_data = vod_data.youtube.filter(function (data) {
+    return data.type === type;
+  });
+  for (let youtube_data of type_youtube_data) {
     const video_data = await this.getVideo(youtube_data.id);
     const snippet = video_data.snippet;
 
     let description = ``;
-    for (let i = 0; i < vod_data.youtube.length; i++) {
-      if (youtube_data.id === vod_data.youtube[i].id) continue;
+    for (let i = 0; i < type_youtube_data.length; i++) {
+      if (youtube_data.id === type_youtube_data[i].id) continue;
       description += `PART ${i + 1}: https://youtube.com/watch?v=${
-        vod_data.youtube[i].id
+        type_youtube_data[i].id
       }\n`;
     }
     description += snippet.description;
@@ -189,8 +203,6 @@ module.exports.saveParts = async (vodId, app) => {
       },
       part: "snippet",
     });
-
-    console.log(res.data);
   }
 };
 
