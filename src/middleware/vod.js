@@ -705,9 +705,10 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
     setTimeout(async () => {
       const fileSize = fs.statSync(data.path).size;
       let description =
-        `VOD TITLE: ${data.vodTitle}\nChat Replay: https://${config.domain_name}/${
-          data.type === "live" ? "live" : "vods"
-        }/${data.vodId}\n` + config.youtube_description;
+        `VOD TITLE: ${data.vodTitle}\nChat Replay: https://${
+          config.domain_name
+        }/${data.type === "live" ? "live" : "vods"}/${data.vodId}\n` +
+        config.youtube_description;
       const res = await youtube.videos.insert(
         {
           auth: oauth2Client,
@@ -1540,7 +1541,7 @@ module.exports.saveChapters = async (vodId, app, duration) => {
         start:
           chapter.node.positionMilliseconds === 0
             ? chapter.node.positionMilliseconds / 1000
-            : chapter.node.positionMilliseconds / 1000 - 120, //2mins prior bc streamers are dumb when setting game?
+            : chapter.node.positionMilliseconds / 1000,
         end:
           chapter.node.durationMilliseconds === 0
             ? duration
