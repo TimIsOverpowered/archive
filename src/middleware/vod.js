@@ -1297,7 +1297,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
         vod.youtube.length + 1
       );
       await youtube.saveChapters(vodId, app, "vod");
-      setTimeout(() => {
+      setTimeout(async () => {
         await youtube.saveParts(vodId, app, type);
       }, 30000)
       fs.rmdirSync(dir, { recursive: true });
