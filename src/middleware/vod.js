@@ -119,7 +119,7 @@ module.exports.upload = async (
       await this.uploadVideo(data, app, dmca);
     }
     await youtube.saveChapters(vodId, app, type);
-    setTimeout(() => {
+    setTimeout(async () => {
       await youtube.saveParts(vodId, app, type);
     }, 30000)
     fs.unlinkSync(vodPath);
