@@ -119,7 +119,9 @@ module.exports.upload = async (
       await this.uploadVideo(data, app, dmca);
     }
     await youtube.saveChapters(vodId, app, type);
-    await youtube.saveParts(vodId, app, type);
+    setTimeout(() => {
+      await youtube.saveParts(vodId, app, type);
+    }, 30000)
     fs.unlinkSync(vodPath);
     return;
   }
@@ -1295,7 +1297,9 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
         vod.youtube.length + 1
       );
       await youtube.saveChapters(vodId, app, "vod");
-      await youtube.saveParts(vodId, app, "vod");
+      setTimeout(() => {
+        await youtube.saveParts(vodId, app, type);
+      }, 30000)
       fs.rmdirSync(dir, { recursive: true });
       return;
     }
