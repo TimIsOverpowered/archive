@@ -107,7 +107,7 @@ module.exports.upload = async (
       const data = {
         path: paths[i],
         title:
-          vod.type === "vod"
+          type === "vod"
             ? `${config.channel} ${vod.date} Vod PART ${i + 1}`
             : `${config.channel} ${vod.date} Live Vod PART ${i + 1}`,
         vodTitle: vod.title,
@@ -172,8 +172,8 @@ module.exports.liveUploadPart = async (
   await this.trimUpload(
     trimmedPath,
     type === "vod"
-      ? `${config.channel} ${vod.date} Vod`
-      : `${config.channel} ${vod.date} Live Vod`,
+      ? `${config.channel} ${vod.date} Vod Part ${part}`
+      : `${config.channel} ${vod.date} Live Vod Part ${part}`,
     {
       vodId: vodId,
       youtube: vod.youtube,
