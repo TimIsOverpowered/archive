@@ -538,14 +538,6 @@ module.exports.partDmca = function (app) {
       app
     );
 
-    fs.unlinkSync(newVodPath ? newVodPath : blackoutPath);
     fs.unlinkSync(trimmedPath);
   };
-};
-
-const fileExists = async (file) => {
-  return fs.promises
-    .access(file, fs.constants.F_OK)
-    .then(() => true)
-    .catch(() => false);
 };
