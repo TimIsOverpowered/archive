@@ -57,6 +57,7 @@ module.exports = async function (app) {
       if (await fileExists(dir))
         await fs.promises.rmdir(dir, {
           recursive: true,
+          force: true,
         });
       vod.startDownload(vodData.id, app);
     }
@@ -119,6 +120,7 @@ const check = async (app) => {
         if (await fileExists(dir))
           await fs.promises.rmdir(dir, {
             recursive: true,
+            force: true,
           });
         vod.startDownload(vodData.id, app);
       }

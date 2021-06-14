@@ -1322,11 +1322,17 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
       setTimeout(async () => {
         await youtube.saveParts(vodId, app, type);
       }, 30000);
-      fs.rmdirSync(dir, { recursive: true });
+      await fs.promises.rmdir(dir, {
+        recursive: true,
+        force: true,
+      });
       return;
     }
     await this.upload(vodId, app, mp4Path);
-    fs.rmdirSync(dir, { recursive: true });
+    await fs.promises.rmdir(dir, {
+      recursive: true,
+      force: true,
+    });
     return;
   }
 

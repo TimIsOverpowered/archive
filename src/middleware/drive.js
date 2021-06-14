@@ -125,11 +125,11 @@ module.exports.download = async (vodId, type, app) => {
 
   const filePath = path.join(
     type === "vod" ? config.vodPath : config.livePath,
-    vodId
+    `${vodId}.mp4`
   );
 
   await drive.files
-    .get({ driveId, alt: "media" }, { responseType: "stream" })
+    .get({ fileId: driveId, alt: "media" }, { responseType: "stream" })
     .then((res) => {
       return new Promise((resolve, reject) => {
         const dest = fs.createWriteStream(filePath);
