@@ -757,11 +757,13 @@ module.exports.uploadVideo = async (data, app) => {
                 type: data.type,
                 duration: await getDuration(path),
                 part: data.part,
+                thumbnail_url : res.data.snippet.thumbnails.medium.url
               }
             : {
                 id: res.data.id,
                 type: data.type,
                 duration: await getDuration(path),
+                thumbnail_url : res.data.snippet.thumbnails.medium.url
               }
         );
       } else {
@@ -771,11 +773,13 @@ module.exports.uploadVideo = async (data, app) => {
               type: data.type,
               duration: await getDuration(path),
               part: data.part,
+              thumbnail_url : res.data.snippet.thumbnails.medium.url
             }
           : {
               id: res.data.id,
               type: data.type,
               duration: await getDuration(path),
+              thumbnail_url : res.data.snippet.thumbnails.medium.url
             };
       }
 
@@ -874,6 +878,7 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
           type: data.type,
           duration: await getDuration(path),
           part: data.part,
+          thumbnail_url : res.data.snippet.thumbnails.medium.url
         });
       } else {
         data.vod.youtube[indexOfPart] = {
@@ -881,6 +886,7 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
           type: data.type,
           duration: await getDuration(path),
           part: data.part,
+          thumbnail_url : res.data.snippet.thumbnails.medium.url
         };
       }
 
