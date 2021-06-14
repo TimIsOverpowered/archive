@@ -59,12 +59,10 @@ module.exports.upload = async (
     return console.error("Failed to download video: no VOD in database");
 
   let vodPath = manualPath ? manualPath : await this.download(vodId);
-  if (!vodPath) vodPath = await drive.download(vodId, type);
+  if (!vodPath) vodPath = await drive.download(vodId, type, app);
 
   if (!vodPath)
-    return console.error(
-      `Could not find a download source for ${vodId}`
-    );
+    return console.error(`Could not find a download source for ${vodId}`);
 
   if (config.perGameUpload) {
     for (let chapter of vod.chapters) {
@@ -1304,9 +1302,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
   if ((!newVodData && m3u8Exists) || retry >= 10) {
     const mp4Path = `${dir}/${vodId}.mp4`;
     await this.convertToMp4(m3u8Path, vodId, mp4Path);
-    if (config.drive.upload) {
-      await drive.upload(vodId, mp4Path);
-    }
+    if (config.drive.upload) await drive.upload(vodId, mp4Path, app);
     if (config.liveUpload) {
       //upload last part
       let startTime = 0;

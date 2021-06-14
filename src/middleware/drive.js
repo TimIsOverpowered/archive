@@ -28,7 +28,7 @@ oauth2Client.on("tokens", (tokens) => {
   });
 });
 
-module.exports.upload = async (vodId, path) => {
+module.exports.upload = async (vodId, path, app) => {
   oauth2Client.credentials = config.drive;
   const drive = google.drive({
     version: "v3",
@@ -90,7 +90,7 @@ module.exports.upload = async (vodId, path) => {
     });
 };
 
-module.exports.download = async (vodId, type) => {
+module.exports.download = async (vodId, type, app) => {
   let vod;
   await app
     .service("vods")

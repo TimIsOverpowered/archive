@@ -235,7 +235,7 @@ module.exports.dmca = function (app) {
     });
 
     let vodPath = await vod.download(req.body.vodId);
-    if (!vodPath) vodPath = await drive.download(req.body.vodId, req.body.type);
+    if (!vodPath) vodPath = await drive.download(req.body.vodId, req.body.type, app);
 
     if (!vodPath)
       return console.error(
@@ -381,7 +381,7 @@ module.exports.reUploadPart = function (app) {
       );
       fs.unlinkSync(mp4Video);
     } else {
-      const driveVideo = await drive.download(req.body.vodId, req.body.type);
+      const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
       if (!driveVideo)
         return console.error(
           `Could not find a download source for ${req.body.vodId}`
@@ -441,7 +441,7 @@ module.exports.partDmca = function (app) {
       );
       fs.unlinkSync(mp4Video);
     } else {
-      const driveVideo = await drive.download(req.body.vodId, req.body.type);
+      const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
       if (!driveVideo)
         return console.error(
           `Could not find a download source for ${req.body.vodId}`
