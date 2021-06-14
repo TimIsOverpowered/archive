@@ -781,17 +781,10 @@ module.exports.uploadVideo = async (data, app) => {
 
       await app
         .service("vods")
-        .patch(
-          data.vodId,
-          data.vod.thumbnail_url
-            ? {
-                youtube: data.vod.youtube,
-              }
-            : {
-                youtube: data.vod.youtube,
-                thumbnail_url: res.data.snippet.thumbnails.medium.url,
-              }
-        )
+        .patch(data.vodId, {
+          youtube: data.vod.youtube,
+          thumbnail_url: res.data.snippet.thumbnails.medium.url,
+        })
         .then(() => {
           console.info(`Saved youtube data in DB for vod ${data.vodId}`);
         })
@@ -893,17 +886,10 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
 
       await app
         .service("vods")
-        .patch(
-          data.vod.id,
-          data.vod.thumbnail_url
-            ? {
-                youtube: data.vod.youtube,
-              }
-            : {
-                youtube: data.vod.youtube,
-                thumbnail_url: res.data.snippet.thumbnails.medium.url,
-              }
-        )
+        .patch(data.vodId, {
+          youtube: data.vod.youtube,
+          thumbnail_url: res.data.snippet.thumbnails.medium.url,
+        })
         .then(() => {
           console.info(`Saved youtube data in DB for vod ${data.vod.id}`);
         })
