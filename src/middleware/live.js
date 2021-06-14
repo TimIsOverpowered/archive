@@ -36,7 +36,7 @@ module.exports = function (app) {
       .json({ error: false, message: "Starting upload to youtube" });
     const vod_data = vods[0];
 
-    vod.drive.push({
+    vod_data.drive.push({
       id: req.body.driveId,
       type: "live",
     });
@@ -44,7 +44,7 @@ module.exports = function (app) {
     await app
       .service("vods")
       .patch(vod_data.id, {
-        drive: vod.drive,
+        drive: vod_data.drive,
       })
       .catch((e) => {
         console.error(e);

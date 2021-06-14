@@ -63,27 +63,27 @@ module.exports.upload = async (vodId, path) => {
   console.log("\n\n");
   console.log(res.data);
 
-  let vod;
+  let vod_data;
   await app
     .service("vods")
     .get(vodId)
     .then((data) => {
-      vod = data;
+      vod_data = data;
     })
     .catch(() => {});
 
-  if (!vod)
+  if (!vod_data)
     return console.error("Failed to upload to drive: no VOD in database");
 
-  vod.drive.push({
+  vod_data.drive.push({
     id: req.body.driveId,
     type: "vod",
   });
 
   await app
     .service("vods")
-    .patch(vod.id, {
-      drive: vod.drive,
+    .patch(vod_data.id, {
+      drive: vod_data.drive,
     })
     .catch((e) => {
       console.error(e);
