@@ -36,10 +36,15 @@ module.exports = function (app) {
       .json({ error: false, message: "Starting upload to youtube" });
     const vod_data = vods[0];
 
+    vod.drive.push({
+      id: req.body.driveId,
+      type: "live",
+    });
+
     await app
       .service("vods")
       .patch(vod_data.id, {
-        drive_id: req.body.driveId,
+        drive: vod.drive,
       })
       .catch((e) => {
         console.error(e);

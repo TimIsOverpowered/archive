@@ -30,17 +30,18 @@ oauth2Client.on("tokens", (tokens) => {
 
 module.exports.upload = async (vodId, path) => {
   oauth2Client.credentials = config.drive;
-  const drive = google.drive("v3");
-  await drive.files.list({
+  const drive = google.drive({
+    version: "v3",
     auth: oauth2Client,
   });
+  await drive.files.list();
   const fileSize = fs.statSync(path).size;
   const res = await drive.files.create(
     {
       auth: oauth2Client,
       resource: {
         name: `${vodId}.mp4`,
-        parents: config.drive.parents
+        parents: config.drive.parents,
       },
       media: {
         body: fs.createReadStream(path),
@@ -52,11 +53,110 @@ module.exports.upload = async (vodId, path) => {
           const progress = (evt.bytesRead / fileSize) * 100;
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
-          process.stdout.write(`DRIVE UPLOAD PROGRESS: ${Math.round(progress)}%`);
+          process.stdout.write(
+            `DRIVE UPLOAD PROGRESS: ${Math.round(progress)}%`
+          );
         }
       },
     }
   );
   console.log("\n\n");
   console.log(res.data);
+
+  let vod;
+  await app
+    .service("vods")
+    .get(vodId)
+    .then((data) => {
+      vod = data;
+    })
+    .catch(() => {});
+
+  if (!vod)
+    return console.error("Failed to upload to drive: no VOD in database");
+
+  vod.drive.push({
+    id: req.body.driveId,
+    type: "vod",
+  });
+
+  await app
+    .service("vods")
+    .patch(vod.id, {
+      drive: vod.drive,
+    })
+    .catch((e) => {
+      console.error(e);
+    });
+};
+
+module.exports.download = async (vodId, type) => {
+  let vod;
+  await app
+    .service("vods")
+    .get(vodId)
+    .then((data) => {
+      vod = data;
+    })
+    .catch(() => {});
+
+  if (!vod)
+    return console.error("Failed to download from drive: no VOD in database");
+
+  let driveId;
+
+  for (let drive of vod.drive) {
+    if (type !== drive.type) continue;
+    driveId = drive.id;
+  }
+
+  if (!driveId)
+    return console.error(
+      "Failed to download from drive: no DRIVE ID in database"
+    );
+
+  console.info(`Drive Download: ${driveId} for ${type} ${vodId}`);
+  oauth2Client.credentials = config.drive;
+  const drive = google.drive({
+    version: "v3",
+    auth: oauth2Client,
+  });
+  await drive.files.list();
+
+  const filePath = path.join(
+    type === "vod" ? config.vodPath : config.livePath,
+    vodId
+  );
+
+  await drive.files
+    .get({ driveId, alt: "media" }, { responseType: "stream" })
+    .then((res) => {
+      return new Promise((resolve, reject) => {
+        const dest = fs.createWriteStream(filePath);
+        let progress = 0;
+
+        res.data
+          .on("end", () => {
+            resolve(filePath);
+          })
+          .on("error", (err) => {
+            console.error("Error downloading file.");
+            reject(err);
+          })
+          .on("data", (d) => {
+            progress += d.length;
+            if (
+              process.stdout.isTTY &&
+              (process.env.NODE_ENV || "").trim() !== "production"
+            ) {
+              process.stdout.clearLine();
+              process.stdout.cursorTo(0);
+              process.stdout.write(`Downloaded ${progress} bytes`);
+            }
+          })
+          .pipe(dest);
+      });
+    });
+
+  return filePath;
 };

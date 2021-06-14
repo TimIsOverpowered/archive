@@ -134,6 +134,8 @@ module.exports.saveChapters = async (vodId, app, type = "vod") => {
       },
       part: "snippet",
     });
+
+    console.info(res.data);
   }
 };
 
@@ -208,6 +210,8 @@ module.exports.saveParts = async (vodId, app, type = "vod") => {
       },
       part: "snippet",
     });
+    
+    console.info(res.data);
   }
 };
 

@@ -5,6 +5,7 @@ const momentDurationFormatSetup = require("moment-duration-format");
 momentDurationFormatSetup(moment);
 const fs = require("fs");
 const config = require("../../config/config.json");
+const drive = require("./drive");
 
 module.exports.verify = function (app) {
   return async function (req, res, next) {
@@ -233,7 +234,13 @@ module.exports.dmca = function (app) {
       message: `Muting the DMCA content for ${vodId}...`,
     });
 
-    const vodPath = await vod.download(vodId);
+    let vodPath = await vod.download(req.body.vodId);
+    if (!vodPath) vodPath = await drive.download(req.body.vodId, req.body.type);
+
+    if (!vodPath)
+      return console.error(
+        `Could not find a download source for ${req.body.vodId}`
+      );
 
     let muteSection = [],
       newVodPath,
@@ -308,7 +315,12 @@ module.exports.dmca = function (app) {
 
     fs.unlinkSync(vodPath);
 
-    vod.upload(vodId, app, newVodPath ? newVodPath : blackoutPath, req.body.type);
+    vod.upload(
+      vodId,
+      app,
+      newVodPath ? newVodPath : blackoutPath,
+      req.body.type
+    );
   };
 };
 
@@ -352,22 +364,6 @@ module.exports.reUploadPart = function (app) {
     });
 
     const part = parseInt(req.body.part) - 1;
-    const dir = `${config.vodPath}${req.body.vodId}`;
-    const m3u8Path = `${dir}/${req.body.vodId}.m3u8`;
-    const m3u8Exists = await fileExists(m3u8Path);
-    if (m3u8Exists) {
-      await vod.liveUploadPart(
-        app,
-        req.body.vodId,
-        m3u8Path,
-        config.splitDuration * part,
-        config.splitDuration,
-        req.body.part,
-        req.body.type
-      );
-      //fs.rmdirSync(dir, { recursive: true });
-      return;
-    }
 
     const mp4Video = req.body.path
       ? req.body.path
@@ -384,10 +380,24 @@ module.exports.reUploadPart = function (app) {
         req.body.type
       );
       fs.unlinkSync(mp4Video);
-      return;
-    }
+    } else {
+      const driveVideo = await drive.download(req.body.vodId, req.body.type);
+      if (!driveVideo)
+        return console.error(
+          `Could not find a download source for ${req.body.vodId}`
+        );
+      await vod.liveUploadPart(
+        app,
+        req.body.vodId,
+        driveVideo,
+        config.splitDuration * part,
+        config.splitDuration,
+        req.body.part,
+        req.body.type
+      );
 
-    console.error(`Could not find a download source for ${vodId}`);
+      fs.unlinkSync(driveVideo);
+    }
   };
 };
 
@@ -421,35 +431,29 @@ module.exports.partDmca = function (app) {
 
     if (!vod_data) return console.error("Failed get vod: no VOD in database");
 
-    const part = parseInt(req.body.part) - 1;
-    const dir = `${config.vodPath}${req.body.vodId}`;
-    const m3u8Path = `${dir}/${req.body.vodId}.m3u8`;
-    const m3u8Exists = await fileExists(m3u8Path);
-    let trimmedPath;
-    if (m3u8Exists) {
-      trimmedPath = await vod.trimHLS(
-        m3u8Path,
+    const mp4Video = await vod.download(req.body.vodId);
+    if (mp4Video) {
+      trimmedPath = await vod.trim(
+        mp4Video,
         req.body.vodId,
-        config.splitDuration * part,
+        config.splitDuration * (parseInt(req.body.part) - 1),
         config.splitDuration
       );
-      fs.unlinkSync(m3u8Path);
+      fs.unlinkSync(mp4Video);
     } else {
-      const mp4Video = await vod.download(req.body.vodId);
-
-      if (mp4Video) {
-        trimmedPath = await vod.trim(
-          mp4Video,
-          req.body.vodId,
-          config.splitDuration * part,
-          config.splitDuration
-        );
-        fs.unlinkSync(mp4Video);
-      } else {
+      const driveVideo = await drive.download(req.body.vodId, req.body.type);
+      if (!driveVideo)
         return console.error(
           `Could not find a download source for ${req.body.vodId}`
         );
-      }
+      trimmedPath = await vod.trim(
+        driveVideo,
+        req.body.vodId,
+        config.splitDuration * (parseInt(req.body.part) - 1),
+        config.splitDuration
+      );
+
+      fs.unlinkSync(driveVideo);
     }
 
     let muteSection = [],

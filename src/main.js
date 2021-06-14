@@ -53,7 +53,7 @@ module.exports = async function (app) {
             console.error(e);
           });
       }
-      const dir = `${config.vodPath}${vodData.id}`;
+      const dir = `${config.vodPath}/${vodData.id}`;
       if (await fileExists(dir))
         await fs.promises.rmdir(dir, {
           recursive: true,
@@ -115,7 +115,7 @@ const check = async (app) => {
             console.error(e);
           });
 
-        const dir = `${config.vodPath}${vodData.id}`;
+        const dir = `${config.vodPath}/${vodData.id}`;
         if (await fileExists(dir))
           await fs.promises.rmdir(dir, {
             recursive: true,

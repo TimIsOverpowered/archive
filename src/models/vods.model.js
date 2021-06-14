@@ -33,8 +33,9 @@ module.exports = function (app) {
     stream_id: {
       type: DataTypes.TEXT
     },
-    drive_id: {
-      type: DataTypes.TEXT
+    drive: {
+      type: DataTypes.ARRAY(DataTypes.JSON),
+      defaultValue: []
     }
   }, {
     hooks: {

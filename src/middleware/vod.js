@@ -58,7 +58,13 @@ module.exports.upload = async (
   if (!vod)
     return console.error("Failed to download video: no VOD in database");
 
-  const vodPath = manualPath ? manualPath : await this.download(vodId);
+  let vodPath = manualPath ? manualPath : await this.download(vodId);
+  if (!vodPath) vodPath = await drive.download(vodId, type);
+
+  if (!vodPath)
+    return console.error(
+      `Could not find a download source for ${vodId}`
+    );
 
   if (config.perGameUpload) {
     for (let chapter of vod.chapters) {
@@ -212,9 +218,9 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
           reject(err);
         })
         .on("end", function () {
-          resolve(`${config.vodPath}${start}-${vodId}.mp4`);
+          resolve(`${config.vodPath}/${start}-${vodId}.mp4`);
         })
-        .saveToFile(`${config.vodPath}${start}-${vodId}.mp4`);
+        .saveToFile(`${config.vodPath}/${start}-${vodId}.mp4`);
     })
       .then((path) => {
         paths.push(path);
@@ -254,9 +260,9 @@ module.exports.mute = async (vodPath, muteSection, vodId) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${config.vodPath}${vodId}-muted.mp4`);
+        resolve(`${config.vodPath}/${vodId}-muted.mp4`);
       })
-      .saveToFile(`${config.vodPath}${vodId}-muted.mp4`);
+      .saveToFile(`${config.vodPath}/${vodId}-muted.mp4`);
   })
     .then((result) => {
       path = result;
@@ -297,9 +303,9 @@ module.exports.trim = async (vodPath, vodId, start, end) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${config.vodPath}${vodId}-${start}-${end}.mp4`);
+        resolve(`${config.vodPath}/${vodId}-${start}-${end}.mp4`);
       })
-      .saveToFile(`${config.vodPath}${vodId}-${start}-${end}.mp4`);
+      .saveToFile(`${config.vodPath}/${vodId}-${start}-${end}.mp4`);
   })
     .then((result) => {
       path = result;
@@ -345,9 +351,9 @@ module.exports.trimHLS = async (vodPath, vodId, start, end) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${config.vodPath}${vodId}-${start}-${end}.mp4`);
+        resolve(`${config.vodPath}/${vodId}-${start}-${end}.mp4`);
       })
-      .saveToFile(`${config.vodPath}${vodId}-${start}-${end}.mp4`);
+      .saveToFile(`${config.vodPath}/${vodId}-${start}-${end}.mp4`);
   })
     .then((result) => {
       path = result;
@@ -408,7 +414,7 @@ const getTextList = async (
   trim_clip_path,
   end_video_path
 ) => {
-  const textPath = `${config.vodPath}${vodId}-list.txt`;
+  const textPath = `${config.vodPath}/${vodId}-list.txt`;
   await writeFile(
     textPath,
     `file '${start_video_path}'\nfile '${trim_clip_path}'\nfile '${end_video_path}'`
@@ -445,9 +451,9 @@ const concat = async (vodId, list) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${config.vodPath}${vodId}-trimmed.mp4`);
+        resolve(`${config.vodPath}/${vodId}-trimmed.mp4`);
       })
-      .saveToFile(`${config.vodPath}${vodId}-trimmed.mp4`);
+      .saveToFile(`${config.vodPath}/${vodId}-trimmed.mp4`);
   })
     .then((result) => {
       path = result;
@@ -487,9 +493,9 @@ const getStartVideo = async (vodPath, vodId, start) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${config.vodPath}${vodId}-start.mp4`);
+        resolve(`${config.vodPath}/${vodId}-start.mp4`);
       })
-      .saveToFile(`${config.vodPath}${vodId}-start.mp4`);
+      .saveToFile(`${config.vodPath}/${vodId}-start.mp4`);
   })
     .then((result) => {
       path = result;
@@ -530,9 +536,9 @@ const getClip = async (vodPath, vodId, start, duration) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${config.vodPath}${vodId}-clip.mp4`);
+        resolve(`${config.vodPath}/${vodId}-clip.mp4`);
       })
-      .saveToFile(`${config.vodPath}${vodId}-clip.mp4`);
+      .saveToFile(`${config.vodPath}/${vodId}-clip.mp4`);
   })
     .then((result) => {
       path = result;
@@ -571,10 +577,10 @@ const getTrimmedClip = async (clipPath, vodId) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${config.vodPath}${vodId}-clip-muted.mp4`);
+        resolve(`${config.vodPath}/${vodId}-clip-muted.mp4`);
         fs.unlinkSync(clipPath);
       })
-      .saveToFile(`${config.vodPath}${vodId}-clip-muted.mp4`);
+      .saveToFile(`${config.vodPath}/${vodId}-clip-muted.mp4`);
   })
     .then((result) => {
       path = result;
@@ -614,9 +620,9 @@ const getEndVideo = async (vodPath, vodId, end) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${config.vodPath}${vodId}-end.mp4`);
+        resolve(`${config.vodPath}/${vodId}-end.mp4`);
       })
-      .saveToFile(`${config.vodPath}${vodId}-end.mp4`);
+      .saveToFile(`${config.vodPath}/${vodId}-end.mp4`);
   })
     .then((result) => {
       path = result;
@@ -638,7 +644,7 @@ module.exports.download = async (vodId) => {
   m3u8 = twitch.getParsedM3u8(m3u8);
   if (!m3u8) return console.error("failed to parse m3u8");
 
-  const vodPath = config.vodPath + vodId + ".mp4";
+  const vodPath = `${config.vodPath}/${vodId}.mp4`;
 
   await downloadAsMP4(m3u8, vodPath)
     .then(() => {
@@ -1255,7 +1261,7 @@ module.exports.startDownload = async (vodId, app) => {
 //RETRY PARAM: Just to make sure whole vod is processed bc it takes awhile for twitch to update the vod even after a stream ends.
 //VOD TS FILES SEEMS TO UPDATE AROUND 5 MINUTES. DELAY IS TO CHECK EVERY 1MIN.
 const download = async (vodId, app, retry = 0, delay = 1) => {
-  const dir = `${config.vodPath}${vodId}`;
+  const dir = `${config.vodPath}/${vodId}`;
   const m3u8Path = `${dir}/${vodId}.m3u8`;
   const newVodData = await twitch.getVodData(vodId);
   const m3u8Exists = await fileExists(m3u8Path);
