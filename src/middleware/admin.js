@@ -235,7 +235,8 @@ module.exports.dmca = function (app) {
     });
 
     let vodPath = await vod.download(req.body.vodId);
-    if (!vodPath) vodPath = await drive.download(req.body.vodId, req.body.type, app);
+    if (!vodPath)
+      vodPath = await drive.download(req.body.vodId, req.body.type, app);
 
     if (!vodPath)
       return console.error(
@@ -381,7 +382,11 @@ module.exports.reUploadPart = function (app) {
       );
       fs.unlinkSync(mp4Video);
     } else {
-      const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
+      const driveVideo = await drive.download(
+        req.body.vodId,
+        req.body.type,
+        app
+      );
       if (!driveVideo)
         return console.error(
           `Could not find a download source for ${req.body.vodId}`
@@ -441,7 +446,11 @@ module.exports.partDmca = function (app) {
       );
       fs.unlinkSync(mp4Video);
     } else {
-      const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
+      const driveVideo = await drive.download(
+        req.body.vodId,
+        req.body.type,
+        app
+      );
       if (!driveVideo)
         return console.error(
           `Could not find a download source for ${req.body.vodId}`
@@ -529,7 +538,9 @@ module.exports.partDmca = function (app) {
 
     await vod.trimUpload(
       newVodPath ? newVodPath : blackoutPath,
-      `${config.channel} ${vod_data.date} Vod Part ${req.body.part}`,
+      req.body.type === "vod"
+        ? `${config.channel} ${vod.date} Vod Part ${part}`
+        : `${config.channel} ${vod.date} Live Vod Part ${part}`,
       {
         vod: vod_data,
         part: req.body.part,
