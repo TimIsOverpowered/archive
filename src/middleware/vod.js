@@ -44,7 +44,6 @@ module.exports.upload = async (
   vodId,
   app,
   manualPath = false,
-  dmca = false,
   type = "vod"
 ) => {
   let vod;
@@ -110,18 +109,16 @@ module.exports.upload = async (
           type === "vod"
             ? `${config.channel} ${vod.date} Vod PART ${i + 1}`
             : `${config.channel} ${vod.date} Live Vod PART ${i + 1}`,
-        vodTitle: vod.title,
-        date: vod.date,
-        vodId: vodId,
         type: type,
-        index: i,
+        vod: vod,
+        part: i + 1,
       };
-      await this.uploadVideo(data, app, dmca);
+      await this.uploadVideo(data, app);
     }
     await youtube.saveChapters(vodId, app, type);
     setTimeout(async () => {
       await youtube.saveParts(vodId, app, type);
-    }, 30000)
+    }, 30000);
     fs.unlinkSync(vodPath);
     return;
   }
@@ -132,14 +129,11 @@ module.exports.upload = async (
       type === "vod"
         ? `${config.channel} ${vod.date} Vod`
         : `${config.channel} ${vod.date} Live Vod`,
-    vodTitle: vod.title,
-    date: vod.date,
-    vodId: vodId,
+    vod: vod,
     type: type,
-    index: 0,
   };
 
-  await this.uploadVideo(data, app, dmca);
+  await this.uploadVideo(data, app);
   await youtube.saveChapters(vodId, app, type);
 };
 
@@ -177,10 +171,8 @@ module.exports.liveUploadPart = async (
       ? `${config.channel} ${vod.date} Vod Part ${part}`
       : `${config.channel} ${vod.date} Live Vod Part ${part}`,
     {
-      vodId: vodId,
-      youtube: vod.youtube,
+      vod: vod,
       part: part,
-      vodTitle: vod.title,
       type: type,
     },
     app
@@ -690,7 +682,7 @@ const downloadAsMP4 = async (m3u8, path) => {
   });
 };
 
-module.exports.uploadVideo = async (data, app, replace = false) => {
+module.exports.uploadVideo = async (data, app) => {
   oauth2Client.credentials = config.youtube;
   const youtube = google.youtube("v3");
   await youtube.search.list({
@@ -707,9 +699,9 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
     setTimeout(async () => {
       const fileSize = fs.statSync(data.path).size;
       let description =
-        `VOD TITLE: ${data.vodTitle}\nChat Replay: https://${
+        `VOD TITLE: ${data.vod.title}\nChat Replay: https://${
           config.domain_name
-        }/${data.type === "live" ? "live" : "vods"}/${data.vodId}\n` +
+        }/${data.type === "live" ? "live" : "vods"}/${data.vod.id}\n` +
         config.youtube_description;
       const res = await youtube.videos.insert(
         {
@@ -744,52 +736,58 @@ module.exports.uploadVideo = async (data, app, replace = false) => {
       console.log("\n\n");
       console.log(res.data);
 
-      let youtube_data;
-      await app
-        .service("vods")
-        .get(data.vodId)
-        .then((data) => {
-          youtube_data = data.youtube;
-        });
+      let videoIndex;
+      for (let i = 0; i < data.vod.youtube.length; i++) {
+        const youtube_data = data.vod.youtube[i];
+        if (data.type !== youtube_data.type) continue;
+        if (data.part && data.part !== youtube_data.part) continue;
+        index = i;
+        break;
+      }
 
-      if (!replace) {
-        if (data.index === 0) {
-          youtube_data.unshift({
-            id: res.data.id,
-            type: data.type,
-            duration: await getDuration(data.path),
-          });
-        } else {
-          youtube_data.push({
-            id: res.data.id,
-            type: data.type,
-            duration: await getDuration(data.path),
-          });
-        }
+      if (videoIndex === undefined) {
+        data.vod.youtube.push(
+          data.part
+            ? {
+                id: res.data.id,
+                type: data.type,
+                duration: await getDuration(path),
+                part: data.part,
+              }
+            : {
+                id: res.data.id,
+                type: data.type,
+                duration: await getDuration(path),
+              }
+        );
       } else {
-        if (data.index === 0) {
-          youtube_data = [
-            {
+        data.vod.youtube[videoIndex] = data.part
+          ? {
               id: res.data.id,
               type: data.type,
-              duration: await getDuration(data.path),
-            },
-          ];
-        } else {
-          youtube_data.push({
-            id: res.data.id,
-            type: data.type,
-            duration: await getDuration(data.path),
-          });
-        }
+              duration: await getDuration(path),
+              part: data.part,
+            }
+          : {
+              id: res.data.id,
+              type: data.type,
+              duration: await getDuration(path),
+            };
       }
 
       await app
         .service("vods")
-        .patch(data.vodId, {
-          thumbnail_url: res.data.snippet.thumbnails.medium.url,
-          youtube: youtube_data,
-        })
+        .patch(
+          data.vodId,
+          data.vod.thumbnail_url
+            ? {
+                youtube: data.vod.youtube,
+              }
+            : {
+                youtube: data.vod.youtube,
+                thumbnail_url: res.data.snippet.thumbnails.medium.url,
+              }
+        )
         .then(() => {
           console.info(`Saved youtube data in DB for vod ${data.vodId}`);
         })
@@ -829,10 +827,11 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
             snippet: {
               title: title,
               description: data
-                ? `VOD TITLE: ${data.vodTitle}\nChat Replay: https://${
+                ? `VOD TITLE: ${data.vod.title}\nChat Replay: https://${
                     config.domain_name
-                  }/${data.type === "live" ? "live" : "vods"}/${data.vodId}\n` +
-                  config.youtube_description
+                  }/${data.type === "live" ? "live" : "vods"}/${
+                    data.vod.id
+                  }\n` + config.youtube_description
                 : config.youtube_description,
               categoryId: "20",
             },
@@ -858,35 +857,56 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
       console.log("\n\n");
       console.log(res.data);
 
-      if (data) {
-        if (data.youtube[data.part - 1]) {
-          data.youtube[data.part - 1] = {
-            id: res.data.id,
-            type: data.type,
-            duration: await getDuration(path),
-          };
-        } else {
-          data.youtube.push({
-            id: res.data.id,
-            type: data.type,
-            duration: await getDuration(path),
-          });
-        }
-
-        await app
-          .service("vods")
-          .patch(data.vodId, {
-            thumbnail_url: res.data.snippet.thumbnails.medium.url,
-            youtube: data.youtube,
-          })
-          .then(() => {
-            console.info(`Saved youtube data in DB for vod ${data.vodId}`);
-          })
-          .catch((e) => {
-            console.error(e);
-          });
-        this.addComment(res.data.id, data.vodId, data.part);
+      if (!data) {
+        fs.unlinkSync(path);
+        return resolve();
       }
+
+      let indexOfPart;
+      for (let i = 0; i < data.vod.youtube.length; i++) {
+        const youtube_data = data.vod.youtube[i];
+        if (data.type !== youtube_data.type) continue;
+        if (data.part !== youtube_data.part) continue;
+        indexOfPart = i;
+        break;
+      }
+
+      if (indexOfPart === undefined) {
+        data.vod.youtube.push({
+          id: res.data.id,
+          type: data.type,
+          duration: await getDuration(path),
+          part: data.part,
+        });
+      } else {
+        data.vod.youtube[indexOfPart] = {
+          id: res.data.id,
+          type: data.type,
+          duration: await getDuration(path),
+          part: data.part,
+        };
+      }
+
+      await app
+        .service("vods")
+        .patch(
+          data.vod.id,
+          data.vod.thumbnail_url
+            ? {
+                youtube: data.vod.youtube,
+              }
+            : {
+                youtube: data.vod.youtube,
+                thumbnail_url: res.data.snippet.thumbnails.medium.url,
+              }
+        )
+        .then(() => {
+          console.info(`Saved youtube data in DB for vod ${data.vod.id}`);
+        })
+        .catch((e) => {
+          console.error(e);
+        });
+      this.addComment(res.data.id, data.vod.id, data.part);
 
       fs.unlinkSync(path);
       resolve();
@@ -1299,7 +1319,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
       await youtube.saveChapters(vodId, app, "vod");
       setTimeout(async () => {
         await youtube.saveParts(vodId, app, type);
-      }, 30000)
+      }, 30000);
       fs.rmdirSync(dir, { recursive: true });
       return;
     }
