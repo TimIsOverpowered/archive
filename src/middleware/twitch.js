@@ -52,6 +52,7 @@ module.exports.refreshToken = async () => {
 };
 
 module.exports.getWebhooks = async () => {
+  await this.checkToken();
   let webhooks;
   await axios
     .get(`https://api.twitch.tv/helix/webhooks/subscriptions?first=100`, {
@@ -81,6 +82,7 @@ module.exports.getWebhooks = async () => {
 };
 
 const getNextWebhooks = async (cursor) => {
+  await this.checkToken();
   let data;
   await axios
     .get(
@@ -105,6 +107,7 @@ const getNextWebhooks = async (cursor) => {
 };
 
 module.exports.unsubscribe = async (user_id) => {
+  await this.checkToken();
   await axios(`https://api.twitch.tv/helix/webhooks/hub`, {
     method: "POST",
     headers: {
@@ -131,6 +134,7 @@ module.exports.unsubscribe = async (user_id) => {
 };
 
 module.exports.subscribe = async (user_id) => {
+  await this.checkToken();
   await axios(`https://api.twitch.tv/helix/webhooks/hub`, {
     method: "POST",
     headers: {
@@ -246,6 +250,7 @@ module.exports.getVariantM3u8 = async (M3U8_URL) => {
 };
 
 module.exports.getLatestVodData = async (userId) => {
+  await this.checkToken();
   let vodData;
   await axios
     .get(`https://api.twitch.tv/helix/videos?user_id=${userId}`, {
@@ -270,6 +275,7 @@ module.exports.getLatestVodData = async (userId) => {
 };
 
 module.exports.getVodData = async (vod_id) => {
+  await this.checkToken();
   let vodData;
   await axios
     .get(`https://api.twitch.tv/helix/videos?id=${vod_id}`, {
@@ -292,6 +298,7 @@ module.exports.getVodData = async (vod_id) => {
 };
 
 module.exports.getGameData = async (gameId) => {
+  await this.checkToken();
   let gameData;
   await axios
     .get(`https://api.twitch.tv/helix/games?id=${gameId}`, {
@@ -438,6 +445,7 @@ module.exports.getChapter = async (vodID) => {
 };
 
 module.exports.getStream = async (twitchId) => {
+  await this.checkToken();
   let stream;
   await axios
     .get(`https://api.twitch.tv/helix/streams?user_id=${twitchId}`, {

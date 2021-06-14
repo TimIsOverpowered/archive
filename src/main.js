@@ -14,7 +14,6 @@ process.on("unhandledRejection", function (reason, p) {
 });
 
 module.exports = async function (app) {
-  await twitch.checkToken();
   const stream = await twitch.getStream(config.twitchId);
   if (
     stream &&
