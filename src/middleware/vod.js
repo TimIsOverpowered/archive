@@ -1367,8 +1367,8 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
         const vod_youtube_data = vod.youtube.filter(function (data) {
           return data.type === "vod";
         });
-        for (let i = 0; i < vod.vod_youtube_data.length; i++) {
-          startTime += vod.vod_youtube_data[i].duration;
+        for (let i = 0; i < vod_youtube_data.length; i++) {
+          startTime += vod_youtube_data[i].duration;
         }
         await this.liveUploadPart(
           app,
