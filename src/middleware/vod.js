@@ -1366,17 +1366,31 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
         startTime += vod.youtube[i].duration;
       }
 
-      await this.liveUploadPart(
-        app,
-        vodId,
-        m3u8Path,
-        startTime,
-        duration - startTime,
-        vod.youtube.length + 1
-      );
+      if(vod.youtube.length > 0) {
+        const vod_youtube_data = vod.youtube.filter(function (data) {
+          return data.type === "vod";
+        });
+        await this.liveUploadPart(
+          app,
+          vodId,
+          m3u8Path,
+          startTime,
+          duration - startTime,
+          vod_youtube_data.length + 1
+        );
+      } else {
+        await this.liveUploadPart(
+          app,
+          vodId,
+          m3u8Path,
+          startTime,
+          duration - startTime,
+          vod.youtube.length + 1
+        );
+      }
       await youtube.saveChapters(vodId, app, "vod");
       setTimeout(async () => {
-        await youtube.saveParts(vodId, app, type);
+        await youtube.saveParts(vodId, app, "vod");
       }, 30000);
       await fs.promises.rmdir(dir, {
         recursive: true,
