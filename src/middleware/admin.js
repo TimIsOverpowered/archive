@@ -234,9 +234,14 @@ module.exports.dmca = function (app) {
       message: `Muting the DMCA content for ${vodId}...`,
     });
 
-    let vodPath = await vod.download(req.body.vodId);
-    if (!vodPath)
+    let vodPath;
+    if (req.body.type === "live") {
       vodPath = await drive.download(req.body.vodId, req.body.type, app);
+    } else {
+      vodPath = await vod.download(req.body.vodId);
+      if (!vodPath)
+        vodPath = await drive.download(req.body.vodId, req.body.type, app);
+    }
 
     if (!vodPath)
       return console.error(
@@ -436,16 +441,7 @@ module.exports.partDmca = function (app) {
 
     if (!vod_data) return console.error("Failed get vod: no VOD in database");
 
-    const mp4Video = await vod.download(req.body.vodId);
-    if (mp4Video) {
-      trimmedPath = await vod.trim(
-        mp4Video,
-        req.body.vodId,
-        config.splitDuration * (parseInt(req.body.part) - 1),
-        config.splitDuration
-      );
-      fs.unlinkSync(mp4Video);
-    } else {
+    if (req.body.type === "live") {
       const driveVideo = await drive.download(
         req.body.vodId,
         req.body.type,
@@ -463,6 +459,35 @@ module.exports.partDmca = function (app) {
       );
 
       fs.unlinkSync(driveVideo);
+    } else {
+      const mp4Video = await vod.download(req.body.vodId);
+      if (mp4Video) {
+        trimmedPath = await vod.trim(
+          mp4Video,
+          req.body.vodId,
+          config.splitDuration * (parseInt(req.body.part) - 1),
+          config.splitDuration
+        );
+        fs.unlinkSync(mp4Video);
+      } else {
+        const driveVideo = await drive.download(
+          req.body.vodId,
+          req.body.type,
+          app
+        );
+        if (!driveVideo)
+          return console.error(
+            `Could not find a download source for ${req.body.vodId}`
+          );
+        trimmedPath = await vod.trim(
+          driveVideo,
+          req.body.vodId,
+          config.splitDuration * (parseInt(req.body.part) - 1),
+          config.splitDuration
+        );
+
+        fs.unlinkSync(driveVideo);
+      }
     }
 
     let muteSection = [],
