@@ -821,7 +821,7 @@ module.exports.uploadVideo = async (data, app) => {
 
       if (videoIndex === undefined) {
         data.vod.youtube.push(
-          data.part
+          data.part !== null
             ? {
                 id: res.data.id,
                 type: data.type,
@@ -837,20 +837,21 @@ module.exports.uploadVideo = async (data, app) => {
               }
         );
       } else {
-        data.vod.youtube[videoIndex] = data.part
-          ? {
-              id: res.data.id,
-              type: data.type,
-              duration: await getDuration(data.path),
-              part: data.part,
-              thumbnail_url: res.data.snippet.thumbnails.medium.url,
-            }
-          : {
-              id: res.data.id,
-              type: data.type,
-              duration: await getDuration(data.path),
-              thumbnail_url: res.data.snippet.thumbnails.medium.url,
-            };
+        data.vod.youtube[videoIndex] =
+          data.part !== null
+            ? {
+                id: res.data.id,
+                type: data.type,
+                duration: await getDuration(data.path),
+                part: data.part,
+                thumbnail_url: res.data.snippet.thumbnails.medium.url,
+              }
+            : {
+                id: res.data.id,
+                type: data.type,
+                duration: await getDuration(data.path),
+                thumbnail_url: res.data.snippet.thumbnails.medium.url,
+              };
       }
 
       await app
