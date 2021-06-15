@@ -1362,14 +1362,14 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
     if (config.liveUpload) {
       //upload last part
       let startTime = 0;
-      for (let i = 0; i < vod.youtube.length; i++) {
-        startTime += vod.youtube[i].duration;
-      }
 
       if(vod.youtube.length > 0) {
         const vod_youtube_data = vod.youtube.filter(function (data) {
           return data.type === "vod";
         });
+        for (let i = 0; i < vod.vod_youtube_data.length; i++) {
+          startTime += vod.vod_youtube_data[i].duration;
+        }
         await this.liveUploadPart(
           app,
           vodId,
@@ -1379,6 +1379,9 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
           vod_youtube_data.length + 1
         );
       } else {
+        for (let i = 0; i < vod.youtube.length; i++) {
+          startTime += vod.youtube[i].duration;
+        }
         await this.liveUploadPart(
           app,
           vodId,
