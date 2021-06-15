@@ -76,7 +76,7 @@ module.exports.upload = async (vodId, path, app) => {
     return console.error("Failed to upload to drive: no VOD in database");
 
   vod_data.drive.push({
-    id: req.body.driveId,
+    id: res.data.id,
     type: "vod",
   });
 

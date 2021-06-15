@@ -64,6 +64,17 @@ module.exports.upload = async (
   if (!vodPath)
     return console.error(`Could not find a download source for ${vodId}`);
 
+  /*
+  const resolution = await this.getResolution(vodPath);
+
+  if (!resolution)
+    console.error(`Could not find resolution of video... ${vodPath}`);
+
+  if (resolution && resolution.width < 1920 && resolution.height < 1080) {
+    console.info(`Original video: ${vodPath} resolution is not normal. ${resolution.width}x${resolution.height}`);
+    vodPath = await this.upscale(vodId, vodPath);
+  }*/
+
   if (config.perGameUpload) {
     for (let chapter of vod.chapters) {
       console.info(`Trimming ${chapter.name} from ${vod.id} ${vod.date}`);
@@ -165,9 +176,20 @@ module.exports.liveUploadPart = async (
   console.info(
     `Trimming ${vod.id} ${vod.date} | Start time: ${start} | Duration: ${end}`
   );
-  const trimmedPath = await this.trimHLS(m3u8Path, vodId, start, end);
+  let trimmedPath = await this.trimHLS(m3u8Path, vodId, start, end);
 
   if (!trimmedPath) return console.error("Trim failed");
+
+  /*
+  const resolution = await this.getResolution(trimmedPath);
+
+  if (!resolution)
+    console.error(`Could not find resolution of video... ${trimmedPath}`);
+
+  if (resolution && resolution.width < 1920 && resolution.height < 1080) {
+    console.info(`Original video: ${trimmedPath} resolution is not normal. ${resolution.width}x${resolution.height}`);
+    trimmedPath = await this.upscale(vodId, trimmedPath);
+  }*/
 
   await this.trimUpload(
     trimmedPath,
@@ -229,6 +251,48 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
       });
   }
   return paths;
+};
+
+module.exports.upscale = async (vodId, ogPath) => {
+  console.info(`Upscaling video ${ogPath} to 1080p`);
+  let path;
+  await new Promise((resolve, reject) => {
+    const ffmpeg_process = ffmpeg(ogPath);
+    ffmpeg_process
+      .videoCodec("libx264")
+      .outputOptions(["-vf scale=1920x1080:flags=lanczos"])
+      .toFormat("mp4")
+      .on("progress", (progress) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          readline.clearLine(process.stdout, 0);
+          readline.cursorTo(process.stdout, 0, null);
+          process.stdout.write(
+            `UPSCALE VIDEO PROGRESS: ${Math.round(progress.percent)}%`
+          );
+        }
+      })
+      .on("start", (cmd) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          console.info(cmd);
+        }
+      })
+      .on("error", function (err) {
+        ffmpeg_process.kill("SIGKILL");
+        reject(err);
+      })
+      .on("end", function () {
+        resolve(`${config.vodPath}/${vodId}-upscaled.mp4`);
+      })
+      .saveToFile(`${config.vodPath}/${vodId}-upscaled.mp4`);
+  })
+    .then((result) => {
+      path = result;
+      console.log("\n");
+    })
+    .catch((e) => {
+      console.error("\nffmpeg error occurred: " + e);
+    });
+  return path;
 };
 
 module.exports.mute = async (vodPath, muteSection, vodId) => {
@@ -857,8 +921,6 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
       );
       console.log("\n\n");
       console.log(res.data);
-
-      console.log(data);
 
       if (!data) {
         fs.unlinkSync(path);
@@ -1523,6 +1585,28 @@ const getDuration = async (video) => {
     });
   });
   return duration;
+};
+
+module.exports.getResolution = async (video) => {
+  let resolution;
+  await new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(video, (err, metadata) => {
+      if (err) {
+        console.error(err);
+        return reject();
+      }
+      for (let stream of metadata.streams) {
+        if (stream.codec_type !== "video") continue;
+        resolution = {
+          width: stream.width,
+          height: stream.height,
+        };
+        break;
+      }
+      resolve();
+    });
+  });
+  return resolution;
 };
 
 const saveDuration = async (vodId, duration, app) => {
