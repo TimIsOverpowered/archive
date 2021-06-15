@@ -757,13 +757,13 @@ module.exports.uploadVideo = async (data, app) => {
                 type: data.type,
                 duration: await getDuration(path),
                 part: data.part,
-                thumbnail_url : res.data.snippet.thumbnails.medium.url
+                thumbnail_url: res.data.snippet.thumbnails.medium.url,
               }
             : {
                 id: res.data.id,
                 type: data.type,
                 duration: await getDuration(path),
-                thumbnail_url : res.data.snippet.thumbnails.medium.url
+                thumbnail_url: res.data.snippet.thumbnails.medium.url,
               }
         );
       } else {
@@ -773,31 +773,31 @@ module.exports.uploadVideo = async (data, app) => {
               type: data.type,
               duration: await getDuration(path),
               part: data.part,
-              thumbnail_url : res.data.snippet.thumbnails.medium.url
+              thumbnail_url: res.data.snippet.thumbnails.medium.url,
             }
           : {
               id: res.data.id,
               type: data.type,
               duration: await getDuration(path),
-              thumbnail_url : res.data.snippet.thumbnails.medium.url
+              thumbnail_url: res.data.snippet.thumbnails.medium.url,
             };
       }
 
       await app
         .service("vods")
-        .patch(data.vodId, {
+        .patch(data.vod.id, {
           youtube: data.vod.youtube,
           thumbnail_url: res.data.snippet.thumbnails.medium.url,
         })
         .then(() => {
-          console.info(`Saved youtube data in DB for vod ${data.vodId}`);
+          console.info(`Saved youtube data in DB for vod ${data.vod.id}`);
         })
         .catch((e) => {
           console.error(e);
         });
 
       fs.unlinkSync(data.path);
-      this.addComment(res.data.id, data.vodId);
+      this.addComment(res.data.id, data.vod.id);
       resolve();
     }, 1000);
   });
@@ -858,6 +858,8 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
       console.log("\n\n");
       console.log(res.data);
 
+      console.log(data);
+
       if (!data) {
         fs.unlinkSync(path);
         return resolve();
@@ -878,7 +880,7 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
           type: data.type,
           duration: await getDuration(path),
           part: data.part,
-          thumbnail_url : res.data.snippet.thumbnails.medium.url
+          thumbnail_url: res.data.snippet.thumbnails.medium.url,
         });
       } else {
         data.vod.youtube[indexOfPart] = {
@@ -886,13 +888,13 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
           type: data.type,
           duration: await getDuration(path),
           part: data.part,
-          thumbnail_url : res.data.snippet.thumbnails.medium.url
+          thumbnail_url: res.data.snippet.thumbnails.medium.url,
         };
       }
 
       await app
         .service("vods")
-        .patch(data.vodId, {
+        .patch(data.vod.id, {
           youtube: data.vod.youtube,
           thumbnail_url: res.data.snippet.thumbnails.medium.url,
         })
