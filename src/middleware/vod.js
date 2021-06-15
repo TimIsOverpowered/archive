@@ -755,14 +755,14 @@ module.exports.uploadVideo = async (data, app) => {
             ? {
                 id: res.data.id,
                 type: data.type,
-                duration: await getDuration(path),
+                duration: await getDuration(data.path),
                 part: data.part,
                 thumbnail_url: res.data.snippet.thumbnails.medium.url,
               }
             : {
                 id: res.data.id,
                 type: data.type,
-                duration: await getDuration(path),
+                duration: await getDuration(data.path),
                 thumbnail_url: res.data.snippet.thumbnails.medium.url,
               }
         );
@@ -771,14 +771,14 @@ module.exports.uploadVideo = async (data, app) => {
           ? {
               id: res.data.id,
               type: data.type,
-              duration: await getDuration(path),
+              duration: await getDuration(data.path),
               part: data.part,
               thumbnail_url: res.data.snippet.thumbnails.medium.url,
             }
           : {
               id: res.data.id,
               type: data.type,
-              duration: await getDuration(path),
+              duration: await getDuration(data.path),
               thumbnail_url: res.data.snippet.thumbnails.medium.url,
             };
       }
