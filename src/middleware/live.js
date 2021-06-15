@@ -51,7 +51,7 @@ module.exports = function (app) {
       });
 
     if (config.multiTrack)
-      await vod.upload(vod_data.id, app, req.body.path, false, "live");
+      await vod.upload(vod_data.id, app, req.body.path, "live");
 
     await fs.promises
       .rmdir(req.body.path, {
