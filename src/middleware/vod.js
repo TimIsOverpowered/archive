@@ -808,7 +808,7 @@ module.exports.uploadVideo = async (data, app) => {
       for (let i = 0; i < data.vod.youtube.length; i++) {
         const youtube_data = data.vod.youtube[i];
         if (data.type !== youtube_data.type) continue;
-        if (data.part !== null) {
+        if (data.part != null) {
           if (data.part === parseInt(youtube_data.part)) {
             videoIndex = i;
             break;
@@ -819,9 +819,9 @@ module.exports.uploadVideo = async (data, app) => {
         }
       }
 
-      if (videoIndex === undefined) {
+      if (videoIndex == undefined) {
         data.vod.youtube.push(
-          data.part !== null
+          data.part != null
             ? {
                 id: res.data.id,
                 type: data.type,
@@ -838,7 +838,7 @@ module.exports.uploadVideo = async (data, app) => {
         );
       } else {
         data.vod.youtube[videoIndex] =
-          data.part !== null
+          data.part != null
             ? {
                 id: res.data.id,
                 type: data.type,
@@ -871,7 +871,7 @@ module.exports.uploadVideo = async (data, app) => {
       this.addComment(
         res.data.id,
         data.vod.id,
-        data.part !== null ? data.part : false,
+        data.part != null ? data.part : false,
         data.type
       );
       resolve();
@@ -948,7 +948,7 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
         break;
       }
 
-      if (indexOfPart === undefined) {
+      if (indexOfPart == undefined) {
         data.vod.youtube.push({
           id: res.data.id,
           type: data.type,
