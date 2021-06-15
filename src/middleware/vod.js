@@ -808,9 +808,15 @@ module.exports.uploadVideo = async (data, app) => {
       for (let i = 0; i < data.vod.youtube.length; i++) {
         const youtube_data = data.vod.youtube[i];
         if (data.type !== youtube_data.type) continue;
-        if (data.part && data.part !== youtube_data.part) continue;
-        index = i;
-        break;
+        if (data.part !== null) {
+          if (data.part === parseInt(youtube_data.part)) {
+            videoIndex = i;
+            break;
+          }
+        } else {
+          videoIndex = i;
+          break;
+        }
       }
 
       if (videoIndex === undefined) {
@@ -861,7 +867,12 @@ module.exports.uploadVideo = async (data, app) => {
         });
 
       fs.unlinkSync(data.path);
-      this.addComment(res.data.id, data.vod.id, data.part !== null ? data.part : false, data.type);
+      this.addComment(
+        res.data.id,
+        data.vod.id,
+        data.part !== null ? data.part : false,
+        data.type
+      );
       resolve();
     }, 1000);
   });
@@ -931,7 +942,7 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
       for (let i = 0; i < data.vod.youtube.length; i++) {
         const youtube_data = data.vod.youtube[i];
         if (data.type !== youtube_data.type) continue;
-        if (data.part !== youtube_data.part) continue;
+        if (data.part !== parseInt(youtube_data.part)) continue;
         indexOfPart = i;
         break;
       }
@@ -1363,7 +1374,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
       //upload last part
       let startTime = 0;
 
-      if(vod.youtube.length > 0) {
+      if (vod.youtube.length > 0) {
         const vod_youtube_data = vod.youtube.filter(function (data) {
           return data.type === "vod";
         });
