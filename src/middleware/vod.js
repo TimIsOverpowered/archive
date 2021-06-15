@@ -861,7 +861,7 @@ module.exports.uploadVideo = async (data, app) => {
         });
 
       fs.unlinkSync(data.path);
-      this.addComment(res.data.id, data.vod.id);
+      this.addComment(res.data.id, data.vod.id, data.part !== null ? data.part : false, data.type);
       resolve();
     }, 1000);
   });
@@ -966,7 +966,7 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
         .catch((e) => {
           console.error(e);
         });
-      this.addComment(res.data.id, data.vod.id, data.part);
+      this.addComment(res.data.id, data.vod.id, data.part, data.type);
 
       fs.unlinkSync(path);
       resolve();
@@ -974,7 +974,7 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
   });
 };
 
-module.exports.addComment = async (videoId, vodId, part = false) => {
+module.exports.addComment = async (videoId, vodId, part = false, type) => {
   const youtube = google.youtube("v3");
   const res = await youtube.commentThreads.insert({
     auth: oauth2Client,
@@ -984,8 +984,8 @@ module.exports.addComment = async (videoId, vodId, part = false) => {
         topLevelComment: {
           snippet: {
             textOriginal: part
-              ? `${config.youtube_comment}${vodId}?part=${part}`
-              : `${config.youtube_comment}${vodId}`,
+              ? `${config.domain_name}/${type}/${vodId}?part=${part}`
+              : `${config.domain_name}/${type}/${vodId}`,
             videoId: videoId,
           },
         },
