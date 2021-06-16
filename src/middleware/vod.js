@@ -996,8 +996,12 @@ module.exports.addComment = async (videoId, vodId, part = false, type) => {
         topLevelComment: {
           snippet: {
             textOriginal: part
-              ? `${config.domain_name}/${type}/${vodId}?part=${part}`
-              : `${config.domain_name}/${type}/${vodId}`,
+              ? `${config.domain_name}/${
+                  type === "vod" ? "vods" : "live"
+                }/${vodId}?part=${part}`
+              : `${config.domain_name}/${
+                  type === "vod" ? "vods" : "live"
+                }/${vodId}`,
             videoId: videoId,
           },
         },
