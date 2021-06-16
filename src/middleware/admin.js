@@ -248,6 +248,8 @@ module.exports.dmca = function (app) {
         `Could not find a download source for ${req.body.vodId}`
       );
 
+    console.info(`Finished download`);
+
     let muteSection = [],
       newVodPath,
       blackoutPath;
@@ -462,6 +464,7 @@ module.exports.partDmca = function (app) {
     } else {
       const mp4Video = await vod.download(req.body.vodId);
       if (mp4Video) {
+        console.info(`Finished download`);
         trimmedPath = await vod.trim(
           mp4Video,
           req.body.vodId,
@@ -479,6 +482,7 @@ module.exports.partDmca = function (app) {
           return console.error(
             `Could not find a download source for ${req.body.vodId}`
           );
+        console.info(`Finished download`);
         trimmedPath = await vod.trim(
           driveVideo,
           req.body.vodId,
@@ -495,51 +499,59 @@ module.exports.partDmca = function (app) {
       blackoutPath;
     for (let dmca of req.body.receivedClaims) {
       //check if audio
-      if (dmca.type === "CLAIM_TYPE_AUDIO") {
-        muteSection.push(
-          `volume=0:enable='between(t,${
-            dmca.matchDetails.longestMatchStartTimeSeconds
-          },${
-            parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
-            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
-          })'`
-        );
-      } else if (dmca.type === "CLAIM_TYPE_VISUAL") {
-        console.info(
-          `Trying to blackout ${
-            blackoutPath ? blackoutPath : trimmedPath
-          }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
-        );
-        blackoutPath = await vod.blackoutVideo(
-          blackoutPath ? blackoutPath : trimmedPath,
-          req.body.vodId,
-          dmca.matchDetails.longestMatchStartTimeSeconds,
-          dmca.matchDetails.longestMatchDurationSeconds,
-          parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
-            parseInt(dmca.matchDetails.longestMatchDurationSeconds)
-        );
-      } else if (dmca.type === "CLAIM_TYPE_AUDIOVISUAL") {
-        muteSection.push(
-          `volume=0:enable='between(t,${
-            dmca.matchDetails.longestMatchStartTimeSeconds
-          },${
-            parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
-            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
-          })'`
-        );
-        console.info(
-          `Trying to blackout ${
-            blackoutPath ? blackoutPath : trimmedPath
-          }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
-        );
-        blackoutPath = await vod.blackoutVideo(
-          blackoutPath ? blackoutPath : trimmedPath,
-          req.body.vodId,
-          dmca.matchDetails.longestMatchStartTimeSeconds,
-          dmca.matchDetails.longestMatchDurationSeconds,
-          parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
-            parseInt(dmca.matchDetails.longestMatchDurationSeconds)
-        );
+      const policyType = dmca.claimPolicy.primaryPolicy.policyType;
+      //check if audio
+      if (
+        policyType === "POLICY_TYPE_GLOBAL_BLOCK" ||
+        policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK" ||
+        policyType === "POLICY_TYPE_BLOCK"
+      ) {
+        if (dmca.type === "CLAIM_TYPE_AUDIO") {
+          muteSection.push(
+            `volume=0:enable='between(t,${
+              dmca.matchDetails.longestMatchStartTimeSeconds
+            },${
+              parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
+              parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
+            })'`
+          );
+        } else if (dmca.type === "CLAIM_TYPE_VISUAL") {
+          console.info(
+            `Trying to blackout ${
+              blackoutPath ? blackoutPath : trimmedPath
+            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
+          );
+          blackoutPath = await vod.blackoutVideo(
+            blackoutPath ? blackoutPath : trimmedPath,
+            req.body.vodId,
+            dmca.matchDetails.longestMatchStartTimeSeconds,
+            dmca.matchDetails.longestMatchDurationSeconds,
+            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
+              parseInt(dmca.matchDetails.longestMatchDurationSeconds)
+          );
+        } else if (dmca.type === "CLAIM_TYPE_AUDIOVISUAL") {
+          muteSection.push(
+            `volume=0:enable='between(t,${
+              dmca.matchDetails.longestMatchStartTimeSeconds
+            },${
+              parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
+              parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
+            })'`
+          );
+          console.info(
+            `Trying to blackout ${
+              blackoutPath ? blackoutPath : trimmedPath
+            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
+          );
+          blackoutPath = await vod.blackoutVideo(
+            blackoutPath ? blackoutPath : trimmedPath,
+            req.body.vodId,
+            dmca.matchDetails.longestMatchStartTimeSeconds,
+            dmca.matchDetails.longestMatchDurationSeconds,
+            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
+              parseInt(dmca.matchDetails.longestMatchDurationSeconds)
+          );
+        }
       }
     }
 
@@ -564,8 +576,8 @@ module.exports.partDmca = function (app) {
     await vod.trimUpload(
       newVodPath ? newVodPath : blackoutPath,
       req.body.type === "vod"
-        ? `${config.channel} ${vod.date} Vod Part ${part}`
-        : `${config.channel} ${vod.date} Live Vod Part ${part}`,
+        ? `${config.channel} ${vod_data.date} Vod Part ${req.body.part}`
+        : `${config.channel} ${vod_data.date} Live Vod Part ${req.body.part}`,
       {
         vod: vod_data,
         part: req.body.part,
