@@ -766,8 +766,9 @@ module.exports.uploadVideo = async (data, app) => {
   await new Promise((resolve, reject) => {
     setTimeout(async () => {
       const fileSize = fs.statSync(data.path).size;
+      const title = data.vod.title.replace(/>|</ig, '');
       let description =
-        `VOD TITLE: ${data.vod.title}\nChat Replay: https://${
+        `VOD TITLE: ${title}\nChat Replay: https://${
           config.domain_name
         }/${data.type === "live" ? "live" : "vods"}/${data.vod.id}\n` +
         config.youtube_description;
