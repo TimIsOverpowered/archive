@@ -463,3 +463,41 @@ module.exports.getStream = async (twitchId) => {
     });
   return stream;
 };
+
+module.exports.getChannelBadges = async () => {
+  await this.checkToken();
+  let badges;
+  await axios
+    .get(
+      `https://api.twitch.tv/helix/chat/badges?broadcaster_id=${config.twitchId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${config.twitch.access_token}`,
+          "Client-Id": config.twitch.client_id,
+        },
+      }
+    )
+    .then((response) => {
+      badges = response.data.data;
+    })
+    .catch((e) => {
+      if (!e.response) return console.error(e);
+      console.error(e.response.data);
+    });
+  return badges;
+};
+
+module.exports.badges = function (app) {
+  const self = this;
+  return async function (req, res, next) {
+    const badges = await self.getChannelBadges();
+
+    if (!badges)
+      return res.status(500).json({
+        error: true,
+        message: "Something went wrong trying to retrieve channel badges..",
+      });
+
+    res.json(badges);
+  };
+};
