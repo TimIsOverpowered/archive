@@ -2,6 +2,7 @@ const admin = require("./admin");
 const logs = require("./logs");
 const live = require("./live");
 const youtube = require("./youtube");
+const twitch = require("./twitch");
 const rateLimit = require("express-rate-limit");
 
 module.exports = function (app) {
@@ -17,6 +18,20 @@ module.exports = function (app) {
   app.post("/v2/youtube/parts", admin.verify(app), youtube.parts(app));
   app.post("/v2/youtube/chapters", admin.verify(app), youtube.chapters(app));
   app.post("/v2/live", admin.verify(app), live(app));
+  app.get(
+    "/v2/badges",
+    rateLimit({
+      windowMs: 5 * 1000,
+      max: 20,
+      message: "API rate limit exceeded",
+      keyGenerator: function (req) {
+        //for cloudflare
+        //return req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        return req.headers["x-forwarded-for"] || req.socket.remoteAddress;
+      },
+    }),
+    twitch.badges(app)
+  );
   app.get(
     "/v1/vods/:vodId/comments",
     rateLimit({
