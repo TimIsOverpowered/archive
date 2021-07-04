@@ -373,22 +373,7 @@ module.exports.reUploadPart = function (app) {
 
     const part = parseInt(req.body.part) - 1;
 
-    const mp4Video = req.body.path
-      ? req.body.path
-      : await vod.download(req.body.vodId);
-
-    if (mp4Video) {
-      await vod.liveUploadPart(
-        app,
-        req.body.vodId,
-        mp4Video,
-        config.splitDuration * part,
-        config.splitDuration,
-        req.body.part,
-        req.body.type
-      );
-      fs.unlinkSync(mp4Video);
-    } else {
+    if (req.body.type === "live") {
       const driveVideo = await drive.download(
         req.body.vodId,
         req.body.type,
@@ -398,6 +383,7 @@ module.exports.reUploadPart = function (app) {
         return console.error(
           `Could not find a download source for ${req.body.vodId}`
         );
+      console.info(`Finished download`);
       await vod.liveUploadPart(
         app,
         req.body.vodId,
@@ -409,6 +395,42 @@ module.exports.reUploadPart = function (app) {
       );
 
       fs.unlinkSync(driveVideo);
+    } else {
+      const mp4Video = await vod.download(req.body.vodId);
+      if (mp4Video) {
+        console.info(`Finished download`);
+        await vod.liveUploadPart(
+          app,
+          req.body.vodId,
+          mp4Video,
+          config.splitDuration * part,
+          config.splitDuration,
+          req.body.part,
+          req.body.type
+        );
+        fs.unlinkSync(mp4Video);
+      } else {
+        const driveVideo = await drive.download(
+          req.body.vodId,
+          req.body.type,
+          app
+        );
+        if (!driveVideo)
+          return console.error(
+            `Could not find a download source for ${req.body.vodId}`
+          );
+        console.info(`Finished download`);
+        await vod.liveUploadPart(
+          app,
+          req.body.vodId,
+          driveVideo,
+          config.splitDuration * part,
+          config.splitDuration,
+          req.body.part,
+          req.body.type
+        );
+        fs.unlinkSync(driveVideo);
+      }
     }
   };
 };
