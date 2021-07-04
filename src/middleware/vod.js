@@ -805,9 +805,22 @@ module.exports.uploadVideo = async (data, app) => {
       console.log("\n\n");
       console.log(res.data);
 
+      let youtube;
+      await app.service("vods")
+      .get(data.vod.id)
+      .then(newData => {
+        youtube = newData.youtube;
+      })
+      .catch(e => {
+        console.error(e);
+      });
+
+      if(!youtube) 
+        return console.error("Could not find youtube data...");
+
       let videoIndex;
-      for (let i = 0; i < data.vod.youtube.length; i++) {
-        const youtube_data = data.vod.youtube[i];
+      for (let i = 0; i < youtube.length; i++) {
+        const youtube_data = youtube[i];
         if (data.type !== youtube_data.type) continue;
         if (data.part != null) {
           if (data.part === parseInt(youtube_data.part)) {
@@ -821,7 +834,7 @@ module.exports.uploadVideo = async (data, app) => {
       }
 
       if (videoIndex == undefined) {
-        data.vod.youtube.push(
+        youtube.push(
           data.part != null
             ? {
                 id: res.data.id,
@@ -838,7 +851,7 @@ module.exports.uploadVideo = async (data, app) => {
               }
         );
       } else {
-        data.vod.youtube[videoIndex] =
+        youtube[videoIndex] =
           data.part != null
             ? {
                 id: res.data.id,
@@ -858,7 +871,7 @@ module.exports.uploadVideo = async (data, app) => {
       await app
         .service("vods")
         .patch(data.vod.id, {
-          youtube: data.vod.youtube,
+          youtube: youtube,
           thumbnail_url: res.data.snippet.thumbnails.medium.url,
         })
         .then(() => {
@@ -940,9 +953,22 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
         return resolve();
       }
 
+      let youtube;
+      await app.service("vods")
+      .get(data.vod.id)
+      .then(newData => {
+        youtube = newData.youtube;
+      })
+      .catch(e => {
+        console.error(e);
+      });
+
+      if(!youtube) 
+        return console.error("Could not find youtube data...");
+
       let indexOfPart;
-      for (let i = 0; i < data.vod.youtube.length; i++) {
-        const youtube_data = data.vod.youtube[i];
+      for (let i = 0; i < youtube.length; i++) {
+        const youtube_data = youtube[i];
         if (data.type !== youtube_data.type) continue;
         if (data.part !== parseInt(youtube_data.part)) continue;
         indexOfPart = i;
@@ -950,7 +976,7 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
       }
 
       if (indexOfPart == undefined) {
-        data.vod.youtube.push({
+        youtube.push({
           id: res.data.id,
           type: data.type,
           duration: await getDuration(path),
@@ -958,7 +984,7 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
           thumbnail_url: res.data.snippet.thumbnails.medium.url,
         });
       } else {
-        data.vod.youtube[indexOfPart] = {
+        youtube[indexOfPart] = {
           id: res.data.id,
           type: data.type,
           duration: await getDuration(path),
@@ -970,7 +996,7 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
       await app
         .service("vods")
         .patch(data.vod.id, {
-          youtube: data.vod.youtube,
+          youtube: youtube,
           thumbnail_url: res.data.snippet.thumbnails.medium.url,
         })
         .then(() => {
