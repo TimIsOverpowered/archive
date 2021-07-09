@@ -971,7 +971,7 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
         return console.error("Could not find youtube data...");
 
       let indexOfPart;
-      for (let i = 0; i < youtube.length; i++) {
+      for (let i = 0; i < vod_youtube.length; i++) {
         const youtube_data = vod_youtube[i];
         if (data.type !== youtube_data.type) continue;
         if (data.part !== parseInt(youtube_data.part)) continue;
