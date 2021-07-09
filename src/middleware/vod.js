@@ -823,7 +823,7 @@ module.exports.uploadVideo = async (data, app) => {
         return console.error("Could not find youtube data...");
 
       let videoIndex;
-      for (let i = 0; i < youtube.length; i++) {
+      for (let i = 0; i < vod_youtube.length; i++) {
         const youtube_data = vod_youtube[i];
         if (data.type !== youtube_data.type) continue;
         if (data.part != null) {
