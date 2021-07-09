@@ -40,6 +40,10 @@ oauth2Client.on("tokens", (tokens) => {
 const drive = require("./drive");
 const youtube = require("./youtube");
 
+process.on('unhandledRejection', function(reason, p){
+  console.log("Possibly Unhandled Rejection at: Promise ", p, " reason: ", reason);
+});
+
 module.exports.upload = async (
   vodId,
   app,
@@ -58,8 +62,7 @@ module.exports.upload = async (
   if (!vod)
     return console.error("Failed to download video: no VOD in database");
 
-  let vodPath = manualPath ? manualPath : await this.download(vodId);
-  if (!vodPath) vodPath = await drive.download(vodId, type, app);
+  let vodPath = manualPath ? manualPath : await drive.download(vodId, type, app);
 
   if (!vodPath)
     return console.error(`Could not find a download source for ${vodId}`);
@@ -758,6 +761,7 @@ module.exports.uploadVideo = async (data, app) => {
     part: "id,snippet",
     q: "Check if token is valid",
   });
+  console.log(data);
   /* Change once they fix this problem, not being able to update using getTokenInfo?
   await oauth2Client
     .getTokenInfo(config.youtube.access_token)
