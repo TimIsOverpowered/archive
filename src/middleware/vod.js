@@ -40,8 +40,13 @@ oauth2Client.on("tokens", (tokens) => {
 const drive = require("./drive");
 const youtube = require("./youtube");
 
-process.on('unhandledRejection', function(reason, p){
-  console.log("Possibly Unhandled Rejection at: Promise ", p, " reason: ", reason);
+process.on("unhandledRejection", function (reason, p) {
+  console.log(
+    "Possibly Unhandled Rejection at: Promise ",
+    p,
+    " reason: ",
+    reason
+  );
 });
 
 module.exports.upload = async (
@@ -62,10 +67,18 @@ module.exports.upload = async (
   if (!vod)
     return console.error("Failed to download video: no VOD in database");
 
-  let vodPath = manualPath ? manualPath : await drive.download(vodId, type, app);
+  let vodPath = manualPath
+    ? manualPath
+    : await drive.download(vodId, type, app);
 
-  if (!vodPath)
+  if (!vodPath && type === "live")
     return console.error(`Could not find a download source for ${vodId}`);
+
+  if (!vodPath && type === "vod") {
+    vodPath = await this.download(vodId);
+    if (!vodPath)
+      return console.error(`Could not find a download source for ${vodId}`);
+  }
 
   /*
   const resolution = await this.getResolution(vodPath);
@@ -770,12 +783,11 @@ module.exports.uploadVideo = async (data, app) => {
   await new Promise((resolve, reject) => {
     setTimeout(async () => {
       const fileSize = fs.statSync(data.path).size;
-      const title = data.vod.title.replace(/>|</ig, '');
+      const title = data.vod.title.replace(/>|</gi, "");
       let description =
-        `VOD TITLE: ${title}\nChat Replay: https://${
-          config.domain_name
-        }/${data.type === "live" ? "live" : "vods"}/${data.vod.id}\n` +
-        config.youtube_description;
+        `VOD TITLE: ${title}\nChat Replay: https://${config.domain_name}/${
+          data.type === "live" ? "live" : "vods"
+        }/${data.vod.id}\n` + config.youtube_description;
       const res = await youtube.videos.insert(
         {
           auth: oauth2Client,
@@ -810,17 +822,17 @@ module.exports.uploadVideo = async (data, app) => {
       console.log(res.data);
 
       let vod_youtube;
-      await app.service("vods")
-      .get(data.vod.id)
-      .then(newData => {
-        vod_youtube = newData.youtube;
-      })
-      .catch(e => {
-        console.error(e);
-      });
+      await app
+        .service("vods")
+        .get(data.vod.id)
+        .then((newData) => {
+          vod_youtube = newData.youtube;
+        })
+        .catch((e) => {
+          console.error(e);
+        });
 
-      if(!vod_youtube) 
-        return console.error("Could not find youtube data...");
+      if (!vod_youtube) return console.error("Could not find youtube data...");
 
       let videoIndex;
       for (let i = 0; i < vod_youtube.length; i++) {
@@ -958,17 +970,17 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
       }
 
       let vod_youtube;
-      await app.service("vods")
-      .get(data.vod.id)
-      .then(newData => {
-        vod_youtube = newData.youtube;
-      })
-      .catch(e => {
-        console.error(e);
-      });
+      await app
+        .service("vods")
+        .get(data.vod.id)
+        .then((newData) => {
+          vod_youtube = newData.youtube;
+        })
+        .catch((e) => {
+          console.error(e);
+        });
 
-      if(!vod_youtube) 
-        return console.error("Could not find youtube data...");
+      if (!vod_youtube) return console.error("Could not find youtube data...");
 
       let indexOfPart;
       for (let i = 0; i < vod_youtube.length; i++) {
