@@ -113,13 +113,15 @@ module.exports.upload = async (
         for (let i = 0; i < paths.length; i++) {
           await this.trimUpload(
             paths[i],
-            `${config.channel} plays ${chapter.name} ${vod.date} PART ${i + 1}`
+            `${config.channel} plays ${chapter.name} ${vod.date} PART ${i + 1}`,
+            true
           );
         }
       } else {
         await this.trimUpload(
           trimmedPath,
-          `${config.channel} plays ${chapter.name} ${vod.date}`
+          `${config.channel} plays ${chapter.name} ${vod.date}`,
+          true
         );
       }
     }
@@ -141,6 +143,7 @@ module.exports.upload = async (
             ? `${config.channel} ${vod.date} Vod PART ${i + 1}`
             : `${config.channel} ${vod.date} Live Vod PART ${i + 1}`,
         type: type,
+        public: config.multiTrack && type === "live" ? true : false,
         vod: vod,
         part: i + 1,
       };
@@ -212,6 +215,7 @@ module.exports.liveUploadPart = async (
     type === "vod"
       ? `${config.channel} ${vod.date} Vod Part ${part}`
       : `${config.channel} ${vod.date} Live Vod Part ${part}`,
+    config.multiTrack && type === "live" ? true : false,
     {
       vod: vod,
       part: part,
@@ -800,7 +804,11 @@ module.exports.uploadVideo = async (data, app) => {
               categoryId: "20",
             },
             status: {
-              privacyStatus: config.youtube_public_vid ? "public" : "unlisted",
+              privacyStatus: config.youtube_public_vid
+                ? data.public
+                  ? "public"
+                  : "unlisted"
+                : "unlisted",
             },
           },
           media: {
@@ -909,7 +917,13 @@ module.exports.uploadVideo = async (data, app) => {
   });
 };
 
-module.exports.trimUpload = async (path, title, data = false, app = null) => {
+module.exports.trimUpload = async (
+  path,
+  title,
+  public,
+  data = false,
+  app = null
+) => {
   oauth2Client.credentials = config.youtube;
   const youtube = google.youtube("v3");
   await youtube.search.list({
@@ -943,7 +957,7 @@ module.exports.trimUpload = async (path, title, data = false, app = null) => {
               categoryId: "20",
             },
             status: {
-              privacyStatus: "public",
+              privacyStatus: public ? "public" : "unlisted",
             },
           },
           media: {

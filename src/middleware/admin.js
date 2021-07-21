@@ -600,6 +600,7 @@ module.exports.partDmca = function (app) {
       req.body.type === "vod"
         ? `${config.channel} ${vod_data.date} Vod Part ${req.body.part}`
         : `${config.channel} ${vod_data.date} Live Vod Part ${req.body.part}`,
+      config.multiTrack && req.body.type === "live" ? true : false,
       {
         vod: vod_data,
         part: req.body.part,
