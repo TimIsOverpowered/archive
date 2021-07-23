@@ -143,7 +143,12 @@ module.exports.upload = async (
             ? `${config.channel} ${vod.date} Vod PART ${i + 1}`
             : `${config.channel} ${vod.date} Live Vod PART ${i + 1}`,
         type: type,
-        public: config.multiTrack && type === "live" ? true : !config.multiTrack && type === "vod" ? true : false,
+        public:
+          config.multiTrack && type === "live"
+            ? true
+            : !config.multiTrack && type === "vod"
+            ? true
+            : false,
         vod: vod,
         part: i + 1,
       };
@@ -163,6 +168,12 @@ module.exports.upload = async (
       type === "vod"
         ? `${config.channel} ${vod.date} Vod`
         : `${config.channel} ${vod.date} Live Vod`,
+    public:
+      config.multiTrack && type === "live"
+        ? true
+        : !config.multiTrack && type === "vod"
+        ? true
+        : false,
     vod: vod,
     type: type,
   };
@@ -215,7 +226,11 @@ module.exports.liveUploadPart = async (
     type === "vod"
       ? `${config.channel} ${vod.date} Vod Part ${part}`
       : `${config.channel} ${vod.date} Live Vod Part ${part}`,
-    config.multiTrack && type === "live" ? true : !config.multiTrack && type === "vod" ? true : false,
+    config.multiTrack && type === "live"
+      ? true
+      : !config.multiTrack && type === "vod"
+      ? true
+      : false,
     {
       vod: vod,
       part: part,
