@@ -2,6 +2,15 @@ const vod = require("./vod");
 const config = require("../../config/config.json");
 const fs = require("fs");
 
+process.on("unhandledRejection", function (reason, p) {
+  console.log(
+    "Possibly Unhandled Rejection at: Promise ",
+    p,
+    " reason: ",
+    reason
+  );
+});
+
 module.exports = function (app) {
   return async function (req, res, next) {
     if (!req.body.driveId)
