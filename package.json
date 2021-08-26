@@ -54,7 +54,7 @@
     "helmet": "^4.6.0",
     "hls-parser": "^0.10.4",
     "moment-duration-format": "^2.3.2",
-    "pg": "^8.6.0",
+    "pg": "^8.7.1",
     "redis": "^3.1.2",
     "retry-axios": "^2.4.0",
     "sequelize": "^6.6.4",
