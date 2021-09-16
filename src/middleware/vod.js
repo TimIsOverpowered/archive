@@ -273,9 +273,9 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
           reject(err);
         })
         .on("end", function () {
-          resolve(`${config.vodPath}/${start}-${vodId}.mp4`);
+          resolve(`${path.dirname(vodPath)}/${start}-${vodId}.mp4`);
         })
-        .saveToFile(`${config.vodPath}/${start}-${vodId}.mp4`);
+        .saveToFile(`${path.dirname(vodPath)}/${start}-${vodId}.mp4`);
     })
       .then((path) => {
         paths.push(path);
@@ -316,9 +316,9 @@ module.exports.upscale = async (vodId, ogPath) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${config.vodPath}/${vodId}-upscaled.mp4`);
+        resolve(`${path.dirname(vodPath)}/${vodId}-upscaled.mp4`);
       })
-      .saveToFile(`${config.vodPath}/${vodId}-upscaled.mp4`);
+      .saveToFile(`${path.dirname(vodPath)}/${vodId}-upscaled.mp4`);
   })
     .then((result) => {
       path = result;
@@ -357,9 +357,9 @@ module.exports.mute = async (vodPath, muteSection, vodId) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${config.vodPath}/${vodId}-muted.mp4`);
+        resolve(`${path.dirname(vodPath)}/${vodId}-muted.mp4`);
       })
-      .saveToFile(`${config.vodPath}/${vodId}-muted.mp4`);
+      .saveToFile(`${path.dirname(vodPath)}/${vodId}-muted.mp4`);
   })
     .then((result) => {
       path = result;
@@ -400,9 +400,9 @@ module.exports.trim = async (vodPath, vodId, start, end) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${config.vodPath}/${vodId}-${start}-${end}.mp4`);
+        resolve(`${path.dirname(vodPath)}/${vodId}-${start}-${end}.mp4`);
       })
-      .saveToFile(`${config.vodPath}/${vodId}-${start}-${end}.mp4`);
+      .saveToFile(`${path.dirname(vodPath)}/${vodId}-${start}-${end}.mp4`);
   })
     .then((result) => {
       path = result;
@@ -448,9 +448,9 @@ module.exports.trimHLS = async (vodPath, vodId, start, end) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${config.vodPath}/${vodId}-${start}-${end}.mp4`);
+        resolve(`${path.dirname(vodPath)}/${vodId}-${start}-${end}.mp4`);
       })
-      .saveToFile(`${config.vodPath}/${vodId}-${start}-${end}.mp4`);
+      .saveToFile(`${path.dirname(vodPath)}/${vodId}-${start}-${end}.mp4`);
   })
     .then((result) => {
       path = result;
@@ -487,7 +487,8 @@ module.exports.blackoutVideo = async (vodPath, vodId, start, duration, end) => {
     vodId,
     start_video_path,
     trim_clip_path,
-    end_video_path
+    end_video_path,
+    vodPath
   );
   if (!list) {
     console.error("failed to get text list");
@@ -509,9 +510,10 @@ const getTextList = async (
   vodId,
   start_video_path,
   trim_clip_path,
-  end_video_path
+  end_video_path,
+  vodPath
 ) => {
-  const textPath = `${config.vodPath}/${vodId}-list.txt`;
+  const textPath = `${path.dirname(vodPath)}/${vodId}-list.txt`;
   await writeFile(
     textPath,
     `file '${start_video_path}'\nfile '${trim_clip_path}'\nfile '${end_video_path}'`
@@ -548,9 +550,9 @@ const concat = async (vodId, list) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${config.vodPath}/${vodId}-trimmed.mp4`);
+        resolve(`${path.dirname(list)}/${vodId}-trimmed.mp4`);
       })
-      .saveToFile(`${config.vodPath}/${vodId}-trimmed.mp4`);
+      .saveToFile(`${path.dirname(list)}/${vodId}-trimmed.mp4`);
   })
     .then((result) => {
       path = result;
@@ -590,9 +592,9 @@ const getStartVideo = async (vodPath, vodId, start) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${config.vodPath}/${vodId}-start.mp4`);
+        resolve(`${path.dirname(vodPath)}/${vodId}-start.mp4`);
       })
-      .saveToFile(`${config.vodPath}/${vodId}-start.mp4`);
+      .saveToFile(`${path.dirname(vodPath)}/${vodId}-start.mp4`);
   })
     .then((result) => {
       path = result;
@@ -633,9 +635,9 @@ const getClip = async (vodPath, vodId, start, duration) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${config.vodPath}/${vodId}-clip.mp4`);
+        resolve(`${path.dirname(vodPath)}/${vodId}-clip.mp4`);
       })
-      .saveToFile(`${config.vodPath}/${vodId}-clip.mp4`);
+      .saveToFile(`${path.dirname(vodPath)}/${vodId}-clip.mp4`);
   })
     .then((result) => {
       path = result;
@@ -674,10 +676,10 @@ const getTrimmedClip = async (clipPath, vodId) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${config.vodPath}/${vodId}-clip-muted.mp4`);
+        resolve(`${path.dirname(vodPath)}/${vodId}-clip-muted.mp4`);
         fs.unlinkSync(clipPath);
       })
-      .saveToFile(`${config.vodPath}/${vodId}-clip-muted.mp4`);
+      .saveToFile(`${path.dirname(vodPath)}/${vodId}-clip-muted.mp4`);
   })
     .then((result) => {
       path = result;
@@ -717,9 +719,9 @@ const getEndVideo = async (vodPath, vodId, end) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${config.vodPath}/${vodId}-end.mp4`);
+        resolve(`${path.dirname(vodPath)}/${vodId}-end.mp4`);
       })
-      .saveToFile(`${config.vodPath}/${vodId}-end.mp4`);
+      .saveToFile(`${path.dirname(vodPath)}/${vodId}-end.mp4`);
   })
     .then((result) => {
       path = result;
