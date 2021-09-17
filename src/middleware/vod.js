@@ -277,8 +277,8 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
         })
         .saveToFile(`${path.dirname(vodPath)}/${start}-${vodId}.mp4`);
     })
-      .then((path) => {
-        paths.push(path);
+      .then((argPath) => {
+        paths.push(argPath);
         console.log("\n");
       })
       .catch((e) => {
@@ -290,7 +290,7 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
 
 module.exports.upscale = async (vodId, ogPath) => {
   console.info(`Upscaling video ${ogPath} to 1080p`);
-  let path;
+  let returnPath;
   await new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(ogPath);
     ffmpeg_process
@@ -321,17 +321,17 @@ module.exports.upscale = async (vodId, ogPath) => {
       .saveToFile(`${path.dirname(vodPath)}/${vodId}-upscaled.mp4`);
   })
     .then((result) => {
-      path = result;
+      returnPath = result;
       console.log("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
     });
-  return path;
+  return returnPath;
 };
 
 module.exports.mute = async (vodPath, muteSection, vodId) => {
-  let path;
+  let returnPath;
   await new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
@@ -362,17 +362,17 @@ module.exports.mute = async (vodPath, muteSection, vodId) => {
       .saveToFile(`${path.dirname(vodPath)}/${vodId}-muted.mp4`);
   })
     .then((result) => {
-      path = result;
+      returnPath = result;
       console.log("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
     });
-  return path;
+  return returnPath;
 };
 
 module.exports.trim = async (vodPath, vodId, start, end) => {
-  let path;
+  let returnPath;
   await new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
@@ -405,17 +405,18 @@ module.exports.trim = async (vodPath, vodId, start, end) => {
       .saveToFile(`${path.dirname(vodPath)}/${vodId}-${start}-${end}.mp4`);
   })
     .then((result) => {
-      path = result;
+      returnPath = result;
       console.log("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
     });
-  return path;
+  return returnPath;
 };
 
 module.exports.trimHLS = async (vodPath, vodId, start, end) => {
-  let path;
+  console.log(path.dirname(vodPath));
+  let returnPath;
   await new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
@@ -453,13 +454,13 @@ module.exports.trimHLS = async (vodPath, vodId, start, end) => {
       .saveToFile(`${path.dirname(vodPath)}/${vodId}-${start}-${end}.mp4`);
   })
     .then((result) => {
-      path = result;
+      returnPath = result;
       console.log("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
     });
-  return path;
+  return returnPath;
 };
 
 module.exports.blackoutVideo = async (vodPath, vodId, start, duration, end) => {
@@ -494,8 +495,8 @@ module.exports.blackoutVideo = async (vodPath, vodId, start, duration, end) => {
     console.error("failed to get text list");
     return null;
   }
-  const path = await concat(vodId, list);
-  if (!path) {
+  const returnPath = await concat(vodId, list);
+  if (!returnPath) {
     console.error("failed to concat");
     return null;
   }
@@ -503,7 +504,7 @@ module.exports.blackoutVideo = async (vodPath, vodId, start, duration, end) => {
   fs.unlinkSync(trim_clip_path);
   fs.unlinkSync(end_video_path);
   fs.unlinkSync(list);
-  return path;
+  return returnPath;
 };
 
 const getTextList = async (
@@ -524,7 +525,7 @@ const getTextList = async (
 };
 
 const concat = async (vodId, list) => {
-  let path;
+  let returnPath;
   await new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(list);
     ffmpeg_process
@@ -555,17 +556,17 @@ const concat = async (vodId, list) => {
       .saveToFile(`${path.dirname(list)}/${vodId}-trimmed.mp4`);
   })
     .then((result) => {
-      path = result;
+      returnPath = result;
       console.log("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
     });
-  return path;
+  return returnPath;
 };
 
 const getStartVideo = async (vodPath, vodId, start) => {
-  let path;
+  let returnPath;
   await new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
@@ -597,17 +598,17 @@ const getStartVideo = async (vodPath, vodId, start) => {
       .saveToFile(`${path.dirname(vodPath)}/${vodId}-start.mp4`);
   })
     .then((result) => {
-      path = result;
+      returnPath = result;
       console.log("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
     });
-  return path;
+  return returnPath;
 };
 
 const getClip = async (vodPath, vodId, start, duration) => {
-  let path;
+  let returnPath;
   await new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
@@ -640,17 +641,17 @@ const getClip = async (vodPath, vodId, start, duration) => {
       .saveToFile(`${path.dirname(vodPath)}/${vodId}-clip.mp4`);
   })
     .then((result) => {
-      path = result;
+      returnPath = result;
       console.log("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
     });
-  return path;
+  return returnPath;
 };
 
 const getTrimmedClip = async (clipPath, vodId) => {
-  let path;
+  let returnPath;
   await new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(clipPath);
     ffmpeg_process
@@ -682,17 +683,17 @@ const getTrimmedClip = async (clipPath, vodId) => {
       .saveToFile(`${path.dirname(vodPath)}/${vodId}-clip-muted.mp4`);
   })
     .then((result) => {
-      path = result;
+      returnPath = result;
       console.log("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
     });
-  return path;
+  return returnPath;
 };
 
 const getEndVideo = async (vodPath, vodId, end) => {
-  let path;
+  let returnPath;
   await new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
@@ -724,13 +725,13 @@ const getEndVideo = async (vodPath, vodId, end) => {
       .saveToFile(`${path.dirname(vodPath)}/${vodId}-end.mp4`);
   })
     .then((result) => {
-      path = result;
+      returnPath = result;
       console.log("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
     });
-  return path;
+  return returnPath;
 };
 
 module.exports.download = async (vodId) => {
