@@ -41,7 +41,7 @@ const drive = require("./drive");
 const youtube = require("./youtube");
 
 process.on("unhandledRejection", function (reason, p) {
-  console.log(
+  console.error(
     "Possibly Unhandled Rejection at: Promise ",
     p,
     " reason: ",
@@ -241,7 +241,7 @@ module.exports.liveUploadPart = async (
 };
 
 module.exports.splitVideo = async (vodPath, duration, vodId) => {
-  console.log(`Trying to split ${vodPath} with duration ${duration}`);
+  console.info(`Trying to split ${vodPath} with duration ${duration}`);
   const paths = [];
   for (let start = 0; start < duration; start += config.splitDuration) {
     await new Promise((resolve, reject) => {
@@ -279,7 +279,7 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
     })
       .then((argPath) => {
         paths.push(argPath);
-        console.log("\n");
+        console.info("\n");
       })
       .catch((e) => {
         console.error("\nffmpeg error occurred: " + e);
@@ -322,7 +322,7 @@ module.exports.upscale = async (vodId, ogPath) => {
   })
     .then((result) => {
       returnPath = result;
-      console.log("\n");
+      console.info("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
@@ -363,7 +363,7 @@ module.exports.mute = async (vodPath, muteSection, vodId) => {
   })
     .then((result) => {
       returnPath = result;
-      console.log("\n");
+      console.info("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
@@ -406,7 +406,7 @@ module.exports.trim = async (vodPath, vodId, start, end) => {
   })
     .then((result) => {
       returnPath = result;
-      console.log("\n");
+      console.info("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
@@ -415,7 +415,6 @@ module.exports.trim = async (vodPath, vodId, start, end) => {
 };
 
 module.exports.trimHLS = async (vodPath, vodId, start, end) => {
-  console.log(path.dirname(vodPath));
   let returnPath;
   await new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(vodPath);
@@ -455,7 +454,7 @@ module.exports.trimHLS = async (vodPath, vodId, start, end) => {
   })
     .then((result) => {
       returnPath = result;
-      console.log("\n");
+      console.info("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
@@ -504,6 +503,7 @@ module.exports.blackoutVideo = async (vodPath, vodId, start, duration, end) => {
   fs.unlinkSync(trim_clip_path);
   fs.unlinkSync(end_video_path);
   fs.unlinkSync(list);
+  fs.unlinkSync(clip_path);
   return returnPath;
 };
 
@@ -557,7 +557,7 @@ const concat = async (vodId, list) => {
   })
     .then((result) => {
       returnPath = result;
-      console.log("\n");
+      console.info("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
@@ -599,7 +599,7 @@ const getStartVideo = async (vodPath, vodId, start) => {
   })
     .then((result) => {
       returnPath = result;
-      console.log("\n");
+      console.info("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
@@ -642,7 +642,7 @@ const getClip = async (vodPath, vodId, start, duration) => {
   })
     .then((result) => {
       returnPath = result;
-      console.log("\n");
+      console.info("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
@@ -677,14 +677,13 @@ const getTrimmedClip = async (clipPath, vodId) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${path.dirname(vodPath)}/${vodId}-clip-muted.mp4`);
-        fs.unlinkSync(clipPath);
+        resolve(`${path.dirname(clipPath)}/${vodId}-clip-muted.mp4`);
       })
-      .saveToFile(`${path.dirname(vodPath)}/${vodId}-clip-muted.mp4`);
+      .saveToFile(`${path.dirname(clipPath)}/${vodId}-clip-muted.mp4`);
   })
     .then((result) => {
       returnPath = result;
-      console.log("\n");
+      console.info("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
@@ -726,7 +725,7 @@ const getEndVideo = async (vodPath, vodId, end) => {
   })
     .then((result) => {
       returnPath = result;
-      console.log("\n");
+      console.info("\n");
     })
     .catch((e) => {
       console.error("\nffmpeg error occurred: " + e);
@@ -748,7 +747,7 @@ module.exports.download = async (vodId) => {
 
   await downloadAsMP4(m3u8, vodPath)
     .then(() => {
-      console.log("\n");
+      console.info("\n");
     })
     .catch((e) => {
       return console.error("\nffmpeg error occurred: " + e);
@@ -796,7 +795,6 @@ module.exports.uploadVideo = async (data, app) => {
     part: "id,snippet",
     q: "Check if token is valid",
   });
-  console.log(data);
   /* Change once they fix this problem, not being able to update using getTokenInfo?
   await oauth2Client
     .getTokenInfo(config.youtube.access_token)
@@ -805,9 +803,9 @@ module.exports.uploadVideo = async (data, app) => {
   await new Promise((resolve, reject) => {
     setTimeout(async () => {
       const fileSize = fs.statSync(data.path).size;
-      const title = data.vod.title.replace(/>|</gi, "");
-      let description =
-        `VOD TITLE: ${title}\nChat Replay: https://${config.domain_name}/${
+      const vodTitle = data.vod.title.replace(/>|</gi, "");
+      const description =
+        `VOD TITLE: ${vodTitle}\nChat Replay: https://${config.domain_name}/${
           data.type === "live" ? "live" : "vods"
         }/${data.vod.id}\n` + config.youtube_description;
       const res = await youtube.videos.insert(
@@ -844,8 +842,8 @@ module.exports.uploadVideo = async (data, app) => {
           },
         }
       );
-      console.log("\n\n");
-      console.log(res.data);
+      console.info("\n\n");
+      console.info(res.data);
 
       let vod_youtube;
       await app
@@ -957,6 +955,12 @@ module.exports.trimUpload = async (
   await new Promise((resolve, reject) => {
     setTimeout(async () => {
       const fileSize = fs.statSync(path).size;
+      const vodTitle = data.vod.title.replace(/>|</gi, "");
+      const description = data
+        ? `VOD TITLE: ${vodTitle}\nChat Replay: https://${config.domain_name}/${
+            data.type === "live" ? "live" : "vods"
+          }/${data.vod.id}\n` + config.youtube_description
+        : config.youtube_description;
       const res = await youtube.videos.insert(
         {
           auth: oauth2Client,
@@ -965,13 +969,7 @@ module.exports.trimUpload = async (
           requestBody: {
             snippet: {
               title: title,
-              description: data
-                ? `VOD TITLE: ${data.vod.title}\nChat Replay: https://${
-                    config.domain_name
-                  }/${data.type === "live" ? "live" : "vods"}/${
-                    data.vod.id
-                  }\n` + config.youtube_description
-                : config.youtube_description,
+              description: description,
               categoryId: "20",
             },
             status: {
@@ -993,8 +991,8 @@ module.exports.trimUpload = async (
           },
         }
       );
-      console.log("\n\n");
-      console.log(res.data);
+      console.info("\n\n");
+      console.info(res.data);
 
       if (!data) {
         fs.unlinkSync(path);
@@ -1083,11 +1081,11 @@ module.exports.addComment = async (videoId, vodId, part = false, type) => {
       },
     },
   });
-  console.log(res.data);
+  console.info(`Added comment for ${type} ${vodId} in ${videoId}`);
 };
 
 module.exports.getLogs = async (vodId, app) => {
-  console.log(`Saving logs for ${vodId}`);
+  console.info(`Saving logs for ${vodId}`);
   //check if offline.
   let start_time = new Date();
   let comments = [];
@@ -1397,9 +1395,9 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
 };
 
 module.exports.startDownload = async (vodId, app) => {
-  console.log(`Start download: ${vodId}`);
+  console.info(`Start download: ${vodId}`);
   download(vodId, app);
-  console.log(`Start Logs download: ${vodId}`);
+  console.info(`Start Logs download: ${vodId}`);
   downloadLogs(vodId, app);
 };
 
@@ -1431,9 +1429,12 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
   if (duration >= config.splitDuration && config.liveUpload) {
     const noOfParts = Math.floor(duration / config.splitDuration);
 
-    if (vod.youtube.length < noOfParts) {
+    const vod_youtube_data = vod.youtube.filter((data) => {
+      return data.type === "vod";
+    });
+    if (vod_youtube_data.length < noOfParts) {
       for (let i = 0; i < noOfParts; i++) {
-        if (vod.youtube[i]) continue;
+        if (vod_youtube_data[i]) continue;
         await this.liveUploadPart(
           app,
           vodId,
@@ -1455,7 +1456,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
       let startTime = 0;
 
       if (vod.youtube.length > 0) {
-        const vod_youtube_data = vod.youtube.filter(function (data) {
+        const vod_youtube_data = vod.youtube.filter((data) => {
           return data.type === "vod";
         });
         for (let i = 0; i < vod_youtube_data.length; i++) {
