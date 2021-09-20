@@ -18,13 +18,13 @@ module.exports = function (app) {
   app.use(
     "/logs",
     rateLimit({
-      windowMs: 30 * 1000,
-      max: 10,
+      windowMs: 5 * 1000,
+      max: 15,
       message: "API rate limit exceeded",
       keyGenerator: function (req) {
         //for cloudflare
         //return req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-        return req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+        return req.headers["x-forwarded-for"] || req.connection.remoteAddress;
       },
     }),
     new Logs(options, app)
