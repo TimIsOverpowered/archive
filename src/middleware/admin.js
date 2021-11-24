@@ -27,11 +27,9 @@ module.exports.verify = function (app) {
 
 module.exports.download = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId)
-      return res.status(400).json({ error: true, message: "No VodId" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No VodId" });
 
-    if (!req.body.type)
-      return res.status(400).json({ error: true, message: "No type" });
+    if (!req.body.type) return res.status(400).json({ error: true, message: "No type" });
 
     let exists;
     await app
@@ -50,8 +48,7 @@ module.exports.download = function (app) {
     }
 
     const vodData = await twitch.getVodData(req.body.vodId);
-    if (!vodData)
-      return res.status(404).json({ error: true, message: "No Vod Data" });
+    if (!vodData) return res.status(404).json({ error: true, message: "No Vod Data" });
 
     await app
       .service("vods")
@@ -62,9 +59,7 @@ module.exports.download = function (app) {
           timeZone: config.timezone,
         }),
         createdAt: vodData.created_at,
-        duration: moment
-          .duration("PT" + vodData.duration.toUpperCase())
-          .format("HH:mm:ss", { trim: false }),
+        duration: moment.duration("PT" + vodData.duration.toUpperCase()).format("HH:mm:ss", { trim: false }),
       })
       .then(() => {
         console.info(`Created vod ${vodData.id} for ${vodData.user_name}`);
@@ -80,8 +75,7 @@ module.exports.download = function (app) {
 
 module.exports.downloadv2 = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId)
-      return res.status(400).json({ error: true, message: "Missing vod id.." });
+    if (!req.body.vodId) return res.status(400).json({ error: true, message: "Missing vod id.." });
 
     let exists;
     await app
@@ -111,9 +105,7 @@ module.exports.downloadv2 = function (app) {
           timeZone: config.timezone,
         }),
         createdAt: vodData.created_at,
-        duration: moment
-          .duration("PT" + vodData.duration.toUpperCase())
-          .format("HH:mm:ss", { trim: false }),
+        duration: moment.duration("PT" + vodData.duration.toUpperCase()).format("HH:mm:ss", { trim: false }),
       })
       .then(() => {
         console.info(`Created vod ${vodData.id} for ${vodData.user_name}`);
@@ -129,8 +121,7 @@ module.exports.downloadv2 = function (app) {
 
 module.exports.logs = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId)
-      return res.status(400).json({ error: true, message: "No VodId" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No VodId" });
 
     let total;
     app
@@ -158,11 +149,9 @@ module.exports.logs = function (app) {
 
 module.exports.manualLogs = function (app) {
   return async function (req, res, next) {
-    if (!req.body.path)
-      return res.status(400).json({ error: true, message: "No log path" });
+    if (!req.body.path) return res.status(400).json({ error: true, message: "No log path" });
 
-    if (!req.body.vodId)
-      return res.status(400).json({ error: true, message: "No vod id" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No vod id" });
 
     vod.manualLogs(req.body.path, req.body.vodId, app);
     res.status(200).json({ error: false, message: "Starting manual logs.." });
@@ -171,12 +160,9 @@ module.exports.manualLogs = function (app) {
 
 module.exports.delete = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId)
-      return res.status(400).json({ error: true, message: "No VodId" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No VodId" });
 
-    res
-      .status(200)
-      .json({ error: false, message: "Starting deletion process.." });
+    res.status(200).json({ error: false, message: "Starting deletion process.." });
 
     await app
       .service("vods")
@@ -206,14 +192,11 @@ module.exports.delete = function (app) {
 
 module.exports.dmca = function (app) {
   return async function (req, res, next) {
-    if (!req.body.receivedClaims)
-      return res.status(400).json({ error: true, message: "No claims" });
+    if (!req.body.receivedClaims) return res.status(400).json({ error: true, message: "No claims" });
 
-    if (!req.body.vodId)
-      return res.status(400).json({ error: true, message: "No vod id" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No vod id" });
 
-    if (!req.body.type)
-      return res.status(400).json({ error: true, message: "No type" });
+    if (!req.body.type) return res.status(400).json({ error: true, message: "No type" });
 
     const vodId = req.body.vodId;
 
@@ -226,8 +209,7 @@ module.exports.dmca = function (app) {
       })
       .catch(() => {});
 
-    if (!vod_data)
-      return console.error("Failed to download video: no VOD in database");
+    if (!vod_data) return console.error("Failed to download video: no VOD in database");
 
     res.status(200).json({
       error: false,
@@ -239,14 +221,10 @@ module.exports.dmca = function (app) {
       vodPath = await drive.download(req.body.vodId, req.body.type, app);
     } else {
       vodPath = await vod.download(req.body.vodId);
-      if (!vodPath)
-        vodPath = await drive.download(req.body.vodId, req.body.type, app);
+      if (!vodPath) vodPath = await drive.download(req.body.vodId, req.body.type, app);
     }
 
-    if (!vodPath)
-      return console.error(
-        `Could not find a download source for ${req.body.vodId}`
-      );
+    if (!vodPath) return console.error(`Could not find a download source for ${req.body.vodId}`);
 
     console.info(`Finished download`);
 
@@ -256,55 +234,35 @@ module.exports.dmca = function (app) {
     for (let dmca of req.body.receivedClaims) {
       const policyType = dmca.claimPolicy.primaryPolicy.policyType;
       //check if audio
-      if (
-        policyType === "POLICY_TYPE_GLOBAL_BLOCK" ||
-        policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK" ||
-        policyType === "POLICY_TYPE_BLOCK"
-      ) {
+      if (policyType === "POLICY_TYPE_GLOBAL_BLOCK" || policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK" || policyType === "POLICY_TYPE_BLOCK") {
         if (dmca.type === "CLAIM_TYPE_AUDIO") {
           muteSection.push(
-            `volume=0:enable='between(t,${
-              dmca.matchDetails.longestMatchStartTimeSeconds
-            },${
-              parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
-              parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
+            `volume=0:enable='between(t,${dmca.matchDetails.longestMatchStartTimeSeconds},${
+              parseInt(dmca.matchDetails.longestMatchDurationSeconds) + parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
             })'`
           );
         } else if (dmca.type === "CLAIM_TYPE_VISUAL") {
-          console.info(
-            `Trying to blackout ${
-              blackoutPath ? blackoutPath : vodPath
-            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
-          );
+          console.info(`Trying to blackout ${blackoutPath ? blackoutPath : vodPath}. Claim: ${JSON.stringify(dmca.asset.metadata)}`);
           blackoutPath = await vod.blackoutVideo(
             blackoutPath ? blackoutPath : vodPath,
             vodId,
             dmca.matchDetails.longestMatchStartTimeSeconds,
             dmca.matchDetails.longestMatchDurationSeconds,
-            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
-              parseInt(dmca.matchDetails.longestMatchDurationSeconds)
+            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) + parseInt(dmca.matchDetails.longestMatchDurationSeconds)
           );
         } else if (dmca.type === "CLAIM_TYPE_AUDIOVISUAL") {
           muteSection.push(
-            `volume=0:enable='between(t,${
-              dmca.matchDetails.longestMatchStartTimeSeconds
-            },${
-              parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
-              parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
+            `volume=0:enable='between(t,${dmca.matchDetails.longestMatchStartTimeSeconds},${
+              parseInt(dmca.matchDetails.longestMatchDurationSeconds) + parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
             })'`
           );
-          console.info(
-            `Trying to blackout ${
-              blackoutPath ? blackoutPath : vodPath
-            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
-          );
+          console.info(`Trying to blackout ${blackoutPath ? blackoutPath : vodPath}. Claim: ${JSON.stringify(dmca.asset.metadata)}`);
           blackoutPath = await vod.blackoutVideo(
             blackoutPath ? blackoutPath : vodPath,
             vodId,
             dmca.matchDetails.longestMatchStartTimeSeconds,
             dmca.matchDetails.longestMatchDurationSeconds,
-            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
-              parseInt(dmca.matchDetails.longestMatchDurationSeconds)
+            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) + parseInt(dmca.matchDetails.longestMatchDurationSeconds)
           );
         }
       }
@@ -312,30 +270,18 @@ module.exports.dmca = function (app) {
 
     if (muteSection.length > 0) {
       console.info(`Trying to mute ${blackoutPath ? blackoutPath : vodPath}`);
-      newVodPath = await vod.mute(
-        blackoutPath ? blackoutPath : vodPath,
-        muteSection,
-        vodId
-      );
+      newVodPath = await vod.mute(blackoutPath ? blackoutPath : vodPath, muteSection, vodId);
       if (!newVodPath) return console.error("failed to mute video");
-      if (blackoutPath) fs.unlinkSync(blackoutPath);
+      fs.unlinkSync(blackoutPath ? blackoutPath : vodPath);
     }
 
-    fs.unlinkSync(vodPath);
-
-    vod.upload(
-      vodId,
-      app,
-      newVodPath ? newVodPath : blackoutPath,
-      req.body.type
-    );
+    vod.upload(vodId, app, newVodPath, req.body.type);
   };
 };
 
 module.exports.saveChapters = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId)
-      return res.status(400).json({ error: true, message: "No vod id" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No vod id" });
 
     const vodData = await twitch.getVodData(req.body.vodId);
     if (!vodData)
@@ -344,27 +290,18 @@ module.exports.saveChapters = function (app) {
         message: `Failed to get vod data for ${req.body.vodId}`,
       });
 
-    vod.saveChapters(
-      vodData.id,
-      app,
-      moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds()
-    );
-    res
-      .status(200)
-      .json({ error: false, message: `Saving Chapters for ${req.body.vodId}` });
+    vod.saveChapters(vodData.id, app, moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds());
+    res.status(200).json({ error: false, message: `Saving Chapters for ${req.body.vodId}` });
   };
 };
 
 module.exports.reUploadPart = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId)
-      return res.status(400).json({ error: true, message: "No vod id" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No vod id" });
 
-    if (!req.body.part)
-      return res.status(400).json({ error: true, message: "No part" });
+    if (!req.body.part) return res.status(400).json({ error: true, message: "No part" });
 
-    if (!req.body.type)
-      return res.status(400).json({ error: true, message: "No type" });
+    if (!req.body.type) return res.status(400).json({ error: true, message: "No type" });
 
     res.status(200).json({
       error: false,
@@ -374,61 +311,23 @@ module.exports.reUploadPart = function (app) {
     const part = parseInt(req.body.part) - 1;
 
     if (req.body.type === "live") {
-      const driveVideo = await drive.download(
-        req.body.vodId,
-        req.body.type,
-        app
-      );
-      if (!driveVideo)
-        return console.error(
-          `Could not find a download source for ${req.body.vodId}`
-        );
+      const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
+      if (!driveVideo) return console.error(`Could not find a download source for ${req.body.vodId}`);
       console.info(`Finished download`);
-      await vod.liveUploadPart(
-        app,
-        req.body.vodId,
-        driveVideo,
-        config.splitDuration * part,
-        config.splitDuration,
-        req.body.part,
-        req.body.type
-      );
+      await vod.liveUploadPart(app, req.body.vodId, driveVideo, config.splitDuration * part, config.splitDuration, req.body.part, req.body.type);
 
       fs.unlinkSync(driveVideo);
     } else {
       const mp4Video = await vod.download(req.body.vodId);
       if (mp4Video) {
         console.info(`Finished download`);
-        await vod.liveUploadPart(
-          app,
-          req.body.vodId,
-          mp4Video,
-          config.splitDuration * part,
-          config.splitDuration,
-          req.body.part,
-          req.body.type
-        );
+        await vod.liveUploadPart(app, req.body.vodId, mp4Video, config.splitDuration * part, config.splitDuration, req.body.part, req.body.type);
         fs.unlinkSync(mp4Video);
       } else {
-        const driveVideo = await drive.download(
-          req.body.vodId,
-          req.body.type,
-          app
-        );
-        if (!driveVideo)
-          return console.error(
-            `Could not find a download source for ${req.body.vodId}`
-          );
+        const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
+        if (!driveVideo) return console.error(`Could not find a download source for ${req.body.vodId}`);
         console.info(`Finished download`);
-        await vod.liveUploadPart(
-          app,
-          req.body.vodId,
-          driveVideo,
-          config.splitDuration * part,
-          config.splitDuration,
-          req.body.part,
-          req.body.type
-        );
+        await vod.liveUploadPart(app, req.body.vodId, driveVideo, config.splitDuration * part, config.splitDuration, req.body.part, req.body.type);
         fs.unlinkSync(driveVideo);
       }
     }
@@ -437,17 +336,13 @@ module.exports.reUploadPart = function (app) {
 
 module.exports.partDmca = function (app) {
   return async function (req, res, next) {
-    if (!req.body.receivedClaims)
-      return res.status(400).json({ error: true, message: "No claims" });
+    if (!req.body.receivedClaims) return res.status(400).json({ error: true, message: "No claims" });
 
-    if (!req.body.vodId)
-      return res.status(400).json({ error: true, message: "No vod id" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No vod id" });
 
-    if (!req.body.part)
-      return res.status(400).json({ error: true, message: "No part" });
+    if (!req.body.part) return res.status(400).json({ error: true, message: "No part" });
 
-    if (!req.body.type)
-      return res.status(400).json({ error: true, message: "No type" });
+    if (!req.body.type) return res.status(400).json({ error: true, message: "No type" });
 
     res.status(200).json({
       error: false,
@@ -466,51 +361,22 @@ module.exports.partDmca = function (app) {
     if (!vod_data) return console.error("Failed get vod: no VOD in database");
 
     if (req.body.type === "live") {
-      const driveVideo = await drive.download(
-        req.body.vodId,
-        req.body.type,
-        app
-      );
-      if (!driveVideo)
-        return console.error(
-          `Could not find a download source for ${req.body.vodId}`
-        );
-      trimmedPath = await vod.trim(
-        driveVideo,
-        req.body.vodId,
-        config.splitDuration * (parseInt(req.body.part) - 1),
-        config.splitDuration
-      );
+      const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
+      if (!driveVideo) return console.error(`Could not find a download source for ${req.body.vodId}`);
+      trimmedPath = await vod.trim(driveVideo, req.body.vodId, config.splitDuration * (parseInt(req.body.part) - 1), config.splitDuration);
 
       fs.unlinkSync(driveVideo);
     } else {
       const mp4Video = await vod.download(req.body.vodId);
       if (mp4Video) {
         console.info(`Finished download`);
-        trimmedPath = await vod.trim(
-          mp4Video,
-          req.body.vodId,
-          config.splitDuration * (parseInt(req.body.part) - 1),
-          config.splitDuration
-        );
+        trimmedPath = await vod.trim(mp4Video, req.body.vodId, config.splitDuration * (parseInt(req.body.part) - 1), config.splitDuration);
         fs.unlinkSync(mp4Video);
       } else {
-        const driveVideo = await drive.download(
-          req.body.vodId,
-          req.body.type,
-          app
-        );
-        if (!driveVideo)
-          return console.error(
-            `Could not find a download source for ${req.body.vodId}`
-          );
+        const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
+        if (!driveVideo) return console.error(`Could not find a download source for ${req.body.vodId}`);
         console.info(`Finished download`);
-        trimmedPath = await vod.trim(
-          driveVideo,
-          req.body.vodId,
-          config.splitDuration * (parseInt(req.body.part) - 1),
-          config.splitDuration
-        );
+        trimmedPath = await vod.trim(driveVideo, req.body.vodId, config.splitDuration * (parseInt(req.body.part) - 1), config.splitDuration);
 
         fs.unlinkSync(driveVideo);
       }
@@ -523,88 +389,53 @@ module.exports.partDmca = function (app) {
       //check if audio
       const policyType = dmca.claimPolicy.primaryPolicy.policyType;
       //check if audio
-      if (
-        policyType === "POLICY_TYPE_GLOBAL_BLOCK" ||
-        policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK" ||
-        policyType === "POLICY_TYPE_BLOCK"
-      ) {
+      if (policyType === "POLICY_TYPE_GLOBAL_BLOCK" || policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK" || policyType === "POLICY_TYPE_BLOCK") {
         if (dmca.type === "CLAIM_TYPE_AUDIO") {
           muteSection.push(
-            `volume=0:enable='between(t,${
-              dmca.matchDetails.longestMatchStartTimeSeconds
-            },${
-              parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
-              parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
+            `volume=0:enable='between(t,${dmca.matchDetails.longestMatchStartTimeSeconds},${
+              parseInt(dmca.matchDetails.longestMatchDurationSeconds) + parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
             })'`
           );
         } else if (dmca.type === "CLAIM_TYPE_VISUAL") {
-          console.info(
-            `Trying to blackout ${
-              blackoutPath ? blackoutPath : trimmedPath
-            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
-          );
+          console.info(`Trying to blackout ${blackoutPath ? blackoutPath : trimmedPath}. Claim: ${JSON.stringify(dmca.asset.metadata)}`);
           blackoutPath = await vod.blackoutVideo(
             blackoutPath ? blackoutPath : trimmedPath,
             req.body.vodId,
             dmca.matchDetails.longestMatchStartTimeSeconds,
             dmca.matchDetails.longestMatchDurationSeconds,
-            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
-              parseInt(dmca.matchDetails.longestMatchDurationSeconds)
+            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) + parseInt(dmca.matchDetails.longestMatchDurationSeconds)
           );
         } else if (dmca.type === "CLAIM_TYPE_AUDIOVISUAL") {
           muteSection.push(
-            `volume=0:enable='between(t,${
-              dmca.matchDetails.longestMatchStartTimeSeconds
-            },${
-              parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
-              parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
+            `volume=0:enable='between(t,${dmca.matchDetails.longestMatchStartTimeSeconds},${
+              parseInt(dmca.matchDetails.longestMatchDurationSeconds) + parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
             })'`
           );
-          console.info(
-            `Trying to blackout ${
-              blackoutPath ? blackoutPath : trimmedPath
-            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
-          );
+          console.info(`Trying to blackout ${blackoutPath ? blackoutPath : trimmedPath}. Claim: ${JSON.stringify(dmca.asset.metadata)}`);
           blackoutPath = await vod.blackoutVideo(
             blackoutPath ? blackoutPath : trimmedPath,
             req.body.vodId,
             dmca.matchDetails.longestMatchStartTimeSeconds,
             dmca.matchDetails.longestMatchDurationSeconds,
-            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
-              parseInt(dmca.matchDetails.longestMatchDurationSeconds)
+            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) + parseInt(dmca.matchDetails.longestMatchDurationSeconds)
           );
         }
       }
     }
 
     if (muteSection.length > 0) {
-      console.info(
-        `Trying to mute ${blackoutPath ? blackoutPath : trimmedPath}`
-      );
-      newVodPath = await vod.mute(
-        blackoutPath ? blackoutPath : trimmedPath,
-        muteSection,
-        req.body.vodId
-      );
+      console.info(`Trying to mute ${blackoutPath ? blackoutPath : trimmedPath}`);
+      newVodPath = await vod.mute(blackoutPath ? blackoutPath : trimmedPath, muteSection, req.body.vodId);
       if (!newVodPath) return console.error("failed to mute video");
-      if (blackoutPath) fs.unlinkSync(blackoutPath);
+      fs.unlinkSync(blackoutPath ? blackoutPath : trimmedPath);
     }
 
-    if (!newVodPath && !blackoutPath)
-      return console.error(
-        "nothing to mute or blackout. don't try to upload.."
-      );
+    if (!newVodPath && !blackoutPath) return console.error("nothing to mute or blackout. don't try to upload..");
 
     await vod.trimUpload(
       newVodPath ? newVodPath : blackoutPath,
-      req.body.type === "vod"
-        ? `${config.channel} ${vod_data.date} Vod Part ${req.body.part}`
-        : `${config.channel} ${vod_data.date} Live Vod Part ${req.body.part}`,
-      config.multiTrack && req.body.type === "live"
-        ? true
-        : !config.multiTrack && req.body.type === "vod"
-        ? true
-        : false,
+      req.body.type === "vod" ? `${config.channel} ${vod_data.date} Vod Part ${req.body.part}` : `${config.channel} ${vod_data.date} Live Vod Part ${req.body.part}`,
+      config.multiTrack && req.body.type === "live" ? true : !config.multiTrack && req.body.type === "vod" ? true : false,
       {
         vod: vod_data,
         part: req.body.part,
@@ -613,6 +444,6 @@ module.exports.partDmca = function (app) {
       app
     );
 
-    fs.unlinkSync(trimmedPath);
+    fs.unlinkSync(newVodPath ? newVodPath : blackoutPath);
   };
 };
