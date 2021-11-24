@@ -272,7 +272,12 @@ module.exports.dmca = function (app) {
       console.info(`Trying to mute ${blackoutPath ? blackoutPath : vodPath}`);
       newVodPath = await vod.mute(blackoutPath ? blackoutPath : vodPath, muteSection, vodId);
       if (!newVodPath) return console.error("failed to mute video");
-      fs.unlinkSync(blackoutPath ? blackoutPath : vodPath);
+      if (blackoutPath) {
+        fs.unlinkSync(vodPath);
+        fs.unlinkSync(blackoutPath);
+      } else {
+        fs.unlinkSync(vodPath);
+      }
     }
 
     vod.upload(vodId, app, newVodPath, req.body.type);
@@ -427,7 +432,12 @@ module.exports.partDmca = function (app) {
       console.info(`Trying to mute ${blackoutPath ? blackoutPath : trimmedPath}`);
       newVodPath = await vod.mute(blackoutPath ? blackoutPath : trimmedPath, muteSection, req.body.vodId);
       if (!newVodPath) return console.error("failed to mute video");
-      fs.unlinkSync(blackoutPath ? blackoutPath : trimmedPath);
+      if (blackoutPath) {
+        fs.unlinkSync(trimmedPath);
+        fs.unlinkSync(blackoutPath);
+      } else {
+        fs.unlinkSync(trimmedPath);
+      }
     }
 
     if (!newVodPath && !blackoutPath) return console.error("nothing to mute or blackout. don't try to upload..");
@@ -443,7 +453,5 @@ module.exports.partDmca = function (app) {
       },
       app
     );
-
-    fs.unlinkSync(newVodPath ? newVodPath : blackoutPath);
   };
 };
