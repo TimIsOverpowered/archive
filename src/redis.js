@@ -2,6 +2,7 @@ const { createClient } = require("redis");
 const { check } = require("./check");
 const { RateLimiterRedis } = require("rate-limiter-flexible");
 const IoRedis = require("ioredis");
+const config = require("../config/config.json");
 
 module.exports = async function (app) {
   const redisConf = app.get("redis"),
@@ -13,16 +14,12 @@ module.exports = async function (app) {
 
   await client
     .connect()
-    .then(() => client.DEL("downloading"))
+    .then(() => client.DEL(`${config.channel}-downloading`))
     .catch((e) => console.error(e));
 
   app.set("redisClient", client);
 
-  const rateLimiterRedisClient = new IoRedis(
-    redisConf.useSocket
-      ? { enableOfflineQueue: false, path: redisConf.path }
-      : { enableOfflineQueue: false, host: redisConf.host }
-  );
+  const rateLimiterRedisClient = new IoRedis(redisConf.useSocket ? { enableOfflineQueue: false, path: redisConf.path } : { enableOfflineQueue: false, host: redisConf.host });
 
   app.set("rateLimiterRedisClient", rateLimiterRedisClient);
 
