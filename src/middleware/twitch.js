@@ -3,39 +3,32 @@ const config = require("../../config/config.json");
 const fs = require("fs");
 const path = require("path");
 const HLS = require("hls-parser");
-const rax = require("retry-axios");
 
 module.exports.checkToken = async () => {
-  let isValid = false;
   await axios(`https://id.twitch.tv/oauth2/validate`, {
     method: "GET",
     headers: {
-      Authorization: `Bearer ${config.twitch.access_token}`,
+      Authorization: `Bearer ${config.twitch.auth.access_token}`,
     },
   })
-    .then((response) => {
-      if (response.status < 400) {
-        isValid = true;
-      }
-    })
+    .then(() => true)
     .catch(async (e) => {
-      if (!e.response) return console.error(e);
-      if (e.response.status === 401) {
+      if (e.response && e.response.status === 401) {
         console.info("Twitch App Token Expired");
-        return await this.refreshToken();
+        await this.refreshToken();
       }
+      console.error(e.response ? e.response.data : e);
     });
-  return isValid;
 };
 
 module.exports.refreshToken = async () => {
   await axios
     .post(
-      `https://id.twitch.tv/oauth2/token?client_id=${config.twitch.client_id}&client_secret=${config.twitch.client_secret}&grant_type=client_credentials`
+      `https://id.twitch.tv/oauth2/token?client_id=${config.twitch.auth.client_id}&client_secret=${config.twitch.auth.client_secret}&grant_type=client_credentials`
     )
     .then((response) => {
       const data = response.data;
-      config.twitch.access_token = data.access_token;
+      config.twitch.auth.access_token = data.access_token;
       fs.writeFile(
         path.resolve(__dirname, "../../config/config.json"),
         JSON.stringify(config, null, 4),
@@ -46,125 +39,12 @@ module.exports.refreshToken = async () => {
       );
     })
     .catch((e) => {
-      if (!e.response) return console.error(e);
-      console.error(e.response.data);
-    });
-};
-
-module.exports.getWebhooks = async () => {
-  await this.checkToken();
-  let webhooks;
-  await axios
-    .get(`https://api.twitch.tv/helix/webhooks/subscriptions?first=100`, {
-      headers: {
-        Authorization: `Bearer ${config.twitch.access_token}`,
-        "Client-Id": config.twitch.client_id,
-      },
-    })
-    .then(async (response) => {
-      const data = response.data;
-      webhooks = data.data;
-      let cursor = data.pagination.cursor;
-
-      while (cursor) {
-        let newData = await getNextWebhooks(cursor);
-        cursor = newData.pagination.cursor;
-        webhooks = webhooks.concat(newData.data);
-      }
-    })
-    .catch(async (e) => {
-      if (!e.response) {
-        return console.error(e);
-      }
-      console.error(e.response.data);
-    });
-  return webhooks;
-};
-
-const getNextWebhooks = async (cursor) => {
-  await this.checkToken();
-  let data;
-  await axios
-    .get(
-      `https://api.twitch.tv/helix/webhooks/subscriptions?first=100&after=${cursor}`,
-      {
-        headers: {
-          Authorization: `Bearer ${config.twitch.access_token}`,
-          "Client-Id": config.twitch.client_id,
-        },
-      }
-    )
-    .then((response) => {
-      data = response.data;
-    })
-    .catch(async (e) => {
-      if (!e.response) {
-        return console.error(e);
-      }
-      console.error(e.response.data);
-    });
-  return data;
-};
-
-module.exports.unsubscribe = async (user_id) => {
-  await this.checkToken();
-  await axios(`https://api.twitch.tv/helix/webhooks/hub`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.twitch.access_token}`,
-      "Client-Id": config.twitch.client_id,
-    },
-    data: {
-      "hub.callback": config.twitch.webhook_callback + `stream/${user_id}`,
-      "hub.mode": "unsubscribe",
-      "hub.topic": `https://api.twitch.tv/helix/streams?user_id=${user_id}`,
-    },
-  })
-    .then((response) => {
-      if (response.status === 202) {
-        console.log(`unsubscribe: ${user_id}`);
-      }
-    })
-    .catch(async (e) => {
-      if (!e.response) {
-        return console.error(e);
-      }
-      console.error(e.response.data);
-    });
-};
-
-module.exports.subscribe = async (user_id) => {
-  await this.checkToken();
-  await axios(`https://api.twitch.tv/helix/webhooks/hub`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.twitch.access_token}`,
-      "Client-Id": config.twitch.client_id,
-    },
-    data: {
-      "hub.callback": config.twitch.webhook_callback + `stream/${user_id}`,
-      "hub.mode": "subscribe",
-      "hub.topic": `https://api.twitch.tv/helix/streams?user_id=${user_id}`,
-      "hub.lease_seconds": 864000,
-      "hub.secret": config.twitch.webhook_secret,
-    },
-  })
-    .then((response) => {
-      if (response.status === 202) {
-        console.log(`trying to subscribe: ${user_id}`);
-      }
-    })
-    .catch(async (e) => {
-      if (!e.response) {
-        return console.error(e);
-      }
-      console.error(e.response.data);
+      console.error(e.response ? e.response.data : e);
     });
 };
 
 module.exports.getVodTokenSig = async (vodID) => {
-  let data;
-  await axios({
+  const data = await axios({
     url: "https://gql.twitch.tv/gql",
     method: "POST",
     headers: {
@@ -192,32 +72,23 @@ module.exports.getVodTokenSig = async (vodID) => {
       },
     },
   })
-    .then((response) => {
-      data = response.data.data.videoPlaybackAccessToken;
-    })
-    .catch(async (e) => {
-      if (!e.response) {
-        return console.error(e);
-      }
-      console.error(e.response.data);
+    .then((response) => response.data.data.videoPlaybackAccessToken)
+    .catch((e) => {
+      console.error(e.response ? e.response.data : e);
+      return null;
     });
   return data;
 };
 
 module.exports.getM3u8 = async (vodId, token, sig) => {
-  let data;
-  await axios
+  const data = await axios
     .get(
       `https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=twitchweb&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`
     )
-    .then((response) => {
-      data = response.data;
-    })
-    .catch(async (e) => {
-      if (!e.response) {
-        return console.error(e);
-      }
-      console.error(e.response.data);
+    .then((response) => (data = response.data))
+    .catch((e) => {
+      console.error(e.response ? e.response.data : e);
+      return null;
     });
   return data;
 };
@@ -229,102 +100,72 @@ module.exports.getParsedM3u8 = (m3u8) => {
   } catch (e) {
     console.error(e);
   }
-  if (!parsedM3u8) return null;
-  return parsedM3u8.variants[0].uri;
+  return parsedM3u8 ? parsedM3u8.variants[0].uri : null;
 };
 
 module.exports.getVariantM3u8 = async (M3U8_URL) => {
-  let data;
-  await axios
+  const data = await axios
     .get(M3U8_URL)
-    .then((response) => {
-      data = response.data;
-    })
-    .catch(async (e) => {
-      if (!e.response) {
-        return console.error(e);
-      }
-      console.error(e.response.data);
+    .then((response) => response.data)
+    .catch((e) => {
+      console.error(e.response ? e.response.data : e);
     });
   return data;
 };
 
 module.exports.getLatestVodData = async (userId) => {
   await this.checkToken();
-  let vodData;
-  await axios
+  const vodData = await axios
     .get(`https://api.twitch.tv/helix/videos?user_id=${userId}`, {
       headers: {
-        Authorization: `Bearer ${config.twitch.access_token}`,
-        "Client-Id": config.twitch.client_id,
+        Authorization: `Bearer ${config.twitch.auth.access_token}`,
+        "Client-Id": config.twitch.auth.client_id,
       },
     })
-    .then((response) => {
-      let data = response.data.data;
-      if (data.length > 0) {
-        vodData = data[0];
-      }
-    })
-    .catch(async (e) => {
-      if (!e.response) {
-        return console.error(e);
-      }
-      console.error(e.response.data);
+    .then((response) => response.data.data[0])
+    .catch((e) => {
+      console.error(e.response ? e.response.data : e);
+      return null;
     });
   return vodData;
 };
 
 module.exports.getVodData = async (vod_id) => {
   await this.checkToken();
-  let vodData;
-  await axios
+  const vodData = await axios
     .get(`https://api.twitch.tv/helix/videos?id=${vod_id}`, {
       headers: {
-        Authorization: `Bearer ${config.twitch.access_token}`,
-        "Client-Id": config.twitch.client_id,
+        Authorization: `Bearer ${config.twitch.auth.access_token}`,
+        "Client-Id": config.twitch.auth.client_id,
       },
     })
-    .then((response) => {
-      const data = response.data.data;
-      if (data.length > 0) {
-        vodData = data[0];
-      }
-    })
+    .then((response) => response.data.data[0])
     .catch((e) => {
-      if (!e.response) return console.error(e);
-      console.error(e.response.data);
+      console.error(e.response ? e.response.data : e);
+      return null;
     });
   return vodData;
 };
 
 module.exports.getGameData = async (gameId) => {
   await this.checkToken();
-  let gameData;
-  await axios
+  const gameData = await axios
     .get(`https://api.twitch.tv/helix/games?id=${gameId}`, {
       headers: {
-        Authorization: `Bearer ${config.twitch.access_token}`,
-        "Client-Id": config.twitch.client_id,
+        Authorization: `Bearer ${config.twitch.auth.access_token}`,
+        "Client-Id": config.twitch.auth.client_id,
       },
     })
-    .then((response) => {
-      let data = response.data.data;
-      if (data.length > 0) {
-        gameData = data[0];
-      }
-    })
-    .catch(async (e) => {
-      if (!e.response) {
-        return console.error(e);
-      }
-      console.error(e.response.data);
+    .then((response) => response.data.data[0])
+    .catch((e) => {
+      console.error(e.response ? e.response.data : e);
+      return null;
     });
   return gameData;
 };
 
 module.exports.fetchComments = async (vodId, offset = 0) => {
-  let data;
-  await axios
+  const data = await axios
     .get(
       `https://api.twitch.tv/v5/videos/${vodId}/comments?content_offset_seconds=${offset}`,
       {
@@ -333,42 +174,31 @@ module.exports.fetchComments = async (vodId, offset = 0) => {
         },
       }
     )
-    .then((response) => {
-      data = response.data;
-    })
-    .catch(async (e) => {
-      if (!e.response) {
-        return console.error(e);
-      }
-      console.error(e.response.data);
+    .then((response) => response.data)
+    .catch((e) => {
+      console.error(e.response ? e.response.data : e);
+      return null;
     });
   return data;
 };
 
 module.exports.fetchNextComments = async (vodId, cursor) => {
-  const interceptorId = rax.attach();
-  let data;
-  await axios
+  const data = await axios
     .get(`https://api.twitch.tv/v5/videos/${vodId}/comments?cursor=${cursor}`, {
       headers: {
         "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko",
       },
     })
-    .then((response) => {
-      data = response.data;
-    })
-    .catch(async (e) => {
-      if (!e.response) {
-        return console.error(e);
-      }
-      console.error(e.response.data);
+    .then((response) => response.data)
+    .catch((e) => {
+      console.error(e.response ? e.response.data : e);
+      return null;
     });
   return data;
 };
 
 module.exports.getChapters = async (vodID) => {
-  let data;
-  await axios({
+  const data = await axios({
     url: "https://gql.twitch.tv/gql",
     method: "POST",
     headers: {
@@ -392,20 +222,17 @@ module.exports.getChapters = async (vodID) => {
   })
     .then((response) => {
       if (!response.data.data.video) return null;
-      data = response.data.data.video.moments.edges;
+      return response.data.data.video.moments.edges;
     })
-    .catch(async (e) => {
-      if (!e.response) {
-        return console.error(e);
-      }
-      console.error(e.response.data);
+    .catch((e) => {
+      console.error(e.response ? e.response.data : e);
+      return null;
     });
   return data;
 };
 
 module.exports.getChapter = async (vodID) => {
-  let data;
-  await axios({
+  const data = await axios({
     url: "https://gql.twitch.tv/gql",
     method: "POST",
     headers: {
@@ -432,65 +259,55 @@ module.exports.getChapter = async (vodID) => {
       },
     },
   })
-    .then((response) => {
-      data = response.data.data.video;
-    })
-    .catch(async (e) => {
-      if (!e.response) {
-        return console.error(e);
-      }
-      console.error(e.response.data);
+    .then((response) => (data = response.data.data.video))
+    .catch((e) => {
+      console.error(e.response ? e.response.data : e);
+      return null;
     });
   return data;
 };
 
 module.exports.getStream = async (twitchId) => {
   await this.checkToken();
-  let stream;
-  await axios
+  const stream = await axios
     .get(`https://api.twitch.tv/helix/streams?user_id=${twitchId}`, {
       headers: {
-        Authorization: `Bearer ${config.twitch.access_token}`,
-        "Client-Id": config.twitch.client_id,
+        Authorization: `Bearer ${config.twitch.auth.access_token}`,
+        "Client-Id": config.twitch.auth.client_id,
       },
     })
-    .then((response) => {
-      stream = response.data.data;
-    })
+    .then((response) => response.data.data)
     .catch((e) => {
-      if (!e.response) return console.error(e);
-      console.error(e.response.data);
+      console.error(e.response ? e.response.data : e);
+      return null;
     });
   return stream;
 };
 
 module.exports.getChannelBadges = async () => {
   await this.checkToken();
-  let badges;
-  await axios
+  const badges = await axios
     .get(
       `https://api.twitch.tv/helix/chat/badges?broadcaster_id=${config.twitchId}`,
       {
         headers: {
-          Authorization: `Bearer ${config.twitch.access_token}`,
-          "Client-Id": config.twitch.client_id,
+          Authorization: `Bearer ${config.twitch.auth.access_token}`,
+          "Client-Id": config.twitch.auth.client_id,
         },
       }
     )
-    .then((response) => {
-      badges = response.data.data;
-    })
+    .then((response) => response.data.data)
     .catch((e) => {
-      if (!e.response) return console.error(e);
-      console.error(e.response.data);
+      console.error(e.response ? e.response.data : e);
+      return null;
     });
   return badges;
 };
 
 module.exports.badges = function (app) {
-  const self = this;
+  const _this = this;
   return async function (req, res, next) {
-    const badges = await self.getChannelBadges();
+    const badges = await _this.getChannelBadges();
 
     if (!badges)
       return res.status(500).json({

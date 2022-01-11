@@ -3,33 +3,9 @@ const fs = require("fs");
 const readline = require("readline");
 const path = require("path");
 const { google } = require("googleapis");
-const OAuth2 = google.auth.OAuth2;
-const oauth2Client = new OAuth2(
-  config.google.client_id,
-  config.google.client_secret,
-  config.google.redirect_url
-);
-oauth2Client.on("tokens", (tokens) => {
-  if (tokens.refresh_token) {
-    config.drive.refresh_token = tokens.refresh_token;
-  }
-  config.drive.access_token = tokens.access_token;
-  fs.writeFile(
-    path.resolve(__dirname, "../../config/config.json"),
-    JSON.stringify(config, null, 4),
-    (err) => {
-      if (err) return console.error(err);
-      console.info("Refreshed Drive Token");
-    }
-  );
-  oauth2Client.setCredentials({
-    refresh_token: tokens.refresh_token,
-    access_token: tokens.access_token,
-  });
-});
 
 module.exports.upload = async (vodId, path, app) => {
-  oauth2Client.credentials = config.drive;
+  const oauth2Client = app.get("googleOauth2Client");
   const drive = google.drive({
     version: "v3",
     auth: oauth2Client,
@@ -116,7 +92,7 @@ module.exports.download = async (vodId, type, app) => {
     );
 
   console.info(`Drive Download: ${driveId} for ${type} ${vodId}`);
-  oauth2Client.credentials = config.drive;
+  const oauth2Client = app.get("googleOauth2Client");
   const drive = google.drive({
     version: "v3",
     auth: oauth2Client,
