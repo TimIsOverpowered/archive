@@ -2,7 +2,6 @@
 const { Logs } = require("./logs.class");
 const createModel = require("../../models/logs.model");
 const hooks = require("./logs.hooks");
-const rateLimit = require("express-rate-limit");
 
 module.exports = function (app) {
   const options = {
@@ -15,20 +14,7 @@ module.exports = function (app) {
   };
 
   // Initialize our service with any options it requires
-  app.use(
-    "/logs",
-    rateLimit({
-      windowMs: 5 * 1000,
-      max: 15,
-      message: "API rate limit exceeded",
-      keyGenerator: function (req) {
-        //for cloudflare
-        //return req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-        return req.headers["x-forwarded-for"] || req.connection.remoteAddress;
-      },
-    }),
-    new Logs(options, app)
-  );
+  app.use("/logs", new Logs(options, app));
 
   // Get our initialized service so that we can register hooks
   const service = app.service("logs");

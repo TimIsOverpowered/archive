@@ -10,7 +10,8 @@
   "ADMIN_API_KEY": "YOUR_ADMIN_API_KEY",
   "redis": {
     "host": "127.0.0.1",
-    "port": 6379
+    "port": 6379,
+    "useSocket": false,
+    "path": "/tmp/redis.sock"
   }
 }
-  

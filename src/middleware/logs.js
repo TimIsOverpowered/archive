@@ -33,26 +33,24 @@ module.exports = function (app) {
         })
         .then((data) => {
           if (data.length === 0) return;
-          if (data.length === 101) {
+          if (data.length === 101)
             cursor = Buffer.from(
               JSON.stringify({
                 id: data[100]._id,
                 content_offset_seconds: data[100].content_offset_seconds,
               })
             ).toString("base64");
-          }
           logs = data.slice(0, 100);
         })
         .catch((e) => {
           console.error(e);
         });
 
-      if (!logs) {
+      if (!logs)
         return res.status(500).json({
           error: true,
           msg: "Failed to retrieve logs from the database",
         });
-      }
 
       return res.json({
         comments: logs,
@@ -105,12 +103,11 @@ module.exports = function (app) {
         console.error(e);
       });
 
-    if (!logs) {
+    if (!logs)
       return res.status(500).json({
         error: true,
         msg: "Failed to retrieve logs from the database",
       });
-    }
 
     return res.json({
       comments: logs,

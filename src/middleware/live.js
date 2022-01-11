@@ -2,15 +2,6 @@ const vod = require("./vod");
 const config = require("../../config/config.json");
 const fs = require("fs");
 
-process.on("unhandledRejection", function (reason, p) {
-  console.log(
-    "Possibly Unhandled Rejection at: Promise ",
-    p,
-    " reason: ",
-    reason
-  );
-});
-
 module.exports = function (app) {
   return async function (req, res, next) {
     if (!req.body.driveId)
@@ -59,13 +50,14 @@ module.exports = function (app) {
         console.error(e);
       });
 
-    if (config.multiTrack)
+    if (config.youtube.multiTrack)
       await vod.upload(vod_data.id, app, req.body.path, "live");
 
-    await fs.promises
-      .rmdir(req.body.path, {
-        recursive: true,
-      })
-      .catch((e) => console.error(e));
+    if (config.delete)
+      await fs.promises
+        .rmdir(req.body.path, {
+          recursive: true,
+        })
+        .catch((e) => console.error(e));
   };
 };
