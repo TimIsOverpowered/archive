@@ -14,7 +14,7 @@ module.exports.check = async (app) => {
   const redisClient = app.get("redisClient");
   const downloading = await redisClient
     .get(`${config.channel}-downloading`)
-    .then(() => true)
+    .then((data) => data)
     .catch(() => false);
   if (downloading)
     return setTimeout(() => {
@@ -64,13 +64,7 @@ module.exports.check = async (app) => {
         createdAt: vodData.created_at,
         stream_id: vodData.stream_id,
       })
-      .then(() =>
-        console.log(
-          `${
-            config.channel
-          } went online. Creating vod. ${new Date().toLocaleDateString()}`
-        )
-      )
+      .then(() => console.log(`${config.channel} went online. Creating vod. ${new Date().toLocaleDateString()}`))
       .catch((e) => {
         console.error(e);
       });
