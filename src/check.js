@@ -72,9 +72,8 @@ module.exports.check = async (app) => {
 
   const dir = `${config.vodPath}/${vodData.id}`;
   if (await fileExists(dir))
-    await fs.promises.rmdir(dir, {
+    await fs.promises.rm(dir, {
       recursive: true,
-      force: true,
     });
   vod.startDownload(vodData.id, app);
 
