@@ -11,12 +11,7 @@ const youtube = require("./youtube");
 const moment = require("moment");
 const emotes = require("./emotes");
 
-module.exports.upload = async (
-  vodId,
-  app,
-  manualPath = false,
-  type = "vod"
-) => {
+module.exports.upload = async (vodId, app, manualPath = false, type = "vod") => {
   let vod;
   await app
     .service("vods")
@@ -26,42 +21,28 @@ module.exports.upload = async (
     })
     .catch(() => {});
 
-  if (!vod)
-    return console.error("Failed to download video: no VOD in database");
+  if (!vod) return console.error("Failed to download video: no VOD in database");
 
-  const vodPath = manualPath
-    ? manualPath
-    : await drive.download(vodId, type, app);
+  const vodPath = manualPath ? manualPath : await drive.download(vodId, type, app);
 
-  if (!vodPath)
-    return console.error(`Could not find a download source for ${vodId}`);
+  if (!vodPath) return console.error(`Could not find a download source for ${vodId}`);
 
   if (config.youtube.perGameUpload) {
     for (let chapter of vod.chapters) {
       console.info(`Trimming ${chapter.name} from ${vod.id} ${vod.date}`);
-      const trimmedPath = await this.trim(
-        vodPath,
-        vodId,
-        chapter.start,
-        chapter.end
-      );
+      const trimmedPath = await this.trim(vodPath, vodId, chapter.start, chapter.end);
 
       if (!trimmedPath) return console.error("Trim failed");
 
       if (chapter.end > config.youtube.splitDuration) {
         let paths = await this.splitVideo(trimmedPath, chapter.end, vodId);
-        if (!paths)
-          return console.error(
-            "Something went wrong trying to split the trimmed video"
-          );
+        if (!paths) return console.error("Something went wrong trying to split the trimmed video");
 
         for (let i = 0; i < paths.length; i++) {
           await youtube.upload(
             {
               paths: paths[i],
-              title: `${config.channel} plays ${chapter.name} ${
-                vod.date
-              } PART ${i + 1}`,
+              title: `${config.channel} plays ${chapter.name} ${vod.date} PART ${i + 1}`,
               type: "vod",
               public: true,
               duration: await getDuration(paths[i]),
@@ -75,9 +56,7 @@ module.exports.upload = async (
         await youtube.upload(
           {
             paths: trimmedPath,
-            title: `${config.channel} plays ${chapter.name} ${vod.date} PART ${
-              i + 1
-            }`,
+            title: `${config.channel} plays ${chapter.name} ${vod.date} PART ${i + 1}`,
             type: "vod",
             public: true,
             duration: await getDuration(trimmedPath),
@@ -95,23 +74,14 @@ module.exports.upload = async (
   if (duration > config.youtube.splitDuration) {
     let paths = await this.splitVideo(vodPath, duration, vodId);
 
-    if (!paths)
-      return console.error("Something went wrong trying to split the video");
+    if (!paths) return console.error("Something went wrong trying to split the video");
 
     for (let i = 0; i < paths.length; i++) {
       const data = {
         path: paths[i],
-        title:
-          type === "vod"
-            ? `${config.channel} ${vod.date} Vod PART ${i + 1}`
-            : `${config.channel} ${vod.date} Live Vod PART ${i + 1}`,
+        title: type === "vod" ? `${config.channel} ${vod.date} Vod PART ${i + 1}` : `${config.channel} ${vod.date} Live Vod PART ${i + 1}`,
         type: type,
-        public:
-          config.youtube.multiTrack && type === "live"
-            ? true
-            : !config.youtube.multiTrack && type === "vod"
-            ? true
-            : false,
+        public: config.youtube.multiTrack && type === "live" ? true : !config.youtube.multiTrack && type === "vod" ? true : false,
         duration: await getDuration(paths[i]),
         vod: vod,
         part: i + 1,
@@ -126,16 +96,8 @@ module.exports.upload = async (
 
   const data = {
     path: vodPath,
-    title:
-      type === "vod"
-        ? `${config.channel} ${vod.date} Vod`
-        : `${config.channel} ${vod.date} Live Vod`,
-    public:
-      config.youtube.multiTrack && type === "live"
-        ? true
-        : !config.youtube.multiTrack && type === "vod"
-        ? true
-        : false,
+    title: type === "vod" ? `${config.channel} ${vod.date} Vod` : `${config.channel} ${vod.date} Live Vod`,
+    public: config.youtube.multiTrack && type === "live" ? true : !config.youtube.multiTrack && type === "vod" ? true : false,
     duration: duration,
     vod: vod,
     type: type,
@@ -146,15 +108,7 @@ module.exports.upload = async (
   await youtube.saveChapters(vodId, app, type);
 };
 
-module.exports.liveUploadPart = async (
-  app,
-  vodId,
-  m3u8Path,
-  start,
-  end,
-  part,
-  type = "vod"
-) => {
+module.exports.liveUploadPart = async (app, vodId, m3u8Path, start, end, part, type = "vod") => {
   let vod;
   await app
     .service("vods")
@@ -164,28 +118,17 @@ module.exports.liveUploadPart = async (
     })
     .catch(() => {});
 
-  if (!vod)
-    return console.error("Failed in liveUploadPart: no VOD in database");
+  if (!vod) return console.error("Failed in liveUploadPart: no VOD in database");
 
-  console.info(
-    `Trimming ${vod.id} ${vod.date} | Start time: ${start} | Duration: ${end}`
-  );
+  console.info(`Trimming ${vod.id} ${vod.date} | Start time: ${start} | Duration: ${end}`);
   let trimmedPath = await this.trimHLS(m3u8Path, vodId, start, end);
 
   if (!trimmedPath) return console.error("Trim failed");
 
   const data = {
     path: trimmedPath,
-    title:
-      type === "vod"
-        ? `${config.channel} ${vod.date} Vod Part ${part}`
-        : `${config.channel} ${vod.date} Live Vod Part ${part}`,
-    public:
-      config.youtube.multiTrack && type === "live"
-        ? true
-        : !config.youtube.multiTrack && type === "vod"
-        ? true
-        : false,
+    title: type === "vod" ? `${config.channel} ${vod.date} Vod Part ${part}` : `${config.channel} ${vod.date} Live Vod Part ${part}`,
+    public: config.youtube.multiTrack && type === "live" ? true : !config.youtube.multiTrack && type === "vod" ? true : false,
     duration: await getDuration(trimmedPath),
     vod: vod,
     type: type,
@@ -201,8 +144,7 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
   for (let start = 0; start < duration; start += config.youtube.splitDuration) {
     await new Promise((resolve, reject) => {
       let cut = duration - start;
-      if (cut > config.youtube.splitDuration)
-        cut = config.youtube.splitDuration;
+      if (cut > config.youtube.splitDuration) cut = config.youtube.splitDuration;
       const ffmpeg_process = ffmpeg(vodPath);
       ffmpeg_process
         .seekOutput(start)
@@ -214,9 +156,7 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
           if ((process.env.NODE_ENV || "").trim() !== "production") {
             readline.clearLine(process.stdout, 0);
             readline.cursorTo(process.stdout, 0, null);
-            process.stdout.write(
-              `SPLIT VIDEO PROGRESS: ${Math.round(progress.percent)}%`
-            );
+            process.stdout.write(`SPLIT VIDEO PROGRESS: ${Math.round(progress.percent)}%`);
           }
         })
         .on("start", (cmd) => {
@@ -256,9 +196,7 @@ module.exports.trim = async (vodPath, vodId, start, end) => {
         if ((process.env.NODE_ENV || "").trim() !== "production") {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
-          process.stdout.write(
-            `TRIM VIDEO PROGRESS: ${Math.round(progress.percent)}%`
-          );
+          process.stdout.write(`TRIM VIDEO PROGRESS: ${Math.round(progress.percent)}%`);
         }
       })
       .on("start", (cmd) => {
@@ -293,20 +231,13 @@ module.exports.trimHLS = async (vodPath, vodId, start, end) => {
       .seekOutput(start)
       .videoCodec("copy")
       .audioCodec("copy")
-      .outputOptions([
-        "-bsf:a aac_adtstoasc",
-        "-copyts",
-        "-start_at_zero",
-        `-t ${end}`,
-      ])
+      .outputOptions(["-bsf:a aac_adtstoasc", "-copyts", "-start_at_zero", `-t ${end}`])
       .toFormat("mp4")
       .on("progress", (progress) => {
         if ((process.env.NODE_ENV || "").trim() !== "production") {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
-          process.stdout.write(
-            `TRIM HLS VIDEO PROGRESS: ${Math.round(progress.percent)}%`
-          );
+          process.stdout.write(`TRIM HLS VIDEO PROGRESS: ${Math.round(progress.percent)}%`);
         }
       })
       .on("start", (cmd) => {
@@ -362,8 +293,7 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
         },
       })
       .then((data) => {
-        if (data.length > 0)
-          offset = data[data.length - 1].content_offset_seconds;
+        if (data.length > 0) offset = data[data.length - 1].content_offset_seconds;
       })
       .catch((e) => {
         console.error(e);
@@ -398,9 +328,7 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
       break;
     }
     if ((process.env.NODE_ENV || "").trim() !== "production") {
-      console.info(
-        `Current Log position: ${response.comments[0].content_offset_seconds}`
-      );
+      console.info(`Current Log position: ${response.comments[0].content_offset_seconds}`);
     }
     for (let comment of response.comments) {
       const exists = await commentExists(comment._id, app);
@@ -411,9 +339,7 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
           .create(comments)
           .then(() => {
             if ((process.env.NODE_ENV || "").trim() !== "production") {
-              console.info(
-                `\nSaved ${comments.length} comments in DB for vod ${vodId}`
-              );
+              console.info(`\nSaved ${comments.length} comments in DB for vod ${vodId}`);
             }
           })
           .catch((e) => {
@@ -444,9 +370,7 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
       .create(comments)
       .then(() => {
         if ((process.env.NODE_ENV || "").trim() !== "production") {
-          console.info(
-            `Finished current log position: ${response.comments[0].content_offset_seconds}`
-          );
+          console.info(`Finished current log position: ${response.comments[0].content_offset_seconds}`);
         }
       })
       .catch((e) => {
@@ -500,8 +424,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
     })
     .catch(() => {});
 
-  if (!vod)
-    return console.error("Failed to download video: no VOD in database");
+  if (!vod) return console.error("Failed to download video: no VOD in database");
 
   if (m3u8Exists) {
     duration = await getDuration(m3u8Path);
@@ -518,14 +441,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
     if (vod_youtube_data.length < noOfParts) {
       for (let i = 0; i < noOfParts; i++) {
         if (vod_youtube_data[i]) continue;
-        await this.liveUploadPart(
-          app,
-          vodId,
-          m3u8Path,
-          config.youtube.splitDuration * i,
-          config.youtube.splitDuration,
-          i + 1
-        );
+        await this.liveUploadPart(app, vodId, m3u8Path, config.youtube.splitDuration * i, config.youtube.splitDuration, i + 1);
       }
     }
   }
@@ -551,41 +467,25 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
         for (let i = 0; i < vod_youtube_data.length; i++) {
           startTime += vod_youtube_data[i].duration;
         }
-        await this.liveUploadPart(
-          app,
-          vodId,
-          m3u8Path,
-          startTime,
-          duration - startTime,
-          vod_youtube_data.length + 1
-        );
+        await this.liveUploadPart(app, vodId, m3u8Path, startTime, duration - startTime, vod_youtube_data.length + 1);
       } else {
         for (let i = 0; i < vod.youtube.length; i++) {
           startTime += vod.youtube[i].duration;
         }
-        await this.liveUploadPart(
-          app,
-          vodId,
-          m3u8Path,
-          startTime,
-          duration - startTime,
-          vod.youtube.length + 1
-        );
+        await this.liveUploadPart(app, vodId, m3u8Path, startTime, duration - startTime, vod.youtube.length + 1);
       }
       await youtube.saveChapters(vodId, app, "vod");
       setTimeout(async () => {
         await youtube.saveParts(vodId, app, "vod");
       }, 30000);
-      await fs.promises.rmdir(dir, {
+      await fs.promises.rm(dir, {
         recursive: true,
-        force: true,
       });
       return;
     }
     await this.upload(vodId, app, mp4Path);
-    await fs.promises.rmdir(dir, {
+    await fs.promises.rm(dir, {
       recursive: true,
-      force: true,
     });
     return;
   }
@@ -598,11 +498,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
     return console.error(`failed to get token/sig for ${vodId}`);
   }
 
-  let newVideoM3u8 = await twitch.getM3u8(
-    vodId,
-    tokenSig.value,
-    tokenSig.signature
-  );
+  let newVideoM3u8 = await twitch.getM3u8(vodId, tokenSig.value, tokenSig.signature);
   if (!newVideoM3u8) {
     setTimeout(() => {
       download(vodId, app, retry, delay);
@@ -662,11 +558,8 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
 
   //retry if last segment is the same as on file m3u8 and if the actual segment exists.
   if (
-    variantM3u8.segments[variantM3u8.segments.length - 1].uri ===
-      videoM3u8.segments[videoM3u8.segments.length - 1].uri &&
-    (await fileExists(
-      `${dir}/${variantM3u8.segments[variantM3u8.segments.length - 1].uri}`
-    ))
+    variantM3u8.segments[variantM3u8.segments.length - 1].uri === videoM3u8.segments[videoM3u8.segments.length - 1].uri &&
+    (await fileExists(`${dir}/${variantM3u8.segments[variantM3u8.segments.length - 1].uri}`))
   ) {
     retry++;
     setTimeout(() => {
@@ -687,10 +580,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
 const checkForUnmutedTS = (m3u8) => {
   for (let segment of m3u8.segments) {
     if (segment.uri.includes("unmuted")) {
-      m3u8.segments[segment] = `${segment.uri.substring(
-        0,
-        segment.uri.indexOf("-unmuted")
-      )}.ts`;
+      m3u8.segments[segment] = `${segment.uri.substring(0, segment.uri.indexOf("-unmuted"))}.ts`;
     }
   }
   return m3u8;
@@ -721,11 +611,7 @@ const downloadTSFiles = async (m3u8, dir, baseURL, vodId) => {
       });
   }
   if ((process.env.NODE_ENV || "").trim() !== "production") {
-    console.info(
-      `Done downloading.. Last segment was ${
-        m3u8.segments[m3u8.segments.length - 1].uri
-      }`
-    );
+    console.info(`Done downloading.. Last segment was ${m3u8.segments[m3u8.segments.length - 1].uri}`);
   }
 };
 
@@ -741,9 +627,7 @@ module.exports.convertToMp4 = async (m3u8, vodId, mp4Path) => {
         if ((process.env.NODE_ENV || "").trim() !== "production") {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
-          process.stdout.write(
-            `M3U8 CONVERT TO MP4 PROGRESS: ${Math.round(progress.percent)}%`
-          );
+          process.stdout.write(`M3U8 CONVERT TO MP4 PROGRESS: ${Math.round(progress.percent)}%`);
         }
       })
       .on("start", (cmd) => {
@@ -798,8 +682,7 @@ const saveDuration = async (vodId, duration, app) => {
 
 module.exports.saveChapters = async (vodId, app, duration) => {
   const chapters = await twitch.getChapters(vodId);
-  if (!chapters)
-    return console.error("Failed to save chapters: Chapters is null");
+  if (!chapters) return console.error("Failed to save chapters: Chapters is null");
 
   let newChapters = [];
   if (chapters.length === 0) {
@@ -817,23 +700,11 @@ module.exports.saveChapters = async (vodId, app, duration) => {
     for (let chapter of chapters) {
       newChapters.push({
         gameId: chapter.node.details.game ? chapter.node.details.game.id : null,
-        name: chapter.node.details.game
-          ? chapter.node.details.game.displayName
-          : null,
-        image: chapter.node.details.game
-          ? chapter.node.details.game.boxArtURL
-          : null,
-        duration: moment
-          .utc(chapter.node.positionMilliseconds)
-          .format("HH:mm:ss"),
-        start:
-          chapter.node.positionMilliseconds === 0
-            ? chapter.node.positionMilliseconds / 1000
-            : chapter.node.positionMilliseconds / 1000,
-        end:
-          chapter.node.durationMilliseconds === 0
-            ? duration
-            : chapter.node.durationMilliseconds / 1000,
+        name: chapter.node.details.game ? chapter.node.details.game.displayName : null,
+        image: chapter.node.details.game ? chapter.node.details.game.boxArtURL : null,
+        duration: moment.utc(chapter.node.positionMilliseconds).format("HH:mm:ss"),
+        start: chapter.node.positionMilliseconds === 0 ? chapter.node.positionMilliseconds / 1000 : chapter.node.positionMilliseconds / 1000,
+        end: chapter.node.durationMilliseconds === 0 ? duration : chapter.node.durationMilliseconds / 1000,
       });
     }
   }
@@ -875,11 +746,7 @@ module.exports.getLogs = async (vodId, app) => {
     if ((process.env.NODE_ENV || "").trim() !== "production") {
       readline.clearLine(process.stdout, 0);
       readline.cursorTo(process.stdout, 0, null);
-      process.stdout.write(
-        `Current Log position: ${moment
-          .utc(response.comments[0].content_offset_seconds * 1000)
-          .format("HH:mm:ss")}`
-      );
+      process.stdout.write(`Current Log position: ${moment.utc(response.comments[0].content_offset_seconds * 1000).format("HH:mm:ss")}`);
     }
     response = await twitch.fetchNextComments(vodId, cursor);
     if (!response) {
@@ -894,9 +761,7 @@ module.exports.getLogs = async (vodId, app) => {
           .create(comments)
           .then(() => {
             if ((process.env.NODE_ENV || "").trim() !== "production") {
-              console.info(
-                `\nSaved ${comments.length} comments in DB for vod ${vodId}`
-              );
+              console.info(`\nSaved ${comments.length} comments in DB for vod ${vodId}`);
             }
           })
           .catch((e) => {
@@ -921,11 +786,7 @@ module.exports.getLogs = async (vodId, app) => {
     await sleep(50); //don't bombarade the api
     howMany++;
   }
-  console.info(
-    `\nTotal API Calls: ${howMany} | Total Time to get logs for ${vodId}: ${
-      (new Date() - start_time) / 1000
-    } seconds`
-  );
+  console.info(`\nTotal API Calls: ${howMany} | Total Time to get logs for ${vodId}: ${(new Date() - start_time) / 1000} seconds`);
 
   await app
     .service("logs")
