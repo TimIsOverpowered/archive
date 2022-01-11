@@ -5,7 +5,7 @@ const path = require("path");
 const { google } = require("googleapis");
 
 module.exports.upload = async (vodId, path, app) => {
-  const oauth2Client = app.get("googleOauth2Client");
+  const oauth2Client = app.get("driveOauth2Client");
   const drive = google.drive({
     version: "v3",
     auth: oauth2Client,
@@ -92,7 +92,7 @@ module.exports.download = async (vodId, type, app) => {
     );
 
   console.info(`Drive Download: ${driveId} for ${type} ${vodId}`);
-  const oauth2Client = app.get("googleOauth2Client");
+  const oauth2Client = app.get("driveOauth2Client");
   const drive = google.drive({
     version: "v3",
     auth: oauth2Client,

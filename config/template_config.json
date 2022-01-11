@@ -11,14 +11,7 @@
   "google": {
     "client_id": "",
     "client_secret": "",
-    "redirect_url": "",
-    "auth": {
-      "access_token": "",
-      "scope": "",
-      "token_type": "Bearer",
-      "expires_in": 3599,
-      "refresh_token": ""
-    }
+    "redirect_url": ""
   },
   "youtube": {
     "description": "",
@@ -27,17 +20,32 @@
     "splitDuration": 10800,
     "api_key": "",
     "liveUpload": false,
-    "multiTrack": false
+    "multiTrack": false,
+    "upload": true,
+    "auth": {
+      "access_token": "",
+      "scope": "https://www.googleapis.com/auth/youtube.force-ssl https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.upload",
+      "token_type": "Bearer",
+      "expires_in": 3599,
+      "refresh_token": ""
+    }
   },
   "channel": "",
   "domain_name": "",
-  "vodPath": "",
-  "livePath": "",
-  "delete": true,
+  "vodPath": "/mnt/vods",
+  "livePath": "/mnt/live",
   "timezone": "America/Chicago",
   "chatDownload": false,
+  "vodDownload": true,
   "drive": {
     "upload": false,
-    "parents": [""]
+    "parents": [""],
+    "auth": {
+      "access_token": "",
+      "scope": "https://www.googleapis.com/auth/drive",
+      "token_type": "Bearer",
+      "expires_in": 3599,
+      "refresh_token": ""
+    }
   }
 }

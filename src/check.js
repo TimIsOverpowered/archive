@@ -11,16 +11,6 @@ const fileExists = async (file) => {
 };
 
 module.exports.check = async (app) => {
-  const redisClient = app.get("redisClient");
-  const downloading = await redisClient
-    .get(`${config.channel}-downloading`)
-    .then((data) => data)
-    .catch(() => false);
-  if (downloading)
-    return setTimeout(() => {
-      this.check(app);
-    }, 30000);
-
   const twitchId = config.twitch.id;
   const stream = await twitch.getStream(twitchId);
 
@@ -46,9 +36,10 @@ module.exports.check = async (app) => {
       this.check(app);
     }, 30000);
 
+  const vodId = vodData.id;
   const vodExists = await app
     .service("vods")
-    .get(vodData.id)
+    .get(vodId)
     .then(() => true)
     .catch(() => false);
 
@@ -56,7 +47,7 @@ module.exports.check = async (app) => {
     await app
       .service("vods")
       .create({
-        id: vodData.id,
+        id: vodId,
         title: vodData.title,
         date: new Date(vodData.created_at).toLocaleDateString("en-US", {
           timeZone: config.timezone,
@@ -70,12 +61,34 @@ module.exports.check = async (app) => {
       });
   }
 
-  const dir = `${config.vodPath}/${vodData.id}`;
-  if (await fileExists(dir))
-    await fs.promises.rm(dir, {
-      recursive: true,
-    });
-  vod.startDownload(vodData.id, app);
+  const redisClient = app.get("redisClient");
+
+  const vodDownloading = await redisClient
+    .get(`${config.channel}-vod-downloading`)
+    .then((data) => data)
+    .catch(() => false);
+
+  if (config.vodDownload && !vodDownloading) {
+    redisClient.set(`${config.channel}-vod-downloading`, 1);
+    const dir = `${config.vodPath}/${vodId}`;
+    if (await fileExists(dir))
+      await fs.promises.rm(dir, {
+        recursive: true,
+      });
+    console.info(`Start Vod download: ${vodId}`);
+    vod.download(vodId, app);
+  }
+
+  const chatDownloading = await redisClient
+    .get(`${config.channel}-chat-downloading`)
+    .then((data) => data)
+    .catch(() => false);
+
+  if (config.chatDownload && !chatDownloading) {
+    redisClient.set(`${config.channel}-chat-downloading`, 1);
+    console.info(`Start Logs download: ${vodId}`);
+    vod.downloadLogs(vodId, app);
+  }
 
   setTimeout(() => {
     this.check(app);

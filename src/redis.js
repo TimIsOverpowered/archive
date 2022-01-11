@@ -14,7 +14,10 @@ module.exports = async function (app) {
 
   await client
     .connect()
-    .then(() => client.DEL(`${config.channel}-downloading`))
+    .then(() => {
+      client.DEL(`${config.channel}-vod-downloading`)
+      client.DEL(`${config.channel}-chat-downloading`)
+    })
     .catch((e) => console.error(e));
 
   app.set("redisClient", client);

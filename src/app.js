@@ -23,7 +23,8 @@ const app = express(feathers());
 // Load app configuration
 app.configure(configuration());
 app.configure(redis);
-google.initialize(app);
+google.initializeYt(app);
+google.initializeDrive(app);
 // Enable security, CORS, compression, favicon and body parsing
 app.use(
   helmet({
@@ -58,7 +59,7 @@ app.configure(channels);
 
 // Configure a middleware for 404s and the error handler
 app.use(function (req, res, next) {
-  res.status(404).send("Sorry can't find that!");
+  res.status(404).json({ error: true, msg: "Missing route" });
 });
 app.use(express.errorHandler({ logger }));
 

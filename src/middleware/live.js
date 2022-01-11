@@ -45,10 +45,5 @@ module.exports = function (app) {
       });
 
     if (config.youtube.multiTrack) await vod.upload(vod_data.id, app, req.body.path, "live");
-
-    if (config.delete)
-      await fs.promises.rm(dir, {
-        recursive: true,
-      });
   };
 };

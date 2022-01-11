@@ -88,8 +88,10 @@ module.exports.upload = async (vodId, app, manualPath = false, type = "vod") => 
       };
       await youtube.upload(data, app);
     }
-    await youtube.saveChapters(vodId, app, type);
-    setTimeout(youtube.saveParts(vodId, app, type), 30000);
+    setTimeout(async () => {
+      await youtube.saveChapters(vodId, app, type);
+      setTimeout(youtube.saveParts(vodId, app, type), 30000);
+    }, 30000);
     fs.unlinkSync(vodPath);
     return;
   }
@@ -105,7 +107,9 @@ module.exports.upload = async (vodId, app, manualPath = false, type = "vod") => 
   };
 
   await youtube.upload(data, app);
-  await youtube.saveChapters(vodId, app, type);
+  setTimeout(async () => {
+    await youtube.saveChapters(vodId, app, type);
+  }, 30000);
 };
 
 module.exports.liveUploadPart = async (app, vodId, m3u8Path, start, end, part, type = "vod") => {
@@ -136,6 +140,12 @@ module.exports.liveUploadPart = async (app, vodId, m3u8Path, start, end, part, t
   };
 
   await youtube.upload(data, app);
+  setTimeout(async () => {
+    await youtube.saveChapters(vodId, app, type);
+    setTimeout(async () => {
+      await youtube.saveParts(vodId, app, type);
+    }, 30000);
+  }, 30000);
 };
 
 module.exports.splitVideo = async (vodPath, duration, vodId) => {
@@ -277,10 +287,12 @@ const sleep = (ms) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
-const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
+module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
   let comments = [],
     response,
     lastCursor;
+
+  const redisClient = app.get("redisClient");
 
   if (!cursor) {
     let offset = 0;
@@ -300,7 +312,11 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
       });
     response = await twitch.fetchComments(vodId, offset);
 
-    if (!response) return console.error(`No Comments found for ${vodId}`);
+    if (!response) {
+      redisClient.del(`${config.channel}-chat-downloading`);
+      emotes.save(vodId, app);
+      return console.error(`No Comments found for ${vodId}`);
+    }
 
     for (let comment of response.comments) {
       if (await commentExists(comment._id, app)) continue;
@@ -383,34 +399,25 @@ const downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
 
   if (stream && stream[0]) {
     setTimeout(() => {
-      downloadLogs(vodId, app, lastCursor);
+      this.downloadLogs(vodId, app, lastCursor);
     }, 1000 * 60 * 1);
     //retry for next 10 mins if not live anymore to catch remaining logs.
   } else if (retry < 10) {
     retry++;
     setTimeout(() => {
-      downloadLogs(vodId, app, lastCursor, retry);
+      this.downloadLogs(vodId, app, lastCursor, retry);
     }, 1000 * 60 * 1);
   } else {
     console.info(`Saved all comments in DB for vod ${vodId}`);
+    redisClient.del(`${config.channel}-chat-downloading`);
+    emotes.save(vodId, app);
   }
-};
-
-module.exports.startDownload = async (vodId, app) => {
-  console.info(`Start download: ${vodId}`);
-  download(vodId, app);
-  if (config.chatDownload) {
-    console.info(`Start Logs download: ${vodId}`);
-    downloadLogs(vodId, app);
-  }
-
-  const redisClient = app.get("redisClient");
-  redisClient.set(`${config.channel}-downloading`, 1);
 };
 
 //RETRY PARAM: Just to make sure whole vod is processed bc it takes awhile for twitch to update the vod even after a stream ends.
 //VOD TS FILES SEEMS TO UPDATE AROUND 5 MINUTES. DELAY IS TO CHECK EVERY X MIN.
-const download = async (vodId, app, retry = 0, delay = 1) => {
+module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
+  if ((process.env.NODE_ENV || "").trim() !== "production") console.info(`${vodId} Download Retry: ${retry}`);
   const dir = `${config.vodPath}/${vodId}`;
   const m3u8Path = `${dir}/${vodId}.m3u8`;
   const newVodData = await twitch.getVodData(vodId);
@@ -432,7 +439,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
     if (newVodData) await this.saveChapters(vodId, app, duration);
   }
 
-  if (duration >= config.youtube.splitDuration && config.youtube.liveUpload) {
+  if (duration >= config.youtube.splitDuration && config.youtube.liveUpload && config.youtube.upload) {
     const noOfParts = Math.floor(duration / config.youtube.splitDuration);
 
     const vod_youtube_data = vod.youtube.filter((data) => {
@@ -446,44 +453,25 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
     }
   }
 
-  if ((!newVodData && m3u8Exists) || retry >= 10) {
+  if ((!newVodData && m3u8Exists) || retry >= 0) {
     const redisClient = app.get("redisClient");
-    redisClient.del(`${config.channel}-downloading`);
-
-    //save emotes.
-    emotes.save();
+    redisClient.del(`${config.channel}-vod-downloading`);
 
     const mp4Path = `${dir}/${vodId}.mp4`;
     await this.convertToMp4(m3u8Path, vodId, mp4Path);
     if (config.drive.upload) await drive.upload(vodId, mp4Path, app);
-    if (config.youtube.liveUpload) {
+    if (config.youtube.liveUpload && config.youtube.upload) {
       //upload last part
       let startTime = 0;
 
-      if (vod.youtube.length > 0) {
-        const vod_youtube_data = vod.youtube.filter((data) => {
-          return data.type === "vod";
-        });
-        for (let i = 0; i < vod_youtube_data.length; i++) {
-          startTime += vod_youtube_data[i].duration;
-        }
-        await this.liveUploadPart(app, vodId, m3u8Path, startTime, duration - startTime, vod_youtube_data.length + 1);
-      } else {
-        for (let i = 0; i < vod.youtube.length; i++) {
-          startTime += vod.youtube[i].duration;
-        }
-        await this.liveUploadPart(app, vodId, m3u8Path, startTime, duration - startTime, vod.youtube.length + 1);
+      const vod_youtube_data = vod.youtube.filter((data) => data.type === "vod");
+      for (let i = 0; i < vod_youtube_data.length; i++) {
+        startTime += vod_youtube_data[i].duration;
       }
-      await youtube.saveChapters(vodId, app, "vod");
-      setTimeout(async () => {
-        await youtube.saveParts(vodId, app, "vod");
-      }, 30000);
-      await fs.promises.rm(dir, {
-        recursive: true,
-      });
-      return;
+      await this.liveUploadPart(app, vodId, m3u8Path, startTime, duration - startTime, vod_youtube_data.length + 1);
+    } else if (config.youtube.upload) {
+      await this.upload(vodId, app, mp4Path);
     }
-    await this.upload(vodId, app, mp4Path);
     await fs.promises.rm(dir, {
       recursive: true,
     });
@@ -493,7 +481,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
   const tokenSig = await twitch.getVodTokenSig(vodId);
   if (!tokenSig) {
     setTimeout(() => {
-      download(vodId, app, retry, delay);
+      this.download(vodId, app, retry, delay);
     }, 1000 * 60 * delay);
     return console.error(`failed to get token/sig for ${vodId}`);
   }
@@ -501,7 +489,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
   let newVideoM3u8 = await twitch.getM3u8(vodId, tokenSig.value, tokenSig.signature);
   if (!newVideoM3u8) {
     setTimeout(() => {
-      download(vodId, app, retry, delay);
+      this.download(vodId, app, retry, delay);
     }, 1000 * 60 * delay);
     return console.error("failed to get m3u8");
   }
@@ -509,7 +497,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
   let parsedM3u8 = twitch.getParsedM3u8(newVideoM3u8);
   if (!parsedM3u8) {
     setTimeout(() => {
-      download(vodId, app, retry, delay);
+      this.download(vodId, app, retry, delay);
     }, 1000 * 60 * delay);
     console.error(newVideoM3u8);
     return console.error("failed to parse m3u8");
@@ -520,7 +508,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
   let variantM3u8 = await twitch.getVariantM3u8(parsedM3u8);
   if (!variantM3u8) {
     setTimeout(() => {
-      download(vodId, app, retry, delay);
+      this.download(vodId, app, retry, delay);
     }, 1000 * 60 * delay);
     return console.error("failed to get variant m3u8");
   }
@@ -535,7 +523,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
     await downloadTSFiles(variantM3u8, dir, baseURL, vodId);
 
     setTimeout(() => {
-      download(vodId, app, retry, delay);
+      this.download(vodId, app, retry, delay);
     }, 1000 * 60 * delay);
     return;
   }
@@ -563,7 +551,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
   ) {
     retry++;
     setTimeout(() => {
-      download(vodId, app, retry, delay);
+      this.download(vodId, app, retry, delay);
     }, 1000 * 60 * delay);
     return;
   }
@@ -573,7 +561,7 @@ const download = async (vodId, app, retry = 0, delay = 1) => {
   await downloadTSFiles(variantM3u8, dir, baseURL, vodId);
 
   setTimeout(() => {
-    download(vodId, app, retry, delay);
+    this.download(vodId, app, retry, delay);
   }, 1000 * 60 * delay);
 };
 
