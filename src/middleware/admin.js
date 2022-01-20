@@ -26,11 +26,9 @@ module.exports.verify = function (app) {
 
 module.exports.download = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId)
-      return res.status(400).json({ error: true, message: "No VodId" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No VodId" });
 
-    if (!req.body.type)
-      return res.status(400).json({ error: true, message: "No type" });
+    if (!req.body.type) return res.status(400).json({ error: true, message: "No type" });
 
     const exists = await app
       .service("vods")
@@ -45,8 +43,7 @@ module.exports.download = function (app) {
     }
 
     const vodData = await twitch.getVodData(req.body.vodId);
-    if (!vodData)
-      return res.status(404).json({ error: true, message: "No Vod Data" });
+    if (!vodData) return res.status(404).json({ error: true, message: "No Vod Data" });
 
     if (vodData.user_id !== config.twitch.id)
       return res.status(400).json({
@@ -63,13 +60,7 @@ module.exports.download = function (app) {
           timeZone: config.timezone,
         }),
         createdAt: vodData.created_at,
-        duration: moment
-          .utc(
-            moment
-              .duration("PT" + vodData.duration.toUpperCase())
-              .asMilliseconds()
-          )
-          .format("HH:mm:ss"),
+        duration: moment.utc(moment.duration("PT" + vodData.duration.toUpperCase()).asMilliseconds()).format("HH:mm:ss"),
       })
       .then(() => {
         console.info(`Created vod ${vodData.id} for ${vodData.user_name}`);
@@ -86,8 +77,7 @@ module.exports.download = function (app) {
 
 module.exports.logs = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId)
-      return res.status(400).json({ error: true, message: "No VodId" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No VodId" });
 
     let total;
     app
@@ -115,12 +105,9 @@ module.exports.logs = function (app) {
 
 module.exports.delete = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId)
-      return res.status(400).json({ error: true, message: "No VodId" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No VodId" });
 
-    res
-      .status(200)
-      .json({ error: false, message: "Starting deletion process.." });
+    res.status(200).json({ error: false, message: "Starting deletion process.." });
 
     await app
       .service("vods")
@@ -150,14 +137,11 @@ module.exports.delete = function (app) {
 
 module.exports.reUploadPart = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId)
-      return res.status(400).json({ error: true, message: "No vod id" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No vod id" });
 
-    if (!req.body.part)
-      return res.status(400).json({ error: true, message: "No part" });
+    if (!req.body.part) return res.status(400).json({ error: true, message: "No part" });
 
-    if (!req.body.type)
-      return res.status(400).json({ error: true, message: "No type" });
+    if (!req.body.type) return res.status(400).json({ error: true, message: "No type" });
 
     res.status(200).json({
       error: false,
@@ -168,33 +152,14 @@ module.exports.reUploadPart = function (app) {
 
     const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
 
-    if (!driveVideo)
-      return console.error(
-        `Could not find a download source for ${req.body.vodId}`
-      );
+    if (!driveVideo) return console.error(`Could not find a download source for ${req.body.vodId}`);
 
     console.info(`Finished download`);
 
     if (req.body.type === "live") {
-      await vod.liveUploadPart(
-        app,
-        req.body.vodId,
-        driveVideo,
-        config.youtube.splitDuration * part,
-        config.youtube.splitDuration,
-        req.body.part,
-        req.body.type
-      );
+      await vod.liveUploadPart(app, req.body.vodId, driveVideo, config.youtube.splitDuration * part, config.youtube.splitDuration, req.body.part, req.body.type);
     } else {
-      await vod.liveUploadPart(
-        app,
-        req.body.vodId,
-        driveVideo,
-        config.youtube.splitDuration * part,
-        config.youtube.splitDuration,
-        req.body.part,
-        req.body.type
-      );
+      await vod.liveUploadPart(app, req.body.vodId, driveVideo, config.youtube.splitDuration * part, config.youtube.splitDuration, req.body.part, req.body.type);
     }
     fs.unlinkSync(driveVideo);
   };
@@ -202,8 +167,7 @@ module.exports.reUploadPart = function (app) {
 
 module.exports.saveChapters = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId)
-      return res.status(400).json({ error: true, message: "No vod id" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No vod id" });
 
     const vodData = await twitch.getVodData(req.body.vodId);
     if (!vodData)
@@ -212,13 +176,39 @@ module.exports.saveChapters = function (app) {
         message: `Failed to get vod data for ${req.body.vodId}`,
       });
 
-    vod.saveChapters(
-      vodData.id,
-      app,
-      moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds()
-    );
-    res
-      .status(200)
-      .json({ error: false, message: `Saving Chapters for ${req.body.vodId}` });
+    vod.saveChapters(vodData.id, app, moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds());
+    res.status(200).json({ error: false, message: `Saving Chapters for ${req.body.vodId}` });
+  };
+};
+
+module.exports.saveDuration = function (app) {
+  return async function (req, res, next) {
+    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No vod id" });
+
+    const vodData = await twitch.getVodData(req.body.vodId);
+    if (!vodData)
+      return res.status(500).json({
+        error: true,
+        message: `Failed to get vod data for ${req.body.vodId}`,
+      });
+
+    const exists = await app
+      .service("vods")
+      .get(req.body.vodId)
+      .then(() => true)
+      .catch(() => false);
+
+    if (exists) {
+      await app
+        .service("vods")
+        .patch(req.body.vodId, {
+          duration: moment.utc(moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds() * 1000).format("HH:mm:ss"),
+        })
+        .then(() => res.status(200).json({ error: false, message: "Saved duration!" }))
+        .catch(() => res.status(500).json({ error: true, message: "Failed to save duration!" }));
+      return;
+    }
+
+    res.status(404).json({ error: true, message: "Vod does not exist!" });
   };
 };

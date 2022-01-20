@@ -23,6 +23,7 @@ module.exports.saveChapters = async (vodId, app, type = "vod") => {
     version: "v3",
     auth: oauth2Client,
   });
+  await sleep(5000);
 
   let vod_data;
   await app
@@ -168,12 +169,13 @@ const sleep = (ms) => {
 module.exports.upload = async (data, app, isVod = true) => {
   const oauth2Client = app.get("ytOauth2Client");
   const youtube = google.youtube("v3");
+
   await youtube.search.list({
     auth: oauth2Client,
     part: "id,snippet",
     q: "Check if token is valid",
   });
-  await sleep(1000);
+  await sleep(5000);
 
   return new Promise(async (resolve, reject) => {
     const fileSize = fs.statSync(data.path).size;

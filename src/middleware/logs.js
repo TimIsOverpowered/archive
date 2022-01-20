@@ -25,7 +25,7 @@ module.exports = function (app) {
             content_offset_seconds: {
               $gte: content_offset_seconds,
             },
-            $limit: 101,
+            $limit: 201,
             $sort: {
               content_offset_seconds: 1,
             },
@@ -33,14 +33,14 @@ module.exports = function (app) {
         })
         .then((data) => {
           if (data.length === 0) return;
-          if (data.length === 101)
+          if (data.length === 201)
             cursor = Buffer.from(
               JSON.stringify({
-                id: data[100]._id,
-                content_offset_seconds: data[100].content_offset_seconds,
+                id: data[200]._id,
+                content_offset_seconds: data[200].content_offset_seconds,
               })
             ).toString("base64");
-          logs = data.slice(0, 100);
+          logs = data.slice(0, 200);
         })
         .catch((e) => {
           console.error(e);
@@ -81,7 +81,7 @@ module.exports = function (app) {
           content_offset_seconds: {
             $gte: json.content_offset_seconds,
           },
-          $limit: 101,
+          $limit: 201,
           $sort: {
             content_offset_seconds: 1,
           },
@@ -89,15 +89,15 @@ module.exports = function (app) {
       })
       .then((data) => {
         if (data.length === 0) return;
-        if (data.length === 101) {
+        if (data.length === 201) {
           cursor = Buffer.from(
             JSON.stringify({
-              id: data[100]._id,
-              content_offset_seconds: data[100].content_offset_seconds,
+              id: data[200]._id,
+              content_offset_seconds: data[200].content_offset_seconds,
             })
           ).toString("base64");
         }
-        logs = data.slice(0, 100);
+        logs = data.slice(0, 200);
       })
       .catch((e) => {
         console.error(e);

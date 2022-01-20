@@ -245,7 +245,7 @@ module.exports.getChapter = async (vodID) => {
       },
     },
   })
-    .then((response) => (data = response.data.data.video))
+    .then((response) => response.data.data.video)
     .catch((e) => {
       console.error(e.response ? e.response.data : e);
       return null;
@@ -273,7 +273,7 @@ module.exports.getStream = async (twitchId) => {
 module.exports.getChannelBadges = async () => {
   await this.checkToken();
   const badges = await axios
-    .get(`https://api.twitch.tv/helix/chat/badges?broadcaster_id=${config.twitchId}`, {
+    .get(`https://api.twitch.tv/helix/chat/badges?broadcaster_id=${config.twitch.id}`, {
       headers: {
         Authorization: `Bearer ${config.twitch.auth.access_token}`,
         "Client-Id": config.twitch.auth.client_id,
