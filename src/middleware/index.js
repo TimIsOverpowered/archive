@@ -5,6 +5,7 @@ const youtube = require("./youtube");
 const twitch = require("./twitch");
 const { limiter } = require("./rateLimit");
 const dmca = require("./dmca");
+const search = require("./search");
 
 module.exports = function (app) {
   app.post("/admin/download", admin.verify(app), admin.download(app));
@@ -20,4 +21,5 @@ module.exports = function (app) {
   app.post("/v2/live", admin.verify(app), live(app));
   app.get("/v2/badges", limiter(app), twitch.badges(app));
   app.get("/v1/vods/:vodId/comments", limiter(app), logs(app));
+  app.post("/search", limiter(app), search(app));
 };
