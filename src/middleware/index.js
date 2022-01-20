@@ -13,6 +13,7 @@ module.exports = function (app) {
   app.delete("/admin/delete", admin.verify(app), admin.delete(app));
   app.post("/admin/part/dmca", admin.verify(app), dmca.part(app));
   app.post("/admin/chapters", admin.verify(app), admin.saveChapters(app));
+  app.post("/admin/duration", admin.verify(app), admin.saveDuration(app));
   app.post("/admin/reupload", admin.verify(app), admin.reUploadPart(app));
   app.post("/youtube/parts", admin.verify(app), youtube.parts(app));
   app.post("/youtube/chapters", admin.verify(app), youtube.chapters(app));

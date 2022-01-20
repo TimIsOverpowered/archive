@@ -15,10 +15,7 @@ module.exports.initializeYt = (app) => {
       console.info("Refreshed Youtube Token");
     });
 
-    oauth2Client.setCredentials({
-      refresh_token: tokens.refresh_token,
-      access_token: tokens.access_token,
-    });
+    oauth2Client.setCredentials(config.youtube.auth);
   });
 
   oauth2Client.setCredentials(config.youtube.auth);
@@ -37,10 +34,7 @@ module.exports.initializeDrive = (app) => {
       console.info("Refreshed Drive Token");
     });
 
-    oauth2Client.setCredentials({
-      refresh_token: tokens.refresh_token,
-      access_token: tokens.access_token,
-    });
+    oauth2Client.setCredentials(config.youtube.auth);
   });
 
   oauth2Client.setCredentials(config.drive.auth);

@@ -540,7 +540,7 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
     }
   }
 
-  if ((!newVodData && m3u8Exists) || retry >= 0) {
+  if ((!newVodData && m3u8Exists) || retry >= 10) {
     const redisClient = app.get("redisClient");
     redisClient.del(`${config.channel}-vod-downloading`);
 
@@ -628,16 +628,17 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
     return;
   }
 
-  let videoM3u8;
-
-  await fs.promises
-    .readFile(m3u8Path, "utf8")
-    .then((data) => (videoM3u8 = data))
-    .catch((e) => console.error(e));
+  let videoM3u8 = 
+    await fs.promises
+      .readFile(m3u8Path, "utf8")
+      .catch((e) => {
+        console.error(e); 
+        return null;
+      });
 
   if (!videoM3u8) {
     setTimeout(() => {
-      download(vodId, app, retry, delay);
+      this.download(vodId, app, retry, delay);
     }, 1000 * 60 * delay);
     return;
   }
@@ -788,11 +789,12 @@ module.exports.saveChapters = async (vodId, app, duration) => {
   let newChapters = [];
   if (chapters.length === 0) {
     const chapter = await twitch.getChapter(vodId);
+    if(!chapter) return null;
     const gameData = await twitch.getGameData(chapter.game.id);
     newChapters.push({
       gameId: chapter.game ? chapter.game.id : null,
       name: chapter.game ? chapter.game.displayName : null,
-      image: gameData.box_art_url,
+      image: gameData.box_art_url.replace('{width}x{height}', "40x53"),
       duration: "00:00:00",
       start: 0,
       end: duration,
@@ -816,7 +818,7 @@ module.exports.saveChapters = async (vodId, app, duration) => {
             : chapter.node.positionMilliseconds / 1000,
         end:
           chapter.node.durationMilliseconds === 0
-            ? duration
+            ? duration - chapter.node.positionMilliseconds / 1000
             : chapter.node.durationMilliseconds / 1000,
       });
     }

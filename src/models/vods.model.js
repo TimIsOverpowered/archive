@@ -21,6 +21,7 @@ module.exports = function (app) {
       },
       duration: {
         type: DataTypes.TEXT,
+        defaultValue: "00:00:00",
       },
       date: {
         type: DataTypes.TEXT,
