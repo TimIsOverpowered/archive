@@ -23,6 +23,11 @@ module.exports.saveChapters = async (vodId, app, type = "vod") => {
     version: "v3",
     auth: oauth2Client,
   });
+  await youtube.search.list({
+    auth: oauth2Client,
+    part: "id,snippet",
+    q: "Check if token is valid",
+  });
   await sleep(5000);
 
   let vod_data;
@@ -40,45 +45,35 @@ module.exports.saveChapters = async (vodId, app, type = "vod") => {
 
   console.log(`Saving chapters on youtube for ${vodId}`);
 
-  const type_youtube_data = vod_data.youtube.filter(function (data) {
-    return data.type === type;
-  });
-  let totalDuration = 0;
-  for (let i = 0; i < type_youtube_data.length; i++) {
-    const youtube_data = type_youtube_data[i];
+  const type_youtube_data = vod_data.youtube.filter((data) => data.type === type);
+  for (let youtube_data of type_youtube_data) {
     const video_data = await this.getVideo(youtube_data.id, oauth2Client);
+    if (!video_data) return console.error(`Could not save chapters: Can't find ${youtube_data.id} youtube video..`);
     const snippet = video_data.snippet;
-    const videoDuration = moment.duration(video_data.contentDetails.duration).asSeconds();
 
     let description = (snippet.description += "\n\n");
     for (let chapter of vod_data.chapters) {
-      if (i === 0) {
-        if (chapter.start <= videoDuration && videoDuration >= chapter.end) {
-          description += `${moment.utc(chapter.start * 1000).format("HH:mm:ss")} ${chapter.name}\n`;
-        }
-      } else {
-        if ((totalDuration <= chapter.start && totalDuration >= chapter.end) || chapter.end + chapter.start >= totalDuration) {
-          let timestamp = chapter.start - totalDuration < 0 ? 0 : chapter.start - totalDuration;
-          description += `${moment.utc(timestamp * 1000).format("HH:mm:ss")} ${chapter.name}\n`;
-        }
+      const startDuration = config.youtube.splitDuration * (youtube_data.part - 1);
+      const endDuration = config.youtube.splitDuration * youtube_data.part;
+
+      if (chapter.start <= endDuration && chapter.start + chapter.end >= startDuration) {
+        const actualTime = chapter.start - startDuration;
+        const timestamp = actualTime < 0 ? 0 : actualTime;
+        description += `${moment.utc(timestamp * 1000).format("HH:mm:ss")} ${chapter.name}\n`;
       }
-    }
 
-    totalDuration += videoDuration;
-
-    const res = await youtube.videos.update({
-      resource: {
-        id: youtube_data.id,
-        snippet: {
-          title: snippet.title,
-          description: description,
-          categoryId: snippet.categoryId,
+      const res = await youtube.videos.update({
+        resource: {
+          id: youtube_data.id,
+          snippet: {
+            title: snippet.title,
+            description: description,
+            categoryId: snippet.categoryId,
+          },
         },
-      },
-      part: "snippet",
-    });
-
-    //console.info(res.data);
+        part: "snippet",
+      });
+    }
   }
 };
 
@@ -180,7 +175,7 @@ module.exports.upload = async (data, app, isVod = true) => {
   return new Promise(async (resolve, reject) => {
     const fileSize = fs.statSync(data.path).size;
     const vodTitle = data.vod.title.replace(/>|</gi, "");
-    const description = `VOD TITLE: ${vodTitle}\nChat Replay: https://${config.domain_name}/${data.type === "live" ? "live" : "vods"}/${data.vod.id}\n` + config.youtube.description;
+    const description = `VOD TITLE: ${vodTitle}\nChat Replay: https://${config.domain_name}/youtube/${data.vod.id}\n` + config.youtube.description;
     const res = await youtube.videos.insert(
       {
         auth: oauth2Client,

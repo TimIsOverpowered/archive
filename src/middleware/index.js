@@ -16,8 +16,8 @@ module.exports = function (app) {
   app.post("/admin/chapters", admin.verify(app), admin.saveChapters(app));
   app.post("/admin/duration", admin.verify(app), admin.saveDuration(app));
   app.post("/admin/reupload", admin.verify(app), admin.reUploadPart(app));
-  app.post("/youtube/parts", admin.verify(app), youtube.parts(app));
-  app.post("/youtube/chapters", admin.verify(app), youtube.chapters(app));
+  app.post("/admin/youtube/parts", admin.verify(app), youtube.parts(app));
+  app.post("/admin/youtube/chapters", admin.verify(app), youtube.chapters(app));
   app.post("/v2/live", admin.verify(app), live(app));
   app.get("/v2/badges", limiter(app), twitch.badges(app));
   app.get("/v1/vods/:vodId/comments", limiter(app), logs(app));

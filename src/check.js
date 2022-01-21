@@ -1,6 +1,7 @@
 const twitch = require("./middleware/twitch");
 const config = require("../config/config.json");
 const vod = require("./middleware/vod");
+const emotes = require("./middleware/emotes");
 const fs = require("fs");
 
 const fileExists = async (file) => {
@@ -88,6 +89,7 @@ module.exports.check = async (app) => {
     redisClient.set(`${config.channel}-chat-downloading`, 1);
     console.info(`Start Logs download: ${vodId}`);
     vod.downloadLogs(vodId, app);
+    emotes.save(vodId, app);
   }
 
   setTimeout(() => {
