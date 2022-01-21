@@ -290,7 +290,17 @@ module.exports.getChannelBadges = async () => {
 module.exports.badges = function (app) {
   const _this = this;
   return async function (req, res, next) {
-    const badges = await _this.getChannelBadges();
+    const redisClient = app.get("redisClient");
+    const key = `${config.channel}-badges`;
+    let badges;
+    badges = await redisClient
+      .get(key)
+      .then((data) => JSON.parse(data))
+      .catch(() => null);
+
+    if (badges) return res.json(badges);
+
+    badges = await _this.getChannelBadges();
 
     if (!badges)
       return res.status(500).json({
@@ -299,5 +309,9 @@ module.exports.badges = function (app) {
       });
 
     res.json(badges);
+
+    redisClient.set(key, JSON.stringify(badges), {
+      EX: 3600,
+    });
   };
 };

@@ -75,6 +75,62 @@ module.exports.download = function (app) {
   };
 };
 
+module.exports.hlsDownload = function (app) {
+  return async function (req, res, next) {
+    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No VodId" });
+
+    const vodId = req.body.vodId;
+
+    const exists = await app
+      .service("vods")
+      .get(vodId)
+      .then(() => true)
+      .catch(() => false);
+
+    if (exists) {
+      console.info(`Start Vod download: ${vodId}`);
+      vod.download(vodId, app);
+      console.info(`Start Logs download: ${vodId}`);
+      vod.downloadLogs(vodId, app);
+      res.status(200).json({ error: false, message: "Starting download.." });
+      return;
+    }
+
+    const vodData = await twitch.getVodData(vodId);
+    if (!vodData) return res.status(404).json({ error: true, message: "No Vod Data" });
+
+    if (vodData.user_id !== config.twitch.id)
+      return res.status(400).json({
+        error: true,
+        message: "This vod belongs to another channel..",
+      });
+
+    await app
+      .service("vods")
+      .create({
+        id: vodData.id,
+        title: vodData.title,
+        date: new Date(vodData.created_at).toLocaleDateString("en-US", {
+          timeZone: config.timezone,
+        }),
+        createdAt: vodData.created_at,
+        duration: moment.utc(moment.duration("PT" + vodData.duration.toUpperCase()).asMilliseconds()).format("HH:mm:ss"),
+      })
+      .then(() => {
+        console.info(`Created vod ${vodData.id} for ${vodData.user_name}`);
+      })
+      .catch((e) => {
+        console.error(e);
+      });
+
+    console.info(`Start Vod download: ${vodId}`);
+    vod.download(vodId, app);
+    console.info(`Start Logs download: ${vodId}`);
+    vod.downloadLogs(vodId, app);
+    res.status(200).json({ error: false, message: "Starting download.." });
+  };
+};
+
 module.exports.logs = function (app) {
   return async function (req, res, next) {
     if (!req.body.vodId) return res.status(400).json({ error: true, message: "No VodId" });
