@@ -1,25 +1,26 @@
 const { disallow } = require("feathers-hooks-common");
-const modify = require('./modify');
+const modify = require("./modify");
+const redisCache = require("../cache");
 
 module.exports = {
   before: {
     all: [disallow("external")],
-    find: [],
+    find: [redisCache.before()],
     get: [],
     create: [],
     update: [],
     patch: [],
-    remove: []
+    remove: [],
   },
 
   after: {
     all: [],
-    find: [modify()],
-    get: [],
-    create: [],
-    update: [],
-    patch: [],
-    remove: []
+    find: [modify(), redisCache.after({ expiration: 3600 * 24 })],
+    get: [redisCache.after({ expiration: 3600 * 24 })],
+    create: [redisCache.purge()],
+    update: [redisCache.purge()],
+    patch: [redisCache.purge()],
+    remove: [redisCache.purge()],
   },
 
   error: {
@@ -29,6 +30,6 @@ module.exports = {
     create: [],
     update: [],
     patch: [],
-    remove: []
-  }
+    remove: [],
+  },
 };
