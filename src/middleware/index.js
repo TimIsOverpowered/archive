@@ -9,6 +9,7 @@ const search = require("./search");
 
 module.exports = function (app) {
   app.post("/admin/download", admin.verify(app), admin.download(app));
+  app.post("/admin/hls/download", admin.verify(app), admin.hlsDownload(app));
   app.post("/admin/logs", admin.verify(app), admin.logs(app));
   app.post("/admin/dmca", admin.verify(app), dmca(app));
   app.delete("/admin/delete", admin.verify(app), admin.delete(app));
