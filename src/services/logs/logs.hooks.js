@@ -16,7 +16,7 @@ module.exports = {
   after: {
     all: [],
     find: [modify(), redisCache.after({ expiration: 3600 * 24 })],
-    get: [redisCache.after({ expiration: 3600 * 24 })],
+    get: [],
     create: [redisCache.purge()],
     update: [redisCache.purge()],
     patch: [redisCache.purge()],
