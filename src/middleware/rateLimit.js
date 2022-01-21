@@ -2,7 +2,7 @@ module.exports.limiter = (app) => {
   return async function (req, res, next) {
     app
       .get("rateLimiter")
-      .consume(req.get("X-Real-IP") || req.ip)
+      .consume(req.get("cf-connecting-ip") || req.get("X-Real-IP") || req.ip)
       .then((rateLimiteRes) => {
         const headers = {
           "Retry-After": rateLimiteRes.msBeforeNext,
