@@ -57,19 +57,13 @@ module.exports.before = (passedOptions = {}) => {
           return resolve(hook);
         }
 
-        const group =
-          typeof options.cacheGroupKey === "function"
-            ? hashCode(`group-${options.cacheGroupKey(hook)}`)
-            : hashCode(`group-${hook.path || "general"}`);
-        const path =
-          typeof options.cacheKey === "function"
-            ? `${options.prefix}${group}${options.cacheKey(hook)}`
-            : `${options.prefix}${group}${cacheKey(hook)}`;
+        const group = typeof options.cacheGroupKey === "function" ? hashCode(`group-${options.cacheGroupKey(hook)}`) : hashCode(`group-${hook.path || "general"}`);
+        const path = typeof options.cacheKey === "function" ? `${options.prefix}${group}${options.cacheKey(hook)}` : `${options.prefix}${group}${cacheKey(hook)}`;
 
         hook.params.cacheKey = path;
 
         data = await client
-          .get(path)
+          .GET(path)
           .then((res) => JSON.parse(res))
           .catch(() => resolve(hook));
 
@@ -77,9 +71,7 @@ module.exports.before = (passedOptions = {}) => {
           return resolve(hook);
         }
 
-        const duration = moment(data.expiresOn).format(
-          "DD MMMM YYYY - HH:mm:ss"
-        );
+        const duration = moment(data.expiresOn).format("DD MMMM YYYY - HH:mm:ss");
 
         hook.result = data.cache;
         hook.params.$skipCacheHook = true;
@@ -119,24 +111,23 @@ module.exports.after = (passedOptions = {}) => {
         const duration = options.expiration || options.defaultExpiration;
         const { cacheKey } = hook.params;
 
-        if (!client) {
+        if (!client || !cacheKey) {
           return resolve(hook);
         }
 
-        client.set(
+        client.SET(
           cacheKey,
           JSON.stringify({
             cache: hook.result,
             expiresOn: moment().add(moment.duration(duration, "seconds")),
           })
         );
-        client.expire(cacheKey, duration);
+
+        client.EXPIRE(cacheKey, duration);
 
         if (options.env !== "test" && ENABLE_REDIS_CACHE_LOGGER === "true") {
           console.log(`[redis] added ${cacheKey} to the cache.`);
-          console.log(
-            `> Expires in ${moment.duration(duration, "seconds").humanize()}.`
-          );
+          console.log(`> Expires in ${moment.duration(duration, "seconds").humanize()}.`);
         }
 
         resolve(hook);
@@ -152,9 +143,7 @@ async function purgeGroup(client, group, prefix = config.channel) {
   return new Promise((resolve, reject) => {
     let cursor = "0";
     const scan = async () => {
-      const reply = await client
-        .SCAN(cursor, { MATCH: `${prefix}${group}*`, COUNT: 1000 })
-        .catch((err) => reject(err));
+      const reply = await client.SCAN(cursor, { MATCH: `${prefix}${group}*`, COUNT: 1000 }).catch((err) => reject(err));
 
       if (!reply.keys[0]) return resolve();
 
@@ -164,10 +153,7 @@ async function purgeGroup(client, group, prefix = config.channel) {
       const batchKeys = keys.reduce((a, c) => {
         if (Array.isArray(a[a.length - 1]) && a[a.length - 1].length < 100) {
           a[a.length - 1].push(c);
-        } else if (
-          !Array.isArray(a[a.length - 1]) ||
-          a[a.length - 1].length >= 100
-        ) {
+        } else if (!Array.isArray(a[a.length - 1]) || a[a.length - 1].length >= 100) {
           a.push([c]);
         }
         return a;
@@ -177,7 +163,6 @@ async function purgeGroup(client, group, prefix = config.channel) {
         batchKeys,
         10,
         (batch, idx, cb) => {
-          console.log(batch);
           if (client.unlink) {
             client.unlink(batch, cb);
           } else {
@@ -205,10 +190,7 @@ module.exports.purge = (passedOptions = {}) => {
         const client = hook.app.get("redisClient");
         const options = { ...defaults, ...passedOptions };
         const { prefix } = hook.app.get("redis");
-        const group =
-          typeof options.cacheGroupKey === "function"
-            ? hashCode(`group-${options.cacheGroupKey(hook)}`)
-            : hashCode(`group-${hook.path || "general"}`);
+        const group = typeof options.cacheGroupKey === "function" ? hashCode(`group-${options.cacheGroupKey(hook)}`) : hashCode(`group-${hook.path || "general"}`);
 
         if (!client) {
           return {
