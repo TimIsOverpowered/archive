@@ -9,7 +9,7 @@ const emotes = require("./emotes");
 module.exports.verify = function (app) {
   return async function (req, res, next) {
     if (!req.headers["authorization"]) {
-      res.status(403).json({ error: true, message: "Missing auth key" });
+      res.status(403).json({ error: true, msg: "Missing auth key" });
       return;
     }
 
@@ -17,7 +17,7 @@ module.exports.verify = function (app) {
     const key = app.get("ADMIN_API_KEY");
 
     if (key !== authKey) {
-      res.status(403).json({ error: true, message: "Not authorized" });
+      res.status(403).json({ error: true, msg: "Not authorized" });
       return;
     }
     next();
@@ -26,9 +26,9 @@ module.exports.verify = function (app) {
 
 module.exports.download = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No VodId" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No VodId" });
 
-    if (!req.body.type) return res.status(400).json({ error: true, message: "No type" });
+    if (!req.body.type) return res.status(400).json({ error: true, msg: "No type" });
 
     const exists = await app
       .service("vods")
@@ -38,17 +38,17 @@ module.exports.download = function (app) {
 
     if (exists) {
       vod.upload(req.body.vodId, app, req.body.path, req.body.type);
-      res.status(200).json({ error: false, message: "Starting download.." });
+      res.status(200).json({ error: false, msg: "Starting download.." });
       return;
     }
 
     const vodData = await twitch.getVodData(req.body.vodId);
-    if (!vodData) return res.status(404).json({ error: true, message: "No Vod Data" });
+    if (!vodData) return res.status(404).json({ error: true, msg: "No Vod Data" });
 
     if (vodData.user_id !== config.twitch.id)
       return res.status(400).json({
         error: true,
-        message: "This vod belongs to another channel..",
+        msg: "This vod belongs to another channel..",
       });
 
     await app
@@ -71,13 +71,13 @@ module.exports.download = function (app) {
 
     vod.upload(req.body.vodId, app, req.body.path, req.body.type);
     emotes.save(req.body.vodId, app);
-    res.status(200).json({ error: false, message: "Starting download.." });
+    res.status(200).json({ error: false, msg: "Starting download.." });
   };
 };
 
 module.exports.hlsDownload = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No VodId" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No VodId" });
 
     const vodId = req.body.vodId;
 
@@ -92,17 +92,17 @@ module.exports.hlsDownload = function (app) {
       vod.download(vodId, app);
       console.info(`Start Logs download: ${vodId}`);
       vod.downloadLogs(vodId, app);
-      res.status(200).json({ error: false, message: "Starting download.." });
+      res.status(200).json({ error: false, msg: "Starting download.." });
       return;
     }
 
     const vodData = await twitch.getVodData(vodId);
-    if (!vodData) return res.status(404).json({ error: true, message: "No Vod Data" });
+    if (!vodData) return res.status(404).json({ error: true, msg: "No Vod Data" });
 
     if (vodData.user_id !== config.twitch.id)
       return res.status(400).json({
         error: true,
-        message: "This vod belongs to another channel..",
+        msg: "This vod belongs to another channel..",
       });
 
     await app
@@ -127,13 +127,13 @@ module.exports.hlsDownload = function (app) {
     vod.download(vodId, app);
     console.info(`Start Logs download: ${vodId}`);
     vod.downloadLogs(vodId, app);
-    res.status(200).json({ error: false, message: "Starting download.." });
+    res.status(200).json({ error: false, msg: "Starting download.." });
   };
 };
 
 module.exports.logs = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No VodId" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No VodId" });
 
     let total;
     app
@@ -151,19 +151,57 @@ module.exports.logs = function (app) {
     if (total > 1)
       return res.status(400).json({
         error: true,
-        message: `Logs already exist for ${req.body.vodId}`,
+        msg: `Logs already exist for ${req.body.vodId}`,
       });
 
     vod.getLogs(req.body.vodId, app);
-    res.status(200).json({ error: false, message: "Getting logs.." });
+    res.status(200).json({ error: false, msg: "Getting logs.." });
   };
 };
 
-module.exports.delete = function (app) {
+module.exports.createVod = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No VodId" });
+    if (req.body.vodId == null) return res.status(400).json({ error: true, msg: "Missing parameter: Vod id" });
+    if (!req.body.title) return res.status(400).json({ error: true, msg: "Missing parameter: Title" });
+    if (!req.body.createdAt) return res.status(400).json({ error: true, msg: "Missing parameter: CreatedAt" });
+    if (!req.body.duration) return res.status(400).json({ error: true, msg: "Missing parameter: Duration" });
 
-    res.status(200).json({ error: false, message: "Starting deletion process.." });
+    const exists = await app
+      .service("vods")
+      .get(req.body.vodId)
+      .then(() => true)
+      .catch(() => false);
+
+    if (exists) return res.status(400).json({ error: true, msg: `${req.body.vodId} already exists!` });
+
+    await app
+      .service("vods")
+      .create({
+        id: req.body.vodId,
+        title: req.body.title,
+        date: new Date(req.body.createdAt).toLocaleDateString("en-US", {
+          timeZone: config.timezone,
+        }),
+        createdAt: req.body.createdAt,
+        duration: req.body.duration,
+        drive: req.body.drive ? [req.body.drive] : []
+      })
+      .then(() => {
+        console.info(`Created vod ${req.body.vodId}`);
+        res.status(200).json({ error: false, msg: `${req.body.vodId} Created!` });
+      })
+      .catch((e) => {
+        console.error(e);
+        res.status(200).json({ error: true, msg: `Failed to create ${req.body.vodId}!` });
+      });
+  };
+};
+
+module.exports.deleteVod = function (app) {
+  return async function (req, res, next) {
+    if (req.body.vodId == null) return res.status(400).json({ error: true, msg: "Missing parameter: Vod id" });
+
+    res.status(200).json({ error: false, msg: "Starting deletion process.." });
 
     await app
       .service("vods")
@@ -193,15 +231,15 @@ module.exports.delete = function (app) {
 
 module.exports.reUploadPart = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No vod id" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No vod id" });
 
-    if (!req.body.part) return res.status(400).json({ error: true, message: "No part" });
+    if (!req.body.part) return res.status(400).json({ error: true, msg: "No part" });
 
-    if (!req.body.type) return res.status(400).json({ error: true, message: "No type" });
+    if (!req.body.type) return res.status(400).json({ error: true, msg: "No type" });
 
     res.status(200).json({
       error: false,
-      message: `Reuploading ${req.body.vodId} Vod Part ${req.body.part}`,
+      msg: `Reuploading ${req.body.vodId} Vod Part ${req.body.part}`,
     });
 
     const part = parseInt(req.body.part) - 1;
@@ -223,29 +261,29 @@ module.exports.reUploadPart = function (app) {
 
 module.exports.saveChapters = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No vod id" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No vod id" });
 
     const vodData = await twitch.getVodData(req.body.vodId);
     if (!vodData)
       return res.status(500).json({
         error: true,
-        message: `Failed to get vod data for ${req.body.vodId}`,
+        msg: `Failed to get vod data for ${req.body.vodId}`,
       });
 
     vod.saveChapters(vodData.id, app, moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds());
-    res.status(200).json({ error: false, message: `Saving Chapters for ${req.body.vodId}` });
+    res.status(200).json({ error: false, msg: `Saving Chapters for ${req.body.vodId}` });
   };
 };
 
 module.exports.saveDuration = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No vod id" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No vod id" });
 
     const vodData = await twitch.getVodData(req.body.vodId);
     if (!vodData)
       return res.status(500).json({
         error: true,
-        message: `Failed to get vod data for ${req.body.vodId}`,
+        msg: `Failed to get vod data for ${req.body.vodId}`,
       });
 
     const exists = await app
@@ -260,11 +298,11 @@ module.exports.saveDuration = function (app) {
         .patch(req.body.vodId, {
           duration: moment.utc(moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds() * 1000).format("HH:mm:ss"),
         })
-        .then(() => res.status(200).json({ error: false, message: "Saved duration!" }))
-        .catch(() => res.status(500).json({ error: true, message: "Failed to save duration!" }));
+        .then(() => res.status(200).json({ error: false, msg: "Saved duration!" }))
+        .catch(() => res.status(500).json({ error: true, msg: "Failed to save duration!" }));
       return;
     }
 
-    res.status(404).json({ error: true, message: "Vod does not exist!" });
+    res.status(404).json({ error: true, msg: "Vod does not exist!" });
   };
 };
