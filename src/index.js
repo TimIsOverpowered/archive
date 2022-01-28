@@ -37,8 +37,8 @@ if (clusterWorkerSize > 1) {
     }
   });
 
-  check();
+  check(app);
 } else {
-  check();
+  check(app);
   start();
 }
