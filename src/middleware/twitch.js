@@ -305,7 +305,7 @@ module.exports.badges = function (app) {
     if (!badges)
       return res.status(500).json({
         error: true,
-        message: "Something went wrong trying to retrieve channel badges..",
+        msg: "Something went wrong trying to retrieve channel badges..",
       });
 
     res.json(badges);

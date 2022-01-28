@@ -320,13 +320,13 @@ module.exports = function (app) {
   const _this = this;
   return async function (req, res, next) {
     if (!req.body.receivedClaims)
-      return res.status(400).json({ error: true, message: "No claims" });
+      return res.status(400).json({ error: true, msg: "No claims" });
 
     if (!req.body.vodId)
-      return res.status(400).json({ error: true, message: "No vod id" });
+      return res.status(400).json({ error: true, msg: "No vod id" });
 
     if (!req.body.type)
-      return res.status(400).json({ error: true, message: "No type" });
+      return res.status(400).json({ error: true, msg: "No type" });
 
     const vodId = req.body.vodId;
 
@@ -344,7 +344,7 @@ module.exports = function (app) {
 
     res.status(200).json({
       error: false,
-      message: `Muting the DMCA content for ${vodId}...`,
+      msg: `Muting the DMCA content for ${vodId}...`,
     });
 
     const vodPath = await drive.download(req.body.vodId, req.body.type, app);
@@ -433,20 +433,20 @@ module.exports.part = function (app) {
   const _this = this;
   return async function (req, res, next) {
     if (!req.body.receivedClaims)
-      return res.status(400).json({ error: true, message: "No claims" });
+      return res.status(400).json({ error: true, msg: "No claims" });
 
     if (!req.body.vodId)
-      return res.status(400).json({ error: true, message: "No vod id" });
+      return res.status(400).json({ error: true, msg: "No vod id" });
 
     if (!req.body.part)
-      return res.status(400).json({ error: true, message: "No part" });
+      return res.status(400).json({ error: true, msg: "No part" });
 
     if (!req.body.type)
-      return res.status(400).json({ error: true, message: "No type" });
+      return res.status(400).json({ error: true, msg: "No type" });
 
     res.status(200).json({
       error: false,
-      message: `Trimming DMCA Content from ${req.body.vodId} Vod Part ${req.body.part}`,
+      msg: `Trimming DMCA Content from ${req.body.vodId} Vod Part ${req.body.part}`,
     });
 
     let vod_data;
