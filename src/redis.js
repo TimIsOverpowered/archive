@@ -1,5 +1,4 @@
 const { createClient } = require("redis");
-const { check } = require("./check");
 const { RateLimiterRedis } = require("rate-limiter-flexible");
 const IoRedis = require("ioredis");
 const config = require("../config/config.json");
@@ -34,6 +33,4 @@ module.exports = async function (app) {
   });
 
   app.set("rateLimiter", rateLimiter);
-
-  check(app);
 };
