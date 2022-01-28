@@ -139,7 +139,10 @@ module.exports.logs = function (app) {
     app
       .service("logs")
       .find({
-        vod_id: req.body.vodId,
+        query: {
+          $limit: 0,
+          vod_id: req.body.vodId,
+        }
       })
       .then((data) => {
         total = data.total;
@@ -155,6 +158,16 @@ module.exports.logs = function (app) {
       });
 
     vod.getLogs(req.body.vodId, app);
+    res.status(200).json({ error: false, msg: "Getting logs.." });
+  };
+};
+
+module.exports.manualLogs = function (app) {
+  return async function (req, res, next) {
+    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No VodId" });
+    if (!req.body.path) return res.status(400).json({ error: true, msg: "No Path" });
+
+    vod.manualLogs(req.body.path, req.body.vodId, app);
     res.status(200).json({ error: false, msg: "Getting logs.." });
   };
 };
