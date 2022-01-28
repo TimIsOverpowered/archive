@@ -34,7 +34,7 @@ module.exports.initializeDrive = (app) => {
       console.info("Refreshed Drive Token");
     });
 
-    oauth2Client.setCredentials(config.youtube.auth);
+    oauth2Client.setCredentials(config.drive.auth);
   });
 
   oauth2Client.setCredentials(config.drive.auth);
