@@ -11,6 +11,7 @@ module.exports = function (app) {
   app.post("/admin/download", limiter(app), admin.verify(app), admin.download(app));
   app.post("/admin/hls/download", limiter(app), admin.verify(app), admin.hlsDownload(app));
   app.post("/admin/logs", limiter(app), admin.verify(app), admin.logs(app));
+  app.post("/admin/logs/manual", limiter(app), admin.verify(app), admin.manualLogs(app));
   app.post("/admin/dmca", limiter(app), admin.verify(app), dmca(app));
   app.post("/admin/create", limiter(app), admin.verify(app), admin.createVod(app));
   app.delete("/admin/delete", limiter(app), admin.verify(app), admin.deleteVod(app));

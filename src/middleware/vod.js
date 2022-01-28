@@ -921,3 +921,62 @@ module.exports.getLogs = async (vodId, app) => {
     })
     .catch(() => {});
 };
+
+module.exports.manualLogs = async (commentsPath, vodId, app) => {
+  let start_time = new Date(),
+    comments = [],
+    responseComments,
+    howMany = 1;
+  await fs.promises
+    .readFile(commentsPath)
+    .then((data) => {
+      responseComments = JSON.parse(data).comments;
+    })
+    .catch((e) => {
+      console.error(e);
+    });
+
+  for (let comment of responseComments) {
+    if ((process.env.NODE_ENV || "").trim() !== "production") {
+      readline.clearLine(process.stdout, 0);
+      readline.cursorTo(process.stdout, 0, null);
+      process.stdout.write(`Current Log position: ${moment.utc(comment.content_offset_seconds * 1000).format("HH:mm:ss")}`);
+    }
+    //if (await commentExists(comment._id, app)) continue;
+    if (comments.length >= 2500) {
+      await app
+        .service("logs")
+        .create(comments)
+        .then(() => {
+          if ((process.env.NODE_ENV || "").trim() !== "production") {
+            console.info(`\nSaved ${comments.length} comments in DB for vod ${vodId}`);
+          }
+        })
+        .catch((e) => {
+          console.error(e);
+        });
+      comments = [];
+    }
+    comments.push({
+      id: comment._id,
+      vod_id: vodId,
+      display_name: comment.commenter.display_name,
+      content_offset_seconds: comment.content_offset_seconds,
+      message: comment.message.fragments,
+      user_badges: comment.message.user_badges,
+      user_color: comment.message.user_color,
+      createdAt: comment.created_at,
+      updatedAt: comment.updated_at,
+    });
+    howMany++;
+  }
+  console.info(`\nTotal Comments: ${howMany} | Total Time to get logs for ${vodId}: ${(new Date() - start_time) / 1000} seconds`);
+
+  await app
+    .service("logs")
+    .create(comments)
+    .then(() => {
+      console.info(`Saved all comments in DB for vod ${vodId}`);
+    })
+    .catch(() => {});
+};
