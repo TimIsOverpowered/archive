@@ -771,14 +771,28 @@ const getDuration = async (video) => {
 };
 
 const saveDuration = async (vodId, duration, app) => {
+  duration = toHHMMSS(duration);
+
   await app
     .service("vods")
     .patch(vodId, {
-      duration: moment.utc(duration * 1000).format("HH:mm:ss"),
+      duration: duration,
     })
     .catch((e) => {
       console.error(e);
     });
+};
+
+const toHHMMSS = (secs) => {
+  var sec_num = parseInt(secs, 10);
+  var hours = Math.floor(sec_num / 3600);
+  var minutes = Math.floor(sec_num / 60) % 60;
+  var seconds = sec_num % 60;
+
+  return [hours, minutes, seconds]
+    .map((v) => (v < 10 ? "0" + v : v))
+    .filter((v, i) => v !== "00" || i > 0)
+    .join(":");
 };
 
 module.exports.saveChapters = async (vodId, app, duration) => {
