@@ -50,7 +50,7 @@
     "feathers-sequelize": "^6.3.2",
     "fluent-ffmpeg": "^2.1.2",
     "googleapis": "^92.0.0",
-    "helmet": "^5.0.1",
+    "helmet": "^5.0.2",
     "hls-parser": "^0.10.4",
     "ioredis": "^4.28.3",
     "moment": "^2.29.1",
