@@ -2,25 +2,13 @@ const vod = require("./vod");
 const config = require("../../config/config.json");
 const fs = require("fs");
 
-process.on("unhandledRejection", function (reason, p) {
-  console.log(
-    "Possibly Unhandled Rejection at: Promise ",
-    p,
-    " reason: ",
-    reason
-  );
-});
-
 module.exports = function (app) {
   return async function (req, res, next) {
-    if (!req.body.driveId)
-      return res.status(400).json({ error: true, message: "No driveId" });
+    if (!req.body.driveId) return res.status(400).json({ error: true, msg: "No driveId" });
 
-    if (!req.body.streamId)
-      return res.status(400).json({ error: true, message: "No streamId" });
+    if (!req.body.streamId) return res.status(400).json({ error: true, msg: "No streamId" });
 
-    if (!req.body.path)
-      return res.status(400).json({ error: true, message: "No Path" });
+    if (!req.body.path) return res.status(400).json({ error: true, msg: "No Path" });
 
     let vods;
     await app
@@ -37,12 +25,9 @@ module.exports = function (app) {
         console.error(e);
       });
 
-    if (vods.length == 0)
-      return res.status(404).json({ error: true, message: "No Vod found" });
+    if (vods.length == 0) return res.status(404).json({ error: true, msg: "No Vod found" });
 
-    res
-      .status(200)
-      .json({ error: false, message: "Starting upload to youtube" });
+    res.status(200).json({ error: false, msg: "Starting upload to youtube" });
     const vod_data = vods[0];
 
     vod_data.drive.push({
@@ -59,13 +44,6 @@ module.exports = function (app) {
         console.error(e);
       });
 
-    if (config.multiTrack)
-      await vod.upload(vod_data.id, app, req.body.path, "live");
-
-    await fs.promises
-      .rmdir(req.body.path, {
-        recursive: true,
-      })
-      .catch((e) => console.error(e));
+    if (config.youtube.multiTrack) await vod.upload(vod_data.id, app, req.body.path, "live");
   };
 };
