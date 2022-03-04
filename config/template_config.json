@@ -1,45 +1,51 @@
 {
-    "twitch": {
-        "client_id": "YOUR_CLIENT_ID",
-        "client_secret": "YOUR_CLIENT_SECRET",
-        "access_token": ""
+  "twitch": {
+    "auth": {
+      "client_id": "",
+      "client_secret": "",
+      "access_token": ""
     },
-    "google": {
-        "client_id": "YOUR_CLIENT_ID",
-        "client_secret": "YOUR_CLIENT_SECRET",
-        "redirect_url": "YOUR_CALLBACK_URL",
-        "scopes": [
-            "https://www.googleapis.com/auth/youtube.upload",
-            "https://www.googleapis.com/auth/youtube.force-ssl"
-        ]
-    },
-    "youtube": {
-        "access_token": "YOUR_YOUTUBE_ACCESS_TOKEN",
-        "scope": "https://www.googleapis.com/auth/youtube.upload",
-        "token_type": "Bearer",
-        "expires_in": 3599,
-        "refresh_token": "YOUR_YOUTUBE_REFRESH_TOKEN"
-    },
-    "twitchId": "YOUR_TWITCH_ID", //CHANNEL'S TWITCH ID YOU ARE MONITORING
-    "channel": "YOUR_TWITCH_CHANNEL", //CHANNEL YOU ARE MONITORING VODS ON
-    "vodPath": "YOUR_VOD_PATH", //WHERE TO DOWNLOAD YOUR VODS AT.
-    "youtube_description": "YOUR YOUTUBE DESCRIPTION GOES HERE", //YOUTUBE DESCRIPTION
-    "youtube_public_vid": false, //SET VIDEOS TO PUBLIC WHEN UPLOADED. OTHERWISE UNLISTED.
-    "domain_name": "YOUR_DOMAIN_NAME", //EXAMPLE: moon2.tv poke.gg 
-    "timezone": "UTC", //TIMEZONE FOR STREAMER. DEFAULT: UTC
-    "perGameUpload": false, //UPLOADS EVERY GAME PLAYED IN THE VOD. (MAY BE BAD FOR PEOPLE WHO SWAP CHAPTERS CONSTANTLY)
-    "splitDuration": 43199, //NUMBER OF SECONDS TO SPLIT THE VIDEO. (EVERY 12 HOURS IS DEFAULT)
-    "youtube_api_key": "YOUR YOUTUBE API KEY",
-    "liveUpload": false, //UPLOAD PARTS LIVE INSTEAD OF WAITING UNTIL VOD IS FINISHED
-    "multiTrack": false, //IF STREAMER IS USING TWITCH VOD TRACK TO SEPERATE MUSIC
-    "livePath": "YOUR_LIVE_RECORDED_PATH", //LIVE PATH IF USING MY RECORDER APP
-    "drive": { //IF USING DRIVE.
-        "access_token": "",
-        "refresh_token": "",
-        "upload": false,
-        "parents": [
-            ""
-        ],
-        "token_type": "Bearer"
+    "id": "",
+    "username": ""
+  },
+  "google": {
+    "client_id": "",
+    "client_secret": "",
+    "redirect_url": ""
+  },
+  "youtube": {
+    "description": "",
+    "public": true,
+    "perGameUpload": false,
+    "splitDuration": 10800,
+    "api_key": "",
+    "liveUpload": false,
+    "multiTrack": false,
+    "upload": true,
+    "auth": {
+      "access_token": "",
+      "scope": "https://www.googleapis.com/auth/youtube.force-ssl https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.upload",
+      "token_type": "Bearer",
+      "expires_in": 3599,
+      "refresh_token": ""
     }
+  },
+  "channel": "",
+  "domain_name": "",
+  "vodPath": "/mnt/vods",
+  "livePath": "/mnt/live",
+  "timezone": "America/Chicago",
+  "chatDownload": false,
+  "vodDownload": true,
+  "drive": {
+    "upload": false,
+    "parents": [""],
+    "auth": {
+      "access_token": "",
+      "scope": "https://www.googleapis.com/auth/drive",
+      "token_type": "Bearer",
+      "expires_in": 3599,
+      "refresh_token": ""
+    }
+  }
 }

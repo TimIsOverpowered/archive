@@ -1,16 +1,15 @@
 const vod = require("./vod");
 const twitch = require("./twitch");
 const moment = require("moment");
-const momentDurationFormatSetup = require("moment-duration-format");
-momentDurationFormatSetup(moment);
 const fs = require("fs");
 const config = require("../../config/config.json");
 const drive = require("./drive");
+const emotes = require("./emotes");
 
 module.exports.verify = function (app) {
   return async function (req, res, next) {
     if (!req.headers["authorization"]) {
-      res.status(403).json({ error: true, message: "Missing auth key" });
+      res.status(403).json({ error: true, msg: "Missing auth key" });
       return;
     }
 
@@ -18,7 +17,7 @@ module.exports.verify = function (app) {
     const key = app.get("ADMIN_API_KEY");
 
     if (key !== authKey) {
-      res.status(403).json({ error: true, message: "Not authorized" });
+      res.status(403).json({ error: true, msg: "Not authorized" });
       return;
     }
     next();
@@ -27,28 +26,30 @@ module.exports.verify = function (app) {
 
 module.exports.download = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No VodId" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No VodId" });
 
-    if (!req.body.type) return res.status(400).json({ error: true, message: "No type" });
+    if (!req.body.type) return res.status(400).json({ error: true, msg: "No type" });
 
-    let exists;
-    await app
+    const exists = await app
       .service("vods")
       .get(req.body.vodId)
-      .then(() => {
-        exists = true;
-      })
-      .catch(() => {
-        exists = false;
-      });
+      .then(() => true)
+      .catch(() => false);
+
     if (exists) {
       vod.upload(req.body.vodId, app, req.body.path, req.body.type);
-      res.status(200).json({ error: false, message: "Starting download.." });
+      res.status(200).json({ error: false, msg: "Starting download.." });
       return;
     }
 
     const vodData = await twitch.getVodData(req.body.vodId);
-    if (!vodData) return res.status(404).json({ error: true, message: "No Vod Data" });
+    if (!vodData) return res.status(404).json({ error: true, msg: "No Vod Data" });
+
+    if (vodData.user_id !== config.twitch.id)
+      return res.status(400).json({
+        error: true,
+        msg: "This vod belongs to another channel..",
+      });
 
     await app
       .service("vods")
@@ -59,7 +60,7 @@ module.exports.download = function (app) {
           timeZone: config.timezone,
         }),
         createdAt: vodData.created_at,
-        duration: moment.duration("PT" + vodData.duration.toUpperCase()).format("HH:mm:ss", { trim: false }),
+        duration: moment.utc(moment.duration("PT" + vodData.duration.toUpperCase()).asMilliseconds()).format("HH:mm:ss"),
       })
       .then(() => {
         console.info(`Created vod ${vodData.id} for ${vodData.user_name}`);
@@ -69,32 +70,40 @@ module.exports.download = function (app) {
       });
 
     vod.upload(req.body.vodId, app, req.body.path, req.body.type);
-    res.status(200).json({ error: false, message: "Starting download.." });
+    emotes.save(req.body.vodId, app);
+    res.status(200).json({ error: false, msg: "Starting download.." });
   };
 };
 
-module.exports.downloadv2 = function (app) {
+module.exports.hlsDownload = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "Missing vod id.." });
+    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No VodId" });
 
-    let exists;
-    await app
+    const vodId = req.body.vodId;
+
+    const exists = await app
       .service("vods")
-      .get(req.body.vodId)
-      .then(() => {
-        exists = true;
-      })
-      .catch(() => {
-        exists = false;
-      });
+      .get(vodId)
+      .then(() => true)
+      .catch(() => false);
+
     if (exists) {
-      vod.startDownload(req.body.vodId, app, req.body.path);
-      res.status(200).json({ error: false, message: "Starting download.." });
+      console.info(`Start Vod download: ${vodId}`);
+      vod.download(vodId, app);
+      console.info(`Start Logs download: ${vodId}`);
+      vod.downloadLogs(vodId, app);
+      res.status(200).json({ error: false, msg: "Starting download.." });
       return;
     }
 
-    const vodData = await twitch.getVodData(req.body.vodId);
-    if (!vodData) return console.error("No vod data");
+    const vodData = await twitch.getVodData(vodId);
+    if (!vodData) return res.status(404).json({ error: true, msg: "No Vod Data" });
+
+    if (vodData.user_id !== config.twitch.id)
+      return res.status(400).json({
+        error: true,
+        msg: "This vod belongs to another channel..",
+      });
 
     await app
       .service("vods")
@@ -105,7 +114,7 @@ module.exports.downloadv2 = function (app) {
           timeZone: config.timezone,
         }),
         createdAt: vodData.created_at,
-        duration: moment.duration("PT" + vodData.duration.toUpperCase()).format("HH:mm:ss", { trim: false }),
+        duration: moment.utc(moment.duration("PT" + vodData.duration.toUpperCase()).asMilliseconds()).format("HH:mm:ss"),
       })
       .then(() => {
         console.info(`Created vod ${vodData.id} for ${vodData.user_name}`);
@@ -114,20 +123,26 @@ module.exports.downloadv2 = function (app) {
         console.error(e);
       });
 
-    vod.startDownload(req.body.vodId, app);
-    res.status(200).json({ error: false, message: "Starting download.." });
+    console.info(`Start Vod download: ${vodId}`);
+    vod.download(vodId, app);
+    console.info(`Start Logs download: ${vodId}`);
+    vod.downloadLogs(vodId, app);
+    res.status(200).json({ error: false, msg: "Starting download.." });
   };
 };
 
 module.exports.logs = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No VodId" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No VodId" });
 
     let total;
     app
       .service("logs")
       .find({
-        vod_id: req.body.vodId,
+        query: {
+          $limit: 0,
+          vod_id: req.body.vodId,
+        }
       })
       .then((data) => {
         total = data.total;
@@ -139,30 +154,67 @@ module.exports.logs = function (app) {
     if (total > 1)
       return res.status(400).json({
         error: true,
-        message: `Logs already exist for ${req.body.vodId}`,
+        msg: `Logs already exist for ${req.body.vodId}`,
       });
 
     vod.getLogs(req.body.vodId, app);
-    res.status(200).json({ error: false, message: "Getting logs.." });
+    res.status(200).json({ error: false, msg: "Getting logs.." });
   };
 };
 
 module.exports.manualLogs = function (app) {
   return async function (req, res, next) {
-    if (!req.body.path) return res.status(400).json({ error: true, message: "No log path" });
-
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No vod id" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No VodId" });
+    if (!req.body.path) return res.status(400).json({ error: true, msg: "No Path" });
 
     vod.manualLogs(req.body.path, req.body.vodId, app);
-    res.status(200).json({ error: false, message: "Starting manual logs.." });
+    res.status(200).json({ error: false, msg: "Getting logs.." });
   };
 };
 
-module.exports.delete = function (app) {
+module.exports.createVod = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No VodId" });
+    if (req.body.vodId == null) return res.status(400).json({ error: true, msg: "Missing parameter: Vod id" });
+    if (!req.body.title) return res.status(400).json({ error: true, msg: "Missing parameter: Title" });
+    if (!req.body.createdAt) return res.status(400).json({ error: true, msg: "Missing parameter: CreatedAt" });
+    if (!req.body.duration) return res.status(400).json({ error: true, msg: "Missing parameter: Duration" });
 
-    res.status(200).json({ error: false, message: "Starting deletion process.." });
+    const exists = await app
+      .service("vods")
+      .get(req.body.vodId)
+      .then(() => true)
+      .catch(() => false);
+
+    if (exists) return res.status(400).json({ error: true, msg: `${req.body.vodId} already exists!` });
+
+    await app
+      .service("vods")
+      .create({
+        id: req.body.vodId,
+        title: req.body.title,
+        date: new Date(req.body.createdAt).toLocaleDateString("en-US", {
+          timeZone: config.timezone,
+        }),
+        createdAt: req.body.createdAt,
+        duration: req.body.duration,
+        drive: req.body.drive ? [req.body.drive] : []
+      })
+      .then(() => {
+        console.info(`Created vod ${req.body.vodId}`);
+        res.status(200).json({ error: false, msg: `${req.body.vodId} Created!` });
+      })
+      .catch((e) => {
+        console.error(e);
+        res.status(200).json({ error: true, msg: `Failed to create ${req.body.vodId}!` });
+      });
+  };
+};
+
+module.exports.deleteVod = function (app) {
+  return async function (req, res, next) {
+    if (req.body.vodId == null) return res.status(400).json({ error: true, msg: "Missing parameter: Vod id" });
+
+    res.status(200).json({ error: false, msg: "Starting deletion process.." });
 
     await app
       .service("vods")
@@ -190,260 +242,80 @@ module.exports.delete = function (app) {
   };
 };
 
-module.exports.dmca = function (app) {
+module.exports.reUploadPart = function (app) {
   return async function (req, res, next) {
-    if (!req.body.receivedClaims) return res.status(400).json({ error: true, message: "No claims" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No vod id" });
 
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No vod id" });
+    if (!req.body.part) return res.status(400).json({ error: true, msg: "No part" });
 
-    if (!req.body.type) return res.status(400).json({ error: true, message: "No type" });
-
-    const vodId = req.body.vodId;
-
-    let vod_data;
-    await app
-      .service("vods")
-      .get(vodId)
-      .then((data) => {
-        vod_data = data;
-      })
-      .catch(() => {});
-
-    if (!vod_data) return console.error("Failed to download video: no VOD in database");
+    if (!req.body.type) return res.status(400).json({ error: true, msg: "No type" });
 
     res.status(200).json({
       error: false,
-      message: `Muting the DMCA content for ${vodId}...`,
+      msg: `Reuploading ${req.body.vodId} Vod Part ${req.body.part}`,
     });
 
-    let vodPath;
-    if (req.body.type === "live") {
-      vodPath = await drive.download(req.body.vodId, req.body.type, app);
-    } else {
-      vodPath = await vod.download(req.body.vodId);
-      if (!vodPath) vodPath = await drive.download(req.body.vodId, req.body.type, app);
-    }
+    const part = parseInt(req.body.part) - 1;
 
-    if (!vodPath) return console.error(`Could not find a download source for ${req.body.vodId}`);
+    const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
+
+    if (!driveVideo) return console.error(`Could not find a download source for ${req.body.vodId}`);
 
     console.info(`Finished download`);
 
-    let muteSection = [],
-      newVodPath,
-      blackoutPath;
-    for (let dmca of req.body.receivedClaims) {
-      const policyType = dmca.claimPolicy.primaryPolicy.policyType;
-      //check if audio
-      if (policyType === "POLICY_TYPE_GLOBAL_BLOCK" || policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK" || policyType === "POLICY_TYPE_BLOCK") {
-        if (dmca.type === "CLAIM_TYPE_AUDIO") {
-          muteSection.push(
-            `volume=0:enable='between(t,${dmca.matchDetails.longestMatchStartTimeSeconds},${
-              parseInt(dmca.matchDetails.longestMatchDurationSeconds) + parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
-            })'`
-          );
-        } else if (dmca.type === "CLAIM_TYPE_VISUAL") {
-          console.info(`Trying to blackout ${blackoutPath ? blackoutPath : vodPath}. Claim: ${JSON.stringify(dmca.asset.metadata)}`);
-          blackoutPath = await vod.blackoutVideo(
-            blackoutPath ? blackoutPath : vodPath,
-            vodId,
-            dmca.matchDetails.longestMatchStartTimeSeconds,
-            dmca.matchDetails.longestMatchDurationSeconds,
-            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) + parseInt(dmca.matchDetails.longestMatchDurationSeconds)
-          );
-        } else if (dmca.type === "CLAIM_TYPE_AUDIOVISUAL") {
-          muteSection.push(
-            `volume=0:enable='between(t,${dmca.matchDetails.longestMatchStartTimeSeconds},${
-              parseInt(dmca.matchDetails.longestMatchDurationSeconds) + parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
-            })'`
-          );
-          console.info(`Trying to blackout ${blackoutPath ? blackoutPath : vodPath}. Claim: ${JSON.stringify(dmca.asset.metadata)}`);
-          blackoutPath = await vod.blackoutVideo(
-            blackoutPath ? blackoutPath : vodPath,
-            vodId,
-            dmca.matchDetails.longestMatchStartTimeSeconds,
-            dmca.matchDetails.longestMatchDurationSeconds,
-            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) + parseInt(dmca.matchDetails.longestMatchDurationSeconds)
-          );
-        }
-      }
+    if (req.body.type === "live") {
+      await vod.liveUploadPart(app, req.body.vodId, driveVideo, config.youtube.splitDuration * part, config.youtube.splitDuration, req.body.part, req.body.type);
+    } else {
+      await vod.liveUploadPart(app, req.body.vodId, driveVideo, config.youtube.splitDuration * part, config.youtube.splitDuration, req.body.part, req.body.type);
     }
-
-    if (muteSection.length > 0) {
-      console.info(`Trying to mute ${blackoutPath ? blackoutPath : vodPath}`);
-      newVodPath = await vod.mute(blackoutPath ? blackoutPath : vodPath, muteSection, vodId);
-      if (!newVodPath) return console.error("failed to mute video");
-    }
-
-    vod.upload(vodId, app, newVodPath, req.body.type);
+    fs.unlinkSync(driveVideo);
   };
 };
 
 module.exports.saveChapters = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No vod id" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No vod id" });
 
     const vodData = await twitch.getVodData(req.body.vodId);
     if (!vodData)
       return res.status(500).json({
         error: true,
-        message: `Failed to get vod data for ${req.body.vodId}`,
+        msg: `Failed to get vod data for ${req.body.vodId}`,
       });
 
     vod.saveChapters(vodData.id, app, moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds());
-    res.status(200).json({ error: false, message: `Saving Chapters for ${req.body.vodId}` });
+    res.status(200).json({ error: false, msg: `Saving Chapters for ${req.body.vodId}` });
   };
 };
 
-module.exports.reUploadPart = function (app) {
+module.exports.saveDuration = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No vod id" });
+    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No vod id" });
 
-    if (!req.body.part) return res.status(400).json({ error: true, message: "No part" });
+    const vodData = await twitch.getVodData(req.body.vodId);
+    if (!vodData)
+      return res.status(500).json({
+        error: true,
+        msg: `Failed to get vod data for ${req.body.vodId}`,
+      });
 
-    if (!req.body.type) return res.status(400).json({ error: true, message: "No type" });
-
-    res.status(200).json({
-      error: false,
-      message: `Reuploading ${req.body.vodId} Vod Part ${req.body.part}`,
-    });
-
-    const part = parseInt(req.body.part) - 1;
-
-    if (req.body.type === "live") {
-      const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
-      if (!driveVideo) return console.error(`Could not find a download source for ${req.body.vodId}`);
-      console.info(`Finished download`);
-      await vod.liveUploadPart(app, req.body.vodId, driveVideo, config.splitDuration * part, config.splitDuration, req.body.part, req.body.type);
-
-      fs.unlinkSync(driveVideo);
-    } else {
-      const mp4Video = await vod.download(req.body.vodId);
-      if (mp4Video) {
-        console.info(`Finished download`);
-        await vod.liveUploadPart(app, req.body.vodId, mp4Video, config.splitDuration * part, config.splitDuration, req.body.part, req.body.type);
-        fs.unlinkSync(mp4Video);
-      } else {
-        const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
-        if (!driveVideo) return console.error(`Could not find a download source for ${req.body.vodId}`);
-        console.info(`Finished download`);
-        await vod.liveUploadPart(app, req.body.vodId, driveVideo, config.splitDuration * part, config.splitDuration, req.body.part, req.body.type);
-        fs.unlinkSync(driveVideo);
-      }
-    }
-  };
-};
-
-module.exports.partDmca = function (app) {
-  return async function (req, res, next) {
-    if (!req.body.receivedClaims) return res.status(400).json({ error: true, message: "No claims" });
-
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "No vod id" });
-
-    if (!req.body.part) return res.status(400).json({ error: true, message: "No part" });
-
-    if (!req.body.type) return res.status(400).json({ error: true, message: "No type" });
-
-    res.status(200).json({
-      error: false,
-      message: `Trimming DMCA Content from ${req.body.vodId} Vod Part ${req.body.part}`,
-    });
-
-    let vod_data;
-    await app
+    const exists = await app
       .service("vods")
       .get(req.body.vodId)
-      .then((data) => {
-        vod_data = data;
-      })
-      .catch(() => {});
+      .then(() => true)
+      .catch(() => false);
 
-    if (!vod_data) return console.error("Failed get vod: no VOD in database");
-
-    if (req.body.type === "live") {
-      const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
-      if (!driveVideo) return console.error(`Could not find a download source for ${req.body.vodId}`);
-      trimmedPath = await vod.trim(driveVideo, req.body.vodId, config.splitDuration * (parseInt(req.body.part) - 1), config.splitDuration);
-
-      fs.unlinkSync(driveVideo);
-    } else {
-      const mp4Video = await vod.download(req.body.vodId);
-      if (mp4Video) {
-        console.info(`Finished download`);
-        trimmedPath = await vod.trim(mp4Video, req.body.vodId, config.splitDuration * (parseInt(req.body.part) - 1), config.splitDuration);
-        fs.unlinkSync(mp4Video);
-      } else {
-        const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
-        if (!driveVideo) return console.error(`Could not find a download source for ${req.body.vodId}`);
-        console.info(`Finished download`);
-        trimmedPath = await vod.trim(driveVideo, req.body.vodId, config.splitDuration * (parseInt(req.body.part) - 1), config.splitDuration);
-
-        fs.unlinkSync(driveVideo);
-      }
+    if (exists) {
+      await app
+        .service("vods")
+        .patch(req.body.vodId, {
+          duration: moment.utc(moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds() * 1000).format("HH:mm:ss"),
+        })
+        .then(() => res.status(200).json({ error: false, msg: "Saved duration!" }))
+        .catch(() => res.status(500).json({ error: true, msg: "Failed to save duration!" }));
+      return;
     }
 
-    let muteSection = [],
-      newVodPath,
-      blackoutPath;
-    for (let dmca of req.body.receivedClaims) {
-      //check if audio
-      const policyType = dmca.claimPolicy.primaryPolicy.policyType;
-      //check if audio
-      if (policyType === "POLICY_TYPE_GLOBAL_BLOCK" || policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK" || policyType === "POLICY_TYPE_BLOCK") {
-        if (dmca.type === "CLAIM_TYPE_AUDIO") {
-          muteSection.push(
-            `volume=0:enable='between(t,${dmca.matchDetails.longestMatchStartTimeSeconds},${
-              parseInt(dmca.matchDetails.longestMatchDurationSeconds) + parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
-            })'`
-          );
-        } else if (dmca.type === "CLAIM_TYPE_VISUAL") {
-          console.info(`Trying to blackout ${blackoutPath ? blackoutPath : trimmedPath}. Claim: ${JSON.stringify(dmca.asset.metadata)}`);
-          blackoutPath = await vod.blackoutVideo(
-            blackoutPath ? blackoutPath : trimmedPath,
-            req.body.vodId,
-            dmca.matchDetails.longestMatchStartTimeSeconds,
-            dmca.matchDetails.longestMatchDurationSeconds,
-            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) + parseInt(dmca.matchDetails.longestMatchDurationSeconds)
-          );
-        } else if (dmca.type === "CLAIM_TYPE_AUDIOVISUAL") {
-          muteSection.push(
-            `volume=0:enable='between(t,${dmca.matchDetails.longestMatchStartTimeSeconds},${
-              parseInt(dmca.matchDetails.longestMatchDurationSeconds) + parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
-            })'`
-          );
-          console.info(`Trying to blackout ${blackoutPath ? blackoutPath : trimmedPath}. Claim: ${JSON.stringify(dmca.asset.metadata)}`);
-          blackoutPath = await vod.blackoutVideo(
-            blackoutPath ? blackoutPath : trimmedPath,
-            req.body.vodId,
-            dmca.matchDetails.longestMatchStartTimeSeconds,
-            dmca.matchDetails.longestMatchDurationSeconds,
-            parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) + parseInt(dmca.matchDetails.longestMatchDurationSeconds)
-          );
-        }
-      }
-    }
-
-    if (muteSection.length > 0) {
-      console.info(`Trying to mute ${blackoutPath ? blackoutPath : trimmedPath}`);
-      newVodPath = await vod.mute(blackoutPath ? blackoutPath : trimmedPath, muteSection, req.body.vodId);
-      if (!newVodPath) return console.error("failed to mute video");
-
-      fs.unlinkSync(trimmedPath);
-    }
-
-    if (!newVodPath && !blackoutPath) return console.error("nothing to mute or blackout. don't try to upload..");
-
-    await vod.trimUpload(
-      newVodPath ? newVodPath : blackoutPath,
-      req.body.type === "vod" ? `${config.channel} ${vod_data.date} Vod Part ${req.body.part}` : `${config.channel} ${vod_data.date} Live Vod Part ${req.body.part}`,
-      config.multiTrack && req.body.type === "live" ? true : !config.multiTrack && req.body.type === "vod" ? true : false,
-      {
-        vod: vod_data,
-        part: req.body.part,
-        type: req.body.type,
-      },
-      app
-    );
-
-    if (blackoutPath) fs.unlinkSync(blackoutPath);
+    res.status(404).json({ error: true, msg: "Vod does not exist!" });
   };
 };
