@@ -61,6 +61,7 @@ module.exports.download = function (app) {
         }),
         createdAt: vodData.created_at,
         duration: moment.utc(moment.duration("PT" + vodData.duration.toUpperCase()).asMilliseconds()).format("HH:mm:ss"),
+        stream_id: vodData.stream_id,
       })
       .then(() => {
         console.info(`Created vod ${vodData.id} for ${vodData.user_name}`);
@@ -115,6 +116,7 @@ module.exports.hlsDownload = function (app) {
         }),
         createdAt: vodData.created_at,
         duration: moment.utc(moment.duration("PT" + vodData.duration.toUpperCase()).asMilliseconds()).format("HH:mm:ss"),
+        stream_id: vodData.stream_id,
       })
       .then(() => {
         console.info(`Created vod ${vodData.id} for ${vodData.user_name}`);
@@ -142,7 +144,7 @@ module.exports.logs = function (app) {
         query: {
           $limit: 0,
           vod_id: req.body.vodId,
-        }
+        },
       })
       .then((data) => {
         total = data.total;
@@ -197,7 +199,7 @@ module.exports.createVod = function (app) {
         }),
         createdAt: req.body.createdAt,
         duration: req.body.duration,
-        drive: req.body.drive ? [req.body.drive] : []
+        drive: req.body.drive ? [req.body.drive] : [],
       })
       .then(() => {
         console.info(`Created vod ${req.body.vodId}`);

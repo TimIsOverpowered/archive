@@ -4,7 +4,7 @@ const readline = require("readline");
 const path = require("path");
 const { google } = require("googleapis");
 
-module.exports.upload = async (vodId, path, app) => {
+module.exports.upload = async (vodId, path, app, type = "vod") => {
   const oauth2Client = app.get("driveOauth2Client");
   const drive = google.drive({
     version: "v3",
@@ -52,7 +52,7 @@ module.exports.upload = async (vodId, path, app) => {
 
   vod_data.drive.push({
     id: res.data.id,
-    type: "vod",
+    type: type,
   });
 
   await app
