@@ -210,7 +210,7 @@ module.exports.upload = async (data, app, isVod = true) => {
       console.info("\n\n");
     }
 
-    console.info(`Uploaded ${data.vod.id} ${data.part} ${data.type} to youtube!`);
+    console.info(isVod ? `Uploaded ${data.vod.id} ${data.part} ${data.type} to youtube!` : `Uploaded ${data.title} to youtube!`);
 
     if (isVod) {
       let vod_youtube;
