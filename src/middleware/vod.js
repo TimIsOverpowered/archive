@@ -75,9 +75,7 @@ module.exports.upload = async (
         await youtube.upload(
           {
             paths: trimmedPath,
-            title: `${config.channel} plays ${chapter.name} ${vod.date} PART ${
-              i + 1
-            }`,
+            title: `${config.channel} plays ${chapter.name} ${vod.date}`,
             type: "vod",
             public: true,
             duration: await getDuration(trimmedPath),
