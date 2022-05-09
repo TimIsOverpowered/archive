@@ -188,7 +188,7 @@ module.exports.upload = async (data, app, isVod = true) => {
             categoryId: "20",
           },
           status: {
-            privacyStatus: config.youtube.public && data.public ? "public" : "unlisted",
+            privacyStatus: data.public ? "public" : "unlisted",
           },
         },
         media: {

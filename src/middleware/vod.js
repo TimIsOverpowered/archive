@@ -105,9 +105,9 @@ module.exports.upload = async (
             : `${config.channel} ${vod.date} Live Vod PART ${i + 1}`,
         type: type,
         public:
-          config.youtube.multiTrack && type === "live"
+          config.youtube.multiTrack && type === "live" && config.youtube.public
             ? true
-            : !config.youtube.multiTrack && type === "vod"
+            : !config.youtube.multiTrack && type === "vod" && config.youtube.public
             ? true
             : false,
         duration: await getDuration(paths[i]),
@@ -131,9 +131,9 @@ module.exports.upload = async (
         ? `${config.channel} ${vod.date} Vod`
         : `${config.channel} ${vod.date} Live Vod`,
     public:
-      config.youtube.multiTrack && type === "live"
+      config.youtube.multiTrack && type === "live" && config.youtube.public
         ? true
-        : !config.youtube.multiTrack && type === "vod"
+        : !config.youtube.multiTrack && type === "vod" && config.youtube.public
         ? true
         : false,
     duration: duration,
@@ -183,9 +183,9 @@ module.exports.liveUploadPart = async (
         ? `${config.channel} ${vod.date} Vod Part ${part}`
         : `${config.channel} ${vod.date} Live Vod Part ${part}`,
     public:
-      config.youtube.multiTrack && type === "live"
+      config.youtube.multiTrack && type === "live" && config.youtube.public
         ? true
-        : !config.youtube.multiTrack && type === "vod"
+        : !config.youtube.multiTrack && type === "vod" && config.youtube.public
         ? true
         : false,
     duration: await getDuration(trimmedPath),
