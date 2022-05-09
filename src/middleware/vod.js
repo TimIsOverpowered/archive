@@ -802,11 +802,11 @@ module.exports.saveChapters = async (vodId, app, duration) => {
   if (chapters.length === 0) {
     const chapter = await twitch.getChapter(vodId);
     if(!chapter) return null;
-    const gameData = await twitch.getGameData(chapter.game.id);
+    const gameData = chapter.game.id !== null ? await twitch.getGameData(chapter.game.id) : null;
     newChapters.push({
       gameId: chapter.game ? chapter.game.id : null,
       name: chapter.game ? chapter.game.displayName : null,
-      image: gameData.box_art_url.replace('{width}x{height}', "40x53"),
+      image: gameData ? gameData.box_art_url.replace('{width}x{height}', "40x53") : null,
       duration: "00:00:00",
       start: 0,
       end: duration,
