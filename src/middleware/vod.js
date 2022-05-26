@@ -802,7 +802,7 @@ module.exports.saveChapters = async (vodId, app, duration) => {
   if (chapters.length === 0) {
     const chapter = await twitch.getChapter(vodId);
     if(!chapter) return null;
-    const gameData = chapter.game.id !== null ? await twitch.getGameData(chapter.game.id) : null;
+    const gameData = chapter.game ? await twitch.getGameData(chapter.game.id) : null;
     newChapters.push({
       gameId: chapter.game ? chapter.game.id : null,
       name: chapter.game ? chapter.game.displayName : null,
