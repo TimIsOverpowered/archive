@@ -27,7 +27,6 @@ module.exports = function (app) {
 
     if (vods.length == 0) return res.status(404).json({ error: true, msg: "No Vod found" });
 
-    res.status(200).json({ error: false, msg: "Starting upload to youtube" });
     const vod_data = vods[0];
 
     vod_data.drive.push({
@@ -44,6 +43,12 @@ module.exports = function (app) {
         console.error(e);
       });
 
-    if (config.youtube.multiTrack) await vod.upload(vod_data.id, app, req.body.path, "live");
+    //Need to deliver a non 200 http code so it will delete the file
+    if (config.youtube.multiTrack) {
+      await vod.upload(vod_data.id, app, req.body.path, "live");
+      res.status(200).json({ error: false, msg: "Starting upload to youtube" });
+    } else {
+      res.status(404).json({ error: true, msg: "Not Uploading to youtube as per multitrack var" });
+    }
   };
 };
