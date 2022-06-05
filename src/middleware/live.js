@@ -45,8 +45,8 @@ module.exports = function (app) {
 
     //Need to deliver a non 200 http code so it will delete the file
     if (config.youtube.multiTrack) {
-      await vod.upload(vod_data.id, app, req.body.path, "live");
       res.status(200).json({ error: false, msg: "Starting upload to youtube" });
+      await vod.upload(vod_data.id, app, req.body.path, "live");
     } else {
       res.status(404).json({ error: true, msg: "Not Uploading to youtube as per multitrack var" });
     }
