@@ -60,7 +60,7 @@
     "redis": "^4.0.2",
     "sequelize": "^6.13.0",
     "serve-favicon": "^2.5.0",
-    "winston": "^3.4.0"
+    "winston": "^3.8.1"
   },
   "devDependencies": {
     "axios": "^0.25.0",
