@@ -58,7 +58,7 @@
     "qs": "^6.10.3",
     "rate-limiter-flexible": "^2.3.6",
     "redis": "^4.0.2",
-    "sequelize": "^6.13.0",
+    "sequelize": "^6.23.0",
     "serve-favicon": "^2.5.0",
     "winston": "^3.4.0"
   },
