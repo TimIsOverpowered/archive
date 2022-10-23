@@ -16,7 +16,9 @@
   "youtube": {
     "description": "",
     "public": true,
+    "vodUpload": true,
     "perGameUpload": false,
+    "restrictedGames": [],
     "splitDuration": 10800,
     "api_key": "",
     "liveUpload": false,
@@ -39,7 +41,7 @@
   "vodDownload": true,
   "drive": {
     "upload": false,
-    "parents": [""],
+    "parents": [],
     "auth": {
       "access_token": "",
       "scope": "https://www.googleapis.com/auth/drive",
