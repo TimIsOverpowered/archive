@@ -38,6 +38,9 @@ module.exports.upload = async (
 
   if (config.youtube.perGameUpload) {
     for (let chapter of vod.chapters) {
+      if (chapter.end < 60 * 5) continue;
+      if (config.youtube.restrictedGames.includes(chapter.name)) continue;
+
       console.info(`Trimming ${chapter.name} from ${vod.id} ${vod.date}`);
       const trimmedPath = await this.trim(
         vodPath,
@@ -88,64 +91,66 @@ module.exports.upload = async (
     }
   }
 
-  const duration = await getDuration(vodPath);
+  if(config.youtube.vodUpload) {
+    const duration = await getDuration(vodPath);
 
-  if (duration > config.youtube.splitDuration) {
-    let paths = await this.splitVideo(vodPath, duration, vodId);
+    if (duration > config.youtube.splitDuration) {
+      let paths = await this.splitVideo(vodPath, duration, vodId);
 
-    if (!paths)
-      return console.error("Something went wrong trying to split the video");
+      if (!paths)
+        return console.error("Something went wrong trying to split the video");
 
-    for (let i = 0; i < paths.length; i++) {
-      const data = {
-        path: paths[i],
-        title:
-          type === "vod"
-            ? `${config.channel} ${vod.date} Vod PART ${i + 1}`
-            : `${config.channel} ${vod.date} Live Vod PART ${i + 1}`,
-        type: type,
-        public:
-          config.youtube.multiTrack && type === "live" && config.youtube.public
-            ? true
-            : !config.youtube.multiTrack && type === "vod" && config.youtube.public
-            ? true
-            : false,
-        duration: await getDuration(paths[i]),
-        vod: vod,
-        part: i + 1,
-      };
-      await youtube.upload(data, app);
+      for (let i = 0; i < paths.length; i++) {
+        const data = {
+          path: paths[i],
+          title:
+            type === "vod"
+              ? `${config.channel} ${vod.date} Vod PART ${i + 1}`
+              : `${config.channel} ${vod.date} Live Vod PART ${i + 1}`,
+          type: type,
+          public:
+            config.youtube.multiTrack && type === "live" && config.youtube.public
+              ? true
+              : !config.youtube.multiTrack && type === "vod" && config.youtube.public
+              ? true
+              : false,
+          duration: await getDuration(paths[i]),
+          vod: vod,
+          part: i + 1,
+        };
+        await youtube.upload(data, app);
+      }
+      setTimeout(async () => {
+        await youtube.saveChapters(vodId, app, type);
+        setTimeout(() => youtube.saveParts(vodId, app, type), 30000);
+      }, 30000);
+      fs.unlinkSync(vodPath);
+      return;
     }
+
+    const data = {
+      path: vodPath,
+      title:
+        type === "vod"
+          ? `${config.channel} ${vod.date} Vod`
+          : `${config.channel} ${vod.date} Live Vod`,
+      public:
+        config.youtube.multiTrack && type === "live" && config.youtube.public
+          ? true
+          : !config.youtube.multiTrack && type === "vod" && config.youtube.public
+          ? true
+          : false,
+      duration: duration,
+      vod: vod,
+      type: type,
+      part: 1,
+    };
+
+    await youtube.upload(data, app);
     setTimeout(async () => {
       await youtube.saveChapters(vodId, app, type);
-      setTimeout(() => youtube.saveParts(vodId, app, type), 30000);
     }, 30000);
-    fs.unlinkSync(vodPath);
-    return;
   }
-
-  const data = {
-    path: vodPath,
-    title:
-      type === "vod"
-        ? `${config.channel} ${vod.date} Vod`
-        : `${config.channel} ${vod.date} Live Vod`,
-    public:
-      config.youtube.multiTrack && type === "live" && config.youtube.public
-        ? true
-        : !config.youtube.multiTrack && type === "vod" && config.youtube.public
-        ? true
-        : false,
-    duration: duration,
-    vod: vod,
-    type: type,
-    part: 1,
-  };
-
-  await youtube.upload(data, app);
-  setTimeout(async () => {
-    await youtube.saveChapters(vodId, app, type);
-  }, 30000);
 };
 
 module.exports.liveUploadPart = async (

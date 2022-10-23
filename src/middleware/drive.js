@@ -18,7 +18,7 @@ module.exports.upload = async (vodId, path, app, type = "vod") => {
     {
       auth: oauth2Client,
       resource: {
-        name: `${vodId}.mp4`,
+        name: `${vodId}_${type}.mp4`,
         parents: config.drive.parents,
       },
       media: {
