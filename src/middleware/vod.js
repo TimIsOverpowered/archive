@@ -61,7 +61,7 @@ module.exports.upload = async (
         for (let i = 0; i < paths.length; i++) {
           await youtube.upload(
             {
-              paths: paths[i],
+              path: paths[i],
               title: `${config.channel} plays ${chapter.name} ${
                 vod.date
               } PART ${i + 1}`,
