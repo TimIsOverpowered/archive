@@ -9,7 +9,7 @@ module.exports = function (app) {
     "emotes",
     {
       vodId: {
-        type: DataTypes.BIGINT,
+        type: DataTypes.TEXT,
         primaryKey: true,
         allowNull: false,
         field: "vod_id",
