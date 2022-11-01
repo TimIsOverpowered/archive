@@ -1,12 +1,11 @@
 const { disallow, iff, isProvider } = require("feathers-hooks-common");
 const redisCache = require("../cache");
-const include = require("./include");
 
 module.exports = {
   before: {
     all: [],
-    find: [iff(isProvider("external"), redisCache.before(), include())],
-    get: [iff(isProvider("external"), redisCache.before(), include())],
+    find: [iff(isProvider("external"), redisCache.before())],
+    get: [iff(isProvider("external"), redisCache.before())],
     create: [disallow("external")],
     update: [disallow("external")],
     patch: [disallow("external")],
