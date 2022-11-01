@@ -158,6 +158,8 @@ module.exports.upload = async (
     setTimeout(async () => {
       await youtube.saveChapters(vodId, app, type);
     }, 30000);
+  } else {
+    fs.unlinkSync(vodPath);
   }
 };
 
