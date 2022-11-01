@@ -309,7 +309,7 @@ module.exports.upload = async (data, app, isVod = true) => {
         });
     } else {
       await app
-        .service("vods")
+        .service("games")
         .create({
           vodId: data.vod.id,
           start_time: data.chapter.start,

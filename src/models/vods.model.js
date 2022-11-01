@@ -52,6 +52,7 @@ module.exports = function (app) {
 
   vods.associate = function (models) {
     vods.hasOne(models.emotes);
+    vods.hasMany(models.games);
   };
 
   return vods;
