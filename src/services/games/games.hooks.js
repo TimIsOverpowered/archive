@@ -20,10 +20,10 @@ module.exports = {
     get: [
       iff(isProvider("external"), redisCache.after({ expiration: 3600 * 24 })),
     ],
-    create: [redisCache.purge()],
-    update: [redisCache.purge()],
-    patch: [redisCache.purge()],
-    remove: [redisCache.purge()],
+    create: [redisCache.purge(), redisCache.purgeVods()],
+    update: [redisCache.purge(), redisCache.purgeVods()],
+    patch: [redisCache.purge(), redisCache.purgeVods()],
+    remove: [redisCache.purge(), redisCache.purgeVods()],
   },
 
   error: {
