@@ -68,6 +68,7 @@ module.exports.upload = async (
               type: "vod",
               public: true,
               duration: await getDuration(paths[i]),
+              chapter: chapter,
               vod: vod,
             },
             app,
@@ -82,6 +83,7 @@ module.exports.upload = async (
             type: "vod",
             public: true,
             duration: await getDuration(trimmedPath),
+            chapter: chapter,
             vod: vod,
           },
           app,
@@ -91,7 +93,7 @@ module.exports.upload = async (
     }
   }
 
-  if(config.youtube.vodUpload) {
+  if (config.youtube.vodUpload) {
     const duration = await getDuration(vodPath);
 
     if (duration > config.youtube.splitDuration) {
@@ -109,9 +111,13 @@ module.exports.upload = async (
               : `${config.channel} ${vod.date} Live Vod PART ${i + 1}`,
           type: type,
           public:
-            config.youtube.multiTrack && type === "live" && config.youtube.public
+            config.youtube.multiTrack &&
+            type === "live" &&
+            config.youtube.public
               ? true
-              : !config.youtube.multiTrack && type === "vod" && config.youtube.public
+              : !config.youtube.multiTrack &&
+                type === "vod" &&
+                config.youtube.public
               ? true
               : false,
           duration: await getDuration(paths[i]),
@@ -137,7 +143,9 @@ module.exports.upload = async (
       public:
         config.youtube.multiTrack && type === "live" && config.youtube.public
           ? true
-          : !config.youtube.multiTrack && type === "vod" && config.youtube.public
+          : !config.youtube.multiTrack &&
+            type === "vod" &&
+            config.youtube.public
           ? true
           : false,
       duration: duration,
@@ -631,13 +639,10 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
     return;
   }
 
-  let videoM3u8 = 
-    await fs.promises
-      .readFile(m3u8Path, "utf8")
-      .catch((e) => {
-        console.error(e); 
-        return null;
-      });
+  let videoM3u8 = await fs.promises.readFile(m3u8Path, "utf8").catch((e) => {
+    console.error(e);
+    return null;
+  });
 
   if (!videoM3u8) {
     setTimeout(() => {
@@ -806,12 +811,16 @@ module.exports.saveChapters = async (vodId, app, duration) => {
   let newChapters = [];
   if (chapters.length === 0) {
     const chapter = await twitch.getChapter(vodId);
-    if(!chapter) return null;
-    const gameData = chapter.game ? await twitch.getGameData(chapter.game.id) : null;
+    if (!chapter) return null;
+    const gameData = chapter.game
+      ? await twitch.getGameData(chapter.game.id)
+      : null;
     newChapters.push({
       gameId: chapter.game ? chapter.game.id : null,
       name: chapter.game ? chapter.game.displayName : null,
-      image: gameData ? gameData.box_art_url.replace('{width}x{height}', "40x53") : null,
+      image: gameData
+        ? gameData.box_art_url.replace("{width}x{height}", "40x53")
+        : null,
       duration: "00:00:00",
       start: 0,
       end: duration,
@@ -957,7 +966,11 @@ module.exports.manualLogs = async (commentsPath, vodId, app) => {
     if ((process.env.NODE_ENV || "").trim() !== "production") {
       readline.clearLine(process.stdout, 0);
       readline.cursorTo(process.stdout, 0, null);
-      process.stdout.write(`Current Log position: ${moment.utc(comment.content_offset_seconds * 1000).format("HH:mm:ss")}`);
+      process.stdout.write(
+        `Current Log position: ${moment
+          .utc(comment.content_offset_seconds * 1000)
+          .format("HH:mm:ss")}`
+      );
     }
     //if (await commentExists(comment._id, app)) continue;
     if (comments.length >= 2500) {
@@ -966,7 +979,9 @@ module.exports.manualLogs = async (commentsPath, vodId, app) => {
         .create(comments)
         .then(() => {
           if ((process.env.NODE_ENV || "").trim() !== "production") {
-            console.info(`\nSaved ${comments.length} comments in DB for vod ${vodId}`);
+            console.info(
+              `\nSaved ${comments.length} comments in DB for vod ${vodId}`
+            );
           }
         })
         .catch((e) => {
@@ -987,7 +1002,11 @@ module.exports.manualLogs = async (commentsPath, vodId, app) => {
     });
     howMany++;
   }
-  console.info(`\nTotal Comments: ${howMany} | Total Time to get logs for ${vodId}: ${(new Date() - start_time) / 1000} seconds`);
+  console.info(
+    `\nTotal Comments: ${howMany} | Total Time to get logs for ${vodId}: ${
+      (new Date() - start_time) / 1000
+    } seconds`
+  );
 
   await app
     .service("logs")

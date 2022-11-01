@@ -7,13 +7,19 @@ const readline = require("readline");
 module.exports.chapters = function (app) {
   const _this = this;
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "Missing vod id.." });
+    if (!req.body.vodId)
+      return res.status(400).json({ error: true, message: "Missing vod id.." });
 
-    if (!req.body.type) return res.status(400).json({ error: true, message: "Missing type param..." });
+    if (!req.body.type)
+      return res
+        .status(400)
+        .json({ error: true, message: "Missing type param..." });
 
     _this.saveChapters(req.body.vodId, app, req.body.type);
 
-    res.status(200).json({ error: false, message: `Saving chapters for ${req.body.vodId}` });
+    res
+      .status(200)
+      .json({ error: false, message: `Saving chapters for ${req.body.vodId}` });
   };
 };
 
@@ -39,27 +45,42 @@ module.exports.saveChapters = async (vodId, app, type = "vod") => {
     })
     .catch(() => {});
 
-  if (!vod_data) return console.error(`Could not save chapters: Can't find vod ${vodId}..`);
+  if (!vod_data)
+    return console.error(`Could not save chapters: Can't find vod ${vodId}..`);
 
-  if (!vod_data.chapters) return console.error(`Could not save chapters: Can't find chapters for vod ${vodId}..`);
+  if (!vod_data.chapters)
+    return console.error(
+      `Could not save chapters: Can't find chapters for vod ${vodId}..`
+    );
 
   console.log(`Saving chapters on youtube for ${vodId}`);
 
-  const type_youtube_data = vod_data.youtube.filter((data) => data.type === type);
+  const type_youtube_data = vod_data.youtube.filter(
+    (data) => data.type === type
+  );
   for (let youtube_data of type_youtube_data) {
     const video_data = await this.getVideo(youtube_data.id, oauth2Client);
-    if (!video_data) return console.error(`Could not save chapters: Can't find ${youtube_data.id} youtube video..`);
+    if (!video_data)
+      return console.error(
+        `Could not save chapters: Can't find ${youtube_data.id} youtube video..`
+      );
     const snippet = video_data.snippet;
 
     let description = (snippet.description += "\n\n");
     for (let chapter of vod_data.chapters) {
-      const startDuration = config.youtube.splitDuration * (youtube_data.part - 1);
+      const startDuration =
+        config.youtube.splitDuration * (youtube_data.part - 1);
       const endDuration = config.youtube.splitDuration * youtube_data.part;
 
-      if (chapter.start <= endDuration && chapter.start + chapter.end >= startDuration) {
+      if (
+        chapter.start <= endDuration &&
+        chapter.start + chapter.end >= startDuration
+      ) {
         const actualTime = chapter.start - startDuration;
         const timestamp = actualTime < 0 ? 0 : actualTime;
-        description += `${moment.utc(timestamp * 1000).format("HH:mm:ss")} ${chapter.name}\n`;
+        description += `${moment.utc(timestamp * 1000).format("HH:mm:ss")} ${
+          chapter.name
+        }\n`;
       }
 
       const res = await youtube.videos.update({
@@ -80,13 +101,19 @@ module.exports.saveChapters = async (vodId, app, type = "vod") => {
 module.exports.parts = function (app) {
   const _this = this;
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, message: "Missing vod id.." });
+    if (!req.body.vodId)
+      return res.status(400).json({ error: true, message: "Missing vod id.." });
 
-    if (!req.body.type) return res.status(400).json({ error: true, message: "Missing Type param..." });
+    if (!req.body.type)
+      return res
+        .status(400)
+        .json({ error: true, message: "Missing Type param..." });
 
     _this.saveParts(req.body.vodId, app, req.body.type);
 
-    res.status(200).json({ error: false, message: `Saving Parts for ${req.body.vodId}` });
+    res
+      .status(200)
+      .json({ error: false, message: `Saving Parts for ${req.body.vodId}` });
   };
 };
 
@@ -105,9 +132,13 @@ module.exports.saveParts = async (vodId, app, type = "vod") => {
     })
     .catch(() => {});
 
-  if (!vod_data) return console.error(`Could not save parts: Can't find vod ${vodId}..`);
+  if (!vod_data)
+    return console.error(`Could not save parts: Can't find vod ${vodId}..`);
 
-  if (vod_data.youtube.length <= 1) return console.error(`Could not save parts: (No or only one) youtube video for ${vodId}`);
+  if (vod_data.youtube.length <= 1)
+    return console.error(
+      `Could not save parts: (No or only one) youtube video for ${vodId}`
+    );
 
   console.log(`Saving parts on youtube for ${vodId}`);
 
@@ -121,7 +152,9 @@ module.exports.saveParts = async (vodId, app, type = "vod") => {
     let description = ``;
     for (let i = 0; i < type_youtube_data.length; i++) {
       if (youtube_data.id === type_youtube_data[i].id) continue;
-      description += `PART ${i + 1}: https://youtube.com/watch?v=${type_youtube_data[i].id}\n`;
+      description += `PART ${i + 1}: https://youtube.com/watch?v=${
+        type_youtube_data[i].id
+      }\n`;
     }
     description += "\n" + snippet.description;
 
@@ -175,7 +208,9 @@ module.exports.upload = async (data, app, isVod = true) => {
   return new Promise(async (resolve, reject) => {
     const fileSize = fs.statSync(data.path).size;
     const vodTitle = data.vod.title.replace(/>|</gi, "");
-    const description = `VOD TITLE: ${vodTitle}\nChat Replay: https://${config.domain_name}/youtube/${data.vod.id}\n` + config.youtube.description;
+    const description =
+      `VOD TITLE: ${vodTitle}\nChat Replay: https://${config.domain_name}/youtube/${data.vod.id}\n` +
+      config.youtube.description;
     const res = await youtube.videos.insert(
       {
         auth: oauth2Client,
@@ -210,7 +245,11 @@ module.exports.upload = async (data, app, isVod = true) => {
       console.info("\n\n");
     }
 
-    console.info(isVod ? `Uploaded ${data.vod.id} ${data.part} ${data.type} to youtube!` : `Uploaded ${data.title} to youtube!`);
+    console.info(
+      isVod
+        ? `Uploaded ${data.vod.id} ${data.part} ${data.type} to youtube!`
+        : `Uploaded ${data.title} to youtube!`
+    );
 
     if (isVod) {
       let vod_youtube;
@@ -261,7 +300,30 @@ module.exports.upload = async (data, app, isVod = true) => {
           thumbnail_url: res.data.snippet.thumbnails.medium.url,
         })
         .then(() => {
-          console.info(`Saved youtube data in DB for vod ${data.vod.id} ${data.type}`);
+          console.info(
+            `Saved youtube data in DB for vod ${data.vod.id} ${data.type}`
+          );
+        })
+        .catch((e) => {
+          console.error(e);
+        });
+    } else {
+      await app
+        .service("vods")
+        .create({
+          vodId: data.vod.id,
+          start_time: data.chapter.start,
+          end_time: data.chapter.end,
+          video_provider: "youtube",
+          video_id: res.data.id,
+          thumbnail_url: res.data.snippet.thumbnails.medium.url,
+          game_id: data.chapter.gameId,
+          game_name: data.chapter.name,
+        })
+        .then(() => {
+          console.info(
+            `Saved game data in DB for games ${data.vod.id} ${data.chapter.name}`
+          );
         })
         .catch((e) => {
           console.error(e);
