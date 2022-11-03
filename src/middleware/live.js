@@ -34,7 +34,7 @@ module.exports = function (app) {
       drive.upload(vod_data.id, path, app, "live");
     } else if (driveId != null) {
       vod_data.drive.push({
-        id: res.data.id,
+        id: driveId,
         type: "live",
       });
       await app
