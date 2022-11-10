@@ -312,8 +312,8 @@ module.exports.upload = async (data, app, isVod = true) => {
         .service("games")
         .create({
           vodId: data.vod.id,
-          start_time: data.chapter.start,
-          end_time: data.chapter.end,
+          start_time: data.start_time,
+          end_time: data.end_time,
           video_provider: "youtube",
           video_id: res.data.id,
           thumbnail_url: res.data.snippet.thumbnails.medium.url,
@@ -322,7 +322,7 @@ module.exports.upload = async (data, app, isVod = true) => {
         })
         .then(() => {
           console.info(
-            `Saved game data in DB for games ${data.vod.id} ${data.chapter.name}`
+            `Created ${data.chapter.name} in games DB for ${data.vod.id}`
           );
         })
         .catch((e) => {
