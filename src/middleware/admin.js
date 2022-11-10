@@ -321,3 +321,46 @@ module.exports.saveDuration = function (app) {
     res.status(404).json({ error: true, msg: "Vod does not exist!" });
   };
 };
+
+module.exports.addGame = function (app) {
+  return async function (req, res, next) {
+    const { vod_id, start_time, end_time, video_provider, video_id, game_id, game_name, thumbnail_url } = req.body;
+    if (vod_id == null) return res.status(400).json({ error: true, msg: "Missing parameter vod_id" });
+    if (start_time == null) return res.status(400).json({ error: true, msg: "Missing parameter: start_time" });
+    if (end_time == null) return res.status(400).json({ error: true, msg: "Missing parameter: end_time" });
+    if (!video_provider) return res.status(400).json({ error: true, msg: "Missing parameter: video_provider" });
+    if (!video_id) return res.status(400).json({ error: true, msg: "Missing parameter: video_id" });
+    if (!game_id) return res.status(400).json({ error: true, msg: "Missing parameter: game_id" });
+    if (!game_name) return res.status(400).json({ error: true, msg: "Missing parameter: game_name" });
+    if (!thumbnail_url) return res.status(400).json({ error: true, msg: "Missing parameter: thumbnail_url" });
+
+    const exists = await app
+      .service("vods")
+      .get(vod_id)
+      .then(() => true)
+      .catch(() => false);
+
+    if (!exists) return res.status(400).json({ error: true, msg: `${vod_id} does not exist!` });
+
+    await app
+      .service("games")
+      .create({
+        vodId: vod_id,
+        start_time: start_time,
+        end_time: end_time,
+        video_provider: video_provider,
+        video_id: video_id,
+        game_id: game_id,
+        game_name: game_name,
+        thumbnail_url: thumbnail_url,
+      })
+      .then(() => {
+        console.info(`Created ${game_name} in games DB for ${vod_id}`);
+        res.status(200).json({ error: false, msg: `Created ${game_name} in games DB for ${vod_id}` });
+      })
+      .catch((e) => {
+        console.error(e);
+        res.status(500).json({ error: true, msg: `Failed to create ${game_name} in games DB for ${vod_id}` });
+      });
+  };
+};

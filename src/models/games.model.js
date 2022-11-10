@@ -19,10 +19,10 @@ module.exports = function (app) {
         field: "vod_id",
       },
       start_time: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.DECIMAL,
       },
       end_time: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.DECIMAL,
       },
       video_provider: {
         type: DataTypes.TEXT,
