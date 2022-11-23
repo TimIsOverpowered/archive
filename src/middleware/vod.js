@@ -27,7 +27,7 @@ module.exports.upload = async (vodId, app, manualPath = false, type = "vod") => 
 
   if (!vodPath) return console.error(`Could not find a download source for ${vodId}`);
 
-  if (config.youtube.perGameUpload) {
+  if (config.youtube.perGameUpload && vod.chapters) {
     for (let chapter of vod.chapters) {
       if (chapter.end < 60 * 5) continue;
       if (config.youtube.restrictedGames.includes(chapter.name)) continue;
