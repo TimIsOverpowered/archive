@@ -411,7 +411,7 @@ module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
       comments.push({
         id: node.id,
         vod_id: vodId,
-        display_name: commenter.displayName,
+        display_name: commenter ? commenter.displayName : null,
         content_offset_seconds: node.contentOffsetSeconds,
         message: message.fragments,
         user_badges: message.userBadges,
@@ -470,7 +470,7 @@ module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
       comments.push({
         id: node.id,
         vod_id: vodId,
-        display_name: commenter.displayName,
+        display_name: commenter ? commenter.displayName : null,
         content_offset_seconds: node.contentOffsetSeconds,
         message: message.fragments,
         user_badges: message.userBadges,
@@ -479,7 +479,7 @@ module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
       });
     }
 
-    await sleep(50); //don't bombarade the api
+    await sleep(150); //don't bombarade the api
   }
 
   if (comments.length > 0) {
@@ -899,7 +899,7 @@ module.exports.getLogs = async (vodId, app) => {
     comments.push({
       id: node.id,
       vod_id: vodId,
-      display_name: commenter.displayName,
+      display_name: commenter ? commenter.displayName : null,
       content_offset_seconds: node.contentOffsetSeconds,
       message: message.fragments,
       user_badges: message.userBadges,
@@ -957,7 +957,7 @@ module.exports.getLogs = async (vodId, app) => {
       comments.push({
         id: node.id,
         vod_id: vodId,
-        display_name: commenter.displayName,
+        display_name: commenter ? commenter.displayName : null,
         content_offset_seconds: node.contentOffsetSeconds,
         message: message.fragments,
         user_badges: message.userBadges,
@@ -966,7 +966,7 @@ module.exports.getLogs = async (vodId, app) => {
       });
     }
 
-    await sleep(50); //don't bombarade the api
+    await sleep(150); //don't bombarade the api
 
     howMany++;
   }
@@ -993,23 +993,25 @@ module.exports.manualLogs = async (commentsPath, vodId, app) => {
   await fs.promises
     .readFile(commentsPath)
     .then((data) => {
-      responseComments = JSON.parse(data).comments;
+      responseComments = JSON.parse(data).comments.edges;
     })
     .catch((e) => {
       console.error(e);
     });
 
   for (let comment of responseComments) {
+    let node = comment.node;
     if ((process.env.NODE_ENV || "").trim() !== "production") {
       readline.clearLine(process.stdout, 0);
       readline.cursorTo(process.stdout, 0, null);
       process.stdout.write(
         `Current Log position: ${moment
-          .utc(comment.content_offset_seconds * 1000)
+          .utc(node.contentOffsetSeconds * 1000)
           .format("HH:mm:ss")}`
       );
     }
-    //if (await commentExists(comment._id, app)) continue;
+    if (await commentExists(node.id, app)) continue;
+
     if (comments.length >= 2500) {
       await app
         .service("logs")
@@ -1026,17 +1028,21 @@ module.exports.manualLogs = async (commentsPath, vodId, app) => {
         });
       comments = [];
     }
+
+    const commenter = node.commenter;
+    const message = node.message;
+
     comments.push({
-      id: comment._id,
+      id: node.id,
       vod_id: vodId,
-      display_name: comment.commenter.display_name,
-      content_offset_seconds: comment.content_offset_seconds,
-      message: comment.message.fragments,
-      user_badges: comment.message.user_badges,
-      user_color: comment.message.user_color,
-      createdAt: comment.created_at,
-      updatedAt: comment.updated_at,
+      display_name: commenter ? commenter.displayName : null,
+      content_offset_seconds: node.contentOffsetSeconds,
+      message: message.fragments,
+      user_badges: message.userBadges,
+      user_color: message.userColor,
+      createdAt: node.createdAt,
     });
+
     howMany++;
   }
   console.info(

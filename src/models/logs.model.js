@@ -21,7 +21,7 @@ module.exports = function (app) {
     },
     display_name: {
       type: DataTypes.TEXT,
-      allowNull: false
+      allowNull: true
     },
     content_offset_seconds: {
       type: DataTypes.TEXT,
