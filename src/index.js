@@ -24,7 +24,7 @@ const start = () => {
   );
 };
 
-if (clusterWorkerSize > 1) {
+if (clusterWorkerSize > 1 && process.env.NODE_ENV === "production") {
   if (!cluster.isMaster) return start();
   for (let i = 0; i < clusterWorkerSize; i++) {
     cluster.fork();
