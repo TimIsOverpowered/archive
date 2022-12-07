@@ -23,14 +23,20 @@ module.exports.checkToken = async () => {
 
 module.exports.refreshToken = async () => {
   await axios
-    .post(`https://id.twitch.tv/oauth2/token?client_id=${config.twitch.auth.client_id}&client_secret=${config.twitch.auth.client_secret}&grant_type=client_credentials`)
+    .post(
+      `https://id.twitch.tv/oauth2/token?client_id=${config.twitch.auth.client_id}&client_secret=${config.twitch.auth.client_secret}&grant_type=client_credentials`
+    )
     .then((response) => {
       const data = response.data;
       config.twitch.auth.access_token = data.access_token;
-      fs.writeFile(path.resolve(__dirname, "../../config/config.json"), JSON.stringify(config, null, 4), (err) => {
-        if (err) return console.error(err);
-        console.info("Refreshed Twitch App Token");
-      });
+      fs.writeFile(
+        path.resolve(__dirname, "../../config/config.json"),
+        JSON.stringify(config, null, 4),
+        (err) => {
+          if (err) return console.error(err);
+          console.info("Refreshed Twitch App Token");
+        }
+      );
     })
     .catch((e) => {
       console.error(e.response ? e.response.data : e);
@@ -60,7 +66,8 @@ module.exports.getVodTokenSig = async (vodID) => {
       extensions: {
         persistedQuery: {
           version: 1,
-          sha256Hash: "0828119ded1c13477966434e15800ff57ddacf13ba1911c129dc2200705b0712",
+          sha256Hash:
+            "0828119ded1c13477966434e15800ff57ddacf13ba1911c129dc2200705b0712",
         },
       },
     },
@@ -75,7 +82,9 @@ module.exports.getVodTokenSig = async (vodID) => {
 
 module.exports.getM3u8 = async (vodId, token, sig) => {
   const data = await axios
-    .get(`https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=twitchweb&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`)
+    .get(
+      `https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=twitchweb&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`
+    )
     .then((response) => response.data)
     .catch((e) => {
       console.error(e.response ? e.response.data : e);
@@ -156,13 +165,34 @@ module.exports.getGameData = async (gameId) => {
 };
 
 module.exports.fetchComments = async (vodId, offset = 0) => {
-  const data = await axios
-    .get(`https://api.twitch.tv/v5/videos/${vodId}/comments?content_offset_seconds=${offset}`, {
-      headers: {
-        "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko",
+  const data = await axios({
+    url: "https://gql.twitch.tv/gql",
+    method: "POST",
+    headers: {
+      Accept: "*/*",
+      "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko", //twitch's
+      "Content-Type": "text/plain;charset=UTF-8",
+    },
+    data: {
+      operationName: "VideoCommentsByOffsetOrCursor",
+      variables: {
+        videoID: vodId,
+        contentOffsetSeconds: offset,
       },
+      extensions: {
+        persistedQuery: {
+          version: 1,
+          sha256Hash:
+            "b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a",
+        },
+      },
+    },
+  })
+    .then((response) => response.data.data.video)
+    .then((video) => {
+      if (!video) return null;
+      return video;
     })
-    .then((response) => response.data)
     .catch((e) => {
       console.error(e.response ? e.response.data : e);
       return null;
@@ -171,13 +201,34 @@ module.exports.fetchComments = async (vodId, offset = 0) => {
 };
 
 module.exports.fetchNextComments = async (vodId, cursor) => {
-  const data = await axios
-    .get(`https://api.twitch.tv/v5/videos/${vodId}/comments?cursor=${cursor}`, {
-      headers: {
-        "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko",
+  const data = await axios({
+    url: "https://gql.twitch.tv/gql",
+    method: "POST",
+    headers: {
+      Accept: "*/*",
+      "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko", //twitch's
+      "Content-Type": "text/plain;charset=UTF-8",
+    },
+    data: {
+      operationName: "VideoCommentsByOffsetOrCursor",
+      variables: {
+        videoID: vodId,
+        cursor: cursor,
       },
+      extensions: {
+        persistedQuery: {
+          version: 1,
+          sha256Hash:
+            "b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a",
+        },
+      },
+    },
+  })
+    .then((response) => response.data.data.video)
+    .then((video) => {
+      if (!video) return null;
+      return video;
     })
-    .then((response) => response.data)
     .catch((e) => {
       console.error(e.response ? e.response.data : e);
       return null;
@@ -202,7 +253,8 @@ module.exports.getChapters = async (vodID) => {
       extensions: {
         persistedQuery: {
           version: 1,
-          sha256Hash: "0094e99aab3438c7a220c0b1897d144be01954f8b4765b884d330d0c0893dbde",
+          sha256Hash:
+            "0094e99aab3438c7a220c0b1897d144be01954f8b4765b884d330d0c0893dbde",
         },
       },
     },
@@ -240,7 +292,8 @@ module.exports.getChapter = async (vodID) => {
       extensions: {
         persistedQuery: {
           version: 1,
-          sha256Hash: "2dbf505ee929438369e68e72319d1106bb3c142e295332fac157c90638968586",
+          sha256Hash:
+            "2dbf505ee929438369e68e72319d1106bb3c142e295332fac157c90638968586",
         },
       },
     },
@@ -273,12 +326,15 @@ module.exports.getStream = async (twitchId) => {
 module.exports.getChannelBadges = async () => {
   await this.checkToken();
   const badges = await axios
-    .get(`https://api.twitch.tv/helix/chat/badges?broadcaster_id=${config.twitch.id}`, {
-      headers: {
-        Authorization: `Bearer ${config.twitch.auth.access_token}`,
-        "Client-Id": config.twitch.auth.client_id,
-      },
-    })
+    .get(
+      `https://api.twitch.tv/helix/chat/badges?broadcaster_id=${config.twitch.id}`,
+      {
+        headers: {
+          Authorization: `Bearer ${config.twitch.auth.access_token}`,
+          "Client-Id": config.twitch.auth.client_id,
+        },
+      }
+    )
     .then((response) => response.data.data)
     .catch((e) => {
       console.error(e.response ? e.response.data : e);
