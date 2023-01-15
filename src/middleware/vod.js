@@ -220,7 +220,7 @@ module.exports.liveUploadPart = async (
   await youtube.upload(data, app);
   setTimeout(async () => {
     await youtube.saveChapters(vodId, app, type);
-    setTimeout(() => outube.saveParts(vodId, app, type), 30000);
+    setTimeout(() => youtube.saveParts(vodId, app, type), 30000);
   }, 30000);
 };
 
