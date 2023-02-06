@@ -22,6 +22,12 @@ module.exports = function (app) {
 
     if (!isNaN(content_offset_seconds) && content_offset_seconds !== null) {
       const vodData = await returnVodData(app, vodId);
+      if (!vodData)
+        return res.status(500).json({
+          error: true,
+          msg: `Failed to retrieve vod ${vodId}`,
+        });
+
       let key = `${config.channel}-${vodId}-offset-${content_offset_seconds}`;
       responseJson = await client
         .get(key)
@@ -269,8 +275,6 @@ const returnVodData = async (app, vodId) => {
       console.error(e);
       return null;
     });
-
-  if (!data) return null;
 
   return data;
 };
