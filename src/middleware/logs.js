@@ -37,7 +37,7 @@ module.exports = function (app) {
           });
 
         client.set(key, JSON.stringify(responseJson), {
-          EX: 60 * 60 * 24 * 1,
+          EX: 60 * 5,
         });
       }
     } else {
@@ -68,7 +68,7 @@ module.exports = function (app) {
           });
 
         client.set(key, JSON.stringify(responseJson), {
-          EX: 60 * 5,
+          EX: 60 * 60 * 24 * 1,
         });
       }
     }
