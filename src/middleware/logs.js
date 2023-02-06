@@ -1,3 +1,5 @@
+const config = require("../../config/config.json");
+
 module.exports = function (app) {
   return async function (req, res, next) {
     if (!req.params.vodId)
@@ -10,108 +12,229 @@ module.exports = function (app) {
         .json({ error: true, msg: "Missing request params" });
 
     const vodId = req.params.vodId,
-      content_offset_seconds = req.query.content_offset_seconds;
+      content_offset_seconds = parseFloat(
+        req.query.content_offset_seconds
+      ).toFixed(1),
+      cursor = req.query.cursor;
 
-    let cursor = null,
-      logs;
+    const client = app.get("redisClient");
+    let responseJson;
 
-    if (content_offset_seconds) {
-      await app
-        .service("logs")
-        .find({
-          paginate: false,
-          query: {
-            vod_id: vodId,
-            content_offset_seconds: {
-              $gte: content_offset_seconds,
-            },
-            $limit: 201,
-            $sort: {
-              content_offset_seconds: 1,
-            },
-          },
-        })
-        .then((data) => {
-          if (data.length === 0) return;
-          if (data.length === 201)
-            cursor = Buffer.from(
-              JSON.stringify({
-                id: data[200]._id,
-                content_offset_seconds: data[200].content_offset_seconds,
-              })
-            ).toString("base64");
-          logs = data.slice(0, 200);
-        })
-        .catch((e) => {
-          console.error(e);
+    if (!isNaN(content_offset_seconds) && content_offset_seconds !== null) {
+      let key = `${config.channel}-${vodId}-offset-${content_offset_seconds}`;
+      responseJson = await client
+        .get(key)
+        .then((data) => JSON.parse(data))
+        .catch(() => null);
+
+      if (!responseJson) {
+        responseJson = await offsetSearch(app, vodId, content_offset_seconds);
+
+        if (!responseJson)
+          return res.status(500).json({
+            error: true,
+            msg: `Failed to retrieve comments from offset ${content_offset_seconds}`,
+          });
+
+        client.set(key, JSON.stringify(responseJson), {
+          EX: 60 * 60 * 24 * 1,
         });
+      }
+    } else {
+      let key = cursor;
+      responseJson = await client
+        .get(key)
+        .then((data) => JSON.parse(data))
+        .catch(() => null);
 
-      if (!logs)
-        return res.status(500).json({
-          error: true,
-          msg: "Failed to retrieve logs from the database",
+      if (!responseJson) {
+        let cursorJson;
+
+        try {
+          cursorJson = JSON.parse(Buffer.from(key, "base64").toString());
+        } catch (e) {}
+
+        if (!cursorJson)
+          return res
+            .status(500)
+            .json({ error: true, msg: "Failed to parse cursor" });
+
+        responseJson = await cursorSearch(app, vodId, cursorJson);
+
+        if (!responseJson)
+          return res.status(500).json({
+            error: true,
+            msg: `Failed to retrieve comments from cursor ${cursor}`,
+          });
+
+        client.set(key, JSON.stringify(responseJson), {
+          EX: 60 * 5,
         });
-
-      return res.json({
-        comments: logs,
-        cursor: cursor,
-      });
+      }
     }
 
-    let json;
+    return res.json(responseJson);
+  };
+};
 
-    try {
-      json = JSON.parse(Buffer.from(req.query.cursor, "base64").toString());
-    } catch (e) {}
+const cursorSearch = async (app, vodId, cursorJson) => {
+  const data = await app
+    .service("logs")
+    .find({
+      paginate: false,
+      query: {
+        vod_id: vodId,
+        _id: {
+          $gte: cursorJson.id,
+        },
+        $limit: 201,
+        $sort: {
+          content_offset_seconds: 1,
+          _id: 1,
+        },
+      },
+    })
+    .catch((e) => {
+      console.error(e);
+      return null;
+    });
 
-    if (!json)
-      return res
-        .status(500)
-        .json({ error: true, msg: "Failed to parse cursor" });
+  if (!data) return null;
 
-    await app
+  if (data.length === 0) return null;
+
+  let cursor, comments;
+
+  if (data.length === 201) {
+    cursor = Buffer.from(
+      JSON.stringify({
+        id: data[200]._id,
+        content_offset_seconds: data[200].content_offset_seconds,
+      })
+    ).toString("base64");
+  }
+
+  comments = data.slice(0, 200);
+
+  return { comments: comments, cursor: cursor };
+};
+
+const offsetSearch = async (app, vodId, content_offset_seconds) => {
+  let startingId = await returnStartingId(app, vodId);
+  if (!startingId) return null;
+
+  let commentId = await returnCommentId(app, vodId, content_offset_seconds);
+  if (!commentId) return null;
+
+  let index = parseInt(commentId) - parseInt(startingId);
+  index = Math.floor(index / 200) * 200;
+
+  const searchCursor = parseInt(startingId) + index;
+
+  const data = await app
+    .service("logs")
+    .find({
+      paginate: false,
+      query: {
+        vod_id: vodId,
+        _id: {
+          $gte: searchCursor,
+        },
+        $limit: 201,
+        $sort: {
+          content_offset_seconds: 1,
+          _id: 1,
+        },
+      },
+    })
+    .catch((e) => {
+      console.error(e);
+      return null;
+    });
+
+  if (!data) return null;
+
+  if (data.length === 0) return null;
+
+  let cursor, comments;
+
+  if (data.length === 201) {
+    cursor = Buffer.from(
+      JSON.stringify({
+        id: data[200]._id,
+        content_offset_seconds: data[200].content_offset_seconds,
+      })
+    ).toString("base64");
+  }
+
+  comments = data.slice(0, 200);
+
+  return { comments: comments, cursor: cursor };
+};
+
+const returnCommentId = async (app, vodId, content_offset_seconds) => {
+  let data = await app
+    .service("logs")
+    .find({
+      paginate: false,
+      query: {
+        vod_id: vodId,
+        content_offset_seconds: {
+          $gte: content_offset_seconds,
+        },
+        $limit: 1,
+        $sort: {
+          content_offset_seconds: 1,
+          _id: 1,
+        },
+      },
+    })
+    .catch((e) => {
+      console.error(e);
+      return null;
+    });
+
+  if (!data) return null;
+
+  if (data.length === 0) return null;
+
+  return data[0]._id;
+};
+
+const returnStartingId = async (app, vodId) => {
+  const key = `${config.channel}-${vodId}-chat-startingId`;
+  const client = app.get("redisClient");
+  let startingId = await client
+    .get(key)
+    .then((data) => data)
+    .catch(() => null);
+
+  if (!startingId) {
+    let data = await app
       .service("logs")
       .find({
         paginate: false,
         query: {
           vod_id: vodId,
-          _id: {
-            $gte: json.id,
-          },
-          content_offset_seconds: {
-            $gte: json.content_offset_seconds,
-          },
-          $limit: 201,
+          $limit: 1,
           $sort: {
             content_offset_seconds: 1,
+            _id: 1,
           },
         },
       })
-      .then((data) => {
-        if (data.length === 0) return;
-        if (data.length === 201) {
-          cursor = Buffer.from(
-            JSON.stringify({
-              id: data[200]._id,
-              content_offset_seconds: data[200].content_offset_seconds,
-            })
-          ).toString("base64");
-        }
-        logs = data.slice(0, 200);
-      })
-      .catch((e) => {
-        console.error(e);
-      });
+      .catch(() => null);
 
-    if (!logs)
-      return res.status(500).json({
-        error: true,
-        msg: "Failed to retrieve logs from the database",
-      });
+    if (!data) return null;
 
-    return res.json({
-      comments: logs,
-      cursor: cursor,
+    if (data.length === 0) return null;
+
+    startingId = data[0]._id;
+
+    client.set(key, startingId, {
+      EX: 60 * 60 * 24 * 1,
     });
-  };
+  }
+
+  return startingId;
 };
