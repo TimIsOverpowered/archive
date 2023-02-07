@@ -151,44 +151,22 @@ module.exports.after = (passedOptions = {}) => {
 
 async function purgeGroup(client, group, prefix = config.channel) {
   return new Promise((resolve, reject) => {
-    let cursor = "0";
+    let cursor = 0;
     const scan = async () => {
       const reply = await client
         .SCAN(cursor, { MATCH: `${prefix}${group}*`, COUNT: 1000 })
         .catch((err) => reject(err));
 
-      if (!reply.keys[0]) return resolve();
-
       cursor = reply.cursor;
       const keys = reply.keys;
 
-      const batchKeys = keys.reduce((a, c) => {
-        if (Array.isArray(a[a.length - 1]) && a[a.length - 1].length < 100) {
-          a[a.length - 1].push(c);
-        } else if (
-          !Array.isArray(a[a.length - 1]) ||
-          a[a.length - 1].length >= 100
-        ) {
-          a.push([c]);
-        }
-        return a;
-      }, []);
+      for (key of keys) {
+        await client.del(key);
+      }
 
-      async.eachOfLimit(
-        batchKeys,
-        10,
-        (batch, idx, cb) => {
-          if (client.unlink) {
-            client.unlink(batch, cb);
-          } else {
-            client.del(batch, cb);
-          }
-        },
-        (err) => {
-          if (err) return reject(err);
-          return scan();
-        }
-      );
+      if (cursor !== 0) return scan();
+
+      resolve()
     };
     return scan();
   });
