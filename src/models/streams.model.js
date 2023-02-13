@@ -17,6 +17,7 @@ module.exports = function (app) {
       },
     },
     {
+      timestamps: false,
       hooks: {
         beforeCount(options) {
           options.raw = true;
@@ -24,10 +25,6 @@ module.exports = function (app) {
       },
     }
   );
-
-  streams.associate = function (models) {
-    streams.belongsTo(models.vods);
-  };
 
   return streams;
 };
