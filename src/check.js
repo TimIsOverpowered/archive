@@ -25,6 +25,28 @@ module.exports.check = async (app) => {
       this.check(app);
     }, 30000);
 
+  const streamExists = await app
+    .service("streams")
+    .get(stream[0].id)
+    .then(() => true)
+    .catch(() => false);
+
+  if (!streamExists)
+    await app
+      .service("streams")
+      .create({
+        id: stream[0].id,
+        started_at: stream[0].started_at,
+      })
+      .then(() =>
+        console.log(
+          `${config.channel} stream online. Created Stream. ${stream[0].started_at}`
+        )
+      )
+      .catch((e) => {
+        console.error(e);
+      });
+
   const vodData = await twitch.getLatestVodData(twitchId);
 
   if (!vodData)
@@ -56,7 +78,13 @@ module.exports.check = async (app) => {
         createdAt: vodData.created_at,
         stream_id: vodData.stream_id,
       })
-      .then(() => console.log(`${config.channel} went online. Creating vod. ${new Date().toLocaleDateString()}`))
+      .then(() =>
+        console.log(
+          `${
+            config.channel
+          } went online. Creating vod. ${new Date().toLocaleDateString()}`
+        )
+      )
       .catch((e) => {
         console.error(e);
       });
