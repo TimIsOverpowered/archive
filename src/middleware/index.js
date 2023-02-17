@@ -6,6 +6,7 @@ const twitch = require("./twitch");
 const { limiter } = require("./rateLimit");
 const dmca = require("./dmca");
 const search = require("./search");
+const { checkPullZone } = require("./bunnycdn");
 
 module.exports = function (app) {
   app.post("/admin/download", limiter(app), admin.verify(app), admin.download(app));
@@ -25,5 +26,6 @@ module.exports = function (app) {
   app.post("/v2/live", limiter(app), admin.verify(app), live(app));
   app.get("/v2/badges", limiter(app), twitch.badges(app));
   app.get("/v1/vods/:vodId/comments", limiter(app), logs(app));
+  app.get("/cdn", limiter(app), checkPullZone(app));
   app.post("/search", limiter(app), search(app));
 };
