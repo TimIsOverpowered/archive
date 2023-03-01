@@ -16,10 +16,7 @@ module.exports.checkPullZone = (app) => {
         });
       const responseJson = {
         enabled: config.bunnycdn ? config.bunnycdn.enabled : false,
-        available:
-          config.bunnycdn && config.bunnycdn.enabled
-            ? await checkAvailability()
-            : false,
+        available: config.bunnycdn && config.bunnycdn.enabled ? await checkAvailability() : false,
       };
       client.set(key, JSON.stringify(responseJson), {
         EX: 60 * 5,
@@ -33,19 +30,13 @@ module.exports.checkPullZone = (app) => {
 };
 
 const checkAvailability = async () => {
-  const available = await axios(
-    `https://api.bunny.net/pullzone/checkavailability`,
-    {
-      method: "POST",
-      headers: {
-        AccessKey: `${config.bunnycdn.api_key}`,
-      },
-      data: {
-        name: config.bunnycdn.pull_zone,
-      },
-    }
-  )
-    .then((response) => response.data.Available)
+  const available = await axios(`https://api.bunny.net/pullzone/${config.bunnycdn.pull_zone}`, {
+    method: "GET",
+    headers: {
+      AccessKey: `${config.bunnycdn.api_key}`,
+    },
+  })
+    .then((response) => response.data.Enabled)
     .catch(async (e) => {
       console.error(e.response ? e.response.data : e);
       return false;
