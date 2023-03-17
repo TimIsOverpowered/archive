@@ -400,6 +400,11 @@ module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
         console.error(e);
       });
     response = await twitch.fetchComments(vodId, offset);
+    if (!response?.comments) {
+      console.info(`No comments for vod ${vodId} at offset ${offset}`);
+      redisClient.del(`${config.channel}-chat-downloading`);
+      return;
+    }
     let responseComments = response.comments.edges;
 
     for (let comment of responseComments) {
@@ -424,7 +429,7 @@ module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
   while (cursor) {
     lastCursor = cursor;
     response = await twitch.fetchNextComments(vodId, cursor);
-    if (!response) {
+    if (!response?.comments) {
       console.info(
         `No more comments left due to vod ${vodId} being deleted or errored out..`
       );
@@ -888,6 +893,10 @@ module.exports.getLogs = async (vodId, app) => {
   let comments = [];
   let cursor;
   let response = await twitch.fetchComments(vodId);
+  if (!response?.comments) {
+    console.info(`No comments for vod ${vodId}`);
+    return;
+  }
   let responseComments = response.comments.edges;
 
   for (let comment of responseComments) {
@@ -911,7 +920,7 @@ module.exports.getLogs = async (vodId, app) => {
   let howMany = 1;
   while (cursor) {
     response = await twitch.fetchNextComments(vodId, cursor);
-    if (!response) {
+    if (!response?.comments) {
       console.info(
         `No more comments left due to vod ${vodId} being deleted or errored out..`
       );
