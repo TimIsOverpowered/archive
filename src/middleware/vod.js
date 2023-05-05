@@ -380,8 +380,6 @@ module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
     response,
     lastCursor;
 
-  const redisClient = app.get("redisClient");
-
   if (!cursor) {
     let offset = 0;
     await app
@@ -402,7 +400,7 @@ module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
     response = await twitch.fetchComments(vodId, offset);
     if (!response?.comments) {
       console.info(`No comments for vod ${vodId} at offset ${offset}`);
-      redisClient.del(`${config.channel}-chat-downloading`);
+      app.set(`${config.channel}-${vodId}-chat-downloading`, false);
       return;
     }
     let responseComments = response.comments.edges;
@@ -521,7 +519,7 @@ module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
     }, 1000 * 60 * 1);
   } else {
     console.info(`Saved all comments in DB for vod ${vodId}`);
-    redisClient.del(`${config.channel}-chat-downloading`);
+    app.set(`${config.channel}-${vodId}-chat-downloading`, false);
     emotes.save(vodId, app);
   }
 };
@@ -579,8 +577,7 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
   }
 
   if ((!newVodData && m3u8Exists) || retry >= 10) {
-    const redisClient = app.get("redisClient");
-    redisClient.del(`${config.channel}-vod-downloading`);
+    app.set(`${config.channel}-${vodId}-vod-downloading`, false);
 
     const mp4Path = `${dir}/${vodId}.mp4`;
     await this.convertToMp4(m3u8Path, vodId, mp4Path);

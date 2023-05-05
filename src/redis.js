@@ -11,17 +11,15 @@ module.exports = async function (app) {
       },
     });
 
-  await client
-    .connect()
-    .then(() => {
-      client.DEL(`${config.channel}-vod-downloading`)
-      client.DEL(`${config.channel}-chat-downloading`)
-    })
-    .catch((e) => console.error(e));
+  await client.connect().catch((e) => console.error(e));
 
   app.set("redisClient", client);
 
-  const rateLimiterRedisClient = new IoRedis(redisConf.useSocket ? { enableOfflineQueue: false, path: redisConf.path } : { enableOfflineQueue: false, host: redisConf.host });
+  const rateLimiterRedisClient = new IoRedis(
+    redisConf.useSocket
+      ? { enableOfflineQueue: false, path: redisConf.path }
+      : { enableOfflineQueue: false, host: redisConf.host }
+  );
 
   app.set("rateLimiterRedisClient", rateLimiterRedisClient);
 

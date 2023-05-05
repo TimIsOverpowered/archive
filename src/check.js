@@ -90,15 +90,10 @@ module.exports.check = async (app) => {
       });
   }
 
-  const redisClient = app.get("redisClient");
-
-  const vodDownloading = await redisClient
-    .get(`${config.channel}-vod-downloading`)
-    .then((data) => data)
-    .catch(() => false);
+  const vodDownloading = app.get(`${config.channel}-${vodId}-vod-downloading`);
 
   if (config.vodDownload && !vodDownloading) {
-    redisClient.set(`${config.channel}-vod-downloading`, 1);
+    app.set(`${config.channel}-${vodId}-vod-downloading`, true);
     const dir = `${config.vodPath}/${vodId}`;
     if (await fileExists(dir))
       await fs.promises.rm(dir, {
@@ -108,13 +103,12 @@ module.exports.check = async (app) => {
     vod.download(vodId, app);
   }
 
-  const chatDownloading = await redisClient
-    .get(`${config.channel}-chat-downloading`)
-    .then((data) => data)
-    .catch(() => false);
+  const chatDownloading = app.get(
+    `${config.channel}-${vodId}-chat-downloading`
+  );
 
   if (config.chatDownload && !chatDownloading) {
-    redisClient.set(`${config.channel}-chat-downloading`, 1);
+    app.set(`${config.channel}-${vodId}-chat-downloading`, true);
     console.info(`Start Logs download: ${vodId}`);
     vod.downloadLogs(vodId, app);
     emotes.save(vodId, app);
