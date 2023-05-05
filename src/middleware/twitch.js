@@ -206,7 +206,7 @@ module.exports.fetchNextComments = async (vodId, cursor) => {
     method: "POST",
     headers: {
       Accept: "*/*",
-      "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko", //twitch's
+      "Client-Id": "kd1unb4b3q4t58fwlpcbzcbnm76a8fp",
       "Content-Type": "text/plain;charset=UTF-8",
     },
     data: {
@@ -242,7 +242,7 @@ module.exports.getChapters = async (vodID) => {
     method: "POST",
     headers: {
       Accept: "*/*",
-      "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko", //twitch's
+      "Client-Id": "kd1unb4b3q4t58fwlpcbzcbnm76a8fp",
       "Content-Type": "text/plain;charset=UTF-8",
     },
     data: {
