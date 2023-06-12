@@ -65,7 +65,7 @@ module.exports.save = async (vodId, app) => {
     BTTV_EMOTES = BTTV_EMOTES.concat(BTTV_CHANNEL_EMOTES);
 
   const _7TV_EMOTES = await axios(
-    `${BASE_7TV_EMOTE_API}/users/${config.twitch.username}/emotes`,
+    `${BASE_7TV_EMOTE_API}/users/${twitchId}/emotes`,
     {
       method: "GET",
     }
