@@ -370,7 +370,7 @@ module.exports.badges = function (app) {
       .then((data) => JSON.parse(data))
       .catch(() => null);
 
-    if (cachedBadges) return res.json(badges);
+    if (cachedBadges) return res.json(cachedBadges);
 
     let badges = {
       channel: await _this.getChannelBadges(),
