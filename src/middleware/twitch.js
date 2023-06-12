@@ -343,20 +343,39 @@ module.exports.getChannelBadges = async () => {
   return badges;
 };
 
+module.exports.getGlobalBadges = async () => {
+  await this.checkToken();
+  const badges = await axios
+    .get(`https://api.twitch.tv/helix/chat/badges/global`, {
+      headers: {
+        Authorization: `Bearer ${config.twitch.auth.access_token}`,
+        "Client-Id": config.twitch.auth.client_id,
+      },
+    })
+    .then((response) => response.data.data)
+    .catch((e) => {
+      console.error(e.response ? e.response.data : e);
+      return null;
+    });
+  return badges;
+};
+
 module.exports.badges = function (app) {
   const _this = this;
   return async function (req, res, next) {
     const redisClient = app.get("redisClient");
     const key = `${config.channel}-badges`;
-    let badges;
-    badges = await redisClient
+    const cachedBadges = await redisClient
       .get(key)
       .then((data) => JSON.parse(data))
       .catch(() => null);
 
-    if (badges) return res.json(badges);
+    if (cachedBadges) return res.json(badges);
 
-    badges = await _this.getChannelBadges();
+    let badges = {
+      channel: await _this.getChannelBadges(),
+      global: await _this.getGlobalBadges(),
+    };
 
     if (!badges)
       return res.status(500).json({
