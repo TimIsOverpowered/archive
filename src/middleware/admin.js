@@ -26,9 +26,11 @@ module.exports.verify = function (app) {
 
 module.exports.download = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No VodId" });
+    if (!req.body.vodId)
+      return res.status(400).json({ error: true, msg: "No VodId" });
 
-    if (!req.body.type) return res.status(400).json({ error: true, msg: "No type" });
+    if (!req.body.type)
+      return res.status(400).json({ error: true, msg: "No type" });
 
     const exists = await app
       .service("vods")
@@ -43,7 +45,8 @@ module.exports.download = function (app) {
     }
 
     const vodData = await twitch.getVodData(req.body.vodId);
-    if (!vodData) return res.status(404).json({ error: true, msg: "No Vod Data" });
+    if (!vodData)
+      return res.status(404).json({ error: true, msg: "No Vod Data" });
 
     if (vodData.user_id !== config.twitch.id)
       return res.status(400).json({
@@ -60,7 +63,13 @@ module.exports.download = function (app) {
           timeZone: config.timezone,
         }),
         createdAt: vodData.created_at,
-        duration: moment.utc(moment.duration("PT" + vodData.duration.toUpperCase()).asMilliseconds()).format("HH:mm:ss"),
+        duration: moment
+          .utc(
+            moment
+              .duration("PT" + vodData.duration.toUpperCase())
+              .asMilliseconds()
+          )
+          .format("HH:mm:ss"),
         stream_id: vodData.stream_id,
       })
       .then(() => {
@@ -78,7 +87,8 @@ module.exports.download = function (app) {
 
 module.exports.hlsDownload = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No VodId" });
+    if (!req.body.vodId)
+      return res.status(400).json({ error: true, msg: "No VodId" });
 
     const vodId = req.body.vodId;
 
@@ -98,7 +108,8 @@ module.exports.hlsDownload = function (app) {
     }
 
     const vodData = await twitch.getVodData(vodId);
-    if (!vodData) return res.status(404).json({ error: true, msg: "No Vod Data" });
+    if (!vodData)
+      return res.status(404).json({ error: true, msg: "No Vod Data" });
 
     if (vodData.user_id !== config.twitch.id)
       return res.status(400).json({
@@ -115,7 +126,13 @@ module.exports.hlsDownload = function (app) {
           timeZone: config.timezone,
         }),
         createdAt: vodData.created_at,
-        duration: moment.utc(moment.duration("PT" + vodData.duration.toUpperCase()).asMilliseconds()).format("HH:mm:ss"),
+        duration: moment
+          .utc(
+            moment
+              .duration("PT" + vodData.duration.toUpperCase())
+              .asMilliseconds()
+          )
+          .format("HH:mm:ss"),
         stream_id: vodData.stream_id,
       })
       .then(() => {
@@ -135,7 +152,8 @@ module.exports.hlsDownload = function (app) {
 
 module.exports.logs = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No VodId" });
+    if (!req.body.vodId)
+      return res.status(400).json({ error: true, msg: "No VodId" });
 
     let total;
     app
@@ -166,8 +184,10 @@ module.exports.logs = function (app) {
 
 module.exports.manualLogs = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No VodId" });
-    if (!req.body.path) return res.status(400).json({ error: true, msg: "No Path" });
+    if (!req.body.vodId)
+      return res.status(400).json({ error: true, msg: "No VodId" });
+    if (!req.body.path)
+      return res.status(400).json({ error: true, msg: "No Path" });
 
     vod.manualLogs(req.body.path, req.body.vodId, app);
     res.status(200).json({ error: false, msg: "Getting logs.." });
@@ -176,10 +196,22 @@ module.exports.manualLogs = function (app) {
 
 module.exports.createVod = function (app) {
   return async function (req, res, next) {
-    if (req.body.vodId == null) return res.status(400).json({ error: true, msg: "Missing parameter: Vod id" });
-    if (!req.body.title) return res.status(400).json({ error: true, msg: "Missing parameter: Title" });
-    if (!req.body.createdAt) return res.status(400).json({ error: true, msg: "Missing parameter: CreatedAt" });
-    if (!req.body.duration) return res.status(400).json({ error: true, msg: "Missing parameter: Duration" });
+    if (req.body.vodId == null)
+      return res
+        .status(400)
+        .json({ error: true, msg: "Missing parameter: Vod id" });
+    if (!req.body.title)
+      return res
+        .status(400)
+        .json({ error: true, msg: "Missing parameter: Title" });
+    if (!req.body.createdAt)
+      return res
+        .status(400)
+        .json({ error: true, msg: "Missing parameter: CreatedAt" });
+    if (!req.body.duration)
+      return res
+        .status(400)
+        .json({ error: true, msg: "Missing parameter: Duration" });
 
     const exists = await app
       .service("vods")
@@ -187,7 +219,10 @@ module.exports.createVod = function (app) {
       .then(() => true)
       .catch(() => false);
 
-    if (exists) return res.status(400).json({ error: true, msg: `${req.body.vodId} already exists!` });
+    if (exists)
+      return res
+        .status(400)
+        .json({ error: true, msg: `${req.body.vodId} already exists!` });
 
     await app
       .service("vods")
@@ -203,18 +238,25 @@ module.exports.createVod = function (app) {
       })
       .then(() => {
         console.info(`Created vod ${req.body.vodId}`);
-        res.status(200).json({ error: false, msg: `${req.body.vodId} Created!` });
+        res
+          .status(200)
+          .json({ error: false, msg: `${req.body.vodId} Created!` });
       })
       .catch((e) => {
         console.error(e);
-        res.status(200).json({ error: true, msg: `Failed to create ${req.body.vodId}!` });
+        res
+          .status(200)
+          .json({ error: true, msg: `Failed to create ${req.body.vodId}!` });
       });
   };
 };
 
 module.exports.deleteVod = function (app) {
   return async function (req, res, next) {
-    if (req.body.vodId == null) return res.status(400).json({ error: true, msg: "Missing parameter: Vod id" });
+    if (req.body.vodId == null)
+      return res
+        .status(400)
+        .json({ error: true, msg: "Missing parameter: Vod id" });
 
     res.status(200).json({ error: false, msg: "Starting deletion process.." });
 
@@ -246,11 +288,14 @@ module.exports.deleteVod = function (app) {
 
 module.exports.reUploadPart = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No vod id" });
+    if (!req.body.vodId)
+      return res.status(400).json({ error: true, msg: "No vod id" });
 
-    if (!req.body.part) return res.status(400).json({ error: true, msg: "No part" });
+    if (!req.body.part)
+      return res.status(400).json({ error: true, msg: "No part" });
 
-    if (!req.body.type) return res.status(400).json({ error: true, msg: "No type" });
+    if (!req.body.type)
+      return res.status(400).json({ error: true, msg: "No type" });
 
     res.status(200).json({
       error: false,
@@ -261,14 +306,33 @@ module.exports.reUploadPart = function (app) {
 
     const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
 
-    if (!driveVideo) return console.error(`Could not find a download source for ${req.body.vodId}`);
+    if (!driveVideo)
+      return console.error(
+        `Could not find a download source for ${req.body.vodId}`
+      );
 
     console.info(`Finished download`);
 
     if (req.body.type === "live") {
-      await vod.liveUploadPart(app, req.body.vodId, driveVideo, config.youtube.splitDuration * part, config.youtube.splitDuration, req.body.part, req.body.type);
+      await vod.liveUploadPart(
+        app,
+        req.body.vodId,
+        driveVideo,
+        config.youtube.splitDuration * part,
+        config.youtube.splitDuration,
+        req.body.part,
+        req.body.type
+      );
     } else {
-      await vod.liveUploadPart(app, req.body.vodId, driveVideo, config.youtube.splitDuration * part, config.youtube.splitDuration, req.body.part, req.body.type);
+      await vod.liveUploadPart(
+        app,
+        req.body.vodId,
+        driveVideo,
+        config.youtube.splitDuration * part,
+        config.youtube.splitDuration,
+        req.body.part,
+        req.body.type
+      );
     }
     fs.unlinkSync(driveVideo);
   };
@@ -276,7 +340,8 @@ module.exports.reUploadPart = function (app) {
 
 module.exports.saveChapters = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No vod id" });
+    if (!req.body.vodId)
+      return res.status(400).json({ error: true, msg: "No vod id" });
 
     const vodData = await twitch.getVodData(req.body.vodId);
     if (!vodData)
@@ -285,14 +350,21 @@ module.exports.saveChapters = function (app) {
         msg: `Failed to get vod data for ${req.body.vodId}`,
       });
 
-    vod.saveChapters(vodData.id, app, moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds());
-    res.status(200).json({ error: false, msg: `Saving Chapters for ${req.body.vodId}` });
+    vod.saveChapters(
+      vodData.id,
+      app,
+      moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds()
+    );
+    res
+      .status(200)
+      .json({ error: false, msg: `Saving Chapters for ${req.body.vodId}` });
   };
 };
 
 module.exports.saveDuration = function (app) {
   return async function (req, res, next) {
-    if (!req.body.vodId) return res.status(400).json({ error: true, msg: "No vod id" });
+    if (!req.body.vodId)
+      return res.status(400).json({ error: true, msg: "No vod id" });
 
     const vodData = await twitch.getVodData(req.body.vodId);
     if (!vodData)
@@ -311,10 +383,20 @@ module.exports.saveDuration = function (app) {
       await app
         .service("vods")
         .patch(req.body.vodId, {
-          duration: moment.utc(moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds() * 1000).format("HH:mm:ss"),
+          duration: moment
+            .utc(
+              moment
+                .duration("PT" + vodData.duration.toUpperCase())
+                .asSeconds() * 1000
+            )
+            .format("HH:mm:ss"),
         })
-        .then(() => res.status(200).json({ error: false, msg: "Saved duration!" }))
-        .catch(() => res.status(500).json({ error: true, msg: "Failed to save duration!" }));
+        .then(() =>
+          res.status(200).json({ error: false, msg: "Saved duration!" })
+        )
+        .catch(() =>
+          res.status(500).json({ error: true, msg: "Failed to save duration!" })
+        );
       return;
     }
 
@@ -324,15 +406,48 @@ module.exports.saveDuration = function (app) {
 
 module.exports.addGame = function (app) {
   return async function (req, res, next) {
-    const { vod_id, start_time, end_time, video_provider, video_id, game_id, game_name, thumbnail_url } = req.body;
-    if (vod_id == null) return res.status(400).json({ error: true, msg: "Missing parameter vod_id" });
-    if (start_time == null) return res.status(400).json({ error: true, msg: "Missing parameter: start_time" });
-    if (end_time == null) return res.status(400).json({ error: true, msg: "Missing parameter: end_time" });
-    if (!video_provider) return res.status(400).json({ error: true, msg: "Missing parameter: video_provider" });
-    if (!video_id) return res.status(400).json({ error: true, msg: "Missing parameter: video_id" });
-    if (!game_id) return res.status(400).json({ error: true, msg: "Missing parameter: game_id" });
-    if (!game_name) return res.status(400).json({ error: true, msg: "Missing parameter: game_name" });
-    if (!thumbnail_url) return res.status(400).json({ error: true, msg: "Missing parameter: thumbnail_url" });
+    const {
+      vod_id,
+      start_time,
+      end_time,
+      video_provider,
+      video_id,
+      game_id,
+      game_name,
+      thumbnail_url,
+    } = req.body;
+    if (vod_id == null)
+      return res
+        .status(400)
+        .json({ error: true, msg: "Missing parameter vod_id" });
+    if (start_time == null)
+      return res
+        .status(400)
+        .json({ error: true, msg: "Missing parameter: start_time" });
+    if (end_time == null)
+      return res
+        .status(400)
+        .json({ error: true, msg: "Missing parameter: end_time" });
+    if (!video_provider)
+      return res
+        .status(400)
+        .json({ error: true, msg: "Missing parameter: video_provider" });
+    if (!video_id)
+      return res
+        .status(400)
+        .json({ error: true, msg: "Missing parameter: video_id" });
+    if (!game_id)
+      return res
+        .status(400)
+        .json({ error: true, msg: "Missing parameter: game_id" });
+    if (!game_name)
+      return res
+        .status(400)
+        .json({ error: true, msg: "Missing parameter: game_name" });
+    if (!thumbnail_url)
+      return res
+        .status(400)
+        .json({ error: true, msg: "Missing parameter: thumbnail_url" });
 
     const exists = await app
       .service("vods")
@@ -340,7 +455,10 @@ module.exports.addGame = function (app) {
       .then(() => true)
       .catch(() => false);
 
-    if (!exists) return res.status(400).json({ error: true, msg: `${vod_id} does not exist!` });
+    if (!exists)
+      return res
+        .status(400)
+        .json({ error: true, msg: `${vod_id} does not exist!` });
 
     await app
       .service("games")
@@ -356,11 +474,27 @@ module.exports.addGame = function (app) {
       })
       .then(() => {
         console.info(`Created ${game_name} in games DB for ${vod_id}`);
-        res.status(200).json({ error: false, msg: `Created ${game_name} in games DB for ${vod_id}` });
+        res.status(200).json({
+          error: false,
+          msg: `Created ${game_name} in games DB for ${vod_id}`,
+        });
       })
       .catch((e) => {
         console.error(e);
-        res.status(500).json({ error: true, msg: `Failed to create ${game_name} in games DB for ${vod_id}` });
+        res.status(500).json({
+          error: true,
+          msg: `Failed to create ${game_name} in games DB for ${vod_id}`,
+        });
       });
+  };
+};
+
+module.exports.saveEmotes = function (app) {
+  return async function (req, res, next) {
+    if (!req.body.vodId)
+      return res.status(400).json({ error: true, msg: "No VodId" });
+
+    emotes.save(req.body.vodId, app);
+    res.status(200).json({ error: false, msg: "Saving emotes.." });
   };
 };
