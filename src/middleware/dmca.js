@@ -477,7 +477,7 @@ module.exports.part = function (app) {
 
     if (!vod_data) return console.error("Failed get vod: no VOD in database");
 
-    const driveVideo = `${config.vodPath}\\1848122563.mp4`; //await drive.download(req.body.vodId, req.body.type, app);
+    const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
     if (!driveVideo)
       return console.error(
         `Could not find a download source for ${req.body.vodId}`
