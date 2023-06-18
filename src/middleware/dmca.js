@@ -3,10 +3,16 @@ const ffmpeg = require("fluent-ffmpeg");
 const drive = require("./drive");
 const youtube = require("./youtube");
 const vod = require("./vod");
+const fs = require("fs");
+const path = require("path");
+const readline = require("readline");
 
-module.exports.mute = async (vodPath, muteSection, vodId) => {
+const mute = async (vodPath, muteSection, vodId) => {
   let returnPath;
   await new Promise((resolve, reject) => {
+    const filePath = path.normalize(
+      `${path.dirname(vodPath)}/${vodId}-muted.mp4`
+    );
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
       .videoCodec("copy")
@@ -31,9 +37,9 @@ module.exports.mute = async (vodPath, muteSection, vodId) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${path.dirname(vodPath)}/${vodId}-muted.mp4`);
+        resolve(filePath);
       })
-      .saveToFile(`${path.dirname(vodPath)}/${vodId}-muted.mp4`);
+      .saveToFile(filePath);
   })
     .then((result) => {
       returnPath = result;
@@ -45,7 +51,7 @@ module.exports.mute = async (vodPath, muteSection, vodId) => {
   return returnPath;
 };
 
-module.exports.blackoutVideo = async (vodPath, vodId, start, duration, end) => {
+const blackoutVideo = async (vodPath, vodId, start, duration, end) => {
   const start_video_path = await getStartVideo(vodPath, vodId, start);
   if (!start_video_path) {
     console.error("failed to get start video");
@@ -97,19 +103,20 @@ const getTextList = async (
   end_video_path,
   vodPath
 ) => {
-  const textPath = `${path.dirname(vodPath)}/${vodId}-list.txt`;
-  await writeFile(
+  const textPath = path.normalize(`${path.dirname(vodPath)}/${vodId}-list.txt`);
+  fs.writeFileSync(
     textPath,
     `file '${start_video_path}'\nfile '${trim_clip_path}'\nfile '${end_video_path}'`
-  ).catch((e) => {
-    console.error(e);
-  });
+  );
   return textPath;
 };
 
 const concat = async (vodId, list) => {
   let returnPath;
   await new Promise((resolve, reject) => {
+    const filePath = path.normalize(
+      `${path.dirname(list)}/${vodId}-trimmed.mp4`
+    );
     const ffmpeg_process = ffmpeg(list);
     ffmpeg_process
       .inputOptions(["-f concat", "-safe 0"])
@@ -134,9 +141,9 @@ const concat = async (vodId, list) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${path.dirname(list)}/${vodId}-trimmed.mp4`);
+        resolve(filePath);
       })
-      .saveToFile(`${path.dirname(list)}/${vodId}-trimmed.mp4`);
+      .saveToFile(filePath);
   })
     .then((result) => {
       returnPath = result;
@@ -151,6 +158,9 @@ const concat = async (vodId, list) => {
 const getStartVideo = async (vodPath, vodId, start) => {
   let returnPath;
   await new Promise((resolve, reject) => {
+    const filePath = path.normalize(
+      `${path.dirname(vodPath)}/${vodId}-start.mp4`
+    );
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
       .videoCodec("copy")
@@ -176,9 +186,9 @@ const getStartVideo = async (vodPath, vodId, start) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${path.dirname(vodPath)}/${vodId}-start.mp4`);
+        resolve(filePath);
       })
-      .saveToFile(`${path.dirname(vodPath)}/${vodId}-start.mp4`);
+      .saveToFile(filePath);
   })
     .then((result) => {
       returnPath = result;
@@ -193,6 +203,9 @@ const getStartVideo = async (vodPath, vodId, start) => {
 const getClip = async (vodPath, vodId, start, duration) => {
   let returnPath;
   await new Promise((resolve, reject) => {
+    const filePath = path.normalize(
+      `${path.dirname(vodPath)}/${vodId}-clip.mp4`
+    );
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
       .videoCodec("copy")
@@ -219,9 +232,9 @@ const getClip = async (vodPath, vodId, start, duration) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${path.dirname(vodPath)}/${vodId}-clip.mp4`);
+        resolve(filePath);
       })
-      .saveToFile(`${path.dirname(vodPath)}/${vodId}-clip.mp4`);
+      .saveToFile(filePath);
   })
     .then((result) => {
       returnPath = result;
@@ -236,6 +249,9 @@ const getClip = async (vodPath, vodId, start, duration) => {
 const getTrimmedClip = async (clipPath, vodId) => {
   let returnPath;
   await new Promise((resolve, reject) => {
+    const filePath = path.normalize(
+      `${path.dirname(clipPath)}/${vodId}-clip-muted.mp4`
+    );
     const ffmpeg_process = ffmpeg(clipPath);
     ffmpeg_process
       .audioCodec("copy")
@@ -260,9 +276,9 @@ const getTrimmedClip = async (clipPath, vodId) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${path.dirname(clipPath)}/${vodId}-clip-muted.mp4`);
+        resolve(filePath);
       })
-      .saveToFile(`${path.dirname(clipPath)}/${vodId}-clip-muted.mp4`);
+      .saveToFile(filePath);
   })
     .then((result) => {
       returnPath = result;
@@ -277,6 +293,9 @@ const getTrimmedClip = async (clipPath, vodId) => {
 const getEndVideo = async (vodPath, vodId, end) => {
   let returnPath;
   await new Promise((resolve, reject) => {
+    const filePath = path.normalize(
+      `${path.dirname(vodPath)}/${vodId}-end.mp4`
+    );
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
       .videoCodec("copy")
@@ -302,9 +321,9 @@ const getEndVideo = async (vodPath, vodId, end) => {
         reject(err);
       })
       .on("end", function () {
-        resolve(`${path.dirname(vodPath)}/${vodId}-end.mp4`);
+        resolve(filePath);
       })
-      .saveToFile(`${path.dirname(vodPath)}/${vodId}-end.mp4`);
+      .saveToFile(filePath);
   })
     .then((result) => {
       returnPath = result;
@@ -317,7 +336,6 @@ const getEndVideo = async (vodPath, vodId, end) => {
 };
 
 module.exports = function (app) {
-  const _this = this;
   return async function (req, res, next) {
     if (!req.body.receivedClaims)
       return res.status(400).json({ error: true, msg: "No claims" });
@@ -381,7 +399,7 @@ module.exports = function (app) {
               blackoutPath ? blackoutPath : vodPath
             }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
           );
-          blackoutPath = await _this.blackoutVideo(
+          blackoutPath = await blackoutVideo(
             blackoutPath ? blackoutPath : vodPath,
             vodId,
             dmca.matchDetails.longestMatchStartTimeSeconds,
@@ -403,7 +421,7 @@ module.exports = function (app) {
               blackoutPath ? blackoutPath : vodPath
             }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
           );
-          blackoutPath = await _this.blackoutVideo(
+          blackoutPath = await blackoutVideo(
             blackoutPath ? blackoutPath : vodPath,
             vodId,
             dmca.matchDetails.longestMatchStartTimeSeconds,
@@ -417,7 +435,7 @@ module.exports = function (app) {
 
     if (muteSection.length > 0) {
       console.info(`Trying to mute ${blackoutPath ? blackoutPath : vodPath}`);
-      newVodPath = await _this.mute(
+      newVodPath = await mute(
         blackoutPath ? blackoutPath : vodPath,
         muteSection,
         vodId
@@ -430,7 +448,6 @@ module.exports = function (app) {
 };
 
 module.exports.part = function (app) {
-  const _this = this;
   return async function (req, res, next) {
     if (!req.body.receivedClaims)
       return res.status(400).json({ error: true, msg: "No claims" });
@@ -460,20 +477,27 @@ module.exports.part = function (app) {
 
     if (!vod_data) return console.error("Failed get vod: no VOD in database");
 
-    const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
+    const driveVideo = `${config.vodPath}\\1848122563.mp4`; //await drive.download(req.body.vodId, req.body.type, app);
     if (!driveVideo)
       return console.error(
         `Could not find a download source for ${req.body.vodId}`
       );
 
-    const trimmedPath = await _this.trim(
+    console.info("Finished download..");
+
+    const trimmedPath = await vod.trim(
       driveVideo,
       req.body.vodId,
       config.youtube.splitDuration * (parseInt(req.body.part) - 1),
       config.youtube.splitDuration
     );
 
-    console.info("Finished download..");
+    if (!trimmedPath)
+      return console.error(
+        `Failed Trim for ${req.body.vodId} Part ${req.body.part}`
+      );
+
+    console.info("Finished Trim..");
 
     fs.unlinkSync(driveVideo);
 
@@ -502,7 +526,7 @@ module.exports.part = function (app) {
               blackoutPath ? blackoutPath : trimmedPath
             }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
           );
-          blackoutPath = await _this.blackoutVideo(
+          blackoutPath = await blackoutVideo(
             blackoutPath ? blackoutPath : trimmedPath,
             req.body.vodId,
             dmca.matchDetails.longestMatchStartTimeSeconds,
@@ -524,7 +548,7 @@ module.exports.part = function (app) {
               blackoutPath ? blackoutPath : trimmedPath
             }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
           );
-          blackoutPath = await _this.blackoutVideo(
+          blackoutPath = await blackoutVideo(
             blackoutPath ? blackoutPath : trimmedPath,
             req.body.vodId,
             dmca.matchDetails.longestMatchStartTimeSeconds,
@@ -540,7 +564,7 @@ module.exports.part = function (app) {
       console.info(
         `Trying to mute ${blackoutPath ? blackoutPath : trimmedPath}`
       );
-      newVodPath = await _this.mute(
+      newVodPath = await mute(
         blackoutPath ? blackoutPath : trimmedPath,
         muteSection,
         req.body.vodId
