@@ -579,7 +579,7 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
   if ((!newVodData && m3u8Exists) || retry >= 10) {
     app.set(`${config.channel}-${vodId}-vod-downloading`, false);
 
-    const mp4Path = `${dir}/${vodId}.mp4`;
+    const mp4Path = `${config.vodPath}/${vodId}.mp4`;
     await this.convertToMp4(m3u8Path, vodId, mp4Path);
     if (config.drive.upload) await drive.upload(vodId, mp4Path, app);
     if (config.youtube.liveUpload && config.youtube.upload) {
