@@ -209,8 +209,9 @@ module.exports.upload = async (data, app, isVod = true) => {
     const fileSize = fs.statSync(data.path).size;
     const vodTitle = data.vod.title.replace(/>|</gi, "");
     const description =
-      `VOD TITLE: ${vodTitle}\nChat Replay: https://${config.domain_name}/${isVod ? "youtube" : "games"}/${data.vod.id}\n` +
-      config.youtube.description;
+      `VOD TITLE: ${vodTitle}\nChat Replay: https://${config.domain_name}/${
+        isVod ? "youtube" : "games"
+      }/${data.vod.id}\n` + config.youtube.description;
     const res = await youtube.videos.insert(
       {
         auth: oauth2Client,
@@ -307,6 +308,8 @@ module.exports.upload = async (data, app, isVod = true) => {
         .catch((e) => {
           console.error(e);
         });
+
+      if (config.drive.enabled) fs.unlinkSync(data.path);
     } else {
       await app
         .service("games")
@@ -328,9 +331,8 @@ module.exports.upload = async (data, app, isVod = true) => {
         .catch((e) => {
           console.error(e);
         });
+      fs.unlinkSync(data.path);
     }
-
-    fs.unlinkSync(data.path);
     resolve();
   });
 };
