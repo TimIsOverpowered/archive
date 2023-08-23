@@ -308,8 +308,6 @@ module.exports.upload = async (data, app, isVod = true) => {
         .catch((e) => {
           console.error(e);
         });
-
-      if (config.drive.upload) fs.unlinkSync(data.path);
     } else {
       await app
         .service("games")
@@ -331,7 +329,6 @@ module.exports.upload = async (data, app, isVod = true) => {
         .catch((e) => {
           console.error(e);
         });
-      fs.unlinkSync(data.path);
     }
     resolve();
   });

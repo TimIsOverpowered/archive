@@ -80,6 +80,7 @@ module.exports.upload = async (
             app,
             false
           );
+          fs.unlinkSync(paths[i]);
         }
       } else {
         await youtube.upload(
@@ -97,6 +98,7 @@ module.exports.upload = async (
           app,
           false
         );
+        fs.unlinkSync(trimmedPath);
       }
     }
   }
@@ -133,12 +135,13 @@ module.exports.upload = async (
           part: i + 1,
         };
         await youtube.upload(data, app);
+        fs.unlinkSync(paths[i]);
       }
       setTimeout(async () => {
         await youtube.saveChapters(vodId, app, type);
         setTimeout(() => youtube.saveParts(vodId, app, type), 30000);
       }, 30000);
-      fs.unlinkSync(vodPath);
+      if (config.drive.upload) fs.unlinkSync(vodPath);
       return;
     }
 
@@ -166,8 +169,7 @@ module.exports.upload = async (
     setTimeout(async () => {
       await youtube.saveChapters(vodId, app, type);
     }, 30000);
-  } else {
-    fs.unlinkSync(vodPath);
+    if (config.drive.upload) fs.unlinkSync(vodPath);
   }
 };
 
@@ -222,6 +224,7 @@ module.exports.liveUploadPart = async (
     await youtube.saveChapters(vodId, app, type);
     setTimeout(() => youtube.saveParts(vodId, app, type), 30000);
   }, 30000);
+  if (config.drive.upload) fs.unlinkSync(trimmedPath);
 };
 
 module.exports.splitVideo = async (vodPath, duration, vodId) => {
