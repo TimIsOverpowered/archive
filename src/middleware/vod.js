@@ -173,6 +173,106 @@ module.exports.upload = async (
   }
 };
 
+module.exports.manualVodUpload = async (
+  app,
+  vodId,
+  videoPath,
+  type = "vod"
+) => {
+  let vod;
+  await app
+    .service("vods")
+    .get(vodId)
+    .then((data) => {
+      vod = data;
+    })
+    .catch(() => {});
+
+  if (!vod) return console.error("Failed to get vod: no VOD in database");
+
+  const duration = await getDuration(videoPath);
+
+  const data = {
+    path: videoPath,
+    title:
+      type === "vod"
+        ? `${config.channel} ${vod.date} Vod`
+        : `${config.channel} ${vod.date} Live Vod`,
+    public:
+      config.youtube.multiTrack && type === "live" && config.youtube.public
+        ? true
+        : !config.youtube.multiTrack && type === "vod" && config.youtube.public
+        ? true
+        : false,
+    duration: duration,
+    vod: vod,
+    type: type,
+    part: 1,
+  };
+
+  await youtube.upload(data, app);
+  setTimeout(async () => {
+    await youtube.saveChapters(vodId, app, type);
+  }, 30000);
+  if (config.drive.upload) fs.unlinkSync(vodPath);
+};
+
+module.exports.manualGameUpload = async (app, game, videoPath) => {
+  const { vodId, date, chapter } = game;
+  const { name, end, start } = chapter;
+  console.info(`Trimming ${name} from ${vodId} ${date}`);
+
+  const trimmedPath = await this.trim(videoPath, vodId, start, end);
+  if (!trimmedPath) return console.error("Trim failed");
+
+  if (end > config.youtube.splitDuration) {
+    let paths = await this.splitVideo(trimmedPath, end, vodId);
+    if (!paths)
+      return console.error(
+        "Something went wrong trying to split the trimmed video"
+      );
+
+    for (let i = 0; i < paths.length; i++) {
+      await youtube.upload(
+        {
+          path: paths[i],
+          title: `${config.channel} plays ${name} ${date} PART ${i + 1}`,
+          type: "vod",
+          public: true,
+          duration: await getDuration(paths[i]),
+          chapter: chapter,
+          start_time: start + config.youtube.splitDuration * i,
+          end_time:
+            start + config.youtube.splitDuration * (i + 1) > end
+              ? end
+              : start + config.youtube.splitDuration * (i + 1),
+          vod: vod,
+        },
+        app,
+        false
+      );
+      fs.unlinkSync(paths[i]);
+    }
+  } else {
+    await youtube.upload(
+      {
+        path: trimmedPath,
+        title: `${config.channel} plays ${name} ${date}`,
+        type: "vod",
+        public: true,
+        duration: await getDuration(trimmedPath),
+        chapter: chapter,
+        start_time: start,
+        end_time: end,
+        vod: vod,
+      },
+      app,
+      false
+    );
+    fs.unlinkSync(trimmedPath);
+  }
+};
+
 module.exports.liveUploadPart = async (
   app,
   vodId,

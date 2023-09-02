@@ -498,3 +498,101 @@ module.exports.saveEmotes = function (app) {
     res.status(200).json({ error: false, msg: "Saving emotes.." });
   };
 };
+
+module.exports.vodUpload = function (app) {
+  return async function (req, res, next) {
+    const { vodId, type } = req.body;
+    if (!vodId) return res.status(400).json({ error: true, msg: "No vod id" });
+    if (!type) return res.status(400).json({ error: true, msg: "No type" });
+
+    res.status(200).json({
+      error: false,
+      msg: `Reuploading ${vodId} Vod`,
+    });
+
+    let videoPath = `${
+      type === "live" ? config.livePath : config.vodPath
+    }/${vodId}.mp4`;
+
+    if (!(await fileExists(videoPath))) {
+      if (config.drive.upload)
+        videoPath = await drive.download(vodId, type, app);
+    }
+
+    if (!videoPath)
+      return console.error(
+        `Could not find a download source for ${req.body.vodId}`
+      );
+
+    vod.manualVodUpload(app, vodId, videoPath, type);
+  };
+};
+
+module.exports.gameUpload = function (app) {
+  return async function (req, res, next) {
+    const { vodId, type, chapterIndex } = req.body;
+    if (!vodId) return res.status(400).json({ error: true, msg: "No vod id" });
+    if (!type) return res.status(400).json({ error: true, msg: "No type" });
+    if (chapterIndex == null)
+      return res.status(400).json({ error: true, msg: "No chapter" });
+
+    let vod;
+    await app
+      .service("vods")
+      .get(vodId)
+      .then((data) => {
+        vod = data;
+      })
+      .catch(() => {});
+
+    if (!vod)
+      res.status(404).json({
+        error: true,
+        msg: "Vod does not exist",
+      });
+
+    const game = vod.chapters[chapterIndex];
+    if (!game)
+      res.status(404).json({
+        error: true,
+        msg: "Chapter does not exist",
+      });
+
+    res.status(200).json({
+      error: false,
+      msg: `Uploading ${chapter.name} from ${vodId} Vod`,
+    });
+
+    let videoPath = `${
+      type === "live" ? config.livePath : config.vodPath
+    }/${vodId}.mp4`;
+
+    if (!(await fileExists(videoPath))) {
+      if (config.drive.upload)
+        videoPath = await drive.download(vodId, type, app);
+    }
+
+    if (!videoPath)
+      return console.error(
+        `Could not find a download source for ${req.body.vodId}`
+      );
+
+    vod.manualGameUpload(
+      app,
+      vodId,
+      {
+        vodId: vodId,
+        date: vod.date,
+        chapter: game,
+      },
+      videoPath
+    );
+  };
+};
+
+const fileExists = async (file) => {
+  return fs.promises
+    .access(file, fs.constants.F_OK)
+    .then(() => true)
+    .catch(() => false);
+};
