@@ -515,8 +515,11 @@ module.exports.vodUpload = function (app) {
     }/${vodId}.mp4`;
 
     if (!(await fileExists(videoPath))) {
-      if (config.drive.upload)
+      if (config.drive.upload) {
         videoPath = await drive.download(vodId, type, app);
+      } else {
+        videoPath = null;
+      }
     }
 
     if (!videoPath)
@@ -568,8 +571,11 @@ module.exports.gameUpload = function (app) {
     }/${vodId}.mp4`;
 
     if (!(await fileExists(videoPath))) {
-      if (config.drive.upload)
+      if (config.drive.upload) {
         videoPath = await drive.download(vodId, type, app);
+      } else {
+        videoPath = null;
+      }
     }
 
     if (!videoPath)
