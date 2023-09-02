@@ -11,6 +11,8 @@ const { checkPullZone } = require("./bunnycdn");
 module.exports = function (app) {
   app.post("/admin/download", limiter(app), admin.verify(app), admin.download(app));
   app.post("/admin/hls/download", limiter(app), admin.verify(app), admin.hlsDownload(app));
+  app.post("/admin/manual/vod", limiter(app), admin.verify(app), admin.vodUpload(app));
+  app.post("/admin/manual/game", limiter(app), admin.verify(app), admin.gameUpload(app));
   app.post("/admin/logs", limiter(app), admin.verify(app), admin.logs(app));
   app.post("/admin/logs/manual", limiter(app), admin.verify(app), admin.manualLogs(app));
   app.post("/admin/dmca", limiter(app), admin.verify(app), dmca(app));
