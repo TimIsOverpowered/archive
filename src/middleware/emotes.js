@@ -4,7 +4,7 @@ const axios = require("axios");
 module.exports.save = async (vodId, app) => {
   const BASE_FFZ_EMOTE_API = "https://api.frankerfacez.com/v1",
     BASE_BTTV_EMOTE_API = "https://api.betterttv.net/3",
-    BASE_7TV_EMOTE_API = "https://api.7tv.app/v2";
+    BASE_7TV_EMOTE_API = "https://7tv.io/v3";
 
   const twitchId = config.twitch.id;
 
@@ -65,13 +65,13 @@ module.exports.save = async (vodId, app) => {
     BTTV_EMOTES = BTTV_EMOTES.concat(BTTV_CHANNEL_EMOTES);
 
   const _7TV_EMOTES = await axios(
-    `${BASE_7TV_EMOTE_API}/users/${twitchId}/emotes`,
+    `${BASE_7TV_EMOTE_API}/users/twitch/${twitchId}`,
     {
       method: "GET",
     }
   )
     .then((response) => {
-      const emotes = response.data;
+      const emotes = response.data.emote_set.emotes;
       let newEmotes = [];
       for (let emote of emotes) {
         newEmotes.push({ id: emote.id, code: emote.name });
