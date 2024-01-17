@@ -45,6 +45,7 @@
     "@feathersjs/transport-commons": "^4.5.15",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
+    "dayjs": "^1.11.10",
     "feathers-hooks-common": "^6.1.5",
     "feathers-sequelize": "^6.3.6",
     "fluent-ffmpeg": "^2.1.2",
