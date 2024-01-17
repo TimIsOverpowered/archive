@@ -10,6 +10,7 @@ const drive = require("./drive");
 const youtube = require("./youtube");
 const moment = require("moment");
 const emotes = require("./emotes");
+const dayjs = require("dayjs");
 
 module.exports.upload = async (
   vodId,
@@ -62,9 +63,11 @@ module.exports.upload = async (
           await youtube.upload(
             {
               path: paths[i],
-              title: `${config.channel} plays ${chapter.name} ${
-                vod.date
-              } PART ${i + 1}`,
+              title: `${config.channel} plays ${chapter.name} ${dayjs(
+                vod.createdAt
+              )
+                .format("MMMM DD YYYY")
+                .toUpperCase()} PART ${i + 1}`,
               type: "vod",
               public: true,
               duration: await getDuration(paths[i]),
@@ -86,7 +89,11 @@ module.exports.upload = async (
         await youtube.upload(
           {
             path: trimmedPath,
-            title: `${config.channel} plays ${chapter.name} ${vod.date}`,
+            title: `${config.channel} plays ${chapter.name} - ${dayjs(
+              vod.createdAt
+            )
+              .format("MMMM DD YYYY")
+              .toUpperCase()}`,
             type: "vod",
             public: true,
             duration: await getDuration(trimmedPath),
@@ -117,8 +124,12 @@ module.exports.upload = async (
           path: paths[i],
           title:
             type === "vod"
-              ? `${config.channel} ${vod.date} Vod PART ${i + 1}`
-              : `${config.channel} ${vod.date} Live Vod PART ${i + 1}`,
+              ? `${config.channel} VOD - ${dayjs(vod.createdAt)
+                  .format("MMMM DD YYYY")
+                  .toUpperCase()} PART ${i + 1}`
+              : `${config.channel} Live VOD - ${dayjs(vod.createdAt)
+                  .format("MMMM DD YYYY")
+                  .toUpperCase()} PART ${i + 1}`,
           type: type,
           public:
             config.youtube.multiTrack &&
@@ -149,8 +160,12 @@ module.exports.upload = async (
       path: vodPath,
       title:
         type === "vod"
-          ? `${config.channel} ${vod.date} Vod`
-          : `${config.channel} ${vod.date} Live Vod`,
+          ? `${config.channel} VOD - ${dayjs(vod.createdAt)
+              .format("MMMM DD YYYY")
+              .toUpperCase()}`
+          : `${config.channel} Live VOD - ${dayjs(vod.createdAt)
+              .format("MMMM DD YYYY")
+              .toUpperCase()}`,
       public:
         config.youtube.multiTrack && type === "live" && config.youtube.public
           ? true
@@ -196,8 +211,12 @@ module.exports.manualVodUpload = async (
     path: videoPath,
     title:
       type === "vod"
-        ? `${config.channel} ${vod.date} Vod`
-        : `${config.channel} ${vod.date} Live Vod`,
+        ? `${config.channel} VOD ${dayjs(vod.createdAt)
+            .format("MMMM DD YYYY")
+            .toUpperCase()}`
+        : `${config.channel} Live VOD - ${dayjs(vod.createdAt)
+            .format("MMMM/DD/YYYY")
+            .toUpperCase()}`,
     public:
       config.youtube.multiTrack && type === "live" && config.youtube.public
         ? true
@@ -236,7 +255,9 @@ module.exports.manualGameUpload = async (app, game, videoPath) => {
       await youtube.upload(
         {
           path: paths[i],
-          title: `${config.channel} plays ${name} ${date} PART ${i + 1}`,
+          title: `${config.channel} plays ${name} - ${dayjs(date)
+            .format("MMMM DD YYYY")
+            .toUpperCase()} PART ${i + 1}`,
           type: "vod",
           public: true,
           duration: await getDuration(paths[i]),
@@ -257,7 +278,9 @@ module.exports.manualGameUpload = async (app, game, videoPath) => {
     await youtube.upload(
       {
         path: trimmedPath,
-        title: `${config.channel} plays ${name} ${date}`,
+        title: `${config.channel} plays ${name} - ${dayjs(vod.createdAt)
+          .format("MMMM DD YYYY")
+          .toUpperCase()}`,
         type: "vod",
         public: true,
         duration: await getDuration(trimmedPath),
@@ -305,8 +328,12 @@ module.exports.liveUploadPart = async (
     path: trimmedPath,
     title:
       type === "vod"
-        ? `${config.channel} ${vod.date} Vod Part ${part}`
-        : `${config.channel} ${vod.date} Live Vod Part ${part}`,
+        ? `${config.channel} VOD ${dayjs(vod.createdAt)
+            .format("MMMM DD YYYY")
+            .toUpperCase()} PART ${part}`
+        : `${config.channel} Live VOD - ${dayjs(vod.createdAt)
+            .format("MMMM DD YYYY")
+            .toUpperCase()} PART ${part}`,
     public:
       config.youtube.multiTrack && type === "live" && config.youtube.public
         ? true
