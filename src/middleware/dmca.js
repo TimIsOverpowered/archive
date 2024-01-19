@@ -6,6 +6,7 @@ const vod = require("./vod");
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
+const dayjs = require("dayjs");
 
 const mute = async (vodPath, muteSection, vodId) => {
   let returnPath;
@@ -337,16 +338,13 @@ const getEndVideo = async (vodPath, vodId, end) => {
 
 module.exports = function (app) {
   return async function (req, res, next) {
-    if (!req.body.receivedClaims)
+    const { vodId, type, receivedClaims } = req.body;
+
+    if (!receivedClaims)
       return res.status(400).json({ error: true, msg: "No claims" });
-
-    if (!req.body.vodId)
-      return res.status(400).json({ error: true, msg: "No vod id" });
-
-    if (!req.body.type)
-      return res.status(400).json({ error: true, msg: "No type" });
-
-    const vodId = req.body.vodId;
+    if (!vodId) return res.status(400).json({ error: true, msg: "No vod id" });
+    if (!part) return res.status(400).json({ error: true, msg: "No part" });
+    if (!type) return res.status(400).json({ error: true, msg: "No type" });
 
     let vod_data;
     await app
@@ -365,19 +363,25 @@ module.exports = function (app) {
       msg: `Muting the DMCA content for ${vodId}...`,
     });
 
-    const vodPath = await drive.download(req.body.vodId, req.body.type, app);
+    let videoPath = `${
+      type === "live" ? config.livePath : config.vodPath
+    }/${vodId}.mp4`;
 
-    if (!vodPath)
-      return console.error(
-        `Could not find a download source for ${req.body.vodId}`
-      );
+    if (!(await fileExists(videoPath))) {
+      if (config.drive.upload) {
+        videoPath = await drive.download(vodId, type, app);
+      } else {
+        videoPath = null;
+      }
+    }
 
-    console.info(`Finished download: ${vodId}`);
+    if (!videoPath)
+      return console.error(`Could not find a download source for ${vodId}`);
 
     let muteSection = [],
       newVodPath,
       blackoutPath;
-    for (let dmca of req.body.receivedClaims) {
+    for (let dmca of receivedClaims) {
       const policyType = dmca.claimPolicy.primaryPolicy.policyType;
       if (
         policyType === "POLICY_TYPE_GLOBAL_BLOCK" ||
@@ -396,11 +400,11 @@ module.exports = function (app) {
         } else if (dmca.type === "CLAIM_TYPE_VISUAL") {
           console.info(
             `Trying to blackout ${
-              blackoutPath ? blackoutPath : vodPath
+              blackoutPath ? blackoutPath : videoPath
             }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
           );
           blackoutPath = await blackoutVideo(
-            blackoutPath ? blackoutPath : vodPath,
+            blackoutPath ? blackoutPath : videoPath,
             vodId,
             dmca.matchDetails.longestMatchStartTimeSeconds,
             dmca.matchDetails.longestMatchDurationSeconds,
@@ -418,11 +422,11 @@ module.exports = function (app) {
           );
           console.info(
             `Trying to blackout ${
-              blackoutPath ? blackoutPath : vodPath
+              blackoutPath ? blackoutPath : videoPath
             }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
           );
           blackoutPath = await blackoutVideo(
-            blackoutPath ? blackoutPath : vodPath,
+            blackoutPath ? blackoutPath : videoPath,
             vodId,
             dmca.matchDetails.longestMatchStartTimeSeconds,
             dmca.matchDetails.longestMatchDurationSeconds,
@@ -434,42 +438,38 @@ module.exports = function (app) {
     }
 
     if (muteSection.length > 0) {
-      console.info(`Trying to mute ${blackoutPath ? blackoutPath : vodPath}`);
+      console.info(`Trying to mute ${blackoutPath ? blackoutPath : videoPath}`);
       newVodPath = await mute(
-        blackoutPath ? blackoutPath : vodPath,
+        blackoutPath ? blackoutPath : videoPath,
         muteSection,
         vodId
       );
       if (!newVodPath) return console.error("failed to mute video");
     }
 
-    vod.upload(vodId, app, newVodPath, req.body.type);
+    vod.upload(vodId, app, newVodPath, type);
   };
 };
 
 module.exports.part = function (app) {
   return async function (req, res, next) {
-    if (!req.body.receivedClaims)
+    const { vodId, part, type, receivedClaims } = req.body;
+
+    if (!receivedClaims)
       return res.status(400).json({ error: true, msg: "No claims" });
-
-    if (!req.body.vodId)
-      return res.status(400).json({ error: true, msg: "No vod id" });
-
-    if (!req.body.part)
-      return res.status(400).json({ error: true, msg: "No part" });
-
-    if (!req.body.type)
-      return res.status(400).json({ error: true, msg: "No type" });
+    if (!vodId) return res.status(400).json({ error: true, msg: "No vod id" });
+    if (!part) return res.status(400).json({ error: true, msg: "No part" });
+    if (!type) return res.status(400).json({ error: true, msg: "No type" });
 
     res.status(200).json({
       error: false,
-      msg: `Trimming DMCA Content from ${req.body.vodId} Vod Part ${req.body.part}`,
+      msg: `Trimming DMCA Content from ${vodId} Vod Part ${part}`,
     });
 
     let vod_data;
     await app
       .service("vods")
-      .get(req.body.vodId)
+      .get(vodId)
       .then((data) => {
         vod_data = data;
       })
@@ -477,34 +477,37 @@ module.exports.part = function (app) {
 
     if (!vod_data) return console.error("Failed get vod: no VOD in database");
 
-    const driveVideo = await drive.download(req.body.vodId, req.body.type, app);
-    if (!driveVideo)
-      return console.error(
-        `Could not find a download source for ${req.body.vodId}`
-      );
+    let videoPath = `${
+      type === "live" ? config.livePath : config.vodPath
+    }/${vodId}.mp4`;
 
-    console.info("Finished download..");
+    if (!(await fileExists(videoPath))) {
+      if (config.drive.upload) {
+        videoPath = await drive.download(vodId, type, app);
+      } else {
+        videoPath = null;
+      }
+    }
+
+    if (!videoPath)
+      return console.error(`Could not find a download source for ${vodId}`);
 
     const trimmedPath = await vod.trim(
-      driveVideo,
-      req.body.vodId,
-      config.youtube.splitDuration * (parseInt(req.body.part) - 1),
+      videoPath,
+      vodId,
+      config.youtube.splitDuration * (parseInt(part) - 1),
       config.youtube.splitDuration
     );
 
     if (!trimmedPath)
-      return console.error(
-        `Failed Trim for ${req.body.vodId} Part ${req.body.part}`
-      );
+      return console.error(`Failed Trim for ${vodId} Part ${part}`);
 
     console.info("Finished Trim..");
-
-    fs.unlinkSync(driveVideo);
 
     let muteSection = [],
       newVodPath,
       blackoutPath;
-    for (let dmca of req.body.receivedClaims) {
+    for (let dmca of receivedClaims) {
       const policyType = dmca.claimPolicy.primaryPolicy.policyType;
       if (
         policyType === "POLICY_TYPE_GLOBAL_BLOCK" ||
@@ -528,7 +531,7 @@ module.exports.part = function (app) {
           );
           blackoutPath = await blackoutVideo(
             blackoutPath ? blackoutPath : trimmedPath,
-            req.body.vodId,
+            vodId,
             dmca.matchDetails.longestMatchStartTimeSeconds,
             dmca.matchDetails.longestMatchDurationSeconds,
             parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
@@ -550,7 +553,7 @@ module.exports.part = function (app) {
           );
           blackoutPath = await blackoutVideo(
             blackoutPath ? blackoutPath : trimmedPath,
-            req.body.vodId,
+            vodId,
             dmca.matchDetails.longestMatchStartTimeSeconds,
             dmca.matchDetails.longestMatchDurationSeconds,
             parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
@@ -567,7 +570,7 @@ module.exports.part = function (app) {
       newVodPath = await mute(
         blackoutPath ? blackoutPath : trimmedPath,
         muteSection,
-        req.body.vodId
+        vodId
       );
       if (!newVodPath) return console.error("failed to mute video");
 
@@ -583,22 +586,33 @@ module.exports.part = function (app) {
       {
         path: newVodPath ? newVodPath : blackoutPath,
         title:
-          req.body.type === "vod"
-            ? `${config.channel} ${vod_data.date} Vod Part ${req.body.part}`
-            : `${config.channel} ${vod_data.date} Live Vod Part ${req.body.part}`,
+          type === "vod"
+            ? `${config.channel} VOD - ${dayjs(vod_data.createdAt)
+                .format("MMMM DD YYYY")
+                .toUpperCase()} Part ${part}`
+            : `${config.channel} Live VOD - ${dayjs(vod_data.createdAt)
+                .format("MMMM DD YYYY")
+                .toUpperCase()} Part ${part}`,
         public:
-          config.youtube.multiTrack && req.body.type === "live"
+          config.youtube.multiTrack && type === "live"
             ? true
-            : !config.youtube.multiTrack && req.body.type === "vod"
+            : !config.youtube.multiTrack && type === "vod"
             ? true
             : false,
         vod: vod_data,
-        part: req.body.part,
-        type: req.body.type,
+        part: part,
+        type: type,
       },
       app
     );
 
     if (blackoutPath) fs.unlinkSync(blackoutPath);
   };
+};
+
+const fileExists = async (file) => {
+  return fs.promises
+    .access(file, fs.constants.F_OK)
+    .then(() => true)
+    .catch(() => false);
 };
