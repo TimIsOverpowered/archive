@@ -343,7 +343,6 @@ module.exports = function (app) {
     if (!receivedClaims)
       return res.status(400).json({ error: true, msg: "No claims" });
     if (!vodId) return res.status(400).json({ error: true, msg: "No vod id" });
-    if (!part) return res.status(400).json({ error: true, msg: "No part" });
     if (!type) return res.status(400).json({ error: true, msg: "No type" });
 
     let vod_data;
