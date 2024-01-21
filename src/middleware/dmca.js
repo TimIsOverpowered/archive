@@ -7,6 +7,10 @@ const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
 const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+const timezone = require("dayjs/plugin/timezone");
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const mute = async (vodPath, muteSection, vodId) => {
   let returnPath;
@@ -587,9 +591,11 @@ module.exports.part = function (app) {
         title:
           type === "vod"
             ? `${config.channel} VOD - ${dayjs(vod_data.createdAt)
+                .tz(config.timezone)
                 .format("MMMM DD YYYY")
                 .toUpperCase()} Part ${part}`
             : `${config.channel} Live VOD - ${dayjs(vod_data.createdAt)
+                .tz(config.timezone)
                 .format("MMMM DD YYYY")
                 .toUpperCase()} Part ${part}`,
         public:
