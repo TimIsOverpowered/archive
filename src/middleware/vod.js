@@ -67,7 +67,7 @@ module.exports.upload = async (
           await youtube.upload(
             {
               path: paths[i],
-              title: `${config.channel} plays ${chapter.name} ${dayjs(
+              title: `${config.channel} plays ${chapter.name} - ${dayjs(
                 vod.createdAt
               )
                 .tz(config.timezone)
@@ -221,7 +221,7 @@ module.exports.manualVodUpload = async (
     path: videoPath,
     title:
       type === "vod"
-        ? `${config.channel} VOD ${dayjs(vod.createdAt)
+        ? `${config.channel} VOD - ${dayjs(vod.createdAt)
             .tz(config.timezone)
             .format("MMMM DD YYYY")
             .toUpperCase()}`
@@ -342,7 +342,7 @@ module.exports.liveUploadPart = async (
     path: trimmedPath,
     title:
       type === "vod"
-        ? `${config.channel} VOD ${dayjs(vod.createdAt)
+        ? `${config.channel} VOD - ${dayjs(vod.createdAt)
             .tz(config.timezone)
             .format("MMMM DD YYYY")
             .toUpperCase()} PART ${part}`
