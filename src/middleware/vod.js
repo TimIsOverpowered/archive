@@ -11,6 +11,10 @@ const youtube = require("./youtube");
 const moment = require("moment");
 const emotes = require("./emotes");
 const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+const timezone = require("dayjs/plugin/timezone");
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 module.exports.upload = async (
   vodId,
@@ -66,6 +70,7 @@ module.exports.upload = async (
               title: `${config.channel} plays ${chapter.name} ${dayjs(
                 vod.createdAt
               )
+                .tz(config.timezone)
                 .format("MMMM DD YYYY")
                 .toUpperCase()} PART ${i + 1}`,
               type: "vod",
@@ -92,6 +97,7 @@ module.exports.upload = async (
             title: `${config.channel} plays ${chapter.name} - ${dayjs(
               vod.createdAt
             )
+              .tz(config.timezone)
               .format("MMMM DD YYYY")
               .toUpperCase()}`,
             type: "vod",
@@ -125,9 +131,11 @@ module.exports.upload = async (
           title:
             type === "vod"
               ? `${config.channel} VOD - ${dayjs(vod.createdAt)
+                  .tz(config.timezone)
                   .format("MMMM DD YYYY")
                   .toUpperCase()} PART ${i + 1}`
               : `${config.channel} Live VOD - ${dayjs(vod.createdAt)
+                  .tz(config.timezone)
                   .format("MMMM DD YYYY")
                   .toUpperCase()} PART ${i + 1}`,
           type: type,
@@ -161,9 +169,11 @@ module.exports.upload = async (
       title:
         type === "vod"
           ? `${config.channel} VOD - ${dayjs(vod.createdAt)
+              .tz(config.timezone)
               .format("MMMM DD YYYY")
               .toUpperCase()}`
           : `${config.channel} Live VOD - ${dayjs(vod.createdAt)
+              .tz(config.timezone)
               .format("MMMM DD YYYY")
               .toUpperCase()}`,
       public:
@@ -212,9 +222,11 @@ module.exports.manualVodUpload = async (
     title:
       type === "vod"
         ? `${config.channel} VOD ${dayjs(vod.createdAt)
+            .tz(config.timezone)
             .format("MMMM DD YYYY")
             .toUpperCase()}`
         : `${config.channel} Live VOD - ${dayjs(vod.createdAt)
+            .tz(config.timezone)
             .format("MMMM/DD/YYYY")
             .toUpperCase()}`,
     public:
@@ -256,6 +268,7 @@ module.exports.manualGameUpload = async (app, game, videoPath) => {
         {
           path: paths[i],
           title: `${config.channel} plays ${name} - ${dayjs(date)
+            .tz(config.timezone)
             .format("MMMM DD YYYY")
             .toUpperCase()} PART ${i + 1}`,
           type: "vod",
@@ -279,6 +292,7 @@ module.exports.manualGameUpload = async (app, game, videoPath) => {
       {
         path: trimmedPath,
         title: `${config.channel} plays ${name} - ${dayjs(vod.createdAt)
+          .tz(config.timezone)
           .format("MMMM DD YYYY")
           .toUpperCase()}`,
         type: "vod",
@@ -329,9 +343,11 @@ module.exports.liveUploadPart = async (
     title:
       type === "vod"
         ? `${config.channel} VOD ${dayjs(vod.createdAt)
+            .tz(config.timezone)
             .format("MMMM DD YYYY")
             .toUpperCase()} PART ${part}`
         : `${config.channel} Live VOD - ${dayjs(vod.createdAt)
+            .tz(config.timezone)
             .format("MMMM DD YYYY")
             .toUpperCase()} PART ${part}`,
     public:
