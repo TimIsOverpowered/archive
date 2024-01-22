@@ -366,9 +366,10 @@ module.exports = function (app) {
       msg: `Muting the DMCA content for ${vodId}...`,
     });
 
-    let videoPath = `${
-      type === "live" ? config.livePath : config.vodPath
-    }/${vodId}.mp4`;
+    let videoPath =
+      type === "live"
+        ? `${config.livePath}/${vod_data.stream_id}.mp4`
+        : `${config.vodPath}/${vodId}.mp4`;
 
     if (!(await fileExists(videoPath))) {
       if (config.drive.upload) {
@@ -480,9 +481,10 @@ module.exports.part = function (app) {
 
     if (!vod_data) return console.error("Failed get vod: no VOD in database");
 
-    let videoPath = `${
-      type === "live" ? config.livePath : config.vodPath
-    }/${vodId}.mp4`;
+    let videoPath =
+      type === "live"
+        ? `${config.livePath}/${vod_data.stream_id}.mp4`
+        : `${config.vodPath}/${vodId}.mp4`;
 
     if (!(await fileExists(videoPath))) {
       if (config.drive.upload) {
