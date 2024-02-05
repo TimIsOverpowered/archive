@@ -15,15 +15,15 @@ module.exports = function (app) {
         field: "vod_id",
       },
       ffz_emotes: {
-        type: DataTypes.ARRAY(DataTypes.JSON),
+        type: DataTypes.JSONB,
         defaultValue: [],
       },
       bttv_emotes: {
-        type: DataTypes.ARRAY(DataTypes.JSON),
+        type: DataTypes.JSONB,
         defaultValue: [],
       },
       "7tv_emotes": {
-        type: DataTypes.ARRAY(DataTypes.JSON),
+        type: DataTypes.JSONB,
         defaultValue: [],
       },
     },

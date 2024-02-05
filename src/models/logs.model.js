@@ -28,11 +28,11 @@ module.exports = function (app) {
       allowNull: false
     },
     message: {
-      type: DataTypes.ARRAY(DataTypes.JSON),
+      type: DataTypes.JSONB,
       allowNull: false
     },
     user_badges: {
-      type: DataTypes.ARRAY(DataTypes.JSON),
+      type: DataTypes.JSONB,
       allowNull: false
     },
     user_color: {
