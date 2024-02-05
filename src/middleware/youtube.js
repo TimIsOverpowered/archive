@@ -1,8 +1,10 @@
 const config = require("../../config/config.json");
 const fs = require("fs");
 const { google } = require("googleapis");
-const moment = require("moment");
 const readline = require("readline");
+const dayjs = require("dayjs");
+const duration = require("dayjs/plugin/duration");
+dayjs.extend(duration);
 
 module.exports.chapters = function (app) {
   const _this = this;
@@ -78,9 +80,10 @@ module.exports.saveChapters = async (vodId, app, type = "vod") => {
       ) {
         const actualTime = chapter.start - startDuration;
         const timestamp = actualTime < 0 ? 0 : actualTime;
-        description += `${moment.utc(timestamp * 1000).format("HH:mm:ss")} ${
+        description += `${dayjs.duration(timestamp, "s").format("HH:mm:ss")} ${
           chapter.name
         }\n`;
+        console.log(description);
       }
 
       const res = await youtube.videos.update({

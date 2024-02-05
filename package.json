@@ -53,7 +53,6 @@
     "helmet": "^7.1.0",
     "hls-parser": "^0.10.8",
     "ioredis": "^5.3.2",
-    "moment": "^2.30.1",
     "pg": "^8.11.3",
     "qs": "^6.11.2",
     "rate-limiter-flexible": "^4.0.1",
