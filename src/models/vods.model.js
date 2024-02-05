@@ -14,7 +14,8 @@ module.exports = function (app) {
         primaryKey: true,
       },
       chapters: {
-        type: DataTypes.ARRAY(DataTypes.JSON),
+        type: DataTypes.JSONB,
+        defaultValue: [],
       },
       title: {
         type: DataTypes.TEXT,
@@ -30,14 +31,14 @@ module.exports = function (app) {
         type: DataTypes.TEXT,
       },
       youtube: {
-        type: DataTypes.ARRAY(DataTypes.JSON),
+        type: DataTypes.JSONB,
         defaultValue: [],
       },
       stream_id: {
         type: DataTypes.TEXT,
       },
       drive: {
-        type: DataTypes.ARRAY(DataTypes.JSON),
+        type: DataTypes.JSONB,
         defaultValue: [],
       },
     },
