@@ -47,7 +47,11 @@ module.exports.upload = async (
       if (chapter.end < 60 * 5) continue;
       if (config.youtube.restrictedGames.includes(chapter.name)) continue;
 
-      console.info(`Trimming ${chapter.name} from ${vod.id} ${vod.date}`);
+      console.info(
+        `Trimming ${chapter.name} from ${vod.id} ${dayjs(vod.createdAt).format(
+          "MM/DD/YYYY"
+        )}`
+      );
       const trimmedPath = await this.trim(
         vodPath,
         vodId,
@@ -252,7 +256,9 @@ module.exports.manualVodUpload = async (
 module.exports.manualGameUpload = async (app, game, videoPath) => {
   const { vodId, date, chapter } = game;
   const { name, end, start } = chapter;
-  console.info(`Trimming ${name} from ${vodId} ${date}`);
+  console.info(
+    `Trimming ${name} from ${vodId} ${dayjs(date).format("MM/DD/YYYY")}`
+  );
 
   const trimmedPath = await this.trim(videoPath, vodId, start, end);
   if (!trimmedPath) return console.error("Trim failed");
@@ -333,7 +339,9 @@ module.exports.liveUploadPart = async (
     return console.error("Failed in liveUploadPart: no VOD in database");
 
   console.info(
-    `Trimming ${vod.id} ${vod.date} | Start time: ${start} | Duration: ${end}`
+    `Trimming ${vod.id} ${dayjs(vod.createdAt).format(
+      "MM/DD/YYYY"
+    )} | Start time: ${start} | Duration: ${end}`
   );
   let trimmedPath = await this.trimHLS(m3u8Path, vodId, start, end);
 

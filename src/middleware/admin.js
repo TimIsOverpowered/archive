@@ -59,9 +59,6 @@ module.exports.download = function (app) {
       .create({
         id: vodData.id,
         title: vodData.title,
-        date: new Date(vodData.created_at).toLocaleDateString("en-US", {
-          timeZone: config.timezone,
-        }),
         createdAt: vodData.created_at,
         duration: moment
           .utc(
@@ -122,9 +119,6 @@ module.exports.hlsDownload = function (app) {
       .create({
         id: vodData.id,
         title: vodData.title,
-        date: new Date(vodData.created_at).toLocaleDateString("en-US", {
-          timeZone: config.timezone,
-        }),
         createdAt: vodData.created_at,
         duration: moment
           .utc(
@@ -229,9 +223,6 @@ module.exports.createVod = function (app) {
       .create({
         id: req.body.vodId,
         title: req.body.title,
-        date: new Date(req.body.createdAt).toLocaleDateString("en-US", {
-          timeZone: config.timezone,
-        }),
         createdAt: req.body.createdAt,
         duration: req.body.duration,
         drive: req.body.drive ? [req.body.drive] : [],
@@ -588,7 +579,7 @@ module.exports.gameUpload = function (app) {
       vodId,
       {
         vodId: vodId,
-        date: vod.date,
+        date: vod.createdAt,
         chapter: game,
       },
       videoPath

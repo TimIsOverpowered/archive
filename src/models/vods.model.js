@@ -24,9 +24,6 @@ module.exports = function (app) {
         type: DataTypes.TEXT,
         defaultValue: "00:00:00",
       },
-      date: {
-        type: DataTypes.TEXT,
-      },
       thumbnail_url: {
         type: DataTypes.TEXT,
       },
