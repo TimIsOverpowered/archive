@@ -5,7 +5,14 @@ const include = require("./include");
 module.exports = {
   before: {
     all: [],
-    find: [iff(isProvider("external"), redisCache.before(), include())],
+    find: [
+      iff(
+        isProvider("external"),
+        redisCache.before(),
+        include(),
+        include.games()
+      ),
+    ],
     get: [iff(isProvider("external"), redisCache.before(), include())],
     create: [disallow("external")],
     update: [disallow("external")],

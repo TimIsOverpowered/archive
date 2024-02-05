@@ -5,7 +5,7 @@ const helmet = require("helmet");
 const cors = require("cors");
 const logger = require("./logger");
 
-const feathers = require("@feathersjs/feathers");
+const { feathers } = require("@feathersjs/feathers");
 const configuration = require("@feathersjs/configuration");
 const express = require("@feathersjs/express");
 

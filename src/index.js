@@ -13,15 +13,14 @@ process.on("unhandledRejection", (reason, p) => {
 });
 
 const start = () => {
-  const server = app.listen(port);
-  server.on("listening", () =>
+  app.listen(port).then(() => {
     logger.info(
       "Feathers application started on http://%s:%d and worker %s",
       app.get("host"),
       port,
       process.pid
-    )
-  );
+    );
+  });
 };
 
 if (clusterWorkerSize > 1 && process.env.NODE_ENV === "production") {
