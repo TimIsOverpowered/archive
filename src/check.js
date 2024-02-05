@@ -72,9 +72,6 @@ module.exports.check = async (app) => {
       .create({
         id: vodId,
         title: vodData.title,
-        date: new Date(vodData.created_at).toLocaleDateString("en-US", {
-          timeZone: config.timezone,
-        }),
         createdAt: vodData.created_at,
         stream_id: vodData.stream_id,
       })
