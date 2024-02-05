@@ -49,10 +49,5 @@
       "expires_in": 3599,
       "refresh_token": ""
     }
-  },
-  "bunnycdn": {
-    "enabled": false,
-    "api_key": "",
-    "pull_zone": ""
   }
 }

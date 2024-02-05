@@ -8,11 +8,12 @@ const HLS = require("hls-parser");
 const axios = require("axios");
 const drive = require("./drive");
 const youtube = require("./youtube");
-const moment = require("moment");
 const emotes = require("./emotes");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const timezone = require("dayjs/plugin/timezone");
+const duration = require("dayjs/plugin/duration");
+dayjs.extend(duration);
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -586,8 +587,8 @@ module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
       readline.clearLine(process.stdout, 0);
       readline.cursorTo(process.stdout, 0, null);
       process.stdout.write(
-        `Current Log position: ${moment
-          .utc(responseComments[0].node.contentOffsetSeconds * 1000)
+        `Current Log position: ${dayjs
+          .duration(responseComments[0].node.contentOffsetSeconds, "s")
           .format("HH:mm:ss")}`
       );
     }
@@ -1005,8 +1006,8 @@ module.exports.saveChapters = async (vodId, app, duration) => {
         image: chapter.node.details.game
           ? chapter.node.details.game.boxArtURL
           : null,
-        duration: moment
-          .utc(chapter.node.positionMilliseconds)
+        duration: dayjs
+          .duration(chapter.node.positionMilliseconds, "ms")
           .format("HH:mm:ss"),
         start:
           chapter.node.positionMilliseconds === 0
@@ -1076,8 +1077,8 @@ module.exports.getLogs = async (vodId, app) => {
       readline.clearLine(process.stdout, 0);
       readline.cursorTo(process.stdout, 0, null);
       process.stdout.write(
-        `Current Log position: ${moment
-          .utc(responseComments[0].node.contentOffsetSeconds * 1000)
+        `Current Log position: ${dayjs
+          .duration(responseComments[0].node.contentOffsetSeconds, "s")
           .format("HH:mm:ss")}`
       );
     }
@@ -1157,8 +1158,8 @@ module.exports.manualLogs = async (commentsPath, vodId, app) => {
       readline.clearLine(process.stdout, 0);
       readline.cursorTo(process.stdout, 0, null);
       process.stdout.write(
-        `Current Log position: ${moment
-          .utc(node.contentOffsetSeconds * 1000)
+        `Current Log position: ${dayjs
+          .duration(node.contentOffsetSeconds, "s")
           .format("HH:mm:ss")}`
       );
     }

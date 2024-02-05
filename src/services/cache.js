@@ -1,8 +1,11 @@
 //https://github.com/sarkistlt/feathers-redis-cache/blob/master/src/hooks.ts
 const config = require("../../config/config.json");
-const moment = require("moment");
 const qs = require("qs");
-const async = require("async");
+const dayjs = require("dayjs");
+const duration = require("dayjs/plugin/duration");
+const relativeTime = require("dayjs/plugin/relativeTime");
+dayjs.extend(duration);
+dayjs.extend(relativeTime);
 
 const { DISABLE_REDIS_CACHE, ENABLE_REDIS_CACHE_LOGGER } = process.env;
 const HTTP_SERVER_ERROR = 500;
@@ -77,7 +80,7 @@ module.exports.before = (passedOptions = {}) => {
           return resolve(hook);
         }
 
-        const duration = moment(data.expiresOn).format(
+        const duration = dayjs(data.expiresOn).format(
           "DD MMMM YYYY - HH:mm:ss"
         );
 
@@ -127,7 +130,7 @@ module.exports.after = (passedOptions = {}) => {
           cacheKey,
           JSON.stringify({
             cache: hook.result,
-            expiresOn: moment().add(moment.duration(duration, "seconds")),
+            expiresOn: dayjs().add(duration, "s"),
           })
         );
 
@@ -136,7 +139,7 @@ module.exports.after = (passedOptions = {}) => {
         if (options.env !== "test" && ENABLE_REDIS_CACHE_LOGGER === "true") {
           console.log(`[redis] added ${cacheKey} to the cache.`);
           console.log(
-            `> Expires in ${moment.duration(duration, "seconds").humanize()}.`
+            `> Expires in ${dayjs.duration(duration, "s").humanize()}.`
           );
         }
 
@@ -166,7 +169,7 @@ async function purgeGroup(client, group, prefix = config.channel) {
 
       if (cursor !== 0) return scan();
 
-      resolve()
+      resolve();
     };
     return scan();
   });
