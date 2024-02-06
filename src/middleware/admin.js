@@ -1,10 +1,12 @@
 const vod = require("./vod");
 const twitch = require("./twitch");
-const moment = require("moment");
 const fs = require("fs");
 const config = require("../../config/config.json");
 const drive = require("./drive");
 const emotes = require("./emotes");
+const dayjs = require("dayjs");
+const duration = require("dayjs/plugin/duration");
+dayjs.extend(duration);
 
 module.exports.verify = function (app) {
   return async function (req, res, next) {
@@ -60,12 +62,8 @@ module.exports.download = function (app) {
         id: vodData.id,
         title: vodData.title,
         createdAt: vodData.created_at,
-        duration: moment
-          .utc(
-            moment
-              .duration("PT" + vodData.duration.toUpperCase())
-              .asMilliseconds()
-          )
+        duration: dayjs
+          .duration(`PT${vodData.duration.toUpperCase()}`)
           .format("HH:mm:ss"),
         stream_id: vodData.stream_id,
       })
@@ -120,12 +118,8 @@ module.exports.hlsDownload = function (app) {
         id: vodData.id,
         title: vodData.title,
         createdAt: vodData.created_at,
-        duration: moment
-          .utc(
-            moment
-              .duration("PT" + vodData.duration.toUpperCase())
-              .asMilliseconds()
-          )
+        duration: dayjs
+          .duration(`PT${vodData.duration.toUpperCase()}`)
           .format("HH:mm:ss"),
         stream_id: vodData.stream_id,
       })
@@ -344,7 +338,7 @@ module.exports.saveChapters = function (app) {
     vod.saveChapters(
       vodData.id,
       app,
-      moment.duration("PT" + vodData.duration.toUpperCase()).asSeconds()
+      dayjs.duration(`PT${vodData.duration.toUpperCase()}`).asSeconds()
     );
     res
       .status(200)
@@ -374,12 +368,8 @@ module.exports.saveDuration = function (app) {
       await app
         .service("vods")
         .patch(req.body.vodId, {
-          duration: moment
-            .utc(
-              moment
-                .duration("PT" + vodData.duration.toUpperCase())
-                .asSeconds() * 1000
-            )
+          duration: dayjs
+            .duration(`PT${vodData.duration.toUpperCase()}`)
             .format("HH:mm:ss"),
         })
         .then(() =>

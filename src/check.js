@@ -3,6 +3,9 @@ const config = require("../config/config.json");
 const vod = require("./middleware/vod");
 const emotes = require("./middleware/emotes");
 const fs = require("fs");
+const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+dayjs.extend(utc);
 
 const fileExists = async (file) => {
   return fs.promises
@@ -77,9 +80,9 @@ module.exports.check = async (app) => {
       })
       .then(() =>
         console.log(
-          `${
-            config.channel
-          } went online. Creating vod. ${new Date().toLocaleDateString()}`
+          `${config.channel} went online. Creating vod. ${dayjs
+            .utc(vodData.createdAt)
+            .format("MM-DD-YYYY")}`
         )
       )
       .catch((e) => {
