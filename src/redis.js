@@ -1,7 +1,6 @@
 const { createClient } = require("redis");
 const { RateLimiterRedis } = require("rate-limiter-flexible");
 const IoRedis = require("ioredis");
-const config = require("../config/config.json");
 
 module.exports = async function (app) {
   const redisConf = app.get("redis"),
