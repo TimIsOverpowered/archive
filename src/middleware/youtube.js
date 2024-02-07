@@ -83,7 +83,6 @@ module.exports.saveChapters = async (vodId, app, type = "vod") => {
         description += `${dayjs.duration(timestamp, "s").format("HH:mm:ss")} ${
           chapter.name
         }\n`;
-        console.log(description);
       }
 
       const res = await youtube.videos.update({
