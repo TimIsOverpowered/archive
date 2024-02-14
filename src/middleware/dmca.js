@@ -374,6 +374,8 @@ module.exports = function (app) {
     if (!(await fileExists(videoPath))) {
       if (config.drive.upload) {
         videoPath = await drive.download(vodId, type, app);
+      } else if (type === "vod") {
+        videoPath = await vod.mp4Download(vodId);
       } else {
         videoPath = null;
       }
@@ -489,6 +491,8 @@ module.exports.part = function (app) {
     if (!(await fileExists(videoPath))) {
       if (config.drive.upload) {
         videoPath = await drive.download(vodId, type, app);
+      } else if (type === "vod") {
+        videoPath = await vod.mp4Download(vodId);
       } else {
         videoPath = null;
       }

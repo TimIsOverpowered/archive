@@ -38,7 +38,7 @@ module.exports.upload = async (
   let vodPath = manualPath
     ? manualPath
     : type === "vod"
-    ? await mp4Download(vodId)
+    ? await this.mp4Download(vodId)
     : await drive.download(vodId, type, app);
 
   if (!vodPath)
@@ -1223,7 +1223,7 @@ module.exports.manualLogs = async (commentsPath, vodId, app) => {
     .catch(() => {});
 };
 
-const mp4Download = async (vodId) => {
+modules.exports.mp4Download = async (vodId) => {
   const tokenSig = await twitch.getVodTokenSig(vodId);
   if (!tokenSig) return console.error(`failed to get token/sig for ${vodId}`);
 
