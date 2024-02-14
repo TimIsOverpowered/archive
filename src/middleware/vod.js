@@ -1223,7 +1223,7 @@ module.exports.manualLogs = async (commentsPath, vodId, app) => {
     .catch(() => {});
 };
 
-modules.exports.mp4Download = async (vodId) => {
+module.exports.mp4Download = async (vodId) => {
   const tokenSig = await twitch.getVodTokenSig(vodId);
   if (!tokenSig) return console.error(`failed to get token/sig for ${vodId}`);
 
