@@ -35,8 +35,10 @@ module.exports.upload = async (
   if (!vod)
     return console.error("Failed to download video: no VOD in database");
 
-  const vodPath = manualPath
+  let vodPath = manualPath
     ? manualPath
+    : type === "vod"
+    ? await mp4Download(vodId)
     : await drive.download(vodId, type, app);
 
   if (!vodPath)
@@ -1219,4 +1221,62 @@ module.exports.manualLogs = async (commentsPath, vodId, app) => {
       console.info(`Saved all comments in DB for vod ${vodId}`);
     })
     .catch(() => {});
+};
+
+const mp4Download = async (vodId) => {
+  const tokenSig = await twitch.getVodTokenSig(vodId);
+  if (!tokenSig) return console.error(`failed to get token/sig for ${vodId}`);
+
+  let m3u8 = await twitch.getM3u8(vodId, tokenSig.value, tokenSig.signature);
+  if (!m3u8) return null;
+
+  m3u8 = twitch.getParsedM3u8(m3u8);
+  if (!m3u8) return null;
+
+  const vodPath = `${config.vodPath}/${vodId}.mp4`;
+
+  const success = await ffmpegMp4Download(m3u8, vodPath)
+    .then(() => {
+      console.info(`Downloaded ${vodId}.mp4\n`);
+      return true;
+    })
+    .catch((e) => {
+      console.error("\nffmpeg error occurred: " + e);
+      return false;
+    });
+
+  if (success) return vodPath;
+
+  return null;
+};
+
+const ffmpegMp4Download = async (m3u8, path) => {
+  return new Promise((resolve, reject) => {
+    const ffmpeg_process = ffmpeg(m3u8);
+    ffmpeg_process
+      .videoCodec("copy")
+      .audioCodec("copy")
+      .outputOptions(["-bsf:a aac_adtstoasc", "-copyts", "-start_at_zero"])
+      .toFormat("mp4")
+      .on("progress", (progress) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          readline.clearLine(process.stdout, 0);
+          readline.cursorTo(process.stdout, 0, null);
+          process.stdout.write(
+            `DOWNLOAD PROGRESS: ${Math.round(progress.percent)}%`
+          );
+        }
+      })
+      .on("start", (cmd) => {
+        console.info(`Starting m3u8 download for ${m3u8} in ${path}`);
+      })
+      .on("error", function (err) {
+        ffmpeg_process.kill("SIGKILL");
+        reject(err);
+      })
+      .on("end", function () {
+        resolve();
+      })
+      .saveToFile(path);
+  });
 };
