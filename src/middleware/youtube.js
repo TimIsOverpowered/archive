@@ -211,9 +211,10 @@ module.exports.upload = async (data, app, isVod = true) => {
     const fileSize = fs.statSync(data.path).size;
     const vodTitle = data.vod.title.replace(/>|</gi, "");
     const description =
-      `VOD TITLE: ${vodTitle}\nChat Replay: https://${config.domain_name}/${
+      `Chat Replay: https://${config.domain_name}/${
         isVod ? "youtube" : "games"
-      }/${data.vod.id}\n` + config.youtube.description;
+      }/${data.vod.id}\nStream Title: ${vodTitle}\n` +
+      config.youtube.description;
     const res = await youtube.videos.insert(
       {
         auth: oauth2Client,
