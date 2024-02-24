@@ -376,7 +376,6 @@ module.exports.liveUploadPart = async (
   await youtube.upload(data, app);
   setTimeout(async () => {
     await youtube.saveChapters(vodId, app, type);
-    setTimeout(() => youtube.saveParts(vodId, app, type), 30000);
   }, 30000);
   if (config.drive.upload) fs.unlinkSync(trimmedPath);
 };
@@ -757,6 +756,8 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
         duration - startTime,
         vod_youtube_data.length + 1
       );
+      //save parts at last upload.
+      setTimeout(() => youtube.saveParts(vodId, app, type), 60000);
     } else if (config.youtube.upload) {
       await this.upload(vodId, app, mp4Path);
     }
