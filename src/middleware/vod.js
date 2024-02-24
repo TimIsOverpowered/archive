@@ -757,7 +757,7 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
         vod_youtube_data.length + 1
       );
       //save parts at last upload.
-      setTimeout(() => youtube.saveParts(vodId, app, type), 60000);
+      setTimeout(() => youtube.saveParts(vodId, app, "vod"), 60000);
     } else if (config.youtube.upload) {
       await this.upload(vodId, app, mp4Path);
     }
