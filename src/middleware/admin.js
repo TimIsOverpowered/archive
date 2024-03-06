@@ -74,9 +74,10 @@ module.exports.download = function (app) {
         console.error(e);
       });
 
-    vod.upload(req.body.vodId, app, req.body.path, req.body.type);
-    emotes.save(req.body.vodId, app);
     res.status(200).json({ error: false, msg: "Starting download.." });
+    emotes.save(req.body.vodId, app);
+    const vodPath = await vod.upload(req.body.vodId, app, req.body.path, req.body.type);
+    fs.unlinkSync(vodPath)
   };
 };
 
