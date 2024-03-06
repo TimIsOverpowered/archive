@@ -202,6 +202,7 @@ module.exports.upload = async (
       await youtube.saveChapters(vodId, app, type);
     }, 30000);
     if (config.drive.upload) fs.unlinkSync(vodPath);
+    return vodPath;
   }
 };
 
