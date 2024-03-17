@@ -23,7 +23,7 @@ module.exports = {
   after: {
     all: [],
     find: [
-      iff(isProvider("external"), redisCache.after({ expiration: 3600 * 24 })),
+      iff(isProvider("external"), redisCache.after({ expiration: 3600 * 24 }))
     ],
     get: [
       iff(isProvider("external"), redisCache.after({ expiration: 3600 * 24 })),
@@ -35,7 +35,7 @@ module.exports = {
   },
 
   error: {
-    all: [],
+    all: [(context) => console.error(context)],
     find: [],
     get: [],
     create: [],
