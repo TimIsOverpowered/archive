@@ -4,7 +4,7 @@ const config = require("../../config/config.json");
 
 module.exports = function (app) {
   return async function (req, res, next) {
-    const { streamId, path, driveId } = req.body;
+    const { streamId, path, driveId, platform } = req.body;
     if (!streamId)
       return res.status(400).json({ error: true, msg: "No streamId" });
 
@@ -53,7 +53,11 @@ module.exports = function (app) {
     //Need to deliver a non 200 http code so it will delete the file
     if (config.youtube.multiTrack) {
       res.status(200).json({ error: false, msg: "Starting upload to youtube" });
-      await vod.upload(vod_data.id, app, path, "live");
+      if (platform) {
+        await vod.upload(vod_data.id, app, path, "live", platform);
+      } else {
+        await vod.upload(vod_data.id, app, path, "live");
+      }
     } else {
       res.status(404).json({
         error: true,

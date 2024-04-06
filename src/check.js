@@ -1,4 +1,5 @@
 const twitch = require("./middleware/twitch");
+const kick = require("./middleware/kick");
 const config = require("../config/config.json");
 const vod = require("./middleware/vod");
 const emotes = require("./middleware/emotes");
@@ -14,23 +15,23 @@ const fileExists = async (file) => {
     .catch(() => false);
 };
 
-module.exports.check = async (app) => {
+module.exports.checkTwitch = async (app) => {
   const twitchId = config.twitch.id;
   const stream = await twitch.getStream(twitchId);
 
   if (!stream)
     return setTimeout(() => {
-      this.check(app);
+      this.checkTwitch(app);
     }, 30000);
 
   if (!stream[0])
     return setTimeout(() => {
-      this.check(app);
+      this.checkTwitch(app);
     }, 30000);
 
   const streamExists = await app
     .service("streams")
-    .get(stream[0].id)
+    .get(stream.id)
     .then(() => true)
     .catch(() => false);
 
@@ -40,10 +41,12 @@ module.exports.check = async (app) => {
       .create({
         id: stream[0].id,
         started_at: stream[0].started_at,
+        platform: "twitch",
+        is_live: true,
       })
       .then(() =>
         console.log(
-          `${config.channel} stream online. Created Stream. ${stream[0].started_at}`
+          `${config.channel} twitch stream online. Created Stream. ${stream[0].started_at}`
         )
       )
       .catch((e) => {
@@ -54,12 +57,12 @@ module.exports.check = async (app) => {
 
   if (!vodData)
     return setTimeout(() => {
-      this.check(app);
+      this.checkTwitch(app);
     }, 30000);
 
   if (vodData.stream_id !== stream[0].id)
     return setTimeout(() => {
-      this.check(app);
+      this.checkTwitch(app);
     }, 30000);
 
   const vodId = vodData.id;
@@ -73,14 +76,15 @@ module.exports.check = async (app) => {
     await app
       .service("vods")
       .create({
-        id: vodId,
+        vod_id: vodId,
         title: vodData.title,
         createdAt: vodData.created_at,
         stream_id: vodData.stream_id,
+        platform: "twitch",
       })
       .then(() =>
         console.log(
-          `${config.channel} went online. Creating vod. ${dayjs
+          `${config.channel} has a new twitch vod. Creating vod. ${dayjs
             .utc(vodData.createdAt)
             .format("MM-DD-YYYY")}`
         )
@@ -115,6 +119,165 @@ module.exports.check = async (app) => {
   }
 
   setTimeout(() => {
-    this.check(app);
+    this.checkTwitch(app);
   }, 30000);
+};
+
+module.exports.checkKick = async (app) => {
+  const kickChannel = config.kick.username;
+  let stream = await kick.getStream(kickChannel);
+
+  if (stream && stream.data) {
+    stream = stream.data;
+    const streamExists = await app
+      .service("streams")
+      .get(stream.id.toString())
+      .then(() => true)
+      .catch(() => false);
+
+    if (!streamExists) {
+      await app
+        .service("streams")
+        .create({
+          stream_id: stream.id,
+          started_at: stream.created_at,
+          platform: "kick",
+          is_live: true,
+        })
+        .then(() =>
+          console.log(
+            `${config.channel} kick stream online. Created Stream. ${stream.created_at}`
+          )
+        )
+        .catch((e) => {
+          console.error(e);
+        });
+
+      await app
+        .service("vods")
+        .create({
+          id: stream.id,
+          title: stream.session_title,
+          createdAt: stream.created_at,
+          platform: "kick",
+        })
+        .then(() =>
+          console.log(
+            `${config.channel} has a new kick vod. Creating vod. ${dayjs
+              .utc(stream.createdAt)
+              .format("MM-DD-YYYY")}`
+          )
+        )
+        .catch((e) => {
+          console.error(e);
+        });
+    }
+
+    kick.saveChapters(stream, app);
+  }
+
+  //If Live stream has ended, set is_live to false & get vod data & download vod
+  const liveStreams = app
+    .service("streams")
+    .find({
+      query: {
+        is_live: true,
+        platform: "kick",
+      },
+    })
+    .then((res) => res.data)
+    .catch(() => null);
+
+  if (stream && !stream.data) {
+    for (let livestream of liveStreams) {
+      await app
+        .service("streams")
+        .patch(livestream.id, {
+          is_live: false,
+        })
+        .catch((e) => console.error(e));
+
+      let kickVod;
+      do {
+        kickVod = await kick.getVod(kickChannel, livestream.id);
+        console.info("Kick stream has ended. Trying to get kick vod..");
+        await sleep(5000);
+      } while (!kickVod);
+
+      await app
+        .service("vods")
+        .patch(livestream.id, {
+          stream_id: kickVod.video.uuid,
+          duration: dayjs
+            .duration(kickVod.duration, "milliseconds")
+            .format("HH:mm:ss"),
+        })
+        .catch((e) => console.error(e));
+
+      if (config.vodDownload) {
+        console.info(`Start Vod download: ${livestream.id}`);
+        kick.download(kickChannel, livestream.id);
+      }
+
+      if (config.chatDownload) {
+        //console.info(`Start Logs download: ${livestream.id}`);
+        //kick.downloadLogs(livestream.id, app, dayjs.utc(kickVod.start_time).toISOString(), kickVod.duration);
+        emotes.save(livestream.id, app);
+      }
+    }
+  }
+
+  const kickVods = await kick.getVods(kickChannel);
+  const vodData = kickVods[0];
+  const vodId = vodData.id.toString();
+  const vodExists = await app
+    .service("vods")
+    .get(vodId)
+    .then(() => true)
+    .catch(() => false);
+
+  if (!vodExists) {
+    await app
+      .service("vods")
+      .create({
+        id: vodId,
+        title: vodData.session_title,
+        createdAt: vodData.start_time,
+        stream_id: vodData.video.uuid,
+        duration: dayjs
+          .duration(vodData.duration, "milliseconds")
+          .format("HH:mm:ss"),
+        platform: "kick",
+      })
+      .then(() =>
+        console.log(
+          `${config.channel} has a new kick vod. Creating vod. ${dayjs
+            .utc(vodData.createdAt)
+            .format("MM-DD-YYYY")}`
+        )
+      )
+      .catch((e) => {
+        console.error(e);
+      });
+
+    //Vods don't come up until after stream on kick
+    if (config.vodDownload) {
+      console.info(`Start Vod download: ${vodId}`);
+      kick.download(kickChannel, vodId);
+    }
+
+    if (config.chatDownload) {
+      //console.info(`Start Logs download: ${vodId}`);
+      //kick.downloadLogs(vodId, app, dayjs.utc(vodData.start_time).toISOString(), vodData.duration);
+      emotes.save(vodId, app);
+    }
+  }
+
+  setTimeout(() => {
+    this.checkKick(app);
+  }, 30000);
+};
+
+const sleep = (ms) => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 };

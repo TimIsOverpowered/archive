@@ -35,7 +35,7 @@ module.exports = {
   },
 
   error: {
-    all: [(context) => console.error(context)],
+    all: [],
     find: [],
     get: [],
     create: [],
