@@ -1,5 +1,6 @@
 {
   "twitch": {
+    "enabled": false,
     "auth": {
       "client_id": "",
       "client_secret": "",
@@ -7,6 +8,11 @@
     },
     "id": "",
     "username": ""
+  },
+  "kick": {
+    "enabled": false,
+    "username": "",
+    "id": ""
   },
   "google": {
     "client_id": "",
