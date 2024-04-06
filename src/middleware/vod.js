@@ -1,5 +1,6 @@
 const ffmpeg = require("fluent-ffmpeg");
 const twitch = require("./twitch");
+const kick = require("./kick");
 const config = require("../../config/config.json");
 const fs = require("fs");
 const readline = require("readline");
@@ -32,17 +33,31 @@ module.exports.upload = async (
     })
     .catch(() => {});
 
-  if (!vod)
-    return console.error("Failed to download video: no VOD in database");
+  if (!vod) {
+    console.error("Failed to download video: no VOD in database");
+    return;
+  }
 
-  let vodPath = manualPath
-    ? manualPath
-    : type === "vod"
-    ? await this.mp4Download(vodId)
-    : await drive.download(vodId, type, app);
+  let vodPath;
 
-  if (!vodPath)
-    return console.error(`Could not find a download source for ${vodId}`);
+  if (manualPath) {
+    vodPath = manualPath;
+  } else if (type === "vod") {
+    if (vod.platform === "twitch") {
+      vodPath = await this.mp4Download(vodId);
+    } else if (vod.platform === "kick") {
+      vodPath = await kick.download(config.kick.username, vodId);
+    }
+  }
+
+  if (!vodPath && config.drive.enabled) {
+    vodPath = await drive.download(vodId, type, app);
+  }
+
+  if (!vodPath) {
+    console.error(`Could not find a download source for ${vodId}`);
+    return;
+  }
 
   if (config.youtube.perGameUpload && vod.chapters) {
     for (let chapter of vod.chapters) {
@@ -61,14 +76,19 @@ module.exports.upload = async (
         chapter.end
       );
 
-      if (!trimmedPath) return console.error("Trim failed");
+      if (!trimmedPath) {
+        console.error("Trim failed");
+        return;
+      }
 
       if (chapter.end > config.youtube.splitDuration) {
         let paths = await this.splitVideo(trimmedPath, chapter.end, vodId);
-        if (!paths)
-          return console.error(
+        if (!paths) {
+          console.error(
             "Something went wrong trying to split the trimmed video"
           );
+          return;
+        }
 
         for (let i = 0; i < paths.length; i++) {
           await youtube.upload(
@@ -129,8 +149,10 @@ module.exports.upload = async (
     if (duration > config.youtube.splitDuration) {
       let paths = await this.splitVideo(vodPath, duration, vodId);
 
-      if (!paths)
-        return console.error("Something went wrong trying to split the video");
+      if (!paths) {
+        console.error("Something went wrong trying to split the trimmed video");
+        return;
+      }
 
       for (let i = 0; i < paths.length; i++) {
         const data = {
@@ -168,7 +190,7 @@ module.exports.upload = async (
         setTimeout(() => youtube.saveParts(vodId, app, type), 30000);
       }, 30000);
       if (config.drive.upload) fs.unlinkSync(vodPath);
-      return;
+      return vodPath;
     }
 
     const data = {
@@ -1237,7 +1259,7 @@ module.exports.mp4Download = async (vodId) => {
 
   const vodPath = `${config.vodPath}/${vodId}.mp4`;
 
-  const success = await ffmpegMp4Download(m3u8, vodPath)
+  const success = await this.ffmpegMp4Download(m3u8, vodPath)
     .then(() => {
       console.info(`Downloaded ${vodId}.mp4\n`);
       return true;
@@ -1252,7 +1274,7 @@ module.exports.mp4Download = async (vodId) => {
   return null;
 };
 
-const ffmpegMp4Download = async (m3u8, path) => {
+module.exports.ffmpegMp4Download = async (m3u8, path) => {
   return new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(m3u8);
     ffmpeg_process

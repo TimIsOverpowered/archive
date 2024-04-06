@@ -10,10 +10,18 @@ module.exports = function (app) {
     {
       id: {
         type: DataTypes.BIGINT,
+        allowNull: false,
         primaryKey: true,
       },
       started_at: {
         type: DataTypes.DATE,
+      },
+      platform: {
+        type: DataTypes.TEXT,
+        allowNull: false,
+      },
+      is_live: {
+        type: DataTypes.BOOLEAN,
       },
     },
     {

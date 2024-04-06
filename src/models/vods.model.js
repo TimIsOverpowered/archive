@@ -38,6 +38,10 @@ module.exports = function (app) {
         type: DataTypes.JSONB,
         defaultValue: [],
       },
+      platform: {
+        type: DataTypes.TEXT,
+        allowNull: false,
+      },
     },
     {
       hooks: {

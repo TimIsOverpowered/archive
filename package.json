@@ -54,9 +54,13 @@
     "hls-parser": "^0.10.8",
     "ioredis": "^5.3.2",
     "pg": "^8.11.3",
+    "puppeteer": "^22.6.2",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "qs": "^6.11.2",
     "rate-limiter-flexible": "^4.0.1",
     "redis": "^4.6.12",
+    "selenium-webdriver": "^4.19.0",
     "sequelize": "^6.36.0",
     "serve-favicon": "^2.5.0",
     "winston": "^3.11.0"

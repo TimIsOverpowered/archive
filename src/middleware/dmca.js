@@ -3,6 +3,7 @@ const ffmpeg = require("fluent-ffmpeg");
 const drive = require("./drive");
 const youtube = require("./youtube");
 const vod = require("./vod");
+const kick = require("./kick");
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
@@ -342,12 +343,14 @@ const getEndVideo = async (vodPath, vodId, end) => {
 
 module.exports = function (app) {
   return async function (req, res, next) {
-    const { vodId, type, receivedClaims } = req.body;
+    const { vodId, type, receivedClaims, platform } = req.body;
 
     if (!receivedClaims)
       return res.status(400).json({ error: true, msg: "No claims" });
     if (!vodId) return res.status(400).json({ error: true, msg: "No vod id" });
     if (!type) return res.status(400).json({ error: true, msg: "No type" });
+    if (!platform)
+      return res.status(400).json({ error: true, msg: "No platform" });
 
     let vod_data;
     await app
@@ -375,7 +378,11 @@ module.exports = function (app) {
       if (config.drive.upload) {
         videoPath = await drive.download(vodId, type, app);
       } else if (type === "vod") {
-        videoPath = await vod.mp4Download(vodId);
+        if (platform === "twitch") {
+          vodPath = await vod.mp4Download(vodId);
+        } else if (platform === "kick") {
+          vodPath = await kick.download(vodId);
+        }
       } else {
         videoPath = null;
       }
@@ -453,7 +460,7 @@ module.exports = function (app) {
       if (!newVodPath) return console.error("failed to mute video");
     }
 
-    vod.upload(vodId, app, newVodPath, type);
+    vod.upload(vodId, app, newVodPath, type, platform);
   };
 };
 

@@ -5,7 +5,8 @@ const port = app.get("port");
 const os = require("os");
 const cluster = require("cluster");
 const clusterWorkerSize = os.cpus().length;
-const { check } = require("./check");
+const { checkTwitch, checkKick, testChapters } = require("./check");
+const config = require("../config/config.json");
 
 process.on("unhandledRejection", (reason, p) => {
   logger.error("Unhandled Rejection at: Promise ", p, reason);
@@ -36,8 +37,10 @@ if (clusterWorkerSize > 1 && process.env.NODE_ENV === "production") {
     }
   });
 
-  check(app);
+  if (config.twitch.enabled) checkTwitch(app);
+  if (config.kick.enabled) checkKick(app);
 } else {
-  check(app);
+  if (config.twitch.enabled) checkTwitch(app);
+  if (config.kick.enabled) checkKick(app);
   start();
 }
