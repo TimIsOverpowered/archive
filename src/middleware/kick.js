@@ -63,8 +63,8 @@ module.exports.getVod = async (app, username, vodId) => {
   return vod;
 };
 
-module.exports.download = async (username, vodId) => {
-  const vod = await this.getVod(username, vodId);
+module.exports.download = async (app, username, vodId) => {
+  const vod = await this.getVod(app, username, vodId);
   if (!vod) return null;
 
   let m3u8 = await this.getM3u8(vod.source);
