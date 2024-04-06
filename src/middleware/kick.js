@@ -13,7 +13,10 @@ dayjs.extend(utc);
 const readline = require("readline");
 
 module.exports.getChannel = async (username) => {
-  const browser = await puppeteer.launch({ headless: true });
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
   const page = await browser.newPage();
   await page.goto(`https://kick.com/api/v2/channels/${username}`);
   await page.content();
@@ -26,7 +29,10 @@ module.exports.getChannel = async (username) => {
 };
 
 module.exports.getStream = async (username) => {
-  const browser = await puppeteer.launch({ headless: true });
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
   const page = await browser.newPage();
   await page.goto(`https://kick.com/api/v2/channels/${username}/livestream`);
   await page.content();
@@ -39,7 +45,10 @@ module.exports.getStream = async (username) => {
 };
 
 module.exports.getVods = async (username) => {
-  const browser = await puppeteer.launch({ headless: true });
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
   const page = await browser.newPage();
   await page.goto(`https://kick.com/api/v2/channels/${username}/videos`);
   await page.content();
@@ -52,7 +61,10 @@ module.exports.getVods = async (username) => {
 };
 
 module.exports.getVod = async (username, vodId) => {
-  const browser = await puppeteer.launch({ headless: true });
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
   const page = await browser.newPage();
   await page.goto(`https://kick.com/api/v2/channels/${username}/videos`);
   await page.content();
@@ -135,7 +147,10 @@ const fetchComments = async (browser, start_time) => {
 
 module.exports.downloadLogs = async (vodId, app, vod_start_date, duration) => {
   console.info(`Saving kick logs for ${vodId}`);
-  const browser = await puppeteer.launch({ headless: true });
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
   let start_time = new Date();
   let comments = [];
   let howMany = 1;
@@ -234,7 +249,10 @@ const sleep = (ms) => {
 };
 
 const getChapterInfo = async (chapter) => {
-  const browser = await puppeteer.launch({ headless: true });
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
   const page = await browser.newPage();
   await page.goto(`https://kick.com/api/v1/subcategories/${chapter}`);
   await page.content();
