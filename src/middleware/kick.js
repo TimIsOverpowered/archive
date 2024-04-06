@@ -8,11 +8,9 @@ const duration = require("dayjs/plugin/duration");
 dayjs.extend(duration);
 dayjs.extend(utc);
 const readline = require("readline");
-const userAgent = require("user-agents");
 
 module.exports.getChannel = async (app, username) => {
   const page = app.get("pupppeter");
-  await page.setUserAgent(userAgent.random().toString());
   await page.goto(`https://kick.com/api/v2/channels/${username}`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
@@ -24,7 +22,6 @@ module.exports.getChannel = async (app, username) => {
 
 module.exports.getStream = async (app, username) => {
   const page = app.get("puppeteer");
-  await page.setUserAgent(userAgent.random().toString());
   await page.goto(`https://kick.com/api/v2/channels/${username}/livestream`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
@@ -36,7 +33,6 @@ module.exports.getStream = async (app, username) => {
 
 module.exports.getVods = async (app, username) => {
   const page = app.get("puppeteer");
-  await page.setUserAgent(userAgent.random().toString());
   await page.goto(`https://kick.com/api/v2/channels/${username}/videos`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
@@ -48,7 +44,6 @@ module.exports.getVods = async (app, username) => {
 
 module.exports.getVod = async (app, username, vodId) => {
   const page = app.get("puppeteer");
-  await page.setUserAgent(userAgent.random().toString());
   await page.goto(`https://kick.com/api/v2/channels/${username}/videos`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
@@ -115,7 +110,6 @@ module.exports.getParsedM3u8 = (m3u8, baseURL) => {
 
 const fetchComments = async (app, start_time) => {
   const page = app.get("puppeteer");
-  await page.setUserAgent(userAgent.random().toString());
   await page.goto(
     `https://kick.com/api/v2/channels/${config.kick.id}/messages?start_time=${start_time}`
   );
@@ -229,7 +223,6 @@ const sleep = (ms) => {
 
 const getChapterInfo = async (app, chapter) => {
   const page = app.get("puppeteer");
-  await page.setUserAgent(userAgent.random().toString());
   await page.goto(`https://kick.com/api/v1/subcategories/${chapter}`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
