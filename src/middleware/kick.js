@@ -9,6 +9,12 @@ dayjs.extend(duration);
 dayjs.extend(utc);
 const readline = require("readline");
 
+module.exports.initialize = async (app, username) => {
+  const page = app.get("puppeteer");
+  await page.goto(`https://kick.com/api/v2/channels/${username}/livestream`);
+  await sleep(10000);
+};
+
 module.exports.getChannel = async (app, username) => {
   const page = app.get("pupppeter");
   await page.goto(`https://kick.com/api/v2/channels/${username}`);

@@ -6,6 +6,7 @@ const os = require("os");
 const cluster = require("cluster");
 const clusterWorkerSize = os.cpus().length;
 const { checkTwitch, checkKick } = require("./check");
+const { initialize } = require("./middleware/kick");
 const config = require("../config/config.json");
 
 process.on("unhandledRejection", (reason, p) => {
@@ -33,6 +34,7 @@ const start = async () => {
       tf: true,
     });
     app.set("puppeteer", page);
+    await initialize(app, config.kick.username);
     checkKick(app);
   }
 };
