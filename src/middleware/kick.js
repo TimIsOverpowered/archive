@@ -13,6 +13,7 @@ module.exports.initialize = async (app, username) => {
   const page = app.get("puppeteer");
   await page.goto(`https://kick.com/api/v2/channels/${username}/livestream`);
   await sleep(10000);
+  console.info("Puppeteer: Initialized!");
 };
 
 module.exports.getChannel = async (app, username) => {
@@ -110,7 +111,6 @@ module.exports.getParsedM3u8 = (m3u8, baseURL) => {
   } catch (e) {
     console.error(e);
   }
-  console.log(`${baseURL}/${parsedM3u8.variants[0].uri}`);
   return parsedM3u8 ? `${baseURL}/${parsedM3u8.variants[0].uri}` : null;
 };
 
