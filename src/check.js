@@ -228,7 +228,17 @@ module.exports.checkKick = async (app) => {
   }
 
   const kickVods = await kick.getVods(kickChannel);
+  if (!kickVods)
+    return setTimeout(() => {
+      this.checkKick(app);
+    }, 30000);
+
   const vodData = kickVods[0];
+  if (!vodData)
+    return setTimeout(() => {
+      this.checkKick(app);
+    }, 30000);
+
   const vodId = vodData.id.toString();
   const vodExists = await app
     .service("vods")
