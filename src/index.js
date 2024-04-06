@@ -28,11 +28,12 @@ const start = async () => {
     const { page, browser } = await connect({
       headless: "auto",
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      fingerprint: true,
+      turnstile: true,
+      tf: true,
     });
     app.set("puppeteer", page);
-    setTimeout(() => {
-      checkKick(app);
-    }, 1000);
+    checkKick(app);
   }
 };
 
