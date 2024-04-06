@@ -23,7 +23,11 @@ module.exports.getChannel = async (app, username) => {
   await page.goto(`https://kick.com/api/v2/channels/${username}`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
-    return JSON.parse(document.querySelector("body").innerText);
+    try {
+      return JSON.parse(document.querySelector("body").innerText);
+    } catch {
+      return undefined;
+    }
   });
 
   return jsonContent;
@@ -34,7 +38,11 @@ module.exports.getStream = async (app, username) => {
   await page.goto(`https://kick.com/api/v2/channels/${username}/livestream`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
-    return JSON.parse(document.querySelector("body").innerText);
+    try {
+      return JSON.parse(document.querySelector("body").innerText);
+    } catch {
+      return undefined;
+    }
   });
 
   return jsonContent;
@@ -45,7 +53,11 @@ module.exports.getVods = async (app, username) => {
   await page.goto(`https://kick.com/api/v2/channels/${username}/videos`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
-    return JSON.parse(document.querySelector("body").innerText);
+    try {
+      return JSON.parse(document.querySelector("body").innerText);
+    } catch {
+      return undefined;
+    }
   });
 
   return jsonContent;
@@ -123,7 +135,11 @@ const fetchComments = async (app, start_time) => {
   );
   await page.content();
   const jsonContent = await page.evaluate(() => {
-    return JSON.parse(document.querySelector("body").innerText);
+    try {
+      return JSON.parse(document.querySelector("body").innerText);
+    } catch {
+      return undefined;
+    }
   });
   await page.close();
 
@@ -234,7 +250,11 @@ const getChapterInfo = async (app, chapter) => {
   await page.goto(`https://kick.com/api/v1/subcategories/${chapter}`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
-    return JSON.parse(document.querySelector("body").innerText);
+    try {
+      return JSON.parse(document.querySelector("body").innerText);
+    } catch {
+      return undefined;
+    }
   });
 
   return jsonContent;
