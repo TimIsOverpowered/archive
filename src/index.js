@@ -5,7 +5,7 @@ const port = app.get("port");
 const os = require("os");
 const cluster = require("cluster");
 const clusterWorkerSize = os.cpus().length;
-const { checkTwitch, checkKick, testChapters } = require("./check");
+const { checkTwitch, checkKick } = require("./check");
 const config = require("../config/config.json");
 
 process.on("unhandledRejection", (reason, p) => {
@@ -13,7 +13,7 @@ process.on("unhandledRejection", (reason, p) => {
   console.error("Unhandled Rejection at: Promise ", p, " reason: ", reason);
 });
 
-const start = () => {
+const start = async () => {
   app.listen(port).then(() => {
     logger.info(
       "Feathers application started on http://%s:%d and worker %s",
@@ -22,6 +22,18 @@ const start = () => {
       process.pid
     );
   });
+  if (config.twitch.enabled) checkTwitch(app);
+  if (config.kick.enabled) {
+    let { connect } = await import("puppeteer-real-browser");
+    const { page, browser } = await connect({
+      headless: "auto",
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    app.set("puppeteer", page);
+    setTimeout(() => {
+      checkKick(app);
+    }, 1000);
+  }
 };
 
 if (clusterWorkerSize > 1 && process.env.NODE_ENV === "production") {
@@ -36,11 +48,6 @@ if (clusterWorkerSize > 1 && process.env.NODE_ENV === "production") {
       cluster.fork();
     }
   });
-
-  if (config.twitch.enabled) checkTwitch(app);
-  if (config.kick.enabled) checkKick(app);
 } else {
-  if (config.twitch.enabled) checkTwitch(app);
-  if (config.kick.enabled) checkKick(app);
   start();
 }
