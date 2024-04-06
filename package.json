@@ -63,6 +63,7 @@
     "selenium-webdriver": "^4.19.0",
     "sequelize": "^6.36.0",
     "serve-favicon": "^2.5.0",
+    "user-agents": "^1.1.166",
     "winston": "^3.11.0"
   },
   "devDependencies": {

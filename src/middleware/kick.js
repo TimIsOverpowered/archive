@@ -11,6 +11,7 @@ const duration = require("dayjs/plugin/duration");
 dayjs.extend(duration);
 dayjs.extend(utc);
 const readline = require("readline");
+const userAgent = require("user-agents");
 
 module.exports.getChannel = async (username) => {
   const browser = await puppeteer.launch({
@@ -18,6 +19,7 @@ module.exports.getChannel = async (username) => {
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
   const page = await browser.newPage();
+  await page.setUserAgent(userAgent.random().toString());
   await page.goto(`https://kick.com/api/v2/channels/${username}`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
@@ -34,6 +36,7 @@ module.exports.getStream = async (username) => {
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
   const page = await browser.newPage();
+  await page.setUserAgent(userAgent.random().toString());
   await page.goto(`https://kick.com/api/v2/channels/${username}/livestream`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
@@ -50,6 +53,7 @@ module.exports.getVods = async (username) => {
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
   const page = await browser.newPage();
+  await page.setUserAgent(userAgent.random().toString());
   await page.goto(`https://kick.com/api/v2/channels/${username}/videos`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
@@ -66,6 +70,7 @@ module.exports.getVod = async (username, vodId) => {
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
   const page = await browser.newPage();
+  await page.setUserAgent(userAgent.random().toString());
   await page.goto(`https://kick.com/api/v2/channels/${username}/videos`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
@@ -133,6 +138,7 @@ module.exports.getParsedM3u8 = (m3u8, baseURL) => {
 
 const fetchComments = async (browser, start_time) => {
   const page = await browser.newPage();
+  await page.setUserAgent(userAgent.random().toString());
   await page.goto(
     `https://kick.com/api/v2/channels/${config.kick.id}/messages?start_time=${start_time}`
   );
@@ -254,6 +260,7 @@ const getChapterInfo = async (chapter) => {
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
   const page = await browser.newPage();
+  await page.setUserAgent(userAgent.random().toString());
   await page.goto(`https://kick.com/api/v1/subcategories/${chapter}`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
