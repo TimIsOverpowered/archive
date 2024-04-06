@@ -26,6 +26,7 @@ module.exports.getChannel = async (app, username) => {
     try {
       return JSON.parse(document.querySelector("body").innerText);
     } catch {
+      console.error("Kick: Failed to parse json");
       return undefined;
     }
   });
@@ -41,6 +42,7 @@ module.exports.getStream = async (app, username) => {
     try {
       return JSON.parse(document.querySelector("body").innerText);
     } catch {
+      console.error("Kick: Failed to parse json");
       return undefined;
     }
   });
@@ -56,6 +58,7 @@ module.exports.getVods = async (app, username) => {
     try {
       return JSON.parse(document.querySelector("body").innerText);
     } catch {
+      console.error("Kick: Failed to parse json");
       return undefined;
     }
   });
@@ -138,6 +141,7 @@ const fetchComments = async (app, start_time) => {
     try {
       return JSON.parse(document.querySelector("body").innerText);
     } catch {
+      console.error("Kick: Failed to parse json");
       return undefined;
     }
   });
@@ -253,6 +257,7 @@ const getChapterInfo = async (app, chapter) => {
     try {
       return JSON.parse(document.querySelector("body").innerText);
     } catch {
+      console.error("Kick: Failed to parse json");
       return undefined;
     }
   });
