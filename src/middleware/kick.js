@@ -13,7 +13,9 @@ module.exports.initialize = async (app, username) => {
   const page = app.get("puppeteer");
   await page.goto(`https://kick.com/api/v2/channels/${username}/livestream`);
   await sleep(10000);
+  await page.content();
   console.info("Puppeteer: Initialized!");
+  return;
 };
 
 module.exports.getChannel = async (app, username) => {
