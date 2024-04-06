@@ -177,7 +177,7 @@ module.exports.checkKick = async (app) => {
   }
 
   //If Live stream has ended, set is_live to false & get vod data & download vod
-  const liveStreams = app
+  const liveStreams = await app
     .service("streams")
     .find({
       query: {
