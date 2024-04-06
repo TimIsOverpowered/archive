@@ -1,6 +1,3 @@
-const puppeteer = require("puppeteer-extra");
-const StealthPlugin = require("puppeteer-extra-plugin-stealth");
-puppeteer.use(StealthPlugin());
 const axios = require("axios");
 const HLS = require("hls-parser");
 const config = require("../../config/config.json");
@@ -13,70 +10,50 @@ dayjs.extend(utc);
 const readline = require("readline");
 const userAgent = require("user-agents");
 
-module.exports.getChannel = async (username) => {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
-  const page = await browser.newPage();
+module.exports.getChannel = async (app, username) => {
+  const page = app.get("pupppeter");
   await page.setUserAgent(userAgent.random().toString());
   await page.goto(`https://kick.com/api/v2/channels/${username}`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
     return JSON.parse(document.querySelector("body").innerText);
   });
-  await browser.close();
 
   return jsonContent;
 };
 
-module.exports.getStream = async (username) => {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
-  const page = await browser.newPage();
+module.exports.getStream = async (app, username) => {
+  const page = app.get("puppeteer");
   await page.setUserAgent(userAgent.random().toString());
   await page.goto(`https://kick.com/api/v2/channels/${username}/livestream`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
     return JSON.parse(document.querySelector("body").innerText);
   });
-  await browser.close();
 
   return jsonContent;
 };
 
-module.exports.getVods = async (username) => {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
-  const page = await browser.newPage();
+module.exports.getVods = async (app, username) => {
+  const page = app.get("puppeteer");
   await page.setUserAgent(userAgent.random().toString());
   await page.goto(`https://kick.com/api/v2/channels/${username}/videos`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
     return JSON.parse(document.querySelector("body").innerText);
   });
-  await browser.close();
 
   return jsonContent;
 };
 
-module.exports.getVod = async (username, vodId) => {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
-  const page = await browser.newPage();
+module.exports.getVod = async (app, username, vodId) => {
+  const page = app.get("puppeteer");
   await page.setUserAgent(userAgent.random().toString());
   await page.goto(`https://kick.com/api/v2/channels/${username}/videos`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
     return JSON.parse(document.querySelector("body").innerText);
   });
-  await browser.close();
 
   const vod = jsonContent.find(
     (livestream) => livestream.id.toString() === vodId
@@ -136,8 +113,8 @@ module.exports.getParsedM3u8 = (m3u8, baseURL) => {
   return parsedM3u8 ? `${baseURL}/${parsedM3u8.variants[0].uri}` : null;
 };
 
-const fetchComments = async (browser, start_time) => {
-  const page = await browser.newPage();
+const fetchComments = async (app, start_time) => {
+  const page = app.get("puppeteer");
   await page.setUserAgent(userAgent.random().toString());
   await page.goto(
     `https://kick.com/api/v2/channels/${config.kick.id}/messages?start_time=${start_time}`
@@ -153,17 +130,14 @@ const fetchComments = async (browser, start_time) => {
 
 module.exports.downloadLogs = async (vodId, app, vod_start_date, duration) => {
   console.info(`Saving kick logs for ${vodId}`);
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
   let start_time = new Date();
   let comments = [];
   let howMany = 1;
   let cursor = vod_start_date;
 
+  const page = app.get("puppeteer");
   do {
-    let response = await fetchComments(browser, cursor);
+    let response = await fetchComments(page, cursor);
     if (!response.data) {
       console.info(`No comments for vod ${vodId}`);
       return;
@@ -238,7 +212,6 @@ module.exports.downloadLogs = async (vodId, app, vod_start_date, duration) => {
       (new Date() - start_time) / 1000
     } seconds`
   );
-  browser.close();
 };
 
 const commentExists = async (id, app) => {
@@ -254,19 +227,14 @@ const sleep = (ms) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
-const getChapterInfo = async (chapter) => {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
-  const page = await browser.newPage();
+const getChapterInfo = async (app, chapter) => {
+  const page = app.get("puppeteer");
   await page.setUserAgent(userAgent.random().toString());
   await page.goto(`https://kick.com/api/v1/subcategories/${chapter}`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
     return JSON.parse(document.querySelector("body").innerText);
   });
-  await browser.close();
 
   return jsonContent;
 };
@@ -288,7 +256,7 @@ module.exports.saveChapters = async (stream, app) => {
     lastChapter.end = currentTime.asSeconds();
   } else {
     //New chapter
-    const chapterInfo = await getChapterInfo(currentChapter.slug);
+    const chapterInfo = await getChapterInfo(app, currentChapter.slug);
     chapters.push({
       gameId: chapterInfo.id,
       name: chapterInfo.name,

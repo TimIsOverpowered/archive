@@ -57,6 +57,7 @@
     "puppeteer": "^22.6.2",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "puppeteer-real-browser": "^1.2.11",
     "qs": "^6.11.2",
     "rate-limiter-flexible": "^4.0.1",
     "redis": "^4.6.12",

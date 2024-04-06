@@ -125,7 +125,7 @@ module.exports.checkTwitch = async (app) => {
 
 module.exports.checkKick = async (app) => {
   const kickChannel = config.kick.username;
-  let stream = await kick.getStream(kickChannel);
+  let stream = await kick.getStream(app, kickChannel);
 
   if (stream && stream.data) {
     stream = stream.data;
@@ -199,7 +199,7 @@ module.exports.checkKick = async (app) => {
 
       let kickVod;
       do {
-        kickVod = await kick.getVod(kickChannel, livestream.id);
+        kickVod = await kick.getVod(app, kickChannel, livestream.id);
         console.info("Kick stream has ended. Trying to get kick vod..");
         await sleep(5000);
       } while (!kickVod);
@@ -216,7 +216,7 @@ module.exports.checkKick = async (app) => {
 
       if (config.vodDownload) {
         console.info(`Start Vod download: ${livestream.id}`);
-        kick.download(kickChannel, livestream.id);
+        kick.download(app, kickChannel, livestream.id);
       }
 
       if (config.chatDownload) {
@@ -227,7 +227,7 @@ module.exports.checkKick = async (app) => {
     }
   }
 
-  const kickVods = await kick.getVods(kickChannel);
+  const kickVods = await kick.getVods(app, kickChannel);
   if (!kickVods)
     return setTimeout(() => {
       this.checkKick(app);
@@ -273,7 +273,7 @@ module.exports.checkKick = async (app) => {
     //Vods don't come up until after stream on kick
     if (config.vodDownload) {
       console.info(`Start Vod download: ${vodId}`);
-      kick.download(kickChannel, vodId);
+      kick.download(app, kickChannel, vodId);
     }
 
     if (config.chatDownload) {

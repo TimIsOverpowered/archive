@@ -84,7 +84,7 @@ module.exports.download = function (app) {
       const vodPath = await vod.upload(vodId, app, path, type, "twitch");
       if (vodPath) fs.unlinkSync(vodPath);
     } else if (platform === "kick") {
-      const vodData = await kick.getVod(vodId, config.kick.username);
+      const vodData = await kick.getVod(app, vodId, config.kick.username);
       if (!vodData)
         return res.status(404).json({ error: true, msg: "No Vod Data" });
 
@@ -211,7 +211,7 @@ module.exports.logs = function (app) {
       vod.getLogs(vodId, app);
       res.status(200).json({ error: false, msg: "Getting logs.." });
     } else if (platform === "kick") {
-      const vodData = await kick.getVod(config.kick.username, vodId);
+      const vodData = await kick.getVod(app, config.kick.username, vodId);
       kick.downloadLogs(vodId, app, dayjs.utc(vodData.start_time).toISOString(), vodData.duration);
       res.status(200).json({ error: false, msg: "Getting logs.." });
     } else {
