@@ -2,6 +2,7 @@
 const logger = require("./logger");
 const app = require("./app");
 const port = app.get("port");
+const host = app.get("host");
 const { checkTwitch, checkKick } = require("./check");
 const { initialize } = require("./middleware/kick");
 const config = require("../config/config.json");
