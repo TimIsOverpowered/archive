@@ -126,7 +126,7 @@ module.exports.checkTwitch = async (app) => {
 module.exports.checkKick = async (app) => {
   const kickChannel = config.kick.username;
   const stream = await kick.getStream(app, kickChannel);
-  const streamData = stream.data;
+  const streamData = stream?.data;
 
   if (stream && streamData) {
     const streamExists = await app
