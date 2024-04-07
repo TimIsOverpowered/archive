@@ -125,13 +125,13 @@ module.exports.checkTwitch = async (app) => {
 
 module.exports.checkKick = async (app) => {
   const kickChannel = config.kick.username;
-  let stream = await kick.getStream(app, kickChannel);
+  const stream = await kick.getStream(app, kickChannel);
+  const streamData = stream.data;
 
-  if (stream && stream.data) {
-    stream = stream.data;
+  if (stream && streamData) {
     const streamExists = await app
       .service("streams")
-      .get(stream.id.toString())
+      .get(streamData.id.toString())
       .then(() => true)
       .catch(() => false);
 
@@ -139,14 +139,14 @@ module.exports.checkKick = async (app) => {
       await app
         .service("streams")
         .create({
-          id: stream.id,
-          started_at: stream.created_at,
+          id: streamData.id,
+          started_at: streamData.created_at,
           platform: "kick",
           is_live: true,
         })
         .then(() =>
           console.log(
-            `${config.channel} kick stream online. Created Stream. ${stream.created_at}`
+            `${config.channel} kick stream online. Created Stream. ${streamData.created_at}`
           )
         )
         .catch((e) => {
@@ -156,15 +156,15 @@ module.exports.checkKick = async (app) => {
       await app
         .service("vods")
         .create({
-          id: stream.id,
-          title: stream.session_title,
-          createdAt: stream.created_at,
+          id: streamData.id,
+          title: streamData.session_title,
+          createdAt: streamData.created_at,
           platform: "kick",
         })
         .then(() =>
           console.log(
             `${config.channel} has a new kick vod. Creating vod. ${dayjs
-              .utc(stream.createdAt)
+              .utc(streamData.createdAt)
               .format("MM-DD-YYYY")}`
           )
         )
@@ -188,7 +188,7 @@ module.exports.checkKick = async (app) => {
     .then((res) => res.data)
     .catch(() => null);
 
-  if (stream && !stream.data) {
+  if (stream && !streamData) {
     for (let livestream of liveStreams) {
       await app
         .service("streams")
@@ -207,7 +207,7 @@ module.exports.checkKick = async (app) => {
       await app
         .service("vods")
         .patch(livestream.id, {
-          stream_id: kickVod.video.uuid,
+          id: kickVod.video.uuid,
           duration: dayjs
             .duration(kickVod.duration, "milliseconds")
             .format("HH:mm:ss"),
