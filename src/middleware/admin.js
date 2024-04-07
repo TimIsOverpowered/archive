@@ -162,6 +162,7 @@ module.exports.hlsDownload = function (app) {
           .duration(`PT${vodData.duration.toUpperCase()}`)
           .format("HH:mm:ss"),
         stream_id: vodData.stream_id,
+        platform: "twitch",
       })
       .then(() => {
         console.info(`Created vod ${vodData.id} for ${vodData.user_name}`);
@@ -212,7 +213,12 @@ module.exports.logs = function (app) {
       res.status(200).json({ error: false, msg: "Getting logs.." });
     } else if (platform === "kick") {
       const vodData = await kick.getVod(app, config.kick.username, vodId);
-      kick.downloadLogs(vodId, app, dayjs.utc(vodData.start_time).toISOString(), vodData.duration);
+      kick.downloadLogs(
+        vodId,
+        app,
+        dayjs.utc(vodData.start_time).toISOString(),
+        vodData.duration
+      );
       res.status(200).json({ error: false, msg: "Getting logs.." });
     } else {
       res.status(400).json({ error: false, msg: "Platform not supported.." });
@@ -274,6 +280,7 @@ module.exports.createVod = function (app) {
         createdAt: createdAt,
         duration: duration,
         drive: drive ? [drive] : [],
+        platform: platform,
       })
       .then(() => {
         console.info(`Created vod ${vodId}`);
