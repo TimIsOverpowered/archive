@@ -43,6 +43,7 @@ module.exports.download = function (app) {
 
     if (exists) {
       vod.upload(vodId, app, path, type);
+      emotes.save(vodId, app);
       res.status(200).json({ error: false, msg: "Starting download.." });
       return;
     }
