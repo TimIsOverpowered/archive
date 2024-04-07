@@ -139,7 +139,7 @@ module.exports.checkKick = async (app) => {
       await app
         .service("streams")
         .create({
-          stream_id: stream.id,
+          id: stream.id,
           started_at: stream.created_at,
           platform: "kick",
           is_live: true,
