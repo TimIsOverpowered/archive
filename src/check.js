@@ -173,7 +173,7 @@ module.exports.checkKick = async (app) => {
         });
     }
 
-    kick.saveChapters(streamData, app);
+    await kick.saveChapters(streamData, app);
   }
 
   //If Live stream has ended, set is_live to false & get vod data & download vod
