@@ -297,7 +297,7 @@ module.exports.saveChapters = async (stream, app) => {
 
   await app
     .service("vods")
-    .patch(vodId, {
+    .patch(stream.id.toString(), {
       chapters: chapters,
     })
     .catch((e) => {
