@@ -273,11 +273,10 @@ module.exports.saveChapters = async (stream, app) => {
     .catch(() => null);
 
   if (!chapters) return;
-
   const currentChapter = stream.category;
   const lastChapter = chapters[chapters.length - 1];
   const currentTime = dayjs.duration(dayjs.utc().diff(stream.created_at));
-  if (lastChapter && lastChapter.id === currentChapter.id) {
+  if (lastChapter && lastChapter.gameId === currentChapter.id) {
     //Same chapter still, only save end time.
     lastChapter.end = currentTime.asSeconds();
   } else {
