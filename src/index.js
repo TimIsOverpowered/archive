@@ -2,9 +2,6 @@
 const logger = require("./logger");
 const app = require("./app");
 const port = app.get("port");
-const os = require("os");
-const cluster = require("cluster");
-const clusterWorkerSize = os.cpus().length;
 const { checkTwitch, checkKick } = require("./check");
 const { initialize } = require("./middleware/kick");
 const config = require("../config/config.json");
@@ -14,15 +11,8 @@ process.on("unhandledRejection", (reason, p) => {
   console.error("Unhandled Rejection at: Promise ", p, " reason: ", reason);
 });
 
-const start = async () => {
-  app.listen(port).then(() => {
-    logger.info(
-      "Feathers application started on http://%s:%d and worker %s",
-      app.get("host"),
-      port,
-      process.pid
-    );
-  });
+app.listen(port).then(async () => {
+  logger.info(`Feathers app listening on http://${host}:${port}`);
   if (config.twitch.enabled) checkTwitch(app);
   if (config.kick.enabled) {
     let { connect } = await import("puppeteer-real-browser");
@@ -37,20 +27,4 @@ const start = async () => {
     await initialize(app, config.kick.username);
     checkKick(app);
   }
-};
-
-if (clusterWorkerSize > 1 && process.env.NODE_ENV === "production") {
-  if (!cluster.isMaster) return start();
-  for (let i = 0; i < clusterWorkerSize; i++) {
-    cluster.fork();
-  }
-
-  cluster.on("exit", function (worker, code, signal) {
-    console.log("Worker", worker.id, "has exited with signal", signal);
-    if (code !== 0 && !worker.exitedAfterDisconnect) {
-      cluster.fork();
-    }
-  });
-} else {
-  start();
-}
+});
