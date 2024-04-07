@@ -76,7 +76,7 @@ module.exports.checkTwitch = async (app) => {
     await app
       .service("vods")
       .create({
-        vod_id: vodId,
+        id: vodId,
         title: vodData.title,
         createdAt: vodData.created_at,
         stream_id: vodData.stream_id,
