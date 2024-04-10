@@ -286,12 +286,18 @@ module.exports.saveChapters = async (stream, app) => {
       gameId: chapterInfo.id,
       name: chapterInfo.name,
       image: chapterInfo.banner.src,
-      duration: chapters.length === 0 ? "00:00:00" : currentTime.format("HH:mm:ss"),
+      duration:
+        chapters.length === 0
+          ? "00:00:00"
+          : dayjs
+              .duration(currentTime.asSeconds() - lastChapter.start, "s")
+              .format("HH:mm:ss"),
       start: chapters.length === 0 ? 0 : currentTime.asSeconds(),
     });
 
     //Update end to last chapter when new chapter is found.
-    if (lastChapter) lastChapter.end = currentTime.asSeconds() - lastChapter.start;
+    if (lastChapter)
+      lastChapter.end = currentTime.asSeconds() - lastChapter.start;
   }
 
   await app
