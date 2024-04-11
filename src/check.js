@@ -216,7 +216,7 @@ module.exports.checkKick = async (app) => {
 
       if (config.vodDownload) {
         console.info(`Start Vod download: ${livestream.id}`);
-        await kick.download(app, kickChannel, livestream.id);
+        await vod.upload(livestream.id, app, false, "vod");
       }
 
       if (config.chatDownload) {
@@ -273,7 +273,7 @@ module.exports.checkKick = async (app) => {
     //Vods don't come up until after stream on kick
     if (config.vodDownload) {
       console.info(`Start Vod download: ${vodId}`);
-      await kick.download(app, kickChannel, vodId);
+      await vod.upload(vodId, app, false, "vod");
     }
 
     if (config.chatDownload) {
