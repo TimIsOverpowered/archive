@@ -24,6 +24,7 @@ app.listen(port).then(async () => {
       turnstile: true,
       tf: true,
     });
+    page.setDefaultNavigationTimeout(5 * 60 * 1000)
     app.set("puppeteer", page);
     await initialize(app, config.kick.username);
     checkKick(app);
