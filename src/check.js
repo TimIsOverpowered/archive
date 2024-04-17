@@ -201,7 +201,7 @@ module.exports.checkKick = async (app) => {
       do {
         kickVod = await kick.getVod(app, kickChannel, livestream.id);
         console.info("Kick stream has ended. Trying to get kick vod..");
-        await sleep(5000);
+        await sleep(1 * 60 * 1000);
       } while (!kickVod);
 
       await app
