@@ -344,18 +344,29 @@ module.exports.reUploadPart = function (app) {
       msg: `Reuploading ${vodId} Vod Part ${part}`,
     });
 
-    const driveVideo = await drive.download(vodId, type, app);
+    let videoPath =
+      type === "live"
+        ? `${config.livePath}/${config.twitch.username}/${vod_data.stream_id}.mp4`
+        : `${config.vodPath}/${vodId}.mp4`;
 
-    if (!driveVideo)
+    if (!(await fileExists(videoPath))) {
+      if (config.drive.upload) {
+        videoPath = await drive.download(vodId, type, app);
+      } else if (type === "vod") {
+        videoPath = await vod.mp4Download(vodId);
+      } else {
+        videoPath = null;
+      }
+    }
+
+    if (!videoPath)
       return console.error(`Could not find a download source for ${vodId}`);
-
-    console.info(`Finished download`);
 
     if (type === "live") {
       await vod.liveUploadPart(
         app,
         vodId,
-        driveVideo,
+        videoPath,
         config.youtube.splitDuration * parseInt(part) - 1,
         config.youtube.splitDuration,
         part,
@@ -365,14 +376,14 @@ module.exports.reUploadPart = function (app) {
       await vod.liveUploadPart(
         app,
         vodId,
-        driveVideo,
+        videoPath,
         config.youtube.splitDuration * parseInt(part) - 1,
         config.youtube.splitDuration,
         part,
         type
       );
     }
-    fs.unlinkSync(driveVideo);
+    fs.unlinkSync(videoPath);
   };
 };
 
