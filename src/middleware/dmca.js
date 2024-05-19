@@ -371,7 +371,7 @@ module.exports = function (app) {
 
     let videoPath =
       type === "live"
-        ? `${config.livePath}/${config.twitch.username}/${vod_data.stream_id}.mp4`
+        ? `${config.livePath}/${config.twitch.username}/${vod_data.stream_id}/${vod_data.stream_id}.mp4`
         : `${config.vodPath}/${vodId}.mp4`;
 
     if (!(await fileExists(videoPath))) {
@@ -492,7 +492,7 @@ module.exports.part = function (app) {
 
     let videoPath =
       type === "live"
-        ? `${config.livePath}/${config.twitch.username}/${vod_data.stream_id}.mp4`
+        ? `${config.livePath}/${config.twitch.username}/${vod_data.stream_id}/${vod_data.stream_id}.mp4`
         : `${config.vodPath}/${vodId}.mp4`;
 
     if (!(await fileExists(videoPath))) {
