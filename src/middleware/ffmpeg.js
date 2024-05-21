@@ -31,3 +31,18 @@ module.exports.mp4Download = async (m3u8, path) => {
       .saveToFile(path);
   });
 };
+
+module.exports.getDuration = async (video) => {
+  let duration;
+  await new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(video, (err, metadata) => {
+      if (err) {
+        console.error(err);
+        return reject();
+      }
+      duration = metadata.format.duration;
+      resolve();
+    });
+  });
+  return duration;
+};
