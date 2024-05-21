@@ -12,6 +12,7 @@ const utc = require("dayjs/plugin/utc");
 const timezone = require("dayjs/plugin/timezone");
 dayjs.extend(utc);
 dayjs.extend(timezone);
+const { getDuration } = require("./ffmpeg");
 
 const mute = async (vodPath, muteSection, vodId) => {
   let returnPath;
@@ -598,6 +599,8 @@ module.exports.part = function (app) {
         "nothing to mute or blackout. don't try to upload.."
       );
 
+    const duration = await getDuration(newVodPath ? newVodPath : blackoutPath);
+
     await youtube.upload(
       {
         path: newVodPath ? newVodPath : blackoutPath,
@@ -620,17 +623,11 @@ module.exports.part = function (app) {
         vod: vod_data,
         part: part,
         type: type,
+        duration: duration,
       },
       app
     );
 
     if (blackoutPath) fs.unlinkSync(blackoutPath);
   };
-};
-
-const fileExists = async (file) => {
-  return fs.promises
-    .access(file, fs.constants.F_OK)
-    .then(() => true)
-    .catch(() => false);
 };
