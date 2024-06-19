@@ -79,6 +79,8 @@ module.exports.getVod = async (app, username, vodId) => {
     }
   });
 
+  if (!jsonContent) return null;
+
   const vod = jsonContent.find(
     (livestream) => livestream.id.toString() === vodId
   );
