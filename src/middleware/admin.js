@@ -85,7 +85,7 @@ module.exports.download = function (app) {
       const vodPath = await vod.upload(vodId, app, path, type, "twitch");
       if (vodPath) fs.unlinkSync(vodPath);
     } else if (platform === "kick") {
-      const vodData = await kick.getVod(app, vodId, config.kick.username);
+      const vodData = await kick.getVod(app, config.kick.username, vodId);
       if (!vodData)
         return res.status(404).json({ error: true, msg: "No Vod Data" });
 
