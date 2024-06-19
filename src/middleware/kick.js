@@ -71,7 +71,12 @@ module.exports.getVod = async (app, username, vodId) => {
   await page.goto(`https://kick.com/api/v2/channels/${username}/videos`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
-    return JSON.parse(document.querySelector("body").innerText);
+    try {
+      return JSON.parse(document.querySelector("body").innerText);
+    } catch {
+      console.error("Kick: Failed to parse json");
+      return undefined;
+    }
   });
 
   const vod = jsonContent.find(
