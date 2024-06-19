@@ -109,7 +109,7 @@ module.exports.download = function (app) {
         })
         .then(() => {
           console.info(
-            `Created kick vod ${vodData.id} for ${vodData.user_name}`
+            `Created kick vod ${vodData.id} for ${config.kick.username}`
           );
         })
         .catch((e) => {
