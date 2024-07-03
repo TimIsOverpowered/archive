@@ -7,6 +7,7 @@ const drive = require("./drive");
 const emotes = require("./emotes");
 const dayjs = require("dayjs");
 const duration = require("dayjs/plugin/duration");
+const ffmpeg = require("./ffmpeg");
 dayjs.extend(duration);
 
 module.exports.verify = function (app) {
@@ -29,7 +30,7 @@ module.exports.verify = function (app) {
 
 module.exports.download = function (app) {
   return async function (req, res, next) {
-    const { vodId, type, platform, path } = req.body;
+    let { vodId, type, platform, path, m3u8 } = req.body;
     if (!vodId) return res.status(400).json({ error: true, msg: "No VodId" });
     if (!type) return res.status(400).json({ error: true, msg: "No type" });
     if (!platform)
@@ -82,6 +83,12 @@ module.exports.download = function (app) {
 
       res.status(200).json({ error: false, msg: "Starting download.." });
       emotes.save(vodId, app);
+
+      if (m3u8) {
+        path = `${config.vodPath}/${vodId}.mp4`;
+        await ffmpeg.mp4Download(m3u8, path);
+      }
+
       const vodPath = await vod.upload(vodId, app, path, type, "twitch");
       if (vodPath) fs.unlinkSync(vodPath);
     } else if (platform === "kick") {
@@ -117,6 +124,12 @@ module.exports.download = function (app) {
         });
       res.status(200).json({ error: false, msg: "Starting download.." });
       emotes.save(vodId, app);
+
+      if (m3u8) {
+        path = `${config.vodPath}/${vodId}.mp4`;
+        await ffmpeg.mp4Download(m3u8, path);
+      }
+
       const vodPath = await vod.upload(vodId, app, path, type, "kick");
       if (vodPath) fs.unlinkSync(vodPath);
     }
