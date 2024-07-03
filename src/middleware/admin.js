@@ -43,6 +43,22 @@ module.exports.download = function (app) {
       .catch(() => false);
 
     if (exists) {
+      if (m3u8) {
+        path = `${config.vodPath}/${vodId}.mp4`;
+        const success = await ffmpeg
+          .mp4Download(m3u8, path)
+          .then(() => {
+            console.info(`Downloaded ${vodId}.mp4\n`);
+            return true;
+          })
+          .catch((e) => {
+            console.error("\nffmpeg error occurred: " + e);
+            return false;
+          });
+
+        if (!success) return;
+      }
+
       vod.upload(vodId, app, path, type);
       emotes.save(vodId, app);
       res.status(200).json({ error: false, msg: "Starting download.." });
@@ -84,22 +100,6 @@ module.exports.download = function (app) {
       res.status(200).json({ error: false, msg: "Starting download.." });
       emotes.save(vodId, app);
 
-      if (m3u8) {
-        path = `${config.vodPath}/${vodId}.mp4`;
-        const success = await ffmpeg
-          .mp4Download(m3u8, path)
-          .then(() => {
-            console.info(`Downloaded ${vodId}.mp4\n`);
-            return true;
-          })
-          .catch((e) => {
-            console.error("\nffmpeg error occurred: " + e);
-            return false;
-          });
-
-        if (!success) return;
-      }
-
       const vodPath = await vod.upload(vodId, app, path, type, "twitch");
       if (vodPath) fs.unlinkSync(vodPath);
     } else if (platform === "kick") {
@@ -135,22 +135,6 @@ module.exports.download = function (app) {
         });
       res.status(200).json({ error: false, msg: "Starting download.." });
       emotes.save(vodId, app);
-
-      if (m3u8) {
-        path = `${config.vodPath}/${vodId}.mp4`;
-        const success = await ffmpeg
-          .mp4Download(m3u8, path)
-          .then(() => {
-            console.info(`Downloaded ${vodId}.mp4\n`);
-            return true;
-          })
-          .catch((e) => {
-            console.error("\nffmpeg error occurred: " + e);
-            return false;
-          });
-
-        if (!success) return;
-      }
 
       const vodPath = await vod.upload(vodId, app, path, type, "kick");
       if (vodPath) fs.unlinkSync(vodPath);
