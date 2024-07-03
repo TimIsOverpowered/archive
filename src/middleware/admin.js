@@ -86,7 +86,18 @@ module.exports.download = function (app) {
 
       if (m3u8) {
         path = `${config.vodPath}/${vodId}.mp4`;
-        await ffmpeg.mp4Download(m3u8, path);
+        const success = await ffmpeg
+          .mp4Download(m3u8, path)
+          .then(() => {
+            console.info(`Downloaded ${vodId}.mp4\n`);
+            return true;
+          })
+          .catch((e) => {
+            console.error("\nffmpeg error occurred: " + e);
+            return false;
+          });
+
+        if (!success) return;
       }
 
       const vodPath = await vod.upload(vodId, app, path, type, "twitch");
@@ -127,7 +138,18 @@ module.exports.download = function (app) {
 
       if (m3u8) {
         path = `${config.vodPath}/${vodId}.mp4`;
-        await ffmpeg.mp4Download(m3u8, path);
+        const success = await ffmpeg
+          .mp4Download(m3u8, path)
+          .then(() => {
+            console.info(`Downloaded ${vodId}.mp4\n`);
+            return true;
+          })
+          .catch((e) => {
+            console.error("\nffmpeg error occurred: " + e);
+            return false;
+          });
+
+        if (!success) return;
       }
 
       const vodPath = await vod.upload(vodId, app, path, type, "kick");
