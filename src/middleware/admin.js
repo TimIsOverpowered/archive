@@ -43,6 +43,7 @@ module.exports.download = function (app) {
       .catch(() => false);
 
     if (exists) {
+      res.status(200).json({ error: false, msg: "Starting download.." });
       if (m3u8) {
         path = `${config.vodPath}/${vodId}.mp4`;
         const success = await ffmpeg
@@ -61,7 +62,6 @@ module.exports.download = function (app) {
 
       vod.upload(vodId, app, path, type);
       emotes.save(vodId, app);
-      res.status(200).json({ error: false, msg: "Starting download.." });
       return;
     }
 
