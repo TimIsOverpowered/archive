@@ -799,10 +799,12 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
       setTimeout(() => youtube.saveParts(vodId, app, "vod"), 60000);
     } else if (config.youtube.upload) {
       await this.upload(vodId, app, mp4Path);
+      if (!config.saveMP4) await fs.promises.rm(mp4Path);
     }
-    await fs.promises.rm(dir, {
-      recursive: true,
-    });
+    if (!config.saveHLS)
+      await fs.promises.rm(dir, {
+        recursive: true,
+      });
     return;
   }
 
