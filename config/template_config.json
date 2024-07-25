@@ -45,6 +45,8 @@
   "timezone": "America/Chicago",
   "chatDownload": false,
   "vodDownload": true,
+  "saveHLS": false,
+  "saveMP4": false,
   "drive": {
     "upload": false,
     "parents": [],

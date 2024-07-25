@@ -16,7 +16,7 @@ app.listen(port).then(async () => {
   logger.info(`Feathers app listening on http://${host}:${port}`);
   if (config.twitch.enabled) checkTwitch(app);
   if (config.kick.enabled) {
-    /*let { connect } = await import("puppeteer-real-browser");
+    let { connect } = await import("puppeteer-real-browser");
     const { page, browser } = await connect({
       headless: "auto",
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
@@ -27,6 +27,6 @@ app.listen(port).then(async () => {
     page.setDefaultNavigationTimeout(5 * 60 * 1000)
     app.set("puppeteer", page);
     await initialize(app, config.kick.username);
-    checkKick(app);*/
+    checkKick(app);
   }
 });

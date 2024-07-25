@@ -8,6 +8,10 @@ const duration = require("dayjs/plugin/duration");
 dayjs.extend(duration);
 dayjs.extend(utc);
 const readline = require("readline");
+const fs = require("fs");
+const { convertToMp4, liveUploadPart, upload } = require("./vod");
+const drive = require("./drive");
+const youtube = require("./youtube");
 
 module.exports.initialize = async (app, username) => {
   const page = app.get("puppeteer");
@@ -315,4 +319,209 @@ module.exports.saveChapters = async (stream, app) => {
     .catch((e) => {
       console.error(e);
     });
+};
+
+module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
+  if ((process.env.NODE_ENV || "").trim() !== "production")
+    console.info(`${vodId} Download Retry: ${retry}`);
+  const dir = `${config.vodPath}/${vodId}`;
+  const m3u8Path = `${dir}/${vodId}.m3u8`;
+  const stream = await this.getStream(app, config.kick.username);
+  const newVodData = await this.getVod(app, config.kick.username, vodId);
+  const m3u8Exists = await fileExists(m3u8Path);
+  let duration, vod;
+  await app
+    .service("vods")
+    .get(vodId)
+    .then((data) => {
+      vod = data;
+    })
+    .catch(() => {});
+
+  if (!vod)
+    return console.error("Failed to download video: no VOD in database");
+
+  if (m3u8Exists) {
+    duration = await getDuration(m3u8Path);
+    await saveDuration(vodId, duration, app);
+    if (stream && stream.data) await this.saveChapters(stream.data, app);
+  }
+
+  if (
+    duration >= config.youtube.splitDuration &&
+    config.youtube.liveUpload &&
+    config.youtube.upload
+  ) {
+    const noOfParts = Math.floor(duration / config.youtube.splitDuration);
+
+    const vod_youtube_data = vod.youtube.filter((data) => {
+      return data.type === "vod";
+    });
+    if (vod_youtube_data.length < noOfParts) {
+      for (let i = 0; i < noOfParts; i++) {
+        if (vod_youtube_data[i]) continue;
+        await liveUploadPart(
+          app,
+          vodId,
+          m3u8Path,
+          config.youtube.splitDuration * i,
+          config.youtube.splitDuration,
+          i + 1
+        );
+      }
+    }
+  }
+
+  if ((!newVodData && m3u8Exists) || retry >= 10) {
+    app.set(`${config.channel}-${vodId}-vod-downloading`, false);
+
+    const mp4Path = `${config.vodPath}/${vodId}.mp4`;
+    await convertToMp4(m3u8Path, vodId, mp4Path);
+    if (config.drive.upload) await drive.upload(vodId, mp4Path, app);
+    if (config.youtube.liveUpload && config.youtube.upload) {
+      //upload last part
+      let startTime = 0;
+
+      const vod_youtube_data = vod.youtube.filter(
+        (data) => data.type === "vod"
+      );
+      for (let i = 0; i < vod_youtube_data.length; i++) {
+        startTime += vod_youtube_data[i].duration;
+      }
+      await liveUploadPart(
+        app,
+        vodId,
+        m3u8Path,
+        startTime,
+        duration - startTime,
+        vod_youtube_data.length + 1
+      );
+      //save parts at last upload.
+      setTimeout(() => youtube.saveParts(vodId, app, "vod"), 60000);
+    } else if (config.youtube.upload) {
+      await upload(vodId, app, mp4Path);
+      if (!config.saveMP4) await fs.promises.rm(mp4Path);
+    }
+    if (!config.saveHLS)
+      await fs.promises.rm(dir, {
+        recursive: true,
+      });
+    return;
+  }
+  const baseURL = `${newVodData.source.substring(
+    0,
+    newVodData.source.lastIndexOf("/")
+  )}/1080p60`;
+
+  let m3u8 = await this.getM3u8(`${baseURL}/playlist.m3u8`);
+  if (!m3u8) {
+    setTimeout(() => {
+      this.download(vodId, app, retry, delay);
+    }, 1000 * 60 * delay);
+    return console.error(`failed to get m3u8 for ${vodId}`);
+  }
+
+  m3u8 = HLS.parse(m3u8);
+
+  if (!(await fileExists(m3u8Path))) {
+    if (!(await fileExists(dir))) {
+      fs.mkdirSync(dir);
+    }
+    await downloadTSFiles(m3u8, dir, baseURL, vodId);
+
+    setTimeout(() => {
+      this.download(vodId, app, retry, delay);
+    }, 1000 * 60 * delay);
+    return;
+  }
+
+  let videoM3u8 = await fs.promises.readFile(m3u8Path, "utf8").catch((e) => {
+    console.error(e);
+    return null;
+  });
+
+  if (!videoM3u8) {
+    setTimeout(() => {
+      this.download(vodId, app, retry, delay);
+    }, 1000 * 60 * delay);
+    return;
+  }
+
+  videoM3u8 = HLS.parse(videoM3u8);
+
+  //retry if last segment is the same as on file m3u8 and if the actual segment exists.
+  if (
+    variantM3u8.segments[variantM3u8.segments.length - 1].uri ===
+      videoM3u8.segments[videoM3u8.segments.length - 1].uri &&
+    (await fileExists(
+      `${dir}/${variantM3u8.segments[variantM3u8.segments.length - 1].uri}`
+    ))
+  ) {
+    retry++;
+    setTimeout(() => {
+      this.download(vodId, app, retry, delay);
+    }, 1000 * 60 * delay);
+    return;
+  }
+
+  //reset retry if downloading new ts files.
+  retry = 1;
+  await downloadTSFiles(variantM3u8, dir, baseURL, vodId);
+
+  setTimeout(() => {
+    this.download(vodId, app, retry, delay);
+  }, 1000 * 60 * delay);
+};
+
+const saveDuration = async (vodId, duration, app) => {
+  duration = toHHMMSS(duration);
+
+  await app
+    .service("vods")
+    .patch(vodId, {
+      duration: duration,
+    })
+    .catch((e) => {
+      console.error(e);
+    });
+};
+
+const downloadTSFiles = async (m3u8, dir, baseURL, vodId) => {
+  try {
+    fs.writeFileSync(`${dir}/${vodId}.m3u8`, HLS.stringify(m3u8));
+  } catch (err) {
+    console.error(err);
+  }
+  for (let segment of m3u8.segments) {
+    if (await fileExists(`${dir}/${segment.uri}`)) continue;
+
+    await axios({
+      method: "get",
+      url: `${baseURL}/${segment.uri}`,
+      responseType: "stream",
+    })
+      .then((response) => {
+        if ((process.env.NODE_ENV || "").trim() !== "production") {
+          console.info(`Downloaded ${segment.uri}`);
+        }
+        response.data.pipe(fs.createWriteStream(`${dir}/${segment.uri}`));
+      })
+      .catch((e) => {
+        console.error(e);
+      });
+  }
+  if ((process.env.NODE_ENV || "").trim() !== "production") {
+    console.info(
+      `Done downloading.. Last segment was ${
+        m3u8.segments[m3u8.segments.length - 1].uri
+      }`
+    );
+  }
+};
+
+const fileExists = async (file) => {
+  return fs.promises
+    .access(file, fs.constants.F_OK)
+    .then(() => true)
+    .catch(() => false);
 };
