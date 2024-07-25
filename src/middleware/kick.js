@@ -9,7 +9,7 @@ dayjs.extend(duration);
 dayjs.extend(utc);
 const readline = require("readline");
 const fs = require("fs");
-const { convertToMp4, liveUploadPart, upload } = require("./vod");
+const vodFunc = require("./vod");
 const drive = require("./drive");
 const youtube = require("./youtube");
 
@@ -92,7 +92,7 @@ module.exports.getVod = async (app, username, vodId) => {
   return vod;
 };
 
-module.exports.download = async (app, username, vodId) => {
+module.exports.downloadMP4 = async (app, username, vodId) => {
   const vod = await this.getVod(app, username, vodId);
   if (!vod) return null;
 
@@ -321,7 +321,7 @@ module.exports.saveChapters = async (stream, app) => {
     });
 };
 
-module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
+module.exports.downloadHLS = async (vodId, app, retry = 0, delay = 1) => {
   if ((process.env.NODE_ENV || "").trim() !== "production")
     console.info(`${vodId} Download Retry: ${retry}`);
   const dir = `${config.vodPath}/${vodId}`;
@@ -360,7 +360,7 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
     if (vod_youtube_data.length < noOfParts) {
       for (let i = 0; i < noOfParts; i++) {
         if (vod_youtube_data[i]) continue;
-        await liveUploadPart(
+        await vodFunc.liveUploadPart(
           app,
           vodId,
           m3u8Path,
@@ -376,7 +376,7 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
     app.set(`${config.channel}-${vodId}-vod-downloading`, false);
 
     const mp4Path = `${config.vodPath}/${vodId}.mp4`;
-    await convertToMp4(m3u8Path, vodId, mp4Path);
+    await vodFunc.convertToMp4(m3u8Path, vodId, mp4Path);
     if (config.drive.upload) await drive.upload(vodId, mp4Path, app);
     if (config.youtube.liveUpload && config.youtube.upload) {
       //upload last part
@@ -388,7 +388,7 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
       for (let i = 0; i < vod_youtube_data.length; i++) {
         startTime += vod_youtube_data[i].duration;
       }
-      await liveUploadPart(
+      await vodFunc.liveUploadPart(
         app,
         vodId,
         m3u8Path,
@@ -399,7 +399,7 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
       //save parts at last upload.
       setTimeout(() => youtube.saveParts(vodId, app, "vod"), 60000);
     } else if (config.youtube.upload) {
-      await upload(vodId, app, mp4Path);
+      await vodFunc.upload(vodId, app, mp4Path);
       if (!config.saveMP4) await fs.promises.rm(mp4Path);
     }
     if (!config.saveHLS)
@@ -416,7 +416,7 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
   let m3u8 = await this.getM3u8(`${baseURL}/playlist.m3u8`);
   if (!m3u8) {
     setTimeout(() => {
-      this.download(vodId, app, retry, delay);
+      this.downloadHLS(vodId, app, retry, delay);
     }, 1000 * 60 * delay);
     return console.error(`failed to get m3u8 for ${vodId}`);
   }
@@ -430,7 +430,7 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
     await downloadTSFiles(m3u8, dir, baseURL, vodId);
 
     setTimeout(() => {
-      this.download(vodId, app, retry, delay);
+      this.downloadHLS(vodId, app, retry, delay);
     }, 1000 * 60 * delay);
     return;
   }
@@ -442,7 +442,7 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
 
   if (!videoM3u8) {
     setTimeout(() => {
-      this.download(vodId, app, retry, delay);
+      this.downloadHLS(vodId, app, retry, delay);
     }, 1000 * 60 * delay);
     return;
   }
@@ -459,7 +459,7 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
   ) {
     retry++;
     setTimeout(() => {
-      this.download(vodId, app, retry, delay);
+      this.downloadHLS(vodId, app, retry, delay);
     }, 1000 * 60 * delay);
     return;
   }
@@ -469,7 +469,7 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
   await downloadTSFiles(variantM3u8, dir, baseURL, vodId);
 
   setTimeout(() => {
-    this.download(vodId, app, retry, delay);
+    this.downloadHLS(vodId, app, retry, delay);
   }, 1000 * 60 * delay);
 };
 
