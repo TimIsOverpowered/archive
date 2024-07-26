@@ -44,24 +44,13 @@ module.exports.download = function (app) {
 
     if (exists) {
       res.status(200).json({ error: false, msg: "Starting download.." });
+      emotes.save(vodId, app);
       if (m3u8) {
-        path = `${config.vodPath}/${vodId}.mp4`;
-        const success = await ffmpeg
-          .mp4Download(m3u8, path)
-          .then(() => {
-            console.info(`Downloaded ${vodId}.mp4\n`);
-            return true;
-          })
-          .catch((e) => {
-            console.error("\nffmpeg error occurred: " + e);
-            return false;
-          });
-
-        if (!success) return;
+        await kick.downloadHLS(vodId, app, m3u8);
+        return;
       }
 
       vod.upload(vodId, app, path, type);
-      emotes.save(vodId, app);
       return;
     }
 
