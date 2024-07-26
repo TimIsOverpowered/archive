@@ -24,6 +24,8 @@ module.exports.initialize = async (app, username) => {
 
 module.exports.getChannel = async (app, username) => {
   const page = app.get("pupppeter");
+  if (!page) return;
+
   await page.goto(`https://kick.com/api/v2/channels/${username}`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
@@ -40,6 +42,8 @@ module.exports.getChannel = async (app, username) => {
 
 module.exports.getStream = async (app, username) => {
   const page = app.get("puppeteer");
+  if (!page) return;
+
   await page.goto(`https://kick.com/api/v2/channels/${username}/livestream`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
@@ -56,6 +60,8 @@ module.exports.getStream = async (app, username) => {
 
 module.exports.getVods = async (app, username) => {
   const page = app.get("puppeteer");
+  if (!page) return;
+
   await page.goto(`https://kick.com/api/v2/channels/${username}/videos`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
@@ -72,6 +78,8 @@ module.exports.getVods = async (app, username) => {
 
 module.exports.getVod = async (app, username, vodId) => {
   const page = app.get("puppeteer");
+  if (!page) return;
+
   await page.goto(`https://kick.com/api/v2/channels/${username}/videos`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
@@ -144,6 +152,8 @@ module.exports.getParsedM3u8 = (m3u8, baseURL) => {
 
 const fetchComments = async (app, start_time) => {
   const page = app.get("puppeteer");
+  if (!page) return;
+
   await page.goto(
     `https://kick.com/api/v2/channels/${config.kick.id}/messages?start_time=${start_time}`
   );
@@ -169,6 +179,8 @@ module.exports.downloadLogs = async (vodId, app, vod_start_date, duration) => {
   let cursor = vod_start_date;
 
   const page = app.get("puppeteer");
+  if (!page) return;
+
   do {
     let response = await fetchComments(page, cursor);
     if (!response.data) {
@@ -262,6 +274,8 @@ const sleep = (ms) => {
 
 const getChapterInfo = async (app, chapter) => {
   const page = app.get("puppeteer");
+  if (!page) return;
+
   await page.goto(`https://kick.com/api/v1/subcategories/${chapter}`);
   await page.content();
   const jsonContent = await page.evaluate(() => {
@@ -321,7 +335,13 @@ module.exports.saveChapters = async (stream, app) => {
     });
 };
 
-module.exports.downloadHLS = async (vodId, app, retry = 0, delay = 1) => {
+module.exports.downloadHLS = async (
+  vodId,
+  app,
+  source,
+  retry = 0,
+  delay = 1
+) => {
   if ((process.env.NODE_ENV || "").trim() !== "production")
     console.info(`${vodId} Download Retry: ${retry}`);
   const dir = `${config.vodPath}/${vodId}`;
@@ -372,7 +392,7 @@ module.exports.downloadHLS = async (vodId, app, retry = 0, delay = 1) => {
     }
   }
 
-  if ((!newVodData && m3u8Exists) || retry >= 10) {
+  if (retry >= 10) {
     app.set(`${config.channel}-${vodId}-vod-downloading`, false);
 
     const mp4Path = `${config.vodPath}/${vodId}.mp4`;
@@ -408,10 +428,14 @@ module.exports.downloadHLS = async (vodId, app, retry = 0, delay = 1) => {
       });
     return;
   }
-  const baseURL = `${newVodData.source.substring(
-    0,
-    newVodData.source.lastIndexOf("/")
-  )}/1080p60`;
+
+  //Use variant from api if not inputting manual m3u8 1080p playlist
+  let baseURL;
+  if (!source) {
+    baseURL = `${newVodData.source.substring(0, newVodData.source.lastIndexOf("/"))}/1080p60`;
+  } else {
+    baseURL = `${source.substring(0, source.lastIndexOf("/"))}`;
+  }
 
   let m3u8 = await this.getM3u8(`${baseURL}/playlist.m3u8`);
   if (!m3u8) {
