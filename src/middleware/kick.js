@@ -440,7 +440,7 @@ module.exports.downloadHLS = async (
   let m3u8 = await this.getM3u8(`${baseURL}/playlist.m3u8`);
   if (!m3u8) {
     setTimeout(() => {
-      this.downloadHLS(vodId, app, retry, delay);
+      this.downloadHLS(vodId, app, source, retry, delay);
     }, 1000 * 60 * delay);
     return console.error(`failed to get m3u8 for ${vodId}`);
   }
@@ -454,7 +454,7 @@ module.exports.downloadHLS = async (
     await downloadTSFiles(m3u8, dir, baseURL, vodId);
 
     setTimeout(() => {
-      this.downloadHLS(vodId, app, retry, delay);
+      this.downloadHLS(vodId, app, source, retry, delay);
     }, 1000 * 60 * delay);
     return;
   }
@@ -466,7 +466,7 @@ module.exports.downloadHLS = async (
 
   if (!videoM3u8) {
     setTimeout(() => {
-      this.downloadHLS(vodId, app, retry, delay);
+      this.downloadHLS(vodId, app, source, retry, delay);
     }, 1000 * 60 * delay);
     return;
   }
@@ -483,7 +483,7 @@ module.exports.downloadHLS = async (
   ) {
     retry++;
     setTimeout(() => {
-      this.downloadHLS(vodId, app, retry, delay);
+      this.downloadHLS(vodId, app, source, retry, delay);
     }, 1000 * 60 * delay);
     return;
   }
@@ -493,7 +493,7 @@ module.exports.downloadHLS = async (
   await downloadTSFiles(m3u8, dir, baseURL, vodId);
 
   setTimeout(() => {
-    this.downloadHLS(vodId, app, retry, delay);
+    this.downloadHLS(vodId, app, source, retry, delay);
   }, 1000 * 60 * delay);
 };
 
