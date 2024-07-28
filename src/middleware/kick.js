@@ -362,7 +362,7 @@ module.exports.downloadHLS = async (
     return console.error("Failed to download video: no VOD in database");
 
   if (m3u8Exists) {
-    duration = await getDuration(m3u8Path);
+    duration = await ffmpeg.getDuration(m3u8Path);
     await saveDuration(vodId, duration, app);
     if (stream && stream.data) await this.saveChapters(stream.data, app);
   }
