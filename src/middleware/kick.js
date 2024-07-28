@@ -475,10 +475,10 @@ module.exports.downloadHLS = async (
 
   //retry if last segment is the same as on file m3u8 and if the actual segment exists.
   if (
-    variantM3u8.segments[variantM3u8.segments.length - 1].uri ===
+    m3u8.segments[m3u8.segments.length - 1].uri ===
       videoM3u8.segments[videoM3u8.segments.length - 1].uri &&
     (await fileExists(
-      `${dir}/${variantM3u8.segments[variantM3u8.segments.length - 1].uri}`
+      `${dir}/${m3u8.segments[m3u8.segments.length - 1].uri}`
     ))
   ) {
     retry++;
@@ -490,7 +490,7 @@ module.exports.downloadHLS = async (
 
   //reset retry if downloading new ts files.
   retry = 1;
-  await downloadTSFiles(variantM3u8, dir, baseURL, vodId);
+  await downloadTSFiles(m3u8, dir, baseURL, vodId);
 
   setTimeout(() => {
     this.downloadHLS(vodId, app, retry, delay);
