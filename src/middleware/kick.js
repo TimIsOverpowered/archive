@@ -14,17 +14,20 @@ const drive = require("./drive");
 const youtube = require("./youtube");
 
 module.exports.initialize = async (app, username) => {
-  const page = app.get("puppeteer");
+  const browser = app.get("puppeteer");
+  const page = await browser.newPage();
   await page.goto(`https://kick.com/api/v2/channels/${username}/livestream`);
   await sleep(10000);
   await page.content();
+  await page.close();
   console.info("Puppeteer: Initialized!");
   return;
 };
 
 module.exports.getChannel = async (app, username) => {
-  const page = app.get("pupppeter");
-  if (!page) return;
+  const browser = app.get("puppeteer");
+  if (!browser) return;
+  const page = await browser.newPage();
 
   await page.goto(`https://kick.com/api/v2/channels/${username}`);
   await page.content();
@@ -37,12 +40,15 @@ module.exports.getChannel = async (app, username) => {
     }
   });
 
+  await page.close();
+
   return jsonContent;
 };
 
 module.exports.getStream = async (app, username) => {
-  const page = app.get("puppeteer");
-  if (!page) return;
+  const browser = app.get("puppeteer");
+  if (!browser) return;
+  const page = await browser.newPage();
 
   await page.goto(`https://kick.com/api/v2/channels/${username}/livestream`);
   await page.content();
@@ -55,12 +61,15 @@ module.exports.getStream = async (app, username) => {
     }
   });
 
+  await page.close();
+
   return jsonContent;
 };
 
 module.exports.getVods = async (app, username) => {
-  const page = app.get("puppeteer");
-  if (!page) return;
+  const browser = app.get("puppeteer");
+  if (!browser) return;
+  const page = await browser.newPage();
 
   await page.goto(`https://kick.com/api/v2/channels/${username}/videos`);
   await page.content();
@@ -73,12 +82,15 @@ module.exports.getVods = async (app, username) => {
     }
   });
 
+  await page.close();
+
   return jsonContent;
 };
 
 module.exports.getVod = async (app, username, vodId) => {
-  const page = app.get("puppeteer");
-  if (!page) return;
+  const browser = app.get("puppeteer");
+  if (!browser) return;
+  const page = await browser.newPage();
 
   await page.goto(`https://kick.com/api/v2/channels/${username}/videos`);
   await page.content();
@@ -96,6 +108,8 @@ module.exports.getVod = async (app, username, vodId) => {
   const vod = jsonContent.find(
     (livestream) => livestream.id.toString() === vodId
   );
+
+  await page.close();
 
   return vod;
 };
@@ -151,8 +165,9 @@ module.exports.getParsedM3u8 = (m3u8, baseURL) => {
 };
 
 const fetchComments = async (app, start_time) => {
-  const page = app.get("puppeteer");
-  if (!page) return;
+  const browser = app.get("puppeteer");
+  if (!browser) return;
+  const page = await browser.newPage();
 
   await page.goto(
     `https://kick.com/api/v2/channels/${config.kick.id}/messages?start_time=${start_time}`
@@ -178,8 +193,9 @@ module.exports.downloadLogs = async (vodId, app, vod_start_date, duration) => {
   let howMany = 1;
   let cursor = vod_start_date;
 
-  const page = app.get("puppeteer");
-  if (!page) return;
+  const browser = app.get("puppeteer");
+  if (!browser) return;
+  const page = await browser.newPage();
 
   do {
     let response = await fetchComments(page, cursor);
@@ -273,8 +289,9 @@ const sleep = (ms) => {
 };
 
 const getChapterInfo = async (app, chapter) => {
-  const page = app.get("puppeteer");
-  if (!page) return;
+  const browser = app.get("puppeteer");
+  if (!browser) return;
+  const page = await browser.newPage();
 
   await page.goto(`https://kick.com/api/v1/subcategories/${chapter}`);
   await page.content();
@@ -286,6 +303,8 @@ const getChapterInfo = async (app, chapter) => {
       return undefined;
     }
   });
+
+  await page.close();
 
   return jsonContent;
 };
@@ -432,7 +451,10 @@ module.exports.downloadHLS = async (
   //Use variant from api if not inputting manual m3u8 1080p playlist
   let baseURL;
   if (!source) {
-    baseURL = `${newVodData.source.substring(0, newVodData.source.lastIndexOf("/"))}/1080p60`;
+    baseURL = `${newVodData.source.substring(
+      0,
+      newVodData.source.lastIndexOf("/")
+    )}/1080p60`;
   } else {
     baseURL = `${source.substring(0, source.lastIndexOf("/"))}`;
   }
@@ -477,9 +499,7 @@ module.exports.downloadHLS = async (
   if (
     m3u8.segments[m3u8.segments.length - 1].uri ===
       videoM3u8.segments[videoM3u8.segments.length - 1].uri &&
-    (await fileExists(
-      `${dir}/${m3u8.segments[m3u8.segments.length - 1].uri}`
-    ))
+    (await fileExists(`${dir}/${m3u8.segments[m3u8.segments.length - 1].uri}`))
   ) {
     retry++;
     setTimeout(() => {

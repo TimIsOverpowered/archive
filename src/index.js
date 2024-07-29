@@ -17,7 +17,7 @@ app.listen(port).then(async () => {
   if (config.twitch.enabled) checkTwitch(app);
   if (config.kick.enabled) {
     let { connect } = await import("puppeteer-real-browser");
-    const { page, browser } = await connect({
+    const { page, browser, setTarget } = await connect({
       headless: "auto",
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
       fingerprint: true,
@@ -25,7 +25,8 @@ app.listen(port).then(async () => {
       tf: true,
     });
     page.setDefaultNavigationTimeout(5 * 60 * 1000)
-    app.set("puppeteer", page);
+    setTarget({ status: false })
+    app.set("puppeteer", browser);
     await initialize(app, config.kick.username);
     checkKick(app);
   }
