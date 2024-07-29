@@ -46,7 +46,7 @@ module.exports.upload = async (
     if (vod.platform === "twitch") {
       vodPath = await this.mp4Download(vodId);
     } else if (vod.platform === "kick") {
-      vodPath = await kick.download(app, config.kick.username, vodId);
+      vodPath = await kick.downloadMP4(app, config.kick.username, vodId);
     }
   }
 
