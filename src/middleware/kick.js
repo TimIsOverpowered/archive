@@ -366,7 +366,6 @@ module.exports.downloadHLS = async (
   const dir = `${config.vodPath}/${vodId}`;
   const m3u8Path = `${dir}/${vodId}.m3u8`;
   const stream = await this.getStream(app, config.kick.username);
-  const newVodData = await this.getVod(app, config.kick.username, vodId);
   const m3u8Exists = await fileExists(m3u8Path);
   let duration, vod;
   await app
@@ -448,13 +447,10 @@ module.exports.downloadHLS = async (
     return;
   }
 
-  //Use variant from api if not inputting manual m3u8 1080p playlist
+  //Make variant work with 1080p playlist
   let baseURL;
-  if (!source) {
-    baseURL = `${newVodData.source.substring(
-      0,
-      newVodData.source.lastIndexOf("/")
-    )}/1080p60`;
+  if (source.includes("master.m3u8")) {
+    baseURL = `${source.substring(0, source.lastIndexOf("/"))}/1080p60`;
   } else {
     baseURL = `${source.substring(0, source.lastIndexOf("/"))}`;
   }
