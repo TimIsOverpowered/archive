@@ -208,7 +208,7 @@ module.exports.checkKick = async (app) => {
         recursive: true,
       });
     console.info(`Start Vod download: ${streamId}`);
-    kick.downloadHLS(streamId, app, vodData.source);
+    await kick.downloadHLS(streamId, app, vodData.source);
   }
 
   const chatDownloading = app.get(
