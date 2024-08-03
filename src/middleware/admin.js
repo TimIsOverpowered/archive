@@ -125,6 +125,11 @@ module.exports.download = function (app) {
       res.status(200).json({ error: false, msg: "Starting download.." });
       emotes.save(vodId, app);
 
+      if (m3u8) {
+        await kick.downloadHLS(vodId, app, m3u8);
+        return;
+      }
+      
       const vodPath = await vod.upload(vodId, app, path, type, "kick");
       if (vodPath) fs.unlinkSync(vodPath);
     }
