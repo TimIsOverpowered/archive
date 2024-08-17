@@ -16,7 +16,12 @@ const youtube = require("./youtube");
 module.exports.initialize = async (app, username) => {
   const browser = app.get("puppeteer");
   const page = await browser.newPage();
-  await page.goto(`https://kick.com/api/v2/channels/${username}/livestream`);
+  await page
+    .goto(`https://kick.com/api/v2/channels/${username}/livestream`)
+    .catch((err) => {
+      console.error(err);
+      return;
+    });
   await sleep(10000);
   await page.content();
   await page.close();
@@ -29,7 +34,12 @@ module.exports.getChannel = async (app, username) => {
   if (!browser) return;
   const page = await browser.newPage();
 
-  await page.goto(`https://kick.com/api/v2/channels/${username}`);
+  await page
+    .goto(`https://kick.com/api/v2/channels/${username}`)
+    .catch((err) => {
+      console.error(err);
+      return undefined;
+    });
   await page.content();
   const jsonContent = await page.evaluate(() => {
     try {
@@ -50,7 +60,12 @@ module.exports.getStream = async (app, username) => {
   if (!browser) return;
   const page = await browser.newPage();
 
-  await page.goto(`https://kick.com/api/v2/channels/${username}/livestream`);
+  await page
+    .goto(`https://kick.com/api/v2/channels/${username}/livestream`)
+    .catch((err) => {
+      console.error(err);
+      return undefined;
+    });
   await page.content();
   const jsonContent = await page.evaluate(() => {
     try {
@@ -71,7 +86,12 @@ module.exports.getVods = async (app, username) => {
   if (!browser) return;
   const page = await browser.newPage();
 
-  await page.goto(`https://kick.com/api/v2/channels/${username}/videos`);
+  await page
+    .goto(`https://kick.com/api/v2/channels/${username}/videos`)
+    .catch((err) => {
+      console.error(err);
+      return undefined;
+    });
   await page.content();
   const jsonContent = await page.evaluate(() => {
     try {
@@ -92,7 +112,12 @@ module.exports.getVod = async (app, username, vodId) => {
   if (!browser) return;
   const page = await browser.newPage();
 
-  await page.goto(`https://kick.com/api/v2/channels/${username}/videos`);
+  await page
+    .goto(`https://kick.com/api/v2/channels/${username}/videos`)
+    .catch((err) => {
+      console.error(err);
+      return undefined;
+    });
   await page.content();
   const jsonContent = await page.evaluate(() => {
     try {
@@ -169,9 +194,14 @@ const fetchComments = async (app, start_time) => {
   if (!browser) return;
   const page = await browser.newPage();
 
-  await page.goto(
-    `https://kick.com/api/v2/channels/${config.kick.id}/messages?start_time=${start_time}`
-  );
+  await page
+    .goto(
+      `https://kick.com/api/v2/channels/${config.kick.id}/messages?start_time=${start_time}`
+    )
+    .catch((err) => {
+      console.error(err);
+      return undefined;
+    });
   await page.content();
   const jsonContent = await page.evaluate(() => {
     try {
@@ -293,7 +323,12 @@ const getChapterInfo = async (app, chapter) => {
   if (!browser) return;
   const page = await browser.newPage();
 
-  await page.goto(`https://kick.com/api/v1/subcategories/${chapter}`);
+  await page
+    .goto(`https://kick.com/api/v1/subcategories/${chapter}`)
+    .catch((err) => {
+      console.error(err);
+      return undefined;
+    });
   await page.content();
   const jsonContent = await page.evaluate(() => {
     try {
