@@ -28,7 +28,7 @@ app.listen(port).then(async () => {
     });
     page.setDefaultNavigationTimeout(5 * 60 * 1000);
     app.set("puppeteer", browser);
-    await initialize(app, config.kick.username);
+    //await initialize(app, config.kick.username);
     checkKick(app);
   }
 });
