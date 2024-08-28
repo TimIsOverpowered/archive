@@ -44,6 +44,7 @@ module.exports.getChannel = async (app, username) => {
       console.error(err);
       return undefined;
     });
+  await sleep(10000);
   await page.content();
   const jsonContent = await page.evaluate(() => {
     try {
@@ -72,6 +73,7 @@ module.exports.getStream = async (app, username) => {
       console.error(err);
       return undefined;
     });
+  await sleep(10000);
   await page.content();
   const jsonContent = await page.evaluate(() => {
     try {
@@ -100,6 +102,7 @@ module.exports.getVods = async (app, username) => {
       console.error(err);
       return undefined;
     });
+  await sleep(10000);
   await page.content();
   const jsonContent = await page.evaluate(() => {
     try {
@@ -128,6 +131,7 @@ module.exports.getVod = async (app, username, vodId) => {
       console.error(err);
       return undefined;
     });
+  await sleep(10000);
   await page.content();
   const jsonContent = await page.evaluate(() => {
     try {
@@ -213,6 +217,7 @@ const fetchComments = async (app, start_time) => {
       console.error(err);
       return undefined;
     });
+  await sleep(10000);
   await page.content();
   const jsonContent = await page.evaluate(() => {
     try {
@@ -342,6 +347,7 @@ const getChapterInfo = async (app, chapter) => {
       console.error(err);
       return undefined;
     });
+  await sleep(10000);
   await page.content();
   const jsonContent = await page.evaluate(() => {
     try {
