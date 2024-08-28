@@ -17,7 +17,9 @@ module.exports.initialize = async (app, username) => {
   const browser = app.get("puppeteer");
   const page = await browser.newPage();
   await page
-    .goto(`https://kick.com/api/v2/channels/${username}/livestream`)
+    .goto(`https://kick.com/api/v2/channels/${username}/livestream`, {
+      waitUntil: "domcontentloaded",
+    })
     .catch((err) => {
       console.error(err);
       return;
@@ -35,7 +37,9 @@ module.exports.getChannel = async (app, username) => {
   const page = await browser.newPage();
 
   await page
-    .goto(`https://kick.com/api/v2/channels/${username}`)
+    .goto(`https://kick.com/api/v2/channels/${username}`, {
+      waitUntil: "domcontentloaded",
+    })
     .catch((err) => {
       console.error(err);
       return undefined;
@@ -61,7 +65,9 @@ module.exports.getStream = async (app, username) => {
   const page = await browser.newPage();
 
   await page
-    .goto(`https://kick.com/api/v2/channels/${username}/livestream`)
+    .goto(`https://kick.com/api/v2/channels/${username}/livestream`, {
+      waitUntil: "domcontentloaded",
+    })
     .catch((err) => {
       console.error(err);
       return undefined;
@@ -87,7 +93,9 @@ module.exports.getVods = async (app, username) => {
   const page = await browser.newPage();
 
   await page
-    .goto(`https://kick.com/api/v2/channels/${username}/videos`)
+    .goto(`https://kick.com/api/v2/channels/${username}/videos`, {
+      waitUntil: "domcontentloaded",
+    })
     .catch((err) => {
       console.error(err);
       return undefined;
@@ -113,7 +121,9 @@ module.exports.getVod = async (app, username, vodId) => {
   const page = await browser.newPage();
 
   await page
-    .goto(`https://kick.com/api/v2/channels/${username}/videos`)
+    .goto(`https://kick.com/api/v2/channels/${username}/videos`, {
+      waitUntil: "domcontentloaded",
+    })
     .catch((err) => {
       console.error(err);
       return undefined;
@@ -196,7 +206,8 @@ const fetchComments = async (app, start_time) => {
 
   await page
     .goto(
-      `https://kick.com/api/v2/channels/${config.kick.id}/messages?start_time=${start_time}`
+      `https://kick.com/api/v2/channels/${config.kick.id}/messages?start_time=${start_time}`,
+      { waitUntil: "domcontentloaded" }
     )
     .catch((err) => {
       console.error(err);
@@ -324,7 +335,9 @@ const getChapterInfo = async (app, chapter) => {
   const page = await browser.newPage();
 
   await page
-    .goto(`https://kick.com/api/v1/subcategories/${chapter}`)
+    .goto(`https://kick.com/api/v1/subcategories/${chapter}`, {
+      waitUntil: "domcontentloaded",
+    })
     .catch((err) => {
       console.error(err);
       return undefined;
