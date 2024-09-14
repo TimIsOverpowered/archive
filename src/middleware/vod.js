@@ -109,14 +109,14 @@ module.exports.upload = async (
 
           let gameTitle;
           if (totalGames !== undefined) {
-            `${config.channel} plays ${chapter.name} EP ${
+            gameTitle =`${config.channel} plays ${chapter.name} EP ${
               totalGames + 1
             } - ${dayjs(vod.createdAt)
               .tz(config.timezone)
               .format("MMMM DD YYYY")
               .toUpperCase()} PART ${i + 1}`;
           } else {
-            `${config.channel} plays ${chapter.name} - ${dayjs(vod.createdAt)
+            gameTitle =`${config.channel} plays ${chapter.name} - ${dayjs(vod.createdAt)
               .tz(config.timezone)
               .format("MMMM DD YYYY")
               .toUpperCase()} PART ${i + 1}`;
@@ -162,14 +162,14 @@ module.exports.upload = async (
 
           let gameTitle;
           if (totalGames !== undefined) {
-            `${config.channel} plays ${chapter.name} EP ${
+            gameTitle = `${config.channel} plays ${chapter.name} EP ${
               totalGames + 1
             } - ${dayjs(vod.createdAt)
               .tz(config.timezone)
               .format("MMMM DD YYYY")
               .toUpperCase()}`;
           } else {
-            `${config.channel} plays ${chapter.name} - ${dayjs(vod.createdAt)
+            gameTitle =`${config.channel} plays ${chapter.name} - ${dayjs(vod.createdAt)
               .tz(config.timezone)
               .format("MMMM DD YYYY")
               .toUpperCase()}`;
