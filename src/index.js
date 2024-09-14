@@ -4,7 +4,6 @@ const app = require("./app");
 const port = app.get("port");
 const host = app.get("host");
 const { checkTwitch, checkKick } = require("./check");
-const { initialize } = require("./middleware/kick");
 const config = require("../config/config.json");
 
 process.on("unhandledRejection", (reason, p) => {
@@ -28,7 +27,6 @@ app.listen(port).then(async () => {
     });
     page.setDefaultNavigationTimeout(5 * 60 * 1000);
     app.set("puppeteer", browser);
-    //await initialize(app, config.kick.username);
     checkKick(app);
   }
 });

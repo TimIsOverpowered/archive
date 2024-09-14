@@ -13,24 +13,6 @@ const vodFunc = require("./vod");
 const drive = require("./drive");
 const youtube = require("./youtube");
 
-module.exports.initialize = async (app, username) => {
-  const browser = app.get("puppeteer");
-  const page = await browser.newPage();
-  await page
-    .goto(`https://kick.com/api/v2/channels/${username}/livestream`, {
-      waitUntil: "domcontentloaded",
-    })
-    .catch((err) => {
-      console.error(err);
-      return;
-    });
-  await sleep(10000);
-  await page.content();
-  await page.close();
-  console.info("Puppeteer: Initialized!");
-  return;
-};
-
 module.exports.getChannel = async (app, username) => {
   const browser = app.get("puppeteer");
   if (!browser) return;
