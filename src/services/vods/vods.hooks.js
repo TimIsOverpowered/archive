@@ -12,6 +12,7 @@ module.exports = {
         include(),
         include.games()
       ),
+      iff(isProvider("server"), include(), include.games()),
     ],
     get: [iff(isProvider("external"), redisCache.before(), include())],
     create: [disallow("external")],
@@ -23,7 +24,7 @@ module.exports = {
   after: {
     all: [],
     find: [
-      iff(isProvider("external"), redisCache.after({ expiration: 3600 * 24 }))
+      iff(isProvider("external"), redisCache.after({ expiration: 3600 * 24 })),
     ],
     get: [
       iff(isProvider("external"), redisCache.after({ expiration: 3600 * 24 })),

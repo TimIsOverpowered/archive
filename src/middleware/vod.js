@@ -91,15 +91,43 @@ module.exports.upload = async (
         }
 
         for (let i = 0; i < paths.length; i++) {
+          let totalChapters;
+          await app
+            .service("vods")
+            .find({
+              query: {
+                chapters: {
+                  name: chapter.name,
+                },
+                $limit: 0,
+              },
+            })
+            .then((response) => {
+              totalChapters = response.total;
+            })
+            .catch((e) => {
+              console.error(e);
+            });
+
+          let gameTitle;
+          if (totalChapters !== undefined) {
+            `${config.channel} plays ${chapter.name} EP ${
+              totalChapters + 1
+            } - ${dayjs(vod.createdAt)
+              .tz(config.timezone)
+              .format("MMMM DD YYYY")
+              .toUpperCase()} PART ${i + 1}`;
+          } else {
+            `${config.channel} plays ${chapter.name} - ${dayjs(vod.createdAt)
+              .tz(config.timezone)
+              .format("MMMM DD YYYY")
+              .toUpperCase()} PART ${i + 1}`;
+          }
+
           await youtube.upload(
             {
               path: paths[i],
-              title: `${config.channel} plays ${chapter.name} - ${dayjs(
-                vod.createdAt
-              )
-                .tz(config.timezone)
-                .format("MMMM DD YYYY")
-                .toUpperCase()} PART ${i + 1}`,
+              title: gameTitle,
               type: "vod",
               public: true,
               duration: await getDuration(paths[i]),
@@ -118,15 +146,43 @@ module.exports.upload = async (
           fs.unlinkSync(paths[i]);
         }
       } else {
+        let totalChapters;
+        await app
+          .service("vods")
+          .find({
+            query: {
+              chapters: {
+                name: chapter.name,
+              },
+              $limit: 0,
+            },
+          })
+          .then((response) => {
+            totalChapters = response.total;
+          })
+          .catch((e) => {
+            console.error(e);
+          });
+
+        let gameTitle;
+        if (totalChapters !== undefined) {
+          `${config.channel} plays ${chapter.name} EP ${
+            totalChapters + 1
+          } - ${dayjs(vod.createdAt)
+            .tz(config.timezone)
+            .format("MMMM DD YYYY")
+            .toUpperCase()}`;
+        } else {
+          `${config.channel} plays ${chapter.name} - ${dayjs(vod.createdAt)
+            .tz(config.timezone)
+            .format("MMMM DD YYYY")
+            .toUpperCase()}`;
+        }
+
         await youtube.upload(
           {
             path: trimmedPath,
-            title: `${config.channel} plays ${chapter.name} - ${dayjs(
-              vod.createdAt
-            )
-              .tz(config.timezone)
-              .format("MMMM DD YYYY")
-              .toUpperCase()}`,
+            title: gameTitle,
             type: "vod",
             public: true,
             duration: await getDuration(trimmedPath),
