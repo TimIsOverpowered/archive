@@ -115,9 +115,7 @@ module.exports.upload = async (
               .tz(config.timezone)
               .format("MMMM DD YYYY")
               .toUpperCase()} PART ${i + 1}`;
-            gameTitle = `${config.channel} plays ${chapter.name} EP ${
-              totalGames + 1
-            }`;
+            gameTitle = `${chapter.name} EP ${totalGames + 1} PART ${i + 1}`;
           } else {
             ytTitle = `${config.channel} plays ${chapter.name} - ${dayjs(
               vod.createdAt
@@ -125,7 +123,7 @@ module.exports.upload = async (
               .tz(config.timezone)
               .format("MMMM DD YYYY")
               .toUpperCase()} PART ${i + 1}`;
-            gameTitle = `${config.channel} plays ${chapter.name}`;
+            gameTitle = `${chapter.name} PART ${i + 1}`;
           }
 
           await youtube.upload(
@@ -175,9 +173,7 @@ module.exports.upload = async (
             .tz(config.timezone)
             .format("MMMM DD YYYY")
             .toUpperCase()}}`;
-          gameTitle = `${config.channel} plays ${chapter.name} EP ${
-            totalGames + 1
-          }`;
+          gameTitle = `${chapter.name} EP ${totalGames + 1}`;
         } else {
           ytTitle = `${config.channel} plays ${chapter.name} - ${dayjs(
             vod.createdAt
@@ -185,7 +181,7 @@ module.exports.upload = async (
             .tz(config.timezone)
             .format("MMMM DD YYYY")
             .toUpperCase()}`;
-          gameTitle = `${config.channel} plays ${chapter.name}`;
+          gameTitle = `${chapter.name}`;
         }
 
         await youtube.upload(
