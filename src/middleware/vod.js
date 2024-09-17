@@ -107,25 +107,32 @@ module.exports.upload = async (
               console.error(e);
             });
 
-          let gameTitle;
+          let gameTitle, ytTitle;
           if (totalGames !== undefined) {
-            gameTitle =`${config.channel} plays ${chapter.name} EP ${
+            ytTitle = `${config.channel} plays ${chapter.name} EP ${
               totalGames + 1
             } - ${dayjs(vod.createdAt)
               .tz(config.timezone)
               .format("MMMM DD YYYY")
               .toUpperCase()} PART ${i + 1}`;
+            gameTitle = `${config.channel} plays ${chapter.name} EP ${
+              totalGames + 1
+            }`;
           } else {
-            gameTitle =`${config.channel} plays ${chapter.name} - ${dayjs(vod.createdAt)
+            ytTitle = `${config.channel} plays ${chapter.name} - ${dayjs(
+              vod.createdAt
+            )
               .tz(config.timezone)
               .format("MMMM DD YYYY")
               .toUpperCase()} PART ${i + 1}`;
+            gameTitle = `${config.channel} plays ${chapter.name}`;
           }
 
           await youtube.upload(
             {
               path: paths[i],
-              title: gameTitle,
+              title: ytTitle,
+              gameTitle: gameTitle,
               type: "vod",
               public: true,
               duration: await getDuration(paths[i]),
@@ -145,40 +152,47 @@ module.exports.upload = async (
         }
       } else {
         let totalGames;
-          await app
-            .service("games")
-            .find({
-              query: {
-                game_name: chapter.name,
-                $limit: 0,
-              },
-            })
-            .then((response) => {
-              totalGames = response.total;
-            })
-            .catch((e) => {
-              console.error(e);
-            });
+        await app
+          .service("games")
+          .find({
+            query: {
+              game_name: chapter.name,
+              $limit: 0,
+            },
+          })
+          .then((response) => {
+            totalGames = response.total;
+          })
+          .catch((e) => {
+            console.error(e);
+          });
 
-          let gameTitle;
-          if (totalGames !== undefined) {
-            gameTitle = `${config.channel} plays ${chapter.name} EP ${
-              totalGames + 1
-            } - ${dayjs(vod.createdAt)
-              .tz(config.timezone)
-              .format("MMMM DD YYYY")
-              .toUpperCase()}`;
-          } else {
-            gameTitle =`${config.channel} plays ${chapter.name} - ${dayjs(vod.createdAt)
-              .tz(config.timezone)
-              .format("MMMM DD YYYY")
-              .toUpperCase()}`;
-          }
+        let gameTitle, ytTitle;
+        if (totalGames !== undefined) {
+          ytTitle = `${config.channel} plays ${chapter.name} EP ${
+            totalGames + 1
+          } - ${dayjs(vod.createdAt)
+            .tz(config.timezone)
+            .format("MMMM DD YYYY")
+            .toUpperCase()}}`;
+          gameTitle = `${config.channel} plays ${chapter.name} EP ${
+            totalGames + 1
+          }`;
+        } else {
+          ytTitle = `${config.channel} plays ${chapter.name} - ${dayjs(
+            vod.createdAt
+          )
+            .tz(config.timezone)
+            .format("MMMM DD YYYY")
+            .toUpperCase()}`;
+          gameTitle = `${config.channel} plays ${chapter.name}`;
+        }
 
         await youtube.upload(
           {
             path: trimmedPath,
-            title: gameTitle,
+            title: ytTitle,
+            gameTitle: gameTitle,
             type: "vod",
             public: true,
             duration: await getDuration(trimmedPath),
