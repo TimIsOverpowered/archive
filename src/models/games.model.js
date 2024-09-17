@@ -39,6 +39,9 @@ module.exports = function (app) {
       game_name: {
         type: DataTypes.TEXT,
       },
+      title: {
+        type: DataTypes.TEXT,
+      },
       chapter_image: {
         type: DataTypes.TEXT,
       },
