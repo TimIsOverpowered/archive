@@ -107,7 +107,7 @@ module.exports.upload = async (
               console.error(e);
             });
 
-          let gameTitle, ytTitle;
+          let ytTitle;
           if (totalGames !== undefined) {
             ytTitle = `${config.channel} plays ${chapter.name} EP ${
               totalGames + 1
@@ -115,9 +115,6 @@ module.exports.upload = async (
               .tz(config.timezone)
               .format("MMMM DD YYYY")
               .toUpperCase()} PART ${i + 1}`;
-            gameTitle = `${config.channel} plays ${chapter.name} EP ${
-              totalGames + 1
-            }`;
           } else {
             ytTitle = `${config.channel} plays ${chapter.name} - ${dayjs(
               vod.createdAt
@@ -125,14 +122,12 @@ module.exports.upload = async (
               .tz(config.timezone)
               .format("MMMM DD YYYY")
               .toUpperCase()} PART ${i + 1}`;
-            gameTitle = `${config.channel} plays ${chapter.name}`;
           }
 
           await youtube.upload(
             {
               path: paths[i],
               title: ytTitle,
-              gameTitle: gameTitle,
               type: "vod",
               public: true,
               duration: await getDuration(paths[i]),
@@ -167,7 +162,7 @@ module.exports.upload = async (
             console.error(e);
           });
 
-        let gameTitle, ytTitle;
+        let ytTitle;
         if (totalGames !== undefined) {
           ytTitle = `${config.channel} plays ${chapter.name} EP ${
             totalGames + 1
@@ -175,9 +170,6 @@ module.exports.upload = async (
             .tz(config.timezone)
             .format("MMMM DD YYYY")
             .toUpperCase()}}`;
-          gameTitle = `${config.channel} plays ${chapter.name} EP ${
-            totalGames + 1
-          }`;
         } else {
           ytTitle = `${config.channel} plays ${chapter.name} - ${dayjs(
             vod.createdAt
@@ -185,14 +177,12 @@ module.exports.upload = async (
             .tz(config.timezone)
             .format("MMMM DD YYYY")
             .toUpperCase()}`;
-          gameTitle = `${config.channel} plays ${chapter.name}`;
         }
 
         await youtube.upload(
           {
             path: trimmedPath,
             title: ytTitle,
-            gameTitle: gameTitle,
             type: "vod",
             public: true,
             duration: await getDuration(trimmedPath),

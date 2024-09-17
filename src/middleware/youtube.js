@@ -324,7 +324,6 @@ module.exports.upload = async (data, app, isVod = true) => {
           game_id: data.chapter.gameId,
           game_name: data.chapter.name,
           chpater_image: data.chapter.image,
-          title: data.gameTitle,
         })
         .then(() => {
           console.info(
