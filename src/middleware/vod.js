@@ -172,7 +172,7 @@ module.exports.upload = async (
           } - ${dayjs(vod.createdAt)
             .tz(config.timezone)
             .format("MMMM DD YYYY")
-            .toUpperCase()}}`;
+            .toUpperCase()}`;
           gameTitle = `${chapter.name} EP ${totalGames + 1}`;
         } else {
           ytTitle = `${config.channel} plays ${chapter.name} - ${dayjs(
