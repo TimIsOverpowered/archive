@@ -323,7 +323,7 @@ module.exports.upload = async (data, app, isVod = true) => {
           thumbnail_url: res.data.snippet.thumbnails.medium.url,
           game_id: data.chapter.gameId,
           game_name: data.chapter.name,
-          chpater_image: data.chapter.image,
+          chapter_image: data.chapter.image,
           title: data.gameTitle,
         })
         .then(() => {
