@@ -964,6 +964,12 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
 
 const checkForUnmutedTS = (m3u8) => {
   for (let segment of m3u8.segments) {
+    if (segment.uri.includes("muted")) {
+      m3u8.segments[segment] = `${segment.uri.substring(
+        0,
+        segment.uri.indexOf("-muted")
+      )}.ts`;
+    }
     if (segment.uri.includes("unmuted")) {
       m3u8.segments[segment] = `${segment.uri.substring(
         0,
