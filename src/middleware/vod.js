@@ -90,42 +90,32 @@ module.exports.upload = async (
           return;
         }
 
-        let totalGames;
-        await app
-          .service("games")
-          .find({
-            query: {
-              game_name: chapter.name,
-            },
-            paginate: false,
-          })
-          .then((response) => {
-            //See if there are parts, ignore them in total games.
-            let data = response.reduce((accumulator, current) => {
-              let exists = accumulator.find((item) => {
-                return item.vodId === current.vodId;
-              });
-              if (!exists) {
-                accumulator = accumulator.concat(current);
-              }
-              return accumulator;
-            }, []);
-            totalGames = data.length;
-          })
-          .catch((e) => {
-            console.error(e);
-          });
-
         for (let i = 0; i < paths.length; i++) {
-          let gameTitle, ytTitle;
+          let totalGames, gameTitle, ytTitle;
+
+          await app
+            .service("games")
+            .find({
+              query: {
+                game_name: chapter.name,
+                $limit: 0,
+              },
+            })
+            .then((response) => {
+              totalGames = response.total;
+            })
+            .catch((e) => {
+              console.error(e);
+            });
+
           if (totalGames !== undefined) {
             ytTitle = `${config.channel} plays ${chapter.name} EP ${
               totalGames + 1
             } - ${dayjs(vod.createdAt)
               .tz(config.timezone)
               .format("MMMM DD YYYY")
-              .toUpperCase()} PART ${i + 1}`;
-            gameTitle = `${chapter.name} EP ${totalGames + 1} PART ${i + 1}`;
+              .toUpperCase()}`;
+            gameTitle = `${chapter.name} EP ${totalGames + 1}`;
           } else {
             ytTitle = `${config.channel} plays ${chapter.name} - ${dayjs(
               vod.createdAt
