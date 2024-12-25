@@ -105,9 +105,6 @@ module.exports.upload = async (
               let exists = accumulator.find((item) => {
                 return item.vodId === current.vodId;
               });
-              if (exists) {
-                console.log(current);
-              }
               if (!exists) {
                 accumulator = accumulator.concat(current);
               }
