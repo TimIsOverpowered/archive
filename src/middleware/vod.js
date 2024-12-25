@@ -100,7 +100,17 @@ module.exports.upload = async (
             },
           })
           .then((response) => {
-            totalGames = response.total;
+            //See if there are parts, ignore them in total games.
+            let data = response.data.reduce((accumulator, current) => {
+              let exists = accumulator.find(item => {
+                return item.vod_id === current.vod_id;
+              });
+              if(!exists) { 
+                accumulator = accumulator.concat(current);
+              }
+              return accumulator;
+            }, []);
+            totalGames = data.length;
           })
           .catch((e) => {
             console.error(e);
