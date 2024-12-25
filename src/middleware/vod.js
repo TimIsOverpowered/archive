@@ -96,16 +96,19 @@ module.exports.upload = async (
           .find({
             query: {
               game_name: chapter.name,
-              $limit: 0,
             },
+            paginate: false,
           })
           .then((response) => {
             //See if there are parts, ignore them in total games.
-            let data = response.data.reduce((accumulator, current) => {
-              let exists = accumulator.find(item => {
-                return item.vod_id === current.vod_id;
+            let data = response.reduce((accumulator, current) => {
+              let exists = accumulator.find((item) => {
+                return item.vodId === current.vodId;
               });
-              if(!exists) { 
+              if (exists) {
+                console.log(current);
+              }
+              if (!exists) {
                 accumulator = accumulator.concat(current);
               }
               return accumulator;
