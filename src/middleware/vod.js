@@ -90,23 +90,23 @@ module.exports.upload = async (
           return;
         }
 
-        for (let i = 0; i < paths.length; i++) {
-          let totalGames;
-          await app
-            .service("games")
-            .find({
-              query: {
-                game_name: chapter.name,
-                $limit: 0,
-              },
-            })
-            .then((response) => {
-              totalGames = response.total;
-            })
-            .catch((e) => {
-              console.error(e);
-            });
+        let totalGames;
+        await app
+          .service("games")
+          .find({
+            query: {
+              game_name: chapter.name,
+              $limit: 0,
+            },
+          })
+          .then((response) => {
+            totalGames = response.total;
+          })
+          .catch((e) => {
+            console.error(e);
+          });
 
+        for (let i = 0; i < paths.length; i++) {
           let gameTitle, ytTitle;
           if (totalGames !== undefined) {
             ytTitle = `${config.channel} plays ${chapter.name} EP ${
