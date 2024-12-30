@@ -44,5 +44,5 @@ module.exports.getDuration = async (video) => {
       resolve();
     });
   });
-  return duration;
+  return Math.round(duration);
 };
