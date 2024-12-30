@@ -489,7 +489,9 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
       let cut = duration - start;
       if (cut > config.youtube.splitDuration)
         cut = config.youtube.splitDuration;
-      const ffmpeg_process = ffmpeg(vodPath);
+      const pathName = `${path.dirname(vodPath)}/${start}-${
+        cut + start
+      }-${vodId}.mp4`;
       ffmpeg_process
         .seekOutput(start)
         .duration(cut)
@@ -506,16 +508,20 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
           }
         })
         .on("start", (cmd) => {
-          console.info(`Splitting ${vodPath}. ${cut + start} / ${duration}`);
+          console.info(
+            `Splitting ${vodPath}. ${start} - ${
+              cut + start
+            } with a duration of ${duration}`
+          );
         })
         .on("error", function (err) {
           ffmpeg_process.kill("SIGKILL");
           reject(err);
         })
         .on("end", function () {
-          resolve(`${path.dirname(vodPath)}/${start}-${vodId}.mp4`);
+          resolve(pathName);
         })
-        .saveToFile(`${path.dirname(vodPath)}/${start}-${vodId}.mp4`);
+        .saveToFile(pathName);
     })
       .then((argPath) => {
         paths.push(argPath);
@@ -1067,7 +1073,7 @@ const getDuration = async (video) => {
       resolve();
     });
   });
-  return duration;
+  return Math.round(duration);
 };
 
 const saveDuration = async (vodId, duration, app) => {
