@@ -492,6 +492,7 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
       const pathName = `${path.dirname(vodPath)}/${start}-${
         cut + start
       }-${vodId}.mp4`;
+      const ffmpeg_process = ffmpeg(vodPath);
       ffmpeg_process
         .seekOutput(start)
         .duration(cut)
