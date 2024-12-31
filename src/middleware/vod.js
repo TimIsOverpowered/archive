@@ -558,6 +558,7 @@ module.exports.trim = async (vodPath, vodId, start, end) => {
         if ((process.env.NODE_ENV || "").trim() !== "production") {
           console.info(cmd);
         }
+        console.info(`Trimming ${vodPath}. ${start} - ${end}`);
       })
       .on("error", function (err) {
         ffmpeg_process.kill("SIGKILL");
