@@ -82,7 +82,8 @@ module.exports.upload = async (
       }
 
       if (chapter.end > config.youtube.splitDuration) {
-        let paths = await this.splitVideo(trimmedPath, chapter.end, vodId);
+        const duration = await getDuration(trimmedPath);
+        let paths = await this.splitVideo(trimmedPath, duration, vodId);
         if (!paths) {
           console.error(
             "Something went wrong trying to split the trimmed video"
@@ -509,6 +510,9 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
           }
         })
         .on("start", (cmd) => {
+          if ((process.env.NODE_ENV || "").trim() !== "production") {
+            console.info(cmd);
+          }
           console.info(
             `Splitting ${vodPath}. ${start} - ${
               cut + start
@@ -558,7 +562,6 @@ module.exports.trim = async (vodPath, vodId, start, end) => {
         if ((process.env.NODE_ENV || "").trim() !== "production") {
           console.info(cmd);
         }
-        console.info(`Trimming ${vodPath}. ${start} - ${end}`);
       })
       .on("error", function (err) {
         ffmpeg_process.kill("SIGKILL");
