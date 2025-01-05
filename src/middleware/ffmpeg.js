@@ -7,7 +7,7 @@ module.exports.mp4Download = async (m3u8, path) => {
     ffmpeg_process
       .videoCodec("copy")
       .audioCodec("copy")
-      .outputOptions(["-bsf:a aac_adtstoasc", "-copyts", "-start_at_zero"])
+      .outputOptions(["-bsf:a aac_adtstoasc"])
       .toFormat("mp4")
       .on("progress", (progress) => {
         if ((process.env.NODE_ENV || "").trim() !== "production") {
