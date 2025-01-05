@@ -495,10 +495,9 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
       }-${vodId}.mp4`;
       const ffmpeg_process = ffmpeg(vodPath);
       ffmpeg_process
-        .seekOutput(start)
-        .duration(cut)
         .videoCodec("copy")
         .audioCodec("copy")
+        .outputOptions([`-ss ${start}`, "-copyts", `-t ${cut}`])
         .toFormat("mp4")
         .on("progress", (progress) => {
           if ((process.env.NODE_ENV || "").trim() !== "production") {
@@ -544,10 +543,9 @@ module.exports.trim = async (vodPath, vodId, start, end) => {
   await new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
-      .seekOutput(start)
       .videoCodec("copy")
       .audioCodec("copy")
-      .duration(end)
+      .outputOptions([`-ss ${start}`, "-copyts", `-t ${end}`])
       .toFormat("mp4")
       .on("progress", (progress) => {
         if ((process.env.NODE_ENV || "").trim() !== "production") {
@@ -1031,7 +1029,7 @@ module.exports.convertToMp4 = async (m3u8, vodId, mp4Path) => {
     ffmpeg_process
       .videoCodec("copy")
       .audioCodec("copy")
-      .outputOptions(["-bsf:a aac_adtstoasc", "-copyts", "-start_at_zero"])
+      .outputOptions(["-bsf:a aac_adtstoasc"])
       .toFormat("mp4")
       .on("progress", (progress) => {
         if ((process.env.NODE_ENV || "").trim() !== "production") {
