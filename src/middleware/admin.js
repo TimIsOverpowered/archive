@@ -365,7 +365,7 @@ module.exports.reUploadPart = function (app) {
 
     let videoPath =
       type === "live"
-        ? `${config.livePath}/${config.twitch.username}/${vod_data.stream_id}.mp4`
+        ? `${config.livePath}/${config.twitch.username}/${vod_data.stream_id}/${vod_data.stream_id}.mp4`
         : `${config.vodPath}/${vodId}.mp4`;
 
     if (!(await fileExists(videoPath))) {
@@ -381,27 +381,16 @@ module.exports.reUploadPart = function (app) {
     if (!videoPath)
       return console.error(`Could not find a download source for ${vodId}`);
 
-    if (type === "live") {
-      await vod.liveUploadPart(
-        app,
-        vodId,
-        videoPath,
-        config.youtube.splitDuration * parseInt(part) - 1,
-        config.youtube.splitDuration,
-        part,
-        type
-      );
-    } else {
-      await vod.liveUploadPart(
-        app,
-        vodId,
-        videoPath,
-        config.youtube.splitDuration * parseInt(part) - 1,
-        config.youtube.splitDuration,
-        part,
-        type
-      );
-    }
+    await vod.liveUploadPart(
+      app,
+      vodId,
+      videoPath,
+      config.youtube.splitDuration * parseInt(part) - 1,
+      config.youtube.splitDuration,
+      part,
+      type
+    );
+    
     fs.unlinkSync(videoPath);
   };
 };
