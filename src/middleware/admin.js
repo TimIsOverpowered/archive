@@ -129,7 +129,7 @@ module.exports.download = function (app) {
         await kick.downloadHLS(vodId, app, m3u8);
         return;
       }
-      
+
       const vodPath = await vod.upload(vodId, app, path, type, "kick");
       if (vodPath) fs.unlinkSync(vodPath);
     }
@@ -356,6 +356,12 @@ module.exports.reUploadPart = function (app) {
       error: false,
       msg: `Reuploading ${vodId} Vod Part ${part}`,
     });
+
+    const vod_data = await app
+      .service("vods")
+      .get(vodId)
+      .then((data) => data)
+      .catch(() => null);
 
     let videoPath =
       type === "live"
