@@ -390,8 +390,6 @@ module.exports.reUploadPart = function (app) {
       part,
       type
     );
-    
-    fs.unlinkSync(videoPath);
   };
 };
 
