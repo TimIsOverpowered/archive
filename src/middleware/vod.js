@@ -890,7 +890,7 @@ module.exports.download = async (
   const tokenSig = await twitch.getVodTokenSig(vodId);
   if (!tokenSig) {
     setTimeout(() => {
-      this.download(vodId, app, retry, delay);
+      this.download(vodId, app, retry, delay, liveDownload);
     }, 1000 * 60 * delay);
     return console.error(`failed to get token/sig for ${vodId}`);
   }
@@ -902,7 +902,7 @@ module.exports.download = async (
   );
   if (!newVideoM3u8) {
     setTimeout(() => {
-      this.download(vodId, app, retry, delay);
+      this.download(vodId, app, retry, delay, liveDownload);
     }, 1000 * 60 * delay);
     return console.error("failed to get m3u8");
   }
@@ -910,7 +910,7 @@ module.exports.download = async (
   let parsedM3u8 = twitch.getParsedM3u8(newVideoM3u8);
   if (!parsedM3u8) {
     setTimeout(() => {
-      this.download(vodId, app, retry, delay);
+      this.download(vodId, app, retry, delay, liveDownload);
     }, 1000 * 60 * delay);
     console.error(newVideoM3u8);
     return console.error("failed to parse m3u8");
@@ -921,7 +921,7 @@ module.exports.download = async (
   let variantM3u8 = await twitch.getVariantM3u8(parsedM3u8);
   if (!variantM3u8) {
     setTimeout(() => {
-      this.download(vodId, app, retry, delay);
+      this.download(vodId, app, retry, delay, liveDownload);
     }, 1000 * 60 * delay);
     return console.error("failed to get variant m3u8");
   }
@@ -936,7 +936,7 @@ module.exports.download = async (
     await downloadTSFiles(variantM3u8, dir, baseURL, vodId);
 
     setTimeout(() => {
-      this.download(vodId, app, retry, delay);
+      this.download(vodId, app, retry, delay, liveDownload);
     }, 1000 * 60 * delay);
     return;
   }
@@ -948,7 +948,7 @@ module.exports.download = async (
 
   if (!videoM3u8) {
     setTimeout(() => {
-      this.download(vodId, app, retry, delay);
+      this.download(vodId, app, retry, delay, liveDownload);
     }, 1000 * 60 * delay);
     return;
   }
@@ -965,7 +965,7 @@ module.exports.download = async (
   ) {
     retry++;
     setTimeout(() => {
-      this.download(vodId, app, retry, delay);
+      this.download(vodId, app, retry, delay, liveDownload);
     }, 1000 * 60 * delay);
     return;
   }
@@ -975,7 +975,7 @@ module.exports.download = async (
   await downloadTSFiles(variantM3u8, dir, baseURL, vodId);
 
   setTimeout(() => {
-    this.download(vodId, app, retry, delay);
+    this.download(vodId, app, retry, delay, liveDownload);
   }, 1000 * 60 * delay);
 };
 
