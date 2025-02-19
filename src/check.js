@@ -104,7 +104,7 @@ module.exports.checkTwitch = async (app) => {
         recursive: true,
       });
     console.info(`Start Vod download: ${vodId}`);
-    vod.download(vodId, app);
+    vod.download(vodId, app, 0, 1, true);
   }
 
   const chatDownloading = app.get(

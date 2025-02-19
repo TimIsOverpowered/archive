@@ -208,6 +208,8 @@ module.exports.upload = async (
 
   if (config.youtube.vodUpload) {
     const duration = await getDuration(vodPath);
+    await saveDuration(vodId, duration, app);
+    await this.saveChapters(vodId, app, duration);
 
     if (duration > config.youtube.splitDuration) {
       let paths = await this.splitVideo(vodPath, duration, vodId);
@@ -792,7 +794,13 @@ module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
 
 //RETRY PARAM: Just to make sure whole vod is processed bc it takes awhile for twitch to update the vod even after a stream ends.
 //VOD TS FILES SEEMS TO UPDATE AROUND 5 MINUTES. DELAY IS TO CHECK EVERY X MIN.
-module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
+module.exports.download = async (
+  vodId,
+  app,
+  retry = 0,
+  delay = 1,
+  liveDownload = false
+) => {
   if ((process.env.NODE_ENV || "").trim() !== "production")
     console.info(`${vodId} Download Retry: ${retry}`);
   const dir = `${config.vodPath}/${vodId}`;
@@ -919,7 +927,7 @@ module.exports.download = async (vodId, app, retry = 0, delay = 1) => {
   }
 
   variantM3u8 = HLS.parse(variantM3u8);
-  variantM3u8 = checkForUnmutedTS(variantM3u8);
+  if (liveDownload) variantM3u8 = checkForUnmutedTS(variantM3u8);
 
   if (!(await fileExists(m3u8Path))) {
     if (!(await fileExists(dir))) {
