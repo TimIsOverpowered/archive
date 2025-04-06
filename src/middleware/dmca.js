@@ -631,3 +631,10 @@ module.exports.part = function (app) {
     if (blackoutPath) fs.unlinkSync(blackoutPath);
   };
 };
+
+const fileExists = async (file) => {
+  return fs.promises
+    .access(file, fs.constants.F_OK)
+    .then(() => true)
+    .catch(() => false);
+};
