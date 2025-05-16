@@ -820,7 +820,7 @@ module.exports.download = async (
     return console.error("Failed to download video: no VOD in database");
 
   if (m3u8Exists) {
-    duration = await getDuration(m3u8Path);
+    duration = await hlsGetDuration(m3u8Path);
     await saveDuration(vodId, duration, app);
     if (newVodData) await this.saveChapters(vodId, app, duration);
   }
@@ -1070,6 +1070,24 @@ const fileExists = async (file) => {
     .access(file, fs.constants.F_OK)
     .then(() => true)
     .catch(() => false);
+};
+
+//EXT-X-TWITCH-TOTAL-SECS use this to get total duration from m3u8
+const hlsGetDuration = async (m3u8) => {
+  const data = await fs.promises.open(m3u8).catch((e) => {
+    console.error(e);
+    return null;
+  });
+  if (!data) return;
+  let totalSeconds;
+  for await (const line of data.readLines()) {
+    if (!line.startsWith("#EXT-X-TWITCH-TOTAL-SECS:")) continue;
+    const split = line.split(":");
+    totalSeconds = parseInt(split[1]);
+    break;
+  }
+  data.close();
+  return totalSeconds;
 };
 
 const getDuration = async (video) => {
