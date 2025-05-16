@@ -1074,20 +1074,26 @@ const fileExists = async (file) => {
 
 //EXT-X-TWITCH-TOTAL-SECS use this to get total duration from m3u8
 const hlsGetDuration = async (m3u8) => {
-  const data = await fs.promises.open(m3u8).catch((e) => {
+  const data = await fs.promises.open(filePath).catch((e) => {
     console.error(e);
     return null;
   });
   if (!data) return;
-  let totalSeconds;
-  for await (const line of data.readLines()) {
-    if (!line.startsWith("#EXT-X-TWITCH-TOTAL-SECS:")) continue;
-    const split = line.split(":");
-    totalSeconds = parseInt(split[1]);
-    break;
+  try {
+    let totalSeconds;
+
+    for await (const line of data.readLines()) {
+      if (!line.startsWith("#EXT-X-TWITCH-TOTAL-SECS:")) continue;
+      const split = line.split(":");
+      if (split[1]) totalSeconds = parseInt(split[1]);
+      break;
+    }
+
+    return totalSeconds;
+  } finally {
+    data.close();
+    return null;
   }
-  data.close();
-  return totalSeconds;
 };
 
 const getDuration = async (video) => {
