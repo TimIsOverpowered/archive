@@ -820,8 +820,6 @@ module.exports.download = async (
     return console.error("Failed to download video: no VOD in database");
 
   if (m3u8Exists) {
-    duration = await hlsGetDuration(m3u8Path);
-    await saveDuration(vodId, duration, app);
     if (newVodData) await this.saveChapters(vodId, app, duration);
   }
 
@@ -925,6 +923,10 @@ module.exports.download = async (
     }, 1000 * 60 * delay);
     return console.error("failed to get variant m3u8");
   }
+
+  //Save duration
+  duration = await hlsGetDuration(variantM3u8);
+  await saveDuration(vodId, duration, app);
 
   variantM3u8 = HLS.parse(variantM3u8);
   if (liveDownload) variantM3u8 = checkForUnmutedTS(variantM3u8);
@@ -1074,26 +1076,14 @@ const fileExists = async (file) => {
 
 //EXT-X-TWITCH-TOTAL-SECS use this to get total duration from m3u8
 const hlsGetDuration = async (m3u8) => {
-  const data = await fs.promises.open(m3u8).catch((e) => {
-    console.error(e);
-    return null;
-  });
-  if (!data) return;
-  try {
-    let totalSeconds;
-
-    for await (const line of data.readLines()) {
-      if (!line.startsWith("#EXT-X-TWITCH-TOTAL-SECS:")) continue;
-      const split = line.split(":");
-      if (split[1]) totalSeconds = parseInt(split[1]);
-      break;
-    }
-
-    return totalSeconds;
-  } finally {
-    data.close();
-    return null;
+  let totalSeconds;
+  for (let line of m3u8.split("\n")) {
+    if (!line.startsWith("#EXT-X-TWITCH-TOTAL-SECS:")) continue;
+    const split = line.split(":");
+    if (split[1]) totalSeconds = parseInt(split[1]);
+    break;
   }
+  return totalSeconds;
 };
 
 const getDuration = async (video) => {
