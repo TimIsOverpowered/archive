@@ -1088,6 +1088,7 @@ const getDuration = async (video) => {
 };
 
 const saveDuration = async (vodId, duration, app) => {
+  if (isNaN(duration)) return;
   duration = toHHMMSS(duration);
 
   await app
