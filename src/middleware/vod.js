@@ -1074,7 +1074,7 @@ const fileExists = async (file) => {
 
 //EXT-X-TWITCH-TOTAL-SECS use this to get total duration from m3u8
 const hlsGetDuration = async (m3u8) => {
-  const data = await fs.promises.open(filePath).catch((e) => {
+  const data = await fs.promises.open(m3u8).catch((e) => {
     console.error(e);
     return null;
   });
