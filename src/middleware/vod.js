@@ -355,7 +355,7 @@ module.exports.manualVodUpload = async (
   if (config.drive.upload) fs.unlinkSync(vodPath);
 };
 
-module.exports.manualGameUpload = async (app, game, videoPath) => {
+module.exports.manualGameUpload = async (app, vod, game, videoPath) => {
   const { vodId, date, chapter } = game;
   const { name, end, start } = chapter;
   console.info(
@@ -401,7 +401,7 @@ module.exports.manualGameUpload = async (app, game, videoPath) => {
     await youtube.upload(
       {
         path: trimmedPath,
-        title: `${config.channel} plays ${name} - ${dayjs(vod.createdAt)
+        title: `${config.channel} plays ${name} - ${dayjs(date)
           .tz(config.timezone)
           .format("MMMM DD YYYY")
           .toUpperCase()}`,

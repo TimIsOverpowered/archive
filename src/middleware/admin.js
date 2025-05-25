@@ -650,12 +650,11 @@ module.exports.gameUpload = function (app) {
     }
 
     if (!videoPath)
-      return console.error(
-        `Could not find a download source for ${vodId}`
-      );
+      return console.error(`Could not find a download source for ${vodId}`);
 
     vod.manualGameUpload(
       app,
+      vodData,
       {
         gameId: null,
         vodId: vodId,
@@ -709,9 +708,9 @@ module.exports.reuploadGame = function (app) {
       msg: `Uploading ${game.game_name} from ${game.vodId} Vod`,
     });
 
-    let videoPath = `${
-      type === "live" ? config.livePath : config.vodPath
-    }/${game.vodId}.mp4`;
+    let videoPath = `${type === "live" ? config.livePath : config.vodPath}/${
+      game.vodId
+    }.mp4`;
 
     if (!(await fileExists(videoPath))) {
       if (config.drive.upload) {
@@ -728,6 +727,7 @@ module.exports.reuploadGame = function (app) {
 
     vod.manualGameUpload(
       app,
+      vodData,
       {
         gameId: game.id,
         vodId: game.vodId,
@@ -735,7 +735,7 @@ module.exports.reuploadGame = function (app) {
         chapter: {
           end: game.end_time,
           start: game.start_time,
-          name: game.game_name
+          name: game.game_name,
         },
       },
       videoPath
