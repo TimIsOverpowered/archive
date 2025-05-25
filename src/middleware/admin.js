@@ -711,11 +711,11 @@ module.exports.reuploadGame = function (app) {
 
     let videoPath = `${
       type === "live" ? config.livePath : config.vodPath
-    }/${vodId}.mp4`;
+    }/${game.vodId}.mp4`;
 
     if (!(await fileExists(videoPath))) {
       if (config.drive.upload) {
-        videoPath = await drive.download(vodId, type, app);
+        videoPath = await drive.download(game.vodId, type, app);
       } else {
         videoPath = null;
       }
@@ -723,7 +723,7 @@ module.exports.reuploadGame = function (app) {
 
     if (!videoPath)
       return console.error(
-        `Could not find a download source for ${req.body.vodId}`
+        `Could not find a download source for ${game.vodId}`
       );
 
     vod.manualGameUpload(
