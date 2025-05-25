@@ -620,14 +620,14 @@ module.exports.gameUpload = function (app) {
       .catch(() => {});
 
     if (!vodData)
-      res.status(404).json({
+      return res.status(404).json({
         error: true,
         msg: "Vod does not exist",
       });
 
     const game = vodData.chapters[chapterIndex];
     if (!game)
-      res.status(404).json({
+      return res.status(404).json({
         error: true,
         msg: "Chapter does not exist",
       });
@@ -684,7 +684,7 @@ module.exports.reuploadGame = function (app) {
       .catch(() => {});
 
     if (!game)
-      res.status(404).json({
+      return res.status(404).json({
         error: true,
         msg: "Game does not exist",
       });
@@ -699,7 +699,7 @@ module.exports.reuploadGame = function (app) {
       .catch(() => {});
 
     if (!vodData)
-      res.status(404).json({
+      return res.status(404).json({
         error: true,
         msg: "Vod does not exist",
       });
