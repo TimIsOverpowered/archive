@@ -20,6 +20,7 @@ module.exports = function (app) {
   app.post("/admin/chapters", limiter(app), admin.verify(app), admin.saveChapters(app));
   app.post("/admin/duration", limiter(app), admin.verify(app), admin.saveDuration(app));
   app.post("/admin/reupload", limiter(app), admin.verify(app), admin.reUploadPart(app));
+  app.post("/admin/reupload/game", limiter(app), admin.verify(app), admin.reuploadGame(app));
   app.post("/admin/youtube/parts", limiter(app), admin.verify(app), youtube.parts(app));
   app.post("/admin/youtube/chapters", limiter(app), admin.verify(app), youtube.chapters(app));
   app.post("/admin/games", limiter(app), admin.verify(app), admin.addGame(app));

@@ -312,28 +312,45 @@ module.exports.upload = async (data, app, isVod = true) => {
           console.error(e);
         });
     } else {
-      await app
-        .service("games")
-        .create({
-          vodId: data.vod.id,
-          start_time: data.start_time,
-          end_time: data.end_time,
-          video_provider: "youtube",
-          video_id: res.data.id,
-          thumbnail_url: res.data.snippet.thumbnails.medium.url,
-          game_id: data.chapter.gameId,
-          game_name: data.chapter.name,
-          chapter_image: data.chapter.image,
-          title: data.gameTitle,
-        })
-        .then(() => {
-          console.info(
-            `Created ${data.chapter.name} in games DB for ${data.vod.id}`
-          );
-        })
-        .catch((e) => {
-          console.error(e);
-        });
+      if (data.gameId) {
+        await app
+          .service("games")
+          .patch(data.gameId, {
+            video_id: res.data.id,
+            thumbnail_url: res.data.snippet.thumbnails.medium.url,
+          })
+          .then(() => {
+            console.info(
+              `Updated ${data.gameId} - ${data.chapter.name} in games DB for ${data.vod.id}`
+            );
+          })
+          .catch((e) => {
+            console.error(e);
+          });
+      } else {
+        await app
+          .service("games")
+          .create({
+            vodId: data.vod.id,
+            start_time: data.start_time,
+            end_time: data.end_time,
+            video_provider: "youtube",
+            video_id: res.data.id,
+            thumbnail_url: res.data.snippet.thumbnails.medium.url,
+            game_id: data.chapter.gameId,
+            game_name: data.chapter.name,
+            chapter_image: data.chapter.image,
+            title: data.gameTitle,
+          })
+          .then(() => {
+            console.info(
+              `Created ${data.chapter.name} in games DB for ${data.vod.id}`
+            );
+          })
+          .catch((e) => {
+            console.error(e);
+          });
+      }
     }
     resolve();
   });
