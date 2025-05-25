@@ -643,9 +643,13 @@ module.exports.gameUpload = function (app) {
 
     if (!(await fileExists(videoPath))) {
       if (config.drive.upload) {
-        videoPath = await drive.download(vodId, type, app);
+        videoPath = await drive.download(game.vodId, type, app);
       } else {
-        videoPath = null;
+        if (vod.platform === "twitch") {
+          videoPath = await vod.mp4Download(vodId);
+        } else if (vod.platform === "kick") {
+          videoPath = await kick.downloadMP4(app, config.kick.username, vodId);
+        }
       }
     }
 
@@ -716,7 +720,11 @@ module.exports.reuploadGame = function (app) {
       if (config.drive.upload) {
         videoPath = await drive.download(game.vodId, type, app);
       } else {
-        videoPath = null;
+        if (vod.platform === "twitch") {
+          videoPath = await vod.mp4Download(vodId);
+        } else if (vod.platform === "kick") {
+          videoPath = await kick.downloadMP4(app, config.kick.username, vodId);
+        }
       }
     }
 
