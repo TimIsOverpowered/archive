@@ -589,7 +589,15 @@ module.exports.vodUpload = function (app) {
       if (config.drive.upload) {
         videoPath = await drive.download(vodId, type, app);
       } else {
-        videoPath = null;
+        if (vodData.platform === "twitch") {
+          videoPath = await vod.mp4Download(vodId);
+        } else if (vodData.platform === "kick") {
+          videoPath = await kick.downloadMP4(
+            app,
+            config.kick.username,
+            game.vodId
+          );
+        }
       }
     }
 
@@ -645,16 +653,22 @@ module.exports.gameUpload = function (app) {
       if (config.drive.upload) {
         videoPath = await drive.download(game.vodId, type, app);
       } else {
-        if (vod.platform === "twitch") {
+        if (vodData.platform === "twitch") {
           videoPath = await vod.mp4Download(game.vodId);
-        } else if (vod.platform === "kick") {
-          videoPath = await kick.downloadMP4(app, config.kick.username, game.vodId);
+        } else if (vodData.platform === "kick") {
+          videoPath = await kick.downloadMP4(
+            app,
+            config.kick.username,
+            game.vodId
+          );
         }
       }
     }
 
     if (!videoPath)
-      return console.error(`Could not find a download source for ${game.vodId}`);
+      return console.error(
+        `Could not find a download source for ${game.vodId}`
+      );
 
     vod.manualGameUpload(
       app,
@@ -720,10 +734,14 @@ module.exports.reuploadGame = function (app) {
       if (config.drive.upload) {
         videoPath = await drive.download(game.vodId, type, app);
       } else {
-        if (vod.platform === "twitch") {
+        if (vodData.platform === "twitch") {
           videoPath = await vod.mp4Download(game.vodId);
-        } else if (vod.platform === "kick") {
-          videoPath = await kick.downloadMP4(app, config.kick.username, game.vodId);
+        } else if (vodData.platform === "kick") {
+          videoPath = await kick.downloadMP4(
+            app,
+            config.kick.username,
+            game.vodId
+          );
         }
       }
     }
