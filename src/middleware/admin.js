@@ -646,15 +646,15 @@ module.exports.gameUpload = function (app) {
         videoPath = await drive.download(game.vodId, type, app);
       } else {
         if (vod.platform === "twitch") {
-          videoPath = await vod.mp4Download(vodId);
+          videoPath = await vod.mp4Download(game.vodId);
         } else if (vod.platform === "kick") {
-          videoPath = await kick.downloadMP4(app, config.kick.username, vodId);
+          videoPath = await kick.downloadMP4(app, config.kick.username, game.vodId);
         }
       }
     }
 
     if (!videoPath)
-      return console.error(`Could not find a download source for ${vodId}`);
+      return console.error(`Could not find a download source for ${game.vodId}`);
 
     vod.manualGameUpload(
       app,
@@ -721,9 +721,9 @@ module.exports.reuploadGame = function (app) {
         videoPath = await drive.download(game.vodId, type, app);
       } else {
         if (vod.platform === "twitch") {
-          videoPath = await vod.mp4Download(vodId);
+          videoPath = await vod.mp4Download(game.vodId);
         } else if (vod.platform === "kick") {
-          videoPath = await kick.downloadMP4(app, config.kick.username, vodId);
+          videoPath = await kick.downloadMP4(app, config.kick.username, game.vodId);
         }
       }
     }
