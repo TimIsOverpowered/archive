@@ -390,6 +390,7 @@ module.exports.manualGameUpload = async (app, game, videoPath) => {
               ? end
               : start + config.youtube.splitDuration * (i + 1),
           vod: vod,
+          gameId: game.gameId,
         },
         app,
         false
@@ -411,6 +412,7 @@ module.exports.manualGameUpload = async (app, game, videoPath) => {
         start_time: start,
         end_time: end,
         vod: vod,
+        gameId: game.gameId,
       },
       app,
       false

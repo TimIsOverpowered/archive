@@ -610,22 +610,22 @@ module.exports.gameUpload = function (app) {
     if (chapterIndex == null)
       return res.status(400).json({ error: true, msg: "No chapter" });
 
-    let vod;
+    let vodData;
     await app
       .service("vods")
       .get(vodId)
       .then((data) => {
-        vod = data;
+        vodData = data;
       })
       .catch(() => {});
 
-    if (!vod)
+    if (!vodData)
       res.status(404).json({
         error: true,
         msg: "Vod does not exist",
       });
 
-    const game = vod.chapters[chapterIndex];
+    const game = vodData.chapters[chapterIndex];
     if (!game)
       res.status(404).json({
         error: true,
@@ -651,16 +651,92 @@ module.exports.gameUpload = function (app) {
 
     if (!videoPath)
       return console.error(
+        `Could not find a download source for ${vodId}`
+      );
+
+    vod.manualGameUpload(
+      app,
+      {
+        gameId: null,
+        vodId: vodId,
+        date: vodData.createdAt,
+        chapter: game,
+      },
+      videoPath
+    );
+  };
+};
+
+module.exports.reuploadGame = function (app) {
+  return async function (req, res, next) {
+    const { gameId, type } = req.body;
+    if (!gameId)
+      return res.status(400).json({ error: true, msg: "No game id" });
+    if (!type) return res.status(400).json({ error: true, msg: "No type" });
+
+    let game;
+    await app
+      .service("games")
+      .get(gameId)
+      .then((data) => {
+        game = data;
+      })
+      .catch(() => {});
+
+    if (!game)
+      res.status(404).json({
+        error: true,
+        msg: "Game does not exist",
+      });
+
+    let vodData;
+    await app
+      .service("vods")
+      .get(game.vodId)
+      .then((data) => {
+        vodData = data;
+      })
+      .catch(() => {});
+
+    if (!vodData)
+      res.status(404).json({
+        error: true,
+        msg: "Vod does not exist",
+      });
+
+    res.status(200).json({
+      error: false,
+      msg: `Uploading ${game.game_name} from ${game.vodId} Vod`,
+    });
+
+    let videoPath = `${
+      type === "live" ? config.livePath : config.vodPath
+    }/${vodId}.mp4`;
+
+    if (!(await fileExists(videoPath))) {
+      if (config.drive.upload) {
+        videoPath = await drive.download(vodId, type, app);
+      } else {
+        videoPath = null;
+      }
+    }
+
+    if (!videoPath)
+      return console.error(
         `Could not find a download source for ${req.body.vodId}`
       );
 
     vod.manualGameUpload(
       app,
-      vodId,
       {
-        vodId: vodId,
-        date: vod.createdAt,
-        chapter: game,
+        gameId: game.id,
+        vodId: game.vodId,
+        date: vodData.createdAt,
+        chapter: {
+          end: game.end_time,
+          start: game.start_time,
+          name: game.game_name
+        },
       },
       videoPath
     );
