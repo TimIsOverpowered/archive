@@ -390,7 +390,7 @@ module.exports.manualGameUpload = async (app, vod, game, videoPath) => {
               ? end
               : start + config.youtube.splitDuration * (i + 1),
           vod: vod,
-          gameId: game.gameId,
+          gameId: (game.gameId ? game.gameId + i : null ),
         },
         app,
         false
@@ -401,7 +401,7 @@ module.exports.manualGameUpload = async (app, vod, game, videoPath) => {
     await youtube.upload(
       {
         path: trimmedPath,
-        title: `${config.channel} plays ${name} - ${dayjs(date)
+        title: game.gameId ? game.title : `${config.channel} plays ${name} - ${dayjs(date)
           .tz(config.timezone)
           .format("MMMM DD YYYY")
           .toUpperCase()}`,
