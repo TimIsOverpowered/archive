@@ -756,6 +756,7 @@ module.exports.reuploadGame = function (app) {
       vodData,
       {
         gameId: game.id,
+        title: game.title,
         vodId: game.vodId,
         date: vodData.createdAt,
         chapter: {
