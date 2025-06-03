@@ -83,7 +83,7 @@ module.exports.getVodTokenSig = async (vodID) => {
 module.exports.getM3u8 = async (vodId, token, sig) => {
   const data = await axios
     .get(
-      `https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=twitchweb&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`
+      `https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h265,h264&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`
     )
     .then((response) => response.data)
     .catch((e) => {
