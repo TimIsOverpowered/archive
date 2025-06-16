@@ -390,7 +390,7 @@ module.exports.manualGameUpload = async (app, vod, game, videoPath) => {
               ? end
               : start + config.youtube.splitDuration * (i + 1),
           vod: vod,
-          gameId: (game.gameId ? game.gameId + i : null ),
+          gameId: game.gameId ? game.gameId + i : null,
         },
         app,
         false
@@ -401,10 +401,12 @@ module.exports.manualGameUpload = async (app, vod, game, videoPath) => {
     await youtube.upload(
       {
         path: trimmedPath,
-        title: game.gameId ? game.title : `${config.channel} plays ${name} - ${dayjs(date)
-          .tz(config.timezone)
-          .format("MMMM DD YYYY")
-          .toUpperCase()}`,
+        title: game.gameId
+          ? game.title
+          : `${config.channel} plays ${name} - ${dayjs(date)
+              .tz(config.timezone)
+              .format("MMMM DD YYYY")
+              .toUpperCase()}`,
         type: "vod",
         public: true,
         duration: await getDuration(trimmedPath),
@@ -821,10 +823,6 @@ module.exports.download = async (
   if (!vod)
     return console.error("Failed to download video: no VOD in database");
 
-  if (m3u8Exists) {
-    if (newVodData) await this.saveChapters(vodId, app, duration);
-  }
-
   if (
     duration >= config.youtube.splitDuration &&
     config.youtube.liveUpload &&
@@ -928,6 +926,8 @@ module.exports.download = async (
 
   //Save duration
   duration = await hlsGetDuration(variantM3u8);
+  if (m3u8Exists && newVodData) await this.saveChapters(vodId, app, duration);
+
   await saveDuration(vodId, duration, app);
 
   variantM3u8 = HLS.parse(variantM3u8);
