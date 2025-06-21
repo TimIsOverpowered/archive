@@ -932,12 +932,13 @@ module.exports.download = async (
 
   variantM3u8 = HLS.parse(variantM3u8);
   if (liveDownload) variantM3u8 = checkForUnmutedTS(variantM3u8);
-  await writeM3u8ToFile(variantM3u8, dir, vodId);
 
+  //initalize
   if (!(await fileExists(m3u8Path))) {
     if (!(await fileExists(dir))) {
-      fs.mkdirSync(dir);
-    }
+    fs.mkdirSync(dir);
+  }
+    await writeM3u8ToFile(variantM3u8, dir, vodId);
     await downloadTSFiles(variantM3u8, dir, baseURL);
 
     setTimeout(() => {
@@ -945,6 +946,8 @@ module.exports.download = async (
     }, 1000 * 60 * delay);
     return;
   }
+  
+  await writeM3u8ToFile(variantM3u8, dir, vodId);
 
   let videoM3u8 = await fs.promises.readFile(m3u8Path, "utf8").catch((e) => {
     console.error(e);
