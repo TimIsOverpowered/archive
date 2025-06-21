@@ -931,7 +931,7 @@ module.exports.download = async (
   await saveDuration(vodId, duration, app);
 
   variantM3u8 = HLS.parse(variantM3u8);
-  if (liveDownload) variantM3u8 = checkForUnmutedTS(variantM3u8);
+  //if (liveDownload) variantM3u8 = checkForUnmutedTS(variantM3u8);
 
   if (!(await fileExists(m3u8Path))) {
     if (!(await fileExists(dir))) {
