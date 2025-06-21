@@ -931,13 +931,14 @@ module.exports.download = async (
   await saveDuration(vodId, duration, app);
 
   variantM3u8 = HLS.parse(variantM3u8);
-  //if (liveDownload) variantM3u8 = checkForUnmutedTS(variantM3u8);
+  if (liveDownload) variantM3u8 = checkForUnmutedTS(variantM3u8);
+  await writeM3u8ToFile(variantM3u8, dir, vodId);
 
   if (!(await fileExists(m3u8Path))) {
     if (!(await fileExists(dir))) {
       fs.mkdirSync(dir);
     }
-    await downloadTSFiles(variantM3u8, dir, baseURL, vodId);
+    await downloadTSFiles(variantM3u8, dir, baseURL);
 
     setTimeout(() => {
       this.download(vodId, app, retry, delay, liveDownload);
@@ -976,7 +977,7 @@ module.exports.download = async (
 
   //reset retry if downloading new ts files.
   retry = 1;
-  await downloadTSFiles(variantM3u8, dir, baseURL, vodId);
+  await downloadTSFiles(variantM3u8, dir, baseURL);
 
   setTimeout(() => {
     this.download(vodId, app, retry, delay, liveDownload);
@@ -1003,12 +1004,15 @@ const checkForUnmutedTS = (m3u8) => {
   return m3u8;
 };
 
-const downloadTSFiles = async (m3u8, dir, baseURL, vodId) => {
-  try {
-    fs.writeFileSync(`${dir}/${vodId}.m3u8`, HLS.stringify(m3u8));
-  } catch (err) {
-    console.error(err);
-  }
+const writeM3u8ToFile = async (m3u8, dir, vodId) => {
+  await fs.promises
+    .writeFile(`${dir}/${vodId}.m3u8`, HLS.stringify(m3u8))
+    .catch((e) => {
+      console.error(e);
+    });
+};
+
+const downloadTSFiles = async (m3u8, dir, baseURL) => {
   for (let segment of m3u8.segments) {
     if (await fileExists(`${dir}/${segment.uri}`)) continue;
 
