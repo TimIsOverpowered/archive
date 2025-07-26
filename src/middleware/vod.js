@@ -60,149 +60,19 @@ module.exports.upload = async (
   }
 
   if (config.youtube.perGameUpload && vod.chapters) {
-    for (let chapter of vod.chapters) {
-      if (chapter.end < 60 * 5) continue;
-      if (config.youtube.restrictedGames.includes(chapter.name)) continue;
-
-      console.info(
-        `Trimming ${chapter.name} from ${vod.id} ${dayjs(vod.createdAt).format(
-          "MM/DD/YYYY"
-        )}`
-      );
-      const trimmedPath = await this.trim(
-        vodPath,
-        vodId,
-        chapter.start,
-        chapter.end
-      );
-
-      if (!trimmedPath) {
-        console.error("Trim failed");
-        return;
-      }
-
-      if (chapter.end > config.youtube.splitDuration) {
-        const duration = await getDuration(trimmedPath);
-        let paths = await this.splitVideo(trimmedPath, duration, vodId);
-        if (!paths) {
-          console.error(
-            "Something went wrong trying to split the trimmed video"
-          );
-          return;
-        }
-
-        for (let i = 0; i < paths.length; i++) {
-          let totalGames, gameTitle, ytTitle;
-
-          await app
-            .service("games")
-            .find({
-              query: {
-                game_name: chapter.name,
-                $limit: 0,
-              },
-            })
-            .then((response) => {
-              totalGames = response.total;
-            })
-            .catch((e) => {
-              console.error(e);
-            });
-
-          if (totalGames !== undefined) {
-            ytTitle = `${config.channel} plays ${chapter.name} EP ${
-              totalGames + 1
-            } - ${dayjs(vod.createdAt)
-              .tz(config.timezone)
-              .format("MMMM DD YYYY")
-              .toUpperCase()}`;
-            gameTitle = `${chapter.name} EP ${totalGames + 1}`;
-          } else {
-            ytTitle = `${config.channel} plays ${chapter.name} - ${dayjs(
-              vod.createdAt
-            )
-              .tz(config.timezone)
-              .format("MMMM DD YYYY")
-              .toUpperCase()} PART ${i + 1}`;
-            gameTitle = `${chapter.name} PART ${i + 1}`;
-          }
-
-          await youtube.upload(
-            {
-              path: paths[i],
-              title: ytTitle,
-              gameTitle: gameTitle,
-              type: "vod",
-              public: true,
-              duration: await getDuration(paths[i]),
-              chapter: chapter,
-              start_time: chapter.start + config.youtube.splitDuration * i,
-              end_time:
-                chapter.start + config.youtube.splitDuration * (i + 1) >
-                chapter.end
-                  ? chapter.end
-                  : chapter.start + config.youtube.splitDuration * (i + 1),
-              vod: vod,
-            },
-            app,
-            false
-          );
-          fs.unlinkSync(paths[i]);
-        }
-      } else {
-        let totalGames;
-        await app
-          .service("games")
-          .find({
-            query: {
-              game_name: chapter.name,
-              $limit: 0,
-            },
-          })
-          .then((response) => {
-            totalGames = response.total;
-          })
-          .catch((e) => {
-            console.error(e);
-          });
-
-        let gameTitle, ytTitle;
-        if (totalGames !== undefined) {
-          ytTitle = `${config.channel} plays ${chapter.name} EP ${
-            totalGames + 1
-          } - ${dayjs(vod.createdAt)
-            .tz(config.timezone)
-            .format("MMMM DD YYYY")
-            .toUpperCase()}`;
-          gameTitle = `${chapter.name} EP ${totalGames + 1}`;
-        } else {
-          ytTitle = `${config.channel} plays ${chapter.name} - ${dayjs(
-            vod.createdAt
-          )
-            .tz(config.timezone)
-            .format("MMMM DD YYYY")
-            .toUpperCase()}`;
-          gameTitle = `${chapter.name}`;
-        }
-
-        await youtube.upload(
-          {
-            path: trimmedPath,
-            title: ytTitle,
-            gameTitle: gameTitle,
-            type: "vod",
-            public: true,
-            duration: await getDuration(trimmedPath),
-            chapter: chapter,
-            start_time: chapter.start,
-            end_time: chapter.end,
-            vod: vod,
-          },
-          app,
-          false
-        );
-        fs.unlinkSync(trimmedPath);
-      }
+    // use only main platform for games when simulcasting
+    switch (vod.platform) {
+      case "twitch":
+        if (config.simulcast && vod.platform === "twitch" && !config.twitch.mainPlatform) break;
+        await doGameUpload(vod, vodPath, app);
+        break;
+      case "kick":
+        if (config.simulcast && !config.kick.mainPlatform) break;
+        await doGameUpload(vod, vodPath, app);
+        break;
+      default:
+        await doGameUpload(vod, vodPath, app);
+        break;
     }
   }
 
@@ -298,6 +168,151 @@ module.exports.upload = async (
     }, 30000);
     if (config.drive.upload) fs.unlinkSync(vodPath);
     return vodPath;
+  }
+};
+
+const doGameUpload = async (vod, vodPath, app) => {
+  for (let chapter of vod.chapters) {
+    if (chapter.end < 60 * 5) continue;
+    if (config.youtube.restrictedGames.includes(chapter.name)) continue;
+
+    console.info(
+      `Trimming ${chapter.name} from ${vod.id} ${dayjs(vod.createdAt).format(
+        "MM/DD/YYYY"
+      )}`
+    );
+    const trimmedPath = await this.trim(
+      vodPath,
+      vod.id,
+      chapter.start,
+      chapter.end
+    );
+
+    if (!trimmedPath) {
+      console.error("Trim failed");
+      return;
+    }
+
+    if (chapter.end > config.youtube.splitDuration) {
+      const duration = await getDuration(trimmedPath);
+      let paths = await this.splitVideo(trimmedPath, duration, vod.id);
+      if (!paths) {
+        console.error("Something went wrong trying to split the trimmed video");
+        return;
+      }
+
+      for (let i = 0; i < paths.length; i++) {
+        let totalGames, gameTitle, ytTitle;
+
+        await app
+          .service("games")
+          .find({
+            query: {
+              game_name: chapter.name,
+              $limit: 0,
+            },
+          })
+          .then((response) => {
+            totalGames = response.total;
+          })
+          .catch((e) => {
+            console.error(e);
+          });
+
+        if (totalGames !== undefined) {
+          ytTitle = `${config.channel} plays ${chapter.name} EP ${
+            totalGames + 1
+          } - ${dayjs(vod.createdAt)
+            .tz(config.timezone)
+            .format("MMMM DD YYYY")
+            .toUpperCase()}`;
+          gameTitle = `${chapter.name} EP ${totalGames + 1}`;
+        } else {
+          ytTitle = `${config.channel} plays ${chapter.name} - ${dayjs(
+            vod.createdAt
+          )
+            .tz(config.timezone)
+            .format("MMMM DD YYYY")
+            .toUpperCase()} PART ${i + 1}`;
+          gameTitle = `${chapter.name} PART ${i + 1}`;
+        }
+
+        await youtube.upload(
+          {
+            path: paths[i],
+            title: ytTitle,
+            gameTitle: gameTitle,
+            type: "vod",
+            public: true,
+            duration: await getDuration(paths[i]),
+            chapter: chapter,
+            start_time: chapter.start + config.youtube.splitDuration * i,
+            end_time:
+              chapter.start + config.youtube.splitDuration * (i + 1) >
+              chapter.end
+                ? chapter.end
+                : chapter.start + config.youtube.splitDuration * (i + 1),
+            vod: vod,
+          },
+          app,
+          false
+        );
+        fs.unlinkSync(paths[i]);
+      }
+    } else {
+      let totalGames;
+      await app
+        .service("games")
+        .find({
+          query: {
+            game_name: chapter.name,
+            $limit: 0,
+          },
+        })
+        .then((response) => {
+          totalGames = response.total;
+        })
+        .catch((e) => {
+          console.error(e);
+        });
+
+      let gameTitle, ytTitle;
+      if (totalGames !== undefined) {
+        ytTitle = `${config.channel} plays ${chapter.name} EP ${
+          totalGames + 1
+        } - ${dayjs(vod.createdAt)
+          .tz(config.timezone)
+          .format("MMMM DD YYYY")
+          .toUpperCase()}`;
+        gameTitle = `${chapter.name} EP ${totalGames + 1}`;
+      } else {
+        ytTitle = `${config.channel} plays ${chapter.name} - ${dayjs(
+          vod.createdAt
+        )
+          .tz(config.timezone)
+          .format("MMMM DD YYYY")
+          .toUpperCase()}`;
+        gameTitle = `${chapter.name}`;
+      }
+
+      await youtube.upload(
+        {
+          path: trimmedPath,
+          title: ytTitle,
+          gameTitle: gameTitle,
+          type: "vod",
+          public: true,
+          duration: await getDuration(trimmedPath),
+          chapter: chapter,
+          start_time: chapter.start,
+          end_time: chapter.end,
+          vod: vod,
+        },
+        app,
+        false
+      );
+      fs.unlinkSync(trimmedPath);
+    }
   }
 };
 
@@ -936,8 +951,8 @@ module.exports.download = async (
   //initalize
   if (!(await fileExists(m3u8Path))) {
     if (!(await fileExists(dir))) {
-    fs.mkdirSync(dir);
-  }
+      fs.mkdirSync(dir);
+    }
     await writeM3u8ToFile(variantM3u8, dir, vodId);
     await downloadTSFiles(variantM3u8, dir, baseURL);
 
@@ -946,7 +961,7 @@ module.exports.download = async (
     }, 1000 * 60 * delay);
     return;
   }
-  
+
   await writeM3u8ToFile(variantM3u8, dir, vodId);
 
   let videoM3u8 = await fs.promises.readFile(m3u8Path, "utf8").catch((e) => {

@@ -7,12 +7,14 @@
       "access_token": ""
     },
     "id": "",
-    "username": ""
+    "username": "",
+    "mainPlatform": true
   },
   "kick": {
     "enabled": false,
     "username": "",
-    "id": ""
+    "id": "",
+    "mainPlatform": false
   },
   "google": {
     "client_id": "",
@@ -45,6 +47,7 @@
   "timezone": "America/Chicago",
   "chatDownload": false,
   "vodDownload": true,
+  "simulcast": false,
   "saveHLS": false,
   "saveMP4": false,
   "drive": {
