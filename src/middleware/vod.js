@@ -865,6 +865,8 @@ module.exports.download = async (
 
   if ((!newVodData && m3u8Exists) || retry >= 10) {
     app.set(`${config.channel}-${vodId}-vod-downloading`, false);
+    //save logs after vod has ended
+    this.getLogs(vodId, app)
 
     const mp4Path = `${config.vodPath}/${vodId}.mp4`;
     await this.convertToMp4(m3u8Path, vodId, mp4Path);
