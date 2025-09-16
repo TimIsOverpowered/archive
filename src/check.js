@@ -112,9 +112,9 @@ module.exports.checkTwitch = async (app) => {
   );
 
   if (config.chatDownload && !chatDownloading) {
-    app.set(`${config.channel}-${vodId}-chat-downloading`, true);
-    console.info(`Start Logs download: ${vodId}`);
-    vod.downloadLogs(vodId, app);
+    //app.set(`${config.channel}-${vodId}-chat-downloading`, true);
+    //console.info(`Start Logs download: ${vodId}`);
+    //vod.downloadLogs(vodId, app);
     emotes.save(vodId, app);
   }
 
@@ -216,7 +216,7 @@ module.exports.checkKick = async (app) => {
   );
 
   if (config.chatDownload && !chatDownloading) {
-    app.set(`${config.channel}-${streamId}-chat-downloading`, true);
+    //app.set(`${config.channel}-${streamId}-chat-downloading`, true);
     //console.info(`Start Logs download: ${streamId}`);
     //kick.downloadLogs(streamId, app);
     emotes.save(streamId, app);
