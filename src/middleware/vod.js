@@ -867,6 +867,7 @@ module.exports.download = async (
     app.set(`${config.channel}-${vodId}-vod-downloading`, false);
     //save logs after vod has ended
     this.getLogs(vodId, app)
+    emotes.save(vodId, app);
 
     const mp4Path = `${config.vodPath}/${vodId}.mp4`;
     await this.convertToMp4(m3u8Path, vodId, mp4Path);

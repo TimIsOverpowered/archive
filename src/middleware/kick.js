@@ -12,6 +12,7 @@ const fs = require("fs");
 const vodFunc = require("./vod");
 const drive = require("./drive");
 const youtube = require("./youtube");
+const emotes = require("./emotes");
 
 module.exports.getChannel = async (app, username) => {
   const browser = app.get("puppeteer");
@@ -301,6 +302,8 @@ module.exports.downloadLogs = async (vodId, app, vod_start_date, duration) => {
       (new Date() - start_time) / 1000
     } seconds`
   );
+
+  emotes.save(vodId, app)
 };
 
 const commentExists = async (id, app) => {
