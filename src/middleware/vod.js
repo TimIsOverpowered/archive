@@ -63,7 +63,12 @@ module.exports.upload = async (
     // use only main platform for games when simulcasting
     switch (vod.platform) {
       case "twitch":
-        if (config.simulcast && vod.platform === "twitch" && !config.twitch.mainPlatform) break;
+        if (
+          config.simulcast &&
+          vod.platform === "twitch" &&
+          !config.twitch.mainPlatform
+        )
+          break;
         await doGameUpload(vod, vodPath, app);
         break;
       case "kick":
@@ -417,7 +422,10 @@ module.exports.manualGameUpload = async (app, vod, game, videoPath) => {
       {
         path: trimmedPath,
         title: game.gameId
-          ? game.title
+          ? `${config.channel} plays ${game.title} - ${dayjs(date)
+              .tz(config.timezone)
+              .format("MMMM DD YYYY")
+              .toUpperCase()}`
           : `${config.channel} plays ${name} - ${dayjs(date)
               .tz(config.timezone)
               .format("MMMM DD YYYY")
@@ -866,7 +874,7 @@ module.exports.download = async (
   if ((!newVodData && m3u8Exists) || retry >= 10) {
     app.set(`${config.channel}-${vodId}-vod-downloading`, false);
     //save logs after vod has ended
-    this.getLogs(vodId, app)
+    this.getLogs(vodId, app);
     emotes.save(vodId, app);
 
     const mp4Path = `${config.vodPath}/${vodId}.mp4`;
