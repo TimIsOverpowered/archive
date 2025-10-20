@@ -13,6 +13,7 @@ const vodFunc = require("./vod");
 const drive = require("./drive");
 const youtube = require("./youtube");
 const emotes = require("./emotes");
+const initCycleTLS = require("cycletls");
 
 module.exports.getChannel = async (app, username) => {
   const browser = app.get("puppeteer");
@@ -166,13 +167,22 @@ module.exports.downloadMP4 = async (app, username, vodId) => {
 };
 
 module.exports.getM3u8 = async (source) => {
-  const data = await axios
-    .get(source)
-    .then((response) => response.data)
-    .catch((e) => {
-      console.error(e.response ? e.response.data : e);
-      return null;
-    });
+  const cycleTLS = await initCycleTLS();
+  const response = await cycleTLS(
+    source,
+    {
+      ja3: "771,4865-4867-4866-49195-49199-52393-52392-49196-49200-49162-49161-49171-49172-51-57-47-53-10,0-23-65281-10-11-35-16-5-51-43-13-45-28-21,29-23-24-25-256-257,0",
+      userAgent:
+        "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:87.0) Gecko/20100101 Firefox/87.0",
+      responseType: "text",
+    },
+    "get"
+  );
+
+  // Parse response as JSON
+  const data = await response.text();
+
+  await cycleTLS.exit();
   return data;
 };
 
@@ -303,7 +313,7 @@ module.exports.downloadLogs = async (vodId, app, vod_start_date, duration) => {
     } seconds`
   );
 
-  emotes.save(vodId, app)
+  emotes.save(vodId, app);
 };
 
 const commentExists = async (id, app) => {
