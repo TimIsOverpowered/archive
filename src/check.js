@@ -2,7 +2,6 @@ const twitch = require("./middleware/twitch");
 const kick = require("./middleware/kick");
 const config = require("../config/config.json");
 const vod = require("./middleware/vod");
-const emotes = require("./middleware/emotes");
 const fs = require("fs");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
