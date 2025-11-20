@@ -259,15 +259,9 @@ module.exports.getChapters = async (vodID) => {
       },
     },
   })
-    .then((response) => response.data)
-    .then((data) => {
-      if (!data) return null;
-      return data.video;
-    })
-    .then((video) => {
-      if (!video) return null;
-      return video.moments.edges;
-    })
+    .then((response) => response.data?.data)
+    .then((data) => data?.video)
+    .then((video) => video?.moments?.edges)
     .catch((e) => {
       console.error(e.response ? e.response.data : e);
       return null;
