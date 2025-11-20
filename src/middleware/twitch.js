@@ -254,15 +254,19 @@ module.exports.getChapters = async (vodID) => {
         persistedQuery: {
           version: 1,
           sha256Hash:
-            "0094e99aab3438c7a220c0b1897d144be01954f8b4765b884d330d0c0893dbde",
+            "7399051b2d46f528d5f0eedf8b0db8d485bb1bb4c0a2c6707be6f1290cdcb31a",
         },
       },
     },
   })
-    .then((response) => {
-      if (!response.data.data.video) return null;
-      if (!response.data.data.video.moments) return null;
-      return response.data.data.video.moments.edges;
+    .then((response) => response.data)
+    .then((data) => {
+      if (!data) return null;
+      return data.video;
+    })
+    .then((video) => {
+      if (!video) return null;
+      return video.moments.edges;
     })
     .catch((e) => {
       console.error(e.response ? e.response.data : e);
