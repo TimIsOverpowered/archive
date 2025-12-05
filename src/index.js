@@ -11,6 +11,10 @@ process.on("unhandledRejection", (reason, p) => {
   console.error("Unhandled Rejection at: Promise ", p, " reason: ", reason);
 });
 
+process.on("SIGINT", () => {
+  process.exit(0);
+});
+
 app.listen(port).then(async () => {
   logger.info(`Feathers app listening on http://${host}:${port}`);
   if (config.twitch.enabled) checkTwitch(app);
