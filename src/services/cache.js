@@ -154,7 +154,7 @@ module.exports.after = (passedOptions = {}) => {
 
 async function purgeGroup(client, group, prefix = config.channel) {
   return new Promise((resolve, reject) => {
-    let cursor = 0;
+    let cursor = "0";
     const scan = async () => {
       const reply = await client
         .SCAN(cursor, { MATCH: `${prefix}${group}*`, COUNT: 1000 })
@@ -163,11 +163,11 @@ async function purgeGroup(client, group, prefix = config.channel) {
       cursor = reply.cursor;
       const keys = reply.keys;
 
-      for (key of keys) {
+      for (let key of keys) {
         await client.del(key);
       }
 
-      if (cursor !== 0) return scan();
+      if (cursor !== "0") return scan();
 
       resolve();
     };

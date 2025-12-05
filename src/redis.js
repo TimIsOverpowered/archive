@@ -5,13 +5,15 @@ module.exports = async function (app) {
   const redisConf = app.get("redis"),
     client = createClient({
       socket: {
-        path: redisConf.useSocket ? redisConf.path : null,
+        path: redisConf.useSocket ? redisConf.path : "",
         host: redisConf.host,
+        port: redisConf.port,
       },
       enable_offline_queue: false,
     });
 
   client.connect().catch((e) => console.error(e));
+  console.log(client.SCAN)
 
   app.set("redisClient", client);
 
