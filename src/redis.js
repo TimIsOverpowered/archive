@@ -13,7 +13,6 @@ module.exports = async function (app) {
     });
 
   client.connect().catch((e) => console.error(e));
-  console.log(client.SCAN)
 
   app.set("redisClient", client);
 
