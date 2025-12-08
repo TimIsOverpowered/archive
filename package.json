@@ -50,7 +50,7 @@
     "feathers-hooks-common": "^8.2.1",
     "feathers-sequelize": "^7.0.3",
     "fluent-ffmpeg": "^2.1.3",
-    "googleapis": "^144.0.0",
+    "googleapis": "^167.0.0",
     "helmet": "^8.1.0",
     "hls-parser": "^0.16.0",
     "ioredis": "^5.8.2",
