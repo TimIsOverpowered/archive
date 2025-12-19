@@ -55,7 +55,7 @@
     "hls-parser": "^0.16.0",
     "ioredis": "^5.8.2",
     "pg": "^8.16.3",
-    "puppeteer": "^24.32.0",
+    "puppeteer": "^24.34.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-click-and-wait": "^2.3.3",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
