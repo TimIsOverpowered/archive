@@ -15,7 +15,7 @@ module.exports.save = async (vodId, app) => {
       const emotes = response.data.sets[response.data.room.set].emoticons;
       let newEmotes = [];
       for (let emote of emotes) {
-        newEmotes.push({ id: emote.id, code: emote.name });
+        newEmotes.push({ id: emote.id, code: emote.name, flags: emote.flags });
       }
       return newEmotes;
     })
