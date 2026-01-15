@@ -53,7 +53,7 @@
     "googleapis": "^144.0.0",
     "helmet": "^8.1.0",
     "hls-parser": "^0.16.0",
-    "ioredis": "^5.8.2",
+    "ioredis": "^5.9.2",
     "pg": "^8.16.3",
     "puppeteer": "^24.32.0",
     "puppeteer-extra": "^3.3.6",
