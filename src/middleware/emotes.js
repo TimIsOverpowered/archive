@@ -15,7 +15,7 @@ module.exports.save = async (vodId, app) => {
       const emotes = response.data.sets[response.data.room.set].emoticons;
       let newEmotes = [];
       for (let emote of emotes) {
-        newEmotes.push({ id: emote.id, code: emote.name, flags: emote.flags });
+        newEmotes.push({ id: emote.id, code: emote.name });
       }
       return newEmotes;
     })
@@ -44,11 +44,11 @@ module.exports.save = async (vodId, app) => {
     `${BASE_BTTV_EMOTE_API}/cached/users/twitch/${twitchId}`,
     {
       method: "GET",
-    }
+    },
   )
     .then((response) => {
       const emotes = response.data.channelEmotes.concat(
-        response.data.sharedEmotes
+        response.data.sharedEmotes,
       );
       let newEmotes = [];
       for (let emote of emotes) {
@@ -68,13 +68,13 @@ module.exports.save = async (vodId, app) => {
     `${BASE_7TV_EMOTE_API}/users/twitch/${twitchId}`,
     {
       method: "GET",
-    }
+    },
   )
     .then((response) => {
       const emotes = response.data.emote_set.emotes;
       let newEmotes = [];
       for (let emote of emotes) {
-        newEmotes.push({ id: emote.id, code: emote.name });
+        newEmotes.push({ id: emote.id, code: emote.name, flags: emote.flags });
       }
       return newEmotes;
     })
