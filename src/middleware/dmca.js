@@ -18,7 +18,7 @@ const mute = async (vodPath, muteSection, vodId) => {
   let returnPath;
   await new Promise((resolve, reject) => {
     const filePath = path.normalize(
-      `${path.dirname(vodPath)}/${vodId}-muted.mp4`
+      `${path.dirname(vodPath)}/${vodId}-muted.mp4`,
     );
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
@@ -30,7 +30,7 @@ const mute = async (vodPath, muteSection, vodId) => {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
           process.stdout.write(
-            `MUTE VIDEO PROGRESS: ${Math.round(progress.percent)}%`
+            `MUTE VIDEO PROGRESS: ${Math.round(progress.percent)}%`,
           );
         }
       })
@@ -84,7 +84,7 @@ const blackoutVideo = async (vodPath, vodId, start, duration, end) => {
     start_video_path,
     trim_clip_path,
     end_video_path,
-    vodPath
+    vodPath,
   );
   if (!list) {
     console.error("failed to get text list");
@@ -108,12 +108,12 @@ const getTextList = async (
   start_video_path,
   trim_clip_path,
   end_video_path,
-  vodPath
+  vodPath,
 ) => {
   const textPath = path.normalize(`${path.dirname(vodPath)}/${vodId}-list.txt`);
   fs.writeFileSync(
     textPath,
-    `file '${start_video_path}'\nfile '${trim_clip_path}'\nfile '${end_video_path}'`
+    `file '${start_video_path}'\nfile '${trim_clip_path}'\nfile '${end_video_path}'`,
   );
   return textPath;
 };
@@ -122,7 +122,7 @@ const concat = async (vodId, list) => {
   let returnPath;
   await new Promise((resolve, reject) => {
     const filePath = path.normalize(
-      `${path.dirname(list)}/${vodId}-trimmed.mp4`
+      `${path.dirname(list)}/${vodId}-trimmed.mp4`,
     );
     const ffmpeg_process = ffmpeg(list);
     ffmpeg_process
@@ -134,7 +134,7 @@ const concat = async (vodId, list) => {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
           process.stdout.write(
-            `CONCAT PROGRESS: ${Math.round(progress.percent)}%`
+            `CONCAT PROGRESS: ${Math.round(progress.percent)}%`,
           );
         }
       })
@@ -166,7 +166,7 @@ const getStartVideo = async (vodPath, vodId, start) => {
   let returnPath;
   await new Promise((resolve, reject) => {
     const filePath = path.normalize(
-      `${path.dirname(vodPath)}/${vodId}-start.mp4`
+      `${path.dirname(vodPath)}/${vodId}-start.mp4`,
     );
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
@@ -179,7 +179,7 @@ const getStartVideo = async (vodPath, vodId, start) => {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
           process.stdout.write(
-            `GET START VIDEO PROGRESS: ${Math.round(progress.percent)}%`
+            `GET START VIDEO PROGRESS: ${Math.round(progress.percent)}%`,
           );
         }
       })
@@ -211,7 +211,7 @@ const getClip = async (vodPath, vodId, start, duration) => {
   let returnPath;
   await new Promise((resolve, reject) => {
     const filePath = path.normalize(
-      `${path.dirname(vodPath)}/${vodId}-clip.mp4`
+      `${path.dirname(vodPath)}/${vodId}-clip.mp4`,
     );
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
@@ -225,7 +225,7 @@ const getClip = async (vodPath, vodId, start, duration) => {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
           process.stdout.write(
-            `GET CLIP PROGRESS: ${Math.round(progress.percent)}%`
+            `GET CLIP PROGRESS: ${Math.round(progress.percent)}%`,
           );
         }
       })
@@ -257,7 +257,7 @@ const getTrimmedClip = async (clipPath, vodId) => {
   let returnPath;
   await new Promise((resolve, reject) => {
     const filePath = path.normalize(
-      `${path.dirname(clipPath)}/${vodId}-clip-muted.mp4`
+      `${path.dirname(clipPath)}/${vodId}-clip-muted.mp4`,
     );
     const ffmpeg_process = ffmpeg(clipPath);
     ffmpeg_process
@@ -269,7 +269,7 @@ const getTrimmedClip = async (clipPath, vodId) => {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
           process.stdout.write(
-            `GET TRIMMED CLIP PROGRESS: ${Math.round(progress.percent)}%`
+            `GET TRIMMED CLIP PROGRESS: ${Math.round(progress.percent)}%`,
           );
         }
       })
@@ -301,7 +301,7 @@ const getEndVideo = async (vodPath, vodId, end) => {
   let returnPath;
   await new Promise((resolve, reject) => {
     const filePath = path.normalize(
-      `${path.dirname(vodPath)}/${vodId}-end.mp4`
+      `${path.dirname(vodPath)}/${vodId}-end.mp4`,
     );
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
@@ -314,7 +314,7 @@ const getEndVideo = async (vodPath, vodId, end) => {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
           process.stdout.write(
-            `GET END VIDEO PROGRESS: ${Math.round(progress.percent)}%`
+            `GET END VIDEO PROGRESS: ${Math.round(progress.percent)}%`,
           );
         }
       })
@@ -382,7 +382,7 @@ module.exports = function (app) {
         if (platform === "twitch") {
           vodPath = await vod.mp4Download(vodId);
         } else if (platform === "kick") {
-          vodPath = await kick.download(vodId);
+          vodPath = await kick.downloadMP4(app, config.kick.username, vodId);
         }
       } else {
         videoPath = null;
@@ -409,13 +409,13 @@ module.exports = function (app) {
             },${
               parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
               parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
-            })'`
+            })'`,
           );
         } else if (dmca.type === "CLAIM_TYPE_VISUAL") {
           console.info(
             `Trying to blackout ${
               blackoutPath ? blackoutPath : videoPath
-            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
+            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`,
           );
           blackoutPath = await blackoutVideo(
             blackoutPath ? blackoutPath : videoPath,
@@ -423,7 +423,7 @@ module.exports = function (app) {
             dmca.matchDetails.longestMatchStartTimeSeconds,
             dmca.matchDetails.longestMatchDurationSeconds,
             parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
-              parseInt(dmca.matchDetails.longestMatchDurationSeconds)
+              parseInt(dmca.matchDetails.longestMatchDurationSeconds),
           );
         } else if (dmca.type === "CLAIM_TYPE_AUDIOVISUAL") {
           muteSection.push(
@@ -432,12 +432,12 @@ module.exports = function (app) {
             },${
               parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
               parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
-            })'`
+            })'`,
           );
           console.info(
             `Trying to blackout ${
               blackoutPath ? blackoutPath : videoPath
-            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
+            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`,
           );
           blackoutPath = await blackoutVideo(
             blackoutPath ? blackoutPath : videoPath,
@@ -445,7 +445,7 @@ module.exports = function (app) {
             dmca.matchDetails.longestMatchStartTimeSeconds,
             dmca.matchDetails.longestMatchDurationSeconds,
             parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
-              parseInt(dmca.matchDetails.longestMatchDurationSeconds)
+              parseInt(dmca.matchDetails.longestMatchDurationSeconds),
           );
         }
       }
@@ -456,7 +456,7 @@ module.exports = function (app) {
       newVodPath = await mute(
         blackoutPath ? blackoutPath : videoPath,
         muteSection,
-        vodId
+        vodId,
       );
       if (!newVodPath) return console.error("failed to mute video");
     }
@@ -467,13 +467,15 @@ module.exports = function (app) {
 
 module.exports.part = function (app) {
   return async function (req, res, next) {
-    const { vodId, part, type, receivedClaims } = req.body;
+    const { vodId, part, type, receivedClaims, platform } = req.body;
 
     if (!receivedClaims)
       return res.status(400).json({ error: true, msg: "No claims" });
     if (!vodId) return res.status(400).json({ error: true, msg: "No vod id" });
     if (!part) return res.status(400).json({ error: true, msg: "No part" });
     if (!type) return res.status(400).json({ error: true, msg: "No type" });
+    if (!platform)
+      return res.status(400).json({ error: true, msg: "No platform" });
 
     res.status(200).json({
       error: false,
@@ -500,7 +502,11 @@ module.exports.part = function (app) {
       if (config.drive.upload) {
         videoPath = await drive.download(vodId, type, app);
       } else if (type === "vod") {
-        videoPath = await vod.mp4Download(vodId);
+        if (platform === "twitch") {
+          vodPath = await vod.mp4Download(vodId);
+        } else if (platform === "kick") {
+          vodPath = await kick.downloadMP4(app, config.kick.username, vodId);
+        }
       } else {
         videoPath = null;
       }
@@ -513,7 +519,7 @@ module.exports.part = function (app) {
       videoPath,
       vodId,
       config.youtube.splitDuration * (parseInt(part) - 1),
-      config.youtube.splitDuration
+      config.youtube.splitDuration,
     );
 
     if (!trimmedPath)
@@ -538,13 +544,13 @@ module.exports.part = function (app) {
             },${
               parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
               parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
-            })'`
+            })'`,
           );
         } else if (dmca.type === "CLAIM_TYPE_VISUAL") {
           console.info(
             `Trying to blackout ${
               blackoutPath ? blackoutPath : trimmedPath
-            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
+            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`,
           );
           blackoutPath = await blackoutVideo(
             blackoutPath ? blackoutPath : trimmedPath,
@@ -552,7 +558,7 @@ module.exports.part = function (app) {
             dmca.matchDetails.longestMatchStartTimeSeconds,
             dmca.matchDetails.longestMatchDurationSeconds,
             parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
-              parseInt(dmca.matchDetails.longestMatchDurationSeconds)
+              parseInt(dmca.matchDetails.longestMatchDurationSeconds),
           );
         } else if (dmca.type === "CLAIM_TYPE_AUDIOVISUAL") {
           muteSection.push(
@@ -561,12 +567,12 @@ module.exports.part = function (app) {
             },${
               parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
               parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
-            })'`
+            })'`,
           );
           console.info(
             `Trying to blackout ${
               blackoutPath ? blackoutPath : trimmedPath
-            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`
+            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`,
           );
           blackoutPath = await blackoutVideo(
             blackoutPath ? blackoutPath : trimmedPath,
@@ -574,7 +580,7 @@ module.exports.part = function (app) {
             dmca.matchDetails.longestMatchStartTimeSeconds,
             dmca.matchDetails.longestMatchDurationSeconds,
             parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
-              parseInt(dmca.matchDetails.longestMatchDurationSeconds)
+              parseInt(dmca.matchDetails.longestMatchDurationSeconds),
           );
         }
       }
@@ -582,12 +588,12 @@ module.exports.part = function (app) {
 
     if (muteSection.length > 0) {
       console.info(
-        `Trying to mute ${blackoutPath ? blackoutPath : trimmedPath}`
+        `Trying to mute ${blackoutPath ? blackoutPath : trimmedPath}`,
       );
       newVodPath = await mute(
         blackoutPath ? blackoutPath : trimmedPath,
         muteSection,
-        vodId
+        vodId,
       );
       if (!newVodPath) return console.error("failed to mute video");
 
@@ -596,7 +602,7 @@ module.exports.part = function (app) {
 
     if (!newVodPath && !blackoutPath)
       return console.error(
-        "nothing to mute or blackout. don't try to upload.."
+        "nothing to mute or blackout. don't try to upload..",
       );
 
     const duration = await getDuration(newVodPath ? newVodPath : blackoutPath);
@@ -618,14 +624,14 @@ module.exports.part = function (app) {
           config.youtube.multiTrack && type === "live"
             ? true
             : !config.youtube.multiTrack && type === "vod"
-            ? true
-            : false,
+              ? true
+              : false,
         vod: vod_data,
         part: part,
         type: type,
         duration: duration,
       },
-      app
+      app,
     );
 
     if (blackoutPath) fs.unlinkSync(blackoutPath);
