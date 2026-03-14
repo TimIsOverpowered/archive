@@ -7,30 +7,30 @@ const drive = require("./drive");
 const emotes = require("./emotes");
 const dayjs = require("dayjs");
 const duration = require("dayjs/plugin/duration");
-const ffmpeg = require("./ffmpeg");
 dayjs.extend(duration);
 
 module.exports.verify = function (app) {
   return async function (req, res, next) {
-    const authHeader = req.headers["authorization"] || req.headers["Authorization"];
+    const authHeader =
+      req.headers["authorization"] || req.headers["Authorization"];
 
     if (!authHeader) {
       console.warn(
-        `[AUTH FAIL] ${new Date().toISOString()} | IP: ${req.ip || req.connection.remoteAddress} | Path: ${req.path} | Reason: Missing Authorization header`
+        `[AUTH FAIL] ${new Date().toISOString()} | IP: ${req.ip || req.connection.remoteAddress} | Path: ${req.path} | Reason: Missing Authorization header`,
       );
-      return res.status(401).json({ 
-        error: true, 
-        msg: "Missing Authorization header" 
+      return res.status(401).json({
+        error: true,
+        msg: "Missing Authorization header",
       });
     }
 
     if (!authHeader.startsWith("Bearer ")) {
       console.warn(
-        `[AUTH FAIL] ${new Date().toISOString()} | IP: ${req.ip || req.connection.remoteAddress} | Path: ${req.path} | Reason: Invalid header format (must use Bearer scheme)`
+        `[AUTH FAIL] ${new Date().toISOString()} | IP: ${req.ip || req.connection.remoteAddress} | Path: ${req.path} | Reason: Invalid header format (must use Bearer scheme)`,
       );
-      return res.status(401).json({ 
-        error: true, 
-        msg: "Authorization header must use Bearer scheme" 
+      return res.status(401).json({
+        error: true,
+        msg: "Authorization header must use Bearer scheme",
       });
     }
 
@@ -39,16 +39,16 @@ module.exports.verify = function (app) {
 
     if (token !== key) {
       console.warn(
-        `[AUTH FAIL] ${new Date().toISOString()} | IP: ${req.ip || req.connection.remoteAddress} | Path: ${req.path} | Reason: Invalid API key`
+        `[AUTH FAIL] ${new Date().toISOString()} | IP: ${req.ip || req.connection.remoteAddress} | Path: ${req.path} | Reason: Invalid API key`,
       );
-      return res.status(403).json({ 
-        error: true, 
-        msg: "Invalid API key" 
+      return res.status(403).json({
+        error: true,
+        msg: "Invalid API key",
       });
     }
 
     console.info(
-      `[AUTH SUCCESS] ${new Date().toISOString()} | IP: ${req.ip || req.connection.remoteAddress} | Path: ${req.path}`
+      `[AUTH SUCCESS] ${new Date().toISOString()} | IP: ${req.ip || req.connection.remoteAddress} | Path: ${req.path}`,
     );
     next();
   };
