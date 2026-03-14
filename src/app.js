@@ -28,7 +28,7 @@ google.initializeDrive(app);
 app.use(
   helmet({
     contentSecurityPolicy: false,
-  })
+  }),
 );
 app.use(cors());
 app.use(compress());

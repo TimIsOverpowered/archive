@@ -12,19 +12,51 @@ dayjs.extend(duration);
 
 module.exports.verify = function (app) {
   return async function (req, res, next) {
-    if (!req.headers["authorization"]) {
-      res.status(403).json({ error: true, msg: "Missing auth key" });
-      return;
+    const authHeader = req.headers["authorization"] || req.headers["Authorization"];
+
+    if (!authHeader) {
+      console.warn(
+        `[AUTH FAIL] ${new Date().toISOString()} | IP: ${req.ip || req.connection.remoteAddress} | Path: ${req.path} | Reason: Missing Authorization header`
+      );
+      return res.status(401).json({ 
+        error: true, 
+        msg: "Missing Authorization header" 
+      });
     }
 
-    const authKey = req.headers.authorization.split(" ")[1];
+    if (!authHeader.startsWith("Bearer ")) {
+      console.warn(
+        `[AUTH FAIL] ${new Date().toISOString()} | IP: ${req.ip || req.connection.remoteAddress} | Path: ${req.path} | Reason: Invalid header format (must use Bearer scheme)`
+      );
+      return res.status(401).json({ 
+        error: true, 
+        msg: "Authorization header must use Bearer scheme" 
+      });
+    }
+
+    const token = authHeader.substring(7);
     const key = app.get("ADMIN_API_KEY");
 
-    if (key !== authKey) {
-      res.status(403).json({ error: true, msg: "Not authorized" });
-      return;
+    if (token !== key) {
+      console.warn(
+        `[AUTH FAIL] ${new Date().toISOString()} | IP: ${req.ip || req.connection.remoteAddress} | Path: ${req.path} | Reason: Invalid API key`
+      );
+      return res.status(403).json({ 
+        error: true, 
+        msg: "Invalid API key" 
+      });
     }
+
+    console.info(
+      `[AUTH SUCCESS] ${new Date().toISOString()} | IP: ${req.ip || req.connection.remoteAddress} | Path: ${req.path}`
+    );
     next();
+  };
+};
+
+module.exports.verifyStatus = function (app) {
+  return async function (req, res, next) {
+    res.status(200).json({ error: false, msg: "Verified!" });
   };
 };
 
@@ -79,7 +111,7 @@ module.exports.download = function (app) {
         })
         .then(() => {
           console.info(
-            `Created twitch vod ${vodData.id} for ${vodData.user_name}`
+            `Created twitch vod ${vodData.id} for ${vodData.user_name}`,
           );
         })
         .catch((e) => {
@@ -116,7 +148,7 @@ module.exports.download = function (app) {
         })
         .then(() => {
           console.info(
-            `Created kick vod ${vodData.id} for ${config.kick.username}`
+            `Created kick vod ${vodData.id} for ${config.kick.username}`,
           );
         })
         .catch((e) => {
@@ -231,7 +263,7 @@ module.exports.logs = function (app) {
         vodId,
         app,
         dayjs.utc(vodData.start_time).toISOString(),
-        vodData.duration
+        vodData.duration,
       );
       res.status(200).json({ error: false, msg: "Getting logs.." });
     } else {
@@ -388,7 +420,7 @@ module.exports.reUploadPart = function (app) {
       config.youtube.splitDuration * parseInt(part) - 1,
       config.youtube.splitDuration,
       part,
-      type
+      type,
     );
   };
 };
@@ -411,7 +443,7 @@ module.exports.saveChapters = function (app) {
       vod.saveChapters(
         vodData.id,
         app,
-        dayjs.duration(`PT${vodData.duration.toUpperCase()}`).asSeconds()
+        dayjs.duration(`PT${vodData.duration.toUpperCase()}`).asSeconds(),
       );
       res
         .status(200)
@@ -457,12 +489,12 @@ module.exports.saveDuration = function (app) {
               .format("HH:mm:ss"),
           })
           .then(() =>
-            res.status(200).json({ error: false, msg: "Saved duration!" })
+            res.status(200).json({ error: false, msg: "Saved duration!" }),
           )
           .catch(() =>
             res
               .status(500)
-              .json({ error: true, msg: "Failed to save duration!" })
+              .json({ error: true, msg: "Failed to save duration!" }),
           );
         return;
       }
@@ -595,7 +627,7 @@ module.exports.vodUpload = function (app) {
           videoPath = await kick.downloadMP4(
             app,
             config.kick.username,
-            game.vodId
+            game.vodId,
           );
         }
       }
@@ -603,7 +635,7 @@ module.exports.vodUpload = function (app) {
 
     if (!videoPath)
       return console.error(
-        `Could not find a download source for ${req.body.vodId}`
+        `Could not find a download source for ${req.body.vodId}`,
       );
 
     vod.manualVodUpload(app, vodId, videoPath, type);
@@ -659,7 +691,7 @@ module.exports.gameUpload = function (app) {
           videoPath = await kick.downloadMP4(
             app,
             config.kick.username,
-            game.vodId
+            game.vodId,
           );
         }
       }
@@ -667,7 +699,7 @@ module.exports.gameUpload = function (app) {
 
     if (!videoPath)
       return console.error(
-        `Could not find a download source for ${game.vodId}`
+        `Could not find a download source for ${game.vodId}`,
       );
 
     vod.manualGameUpload(
@@ -679,7 +711,7 @@ module.exports.gameUpload = function (app) {
         date: vodData.createdAt,
         chapter: game,
       },
-      videoPath
+      videoPath,
     );
   };
 };
@@ -740,7 +772,7 @@ module.exports.reuploadGame = function (app) {
           videoPath = await kick.downloadMP4(
             app,
             config.kick.username,
-            game.vodId
+            game.vodId,
           );
         }
       }
@@ -748,7 +780,7 @@ module.exports.reuploadGame = function (app) {
 
     if (!videoPath)
       return console.error(
-        `Could not find a download source for ${game.vodId}`
+        `Could not find a download source for ${game.vodId}`,
       );
 
     vod.manualGameUpload(
@@ -765,7 +797,7 @@ module.exports.reuploadGame = function (app) {
           name: game.game_name,
         },
       },
-      videoPath
+      videoPath,
     );
   };
 };
