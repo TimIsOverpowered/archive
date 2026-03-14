@@ -19,6 +19,9 @@ const sequelize = require("./sequelize");
 
 const app = express(feathers());
 
+// Trust proxies for correct IP logging (Cloudflare + Nginx)
+app.set('trust proxy', 'loopback');
+
 // Load app configuration
 app.configure(configuration());
 app.configure(redis);
