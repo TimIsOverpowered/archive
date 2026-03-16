@@ -461,7 +461,90 @@ module.exports = function (app) {
       if (!newVodPath) return console.error("failed to mute video");
     }
 
-    vod.upload(vodId, app, newVodPath, type, platform);
+    const duration = await getDuration(newVodPath);
+
+    if (duration > config.youtube.splitDuration) {
+      let paths = await vod.splitVideo(newVodPath, duration, vodId);
+
+      if (!paths) {
+        console.error("Something went wrong trying to split the trimmed video");
+        return;
+      }
+
+      for (let i = 0; i < paths.length; i++) {
+        const data = {
+          path: paths[i],
+          title:
+            type === "vod"
+              ? `${config.channel} ${
+                  vod_data.platform.charAt(0).toUpperCase() +
+                  vod_data.platform.slice(1)
+                } VOD - ${dayjs(vod_data.createdAt)
+                  .tz(config.timezone)
+                  .format("MMMM DD YYYY")
+                  .toUpperCase()} PART ${i + 1}`
+              : `${config.channel} ${
+                  vod_data.platform.charAt(0).toUpperCase() +
+                  vod_data.platform.slice(1)
+                }  Live VOD - ${dayjs(vod_data.createdAt)
+                  .tz(config.timezone)
+                  .format("MMMM DD YYYY")
+                  .toUpperCase()} PART ${i + 1}`,
+          type: type,
+          public:
+            config.youtube.multiTrack &&
+            type === "live" &&
+            config.youtube.public
+              ? true
+              : !config.youtube.multiTrack &&
+                  type === "vod" &&
+                  config.youtube.public
+                ? true
+                : false,
+          duration: await getDuration(paths[i]),
+          vod: vod,
+          part: i + 1,
+        };
+        await youtube.upload(data, app);
+        fs.unlinkSync(paths[i]);
+      }
+      setTimeout(async () => {
+        await youtube.saveChapters(vodId, app, type);
+        setTimeout(() => youtube.saveParts(vodId, app, type), 30000);
+      }, 30000);
+    } else {
+      await youtube.upload(
+        {
+          path: newVodPath,
+          title:
+            type === "vod"
+              ? `${config.channel} ${
+                  vod_data.platform.charAt(0).toUpperCase() +
+                  vod_data.platform.slice(1)
+                } VOD - ${dayjs(vod_data.createdAt)
+                  .tz(config.timezone)
+                  .format("MMMM DD YYYY")
+                  .toUpperCase()}`
+              : `${config.channel} ${
+                  vod_data.platform.charAt(0).toUpperCase() +
+                  vod_data.platform.slice(1)
+                } Live VOD - ${dayjs(vod_data.createdAt)
+                  .tz(config.timezone)
+                  .format("MMMM DD YYYY")
+                  .toUpperCase()}`,
+          public:
+            config.youtube.multiTrack && type === "live"
+              ? true
+              : !config.youtube.multiTrack && type === "vod"
+                ? true
+                : false,
+          vod: vod_data,
+          type: type,
+          duration: duration,
+        },
+        app,
+      );
+    }
   };
 };
 
@@ -612,14 +695,20 @@ module.exports.part = function (app) {
         path: newVodPath ? newVodPath : blackoutPath,
         title:
           type === "vod"
-            ? `${config.channel} VOD - ${dayjs(vod_data.createdAt)
+            ? `${config.channel} ${
+                vod_data.platform.charAt(0).toUpperCase() +
+                vod_data.platform.slice(1)
+              } VOD - ${dayjs(vod_data.createdAt)
                 .tz(config.timezone)
                 .format("MMMM DD YYYY")
-                .toUpperCase()} Part ${part}`
-            : `${config.channel} Live VOD - ${dayjs(vod_data.createdAt)
+                .toUpperCase()}`
+            : `${config.channel} ${
+                vod_data.platform.charAt(0).toUpperCase() +
+                vod_data.platform.slice(1)
+              } Live VOD - ${dayjs(vod_data.createdAt)
                 .tz(config.timezone)
                 .format("MMMM DD YYYY")
-                .toUpperCase()} Part ${part}`,
+                .toUpperCase()}`,
         public:
           config.youtube.multiTrack && type === "live"
             ? true
