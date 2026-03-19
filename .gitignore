@@ -111,4 +111,8 @@ data/
 config/*
 !config/template_config.json
 !config/template_default.json
-*.opencode
+
+# .opencode directory - ignore everything except plan.md and TASKS.md
+.opencode/
+!.opencode/plan.md
+!.opencode/TASKS.md
