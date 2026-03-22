@@ -1,8 +1,11 @@
 const config = require('../../config/config.json');
 
 const PAGE_SIZE = 200;
-const CURSOR_TTL = 60 * 60 * 24;
-const OFFSET_TTL = 60 * 5;
+const BUCKET_SIZE = 60;
+const CURSOR_TTL = 60 * 60 * 24 * 7;
+const OFFSET_TTL = 60 * 60 * 24 * 7;
+
+const quantizeOffset = (offset) => Math.floor(offset / BUCKET_SIZE) * BUCKET_SIZE;
 
 module.exports = function (app) {
   return async function (req, res, next) {
@@ -17,14 +20,16 @@ module.exports = function (app) {
     let responseJson;
 
     if (!cursor && isFinite(content_offset_seconds)) {
-      const key = `${config.channel}-${vodId}-offset-${content_offset_seconds}`;
+      const bucket = quantizeOffset(content_offset_seconds);
+      const key = `${config.channel}-${vodId}-bucket-${bucket}`;
+
       responseJson = await client
         .get(key)
         .then((data) => JSON.parse(data))
         .catch(() => null);
 
       if (!responseJson) {
-        responseJson = await offsetSearch(app, vodId, content_offset_seconds);
+        responseJson = await offsetSearch(app, vodId, bucket);
 
         if (!responseJson)
           return res.status(500).json({
@@ -97,14 +102,14 @@ const cursorSearch = async (app, vodId, cursorJson) => {
   return { comments, cursor };
 };
 
-const offsetSearch = async (app, vodId, content_offset_seconds) => {
+const offsetSearch = async (app, vodId, bucket) => {
   const data = await app
     .service('logs')
     .find({
       paginate: false,
       query: {
         vod_id: vodId,
-        content_offset_seconds: { $gte: content_offset_seconds },
+        content_offset_seconds: { $gte: bucket },
         $limit: PAGE_SIZE + 1,
         $sort: { content_offset_seconds: 1, id: 1 },
       },
