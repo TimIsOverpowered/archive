@@ -84,7 +84,11 @@ module.exports = function (app) {
           cursorJson = JSON.parse(Buffer.from(cursor, 'base64').toString());
         } catch (e) {}
 
-        if (!cursorJson?.offset || !cursorJson?.id || typeof cursorJson.offset !== 'number') return res.status(400).json({ error: true, msg: 'Invalid cursor' });
+        if (!cursorJson?.offset || !cursorJson?.id) return res.status(400).json({ error: true, msg: 'Invalid cursor' });
+
+        cursorJson.offset = parseFloat(cursorJson.offset);
+
+        if (!isFinite(cursorJson.offset)) return res.status(400).json({ error: true, msg: 'Invalid cursor' });
 
         responseJson = await cursorSearch(app, vodId, cursorJson);
 
@@ -126,7 +130,7 @@ const cursorSearch = async (app, vodId, cursorJson) => {
     data.length === PAGE_SIZE + 1
       ? Buffer.from(
           JSON.stringify({
-            offset: data[PAGE_SIZE].content_offset_seconds,
+            offset: parseFloat(data[PAGE_SIZE].content_offset_seconds),
             id: data[PAGE_SIZE].id,
           }),
         ).toString('base64')
@@ -159,7 +163,7 @@ const offsetSearch = async (app, vodId, bucket) => {
     data.length === PAGE_SIZE + 1
       ? Buffer.from(
           JSON.stringify({
-            offset: data[PAGE_SIZE].content_offset_seconds,
+            offset: parseFloat(data[PAGE_SIZE].content_offset_seconds),
             id: data[PAGE_SIZE].id,
           }),
         ).toString('base64')
