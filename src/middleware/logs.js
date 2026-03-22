@@ -1,11 +1,43 @@
 const config = require('../../config/config.json');
+const { QueryTypes } = require('sequelize');
 
 const PAGE_SIZE = 200;
-const BUCKET_SIZE = 60;
+const BUCKET_SIZE = 120;
 const CURSOR_TTL = 60 * 60 * 24 * 7;
 const OFFSET_TTL = 60 * 60 * 24 * 7;
+const TARGET_COMMENTS_PER_BUCKET = 300;
+const BOUNDARIES = [30, 60, 90, 120, 180, 300, 600, 900, 1800, 3600];
 
-const quantizeOffset = (offset) => Math.floor(offset / BUCKET_SIZE) * BUCKET_SIZE;
+const computeBucketSize = (commentsPer100s) => {
+  const raw = (TARGET_COMMENTS_PER_BUCKET / commentsPer100s) * 100;
+  return BOUNDARIES.reduce((prev, curr) => (Math.abs(curr - raw) < Math.abs(prev - raw) ? curr : prev));
+};
+
+const getVodBucketSize = async (app, vodId) => {
+  const client = app.get('redisClient');
+  const key = `${config.channel}-${vodId}-bucketSize`;
+
+  const cached = await client.get(key).catch(() => null);
+  if (cached) return parseInt(cached);
+
+  const result = await app.get('sequelizeClient').query(
+    `
+    SELECT 
+      COUNT(*) / NULLIF((MAX(content_offset_seconds) - MIN(content_offset_seconds)), 0) * 100 AS comments_per_100s
+    FROM logs
+    WHERE vod_id = :vodId
+  `,
+    { replacements: { vodId }, type: QueryTypes.SELECT },
+  );
+
+  if (!result?.[0]?.comments_per_100s) return BUCKET_SIZE; // fallback to static
+
+  const commentsPer100s = parseFloat(result[0].comments_per_100s);
+  const bucketSize = computeBucketSize(commentsPer100s);
+
+  client.set(key, bucketSize); // no TTL, permanent
+  return bucketSize;
+};
 
 module.exports = function (app) {
   return async function (req, res, next) {
@@ -20,7 +52,8 @@ module.exports = function (app) {
     let responseJson;
 
     if (!cursor && isFinite(content_offset_seconds)) {
-      const bucket = quantizeOffset(content_offset_seconds);
+      const bucketSize = await getVodBucketSize(app, vodId);
+      const bucket = Math.floor(content_offset_seconds / bucketSize) * bucketSize;
       const key = `${config.channel}-${vodId}-bucket-${bucket}`;
 
       responseJson = await client
