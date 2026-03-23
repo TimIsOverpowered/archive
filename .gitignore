@@ -108,7 +108,15 @@ $RECYCLE.BIN/
 lib/
 data/
 
+# Prisma generated clients - platform-specific binaries regenerated on each deploy
+generated/
+prisma/generated/meta/
+
 config/*
 !config/template_config.json
 !config/template_default.json
-*.opencode
+
+scripts/
+
+*.opencode*
+.env
