@@ -8,6 +8,8 @@ const emotes = require("./emotes");
 const dayjs = require("dayjs");
 const duration = require("dayjs/plugin/duration");
 dayjs.extend(duration);
+const bcrypt = require("bcrypt");
+const { metaClient } = require("../../prisma/generated/meta");
 
 module.exports.verify = function (app) {
   return async function (req, res, next) {
@@ -36,12 +38,29 @@ module.exports.verify = function (app) {
       });
     }
 
-    const token = authHeader.substring(7);
-    const key = app.get("ADMIN_API_KEY");
+    const apiKey = authHeader.substring(7);
 
-    if (token !== key) {
+    // Look up admin by API key
+    const admin = await metaClient.admin.findUnique({
+      where: { api_key: apiKey },
+    });
+
+    if (!admin) {
       console.warn(
-        `[AUTH FAIL] ${new Date().toISOString()} | IP: ${clientIP} | Path: ${req.path} | Reason: Invalid API key`,
+        `[AUTH FAIL] ${new Date().toISOString()} | IP: ${clientIP} | Path: ${req.path} | Reason: API key not found`,
+      );
+      return res.status(401).json({
+        error: true,
+        msg: "Invalid API key",
+      });
+    }
+
+    // Verify hash
+    const valid = await bcrypt.compare(apiKey, admin.api_key_hash);
+
+    if (!valid) {
+      console.warn(
+        `[AUTH FAIL] ${new Date().toISOString()} | IP: ${clientIP} | Path: ${req.path} | Reason: API key hash mismatch`,
       );
       return res.status(403).json({
         error: true,
@@ -49,8 +68,14 @@ module.exports.verify = function (app) {
       });
     }
 
+    // Attach admin info to request
+    req.user = {
+      id: admin.id,
+      username: admin.username,
+    };
+
     console.info(
-      `[AUTH SUCCESS] ${new Date().toISOString()} | IP: ${clientIP} | Path: ${req.path}`,
+      `[AUTH SUCCESS] ${new Date().toISOString()} | IP: ${clientIP} | Path: ${req.path} | User: ${admin.username}`,
     );
     next();
   };
