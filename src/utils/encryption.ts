@@ -64,3 +64,25 @@ export function decrypt(ciphertext: Uint8Array): string {
     
     return decrypted.toString('utf8');
 }
+
+export function encryptObject(obj: object): string {
+    const plaintext = JSON.stringify(obj);
+    const { ciphertext } = encrypt(plaintext);
+    return Buffer.from(ciphertext).toString('base64');
+}
+
+export function decryptObject<T>(encryptedBase64: string): T {
+    const ciphertext = Buffer.from(encryptedBase64, 'base64');
+    const plaintext = decrypt(ciphertext);
+    return JSON.parse(plaintext) as T;
+}
+
+export function encryptScalar(value: string): string {
+    const { ciphertext } = encrypt(value);
+    return Buffer.from(ciphertext).toString('base64');
+}
+
+export function decryptScalar(encryptedBase64: string): string {
+    const ciphertext = Buffer.from(encryptedBase64, 'base64');
+    return decrypt(ciphertext);
+}

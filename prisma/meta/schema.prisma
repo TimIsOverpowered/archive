@@ -9,35 +9,26 @@ datasource db {
 }
 
 model Tenant {
-  id        String   @id // e.g., "xqc", "shroud"
-  name      String
-  platform  String[] // ["twitch"], ["youtube"], or both
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  credentials Credential[]
-  
+  id            Int      @id @default(autoincrement())
+  display_name  String?
+  twitch        Json?
+  youtube       Json?
+  kick          Json?
+  google        Json?
+  database_url  String? // encrypted connection string
+  settings      Json
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
   @@map("tenants")
 }
 
-model Credential {
-  id             String   @id @default(uuid())
-  tenantId       String
-  platform       String // "twitch", "youtube", "kick", or "database"
-  type           String // "client_id", "client_secret", "refresh_token", "db_url", etc.
-  encryptedValue Bytes? // AES-256-GCM ciphertext
-  iv             Bytes?   // Initialization vector for decryption
-  
-  tenant         Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  
-  @@unique([tenantId, platform, type])
-  @@map("credentials")
-}
-
 model Admin {
-  id          String   @id @default(uuid())
-  apiKeyHash  String   @unique // bcrypt hash of raw API key (never store plaintext!)
-  createdAt   DateTime @default(now())
-  
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  api_key      String   @unique
+  api_key_hash String   @unique
+  created_at   DateTime @default(now())
+
   @@map("admins")
 }
