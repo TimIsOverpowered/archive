@@ -1,59 +1,68 @@
 import { metaClient } from '../db/meta-client';
-import { decrypt, validateEncryptionKey } from '../utils/encryption';
+import { decryptObject, decryptScalar } from '../utils/encryption';
 import { StreamerConfig } from './types';
 
 const configCache = new Map<string, StreamerConfig>();
 
 export async function loadStreamerConfigs(): Promise<StreamerConfig[]> {
-    if (!validateEncryptionKey(process.env.ENCRYPTION_MASTER_KEY || '')) throw new Error('ENCRYPTION_MASTER_KEY must be set and valid');
-
-    const tenants = await metaClient.tenant.findMany({ include: { credentials: true } });
+    const tenants = await metaClient.tenant.findMany();
     if (tenants.length === 0) return [];
 
     for (const tenant of tenants) {
-        const configMap = new Map<string, string>();
-        
-        for (const credential of tenant.credentials) {
-            try {
-                const decryptedValue = decrypt(Buffer.from(credential.encryptedValue!));
-                configMap.set(`${credential.platform}:${credential.type}`, decryptedValue);
-            } catch {}
-        }
+        if (!tenant.database_url) continue;
+
+        const dbUrl = decryptScalar(tenant.database_url);
 
         const streamerConfig: StreamerConfig = {
-            id: tenant.id,
-            database: { url: '' },
+            id: tenant.id.toString(),
+            database: { url: dbUrl },
         };
 
-        if (configMap.has('twitch:client_id')) {
-            streamerConfig.twitch = {};
-            if (configMap.has('twitch:client_secret')) streamerConfig.twitch.clientSecret = configMap.get('twitch:client_secret') || undefined;
-            if (configMap.has('twitch:channel_name')) streamerConfig.twitch.channelName = configMap.get('twitch:channel_name');
+        if (tenant.twitch && typeof tenant.twitch === 'object') {
+            const twitch = tenant.twitch as Record<string, unknown>;
+            if ('username' in twitch && twitch.username) {
+                streamerConfig.twitch = {};
+                
+                if ('auth' in twitch && twitch.auth) {
+                    const auth = decryptObject<{ client_id: string; client_secret: string; access_token: string }>(twitch.auth as string);
+                    streamerConfig.twitch.clientId = auth.client_id;
+                    streamerConfig.twitch.clientSecret = auth.client_secret;
+                }
+                
+                streamerConfig.twitch.channelName = twitch.username as string;
+            }
         }
 
-        if (configMap.has('youtube:client_id')) {
+        if (tenant.youtube && typeof tenant.youtube === 'object') {
+            const youtube = tenant.youtube as Record<string, unknown>;
+            
             streamerConfig.youtube = {};
-            if (configMap.has('youtube:client_secret')) streamerConfig.youtube.clientSecret = configMap.get('youtube:client_secret') || undefined;
-            if (configMap.has('youtube:refresh_token')) streamerConfig.youtube.refreshToken = configMap.get('youtube:refresh_token');
+            
+            if ('api_key' in youtube && youtube.api_key) {
+                const apiKey = decryptScalar(youtube.api_key as string);
+                streamerConfig.youtube.clientId = apiKey;
+            }
+
+            if ('auth' in youtube && youtube.auth) {
+                const auth = decryptObject<{ access_token: string; refresh_token: string; scope: string; token_type: string; expires_in: number }>(youtube.auth as string);
+                streamerConfig.youtube.refreshToken = auth.refresh_token;
+            }
+
+            if ('client_secret' in youtube && youtube.client_secret) {
+                const clientSecret = decryptScalar(youtube.client_secret as string);
+                streamerConfig.youtube.clientSecret = clientSecret;
+            }
         }
 
-        const kickEnabled = configMap.get('kick:enabled') === 'true';
-        if (kickEnabled) {
-            streamerConfig.kick = { enabled: true };
-            if (configMap.has('kick:channel_name')) streamerConfig.kick.channelName = configMap.get('kick:channel_name');
+        if (tenant.kick && typeof tenant.kick === 'object') {
+            const kick = tenant.kick as Record<string, unknown>;
+            if ('username' in kick && kick.username) {
+                streamerConfig.kick = { enabled: true };
+                streamerConfig.kick.channelName = kick.username as string;
+            }
         }
 
-        const dbUrl = configMap.get('database:url');
-        if (!dbUrl) continue;
-
-        streamerConfig.database.url = dbUrl;
-        
-        const connectionLimitStr = configMap.get('database:connection_limit');
-        if (connectionLimitStr && !isNaN(parseInt(connectionLimitStr))) {
-            streamerConfig.database.connectionLimit = parseInt(connectionLimitStr);
-        }
-
-        configCache.set(tenant.id, streamerConfig);
+        configCache.set(streamerConfig.id, streamerConfig);
     }
 
     return Array.from(configCache.values());

@@ -1,0 +1,36 @@
+generator streamer_client {
+  provider = "prisma-client-js"
+  output   = "../generated/streamer"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Vod {
+  id                 String    @id @default(uuid())
+  platform           String // "twitch", "kick", etc.
+  externalId         String   // Platform's VOD ID
+  title              String
+  createdAt          DateTime @default(now())
+  downloadedAt       DateTime?
+  uploadedToYoutubeAt DateTime?
+  
+  chatLogs ChatLog[]
+
+  @@unique([platform, externalId])
+  @@map("vods")
+}
+
+model ChatLog {
+  id           String   @id @default(uuid())
+  vodId        String
+  timestamp    DateTime // Message timestamp from stream platform
+  contentPath  String? // Path to stored chat file (S3/local) or URL
+  
+  vod          Vod      @relation(fields: [vodId], references: [id], onDelete: Cascade)
+
+  @@index([vodId, timestamp])
+  @@map("chat_logs")
+}

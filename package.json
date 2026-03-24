@@ -45,6 +45,7 @@
     "@feathersjs/feathers": "^5.0.37",
     "@feathersjs/transport-commons": "^5.0.37",
     "@prisma/client": "^5.22.0",
+    "bcrypt": "^6.0.0",
     "bullmq": "^5.71.0",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
@@ -73,6 +74,7 @@
     "winston": "^3.18.3"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/node": "^25.5.0",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
