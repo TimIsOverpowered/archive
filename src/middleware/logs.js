@@ -27,7 +27,7 @@ const getVodBucketSize = async (app, vodId) => {
     FROM logs
     WHERE vod_id = :vodId
   `,
-    { replacements: { vodId }, type: QueryTypes.SELECT },
+    { replacements: { vodId }, type: QueryTypes.SELECT }
   );
 
   if (!result?.[0]?.comments_per_100s) return BUCKET_SIZE; // fallback to static
@@ -132,7 +132,7 @@ const cursorSearch = async (app, vodId, cursorJson) => {
           JSON.stringify({
             offset: parseFloat(data[PAGE_SIZE].content_offset_seconds),
             id: data[PAGE_SIZE].id,
-          }),
+          })
         ).toString('base64')
       : undefined;
 
@@ -165,7 +165,7 @@ const offsetSearch = async (app, vodId, bucket) => {
           JSON.stringify({
             offset: parseFloat(data[PAGE_SIZE].content_offset_seconds),
             id: data[PAGE_SIZE].id,
-          }),
+          })
         ).toString('base64')
       : undefined;
 
