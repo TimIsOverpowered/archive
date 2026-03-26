@@ -13,20 +13,20 @@ Ensure environment variables are loaded from `.env`:
 
 ## Tenant Management
 
-### import-tenants.ts
+### import-tenant.ts
 
 Import a streamer's configuration from JSON file into the meta database.
 
 **Usage:**
 
 ```bash
-npx tsx scripts/import-tenants.ts <streamer_id> " postgresql://<user>:***@<host>:5432/<db>"
+npx tsx scripts/import-tenant.ts <streamer_id> " postgresql://<user>:***@<host>:5432/<db>"
 ```
 
 **Example:**
 
 ```bash
-npx tsx scripts/import-tenants.ts moonmoon "  postgresql://<user>:***@<host>:5432/<db>"
+npx tsx scripts/import-tenant.ts moonmoon "  postgresql://<user>:***@<host>:5432/<db>"
 ```
 
 **What it does:**
@@ -382,24 +382,24 @@ Tenant ID in meta DB: 5
 - `youtube.auth` (access_token, refresh_token, etc.)
 - `database_url`
 
-**Note:** This script is for interactive tenant creation. For bulk imports from existing config files, use `import-tenants.ts`.
+**Note:** This script is for interactive tenant creation. For bulk imports from existing config files, use `import-tenant.ts`.
 
 ---
 
-### import-tenants.ts
+### import-tenant.ts
 
 Import a streamer's configuration from JSON file into the meta database.
 
 **Usage:**
 
 ```bash
-npx tsx scripts/import-tenants.ts <streamer_id> " postgresql://<user>:***@<host>:5432/<db>"
+npx tsx scripts/import-tenant.ts <streamer_id> " postgresql://<user>:***@<host>:5432/<db>"
 ```
 
 **Example:**
 
 ```bash
-npx tsx scripts/import-tenants.ts moonmoon "  postgresql://<user>:***@<host>:5432/<db>"
+npx tsx scripts/import-tenant.ts moonmoon "  postgresql://<user>:***@<host>:5432/<db>"
 ```
 
 **What it does:**
