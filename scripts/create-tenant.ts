@@ -35,8 +35,9 @@ function validatePostgresConnection(host: string, port: number, user: string, pa
     pool.end();
     return true;
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`❌ Cannot connect to PostgreSQL server at ${host}:${port}`);
-    console.error(`   Error: ${error.message}`);
+    console.error(`   Error: ${errorMessage}`);
     return false;
   }
 }
@@ -167,7 +168,7 @@ async function createDatabase(host: string, port: number, user: string, password
   }
 }
 
-async function runMigrations(streamerId: string, dbUrl: string): Promise<void> {
+async function runMigrations(channelName: string, dbUrl: string): Promise<void> {
   console.log('\n📦 Running Prisma migrations...');
 
   const envDbUrl = process.env.DATABASE_URL;
@@ -189,7 +190,7 @@ async function runMigrations(streamerId: string, dbUrl: string): Promise<void> {
 
 // Main script
 async function main(): Promise<void> {
-  let tenantId: number | null = null;
+  let tenantId: string | null = null;
 
   try {
     console.log('╔════════════════════════════════════════════╗');
@@ -202,15 +203,30 @@ async function main(): Promise<void> {
     console.log('BASIC INFORMATION');
     console.log('─'.repeat(50));
 
-    let streamerId = await prompt('Streamer ID (database name, lowercase, alphanumeric + underscore): ');
+    let channelName = await prompt('Channel Name (tenant ID, lowercase alphanumeric + underscore, max 25 chars): ');
 
-    // Validate streamer ID format
-    if (!/^[a-z0-9_]+$/.test(streamerId)) {
-      console.error('❌ Invalid format. Streamer ID must be lowercase with only letters, numbers, and underscores.');
-      streamerId = await prompt('Streamer ID: ');
+    // Validate format
+    if (!/^[a-z0-9_]+$/.test(channelName)) {
+      console.error('❌ Invalid format. Channel name must be lowercase with only letters, numbers, and underscores.');
+      process.exit(1);
     }
 
-    const displayName = (await prompt('Display Name (or press Enter for same as streamer ID): ')) || streamerId;
+    // Validate length
+    if (channelName.length > 25) {
+      console.error('❌ Channel name exceeds maximum length of 25 characters.');
+      process.exit(1);
+    }
+
+    // Check for duplicates
+    const existingTenant = await metaClient.tenant.findFirst({
+      where: { id: channelName },
+    });
+    if (existingTenant) {
+      console.error('❌ Tenant with this channel name already exists.');
+      process.exit(1);
+    }
+
+    const displayName = (await prompt('Display Name (or press Enter to use channel name): ')) || channelName;
 
     console.log('\n─'.repeat(50));
     console.log('POSTGRESQL SERVER');
@@ -220,7 +236,7 @@ async function main(): Promise<void> {
     const dbPort = parseInt((await prompt('PostgreSQL port: ')) || '5432') || 5432;
     const dbUser = await prompt('PostgreSQL username: ');
     const dbPassword = await promptHidden('PostgreSQL password: ');
-    const dbName = streamerId; // Use streamer ID as database name
+    const dbName = channelName; // Use streamer ID as database name
 
     // Validate connection BEFORE continuing
     console.log('\n🔍 Validating PostgreSQL connection...');
@@ -243,7 +259,7 @@ async function main(): Promise<void> {
 
     const dbUrl = ` postgresql://<user>:***@<host>:5432/<db>
 
-    await runMigrations(streamerId, dbUrl);
+    await runMigrations(channelName, dbUrl);
 
     // Phase 3: Streaming Platforms
     console.log('\n─'.repeat(50));
@@ -383,7 +399,7 @@ async function main(): Promise<void> {
     console.log('TENANT CREATION SUMMARY');
     console.log('='.repeat(50));
 
-    console.log(`\nStreamer ID: ${streamerId}`);
+    console.log(`\nStreamer ID: ${channelName}`);
     console.log(`Display Name: ${displayName}`);
     console.log(`Database:  postgresql://<user>:***@<host>:5432/<db>
 
@@ -429,8 +445,8 @@ async function main(): Promise<void> {
     console.log('1. ✓ Database created/verified');
     console.log('2. ✓ Prisma migrations applied');
     console.log('3. Generate config files:');
-    console.log(`   - config/config.json.${streamerId}`);
-    console.log(`   - config/default.json.${streamerId}`);
+    console.log(`   - config/config.json.${channelName}`);
+    console.log(`   - config/default.json.${channelName}`);
     console.log('4. Register tenant in meta database (with encryption)');
 
     const proceed = await confirm('\nProceed with tenant creation?');
@@ -441,7 +457,7 @@ async function main(): Promise<void> {
 
     // Phase 7: Execution
 
-    // Step 1: Generate config/config.json.<streamerId>
+    // Step 1: Generate config/config.json.<channelName>
     const configData: any = {
       channel: displayName,
       domain_name: domainName,
@@ -511,10 +527,10 @@ async function main(): Promise<void> {
       fs.mkdirSync(configDir, { recursive: true });
     }
 
-    fs.writeFileSync(path.join(configDir, `config.json.${streamerId}`), JSON.stringify(configData, null, 2));
-    console.log(`✓ Created config/config.json.${streamerId}`);
+    fs.writeFileSync(path.join(configDir, `config.json.${channelName}`), JSON.stringify(configData, null, 2));
+    console.log(`✓ Created config/config.json.${channelName}`);
 
-    // Step 2: Generate config/default.json.<streamerId>
+    // Step 2: Generate config/default.json.<channelName>
     const defaultConfig = {
       host: 'localhost',
       port: 3030,
@@ -530,8 +546,8 @@ async function main(): Promise<void> {
       },
     };
 
-    fs.writeFileSync(path.join(configDir, `default.json.${streamerId}`), JSON.stringify(defaultConfig, null, 2));
-    console.log(`✓ Created config/default.json.${streamerId}`);
+    fs.writeFileSync(path.join(configDir, `default.json.${channelName}`), JSON.stringify(defaultConfig, null, 2));
+    console.log(`✓ Created config/default.json.${channelName}`);
 
     // Step 3: Prepare meta DB record with encryption
     const tenantData: any = {
@@ -597,9 +613,12 @@ async function main(): Promise<void> {
       tenantData.google = googleData; // NOT encrypted - public OAuth credentials
     }
 
-    // Step 4: Insert into meta DB
+    // Step 4: Insert into meta DB with explicit ID
     const createdTenant = await metaClient.tenant.create({
-      data: tenantData,
+      data: {
+        id: channelName,
+        ...tenantData,
+      },
     });
     tenantId = createdTenant.id;
 
@@ -607,15 +626,15 @@ async function main(): Promise<void> {
     console.log('\n' + '✅'.repeat(20));
     console.log('TENANT CREATED SUCCESSFULLY!');
     console.log('✅'.repeat(20));
-    console.log(`\nStreamer ID: ${streamerId}`);
+    console.log(`\nStreamer ID: ${channelName}`);
     console.log(`Tenant ID in meta DB: ${createdTenant.id}`);
     console.log(`\n📁 Config files created:`);
-    console.log(`   - config/config.json.${streamerId}`);
-    console.log(`   - config/default.json.${streamerId}`);
+    console.log(`   - config/config.json.${channelName}`);
+    console.log(`   - config/default.json.${channelName}`);
     console.log(`\n🗄️  Database:  postgresql://<user>:***@<host>:5432/<db>
     console.log(`   Schema: Migrated with normalized tables`);
     console.log('\n⚠️  IMPORTANT: Store these credentials securely:');
-    console.log('   Plaintext credentials are stored in config/config.json.${streamerId}');
+    console.log('   Plaintext credentials are stored in config/config.json.${channelName}');
     console.log('   - Twitch Client Secret, Access Token');
     if (youtubeData) {
       console.log('   - YouTube API Key, Refresh Token');
@@ -635,7 +654,8 @@ async function main(): Promise<void> {
           await metaClient.tenant.delete({ where: { id: tenantId } });
           console.log('✓ Rolled back tenant from meta DB');
         } catch (rollbackError) {
-          console.error('⚠️  Could not rollback:', rollbackError.message);
+          const errorMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+          console.error('⚠️  Could not rollback:', errorMessage);
         }
       }
     }

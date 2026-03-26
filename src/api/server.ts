@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import jwt from '@fastify/jwt';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import compress from '@fastify/compress';
@@ -76,6 +77,15 @@ export async function buildServer() {
       docExpansion: 'list',
       deepLinking: false,
     },
+  });
+
+  // JWT configuration
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+
+  await fastify.register(jwt, {
+    secret: process.env.JWT_SECRET,
   });
 
   // Global CORS with route-based origin checking
