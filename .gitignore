@@ -116,9 +116,7 @@ config/*
 !config/template_config.json
 !config/template_default.json
 
-scripts/
-
 *.opencode*
 .env
 .env.dev
-.env.production
+.env.production*.log
