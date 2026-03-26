@@ -20,7 +20,7 @@ Import a streamer's configuration from JSON file into the meta database.
 **Usage:**
 
 ```bash
-npx tsx scripts/import-tenant.ts <streamer_id> " postgresql://<user>:***@<host>:5432/<db>"
+npx tsx scripts/import-tenant.ts <channel_name> " postgresql://<user>:***@<host>:5432/<db>"
 ```
 
 **Example:**
@@ -29,19 +29,27 @@ npx tsx scripts/import-tenant.ts <streamer_id> " postgresql://<user>:***@<host>:
 npx tsx scripts/import-tenant.ts moonmoon "  postgresql://<user>:***@<host>:5432/<db>"
 ```
 
+**Channel Name Validation:**
+
+- **Format**: Lowercase alphanumeric + underscore only (`^[a-z0-9_]+$`)
+- **Length**: Maximum 25 characters
+- **Uniqueness**: Must not already exist in the database (exits immediately if duplicate)
+
 **What it does:**
 
-1. Reads `config/config.json.<streamer_id>`
-2. Encrypts sensitive fields:
+1. Validates channel name format and length
+2. Checks for existing tenant (exits with error if found)
+3. Reads `config/config.json.<channel_name>`
+4. Encrypts sensitive fields:
    - `twitch.auth` (client_secret, access_token)
    - `youtube.auth` (refresh_token, access_token)
    - `youtube.api_key`
    - `database_url`
-3. Inserts into `tenants` table with all settings
+5. Inserts into `tenants` table with explicit `id` set to channel name
 
 **Requirements:**
 
-- Config file must exist at `config/config.json.<streamer_id>`
+- Config file must exist at `config/config.json.<channel_name>`
 - Database URL must be provided as second argument
 - The PostgreSQL database must already exist
 
@@ -250,19 +258,28 @@ Interactive wizard to create a new streamer tenant from scratch.
 npx tsx scripts/create-tenant.ts
 ```
 
+**Channel Name Validation:**
+
+The script validates the channel name (which becomes the tenant ID):
+
+- **Format**: Lowercase alphanumeric + underscore only (`^[a-z0-9_]+$`)
+- **Length**: Maximum 25 characters
+- **Uniqueness**: Checks for existing tenant before creation (exits immediately if duplicate)
+
 **What it does:**
 
-1. Validates PostgreSQL connection before starting prompts
-2. Prompts for streamer ID, display name, and PostgreSQL credentials
-3. Attempts to create the PostgreSQL database (or asks you to create manually)
-4. Runs Prisma migrations to set up the normalized schema
-5. Collects streaming platform credentials (Twitch, Kick)
-6. Collects YouTube upload settings and OAuth credentials
-7. Collects Google OAuth credentials (for YouTube token refresh)
-8. Collects general archive settings (paths, timezone, download preferences)
-9. Shows a summary and requires confirmation before proceeding
-10. Generates config files with plaintext credentials for backup
-11. Registers tenant in meta database with encrypted sensitive fields
+1. Validates channel name format, length, and uniqueness
+2. Prompts for display name (defaults to channel name if empty)
+3. Validates PostgreSQL connection before starting prompts
+4. Attempts to create the PostgreSQL database (or asks you to create manually)
+5. Runs Prisma migrations to set up the normalized schema
+6. Collects streaming platform credentials (Twitch, Kick)
+7. Collects YouTube upload settings and OAuth credentials
+8. Collects Google OAuth credentials (for YouTube token refresh)
+9. Collects general archive settings (paths, timezone, download preferences)
+10. Shows a summary and requires confirmation before proceeding
+11. Generates config files with plaintext credentials for backup
+12. Registers tenant in meta database with encrypted sensitive fields and explicit `id`
 
 **Prerequisites:**
 
@@ -282,8 +299,8 @@ $ npx tsx scripts/create-tenant.ts
 ──────────────────────────────────────────
 BASIC INFORMATION
 ──────────────────────────────────────────
-Streamer ID (database name, lowercase, alphanumeric + underscore): moonmoon
-Display Name (or press Enter for same as streamer ID): MOONMOON
+Channel Name (tenant ID, lowercase alphanumeric + underscore, max 25 chars): moonmoon
+Display Name (or press Enter to use channel name): MOONMOON
 
 ──────────────────────────────────────────
 POSTGRESQL SERVER
@@ -356,8 +373,8 @@ Proceed with tenant creation? (y/N): y
 
 ✅ TENANT CREATED SUCCESSFULLY!
 
-Streamer ID: moonmoon
-Tenant ID in meta DB: 5
+Channel Name: moonmoon
+Tenant ID in meta DB: moonmoon
 
 📁 Config files created:
    - config/config.json.moonmoon
@@ -372,8 +389,8 @@ Tenant ID in meta DB: 5
 
 **Generated files:**
 
-- `config/config.json.<streamer_id>` - Full configuration with plaintext credentials for backup
-- `config/default.json.<streamer_id>` - Server defaults with database connection string
+- `config/config.json.<channel_name>` - Full configuration with plaintext credentials for backup
+- `config/default.json.<channel_name>` - Server defaults with database connection string
 
 **Encrypted fields in meta DB:**
 

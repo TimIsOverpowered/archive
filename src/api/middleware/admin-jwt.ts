@@ -16,7 +16,7 @@ export default async function adminJwtMiddleware(request: FastifyRequest, reply:
   const token = authHeader.substring(7);
 
   try {
-    const decoded = request.jwt.verify(token);
+    const decoded = (request as unknown as { jwt: { verify: (token: string) => unknown } }).jwt.verify(token);
     (request as unknown as { user: unknown }).user = decoded;
   } catch {
     return reply.status(401).send({

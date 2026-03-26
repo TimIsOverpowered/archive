@@ -54,7 +54,7 @@ export async function getTenantStats(client: PrismaClient, streamerId: string): 
   }
 
   const tenant = await metaClient.tenant.findFirst({
-    where: { id: parseInt(streamerId, 10) },
+    where: { id: streamerId },
   });
 
   if (!tenant) {
@@ -69,9 +69,13 @@ export async function getTenantStats(client: PrismaClient, streamerId: string): 
   }
 
   const platforms: string[] = [];
-  if (tenant.twitch?.username) platforms.push('twitch');
-  if (tenant.youtube?.api_key || tenant.youtube?.auth) platforms.push('youtube');
-  if (tenant.kick?.username) platforms.push('kick');
+  const twitch = tenant.twitch as Record<string, unknown> | null;
+  const youtube = tenant.youtube as Record<string, unknown> | null;
+  const kick = tenant.kick as Record<string, unknown> | null;
+
+  if (twitch?.username) platforms.push('twitch');
+  if (youtube?.api_key || youtube?.auth) platforms.push('youtube');
+  if (kick?.username) platforms.push('kick');
 
   const [vods, vodUploads, chatMessages, chapters] = await Promise.all([
     client.vod.findMany({ where: { platform: { startsWith: streamerId } } }),
@@ -128,9 +132,9 @@ export async function getTenantStats(client: PrismaClient, streamerId: string): 
   const stats: TenantStats = {
     tenant: {
       id: streamerId,
-      display_name: tenant.display_name,
+      display_name: tenant.displayName,
       platforms,
-      created_at: tenant.created_at,
+      created_at: tenant.createdAt,
     },
     database: {
       status: dbStatus,
@@ -181,25 +185,29 @@ export async function getAllTenants(): Promise<
   const tenants = await metaClient.tenant.findMany({
     select: {
       id: true,
-      display_name: true,
+      displayName: true,
       twitch: true,
-      youtube: true,
       kick: true,
-      created_at: true,
+      youtube: true,
+      createdAt: true,
     },
   });
 
   return tenants.map((t) => {
     const platforms: string[] = [];
-    if (t.twitch?.username) platforms.push('twitch');
-    if (t.youtube?.api_key || t.youtube?.auth) platforms.push('youtube');
-    if (t.kick?.username) platforms.push('kick');
+    const twitch = t.twitch as Record<string, unknown> | null;
+    const youtube = t.youtube as Record<string, unknown> | null;
+    const kick = t.kick as Record<string, unknown> | null;
+
+    if (twitch?.username) platforms.push('twitch');
+    if (youtube?.api_key || youtube?.auth) platforms.push('youtube');
+    if (kick?.username) platforms.push('kick');
 
     return {
-      id: t.id.toString(),
-      display_name: t.display_name,
+      id: t.id,
+      display_name: t.displayName,
       platforms,
-      created_at: t.created_at,
+      created_at: t.createdAt,
     };
   });
 }
