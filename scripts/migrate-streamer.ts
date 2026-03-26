@@ -1,5 +1,7 @@
 #!/usr/bin/env node
+import 'dotenv/config';
 import { PrismaClient } from '../prisma/generated/meta/index.js';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { program } from 'commander';
 import readline from 'readline';
 import { createRequire } from 'module';
@@ -22,13 +24,8 @@ if (!META_DB_URL) {
   process.exit(1);
 }
 
-const metaClient = new PrismaClient({
-  datasources: {
-    db: {
-      url: META_DB_URL,
-    },
-  },
-});
+const adapter = new PrismaPg({ connectionString: META_DB_URL });
+const metaClient = new PrismaClient({ adapter });
 
 const parseDuration = (durationStr: string): number => {
   if (!durationStr || durationStr === '00:00:00') return 0;
@@ -172,9 +169,6 @@ const main = async () => {
               return !line.includes('ALTER TABLE "chat_messages"') && !line.includes('ALTER TABLE "chat_messages_new"') && !line.includes('chat_messages_vod_id_fkey');
             })
             .join('\n');
-
-          // Debug: log the modified SQL to a file for troubleshooting
-          fs.writeFileSync('debug-migration.sql', migrationSql);
 
           await client.query(migrationSql);
 

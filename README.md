@@ -1,48 +1,103 @@
 # Archives
 
-> 
+Automated VOD upload from Twitch to YouTube after streaming.
 
-## About
+## Prerequisites
 
-Automated Upload Twitch Vod to Youtube after streaming 
+- Node.js 20+
+- PostgreSQL 14+
+- Redis 6+
+
+## Database Setup
+
+This project uses two databases:
+
+### Meta Database (Tenant Management)
+
+Stores tenant configurations and admin users.
+
+```bash
+# Create the database
+createdb archive
+
+# Run migrations (from project root)
+NODE_ENV=development npx prisma migrate deploy --config=./prisma/meta/prisma.config.ts
+```
+
+**Important**: Always use `--config=./prisma/meta/prisma.config.ts` when running Prisma CLI commands for the meta database from the project root. Alternatively, run commands from within the `prisma/meta/` directory.
+
+### Streamer Database (Per-Tenant)
+
+Each tenant has its own database for VODs, chat logs, emotes, etc. The database URL is stored in the tenant's record in the meta database.
+
+To run migrations for a specific tenant:
+
+```bash
+# Set the tenant's database URL
+export DATABASE_URL=" postgresql://<user>:***@<host>:5432/<db>"
+
+# Run migrations
+npx prisma migrate deploy
+```
+
+Or use the migration script:
+
+```bash
+NODE_ENV=development npx tsx scripts/migrate-streamer.ts --streamer <tenant-name> --db-url <database-url>
+```
 
 ## Getting Started
 
-Getting up and running is as easy as 1, 2, 3.
+1. Install dependencies
 
-1. Make sure you have [NodeJS](https://nodejs.org/) and [npm](https://www.npmjs.com/) installed.
-2. Install your dependencies
-
-    ```
-    cd path/to/archive
-    npm install
-    install postgresql
-    ```
-    
-3. Add tables using the src/services folder.
-   For example: There is a logs service and a vods service. Add them both as a table in postgres.
-   
-4. Add the columns using the src/models folder.
-    
-4. Make the following configs using the templates found in the config folder.
-   
+   ```bash
+   cd path/to/archive
+   npm install
    ```
-   path/to/archive/config/config.json
-   path/to/archive/config/default.json
-   path/to/archive/config/production.json (used in nodejs production mode) (copy default.json)
+
+2. Set up environment variables
+
+   ```bash
+   cp .env.example .env.development
+   # Edit .env.development with your configuration
    ```
-  
-5. Start your app
 
-    ```
-    npm start
-    ```
-## Verifying your Youtube channel
+3. Create a tenant
 
-To upload 15 minutes+ videos, you will need to verify your youtube using this [link](https://www.youtube.com/verify)
+   ```bash
+   NODE_ENV=development npx tsx scripts/create-tenant.ts
+   ```
 
-## Verifying your Google Console API
+4. Start the application
 
-To make your videos publicly automatically, you need to undergo an audit from google.
+   ```bash
+   NODE_ENV=development npm run dev
+   ```
 
-Please refer to https://developers.google.com/youtube/v3/docs/videos/insert
+## Environment Variables
+
+See `.env.example` for all available configuration options. Key variables:
+
+- `META_DATABASE_URL`: Connection string for the meta database
+- `REDIS_URL`: Redis connection for caching and job queues
+- `ENCRYPTION_MASTER_KEY`: 64-character hex string for encrypting sensitive data
+- `JWT_SECRET`: Secret for admin dashboard authentication
+
+## Troubleshooting
+
+### "Cannot resolve environment variable" errors
+
+Ensure `.env` or `.env.development` exists and `NODE_ENV` is set before running Prisma commands:
+
+```bash
+export NODE_ENV=development
+npx prisma migrate deploy --config=./prisma/meta/prisma.config.ts
+```
+
+## Verifying your YouTube channel
+
+To upload 15+ minute videos, verify your YouTube channel: https://www.youtube.com/verify
+
+## Google Console API Verification
+
+To make videos public automatically, you need to complete Google's API audit. See: https://developers.google.com/youtube/v3/docs/videos/insert

@@ -1,4 +1,4 @@
-import { PrismaClient } from '../../generated/streamer';
+import { PrismaClient } from '../../generated/streamer/client';
 import { redisClient } from '../api/plugins/redis.plugin';
 import { compressChatData, decompressChatData } from '../utils/compression';
 

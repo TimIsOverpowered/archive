@@ -1,11 +1,10 @@
 generator streamer_client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
   output   = "../generated/streamer"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum UploadStatus {

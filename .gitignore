@@ -113,10 +113,8 @@ generated/
 prisma/generated/meta/
 
 config/*
-!config/template_config.json
-!config/template_default.json
+!config/example.config.json
 
 *.opencode*
-.env
-.env.dev
-.env.production*.log
+.env*
+!.env.example
