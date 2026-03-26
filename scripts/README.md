@@ -403,40 +403,6 @@ Tenant ID in meta DB: moonmoon
 
 ---
 
-### import-tenant.ts
-
-Import a streamer's configuration from JSON file into the meta database.
-
-**Usage:**
-
-```bash
-npx tsx scripts/import-tenant.ts <streamer_id> "postgresql://user:pass@host:5432/dbname"
-```
-
-**Example:**
-
-```bash
-npx tsx scripts/import-tenant.ts moonmoon "postgresql://archive_moonmoon:password@95.217.201.55:5432/moonmoon"
-```
-
-**What it does:**
-
-1. Reads `config/config.json.<streamer_id>`
-2. Encrypts sensitive fields:
-   - `twitch.auth` (client_secret, access_token)
-   - `youtube.auth` (refresh_token, access_token)
-   - `youtube.api_key`
-   - `database_url`
-3. Inserts into `tenants` table with all settings
-
-**Requirements:**
-
-- Config file must exist at `config/config.json.<streamer_id>`
-- Database URL must be provided as second argument
-- The PostgreSQL database must already exist
-
----
-
 ## Security Notes
 
 - All credentials are encrypted at rest using AES-256-GCM

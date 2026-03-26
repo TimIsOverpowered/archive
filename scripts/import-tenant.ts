@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 
+import 'dotenv/config';
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { metaClient } from '../src/db/meta-client';
 import { encryptObject, encryptScalar } from '../src/utils/encryption';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 interface TwitchConfig {
   enabled?: boolean;

@@ -1,5 +1,5 @@
 generator meta_client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
   output   = "../generated/meta"
 }
 
@@ -8,16 +8,16 @@ datasource db {
 }
 
 model Tenant {
-  id           String   @id @unique @db.VarChar(25)
-  displayName  String   @map("display_name")
-  twitch       Json?    @map("twitch")
-  youtube      Json?    @map("youtube")
-  kick         Json?    @map("kick")
-  google       Json?    @map("google")
-  databaseUrl  String?  @map("database_url")
-  settings     Json     @default("{}") @map("settings")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id          String   @id @unique @db.VarChar(25)
+  displayName String   @map("display_name")
+  twitch      Json?    @map("twitch")
+  youtube     Json?    @map("youtube")
+  kick        Json?    @map("kick")
+  google      Json?    @map("google")
+  databaseUrl String?  @map("database_url")
+  settings    Json     @default("{}") @map("settings")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("tenants")
 }
