@@ -8,29 +8,111 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Vod {
-  id                 String    @id @default(uuid())
-  platform           String // "twitch", "kick", etc.
-  externalId         String   // Platform's VOD ID
-  title              String
-  createdAt          DateTime @default(now())
-  downloadedAt       DateTime?
-  uploadedToYoutubeAt DateTime?
-  
-  chatLogs ChatLog[]
+enum UploadStatus {
+  PENDING
+  UPLOADING
+  COMPLETED
+  FAILED
+}
 
-  @@unique([platform, externalId])
+model Vod {
+  id            String    @id
+  platform      String
+  title         String?
+  duration      Int       @default(0)
+  thumbnail_url String?
+  stream_id     String?
+  created_at    DateTime  @default(now())
+  downloaded_at DateTime?
+  
+  vod_uploads   VodUpload[]
+  games         Game[]
+  emotes        Emote[]
+  chapters      Chapter[]
+
+  @@unique([platform, id])
+  @@index([platform])
   @@map("vods")
 }
 
-model ChatLog {
-  id           String   @id @default(uuid())
-  vodId        String
-  timestamp    DateTime // Message timestamp from stream platform
-  contentPath  String? // Path to stored chat file (S3/local) or URL
-  
-  vod          Vod      @relation(fields: [vodId], references: [id], onDelete: Cascade)
+model VodUpload {
+  vod_id        String
+  platform      String
+  upload_id     String    @id
+  type          String?
+  duration      Int       @default(0)
+  part          Int       @default(0)
+  status        UploadStatus @default(PENDING)
+  thumbnail_url String?
+  created_at    DateTime  @default(now())
 
-  @@index([vodId, timestamp])
-  @@map("chat_logs")
+  vod Vod @relation(fields: [vod_id], references: [id], onDelete: Cascade)
+
+  @@index([vod_id, platform])
+  @@index([platform])
+  @@index([status])
+  @@index([type])
+  @@index([vod_id, type, part])
+  @@map("vod_uploads")
 }
+
+model Emote {
+  id              Int       @id @default(autoincrement())
+  vod_id          String    @unique
+  ffz_emotes      Json?
+  bttv_emotes     Json?
+  seven_tv_emotes Json?
+
+  vod Vod @relation(fields: [vod_id], references: [id], onDelete: Cascade)
+
+  @@map("emotes")
+}
+
+model Game {
+  id            Int       @id @default(autoincrement())
+  vod_id        String
+  start_time    Decimal?
+  end_time      Decimal?
+  video_provider String?
+  video_id      String?
+  thumbnail_url String?
+  game_id       String?
+  game_name     String?
+  title         String?
+  chapter_image String?
+
+  vod Vod @relation(fields: [vod_id], references: [id], onDelete: Cascade)
+
+  @@index([vod_id, start_time])
+  @@index([game_name])
+  @@map("games")
+}
+
+model Chapter {
+  id            Int       @id @default(autoincrement())
+  vod_id        String
+  game_id       String?
+  name          String?
+  image         String?
+  duration      String?
+  start         Int       @default(0)
+  end           Int?
+
+  vod Vod @relation(fields: [vod_id], references: [id], onDelete: Cascade)
+
+  @@index([vod_id])
+  @@map("chapters")
+}
+
+model ChatMessage {
+   id                     String   @id
+   vod_id                 String
+   display_name           String?
+   content_offset_seconds Decimal
+   message                Json
+   user_badges            Json
+   user_color             String
+
+   @@index([vod_id, content_offset_seconds, id])
+   @@map("chat_messages")
+ }
