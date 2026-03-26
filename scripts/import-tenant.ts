@@ -197,8 +197,8 @@ async function main(): Promise<void> {
     const args = process.argv.slice(2);
 
     if (args.length === 0) {
-        console.log('Usage: tsx import-tenants.ts <streamer_id> <database_url>');
-        console.log('Example: tsx import-tenants.ts moonmoon "postgresql://user:pass@host/db"');
+        console.log('Usage: tsx import-tenant.ts <streamer_id> <database_url>');
+        console.log('Example: tsx import-tenant.ts moonmoon "postgresql://user:pass@host/db"');
         process.exit(1);
     }
 
