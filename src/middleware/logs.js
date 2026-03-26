@@ -3,8 +3,8 @@ const { QueryTypes } = require('sequelize');
 
 const PAGE_SIZE = 200;
 const BUCKET_SIZE = 120;
-const CURSOR_TTL = 60 * 60 * 12;
-const OFFSET_TTL = 60 * 60 * 1;
+const CURSOR_TTL = 60 * 60 * 24 * 1;
+const OFFSET_TTL = 60 * 60 * 2;
 const TARGET_COMMENTS_PER_BUCKET = 300;
 const BOUNDARIES = [30, 60, 90, 120, 180, 300, 600, 900, 1800, 3600];
 
