@@ -1,12 +1,17 @@
 #!/usr/bin/env node
 
+import 'dotenv/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
 import { Pool } from 'pg';
 import { metaClient } from '../src/db/meta-client';
 import { encryptObject, encryptScalar, validateEncryptionKey } from '../src/utils/encryption';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Validate encryption key at startup
 if (!process.env.ENCRYPTION_MASTER_KEY || !validateEncryptionKey(process.env.ENCRYPTION_MASTER_KEY)) {

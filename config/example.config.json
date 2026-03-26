@@ -1,0 +1,64 @@
+{
+  "twitch": {
+    "enabled": false,
+    "auth": {
+      "client_id": "",
+      "client_secret": "",
+      "access_token": ""
+    },
+    "id": "",
+    "username": "",
+    "mainPlatform": true
+  },
+  "kick": {
+    "enabled": false,
+    "username": "",
+    "id": "",
+    "mainPlatform": false
+  },
+  "google": {
+    "client_id": "",
+    "client_secret": "",
+    "redirect_url": ""
+  },
+  "youtube": {
+    "description": "",
+    "public": true,
+    "vodUpload": true,
+    "perGameUpload": false,
+    "restrictedGames": [],
+    "splitDuration": 10800,
+    "api_key": "",
+    "liveUpload": false,
+    "multiTrack": false,
+    "upload": true,
+    "auth": {
+      "access_token": "",
+      "scope": "https://www.googleapis.com/auth/youtube.force-ssl https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.upload",
+      "token_type": "Bearer",
+      "expires_in": 3599,
+      "refresh_token": ""
+    }
+  },
+  "channel": "",
+  "domain_name": "",
+  "vodPath": "/mnt/vods",
+  "livePath": "/mnt/live",
+  "timezone": "America/Chicago",
+  "chatDownload": false,
+  "vodDownload": true,
+  "simulcast": false,
+  "saveHLS": false,
+  "saveMP4": false,
+  "drive": {
+    "upload": false,
+    "parents": [],
+    "auth": {
+      "access_token": "",
+      "scope": "https://www.googleapis.com/auth/drive",
+      "token_type": "Bearer",
+      "expires_in": 3599,
+      "refresh_token": ""
+    }
+  }
+}
