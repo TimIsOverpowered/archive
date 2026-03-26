@@ -1,32 +1,27 @@
-const ffmpeg = require("fluent-ffmpeg");
-const twitch = require("./twitch");
-const kick = require("./kick");
-const config = require("../../config/config.json");
-const fs = require("fs");
-const readline = require("readline");
-const path = require("path");
-const HLS = require("hls-parser");
-const axios = require("axios");
-const drive = require("./drive");
-const youtube = require("./youtube");
-const emotes = require("./emotes");
-const dayjs = require("dayjs");
-const utc = require("dayjs/plugin/utc");
-const timezone = require("dayjs/plugin/timezone");
-const duration = require("dayjs/plugin/duration");
+const ffmpeg = require('fluent-ffmpeg');
+const twitch = require('./twitch');
+const kick = require('./kick');
+const config = require('../../config/config.json');
+const fs = require('fs');
+const readline = require('readline');
+const path = require('path');
+const HLS = require('hls-parser');
+const axios = require('axios');
+const drive = require('./drive');
+const youtube = require('./youtube');
+const emotes = require('./emotes');
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+const timezone = require('dayjs/plugin/timezone');
+const duration = require('dayjs/plugin/duration');
 dayjs.extend(duration);
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-module.exports.upload = async (
-  vodId,
-  app,
-  manualPath = false,
-  type = "vod"
-) => {
+module.exports.upload = async (vodId, app, manualPath = false, type = 'vod') => {
   let vod;
   await app
-    .service("vods")
+    .service('vods')
     .get(vodId)
     .then((data) => {
       vod = data;
@@ -34,7 +29,7 @@ module.exports.upload = async (
     .catch(() => {});
 
   if (!vod) {
-    console.error("Failed to download video: no VOD in database");
+    console.error('Failed to download video: no VOD in database');
     return;
   }
 
@@ -42,10 +37,10 @@ module.exports.upload = async (
 
   if (manualPath) {
     vodPath = manualPath;
-  } else if (type === "vod") {
-    if (vod.platform === "twitch") {
+  } else if (type === 'vod') {
+    if (vod.platform === 'twitch') {
       vodPath = await this.mp4Download(vodId);
-    } else if (vod.platform === "kick") {
+    } else if (vod.platform === 'kick') {
       vodPath = await kick.downloadMP4(app, config.kick.username, vodId);
     }
   }
@@ -62,16 +57,11 @@ module.exports.upload = async (
   if (config.youtube.perGameUpload && vod.chapters) {
     // use only main platform for games when simulcasting
     switch (vod.platform) {
-      case "twitch":
-        if (
-          config.simulcast &&
-          vod.platform === "twitch" &&
-          !config.twitch.mainPlatform
-        )
-          break;
+      case 'twitch':
+        if (config.simulcast && vod.platform === 'twitch' && !config.twitch.mainPlatform) break;
         await doGameUpload(vod, vodPath, app);
         break;
-      case "kick":
+      case 'kick':
         if (config.simulcast && !config.kick.mainPlatform) break;
         await doGameUpload(vod, vodPath, app);
         break;
@@ -90,7 +80,7 @@ module.exports.upload = async (
       let paths = await this.splitVideo(vodPath, duration, vodId);
 
       if (!paths) {
-        console.error("Something went wrong trying to split the trimmed video");
+        console.error('Something went wrong trying to split the trimmed video');
         return;
       }
 
@@ -98,30 +88,14 @@ module.exports.upload = async (
         const data = {
           path: paths[i],
           title:
-            type === "vod"
-              ? `${config.channel} ${
-                  vod.platform.charAt(0).toUpperCase() + vod.platform.slice(1)
-                } VOD - ${dayjs(vod.createdAt)
+            type === 'vod'
+              ? `${config.channel} ${vod.platform.charAt(0).toUpperCase() + vod.platform.slice(1)} VOD - ${dayjs(vod.createdAt).tz(config.timezone).format('MMMM DD YYYY').toUpperCase()} PART ${i + 1}`
+              : `${config.channel} ${vod.platform.charAt(0).toUpperCase() + vod.platform.slice(1)}  Live VOD - ${dayjs(vod.createdAt)
                   .tz(config.timezone)
-                  .format("MMMM DD YYYY")
-                  .toUpperCase()} PART ${i + 1}`
-              : `${config.channel} ${
-                  vod.platform.charAt(0).toUpperCase() + vod.platform.slice(1)
-                }  Live VOD - ${dayjs(vod.createdAt)
-                  .tz(config.timezone)
-                  .format("MMMM DD YYYY")
+                  .format('MMMM DD YYYY')
                   .toUpperCase()} PART ${i + 1}`,
           type: type,
-          public:
-            config.youtube.multiTrack &&
-            type === "live" &&
-            config.youtube.public
-              ? true
-              : !config.youtube.multiTrack &&
-                type === "vod" &&
-                config.youtube.public
-              ? true
-              : false,
+          public: config.youtube.multiTrack && type === 'live' && config.youtube.public ? true : !config.youtube.multiTrack && type === 'vod' && config.youtube.public ? true : false,
           duration: await getDuration(paths[i]),
           vod: vod,
           part: i + 1,
@@ -140,27 +114,10 @@ module.exports.upload = async (
     const data = {
       path: vodPath,
       title:
-        type === "vod"
-          ? `${config.channel} ${
-              vod.platform.charAt(0).toUpperCase() + vod.platform.slice(1)
-            } VOD - ${dayjs(vod.createdAt)
-              .tz(config.timezone)
-              .format("MMMM DD YYYY")
-              .toUpperCase()}`
-          : `${config.channel} ${
-              vod.platform.charAt(0).toUpperCase() + vod.platform.slice(1)
-            } Live VOD - ${dayjs(vod.createdAt)
-              .tz(config.timezone)
-              .format("MMMM DD YYYY")
-              .toUpperCase()}`,
-      public:
-        config.youtube.multiTrack && type === "live" && config.youtube.public
-          ? true
-          : !config.youtube.multiTrack &&
-            type === "vod" &&
-            config.youtube.public
-          ? true
-          : false,
+        type === 'vod'
+          ? `${config.channel} ${vod.platform.charAt(0).toUpperCase() + vod.platform.slice(1)} VOD - ${dayjs(vod.createdAt).tz(config.timezone).format('MMMM DD YYYY').toUpperCase()}`
+          : `${config.channel} ${vod.platform.charAt(0).toUpperCase() + vod.platform.slice(1)} Live VOD - ${dayjs(vod.createdAt).tz(config.timezone).format('MMMM DD YYYY').toUpperCase()}`,
+      public: config.youtube.multiTrack && type === 'live' && config.youtube.public ? true : !config.youtube.multiTrack && type === 'vod' && config.youtube.public ? true : false,
       duration: duration,
       vod: vod,
       type: type,
@@ -181,20 +138,11 @@ const doGameUpload = async (vod, vodPath, app) => {
     if (chapter.end < 60 * 5) continue;
     if (config.youtube.restrictedGames.includes(chapter.name)) continue;
 
-    console.info(
-      `Trimming ${chapter.name} from ${vod.id} ${dayjs(vod.createdAt).format(
-        "MM/DD/YYYY"
-      )}`
-    );
-    const trimmedPath = await this.trim(
-      vodPath,
-      vod.id,
-      chapter.start,
-      chapter.end
-    );
+    console.info(`Trimming ${chapter.name} from ${vod.id} ${dayjs(vod.createdAt).format('MM/DD/YYYY')}`);
+    const trimmedPath = await this.trim(vodPath, vod.id, chapter.start, chapter.end);
 
     if (!trimmedPath) {
-      console.error("Trim failed");
+      console.error('Trim failed');
       return;
     }
 
@@ -202,7 +150,7 @@ const doGameUpload = async (vod, vodPath, app) => {
       const duration = await getDuration(trimmedPath);
       let paths = await this.splitVideo(trimmedPath, duration, vod.id);
       if (!paths) {
-        console.error("Something went wrong trying to split the trimmed video");
+        console.error('Something went wrong trying to split the trimmed video');
         return;
       }
 
@@ -210,7 +158,7 @@ const doGameUpload = async (vod, vodPath, app) => {
         let totalGames, gameTitle, ytTitle;
 
         await app
-          .service("games")
+          .service('games')
           .find({
             query: {
               game_name: chapter.name,
@@ -225,20 +173,10 @@ const doGameUpload = async (vod, vodPath, app) => {
           });
 
         if (totalGames !== undefined) {
-          ytTitle = `${config.channel} plays ${chapter.name} EP ${
-            totalGames + 1
-          } - ${dayjs(vod.createdAt)
-            .tz(config.timezone)
-            .format("MMMM DD YYYY")
-            .toUpperCase()}`;
+          ytTitle = `${config.channel} plays ${chapter.name} EP ${totalGames + 1} - ${dayjs(vod.createdAt).tz(config.timezone).format('MMMM DD YYYY').toUpperCase()}`;
           gameTitle = `${chapter.name} EP ${totalGames + 1}`;
         } else {
-          ytTitle = `${config.channel} plays ${chapter.name} - ${dayjs(
-            vod.createdAt
-          )
-            .tz(config.timezone)
-            .format("MMMM DD YYYY")
-            .toUpperCase()} PART ${i + 1}`;
+          ytTitle = `${config.channel} plays ${chapter.name} - ${dayjs(vod.createdAt).tz(config.timezone).format('MMMM DD YYYY').toUpperCase()} PART ${i + 1}`;
           gameTitle = `${chapter.name} PART ${i + 1}`;
         }
 
@@ -247,27 +185,23 @@ const doGameUpload = async (vod, vodPath, app) => {
             path: paths[i],
             title: ytTitle,
             gameTitle: gameTitle,
-            type: "vod",
+            type: 'vod',
             public: true,
             duration: await getDuration(paths[i]),
             chapter: chapter,
             start_time: chapter.start + config.youtube.splitDuration * i,
-            end_time:
-              chapter.start + config.youtube.splitDuration * (i + 1) >
-              chapter.end
-                ? chapter.end
-                : chapter.start + config.youtube.splitDuration * (i + 1),
+            end_time: chapter.start + config.youtube.splitDuration * (i + 1) > chapter.end ? chapter.end : chapter.start + config.youtube.splitDuration * (i + 1),
             vod: vod,
           },
           app,
-          false
+          false,
         );
         fs.unlinkSync(paths[i]);
       }
     } else {
       let totalGames;
       await app
-        .service("games")
+        .service('games')
         .find({
           query: {
             game_name: chapter.name,
@@ -283,20 +217,10 @@ const doGameUpload = async (vod, vodPath, app) => {
 
       let gameTitle, ytTitle;
       if (totalGames !== undefined) {
-        ytTitle = `${config.channel} plays ${chapter.name} EP ${
-          totalGames + 1
-        } - ${dayjs(vod.createdAt)
-          .tz(config.timezone)
-          .format("MMMM DD YYYY")
-          .toUpperCase()}`;
+        ytTitle = `${config.channel} plays ${chapter.name} EP ${totalGames + 1} - ${dayjs(vod.createdAt).tz(config.timezone).format('MMMM DD YYYY').toUpperCase()}`;
         gameTitle = `${chapter.name} EP ${totalGames + 1}`;
       } else {
-        ytTitle = `${config.channel} plays ${chapter.name} - ${dayjs(
-          vod.createdAt
-        )
-          .tz(config.timezone)
-          .format("MMMM DD YYYY")
-          .toUpperCase()}`;
+        ytTitle = `${config.channel} plays ${chapter.name} - ${dayjs(vod.createdAt).tz(config.timezone).format('MMMM DD YYYY').toUpperCase()}`;
         gameTitle = `${chapter.name}`;
       }
 
@@ -305,7 +229,7 @@ const doGameUpload = async (vod, vodPath, app) => {
           path: trimmedPath,
           title: ytTitle,
           gameTitle: gameTitle,
-          type: "vod",
+          type: 'vod',
           public: true,
           duration: await getDuration(trimmedPath),
           chapter: chapter,
@@ -314,54 +238,34 @@ const doGameUpload = async (vod, vodPath, app) => {
           vod: vod,
         },
         app,
-        false
+        false,
       );
       fs.unlinkSync(trimmedPath);
     }
   }
 };
 
-module.exports.manualVodUpload = async (
-  app,
-  vodId,
-  videoPath,
-  type = "vod"
-) => {
+module.exports.manualVodUpload = async (app, vodId, videoPath, type = 'vod') => {
   let vod;
   await app
-    .service("vods")
+    .service('vods')
     .get(vodId)
     .then((data) => {
       vod = data;
     })
     .catch(() => {});
 
-  if (!vod) return console.error("Failed to get vod: no VOD in database");
+  if (!vod) return console.error('Failed to get vod: no VOD in database');
 
   const duration = await getDuration(videoPath);
 
   const data = {
     path: videoPath,
     title:
-      type === "vod"
-        ? `${config.channel} ${
-            vod.platform.charAt(0).toUpperCase() + vod.platform.slice(1)
-          } VOD - ${dayjs(vod.createdAt)
-            .tz(config.timezone)
-            .format("MMMM DD YYYY")
-            .toUpperCase()}`
-        : `${config.channel} ${
-            vod.platform.charAt(0).toUpperCase() + vod.platform.slice(1)
-          } Live VOD - ${dayjs(vod.createdAt)
-            .tz(config.timezone)
-            .format("MMMM/DD/YYYY")
-            .toUpperCase()}`,
-    public:
-      config.youtube.multiTrack && type === "live" && config.youtube.public
-        ? true
-        : !config.youtube.multiTrack && type === "vod" && config.youtube.public
-        ? true
-        : false,
+      type === 'vod'
+        ? `${config.channel} ${vod.platform.charAt(0).toUpperCase() + vod.platform.slice(1)} VOD - ${dayjs(vod.createdAt).tz(config.timezone).format('MMMM DD YYYY').toUpperCase()}`
+        : `${config.channel} ${vod.platform.charAt(0).toUpperCase() + vod.platform.slice(1)} Live VOD - ${dayjs(vod.createdAt).tz(config.timezone).format('MMMM/DD/YYYY').toUpperCase()}`,
+    public: config.youtube.multiTrack && type === 'live' && config.youtube.public ? true : !config.youtube.multiTrack && type === 'vod' && config.youtube.public ? true : false,
     duration: duration,
     vod: vod,
     type: type,
@@ -378,42 +282,31 @@ module.exports.manualVodUpload = async (
 module.exports.manualGameUpload = async (app, vod, game, videoPath) => {
   const { vodId, date, chapter } = game;
   const { name, end, start } = chapter;
-  console.info(
-    `Trimming ${name} from ${vodId} ${dayjs(date).format("MM/DD/YYYY")}`
-  );
+  console.info(`Trimming ${name} from ${vodId} ${dayjs(date).format('MM/DD/YYYY')}`);
 
   const trimmedPath = await this.trim(videoPath, vodId, start, end);
-  if (!trimmedPath) return console.error("Trim failed");
+  if (!trimmedPath) return console.error('Trim failed');
 
   if (end > config.youtube.splitDuration) {
     let paths = await this.splitVideo(trimmedPath, end, vodId);
-    if (!paths)
-      return console.error(
-        "Something went wrong trying to split the trimmed video"
-      );
+    if (!paths) return console.error('Something went wrong trying to split the trimmed video');
 
     for (let i = 0; i < paths.length; i++) {
       await youtube.upload(
         {
           path: paths[i],
-          title: `${config.channel} plays ${name} - ${dayjs(date)
-            .tz(config.timezone)
-            .format("MMMM DD YYYY")
-            .toUpperCase()} PART ${i + 1}`,
-          type: "vod",
+          title: `${config.channel} plays ${name} - ${dayjs(date).tz(config.timezone).format('MMMM DD YYYY').toUpperCase()} PART ${i + 1}`,
+          type: 'vod',
           public: true,
           duration: await getDuration(paths[i]),
           chapter: chapter,
           start_time: start + config.youtube.splitDuration * i,
-          end_time:
-            start + config.youtube.splitDuration * (i + 1) > end
-              ? end
-              : start + config.youtube.splitDuration * (i + 1),
+          end_time: start + config.youtube.splitDuration * (i + 1) > end ? end : start + config.youtube.splitDuration * (i + 1),
           vod: vod,
           gameId: game.gameId ? game.gameId + i : null,
         },
         app,
-        false
+        false,
       );
       fs.unlinkSync(paths[i]);
     }
@@ -422,15 +315,9 @@ module.exports.manualGameUpload = async (app, vod, game, videoPath) => {
       {
         path: trimmedPath,
         title: game.gameId
-          ? `${config.channel} plays ${game.title} - ${dayjs(date)
-              .tz(config.timezone)
-              .format("MMMM DD YYYY")
-              .toUpperCase()}`
-          : `${config.channel} plays ${name} - ${dayjs(date)
-              .tz(config.timezone)
-              .format("MMMM DD YYYY")
-              .toUpperCase()}`,
-        type: "vod",
+          ? `${config.channel} plays ${game.title} - ${dayjs(date).tz(config.timezone).format('MMMM DD YYYY').toUpperCase()}`
+          : `${config.channel} plays ${name} - ${dayjs(date).tz(config.timezone).format('MMMM DD YYYY').toUpperCase()}`,
+        type: 'vod',
         public: true,
         duration: await getDuration(trimmedPath),
         chapter: chapter,
@@ -440,64 +327,36 @@ module.exports.manualGameUpload = async (app, vod, game, videoPath) => {
         gameId: game.gameId,
       },
       app,
-      false
+      false,
     );
     fs.unlinkSync(trimmedPath);
   }
 };
 
-module.exports.liveUploadPart = async (
-  app,
-  vodId,
-  m3u8Path,
-  start,
-  end,
-  part,
-  type = "vod"
-) => {
+module.exports.liveUploadPart = async (app, vodId, m3u8Path, start, end, part, type = 'vod') => {
   let vod;
   await app
-    .service("vods")
+    .service('vods')
     .get(vodId)
     .then((data) => {
       vod = data;
     })
     .catch(() => {});
 
-  if (!vod)
-    return console.error("Failed in liveUploadPart: no VOD in database");
+  if (!vod) return console.error('Failed in liveUploadPart: no VOD in database');
 
-  console.info(
-    `Trimming ${vod.id} ${dayjs(vod.createdAt).format(
-      "MM/DD/YYYY"
-    )} | Start time: ${start} | Duration: ${end}`
-  );
+  console.info(`Trimming ${vod.id} ${dayjs(vod.createdAt).format('MM/DD/YYYY')} | Start time: ${start} | Duration: ${end}`);
   let trimmedPath = await this.trimHLS(m3u8Path, vodId, start, end);
 
-  if (!trimmedPath) return console.error("Trim failed");
+  if (!trimmedPath) return console.error('Trim failed');
 
   const data = {
     path: trimmedPath,
     title:
-      type === "vod"
-        ? `${config.channel} ${
-            vod.platform.charAt(0).toUpperCase() + vod.platform.slice(1)
-          } VOD - ${dayjs(vod.createdAt)
-            .tz(config.timezone)
-            .format("MMMM DD YYYY")
-            .toUpperCase()} PART ${part}`
-        : `${config.channel} ${
-            vod.platform.charAt(0).toUpperCase() + vod.platform.slice(1)
-          } Live VOD - ${dayjs(vod.createdAt)
-            .tz(config.timezone)
-            .format("MMMM DD YYYY")
-            .toUpperCase()} PART ${part}`,
-    public:
-      config.youtube.multiTrack && type === "live" && config.youtube.public
-        ? true
-        : !config.youtube.multiTrack && type === "vod" && config.youtube.public
-        ? true
-        : false,
+      type === 'vod'
+        ? `${config.channel} ${vod.platform.charAt(0).toUpperCase() + vod.platform.slice(1)} VOD - ${dayjs(vod.createdAt).tz(config.timezone).format('MMMM DD YYYY').toUpperCase()} PART ${part}`
+        : `${config.channel} ${vod.platform.charAt(0).toUpperCase() + vod.platform.slice(1)} Live VOD - ${dayjs(vod.createdAt).tz(config.timezone).format('MMMM DD YYYY').toUpperCase()} PART ${part}`,
+    public: config.youtube.multiTrack && type === 'live' && config.youtube.public ? true : !config.youtube.multiTrack && type === 'vod' && config.youtube.public ? true : false,
     duration: await getDuration(trimmedPath),
     vod: vod,
     type: type,
@@ -517,51 +376,42 @@ module.exports.splitVideo = async (vodPath, duration, vodId) => {
   for (let start = 0; start < duration; start += config.youtube.splitDuration) {
     await new Promise((resolve, reject) => {
       let cut = duration - start;
-      if (cut > config.youtube.splitDuration)
-        cut = config.youtube.splitDuration;
-      const pathName = `${path.dirname(vodPath)}/${start}-${
-        cut + start
-      }-${vodId}.mp4`;
+      if (cut > config.youtube.splitDuration) cut = config.youtube.splitDuration;
+      const pathName = `${path.dirname(vodPath)}/${start}-${cut + start}-${vodId}.mp4`;
       const ffmpeg_process = ffmpeg(vodPath);
       ffmpeg_process
-        .videoCodec("copy")
-        .audioCodec("copy")
-        .outputOptions([`-ss ${start}`, "-copyts", `-t ${cut}`])
-        .toFormat("mp4")
-        .on("progress", (progress) => {
-          if ((process.env.NODE_ENV || "").trim() !== "production") {
+        .videoCodec('copy')
+        .audioCodec('copy')
+        .outputOptions([`-ss ${start}`, '-copyts', `-t ${cut}`])
+        .toFormat('mp4')
+        .on('progress', (progress) => {
+          if ((process.env.NODE_ENV || '').trim() !== 'production') {
             readline.clearLine(process.stdout, 0);
             readline.cursorTo(process.stdout, 0, null);
-            process.stdout.write(
-              `SPLIT VIDEO PROGRESS: ${Math.round(progress.percent)}%`
-            );
+            process.stdout.write(`SPLIT VIDEO PROGRESS: ${Math.round(progress.percent)}%`);
           }
         })
-        .on("start", (cmd) => {
-          if ((process.env.NODE_ENV || "").trim() !== "production") {
+        .on('start', (cmd) => {
+          if ((process.env.NODE_ENV || '').trim() !== 'production') {
             console.info(cmd);
           }
-          console.info(
-            `Splitting ${vodPath}. ${start} - ${
-              cut + start
-            } with a duration of ${duration}`
-          );
+          console.info(`Splitting ${vodPath}. ${start} - ${cut + start} with a duration of ${duration}`);
         })
-        .on("error", function (err) {
-          ffmpeg_process.kill("SIGKILL");
+        .on('error', function (err) {
+          ffmpeg_process.kill('SIGKILL');
           reject(err);
         })
-        .on("end", function () {
+        .on('end', function () {
           resolve(pathName);
         })
         .saveToFile(pathName);
     })
       .then((argPath) => {
         paths.push(argPath);
-        console.info("\n");
+        console.info('\n');
       })
       .catch((e) => {
-        console.error("\nffmpeg error occurred: " + e);
+        console.error('\nffmpeg error occurred: ' + e);
       });
   }
   return paths;
@@ -572,39 +422,37 @@ module.exports.trim = async (vodPath, vodId, start, end) => {
   await new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
-      .videoCodec("copy")
-      .audioCodec("copy")
-      .outputOptions([`-ss ${start}`, "-copyts", `-t ${end}`])
-      .toFormat("mp4")
-      .on("progress", (progress) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .videoCodec('copy')
+      .audioCodec('copy')
+      .outputOptions([`-ss ${start}`, '-copyts', `-t ${end}`])
+      .toFormat('mp4')
+      .on('progress', (progress) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
-          process.stdout.write(
-            `TRIM VIDEO PROGRESS: ${Math.round(progress.percent)}%`
-          );
+          process.stdout.write(`TRIM VIDEO PROGRESS: ${Math.round(progress.percent)}%`);
         }
       })
-      .on("start", (cmd) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .on('start', (cmd) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           console.info(cmd);
         }
       })
-      .on("error", function (err) {
-        ffmpeg_process.kill("SIGKILL");
+      .on('error', function (err) {
+        ffmpeg_process.kill('SIGKILL');
         reject(err);
       })
-      .on("end", function () {
+      .on('end', function () {
         resolve(`${path.dirname(vodPath)}/${vodId}-${start}-${end}.mp4`);
       })
       .saveToFile(`${path.dirname(vodPath)}/${vodId}-${start}-${end}.mp4`);
   })
     .then((result) => {
       returnPath = result;
-      console.info("\n");
+      console.info('\n');
     })
     .catch((e) => {
-      console.error("\nffmpeg error occurred: " + e);
+      console.error('\nffmpeg error occurred: ' + e);
     });
   return returnPath;
 };
@@ -615,51 +463,44 @@ module.exports.trimHLS = async (vodPath, vodId, start, end) => {
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
       .seekOutput(start)
-      .videoCodec("copy")
-      .audioCodec("copy")
-      .outputOptions([
-        "-bsf:a aac_adtstoasc",
-        "-copyts",
-        "-start_at_zero",
-        `-t ${end}`,
-      ])
-      .toFormat("mp4")
-      .on("progress", (progress) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .videoCodec('copy')
+      .audioCodec('copy')
+      .outputOptions(['-bsf:a aac_adtstoasc', '-copyts', '-start_at_zero', `-t ${end}`])
+      .toFormat('mp4')
+      .on('progress', (progress) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
-          process.stdout.write(
-            `TRIM HLS VIDEO PROGRESS: ${Math.round(progress.percent)}%`
-          );
+          process.stdout.write(`TRIM HLS VIDEO PROGRESS: ${Math.round(progress.percent)}%`);
         }
       })
-      .on("start", (cmd) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .on('start', (cmd) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           console.info(cmd);
         }
       })
-      .on("error", function (err) {
-        ffmpeg_process.kill("SIGKILL");
+      .on('error', function (err) {
+        ffmpeg_process.kill('SIGKILL');
         reject(err);
       })
-      .on("end", function () {
+      .on('end', function () {
         resolve(`${path.dirname(vodPath)}/${vodId}-${start}-${end}.mp4`);
       })
       .saveToFile(`${path.dirname(vodPath)}/${vodId}-${start}-${end}.mp4`);
   })
     .then((result) => {
       returnPath = result;
-      console.info("\n");
+      console.info('\n');
     })
     .catch((e) => {
-      console.error("\nffmpeg error occurred: " + e);
+      console.error('\nffmpeg error occurred: ' + e);
     });
   return returnPath;
 };
 
 const commentExists = async (id, app) => {
   const exists = await app
-    .service("logs")
+    .service('logs')
     .get(id)
     .then(() => true)
     .catch(() => false);
@@ -678,7 +519,7 @@ module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
   if (!cursor) {
     let offset = 0;
     await app
-      .service("logs")
+      .service('logs')
       .find({
         paginate: false,
         query: {
@@ -686,8 +527,7 @@ module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
         },
       })
       .then((data) => {
-        if (data.length > 0)
-          offset = parseFloat(data[data.length - 1].content_offset_seconds);
+        if (data.length > 0) offset = parseFloat(data[data.length - 1].content_offset_seconds);
       })
       .catch((e) => {
         console.error(e);
@@ -723,22 +563,16 @@ module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
     lastCursor = cursor;
     response = await twitch.fetchNextComments(vodId, cursor);
     if (!response?.comments) {
-      console.info(
-        `No more comments left due to vod ${vodId} being deleted or errored out..`
-      );
+      console.info(`No more comments left due to vod ${vodId} being deleted or errored out..`);
       break;
     }
 
     responseComments = response.comments.edges;
 
-    if ((process.env.NODE_ENV || "").trim() !== "production") {
+    if ((process.env.NODE_ENV || '').trim() !== 'production') {
       readline.clearLine(process.stdout, 0);
       readline.cursorTo(process.stdout, 0, null);
-      process.stdout.write(
-        `Current Log position: ${dayjs
-          .duration(responseComments[0].node.contentOffsetSeconds, "s")
-          .format("HH:mm:ss")}`
-      );
+      process.stdout.write(`Current Log position: ${dayjs.duration(responseComments[0].node.contentOffsetSeconds, 's').format('HH:mm:ss')}`);
     }
 
     for (let comment of responseComments) {
@@ -750,13 +584,11 @@ module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
 
       if (comments.length >= 2500) {
         await app
-          .service("logs")
+          .service('logs')
           .create(comments)
           .then(() => {
-            if ((process.env.NODE_ENV || "").trim() !== "production") {
-              console.info(
-                `\nSaved ${comments.length} comments in DB for vod ${vodId}`
-              );
+            if ((process.env.NODE_ENV || '').trim() !== 'production') {
+              console.info(`\nSaved ${comments.length} comments in DB for vod ${vodId}`);
             }
           })
           .catch((e) => {
@@ -782,16 +614,11 @@ module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
 
   if (comments.length > 0) {
     await app
-      .service("logs")
+      .service('logs')
       .create(comments)
       .then(() => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
-          console.info(
-            `Finished current log position: ${
-              responseComments[responseComments.length - 1].node
-                .contentOffsetSeconds * 1000
-            }`
-          );
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
+          console.info(`Finished current log position: ${responseComments[responseComments.length - 1].node.contentOffsetSeconds * 1000}`);
         }
       })
       .catch((e) => {
@@ -803,15 +630,21 @@ module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
   const stream = await twitch.getStream(config.twitch.id);
 
   if (stream && stream[0]) {
-    setTimeout(() => {
-      this.downloadLogs(vodId, app, lastCursor);
-    }, 1000 * 60 * 1);
+    setTimeout(
+      () => {
+        this.downloadLogs(vodId, app, lastCursor);
+      },
+      1000 * 60 * 1,
+    );
     //retry for next 10 mins if not live anymore to catch remaining logs.
   } else if (retry < 10) {
     retry++;
-    setTimeout(() => {
-      this.downloadLogs(vodId, app, lastCursor, retry);
-    }, 1000 * 60 * 1);
+    setTimeout(
+      () => {
+        this.downloadLogs(vodId, app, lastCursor, retry);
+      },
+      1000 * 60 * 1,
+    );
   } else {
     console.info(`Saved all comments in DB for vod ${vodId}`);
     app.set(`${config.channel}-${vodId}-chat-downloading`, false);
@@ -821,52 +654,33 @@ module.exports.downloadLogs = async (vodId, app, cursor = null, retry = 1) => {
 
 //RETRY PARAM: Just to make sure whole vod is processed bc it takes awhile for twitch to update the vod even after a stream ends.
 //VOD TS FILES SEEMS TO UPDATE AROUND 5 MINUTES. DELAY IS TO CHECK EVERY X MIN.
-module.exports.download = async (
-  vodId,
-  app,
-  retry = 0,
-  delay = 1,
-  liveDownload = false
-) => {
-  if ((process.env.NODE_ENV || "").trim() !== "production")
-    console.info(`${vodId} Download Retry: ${retry}`);
+module.exports.download = async (vodId, app, retry = 0, delay = 1, liveDownload = false) => {
+  if ((process.env.NODE_ENV || '').trim() !== 'production') console.info(`${vodId} Download Retry: ${retry}`);
   const dir = `${config.vodPath}/${vodId}`;
   const m3u8Path = `${dir}/${vodId}.m3u8`;
   const newVodData = await twitch.getVodData(vodId);
   const m3u8Exists = await fileExists(m3u8Path);
   let duration, vod;
   await app
-    .service("vods")
+    .service('vods')
     .get(vodId)
     .then((data) => {
       vod = data;
     })
     .catch(() => {});
 
-  if (!vod)
-    return console.error("Failed to download video: no VOD in database");
+  if (!vod) return console.error('Failed to download video: no VOD in database');
 
-  if (
-    duration >= config.youtube.splitDuration &&
-    config.youtube.liveUpload &&
-    config.youtube.upload
-  ) {
+  if (duration >= config.youtube.splitDuration && config.youtube.liveUpload && config.youtube.upload) {
     const noOfParts = Math.floor(duration / config.youtube.splitDuration);
 
     const vod_youtube_data = vod.youtube.filter((data) => {
-      return data.type === "vod";
+      return data.type === 'vod';
     });
     if (vod_youtube_data.length < noOfParts) {
       for (let i = 0; i < noOfParts; i++) {
         if (vod_youtube_data[i]) continue;
-        await this.liveUploadPart(
-          app,
-          vodId,
-          m3u8Path,
-          config.youtube.splitDuration * i,
-          config.youtube.splitDuration,
-          i + 1
-        );
+        await this.liveUploadPart(app, vodId, m3u8Path, config.youtube.splitDuration * i, config.youtube.splitDuration, i + 1);
       }
     }
   }
@@ -884,22 +698,13 @@ module.exports.download = async (
       //upload last part
       let startTime = 0;
 
-      const vod_youtube_data = vod.youtube.filter(
-        (data) => data.type === "vod"
-      );
+      const vod_youtube_data = vod.youtube.filter((data) => data.type === 'vod');
       for (let i = 0; i < vod_youtube_data.length; i++) {
         startTime += vod_youtube_data[i].duration;
       }
-      await this.liveUploadPart(
-        app,
-        vodId,
-        m3u8Path,
-        startTime,
-        duration - startTime,
-        vod_youtube_data.length + 1
-      );
+      await this.liveUploadPart(app, vodId, m3u8Path, startTime, duration - startTime, vod_youtube_data.length + 1);
       //save parts at last upload.
-      setTimeout(() => youtube.saveParts(vodId, app, "vod"), 60000);
+      setTimeout(() => youtube.saveParts(vodId, app, 'vod'), 60000);
     } else if (config.youtube.upload) {
       await this.upload(vodId, app, mp4Path);
       if (!config.saveMP4) await fs.promises.rm(mp4Path);
@@ -913,41 +718,49 @@ module.exports.download = async (
 
   const tokenSig = await twitch.getVodTokenSig(vodId);
   if (!tokenSig) {
-    setTimeout(() => {
-      this.download(vodId, app, retry, delay, liveDownload);
-    }, 1000 * 60 * delay);
+    setTimeout(
+      () => {
+        this.download(vodId, app, retry, delay, liveDownload);
+      },
+      1000 * 60 * delay,
+    );
     return console.error(`failed to get token/sig for ${vodId}`);
   }
 
-  let newVideoM3u8 = await twitch.getM3u8(
-    vodId,
-    tokenSig.value,
-    tokenSig.signature
-  );
+  let newVideoM3u8 = await twitch.getM3u8(vodId, tokenSig.value, tokenSig.signature);
   if (!newVideoM3u8) {
-    setTimeout(() => {
-      this.download(vodId, app, retry, delay, liveDownload);
-    }, 1000 * 60 * delay);
-    return console.error("failed to get m3u8");
+    setTimeout(
+      () => {
+        this.download(vodId, app, retry, delay, liveDownload);
+      },
+      1000 * 60 * delay,
+    );
+    return console.error('failed to get m3u8');
   }
 
   let parsedM3u8 = twitch.getParsedM3u8(newVideoM3u8);
   if (!parsedM3u8) {
-    setTimeout(() => {
-      this.download(vodId, app, retry, delay, liveDownload);
-    }, 1000 * 60 * delay);
+    setTimeout(
+      () => {
+        this.download(vodId, app, retry, delay, liveDownload);
+      },
+      1000 * 60 * delay,
+    );
     console.error(newVideoM3u8);
-    return console.error("failed to parse m3u8");
+    return console.error('failed to parse m3u8');
   }
 
-  const baseURL = parsedM3u8.substring(0, parsedM3u8.lastIndexOf("/"));
+  const baseURL = parsedM3u8.substring(0, parsedM3u8.lastIndexOf('/'));
 
   let variantM3u8 = await twitch.getVariantM3u8(parsedM3u8);
   if (!variantM3u8) {
-    setTimeout(() => {
-      this.download(vodId, app, retry, delay, liveDownload);
-    }, 1000 * 60 * delay);
-    return console.error("failed to get variant m3u8");
+    setTimeout(
+      () => {
+        this.download(vodId, app, retry, delay, liveDownload);
+      },
+      1000 * 60 * delay,
+    );
+    return console.error('failed to get variant m3u8');
   }
 
   //Save duration
@@ -967,23 +780,29 @@ module.exports.download = async (
     await writeM3u8ToFile(variantM3u8, dir, vodId);
     await downloadTSFiles(variantM3u8, dir, baseURL);
 
-    setTimeout(() => {
-      this.download(vodId, app, retry, delay, liveDownload);
-    }, 1000 * 60 * delay);
+    setTimeout(
+      () => {
+        this.download(vodId, app, retry, delay, liveDownload);
+      },
+      1000 * 60 * delay,
+    );
     return;
   }
 
   await writeM3u8ToFile(variantM3u8, dir, vodId);
 
-  let videoM3u8 = await fs.promises.readFile(m3u8Path, "utf8").catch((e) => {
+  let videoM3u8 = await fs.promises.readFile(m3u8Path, 'utf8').catch((e) => {
     console.error(e);
     return null;
   });
 
   if (!videoM3u8) {
-    setTimeout(() => {
-      this.download(vodId, app, retry, delay, liveDownload);
-    }, 1000 * 60 * delay);
+    setTimeout(
+      () => {
+        this.download(vodId, app, retry, delay, liveDownload);
+      },
+      1000 * 60 * delay,
+    );
     return;
   }
 
@@ -991,16 +810,16 @@ module.exports.download = async (
 
   //retry if last segment is the same as on file m3u8 and if the actual segment exists.
   if (
-    variantM3u8.segments[variantM3u8.segments.length - 1].uri ===
-      videoM3u8.segments[videoM3u8.segments.length - 1].uri &&
-    (await fileExists(
-      `${dir}/${variantM3u8.segments[variantM3u8.segments.length - 1].uri}`
-    ))
+    variantM3u8.segments[variantM3u8.segments.length - 1].uri === videoM3u8.segments[videoM3u8.segments.length - 1].uri &&
+    (await fileExists(`${dir}/${variantM3u8.segments[variantM3u8.segments.length - 1].uri}`))
   ) {
     retry++;
-    setTimeout(() => {
-      this.download(vodId, app, retry, delay, liveDownload);
-    }, 1000 * 60 * delay);
+    setTimeout(
+      () => {
+        this.download(vodId, app, retry, delay, liveDownload);
+      },
+      1000 * 60 * delay,
+    );
     return;
   }
 
@@ -1008,37 +827,32 @@ module.exports.download = async (
   retry = 1;
   await downloadTSFiles(variantM3u8, dir, baseURL);
 
-  setTimeout(() => {
-    this.download(vodId, app, retry, delay, liveDownload);
-  }, 1000 * 60 * delay);
+  setTimeout(
+    () => {
+      this.download(vodId, app, retry, delay, liveDownload);
+    },
+    1000 * 60 * delay,
+  );
 };
 
 const checkForUnmutedTS = (m3u8) => {
   for (let i = 0; i < m3u8.segments.length; i++) {
     const segment = m3u8.segments[i];
-    if (segment.uri.includes("-muted")) {
-      m3u8.segments[i].uri = `${segment.uri.substring(
-        0,
-        segment.uri.indexOf("-muted")
-      )}.ts`;
+    if (segment.uri.includes('-muted')) {
+      m3u8.segments[i].uri = `${segment.uri.substring(0, segment.uri.indexOf('-muted'))}.ts`;
       continue;
     }
-    if (segment.uri.includes("-unmuted")) {
-      m3u8.segments[i].uri = `${segment.uri.substring(
-        0,
-        segment.uri.indexOf("-unmuted")
-      )}.ts`;
+    if (segment.uri.includes('-unmuted')) {
+      m3u8.segments[i].uri = `${segment.uri.substring(0, segment.uri.indexOf('-unmuted'))}.ts`;
     }
   }
   return m3u8;
 };
 
 const writeM3u8ToFile = async (m3u8, dir, vodId) => {
-  await fs.promises
-    .writeFile(`${dir}/${vodId}.m3u8`, HLS.stringify(m3u8))
-    .catch((e) => {
-      console.error(e);
-    });
+  await fs.promises.writeFile(`${dir}/${vodId}.m3u8`, HLS.stringify(m3u8)).catch((e) => {
+    console.error(e);
+  });
 };
 
 const downloadTSFiles = async (m3u8, dir, baseURL) => {
@@ -1046,12 +860,12 @@ const downloadTSFiles = async (m3u8, dir, baseURL) => {
     if (await fileExists(`${dir}/${segment.uri}`)) continue;
 
     await axios({
-      method: "get",
+      method: 'get',
       url: `${baseURL}/${segment.uri}`,
-      responseType: "stream",
+      responseType: 'stream',
     })
       .then((response) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           console.info(`Downloaded ${segment.uri}`);
         }
         response.data.pipe(fs.createWriteStream(`${dir}/${segment.uri}`));
@@ -1060,12 +874,8 @@ const downloadTSFiles = async (m3u8, dir, baseURL) => {
         console.error(e);
       });
   }
-  if ((process.env.NODE_ENV || "").trim() !== "production") {
-    console.info(
-      `Done downloading.. Last segment was ${
-        m3u8.segments[m3u8.segments.length - 1].uri
-      }`
-    );
+  if ((process.env.NODE_ENV || '').trim() !== 'production') {
+    console.info(`Done downloading.. Last segment was ${m3u8.segments[m3u8.segments.length - 1].uri}`);
   }
 };
 
@@ -1073,30 +883,28 @@ module.exports.convertToMp4 = async (m3u8, vodId, mp4Path) => {
   await new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(m3u8);
     ffmpeg_process
-      .videoCodec("copy")
-      .audioCodec("copy")
-      .outputOptions(["-bsf:a aac_adtstoasc"])
-      .toFormat("mp4")
-      .on("progress", (progress) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .videoCodec('copy')
+      .audioCodec('copy')
+      .outputOptions(['-bsf:a aac_adtstoasc', '-movflags +faststart'])
+      .toFormat('mp4')
+      .on('progress', (progress) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
-          process.stdout.write(
-            `M3U8 CONVERT TO MP4 PROGRESS: ${Math.round(progress.percent)}%`
-          );
+          process.stdout.write(`M3U8 CONVERT TO MP4 PROGRESS: ${Math.round(progress.percent)}%`);
         }
       })
-      .on("start", (cmd) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .on('start', (cmd) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           console.info(cmd);
         }
         console.info(`Converting ${vodId} m3u8 to mp4`);
       })
-      .on("error", function (err) {
-        ffmpeg_process.kill("SIGKILL");
+      .on('error', function (err) {
+        ffmpeg_process.kill('SIGKILL');
         reject(err);
       })
-      .on("end", function () {
+      .on('end', function () {
         resolve();
       })
       .saveToFile(mp4Path);
@@ -1113,9 +921,9 @@ const fileExists = async (file) => {
 //EXT-X-TWITCH-TOTAL-SECS use this to get total duration from m3u8
 const hlsGetDuration = async (m3u8) => {
   let totalSeconds;
-  for (let line of m3u8.split("\n")) {
-    if (!line.startsWith("#EXT-X-TWITCH-TOTAL-SECS:")) continue;
-    const split = line.split(":");
+  for (let line of m3u8.split('\n')) {
+    if (!line.startsWith('#EXT-X-TWITCH-TOTAL-SECS:')) continue;
+    const split = line.split(':');
     if (split[1]) totalSeconds = parseInt(split[1]);
     break;
   }
@@ -1142,7 +950,7 @@ const saveDuration = async (vodId, duration, app) => {
   duration = toHHMMSS(duration);
 
   await app
-    .service("vods")
+    .service('vods')
     .patch(vodId, {
       duration: duration,
     })
@@ -1158,30 +966,25 @@ const toHHMMSS = (secs) => {
   var seconds = sec_num % 60;
 
   return [hours, minutes, seconds]
-    .map((v) => (v < 10 ? "0" + v : v))
-    .filter((v, i) => v !== "00" || i > 0)
-    .join(":");
+    .map((v) => (v < 10 ? '0' + v : v))
+    .filter((v, i) => v !== '00' || i > 0)
+    .join(':');
 };
 
 module.exports.saveChapters = async (vodId, app, duration) => {
   const chapters = await twitch.getChapters(vodId);
-  if (!chapters)
-    return console.error("Failed to save chapters: Chapters is null");
+  if (!chapters) return console.error('Failed to save chapters: Chapters is null');
 
   let newChapters = [];
   if (chapters.length === 0) {
     const chapter = await twitch.getChapter(vodId);
     if (!chapter) return null;
-    const gameData = chapter.game
-      ? await twitch.getGameData(chapter.game.id)
-      : null;
+    const gameData = chapter.game ? await twitch.getGameData(chapter.game.id) : null;
     newChapters.push({
       gameId: chapter.game ? chapter.game.id : null,
       name: chapter.game ? chapter.game.displayName : null,
-      image: gameData
-        ? gameData.box_art_url.replace("{width}x{height}", "40x53")
-        : null,
-      duration: "00:00:00",
+      image: gameData ? gameData.box_art_url.replace('{width}x{height}', '40x53') : null,
+      duration: '00:00:00',
       start: 0,
       end: duration,
     });
@@ -1189,29 +992,17 @@ module.exports.saveChapters = async (vodId, app, duration) => {
     for (let chapter of chapters) {
       newChapters.push({
         gameId: chapter.node.details.game ? chapter.node.details.game.id : null,
-        name: chapter.node.details.game
-          ? chapter.node.details.game.displayName
-          : null,
-        image: chapter.node.details.game
-          ? chapter.node.details.game.boxArtURL
-          : null,
-        duration: dayjs
-          .duration(chapter.node.positionMilliseconds, "ms")
-          .format("HH:mm:ss"),
-        start:
-          chapter.node.positionMilliseconds === 0
-            ? chapter.node.positionMilliseconds / 1000
-            : chapter.node.positionMilliseconds / 1000,
-        end:
-          chapter.node.durationMilliseconds === 0
-            ? duration - chapter.node.positionMilliseconds / 1000
-            : chapter.node.durationMilliseconds / 1000,
+        name: chapter.node.details.game ? chapter.node.details.game.displayName : null,
+        image: chapter.node.details.game ? chapter.node.details.game.boxArtURL : null,
+        duration: dayjs.duration(chapter.node.positionMilliseconds, 'ms').format('HH:mm:ss'),
+        start: chapter.node.positionMilliseconds === 0 ? chapter.node.positionMilliseconds / 1000 : chapter.node.positionMilliseconds / 1000,
+        end: chapter.node.durationMilliseconds === 0 ? duration - chapter.node.positionMilliseconds / 1000 : chapter.node.durationMilliseconds / 1000,
       });
     }
   }
 
   await app
-    .service("vods")
+    .service('vods')
     .patch(vodId, {
       chapters: newChapters,
     })
@@ -1254,22 +1045,16 @@ module.exports.getLogs = async (vodId, app) => {
   while (cursor) {
     response = await twitch.fetchNextComments(vodId, cursor);
     if (!response?.comments) {
-      console.info(
-        `No more comments left due to vod ${vodId} being deleted or errored out..`
-      );
+      console.info(`No more comments left due to vod ${vodId} being deleted or errored out..`);
       break;
     }
 
     responseComments = response.comments.edges;
 
-    if ((process.env.NODE_ENV || "").trim() !== "production") {
+    if ((process.env.NODE_ENV || '').trim() !== 'production') {
       readline.clearLine(process.stdout, 0);
       readline.cursorTo(process.stdout, 0, null);
-      process.stdout.write(
-        `Current Log position: ${dayjs
-          .duration(responseComments[0].node.contentOffsetSeconds, "s")
-          .format("HH:mm:ss")}`
-      );
+      process.stdout.write(`Current Log position: ${dayjs.duration(responseComments[0].node.contentOffsetSeconds, 's').format('HH:mm:ss')}`);
     }
 
     for (let comment of responseComments) {
@@ -1281,13 +1066,11 @@ module.exports.getLogs = async (vodId, app) => {
 
       if (comments.length >= 2500) {
         await app
-          .service("logs")
+          .service('logs')
           .create(comments)
           .then(() => {
-            if ((process.env.NODE_ENV || "").trim() !== "production") {
-              console.info(
-                `\nSaved ${comments.length} comments in DB for vod ${vodId}`
-              );
+            if ((process.env.NODE_ENV || '').trim() !== 'production') {
+              console.info(`\nSaved ${comments.length} comments in DB for vod ${vodId}`);
             }
           })
           .catch((e) => {
@@ -1312,14 +1095,10 @@ module.exports.getLogs = async (vodId, app) => {
 
     howMany++;
   }
-  console.info(
-    `\nTotal API Calls: ${howMany} | Total Time to get logs for ${vodId}: ${
-      (new Date() - start_time) / 1000
-    } seconds`
-  );
+  console.info(`\nTotal API Calls: ${howMany} | Total Time to get logs for ${vodId}: ${(new Date() - start_time) / 1000} seconds`);
 
   await app
-    .service("logs")
+    .service('logs')
     .create(comments)
     .then(() => {
       console.info(`Saved all comments in DB for vod ${vodId}`);
@@ -1343,26 +1122,20 @@ module.exports.manualLogs = async (commentsPath, vodId, app) => {
 
   for (let comment of responseComments) {
     let node = comment.node;
-    if ((process.env.NODE_ENV || "").trim() !== "production") {
+    if ((process.env.NODE_ENV || '').trim() !== 'production') {
       readline.clearLine(process.stdout, 0);
       readline.cursorTo(process.stdout, 0, null);
-      process.stdout.write(
-        `Current Log position: ${dayjs
-          .duration(node.contentOffsetSeconds, "s")
-          .format("HH:mm:ss")}`
-      );
+      process.stdout.write(`Current Log position: ${dayjs.duration(node.contentOffsetSeconds, 's').format('HH:mm:ss')}`);
     }
     if (await commentExists(node.id, app)) continue;
 
     if (comments.length >= 2500) {
       await app
-        .service("logs")
+        .service('logs')
         .create(comments)
         .then(() => {
-          if ((process.env.NODE_ENV || "").trim() !== "production") {
-            console.info(
-              `\nSaved ${comments.length} comments in DB for vod ${vodId}`
-            );
+          if ((process.env.NODE_ENV || '').trim() !== 'production') {
+            console.info(`\nSaved ${comments.length} comments in DB for vod ${vodId}`);
           }
         })
         .catch((e) => {
@@ -1387,14 +1160,10 @@ module.exports.manualLogs = async (commentsPath, vodId, app) => {
 
     howMany++;
   }
-  console.info(
-    `\nTotal Comments: ${howMany} | Total Time to get logs for ${vodId}: ${
-      (new Date() - start_time) / 1000
-    } seconds`
-  );
+  console.info(`\nTotal Comments: ${howMany} | Total Time to get logs for ${vodId}: ${(new Date() - start_time) / 1000} seconds`);
 
   await app
-    .service("logs")
+    .service('logs')
     .create(comments)
     .then(() => {
       console.info(`Saved all comments in DB for vod ${vodId}`);
@@ -1420,7 +1189,7 @@ module.exports.mp4Download = async (vodId) => {
       return true;
     })
     .catch((e) => {
-      console.error("\nffmpeg error occurred: " + e);
+      console.error('\nffmpeg error occurred: ' + e);
       return false;
     });
 
@@ -1433,27 +1202,25 @@ module.exports.ffmpegMp4Download = async (m3u8, path) => {
   return new Promise((resolve, reject) => {
     const ffmpeg_process = ffmpeg(m3u8);
     ffmpeg_process
-      .videoCodec("copy")
-      .audioCodec("copy")
-      .outputOptions(["-bsf:a aac_adtstoasc", "-copyts", "-start_at_zero"])
-      .toFormat("mp4")
-      .on("progress", (progress) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .videoCodec('copy')
+      .audioCodec('copy')
+      .outputOptions(['-bsf:a aac_adtstoasc', '-copyts', '-start_at_zero'])
+      .toFormat('mp4')
+      .on('progress', (progress) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
-          process.stdout.write(
-            `DOWNLOAD PROGRESS: ${Math.round(progress.percent)}%`
-          );
+          process.stdout.write(`DOWNLOAD PROGRESS: ${Math.round(progress.percent)}%`);
         }
       })
-      .on("start", (cmd) => {
+      .on('start', (cmd) => {
         console.info(`Starting m3u8 download for ${m3u8} in ${path}`);
       })
-      .on("error", function (err) {
-        ffmpeg_process.kill("SIGKILL");
+      .on('error', function (err) {
+        ffmpeg_process.kill('SIGKILL');
         reject(err);
       })
-      .on("end", function () {
+      .on('end', function () {
         resolve();
       })
       .saveToFile(path);
