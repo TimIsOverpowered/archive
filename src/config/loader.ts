@@ -9,12 +9,12 @@ export async function loadStreamerConfigs(): Promise<StreamerConfig[]> {
   if (tenants.length === 0) return [];
 
   for (const tenant of tenants) {
-    if (!tenant.database_url) continue;
+    if (!tenant.databaseUrl) continue;
 
-    const dbUrl = decryptScalar(tenant.database_url);
+    const dbUrl = decryptScalar(tenant.databaseUrl);
 
     const streamerConfig: StreamerConfig = {
-      id: tenant.id.toString(),
+      id: tenant.id,
       database: { url: dbUrl },
     };
 
