@@ -15,7 +15,6 @@
     "declarationMap": true,
     "sourceMap": true,
     "moduleResolution": "node10",
-    "ignoreDeprecations": "6.0",
     "allowSyntheticDefaultImports": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
