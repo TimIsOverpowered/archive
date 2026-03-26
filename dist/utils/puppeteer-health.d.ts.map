@@ -1,0 +1,1 @@
+{"version":3,"file":"puppeteer-health.d.ts","sourceRoot":"","sources":["../../src/utils/puppeteer-health.ts"],"names":[],"mappings":"AAEA,UAAU,qBAAqB;IAC7B,MAAM,EAAE,IAAI,GAAG,aAAa,GAAG,aAAa,CAAC;IAC7C,gBAAgB,CAAC,EAAE,MAAM,CAAC;CAC3B;AAMD,wBAAsB,oBAAoB,IAAI,OAAO,CAAC,qBAAqB,CAAC,CAgC3E;AAED,wBAAgB,yBAAyB,IAAI,IAAI,CAGhD"}
