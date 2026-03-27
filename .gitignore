@@ -108,6 +108,9 @@ $RECYCLE.BIN/
 lib/
 data/
 
+# Build output (never commit compiled code)
+dist/
+
 # Prisma generated clients - platform-specific binaries regenerated on each deploy
 generated/
 prisma/generated/meta/

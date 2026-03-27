@@ -1,1 +1,0 @@
-{"version":3,"file":"vods.d.ts","sourceRoot":"","sources":["../../../src/api/routes/vods.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,eAAe,EAAE,MAAM,SAAS,CAAC;AAM1C,UAAU,gBAAgB;IACxB,MAAM,EAAE,MAAM,CAAC;CAChB;AAED,OAAO,QAAQ,SAAS,CAAC;IACvB,UAAU,eAAe;QACvB,iBAAiB,EAAE,GAAG,CAAC;KACxB;CACF;AAED,wBAA8B,UAAU,CAAC,OAAO,EAAE,eAAe,EAAE,QAAQ,EAAE,gBAAgB,iBAuG5F"}

@@ -3,48 +3,86 @@ import dotenv from 'dotenv';
 import fetch from 'node-fetch';
 import crypto from 'crypto';
 import http from 'http';
-import { createClient, closeAllClients } from '../src/db/client.js';
-import type { StreamerConfig } from '../src/config/types.js';
+import open from 'open';
+import readline from 'readline';
 
 // Load environment variables based on NODE_ENV
 const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development';
-dotenv.config({ path: `.\\.${envFile}` });
+dotenv.config({ path: `.${envFile}` });
 
 program.name('auth-youtube').description('YouTube OAuth authentication CLI tool (headless-friendly)').version('1.0.0');
 
 interface Tenant {
   id: string;
-  youtube?: any; // Will be structured based on schema
+  displayName: string;
+  youtube?: any;
 }
 
 async function getTenant(streamerIdOrName: string): Promise<Tenant | null> {
   try {
-    const config = JSON.parse(process.env.TENANT_CONFIG || '{}') as StreamerConfig[];
-    const tenant = config.find((t) => t.id === streamerIdOrName);
-
-    if (!tenant) {
-      console.error(`Tenant not found: ${streamerIdOrName}`);
+    if (!process.env.META_DATABASE_URL) {
+      console.error('META_DATABASE_URL is required for tenant lookup');
       return null;
     }
 
-    // Create client and fetch from DB (simplified - actual implementation needs proper tenant lookup)
-    const db = await createClient(tenant);
-    // Note: Actual tenant retrieval would query the meta database here
-    closeAllClients();
+    const { PrismaClient } = await import('../../prisma/generated/meta');
+    const prismaMeta = new PrismaClient();
 
-    return { id: streamerIdOrName, youtube: {} };
-  } catch (error) {
-    console.error('Error getting tenant:', error);
+    try {
+      await prismaMeta.$connect();
+
+      let tenant: Tenant | null = null;
+
+      if (streamerIdOrName.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        tenant = await prismaMeta.tenant.findUnique({
+          where: { id: streamerIdOrName },
+        });
+      } else {
+        const config = JSON.parse(process.env.TENANT_CONFIG || '[]');
+        const configTenant = config.find((t: any) => t.id === streamerIdOrName);
+
+        if (configTenant?.databaseUrl) {
+          tenant = await prismaMeta.tenant.findUnique({
+            where: { id: configTenant.databaseUrl.split('/').pop() || configTenant.id },
+          });
+        } else {
+          const matchingConfig = config.find((t: any) => t.id === streamerIdOrName);
+
+          if (matchingConfig?.database.url) {
+            tenant = await prismaMeta.tenant.findUnique({
+              where: { databaseUrl: matchingConfig.database.url },
+            });
+          } else {
+            throw new Error('Could not determine tenant ID from config');
+          }
+        }
+
+        if (!tenant) {
+          const allTenants = await prismaMeta.tenant.findMany();
+          const foundByName = allTenants.find((t: any) => t.displayName === streamerIdOrName);
+          if (foundByName) tenant = foundByName;
+        }
+      }
+
+      if (!tenant) {
+        console.error(`Tenant not found: ${streamerIdOrName}`);
+        return null;
+      }
+
+      await prismaMeta.$disconnect();
+      return tenant as Tenant;
+    } catch (error) {
+      await prismaMeta.$disconnect().catch(() => {});
+      throw error;
+    }
+  } catch (error: any) {
+    console.error('Error getting tenant:', error.message || error);
     return null;
   }
 }
 
 async function startOAuthFlow(tenantId: string): Promise<void> {
   const state = crypto.randomBytes(32).toString('hex');
-
-  // Store CSRF token for validation (in production, use Redis/session)
-  process.env._oauth_state = state;
-
   const scopes = ['https://www.googleapis.com/auth/youtube.force-ssl', 'https://www.googleapis.com/auth/youtube', 'https://www.googleapis.com/auth/youtube.upload'].join(' ');
 
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
@@ -61,18 +99,36 @@ async function startOAuthFlow(tenantId: string): Promise<void> {
   console.log(`Tenant ID: ${tenantId}\n`);
 
   if (process.argv.includes('--open')) {
-    // Open browser automatically
-    const open = await import('open');
-    await default_1.default(authUrl.toString());
-
-    // Start callback server for browser mode
+    await open(authUrl.toString());
     startCallbackServer(tenantId, state);
   } else {
-    console.log(`Open this URL in your browser:\n${authUrl.toString()}\n`);
-    console.log('After authorizing, you will be redirected to http://localhost:9999/callback');
-    console.log('\nThe script will automatically capture the callback and complete authentication.\n');
+    console.log('Open this URL in your browser:\n');
+    console.log(`${authUrl.toString()}\n`);
+    console.log('After authorizing, you will be redirected to http://localhost:9999/callback\n');
 
-    startCallbackServer(tenantId, state);
+    if (process.argv.includes('--headless')) {
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+      const userCode = await new Promise<string>((resolve) => {
+        console.log('Paste the full redirect URL here (or press Enter to start callback server):');
+
+        rl.question('', (answer) => {
+          if (answer.trim()) {
+            resolve(answer);
+          } else {
+            resolve('');
+          }
+          rl.close();
+        });
+      });
+
+      if (userCode && userCode.startsWith('http')) {
+        await completeOAuth(tenantId, state, userCode);
+      } else {
+        startCallbackServer(tenantId, state);
+      }
+    } else {
+      startCallbackServer(tenantId, state);
+    }
   }
 }
 
@@ -80,66 +136,14 @@ function startCallbackServer(streamerId: string, expectedState: string): void {
   const server = http.createServer(async (req, res) => {
     if (req.url.startsWith('/callback')) {
       try {
-        // Parse query parameters manually for Node.js native HTTP
         const urlObj = new URL(req.url, 'http://localhost:9999');
         const code = urlObj.searchParams.get('code');
-        const state = urlObj.searchParams.get('state');
 
-        if (!code) {
-          res.writeHead(400);
-          res.end('No authorization code received');
-          return;
-        }
-
-        if (state !== expectedState && process.env._oauth_state !== state) {
-          console.error('[OAuth] State mismatch - possible CSRF attack');
-          res.writeHead(401);
-          res.end('Invalid authentication request');
-          return;
-        }
-
-        // Exchange code for token using PKCE flow (simplified to standard OAuth2 here)
-        const response = await fetch('https://oauth2.googleapis.com/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            code,
-            client_id: process.env.YOUTUBE_CLIENT_ID || '',
-            client_secret: process.env.YOUTUBE_CLIENT_SECRET || '',
-            redirect_uri: 'http://localhost:9999/callback',
-            grant_type: 'authorization_code',
-          }),
-        });
-
-        const tokenData = await response.json();
-
-        if (!response.ok) {
-          console.error('Token exchange failed:', tokenData);
-          res.writeHead(500);
-          res.end('Authentication failed');
-          return;
-        }
-
-        // Store the entire auth object encrypted in DB (simplified - actual implementation needs encryption layer)
-        const tenantConfig = JSON.parse(process.env.TENANT_CONFIG || '[]');
-        const streamerIndex = tenantConfig.findIndex((t: any) => t.id === streamerId);
-
-        if (streamerIndex >= 0) {
-          // Store auth object - actual implementation should encrypt this
-          console.log('\n=== Authentication Successful ===\n');
-          console.log('Auth token received and stored.');
-
-          server.close();
-          process.exit(0);
-        } else {
-          throw new Error(`Streamer ${streamerId} not found in config`);
-        }
+        await completeOAuth(streamerId, expectedState, urlObj.href);
       } catch (error) {
         console.error('[OAuth] Error:', error);
         res.writeHead(500);
-        res.end('Authentication failed');
+        res.end('Authentication failed. Check the terminal for details.');
       }
     } else if (req.url === '/') {
       res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -161,6 +165,149 @@ function startCallbackServer(streamerId: string, expectedState: string): void {
   });
 }
 
-program.parse(process.argv);
+async function completeOAuth(streamerId: string, expectedState: string, urlOrCode: string): Promise<void> {
+  let code = '';
 
-const default_1 = (await import('open')).default;
+  if (urlOrCode.startsWith('http')) {
+    const urlObj = new URL(urlOrCode);
+    const stateParam = urlObj.searchParams.get('state');
+    const receivedCode = urlObj.searchParams.get('code');
+
+    console.log(`\nReceived callback with state: ${stateParam}`);
+    console.log(`Expected state: ${expectedState}`);
+
+    if (receivedCode) {
+      code = receivedCode;
+    } else {
+      throw new Error('No authorization code in URL');
+    }
+
+    if (!code || !urlOrCode.includes(code)) {
+      const allParams = urlObj.search
+        .slice(1)
+        .split('&')
+        .reduce(
+          (acc, pair) => {
+            const [key, value] = pair.split('=');
+            acc[decodeURIComponent(key)] = decodeURIComponent(value);
+            return acc;
+          },
+          {} as Record<string, string>
+        );
+
+      if (allParams.code && allParams.state === expectedState) {
+        code = allParams.code!;
+      } else if (!urlOrCode.includes('error=')) {
+        throw new Error(`Invalid state parameter. Expected: ${expectedState}, Received: ${stateParam}`);
+      } else {
+        console.error('\n=== OAuth Error ===');
+        Object.entries(allParams).forEach(([key, value]) => {
+          if (key !== 'redirect_uri') {
+            console.log(`${key}: ${value}\n`);
+          }
+        });
+        process.exit(1);
+      }
+    } else {
+      throw new Error('Authorization code not found in URL');
+    }
+
+    server.close();
+  } else {
+    code = urlOrCode;
+  }
+
+  try {
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        code,
+        client_id: process.env.YOUTUBE_CLIENT_ID || '',
+        client_secret: process.env.YOUTUBE_CLIENT_SECRET || '',
+        redirect_uri: 'http://localhost:9999/callback',
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    const tokenData = await response.json();
+
+    if (!response.ok) {
+      console.error('Token exchange failed:', tokenData);
+      process.exit(1);
+    }
+
+    const authObject = {
+      type: 'auth' as const,
+      ...tokenData,
+    };
+
+    console.log('\n=== Authentication Successful ===\n');
+    console.log(`Stream ID: ${streamerId}`);
+    console.log('Token received. Storing encrypted authentication object in database...\n');
+
+    await storeAuthObject(streamerId, authObject);
+
+    server.close();
+    process.exit(0);
+  } catch (error) {
+    console.error('[OAuth] Token exchange error:', error);
+    throw error;
+  }
+}
+
+async function storeAuthObject(tenantId: string, authObject: any): Promise<void> {
+  if (!process.env.META_DATABASE_URL) {
+    throw new Error('META_DATABASE_URL is required for storing auth object');
+  }
+
+  const { PrismaClient } = await import('../../prisma/generated/meta');
+  const prismaMeta = new PrismaClient();
+
+  try {
+    await prismaMeta.$connect();
+
+    let encryptedAuth: string;
+    if (process.env.ENCRYPTION_MASTER_KEY) {
+      const { encryptObject } = await import('../src/utils/encryption.js');
+      encryptedAuth = encryptObject(authObject);
+      console.log('Using encryption for auth object storage.');
+    } else {
+      encryptedAuth = JSON.stringify(authObject);
+      console.warn('WARNING: Storing auth object unencrypted (no ENCRYPTION_MASTER_KEY)');
+    }
+
+    await prismaMeta.tenant.update({
+      where: { id: tenantId },
+      data: { youtube: encryptedAuth },
+    });
+
+    console.log('\n=== Auth Object Stored Successfully ===\n');
+  } catch (error: any) {
+    if ((error as any).code === 'P2025') {
+      throw new Error(`Tenant not found in database: ${tenantId}`);
+    }
+    throw error;
+  } finally {
+    await prismaMeta.$disconnect();
+  }
+}
+
+program
+  .argument('<streamer_id>', 'Streamer ID or display name to authenticate')
+  .option('--open', 'Automatically open browser for OAuth flow')
+  .option('--headless', 'Run in headless mode (paste URL manually)')
+  .action(async (streamerId: string, options) => {
+    const tenant = await getTenant(streamerId);
+
+    if (!tenant) {
+      console.error('Failed to load tenant. Please verify the streamer ID or display name.');
+      process.exit(1);
+    }
+
+    startOAuthFlow(tenant.id);
+  });
+
+program.parse(process.argv);
