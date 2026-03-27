@@ -16,6 +16,8 @@ export async function loadStreamerConfigs(): Promise<StreamerConfig[]> {
     const streamerConfig: StreamerConfig = {
       id: tenant.id,
       database: { url: dbUrl },
+      timezone: 'America/Chicago',
+      alerts: { enabled: true },
     };
 
     if (tenant.twitch && typeof tenant.twitch === 'object') {
@@ -33,10 +35,20 @@ export async function loadStreamerConfigs(): Promise<StreamerConfig[]> {
       }
     }
 
+    const settingsObj: Record<string, unknown> = tenant.settings && typeof tenant.settings === 'object' && !Array.isArray(tenant.settings) ? (tenant.settings as Record<string, unknown>) : {};
+
     if (tenant.youtube && typeof tenant.youtube === 'object') {
       const youtube = tenant.youtube as Record<string, unknown>;
 
-      streamerConfig.youtube = {};
+      streamerConfig.youtube = {
+        public: true,
+        splitDuration: 10800,
+        perGameUpload: false,
+        restrictedGames: [],
+        description: '',
+        saveMP4: false,
+        saveHLS: false,
+      };
 
       if ('api_key' in youtube && youtube.api_key) {
         const apiKey = decryptScalar(youtube.api_key as string);
@@ -52,6 +64,17 @@ export async function loadStreamerConfigs(): Promise<StreamerConfig[]> {
         const clientSecret = decryptScalar(youtube.client_secret as string);
         streamerConfig.youtube.clientSecret = clientSecret;
       }
+
+      const youtubeSettings: Record<string, unknown> =
+        settingsObj.youtube && typeof settingsObj.youtube === 'object' && !Array.isArray(settingsObj.youtube) ? (settingsObj.youtube as Record<string, unknown>) : {};
+
+      streamerConfig.youtube.public = (youtubeSettings.public ?? true) as boolean;
+      streamerConfig.youtube.splitDuration = (youtubeSettings.splitDuration ?? 10800) as number;
+      streamerConfig.youtube.perGameUpload = (youtubeSettings.perGameUpload ?? false) as boolean;
+      streamerConfig.youtube.restrictedGames = Array.isArray(youtubeSettings.restrictedGames) ? (youtubeSettings.restrictedGames as string[]) : [];
+      streamerConfig.youtube.description = typeof youtubeSettings.description === 'string' ? youtubeSettings.description : '';
+      streamerConfig.youtube.saveMP4 = (youtubeSettings.saveMP4 ?? false) as boolean;
+      streamerConfig.youtube.saveHLS = (youtubeSettings.saveHLS ?? false) as boolean;
     }
 
     if (tenant.kick && typeof tenant.kick === 'object') {
@@ -61,6 +84,11 @@ export async function loadStreamerConfigs(): Promise<StreamerConfig[]> {
         streamerConfig.kick.channelName = kick.username as string;
       }
     }
+
+    const alertsSettings: Record<string, unknown> =
+      settingsObj.alerts && typeof settingsObj.alerts === 'object' && !Array.isArray(settingsObj.alerts) ? (settingsObj.alerts as Record<string, unknown>) : {};
+    streamerConfig.timezone = typeof settingsObj.timezone === 'string' ? settingsObj.timezone : 'America/Chicago';
+    streamerConfig.alerts.enabled = (alertsSettings.enabled ?? true) as boolean;
 
     configCache.set(streamerConfig.id, streamerConfig);
   }
@@ -78,4 +106,8 @@ export function getConfigById(streamerId: string): StreamerConfig | undefined {
 
 export function clearConfigCache(): void {
   configCache.clear();
+}
+
+export function getConfigs(): Array<{ id: string }> {
+  return Array.from(configCache.values());
 }
