@@ -44,11 +44,10 @@ const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, opti
 
     redisClient.on('error', (err) => {
       errorCount++;
-      logger.error({ err, errorCount }, 'Redis connection error');
+      logger.error({ err: err.message, errorCount }, 'Redis connection error');
 
       if (errorCount >= maxErrorsBeforeFail) {
         const errorMsg = `Redis connection unstable after ${errorCount} errors`;
-        logger.fatal({ error: err.message }, errorMsg);
         redisClient?.quit().catch(() => {});
         throw new Error(errorMsg);
       }

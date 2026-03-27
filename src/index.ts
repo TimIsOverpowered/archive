@@ -1,3 +1,11 @@
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Load environment variables based on NODE_ENV
+const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : process.env.NODE_ENV === 'development' ? '.env.development' : '.env';
+
+dotenv.config({ path: path.resolve(process.cwd(), envFile) });
+
 import { buildServer } from './api/server';
 import { closeAllClients } from './db/client';
 import { logger } from './utils/logger';
@@ -21,7 +29,8 @@ async function start() {
     logger.info({ docs: `http://${HOST}:${PORT}/docs` }, 'Swagger documentation available');
     logger.info({ metrics: `http://${HOST}:${PORT}/metrics` }, 'Prometheus metrics available');
   } catch (error) {
-    logger.fatal({ error }, 'Failed to start server');
+    const errorMessage = error instanceof Error ? error.message : JSON.stringify(error, Object.getOwnPropertyNames(error));
+    logger.fatal({ error: errorMessage, stack: error instanceof Error ? error.stack : 'no-stack' }, 'Failed to start server');
     process.exit(1);
   }
 }

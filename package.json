@@ -28,8 +28,10 @@
     "lint": "eslint \"src/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "build": "tsc",
-    "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.js"
+    "dev": "set NODE_ENV=development&& tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "workers": "tsx -r dotenv/config src/workers/index.ts",
+    "auth:youtube": "tsx scripts/auth-youtube.ts"
   },
   "standard": {
     "env": [
@@ -49,6 +51,7 @@
     "@feathersjs/express": "^5.0.43",
     "@feathersjs/feathers": "^5.0.43",
     "@feathersjs/transport-commons": "^5.0.43",
+    "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.71.1",
@@ -84,14 +87,19 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "@types/dotenv": "^6.1.1",
+    "@types/fluent-ffmpeg": "^2.1.28",
     "@types/node": "^25.5.0",
+    "@types/node-fetch": "^2.6.13",
     "@typescript-eslint/eslint-plugin": "^8.57.2",
     "@typescript-eslint/parser": "^8.57.2",
     "axios": "^1.13.6",
+    "dotenv": "^17.3.1",
     "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.1.8",
     "mocha": "^11.7.5",
     "nodemon": "^3.1.14",
+    "open": "^11.0.0",
     "prettier": "^3.8.1",
     "prisma": "^7.5.0",
     "tsx": "^4.21.0",
