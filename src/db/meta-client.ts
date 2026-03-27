@@ -4,7 +4,12 @@ import { PrismaPg } from '@prisma/adapter-pg';
 const globalForPrisma = globalThis as unknown as { prismaMeta: PrismaClient | undefined };
 
 if (!process.env.META_DATABASE_URL) {
-  throw new Error('META_DATABASE_URL environment variable is required');
+  if (process.argv[1]?.includes('workers')) {
+    console.warn('[meta-client] META_DATABASE_URL not set. Skipping meta client initialization.');
+    process.exit(0);
+  } else {
+    throw new Error('META_DATABASE_URL environment variable is required');
+  }
 }
 
 const adapter = new PrismaPg({
