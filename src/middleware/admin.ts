@@ -1,10 +1,16 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import bcrypt from 'bcrypt';
-import { metaClient } from '../db/meta-client';
+import { metaClient } from '../db/meta-client.js';
 
-export interface AdminUser {
+interface AdminUser {
   id: number;
   username: string;
+}
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    user?: AdminUser;
+  }
 }
 
 export function adminAuth() {
