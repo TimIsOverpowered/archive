@@ -138,12 +138,17 @@ function getYoutubeOAuthClient(streamerId: string): any {
         console.error(`[YouTube] Failed to persist refresh token for ${streamerId}:`, dbError.message);
       } finally {
         // ALWAYS update OAuth2 client credentials with new tokens (critical for continued auth!)
-        if (newTokens.access_token || newTokens.refresh_token || newTokens.expiry_date) {
+        if (newTokens.access_token || newTokens.refresh_token) {
           const updateObj: any = {};
 
           if (newTokens.access_token) updateObj.access_token = newTokens.access_token;
           if (newTokens.refresh_token) updateObj.refresh_token = newTokens.refresh_token;
-          if (newTokens.expiry_date !== undefined && typeof newTokens.expiry_date === 'number') {
+
+          // Convert expires_in to absolute timestamp for expiry_date
+          if (!updateObj.expiry_date && newTokens.expires_in !== undefined) {
+            updateObj.expiry_date = Date.now() + newTokens.expiresIn * 1000;
+          } else if (newTokens.expiry_date !== undefined && typeof newTokens.expiry_date === 'number') {
+            // If expiry_date is already provided, use it directly
             updateObj.expiry_date = newTokens.expiry_date as number;
           }
 
