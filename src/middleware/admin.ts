@@ -16,8 +16,31 @@ declare module 'fastify' {
 export function adminAuth() {
   return async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
     const authHeader = req.headers.authorization;
+
+    // Get client IP with proper priority for Cloudflare + nginx reverse proxy setup
+    // Priority order: cf-connecting-ip > x-real-ip > x-forwarded-for[0] > req.ip (fallback)
+    const cfConnectingIp = req.headers['cf-connecting-ip'];
+    const xRealIp = req.headers['x-real-ip'];
     const forwardedFor = req.headers['x-forwarded-for'];
-    const clientIP = req.ip || (req.headers['cf-connecting-ip'] as string) || (req.headers['x-real-ip'] as string) || (typeof forwardedFor === 'string' ? forwardedFor.split(',')[0] : undefined) || '';
+
+    let clientIP: string;
+
+    if (typeof cfConnectingIp === 'string' && cfConnectingIp) {
+      // Cloudflare provides the real user IP first - use it when available
+      clientIP = Array.isArray(cfConnectingIp) ? cfConnectingIp[0].trim() : cfConnectingIp.trim();
+    } else if (typeof xRealIp === 'string' && xRealIp) {
+      // Nginx reverse proxy header
+      clientIP = Array.isArray(xRealIp) ? xRealIp[0].trim() : xRealIp.trim();
+    } else if (Array.isArray(forwardedFor)) {
+      // Fallback to first entry in X-Forwarded-For chain
+      const ffString = forwardedFor.join(',');
+      clientIP = ffString.split(',')[0].trim() || '';
+    } else if (typeof forwardedFor === 'string') {
+      clientIP = forwardedFor.split(',')[0].trim() || '';
+    } else {
+      // Last resort - use Fastify's computed IP
+      clientIP = req.ip?.trim() || '';
+    }
 
     if (!authHeader) {
       console.warn(`[AUTH FAIL] ${new Date().toISOString()} | IP: ${clientIP} | Path: ${req.url} | Reason: Missing Authorization header`);
