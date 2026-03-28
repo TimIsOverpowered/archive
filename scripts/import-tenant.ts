@@ -28,7 +28,7 @@ interface YoutubeConfig {
   perGameUpload?: boolean;
   restrictedGames?: (string | null)[];
   splitDuration?: number;
-  api_key?: string;
+  apiKey?: string;
   liveUpload?: boolean;
   multiTrack?: boolean;
   upload?: boolean;
@@ -55,7 +55,7 @@ interface GoogleConfig {
 
 interface SettingsConfig {
   channel?: string;
-  domain_name: string;
+  domainName: string;
   vodPath: string;
   livePath: string;
   timezone: string;
@@ -71,7 +71,7 @@ interface RawConfig {
   google?: GoogleConfig;
   youtube?: YoutubeConfig;
   channel?: string;
-  domain_name?: string;
+  domainName?: string;
   vodPath?: string;
   livePath?: string;
   timezone?: string;
@@ -112,8 +112,8 @@ function processYoutube(config: YoutubeConfig | undefined) {
   if (config.multiTrack !== undefined) youtube.multiTrack = config.multiTrack;
   if (config.upload !== undefined) youtube.upload = config.upload;
 
-  if (config.api_key) {
-    youtube.api_key = encryptScalar(config.api_key);
+  if (config.apiKey) {
+    youtube.apiKey = encryptScalar(config.apiKey);
   }
 
   if (config.auth && (config.auth.refresh_token || config.auth.access_token)) {
@@ -149,7 +149,7 @@ function processGoogle(config: GoogleConfig | undefined) {
 function processSettings(raw: RawConfig) {
   const settings: Record<string, unknown> = {};
 
-  if (raw.domain_name) settings.domain_name = raw.domain_name;
+  if (raw.domainName) settings.domain_name = raw.domainName;
   if (raw.vodPath) settings.vodPath = raw.vodPath;
   if (raw.livePath) settings.livePath = raw.livePath;
   if (raw.timezone) settings.timezone = raw.timezone;

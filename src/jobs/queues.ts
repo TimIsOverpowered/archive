@@ -1,11 +1,23 @@
 import { Queue, QueueOptions } from 'bullmq';
 import Redis from 'ioredis';
 
+export type VodJobType = 'STANDARD_VOD_DOWNLOAD' | 'LIVE_HLS_DOWNLOAD';
+
 export interface VODDownloadJob {
-  streamerId: string;
+  streamerId?: string; // For backward compatibility with standard downloads
   vodId: string;
   platform: 'twitch' | 'kick';
-  externalVodId: string;
+  externalVodId?: string;
+  userId?: string; // Channel/user identifier for multi-tenant tracking (required for Live HLS)
+}
+
+export interface LiveHlsDownloadJob {
+  vodId: string;
+  platform: 'twitch' | 'kick';
+  userId: string; // Required - channel ID or username depending on platform
+  startedAt?: string; // ISO timestamp when live stream was detected
+  sourceUrl?: string; // Kick HLS URL (passed from monitor)
+  isFallback?: boolean; // Flag for Twitch fallback mode (no VOD object found)
 }
 
 export interface ChatDownloadJob {
@@ -23,6 +35,7 @@ export interface YoutubeUploadJob {
   title: string;
   description: string;
   type: 'vod' | 'game';
+  platform?: 'twitch' | 'kick';
   part?: number;
   chapter?: {
     name: string;

@@ -1,22 +1,28 @@
 export interface StreamerConfig {
   id: string;
-  twitch?: { clientId?: string | undefined; clientSecret?: string | undefined; channelName?: string };
+  twitch?: { enabled: boolean; auth?: string; username?: string; mainPlatform?: boolean };
   youtube?: {
-    clientId?: string | undefined;
-    clientSecret?: string | undefined;
-    refreshToken?: string;
+    auth?: string;
     public: boolean;
+    upload: boolean;
+    vodUpload: boolean;
+    liveUpload: boolean;
+    multiTrack: boolean;
+    apiKey?: string;
     splitDuration: number;
     perGameUpload: boolean;
     restrictedGames: string[];
     description: string;
+  };
+  kick?: { enabled: boolean; username?: string; mainPlatform?: boolean };
+  database: { url: string; connectionLimit?: number };
+  settings: {
+    vodPath?: string;
+    vodDownload?: boolean;
+    chatDownload?: boolean;
+    domainName: string;
+    timezone: string;
     saveMP4: boolean;
     saveHLS: boolean;
-  };
-  kick?: { enabled: boolean; channelName?: string };
-  database: { url: string; connectionLimit?: number };
-  timezone: string;
-  alerts: {
-    enabled: boolean;
   };
 }

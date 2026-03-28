@@ -28,7 +28,7 @@
     "perGameUpload": false,
     "restrictedGames": [],
     "splitDuration": 10800,
-    "api_key": "",
+    "apiKey": "",
     "liveUpload": false,
     "multiTrack": false,
     "upload": true,
@@ -41,7 +41,7 @@
     }
   },
   "channel": "",
-  "domain_name": "",
+  "domainName": "",
   "vodPath": "/mnt/vods",
   "livePath": "/mnt/live",
   "timezone": "America/Chicago",

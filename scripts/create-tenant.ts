@@ -353,7 +353,7 @@ async function main(): Promise<void> {
       const youtubeRefreshToken = await promptHidden('Refresh Token: ');
 
       youtubeData = {
-        api_key: youtubeApiKey,
+        apiKey: youtubeApiKey,
         description: youtubeDescription,
         public: youtubePublic,
         vodUpload: youtubeVodUpload,
@@ -465,7 +465,7 @@ async function main(): Promise<void> {
     // Step 1: Generate config/config.json.<channelName>
     const configData: any = {
       channel: displayName,
-      domain_name: domainName,
+      domainName: domainName,
       vodPath: vodPath,
       livePath: livePath,
       timezone: timezone,

@@ -39,8 +39,15 @@ export async function triggerChatAfterVod(vodJob: VODDownloadJob): Promise<strin
     return null;
   }
 
+  const streamerId = vodJob.streamerId || vodJob.userId;
+
+  if (!streamerId) {
+    console.warn('[Chat Job] No streamerId or userId available, skipping chat download');
+    return null;
+  }
+
   const job = enqueueChatDownload({
-    streamerId: vodJob.streamerId,
+    streamerId: streamerId as string,
     vodId: vodJob.vodId,
     platform: vodJob.platform,
     duration: 0, // Will be fetched from VOD metadata in worker if needed
