@@ -29,10 +29,15 @@ export async function checkTokenHealth(): Promise<void> {
     if (config.youtube?.auth) {
       try {
         const youtubeModule: any = await import('../services/youtube');
-        await youtubeModule.getAccessToken(streamerId);
-        resetFailures(`${streamerId}:youtube`);
+
+        // Use lightweight validation instead of forcing token refresh
+        if (await youtubeModule.validateYoutubeToken(streamerId)) {
+          resetFailures(`${streamerId}:youtube`);
+        } else if (trackFailure(`${streamerId}:youtube`, MAX_FAILURES)) {
+          await sendDiscordAlert(`🚨 YouTube token health check failed for ${streamerId} after ${MAX_FAILURES} attempts`);
+        }
       } catch (err: any) {
-        console.error(`YouTube token health check failed for ${streamerId}:`, err.message || err);
+        console.error(`YouTube token health check error for ${streamerId}:`, err.message || err);
 
         if (trackFailure(`${streamerId}:youtube`, MAX_FAILURES)) {
           await sendDiscordAlert(`🚨 YouTube token health check failed for ${streamerId} after ${MAX_FAILURES} attempts`);
