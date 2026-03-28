@@ -13,7 +13,7 @@ export async function checkTokenHealth(): Promise<void> {
   for (const config of streamerConfigs) {
     const streamerId = config.id;
 
-    if (config.twitch?.clientId) {
+    if (config.twitch?.auth) {
       try {
         await getAppAccessToken(streamerId);
         resetFailures(`${streamerId}:twitch`);
@@ -26,7 +26,7 @@ export async function checkTokenHealth(): Promise<void> {
       }
     }
 
-    if (config.youtube?.refreshToken) {
+    if (config.youtube?.auth) {
       try {
         const youtubeModule: any = await import('../services/youtube');
         await youtubeModule.getAccessToken(streamerId);

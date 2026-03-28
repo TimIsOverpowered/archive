@@ -27,6 +27,7 @@ export async function triggerYoutubeUpload(
   title: string,
   description: string,
   type: 'vod' | 'game',
+  platform?: 'twitch' | 'kick',
   part?: number,
   chapterName?: string,
   gameId?: string
@@ -38,6 +39,7 @@ export async function triggerYoutubeUpload(
     title,
     description,
     type,
+    platform,
     part,
   };
 
@@ -58,11 +60,12 @@ export async function triggerYoutubeUploadWithChapters(
   title: string,
   description: string,
   type: 'vod' | 'game',
+  platform?: 'twitch' | 'kick',
   part?: number,
   chapters?: { name: string; start: number; end: number; gameId?: string }[]
 ): Promise<string[]> {
   if (!chapters || chapters.length === 0) {
-    const jobId = await triggerYoutubeUpload(streamerId, vodId, filePath, title, description, type, part);
+    const jobId = await triggerYoutubeUpload(streamerId, vodId, filePath, title, description, type, platform, part);
     return jobId ? [jobId] : [];
   }
 
@@ -70,7 +73,7 @@ export async function triggerYoutubeUploadWithChapters(
   const jobIds: string[] = [];
 
   for (const chapter of chapters) {
-    const jobId = await triggerYoutubeUpload(streamerId, vodId, filePath, title, description, type, part && chapters.length > 1 ? part : undefined, chapter.name, chapter.gameId);
+    const jobId = await triggerYoutubeUpload(streamerId, vodId, filePath, title, description, type, platform, part && chapters.length > 1 ? part : undefined, chapter.name, chapter.gameId);
 
     if (jobId) {
       jobIds.push(jobId);

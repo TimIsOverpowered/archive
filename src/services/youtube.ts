@@ -1,7 +1,8 @@
 import { google } from 'googleapis';
 import fs from 'fs';
 import fsPromises from 'fs/promises';
-import { getStreamerConfig } from '../config/loader';
+import { getStreamerConfig } from '../config/loader.js';
+import { decryptObject } from '../utils/encryption.js';
 
 interface AuthObject {
   access_token: string;
@@ -11,11 +12,82 @@ interface AuthObject {
   expires_in: number;
 }
 
+interface DecryptedYoutubeCreds {
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+}
+
 const authCache = new Map<string, AuthObject>();
+const decryptedAuthCache = new Map<string, DecryptedYoutubeCreds>();
+
+function getYoutubeCredentials(streamerId: string): DecryptedYoutubeCreds | null {
+  const config = getStreamerConfig(streamerId);
+
+  if (!config?.youtube?.auth) {
+    return null;
+  }
+
+  // Check cache first
+  const cached = decryptedAuthCache.get(streamerId);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const authObj = decryptObject<{ client_id: string; client_secret: string; refresh_token: string }>(config.youtube.auth);
+
+    // Store in cache - will update after token refresh
+    const creds: DecryptedYoutubeCreds = {
+      clientId: authObj.client_id,
+      clientSecret: authObj.client_secret,
+      refreshToken: authObj.refresh_token,
+    };
+
+    decryptedAuthCache.set(streamerId, creds);
+    return creds;
+  } catch (error) {
+    console.error(`Failed to decrypt YouTube credentials for ${streamerId}:`, error);
+    return null;
+  }
+}
+
+function updateYoutubeRefreshToken(streamerId: string, newAuthTokenObject: AuthObject): void {
+  const config = getStreamerConfig(streamerId);
+
+  if (!config?.youtube?.auth) {
+    console.warn(`No YouTube auth configured for ${streamerId}, cannot update refresh token`);
+    return;
+  }
+
+  try {
+    // Update the in-memory cache
+    decryptedAuthCache.set(streamerId, {
+      clientId: config.youtube.apiKey || '', // apiKey is reused as client_id from original decrypt
+      clientSecret: '', // Will be re-decrypte d if needed
+      refreshToken: newAuthTokenObject.refresh_token,
+    });
+
+    // Re-read and update with the new refresh token
+    const authObj = decryptObject<{ client_id: string; client_secret: string; refresh_token: string }>(config.youtube.auth);
+
+    authObj.refresh_token = newAuthTokenObject.refresh_token;
+
+    // Encrypt back to config (in-memory only, doesn't persist to DB)
+    decryptedAuthCache.set(streamerId, {
+      clientId: authObj.client_id,
+      clientSecret: authObj.client_secret,
+      refreshToken: authObj.refresh_token,
+    });
+  } catch (error) {
+    console.error(`Failed to update YouTube refresh token for ${streamerId}:`, error);
+  }
+}
 
 export async function getAccessToken(streamerId: string): Promise<string> {
-  const config = getStreamerConfig(streamerId);
-  if (!config?.youtube?.refreshToken || !config.youtube.clientId || !config.youtube.clientSecret) {
+  const creds = getYoutubeCredentials(streamerId);
+
+  if (!creds) {
     throw new Error('YouTube credentials not configured');
   }
 
@@ -27,22 +99,29 @@ export async function getAccessToken(streamerId: string): Promise<string> {
     }
   }
 
-  const oauth2Client = new google.auth.OAuth2(config.youtube.clientId, config.youtube.clientSecret, 'https://developers.google.com/oauthplayground');
+  const oauth2Client = new google.auth.OAuth2(creds.clientId, creds.clientSecret, 'https://developers.google.com/oauthplayground');
 
   oauth2Client.setCredentials({
-    refresh_token: config.youtube.refreshToken,
+    refresh_token: creds.refreshToken,
   });
 
   const credentials = await oauth2Client.refreshAccessToken();
 
   if (credentials.credentials.access_token) {
-    authCache.set(streamerId, {
+    const authObj: AuthObject = {
       access_token: credentials.credentials.access_token!,
-      refresh_token: credentials.credentials.refresh_token || config.youtube.refreshToken,
+      refresh_token: credentials.credentials.refresh_token || creds.refreshToken,
       scope: credentials.credentials.scope || '',
       token_type: credentials.credentials.token_type || 'Bearer',
       expires_in: credentials.credentials.expiry_date ? Math.floor(((credentials.credentials.expiry_date as number) - Date.now()) / 1000) : 3600,
-    });
+    };
+
+    authCache.set(streamerId, authObj);
+
+    // Update the refresh token in decrypted cache if it changed
+    if (credentials.credentials.refresh_token && credentials.credentials.refresh_token !== creds.refreshToken) {
+      updateYoutubeRefreshToken(streamerId, authObj);
+    }
 
     return credentials.credentials.access_token;
   }
@@ -57,16 +136,16 @@ export async function uploadVideo(
   description: string,
   privacyStatus: 'public' | 'unlisted' | 'private'
 ): Promise<{ videoId: string; thumbnailUrl: string }> {
-  const config = getStreamerConfig(streamerId);
+  const creds = getYoutubeCredentials(streamerId);
 
-  if (!config?.youtube?.clientId || !config.youtube.clientSecret || !config.youtube.refreshToken) {
+  if (!creds) {
     throw new Error('YouTube credentials not configured');
   }
 
-  const oauth2Client = new google.auth.OAuth2(config.youtube.clientId, config.youtube.clientSecret, 'https://developers.google.com/oauthplayground');
+  const oauth2Client = new google.auth.OAuth2(creds.clientId, creds.clientSecret, 'https://developers.google.com/oauthplayground');
 
   oauth2Client.setCredentials({
-    refresh_token: config.youtube.refreshToken,
+    refresh_token: creds.refreshToken,
   });
 
   const youtube = google.youtube({
@@ -117,15 +196,16 @@ export async function uploadVideo(
 }
 
 export async function addChapters(streamerId: string, videoId: string, chapters: { time: string; title: string }[]): Promise<void> {
-  const config = getStreamerConfig(streamerId);
-  if (!config?.youtube?.clientId || !config.youtube.clientSecret || !config.youtube.refreshToken) {
+  const creds = getYoutubeCredentials(streamerId);
+
+  if (!creds) {
     throw new Error('YouTube credentials not configured');
   }
 
-  const oauth2Client = new google.auth.OAuth2(config.youtube.clientId, config.youtube.clientSecret, 'https://developers.google.com/oauthplayground');
+  const oauth2Client = new google.auth.OAuth2(creds.clientId, creds.clientSecret, 'https://developers.google.com/oauthplayground');
 
   oauth2Client.setCredentials({
-    refresh_token: config.youtube.refreshToken,
+    refresh_token: creds.refreshToken,
   });
 
   const youtube = google.youtube({
@@ -158,15 +238,16 @@ export async function addChapters(streamerId: string, videoId: string, chapters:
 }
 
 export async function linkParts(streamerId: string, videoIds: { id: string; part: number }[]): Promise<void> {
-  const config = getStreamerConfig(streamerId);
-  if (!config?.youtube?.clientId || !config.youtube.clientSecret || !config.youtube.refreshToken) {
+  const creds = getYoutubeCredentials(streamerId);
+
+  if (!creds) {
     throw new Error('YouTube credentials not configured');
   }
 
-  const oauth2Client = new google.auth.OAuth2(config.youtube.clientId, config.youtube.clientSecret, 'https://developers.google.com/oauthplayground');
+  const oauth2Client = new google.auth.OAuth2(creds.clientId, creds.clientSecret, 'https://developers.google.com/oauthplayground');
 
   oauth2Client.setCredentials({
-    refresh_token: config.youtube.refreshToken,
+    refresh_token: creds.refreshToken,
   });
 
   const youtube = google.youtube({

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getStreamerConfig } from '../config/loader.js';
+import { decryptObject } from '../utils/encryption.js';
 
 interface VodData {
   id: string;
@@ -24,9 +25,26 @@ interface VodTokenSig {
 
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();
 
-export async function getAppAccessToken(streamerId: string): Promise<string> {
+function getTwitchCredentials(streamerId: string): { clientId: string; clientSecret: string } | null {
   const config = getStreamerConfig(streamerId);
-  if (!config?.twitch?.clientId || !config.twitch.clientSecret) {
+
+  if (!config?.twitch?.auth) {
+    return null;
+  }
+
+  try {
+    const auth = decryptObject<{ client_id: string; client_secret: string; access_token: string }>(config.twitch.auth);
+    return { clientId: auth.client_id, clientSecret: auth.client_secret };
+  } catch (error) {
+    console.error(`Failed to decrypt Twitch credentials for ${streamerId}:`, error);
+    return null;
+  }
+}
+
+export async function getAppAccessToken(streamerId: string): Promise<string> {
+  const creds = getTwitchCredentials(streamerId);
+
+  if (!creds) {
     throw new Error('Twitch credentials not configured');
   }
 
@@ -37,8 +55,8 @@ export async function getAppAccessToken(streamerId: string): Promise<string> {
 
   const response = await axios.post('https://id.twitch.tv/oauth2/token', null, {
     params: {
-      client_id: config.twitch.clientId,
-      client_secret: config.twitch.clientSecret,
+      client_id: creds.clientId,
+      client_secret: creds.clientSecret,
       grant_type: 'client_credentials',
     },
   });
@@ -54,13 +72,13 @@ export async function getAppAccessToken(streamerId: string): Promise<string> {
 
 export async function getVodData(vodId: string, streamerId: string): Promise<VodData> {
   const accessToken = await getAppAccessToken(streamerId);
-  const config = getStreamerConfig(streamerId);
+  const creds = getTwitchCredentials(streamerId)!;
 
   const response = await axios.get('https://api.twitch.tv/helix/videos', {
     params: { id: vodId },
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      'Client-Id': config!.twitch!.clientId!,
+      'Client-Id': creds.clientId,
     },
   });
 
@@ -237,13 +255,14 @@ export async function getChapter(vodId: string): Promise<any | null> {
 
 export async function getGameData(gameId: string, streamerId: string): Promise<any | null> {
   const accessToken = await getAppAccessToken(streamerId);
-  const config = getStreamerConfig(streamerId);
+
+  const creds = getTwitchCredentials(streamerId)!;
 
   const response = await axios.get('https://api.twitch.tv/helix/games', {
     params: { id: gameId },
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      'Client-Id': config!.twitch!.clientId!,
+      'Client-Id': creds.clientId,
     },
   });
 

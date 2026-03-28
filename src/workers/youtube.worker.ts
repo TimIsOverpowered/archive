@@ -50,7 +50,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUpl
 
           uploadedVideos.push({ id: result.videoId, part: i + 1 });
 
-          if (!config.youtube.saveMP4) {
+          if (!config.settings.saveMP4) {
             await deleteFile(parts[i]);
           }
         }
@@ -59,7 +59,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUpl
 
         uploadedVideos.push({ id: result.videoId, part: 1 });
 
-        if (!config.youtube.saveMP4) {
+        if (!config.settings.saveMP4) {
           await deleteFile(filePath);
         }
       }
@@ -89,6 +89,29 @@ const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUpl
 
       return { success: true, videos: uploadedVideos };
     } else {
+      const hasTwitch = config.twitch?.enabled === true;
+      const hasKick = config.kick?.enabled === true;
+
+      if (hasTwitch && hasKick) {
+        const isMainPlatform = job.data.platform === 'twitch' ? config.twitch?.mainPlatform : config.kick?.mainPlatform;
+
+        if (!isMainPlatform) {
+          console.info(`[${vodId}] Skipping game upload: ${job.data.platform} is not main platform (simulcast mode)`);
+
+          await db.game.updateMany({
+            where: { vod_id: vodId },
+            data: { video_provider: null, video_id: null, thumbnail_url: null },
+          });
+
+          resetFailures(streamerId);
+
+          if (messageId && isAlertsEnabled()) {
+            await updateDiscordMessage(messageId, `[Game Upload] ${streamerId} Skipped (${job.data.platform} not main platform)`);
+          }
+
+          return { success: true, skipped: true };
+        }
+      }
       const trimmedPath = await trimVideo(filePath, chapter!.start, chapter!.end, `${vodId}-${part}`, (percent: any) => {
         if (messageId && isAlertsEnabled()) {
           updateDiscordMessage(messageId, formatProgressMessage('Game Trimming', streamerId, percent));
@@ -96,7 +119,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUpl
       });
 
       await getDuration(trimmedPath);
-      const dateStr = dayjs().tz(config.timezone).format('MMM D, YYYY');
+      const dateStr = dayjs().tz(config?.settings?.timezone).format('MMMM DD YYYY');
 
       const gameTitle = `${title} EP ${part} - ${dateStr}`;
 

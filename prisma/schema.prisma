@@ -24,6 +24,12 @@ model Vod {
   created_at    DateTime  @default(now())
   downloaded_at DateTime?
   
+  // Live streaming fields (consolidated from streams table)
+  is_live       Boolean   @default(false)
+  started_at    DateTime?
+  ended_at      DateTime?
+  user_id       String?   // Channel/user identifier for tracking
+  
   vod_uploads   VodUpload[]
   games         Game[]
   emotes        Emote[]
@@ -31,6 +37,8 @@ model Vod {
 
   @@unique([platform, id])
   @@index([platform])
+  @@index([is_live])
+  @@index([user_id, platform])
   @@map("vods")
 }
 
