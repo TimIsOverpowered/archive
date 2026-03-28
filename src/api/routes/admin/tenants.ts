@@ -1,10 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
-import { getTenantStats, getAllTenants } from '../../../services/tenants.service';
-import { getClient } from '../../../db/client';
-import { getStreamerConfig } from '../../../config/loader';
-import createRateLimitMiddleware from '../../middleware/rate-limit';
-import adminJwtMiddleware from '../../middleware/admin-jwt';
+import { getTenantStats, getAllTenants } from '../../../services/tenants.service.js';
+import { getClient } from '../../../db/client.js';
+import { getStreamerConfig } from '../../../config/loader.js';
+import createRateLimitMiddleware from '../../middleware/rate-limit.js';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 
 type TenantsRoutesOptions = Record<string, unknown>;
 
@@ -25,9 +25,22 @@ export default async function tenantsRoutes(fastify: FastifyInstance, _options: 
       schema: {
         tags: ['Admin', 'Tenants'],
         description: 'List all tenants (streamers)',
-        security: [{ bearer: [] }],
+        security: [{ apiKey: [] }],
+        headers: {
+          type: 'object',
+          properties: {
+            Authorization: {
+              type: 'string',
+              description: 'Bearer token with API key (e.g., "Bearer archive_...")',
+            },
+            'X-API-Key': {
+              type: 'string',
+              description: 'Direct API key header as alternative to Bearer auth',
+            },
+          },
+        },
       },
-      onRequest: [adminJwtMiddleware, rateLimitMiddleware],
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
     async () => {
       const tenants = await getAllTenants();
@@ -48,9 +61,9 @@ export default async function tenantsRoutes(fastify: FastifyInstance, _options: 
           },
           required: ['id'],
         },
-        security: [{ bearer: [] }],
+        security: [{ apiKey: [] }],
       },
-      onRequest: [adminJwtMiddleware, rateLimitMiddleware],
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
     async (request) => {
       const { id } = request.params as { id: string };
@@ -84,9 +97,9 @@ export default async function tenantsRoutes(fastify: FastifyInstance, _options: 
           },
           required: ['id', 'vodId'],
         },
-        security: [{ bearer: [] }],
+        security: [{ apiKey: [] }],
       },
-      onRequest: [adminJwtMiddleware, rateLimitMiddleware],
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
     async (request) => {
       const { id, vodId } = request.params as { id: string; vodId: string };

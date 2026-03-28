@@ -21,7 +21,7 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
   });
 
   fastify.get(
-    '/:streamerId/:vodId/logs',
+    '/:streamerId/vods/:vodId/logs',
     {
       schema: {
         tags: ['Chat Logs'],
