@@ -145,11 +145,19 @@ function getYoutubeOAuthClient(streamerId: string): any {
           if (newTokens.refresh_token) updateObj.refresh_token = newTokens.refresh_token;
 
           // Convert expires_in to absolute timestamp for expiry_date
-          if (!updateObj.expiry_date && newTokens.expires_in !== undefined) {
-            updateObj.expiry_date = Date.now() + newTokens.expiresIn * 1000;
+          // Google returns "expires_in" in seconds, googleapis expects "expiry_date" as absolute timestamp
+          const expiresInSeconds: number | undefined =
+            typeof newTokens.expiresIn === 'number'
+              ? newTokens.expiresIn // camelCase (googleapis standard)
+              : typeof newTokens.expires_in === 'number'
+                ? newTokens.expires_in // snake_case (actual Google response)
+                : undefined;
+
+          if (expiresInSeconds !== undefined && !updateObj.expiry_date) {
+            updateObj.expiry_date = Date.now() + expiresInSeconds * 1000;
           } else if (newTokens.expiry_date !== undefined && typeof newTokens.expiry_date === 'number') {
-            // If expiry_date is already provided, use it directly
-            updateObj.expiry_date = newTokens.expiry_date as number;
+            // If expiry_date is already provided as absolute timestamp, use it directly
+            updateObj.expiry_date = newTokens.expiry_date;
           }
 
           try {
