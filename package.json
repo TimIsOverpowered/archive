@@ -31,7 +31,12 @@
     "dev": "set NODE_ENV=development&& tsx watch src/index.ts",
     "start": "node dist/index.js",
     "workers": "tsx -r dotenv/config src/workers/index.ts",
-    "auth:youtube": "tsx scripts/auth-youtube.ts"
+    "auth:youtube": "tsx scripts/auth-youtube.ts",
+    "streamer:migrate": "tsx scripts/migrate-streamer.ts",
+    "tenant:create": "tsx scripts/create-tenant.ts",
+    "tenant:import": "tsx scripts/import-tenant.ts",
+    "admin:create": "tsx scripts/create-admin.ts",
+    "admin:reset": "tsx scripts/reset-admin-key.ts"
   },
   "standard": {
     "env": [
