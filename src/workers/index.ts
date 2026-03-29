@@ -15,6 +15,7 @@ import youtubeProcessor from './youtube.worker.js';
 import { releaseKickBrowser } from '../utils/puppeteer-manager.js';
 
 import { startTokenHealthCron } from '../cron/token-health.js';
+import { startMonitorService, stopMonitorService } from '../monitor/index.js';
 
 const logger = {
   info: console.info,
@@ -28,6 +29,10 @@ async function bootstrap() {
   try {
     await loadStreamerConfigs();
     logger.info('Loaded streamer configurations');
+
+    // Start monitor service (stream detection polling)
+    await startMonitorService();
+    logger.info('Stream detection monitoring started');
 
     const redisConnection = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
       maxRetriesPerRequest: null, // Required by BullMQ workers
@@ -78,6 +83,9 @@ async function bootstrap() {
     const shutdown = async () => {
       logger.info('Shutting down workers...');
 
+      // Stop monitor polling loops first
+      await stopMonitorService();
+
       await vodWorker.close();
       await chatWorker.close();
       await youtubeWorker.close();
@@ -91,6 +99,9 @@ async function bootstrap() {
       process.exit(0);
     };
 
+    // Override default shutdown handlers (monitor/index.ts registers its own)
+    process.removeAllListeners('SIGTERM');
+    process.removeAllListeners('SIGINT');
     process.on('SIGTERM', shutdown);
     process.on('SIGINT', shutdown);
 
