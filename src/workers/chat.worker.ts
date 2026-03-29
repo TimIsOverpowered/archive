@@ -2,7 +2,7 @@ import { Processor, Job } from 'bullmq';
 import { getClient, createClient } from '../db/client';
 import { getStreamerConfig } from '../config/loader';
 import { fetchComments, fetchNextComments } from '../services/twitch';
-import { sendDiscordAlert, updateDiscordMessage, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/alerts';
+import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/alerts';
 import { ChatDownloadJob } from '../jobs/queues';
 
 const BATCH_SIZE = 2500;
@@ -26,7 +26,18 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
     db = await createClient(config);
   }
 
-  const messageId = isAlertsEnabled() ? await sendDiscordAlert(`[Chat Download] ${streamerId} Starting...`) : null;
+  const messageId = isAlertsEnabled()
+    ? await sendRichAlert({
+        title: `💬 Chat Download Started`,
+        description: `${streamerId} - Fetching chat messages for ${vodId}`,
+        status: 'warning',
+        fields: [
+          { name: 'Platform', value: platform, inline: true },
+          { name: 'VOD ID', value: vodId, inline: false },
+        ],
+        timestamp: new Date().toISOString(),
+      })
+    : null;
 
   try {
     let cursor: string | null = null;
@@ -70,7 +81,18 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
 
       if (messageId && isAlertsEnabled() && batchCount * 50 >= BATCH_SIZE) {
         const percent = Math.min(Math.round((totalMessages / ((duration / 60) * 50)) * 100), 100);
-        await updateDiscordMessage(messageId, formatProgressMessage('Chat Download', streamerId, percent, totalMessages));
+        updateDiscordEmbed(messageId, {
+          title: `💬 Downloading Chat`,
+          description: `${streamerId} - Fetching chat messages for ${vodId}`,
+          status: 'warning',
+          fields: [
+            { name: 'Messages Fetched', value: String(totalMessages), inline: true },
+            { name: 'Progress', value: formatProgressMessage('Chat Download', streamerId, percent, totalMessages), inline: false },
+          ],
+          timestamp: new Date().toISOString(),
+          updatedTimestamp: new Date().toISOString(),
+        });
+
         batchCount = 0;
       }
 
@@ -85,7 +107,17 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
     resetFailures(streamerId);
 
     if (messageId && isAlertsEnabled()) {
-      await updateDiscordMessage(messageId, `[Chat Download] ${streamerId} Complete! (${totalMessages} messages)`);
+      updateDiscordEmbed(messageId, {
+        title: `✅ Chat Download Complete`,
+        description: `${streamerId} - Successfully fetched ${totalMessages.toLocaleString()} chat messages for ${vodId}`,
+        status: 'success',
+        fields: [
+          { name: 'Platform', value: platform, inline: true },
+          { name: 'Total Messages', value: String(totalMessages), inline: false },
+        ],
+        timestamp: new Date().toISOString(),
+        updatedTimestamp: new Date().toISOString(),
+      });
     }
 
     return { success: true, totalMessages };
@@ -93,7 +125,17 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
     console.error(`Chat download failed for ${vodId}:`, error);
 
     if (messageId && isAlertsEnabled()) {
-      await updateDiscordMessage(messageId, `[Chat Download] ${streamerId} FAILED: ${(error as Error).message}`);
+      updateDiscordEmbed(messageId, {
+        title: `❌ Chat Download Failed`,
+        description: `${streamerId} - Error fetching chat messages for ${vodId}`,
+        status: 'error',
+        fields: [
+          { name: 'Platform', value: platform, inline: true },
+          { name: 'Error', value: (error as Error).message.substring(0, 500), inline: false },
+        ],
+        timestamp: new Date().toISOString(),
+        updatedTimestamp: new Date().toISOString(),
+      });
     }
 
     throw error;

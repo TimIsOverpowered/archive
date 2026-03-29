@@ -2,8 +2,30 @@ import axios from 'axios';
 
 const globalDiscordAlertsEnabled = process.env.DISCORD_ALERTS_ENABLED !== 'false';
 
+export type AlertStatus = 'success' | 'warning' | 'error';
+
+interface RichEmbedData {
+  title: string;
+  description?: string;
+  status: AlertStatus;
+  fields?: Array<{ name: string; value: string; inline?: boolean }>;
+  timestamp?: string;
+  updatedTimestamp?: string;
+}
+
 export function isAlertsEnabled(): boolean {
   return globalDiscordAlertsEnabled;
+}
+
+function getEmbedColor(status: AlertStatus): number {
+  switch (status) {
+    case 'success':
+      return 0x306934;
+    case 'warning':
+      return 15158332;
+    case 'error':
+      return 0xed4245;
+  }
 }
 
 export async function sendDiscordAlert(message: string): Promise<string | null> {
@@ -20,6 +42,8 @@ export async function sendDiscordAlert(message: string): Promise<string | null> 
     const response = await axios.post(webhookUrl, {
       content: message,
     });
+
+    console.log('Discord alert sent:', message.substring(0, 80));
 
     if (response.data.id) {
       return response.data.id;
@@ -51,8 +75,120 @@ export async function updateDiscordMessage(messageId: string, message: string): 
     await axios.patch(updateUrl, {
       content: message,
     });
+
+    console.log('Discord message updated:', messageId.substring(0, 8));
   } catch (err) {
     console.error('Failed to update Discord message:', err);
+  }
+}
+
+export async function sendRichAlert(data: RichEmbedData): Promise<string | null> {
+  if (!isAlertsEnabled()) {
+    return null;
+  }
+
+  const webhookUrl = process.env.DISCORD_ALERT_WEBHOOK_URL;
+  if (!webhookUrl) {
+    return null;
+  }
+
+  try {
+    const embed: any = {
+      title: data.title,
+      color: getEmbedColor(data.status),
+      fields: [],
+    };
+
+    if (data.description) {
+      embed.description = data.description;
+    }
+
+    if (data.fields && data.fields.length > 0) {
+      embed.fields = data.fields.map((f) => ({
+        name: f.name,
+        value: f.value,
+        inline: f.inline || false,
+      }));
+    }
+
+    const timestamp = data.timestamp ? new Date(data.timestamp).toISOString() : new Date().toISOString();
+
+    if (data.updatedTimestamp) {
+      embed.footer = {
+        text: `Started: ${new Date(timestamp).toLocaleString()} | Updated: ${new Date(data.updatedTimestamp).toLocaleString()}`,
+      };
+    } else {
+      embed.timestamp = timestamp;
+    }
+
+    const response = await axios.post(webhookUrl, {
+      embeds: [embed],
+    });
+
+    console.log('Rich Discord alert sent:', data.title);
+
+    if (response.data.id) {
+      return response.data.id;
+    }
+    return null;
+  } catch (err) {
+    console.error('Failed to send rich Discord alert:', err);
+    return null;
+  }
+}
+
+export async function updateDiscordEmbed(messageId: string, data: RichEmbedData): Promise<void> {
+  if (!isAlertsEnabled()) {
+    return;
+  }
+
+  const webhookUrl = process.env.DISCORD_ALERT_WEBHOOK_URL;
+  if (!webhookUrl) {
+    return;
+  }
+
+  try {
+    const webhookData = webhookUrl.split('/');
+    webhookData.pop();
+    const guildId = webhookData.pop();
+    const webhookId = webhookData.pop();
+    const updateUrl = `${webhookData.join('/')}/${guildId}/${webhookId}/messages/${messageId}`;
+
+    const embed: any = {
+      title: data.title,
+      color: getEmbedColor(data.status),
+      fields: [],
+    };
+
+    if (data.description) {
+      embed.description = data.description;
+    }
+
+    if (data.fields && data.fields.length > 0) {
+      embed.fields = data.fields.map((f) => ({
+        name: f.name,
+        value: f.value,
+        inline: f.inline || false,
+      }));
+    }
+
+    const timestamp = data.timestamp ? new Date(data.timestamp).toISOString() : new Date().toISOString();
+
+    if (data.updatedTimestamp) {
+      embed.footer = {
+        text: `Started: ${new Date(timestamp).toLocaleString()} | Updated: ${new Date(data.updatedTimestamp).toLocaleString()}`,
+      };
+    } else {
+      embed.timestamp = timestamp;
+    }
+
+    await axios.patch(updateUrl, {
+      embeds: [embed],
+    });
+
+    console.log('Discord embed updated:', messageId.substring(0, 8));
+  } catch (err) {
+    console.error('Failed to update Discord embed:', err);
   }
 }
 
