@@ -121,3 +121,8 @@ config/*
 *.opencode*
 .env*
 !.env.example
+
+# PM2 logs and runtime state  
+logs/
+.pm2/
+pm2-debug.log

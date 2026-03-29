@@ -37,7 +37,11 @@
     "tenant:import": "tsx scripts/import-tenant.ts",
     "admin:create": "tsx scripts/create-admin.ts",
     "admin:reset": "tsx scripts/reset-admin-key.ts",
-    "prisma:meta:generate": "npx prisma generate --schema=./prisma/meta/schema.prisma"
+    "prisma:meta:generate": "npx prisma generate --schema=./prisma/meta/schema.prisma",
+    "start:pm2": "pm2 start ecosystem.config.js --env production && pm2 save",
+    "stop:pm2": "pm2 stop all && pm2 delete all",
+    "restart:pm2": "pm2 restart all",
+    "logs:pm2": "pm2 logs --lines 100 --raw"
   },
   "standard": {
     "env": [
@@ -106,6 +110,7 @@
     "mocha": "^11.7.5",
     "nodemon": "^3.1.14",
     "open": "^11.0.0",
+    "pm2": "^5.3.0",
     "prettier": "^3.8.1",
     "prisma": "^7.6.0",
     "tsx": "^4.21.0",

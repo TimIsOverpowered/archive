@@ -15,10 +15,7 @@ export async function checkTokenHealth(): Promise<void> {
     const streamerId = String(config.id);
 
     // Create logger with tenant context per iteration so each error is attributed to correct tenant
-    const log = createAutoLogger({
-      tenantId: streamerId,
-      component: 'TokenHealth',
-    });
+    const log = createAutoLogger(streamerId);
 
     if (config.twitch?.auth) {
       try {

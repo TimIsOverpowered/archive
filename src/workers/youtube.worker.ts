@@ -15,11 +15,7 @@ import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUploadJob>) => {
   const { streamerId, vodId, filePath, title, description, type, part, chapter } = job.data;
 
-  // Create logger with tenant context ONCE at start of processing scope
-  const log = createAutoLogger({
-    tenantId: String(streamerId),
-    component: 'YouTube-Worker',
-  });
+  const log = createAutoLogger(String(streamerId));
 
   const config = getStreamerConfig(streamerId);
 
