@@ -1,4 +1,4 @@
-import { PrismaClient } from '../../generated/streamer/client';
+import { PrismaClient, UploadStatus } from '../../generated/streamer/client';
 import { redisClient } from '../api/plugins/redis.plugin';
 
 interface VodResponse {
@@ -6,13 +6,15 @@ interface VodResponse {
   platform: string;
   title: string | null;
   duration: number;
-  thumbnail_url: string | null;
   created_at: Date;
-  downloaded_at: Date | null;
+  updated_at: Date;
+  is_live: boolean;
+  started_at: Date | null;
   vod_uploads?: Array<{
     upload_id: string;
     platform: string;
-    status: string;
+    status: UploadStatus;
+    thumbnail_url: string | null;
   }>;
   chapters?: Array<{
     name: string | null;
@@ -108,6 +110,7 @@ export async function getVods(client: PrismaClient, streamerId: string, query: V
             upload_id: true,
             platform: true,
             status: true,
+            thumbnail_url: true,
           },
         },
         chapters: {
@@ -179,7 +182,7 @@ export async function getVodById(client: PrismaClient, streamerId: string, vodId
   });
 
   if (vod) {
-    const response = vod as VodResponse;
+    const response = vod as unknown as VodResponse;
 
     if (!DISABLE_CACHE && redisClient) {
       try {

@@ -16,7 +16,7 @@ import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 interface LiveHlsDownloadJobData {
   vodId: string;
   platform: 'twitch' | 'kick';
-  userId: string;
+  streamerId: string;
   startedAt?: string;
   sourceUrl?: string;
 }
@@ -80,11 +80,11 @@ async function downloadTSSegmentsSequentially(segments: any[], vodDir: string, b
 }
 
 async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise<any> {
-  const { vodId, platform, userId, startedAt, sourceUrl } = job.data;
+  const { vodId, platform, streamerId, startedAt, sourceUrl } = job.data;
 
   // Create logger with tenant context ONCE at start of processing scope
   const log = createAutoLogger({
-    tenantId: String(userId),
+    tenantId: String(streamerId),
     component: 'VOD-Worker',
   });
 
@@ -100,13 +100,13 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
 
     if (!vodRecord || !vodRecord.id) throw new Error(`VOD record not found for ${vodId}`);
 
-    prisma = getClient(String(userId));
+    prisma = getClient(String(streamerId));
   } catch (error: any) {
     log.error(`[${vodId}] Failed to get database connection:`, error.message);
     throw error;
   }
 
-  const config = getStreamerConfig(String(userId)) || getStreamerConfig(vodId.split('-')[0]);
+  const config = getStreamerConfig(String(streamerId)) || getStreamerConfig(vodId.split('-')[0]);
 
   if (!config) throw new Error(`Stream config not found for VOD ${vodId}`);
 
@@ -122,7 +122,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
         status: 'warning',
         fields: [
           { name: 'Platform', value: platform, inline: true },
-          { name: 'User ID', value: String(userId), inline: true },
+          { name: 'Streamer ID', value: String(streamerId), inline: true },
           { name: 'Started At', value: startedAt || startTime, inline: false },
         ],
         timestamp: startTime,
@@ -131,7 +131,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
       log.warn('Failed to initialize Discord alert message');
     }
 
-    const vodDir = pathMod.join(config.settings.vodPath || '', String(userId), vodId);
+    const vodDir = pathMod.join(config.settings.vodPath || '', String(streamerId), vodId);
 
     try {
       await fsPromises.mkdir(vodDir, { recursive: true });
@@ -434,7 +434,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
 
       log.info(`[${vodId}] Found ${tsFilesCount} TS segments. Starting MP4 conversion...`);
 
-      const finalMp4Path = pathMod.join(config.settings.vodPath || '', String(userId), `${vodId}.mp4`);
+      const finalMp4Path = pathMod.join(config.settings.vodPath || '', String(streamerId), `${vodId}.mp4`);
 
       await convertHlsToMp4(m3u8Path, vodId, finalMp4Path);
 
@@ -469,7 +469,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
 
       if (config.youtube) {
         const youtubeJob = {
-          streamerId: String(userId),
+          streamerId: String(streamerId),
           vodId,
           filePath: finalMp4Path,
           title: `Live Stream - ${vodId}`,
@@ -491,7 +491,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
         log.info(`[${vodId}] HLS files preserved in ${vodDir} (saveHLS=true)`);
       }
 
-      resetFailures(String(userId));
+      resetFailures(String(streamerId));
 
       return { success: true, finalPath: finalMp4Path, durationSeconds: actualDuration };
     } catch (error: any) {
@@ -515,7 +515,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
     }
   } else {
     // Alerts disabled - just do the download without Discord notifications
-    const vodDir = pathMod.join(config.settings.vodPath || '', String(userId), vodId);
+    const vodDir = pathMod.join(config.settings.vodPath || '', String(streamerId), vodId);
 
     try {
       await fsPromises.mkdir(vodDir, { recursive: true });
@@ -607,7 +607,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
 
     log.info(`[${vodId}] Found ${tsFilesCount} TS segments. Starting MP4 conversion...`);
 
-    const finalMp4Path = pathMod.join(config.settings.vodPath || '', String(userId), `${vodId}.mp4`);
+    const finalMp4Path = pathMod.join(config.settings.vodPath || '', String(streamerId), `${vodId}.mp4`);
     await convertHlsToMp4(m3u8Path, vodId, finalMp4Path);
 
     log.info(`[${vodId}] MP4 conversion complete.`);
@@ -620,7 +620,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
     }
 
     if (config.youtube) {
-      const youtubeJob = { streamerId: String(userId), vodId, filePath: finalMp4Path, title: `Live Stream - ${vodId}`, description: '', type: 'vod' as const };
+      const youtubeJob = { streamerId: String(streamerId), vodId, filePath: finalMp4Path, title: `Live Stream - ${vodId}`, description: '', type: 'vod' as const };
       await (getYoutubeUploadQueue() as any).add(youtubeJob, { id: `youtube:${vodId}` });
     }
 
@@ -630,7 +630,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
       } catch {}
     }
 
-    resetFailures(String(userId));
+    resetFailures(String(streamerId));
     return { success: true, finalPath: finalMp4Path };
   }
 }

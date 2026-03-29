@@ -34,23 +34,15 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
 
   if (!twitchUsername || !config.twitch?.enabled) return;
 
-  // Get or extract user_id from channel name (handle both !id and username formats)
   let userIdCache: string | null = null;
 
-  if (twitchUsername.startsWith('!')) {
+  if (config.twitch?.id) {
+    userIdCache = String(config.twitch.id);
+  } else if (twitchUsername.startsWith('!')) {
     userIdCache = twitchUsername.slice(1);
   } else {
-    const lastVod = await prisma.vod.findFirst({
-      where: { platform, is_live: true },
-      orderBy: { createdAt: 'desc' as any },
-    });
-
-    if (lastVod && lastVod.userId) {
-      userIdCache = String(lastVod.userId);
-    } else {
-      log.warn(`[Monitor]:  No user_id cached for Twitch channel ${twitchUsername}. Skipping check.`);
-      return;
-    }
+    log.warn(`[Monitor]: No Twitch user_id available for channel ${twitchUsername}. Skipping check.`);
+    return;
   }
 
   if (!userIdCache) return;
@@ -62,7 +54,7 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
     log.info(`[Monitor]:  Twitch user ${userIdCache} is OFFLINE`);
 
     const activeLiveVod = await prisma.vod.findFirst({
-      where: { platform, userId: userIdCache, is_live: true },
+      where: { platform, is_live: true },
     });
 
     if (activeLiveVod) {
@@ -70,7 +62,7 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
 
       await prisma.vod.update({
         where: { id: String(activeLiveVod.id) },
-        data: { is_live: false, ended_at: new Date() },
+        data: { is_live: false },
       });
 
       // Clean up Redis dedup key for re-downloads later (stream ended = safe to clear)
@@ -108,15 +100,13 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
         is_live: true,
         started_at: new Date(streamStatus.started_at),
         title: streamStatus.title || 'Live Stream',
-        userId: userIdCache,
-        ended_at: null,
       },
     });
 
     await enqueueLiveHlsDownload({
       vodId: vodResult.vodId,
       platform,
-      userId: userIdCache,
+      streamerId: userIdCache,
       startedAt: new Date(streamStatus.started_at),
     });
   } else if (existingVod && !existingVod.is_live) {
@@ -141,7 +131,7 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
       await enqueueLiveHlsDownload({
         vodId: String(existingVod.id),
         platform,
-        userId: userIdCache,
+        streamerId: userIdCache,
         startedAt: new Date(streamStatus.started_at),
       });
     } else {
@@ -173,11 +163,7 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
     log.info(`[Monitor]:  Kick channel ${kickUsername} is offline`);
 
     const activeLiveVod = await prisma.vod.findFirst({
-      where: {
-        platform,
-        userId: kickUsername,
-        is_live: true,
-      },
+      where: { platform, is_live: true },
     });
 
     if (activeLiveVod) {
@@ -185,10 +171,7 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
 
       await prisma.vod.update({
         where: { id: String(activeLiveVod.id) },
-        data: {
-          is_live: false,
-          ended_at: new Date(),
-        },
+        data: { is_live: false },
       });
 
       // Clean up Redis dedup key for re-downloads later (stream ended = safe to clear)
@@ -230,8 +213,6 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
         is_live: true,
         started_at: new Date(streamStatus.created_at),
         title: vodObject.title || streamStatus.session_title,
-        userId: kickUsername,
-        ended_at: null,
       },
     });
 
@@ -240,7 +221,7 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
     await enqueueLiveHlsDownload({
       vodId: kickStreamIdStr,
       platform,
-      userId: kickUsername,
+      streamerId: kickUsername,
       startedAt: new Date(streamStatus.created_at),
       sourceUrl: streamStatus.source || undefined,
     });
@@ -266,7 +247,7 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
       await enqueueLiveHlsDownload({
         vodId: kickStreamIdStr,
         platform,
-        userId: kickUsername,
+        streamerId: kickUsername,
         startedAt: new Date(streamStatus.created_at),
         sourceUrl: streamStatus.source || undefined,
       });
@@ -314,8 +295,8 @@ async function checkHasActiveDownload(tenantId: string, vodId: string): Promise<
 /**
  * Enqueue Live HLS Download job with Redis deduplication check (48-hour TTL)
  */
-async function enqueueLiveHlsDownload(params: { vodId: string; platform: PlatformType; userId: string; startedAt: Date; sourceUrl?: string }): Promise<void> {
-  const log = loggerWithTenant(params.userId);
+async function enqueueLiveHlsDownload(params: { vodId: string; platform: PlatformType; streamerId: string; startedAt: Date; sourceUrl?: string }): Promise<void> {
+  const log = loggerWithTenant(params.streamerId);
   const Redis = (await import('ioredis')).default;
 
   // Use global Redis connection for deduplication checks only (not BullMQ queues)
@@ -353,7 +334,7 @@ async function enqueueLiveHlsDownload(params: { vodId: string; platform: Platfor
       {
         vodId: params.vodId,
         platform: params.platform,
-        userId: params.userId,
+        streamerId: params.streamerId,
         startedAt: params.startedAt.toISOString(),
         sourceUrl: params.sourceUrl || undefined,
       } as any, // Cast to bypass BullMQ type inference for extended job data

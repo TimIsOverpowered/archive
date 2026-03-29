@@ -39,10 +39,10 @@ export async function triggerChatAfterVod(vodJob: VODDownloadJob): Promise<strin
     return null;
   }
 
-  const streamerId = vodJob.streamerId || vodJob.userId;
+  const streamerId = vodJob.streamerId || undefined;
 
   if (!streamerId) {
-    console.warn('[Chat Job] No streamerId or userId available, skipping chat download');
+    console.warn('[Chat Job] No streamerId available, skipping chat download');
     return null;
   }
 
