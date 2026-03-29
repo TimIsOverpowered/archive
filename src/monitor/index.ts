@@ -41,7 +41,7 @@ export async function startMonitorService(): Promise<void> {
 /**
  * Graceful shutdown handler - clears all polling intervals and closes browser instances
  */
-async function gracefulShutdown(): Promise<void> {
+export async function stopMonitorService(): Promise<void> {
   console.info('[Monitor] Received shutdown signal. Cleaning up...');
 
   // Clear all monitor intervals
@@ -65,10 +65,9 @@ async function gracefulShutdown(): Promise<void> {
     console.warn('[Monitor]', err instanceof Error ? err.message : 'Error during shutdown cleanup');
   }
 
-  console.info('[Monitor] Shutdown complete. Exiting...');
-  process.exit(0);
+  console.info('[Monitor] Shutdown complete.');
 }
 
-// Register shutdown handlers for PM2 restarts/process termination
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
+// Register shutdown handlers for PM2 restarts/process termination (when running as standalone service)
+process.on('SIGTERM', stopMonitorService);
+process.on('SIGINT', stopMonitorService);

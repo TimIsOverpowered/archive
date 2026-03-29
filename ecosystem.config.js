@@ -1,10 +1,9 @@
 /**
  * PM2 Ecosystem Configuration for Archive API
  *
- * Defines three app instances running under a single PM2 process manager (Linux production server):
+ * Defines two app instances running under a single PM2 process manager (Linux production server):
  * 1. archive-api - HTTP REST endpoints (Fastify/Feathers)
- * 2. archive-worker - Background job processors (BullMQ + Puppeteer)
- * 3. archive-monitor - Stream detection and monitoring service
+ * 2. archive-worker - Background job processors + stream detection monitoring (BullMQ + Puppeteer)
  *
  * Deployment on Linux:
  *   npm install && npm run start:pm2
@@ -48,7 +47,7 @@ module.exports = {
       error_file: './logs/api-error.log', // Uncaught errors and exceptions
     },
 
-    // === APP #2: Background Workers (BullMQ queues + Puppeteer for VOD/Chat downloads & YouTube uploads) ===
+    // === APP #2: Background Workers + Stream Monitoring (BullMQ queues + Puppeteer for VOD/Chat downloads, YouTube uploads, and live stream detection) ===
     {
       name: 'archive-worker', // Separate PM2 app identifier
 
@@ -77,41 +76,8 @@ module.exports = {
 
       merge_logs: true, // Combine streams for cleaner log viewing
 
-      out_file: './logs/worker-out.log', // Worker stdout with pretty pino logs from console transport
-      error_file: './logs/worker-error.log', // Worker uncaught errors and exceptions
-    },
-
-    // === APP #3: Stream Monitoring Service (detects live streams, triggers VOD downloads) ===
-    {
-      name: 'archive-monitor', // Monitor service app identifier
-
-      script: './src/monitor-service.js', // Monitor entry point
-
-      interpreter: 'tsx', // TypeScript support via tsx
-
-      env: {
-        // Production monitor settings
-        NODE_ENV: 'production',
-        LOG_LEVEL: 'info',
-      },
-
-      env_development: {
-        // Development mode for monitor
-        NODE_ENV: 'development',
-        LOG_LEVEL: 'debug',
-      },
-
-      max_memory_restart: '384M', // Moderate memory usage (stream polling, lightweight compared to workers)
-
-      autorestart: true,
-      watch: false,
-      instances: 1,
-      exec_mode: 'fork',
-
-      merge_logs: true, // Combine stdout + stderr
-
-      out_file: './logs/monitor-out.log', // Monitor service console output
-      error_file: './logs/monitor-error.log', // Uncaught errors from monitor process
+      out_file: './logs/worker-out.log', // Worker stdout with pretty pino logs (includes stream detection polling)
+      error_file: './logs/worker-error.log', // Uncaught errors and exceptions
     },
   ],
 };
