@@ -4,11 +4,8 @@ import { PrismaClient } from '../prisma/generated/meta/index.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { program } from 'commander';
 import readline from 'readline';
-import { createRequire } from 'module';
 import path from 'path';
 import fs from 'fs';
-
-const require = createRequire(import.meta.url);
 
 program
   .requiredOption('--streamer <name>', 'Streamer name (tenant identifier)')
@@ -57,28 +54,10 @@ const main = async () => {
   console.log(`Dry run: ${options.dryRun ? 'YES' : 'NO'}\n`);
 
   try {
-    // Skip tenant lookup for testing purposes - comment out if meta DB is accessible
-    // const tenant = await metaClient.tenant.findFirst({
-    //   where: { display_name: options.streamer },
-    // });
-    // if (!tenant) {
-    //   console.error(`❌ Tenant "${options.streamer}" not found in meta database`);
-    //   process.exit(1);
-    // }
-
     const pg = await import('pg');
     const oldPool = new pg.Pool({ connectionString: options.dbUrl });
 
     try {
-      // Check if migration already completed (new tables exist without _new suffix)
-      const checkResult = await oldPool.query(`
-         SELECT EXISTS (
-           SELECT 1 FROM information_schema.tables 
-           WHERE table_schema = 'public' AND table_name IN ('vods', 'emotes', 'games', 'chat_messages')
-           AND table_name NOT LIKE '%_legacy'
-         ) as tables_exist
-       `);
-
       const vodsResult = await oldPool.query("SELECT COUNT(*) FROM vods WHERE NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vods' AND column_name = 'youtube')");
       const isAlreadyMigrated = vodsResult.rows[0].count > 0;
 
@@ -286,6 +265,47 @@ const main = async () => {
             await oldPool.query('ALTER TABLE "games_new" RENAME TO "games"');
             await oldPool.query('ALTER TABLE "streams" RENAME TO "streams_legacy"');
             console.log('✅ Legacy tables renamed and migration finalized\n');
+
+            const resolveMigrations = await confirm('Mark Prisma migrations as applied? This enables future prisma migrate deploy commands');
+            if (resolveMigrations) {
+              try {
+                const { execSync } = await import('child_process');
+                console.log('\n📝 Resolving migration state with Prisma...');
+
+                execSync('npx prisma migrate resolve --applied 20240101000000_add_normalized_schema', {
+                  stdio: 'inherit',
+                  cwd: process.cwd(),
+                });
+
+                console.log('✅ Migration state resolved successfully\n');
+              } catch (resolveError) {
+                console.warn('⚠️  Failed to resolve migration state. You may need to run manually:');
+                console.warn('   npx prisma migrate resolve --applied 20240101000000_add_normalized_schema\n');
+              }
+
+              try {
+                const { execSync } = await import('child_process');
+                console.log('📝 Applying remaining Prisma migrations...');
+
+                execSync('npx prisma migrate deploy', {
+                  stdio: 'inherit',
+                  cwd: process.cwd(),
+                });
+
+                console.log('✅ All Prisma migrations applied successfully\n');
+              } catch (deployError) {
+                console.warn('⚠️  Failed to apply remaining migrations. You may need to run manually:');
+                console.warn('   npx prisma migrate deploy\n');
+              }
+            } else {
+              console.log('\nℹ️  To enable future Prisma migrations, run:');
+              console.log('   npx prisma migrate resolve --applied 20240101000000_add_normalized_schema');
+              console.log('   npx prisma migrate deploy\n');
+            }
+          } else {
+            console.log('\nℹ️  To enable future Prisma migrations, run:');
+            console.log('   npx prisma migrate resolve --applied 20240101000000_add_normalized_schema');
+            console.log('   npx prisma migrate deploy\n');
           }
 
           console.log('🎉 Migration completed successfully!');
