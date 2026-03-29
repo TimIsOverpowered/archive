@@ -7,7 +7,7 @@ import HLS from 'hls-parser';
 import Redis from 'ioredis';
 import { getStreamerConfig } from '../config/loader.js';
 import { getClient } from '../db/client.js';
-import { sendDiscordAlert, updateDiscordMessage, resetFailures, isAlertsEnabled } from '../utils/alerts.js';
+import { sendRichAlert, updateDiscordEmbed, resetFailures, isAlertsEnabled } from '../utils/alerts.js';
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../services/twitch.js';
 import { getYoutubeUploadQueue } from '../jobs/queues.js';
 import { convertHlsToMp4, getDuration as getVideoDuration } from '../utils/video-utils.js';
@@ -114,7 +114,19 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
 
   if (isAlertsEnabled()) {
     try {
-      messageId = await sendDiscordAlert(`[Live Stream] Starting live HLS download for VOD: ${vodId}\nStream started at: ${startedAt || 'Unknown'}`);
+      const startTime = new Date().toISOString();
+
+      messageId = await sendRichAlert({
+        title: `🎬 Live Stream Started: ${vodId}`,
+        description: `${platform.toUpperCase()} live HLS download in progress`,
+        status: 'warning',
+        fields: [
+          { name: 'Platform', value: platform, inline: true },
+          { name: 'User ID', value: String(userId), inline: true },
+          { name: 'Started At', value: startedAt || startTime, inline: false },
+        ],
+        timestamp: startTime,
+      });
     } catch {
       log.warn('Failed to initialize Discord alert message');
     }
@@ -137,14 +149,78 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
     let lastSegmentUri: string | null = null;
     let noChangePollCounter = 0;
     let baseURL: string = '';
+    let totalSegmentsFound = 0;
+    let lastAlertPercentage = -1;
 
     log.info(`[${vodId}] Starting HLS polling loop...`);
 
     while (true) {
       try {
-        if (isAlertsEnabled() && messageId && noChangePollCounter % 12 === 0) {
-          const segmentCount = await fsPromises.readdir(vodDir).then((files) => files.filter((f) => f.endsWith('.ts')).length);
-          await updateDiscordMessage(messageId, `[Live Stream] ${vodId} - Downloading segments... (${segmentCount} TS files so far)`);
+        const segmentCount = await fsPromises.readdir(vodDir).then((files) => files.filter((f) => f.endsWith('.ts')).length);
+
+        if (segmentCount > totalSegmentsFound && isAlertsEnabled() && messageId) {
+          totalSegmentsFound = segmentCount;
+
+          if (noChangePollCounter % 24 === 0 && noChangePollCounter > 0) {
+            updateDiscordEmbed(messageId, {
+              title: `📥 Downloading ${vodId}`,
+              description: `${platform.toUpperCase()} live HLS download in progress`,
+              status: 'warning',
+              fields: [
+                { name: 'Platform', value: platform, inline: true },
+                { name: 'Segments', value: String(totalSegmentsFound), inline: false },
+              ],
+              timestamp: startedAt || new Date().toISOString(),
+              updatedTimestamp: new Date().toISOString(),
+            });
+
+            lastAlertPercentage = 15;
+          } else if (totalSegmentsFound > 20 && totalSegmentsFound < 40) {
+            updateDiscordEmbed(messageId, {
+              title: `📥 Downloading ${vodId}`,
+              description: `${platform.toUpperCase()} live HLS download in progress`,
+              status: 'warning',
+              fields: [
+                { name: 'Platform', value: platform, inline: true },
+                { name: 'Segments', value: String(totalSegmentsFound), inline: false },
+                { name: 'Progress', value: '~30%', inline: false },
+              ],
+              timestamp: startedAt || new Date().toISOString(),
+              updatedTimestamp: new Date().toISOString(),
+            });
+
+            lastAlertPercentage = 30;
+          } else if (totalSegmentsFound > 45 && totalSegmentsFound < 80) {
+            updateDiscordEmbed(messageId, {
+              title: `📥 Downloading ${vodId}`,
+              description: `${platform.toUpperCase()} live HLS download in progress`,
+              status: 'warning',
+              fields: [
+                { name: 'Platform', value: platform, inline: true },
+                { name: 'Segments', value: String(totalSegmentsFound), inline: false },
+                { name: 'Progress', value: '~60%', inline: false },
+              ],
+              timestamp: startedAt || new Date().toISOString(),
+              updatedTimestamp: new Date().toISOString(),
+            });
+
+            lastAlertPercentage = 60;
+          } else if (totalSegmentsFound > 150) {
+            updateDiscordEmbed(messageId, {
+              title: `📥 Downloading ${vodId}`,
+              description: `${platform.toUpperCase()} live HLS download in progress`,
+              status: 'warning',
+              fields: [
+                { name: 'Platform', value: platform, inline: true },
+                { name: 'Segments', value: String(totalSegmentsFound), inline: false },
+                { name: 'Progress', value: '~90%', inline: false },
+              ],
+              timestamp: startedAt || new Date().toISOString(),
+              updatedTimestamp: new Date().toISOString(),
+            });
+
+            lastAlertPercentage = 90;
+          }
         }
 
         log.info(`[${vodId}] Polling HLS playlist (attempt #${retryCount + 1})...`);
@@ -335,7 +411,17 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
     }
 
     if (isAlertsEnabled() && messageId) {
-      await updateDiscordMessage(messageId, `[Live Stream] ${vodId} - Download complete. Converting to MP4...`);
+      updateDiscordEmbed(messageId, {
+        title: `🔄 Converting ${vodId}`,
+        description: 'Download complete. MP4 conversion in progress...',
+        status: 'warning',
+        fields: [
+          { name: 'Platform', value: platform, inline: true },
+          { name: 'Total Segments', value: String(totalSegmentsFound), inline: false },
+        ],
+        timestamp: startedAt || new Date().toISOString(),
+        updatedTimestamp: new Date().toISOString(),
+      });
     }
 
     log.info(`[${vodId}] Stream download complete. Starting finalization...`);
@@ -364,7 +450,17 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
         log.info(`[${vodId}] Updated VOD with duration ${formattedDuration} and marked as ended`);
 
         if (isAlertsEnabled() && messageId) {
-          await updateDiscordMessage(messageId, `[Live Stream] ${vodId} - Complete! Duration: ${formattedDuration}`);
+          updateDiscordEmbed(messageId, {
+            title: `✅ ${vodId} Complete!`,
+            description: `${platform.toUpperCase()} live stream successfully processed and converted to MP4`,
+            status: 'success',
+            fields: [
+              { name: 'Platform', value: platform, inline: true },
+              { name: 'Duration', value: formattedDuration, inline: false },
+            ],
+            timestamp: startedAt || new Date().toISOString(),
+            updatedTimestamp: new Date().toISOString(),
+          });
         }
       } else {
         log.warn(`[${vodId}] Could not determine video duration from MP4 file`);
@@ -402,7 +498,17 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
       log.error(`[${vodId}] Finalization failed:`, error.message);
 
       if (messageId && isAlertsEnabled()) {
-        await updateDiscordMessage(messageId, `[Live Stream] ${vodId} FAILED: ${(error as Error).message}`);
+        updateDiscordEmbed(messageId, {
+          title: `❌ ${vodId} FAILED`,
+          description: `${platform.toUpperCase()} live stream processing failed`,
+          status: 'error',
+          fields: [
+            { name: 'Platform', value: platform, inline: true },
+            { name: 'Error', value: (error as Error).message.substring(0, 500), inline: false },
+          ],
+          timestamp: startedAt || new Date().toISOString(),
+          updatedTimestamp: new Date().toISOString(),
+        });
       }
 
       throw new Error('Stream finalization failed: ' + (error as Error).message);
