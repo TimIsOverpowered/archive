@@ -17,6 +17,7 @@ export async function loadStreamerConfigs(): Promise<StreamerConfig[]> {
 
     const streamerConfig: StreamerConfig = {
       id: tenant.id,
+      displayName: tenant.displayName,
       database: { url: dbUrl },
       settings: {
         domainName: typeof settingsObj.domainName === 'string' ? settingsObj.domainName : '',
@@ -121,4 +122,9 @@ export function clearConfigCache(): void {
 
 export function getConfigs(): Array<{ id: string }> {
   return Array.from(configCache.values());
+}
+
+export function getTenantDisplayName(tenantId: string): string {
+  const config = configCache.get(tenantId);
+  return config?.displayName || tenantId; // fallback to ID if somehow not found
 }

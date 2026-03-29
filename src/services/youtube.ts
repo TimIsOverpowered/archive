@@ -5,6 +5,7 @@ import { getStreamerConfig, clearConfigCache } from '../config/loader.js';
 import { decryptObject, encryptObject } from '../utils/encryption.js';
 import { metaClient } from '../db/meta-client.js';
 
+import { loggerWithTenant } from '../utils/logger.js';
 interface AuthObject {
   access_token?: string; // Optional - may not exist if expired and not refreshed yet
   refresh_token: string; // Always required for persistence
@@ -77,10 +78,11 @@ function getRemainingSeconds(client: any): number {
  * Forces refresh when <120s remaining to prevent mid-operation expiration during long tasks like uploads.
  */
 async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<any> {
+  const log = loggerWithTenant(streamerId);
   const creds = getYoutubeCredentials(streamerId);
 
   if (!creds) {
-    throw new Error(`YouTube credentials not configured for tenant ${streamerId}`);
+    throw new Error(`YouTube credentials not configured`);
   }
 
   // Get existing cached client (may be undefined or expired)
@@ -91,7 +93,7 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
 
   if (shouldRefreshPreemptively && client?.credentials.refresh_token) {
     // Pre-emptive refresh: force fresh token before operation starts
-    console.log(`[YouTube] Token expiring soon (${getRemainingSeconds(client)}s remaining), pre-emptive refresh for ${streamerId}`);
+    log.info(`[YouTube] Token expiring soon (${getRemainingSeconds(client)}s remaining), pre-emptive refresh`);
 
     try {
       await client.refreshAccessToken(); // Google's explicit async refresh method
@@ -130,7 +132,7 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
           clearConfigCache();
         }
 
-        console.log(`[YouTube] Pre-emptive token refresh persisted to DB for ${streamerId}`);
+        log.info(`[YouTube] Pre-emptive token refresh persisted to DB`);
       } else {
         // No auth configured - just refresh the existing client credentials but skip persistence
         client.setCredentials(buildCredentialsObject(client.credentials, undefined));
@@ -143,7 +145,7 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
         throw new Error(`Token refresh failed for ${streamerId} - re-authentication required. Original error: ${error.message}`);
       }
 
-      console.error(`[YouTube] Pre-emptive refresh error for ${streamerId}:`, error.message || error);
+      log.error(`[YouTube] Pre-emptive refresh error for ${streamerId}:`, error.message || error);
 
       // Don't clear cache yet - fall through to create fresh client below (graceful degradation)
     } finally {
@@ -151,7 +153,7 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
       if (!oauthClients.has(streamerId)) {
         oauthClients.set(streamerId, client);
 
-        console.log(`[YouTube] OAuth client updated in cache for ${streamerId}`);
+        log.info(`[YouTube] OAuth client updated in cache`);
       }
     }
 
@@ -159,7 +161,7 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
     const refreshedClient = oauthClients.get(streamerId);
 
     if (refreshedClient && !isTokenExpired(refreshedClient)) {
-      console.log(`[YouTube] Using pre-fetched token for ${streamerId}`);
+      log.info(`[YouTube] Using pre-fetched token`);
 
       return refreshedClient; // ✅ Valid token guaranteed - no race conditions!
     }
@@ -172,12 +174,12 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
 
   // Set up 'tokens' event listener for persistence on future refreshes
   newClient.on('tokens', async (newTokens: any) => {
-    console.log(`[YouTube] Tokens refreshed via auto-refresh for ${streamerId}`);
+    log.info(`[YouTube] Tokens refreshed via auto-refresh`);
 
     const config = getStreamerConfig(streamerId);
 
     if (!config?.youtube?.auth) {
-      console.error('[YouTube] No YouTube auth configured, cannot persist tokens');
+      log.error('[YouTube] No YouTube auth configured, cannot persist tokens');
 
       newClient.setCredentials(buildCredentialsObject(newTokens));
 
@@ -194,7 +196,7 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
         expiry_date: calculateExpiryDate(newTokens), // Always include absolute timestamp (Option A)
       };
 
-      console.log(`[YouTube] Persisting auto-refreshed auth object for ${streamerId}`);
+      log.info(`[YouTube] Persisting auto-refreshed auth object`);
 
       const encryptedAuth = encryptObject(updatedAuth);
 
@@ -203,9 +205,9 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
         data: { youtube: { ...config.youtube, auth: encryptedAuth } as any },
       });
 
-      console.log(`[YouTube] Auth object persisted to DB for ${streamerId}`);
+      log.info(`[YouTube] Auth object persisted to DB`);
     } catch (dbError: any) {
-      console.error(`[YouTube] Failed to persist auto-refreshed tokens to DB for ${streamerId}:`, dbError.message || dbError);
+      log.error(`[YouTube] Failed to persist auto-refreshed tokens to DB for ${streamerId}:`, dbError.message || dbError);
     } finally {
       // CRITICAL: Always update OAuth client's internal state regardless of DB write success/failure
       const credsUpdate = buildCredentialsObject(newTokens, config.youtube.auth);
@@ -213,9 +215,9 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
       try {
         newClient.setCredentials(credsUpdate);
 
-        console.log(`[YouTube] OAuth client credentials updated for ${streamerId}`);
+        log.info(`[YouTube] OAuth client credentials updated`);
       } catch (setCredsError: any) {
-        console.error('[YouTube] Failed to update OAuth client credentials:', setCredsError.message || setCredsError);
+        log.error('[YouTube] Failed to update OAuth client credentials:', setCredsError.message || setCredsError);
 
         throw new Error('Token refresh failed - cannot proceed with API call'); // Crash the current operation correctly
       }
@@ -227,9 +229,9 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
     if (clearConfigCache) {
       clearConfigCache();
 
-      console.log(`[YouTube] All caches cleared for ${streamerId} - will read fresh data from DB`);
+      log.info(`[YouTube] All caches cleared for ${streamerId} - will read fresh data from DB`);
     } else {
-      console.warn('[YouTube] Config cache clearing not available, may have stale config in memory');
+      log.warn('[YouTube] Config cache clearing not available, may have stale config in memory');
     }
   });
 
@@ -250,9 +252,9 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
         // Update credentials with expiry_date while preserving existing values
         newClient.credentials.expiry_date = authObj.expiry_date;
 
-        console.log(`[YouTube] Initialized client with cached token expiring at ${new Date(authObj.expiry_date).toISOString()}`);
+        log.info(`[YouTube] Initialized client with cached token expiring at ${new Date(authObj.expiry_date).toISOString()}`);
       } else {
-        console.warn('[YouTube] Cached access_token has invalid expiry format');
+        log.warn('[YouTube] Cached access_token has invalid expiry format');
       }
     } catch {
       // Ignore - OAuth2 library will handle refresh on first API call automatically (graceful fallback)
@@ -262,7 +264,7 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
   // Cache the newly created client for future reuse until token expires or explicitly cleared
   oauthClients.set(streamerId, newClient);
 
-  console.log(`[YouTube] Created/refreshed OAuth client with guaranteed valid token for ${streamerId}`);
+  log.info(`[YouTube] Created/refreshed OAuth client with guaranteed valid token`);
 
   return newClient;
 }
@@ -346,11 +348,12 @@ function buildCredentialsObject(
 
 function getYoutubeCredentials(streamerId: string): DecryptedYoutubeCreds | null {
   // Global OAuth2 app credentials from .env (single source of truth for all tenants)
+  const log = loggerWithTenant(streamerId);
   const clientId = process.env.YOUTUBE_CLIENT_ID;
   const clientSecret = process.env.YOUTUBE_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
-    console.error('[YouTube] YOUTUBE_CLIENT_ID or YOUTUBE_CLIENT_SECRET not set in .env');
+    log.error('[YouTube] YOUTUBE_CLIENT_ID or YOUTUBE_CLIENT_SECRET not set in .env');
     return null;
   }
 
@@ -358,7 +361,7 @@ function getYoutubeCredentials(streamerId: string): DecryptedYoutubeCreds | null
   const config = getStreamerConfig(streamerId);
 
   if (!config?.youtube?.auth) {
-    console.warn(`[YouTube] No auth configured for tenant ${streamerId}`);
+    log.warn(`[YouTube] No auth configured`);
     return null;
   }
 
@@ -367,7 +370,7 @@ function getYoutubeCredentials(streamerId: string): DecryptedYoutubeCreds | null
     const authObj = decryptObject<AuthObject>(config.youtube.auth);
 
     if (!authObj.refresh_token || typeof authObj.refresh_token !== 'string' || !authObj.refresh_token.trim()) {
-      console.warn(`[YouTube] No valid refresh token found for tenant ${streamerId}`);
+      log.warn(`[YouTube] No valid refresh token found`);
       return null;
     }
 
@@ -386,25 +389,25 @@ function getYoutubeCredentials(streamerId: string): DecryptedYoutubeCreds | null
       if (now < authObj.expiry_date - 60_000) {
         creds.accessToken = authObj.access_token;
 
-        console.log(`[YouTube] Using cached access token, expires at ${new Date(authObj.expiry_date).toISOString()}`);
+        log.info(`[YouTube] Using cached access token, expires at ${new Date(authObj.expiry_date).toISOString()}`);
       } else {
         // Token exists but expired or expiring soon - will force refresh on next API call (correct behavior)
         const timeUntilExpiry = authObj.expiry_date - now;
 
         if (timeUntilExpiry < 0) {
-          console.log(`[YouTube] Cached access token expired ${Math.abs(timeUntilExpiry / 1000).toFixed(0)}s ago, will refresh on next API call`);
+          log.info(`[YouTube] Cached access token expired ${Math.abs(timeUntilExpiry / 1000).toFixed(0)}s ago, will refresh on next API call`);
         } else {
-          console.log(`[YouTube] Access token expiring in ${(timeUntilExpiry / 1000).toFixed(0)}s (<60s buffer), forcing refresh for safety`);
+          log.info(`[YouTube] Access token expiring in ${(timeUntilExpiry / 1000).toFixed(0)}s (<60s buffer), forcing refresh for safety`);
         }
       }
     } else if (authObj.access_token) {
       // Has access_token but no expiry_date - suspicious data state, skip using cached token
-      console.warn(`[YouTube] Cached access token has no valid expiry_date field, skipping cache use`);
+      log.warn(`[YouTube] Cached access token has no valid expiry_date field, skipping cache use`);
     }
 
     return creds;
   } catch (error: any) {
-    console.error(`Failed to decrypt YouTube credentials for ${streamerId}:`, error.message || error);
+    log.error(`Failed to decrypt YouTube credentials for ${streamerId}:`, error.message || error);
     return null; // Return null instead of throwing - let caller handle gracefully
   }
 }
@@ -414,6 +417,7 @@ function getYoutubeCredentials(streamerId: string): DecryptedYoutubeCreds | null
  * Uses local expiry check (Option 2) + Google API validation (Option 1).
  */
 export async function validateYoutubeToken(streamerId: string): Promise<boolean> {
+  const log = loggerWithTenant(streamerId);
   const creds = getYoutubeCredentials(streamerId);
 
   if (!creds) return false;
@@ -434,11 +438,11 @@ export async function validateYoutubeToken(streamerId: string): Promise<boolean>
     }
 
     // No cached access token - will refresh on next API call automatically
-    console.log(`[YouTube] No cached token for ${streamerId}, will auto-refresh on first use`);
+    log.info(`[YouTube] No cached token for ${streamerId}, will auto-refresh on first use`);
     return true;
   } catch (error: any) {
     if (client && client.credentials.access_token) {
-      console.warn(`[YouTube] Token validation failed for ${streamerId}:`, error.message);
+      log.warn(`[YouTube] Token validation failed for ${streamerId}:`, error.message);
     }
     // Don't clear cache - let next API call handle refresh naturally
     return false;
@@ -467,9 +471,10 @@ export async function getAccessToken(streamerId: string): Promise<string> {
  */
 export function clearYoutubeOAuthClient(streamerId?: string): void {
   if (streamerId) {
+    const log = loggerWithTenant(streamerId);
     oauthClients.delete(streamerId);
 
-    console.log(`[YouTube] Cleared OAuth client cache for ${streamerId}`);
+    log.info(`[YouTube] Cleared OAuth client cache`);
   } else {
     oauthClients.clear();
 
@@ -500,6 +505,7 @@ export async function uploadVideo(
   privacyStatus: 'public' | 'unlisted' | 'private'
 ): Promise<{ videoId: string; thumbnailUrl: string }> {
   // Use guaranteed-valid-token helper (pre-emptive refresh if <120s remaining)
+  const log = loggerWithTenant(streamerId);
   const oauth2Client = await getYoutubeOAuthClientWithValidToken(streamerId);
 
   const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
@@ -540,7 +546,7 @@ export async function uploadVideo(
       thumbnailUrl = thumbnails?.high?.url || thumbnails?.medium?.url || '';
     }
   } catch (err) {
-    console.error('Failed to fetch thumbnail URL:', err);
+    log.error({ err }, 'Failed to fetch thumbnail URL');
   }
 
   return { videoId, thumbnailUrl };

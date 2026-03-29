@@ -11,6 +11,7 @@ import { sendDiscordAlert, updateDiscordMessage, resetFailures, isAlertsEnabled 
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../services/twitch.js';
 import { getYoutubeUploadQueue } from '../jobs/queues.js';
 import { convertHlsToMp4, getDuration as getVideoDuration } from '../utils/video-utils.js';
+import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 
 interface LiveHlsDownloadJobData {
   vodId: string;
@@ -81,7 +82,13 @@ async function downloadTSSegmentsSequentially(segments: any[], vodDir: string, b
 async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise<any> {
   const { vodId, platform, userId, startedAt, sourceUrl } = job.data;
 
-  console.info(`[${vodId}] Starting Live HLS Download mode for ${platform} stream`);
+  // Create logger with tenant context ONCE at start of processing scope
+  const log = createAutoLogger({
+    tenantId: String(userId),
+    component: 'VOD-Worker',
+  });
+
+  log.info(`[${vodId}] Starting Live HLS Download mode for ${platform} stream`);
 
   let prisma: any;
   try {
@@ -95,7 +102,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
 
     prisma = getClient(String(userId));
   } catch (error: any) {
-    console.error(`[${vodId}] Failed to get database connection:`, error.message);
+    log.error(`[${vodId}] Failed to get database connection:`, error.message);
     throw error;
   }
 
@@ -109,14 +116,14 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
     try {
       messageId = await sendDiscordAlert(`[Live Stream] Starting live HLS download for VOD: ${vodId}\nStream started at: ${startedAt || 'Unknown'}`);
     } catch {
-      console.warn('Failed to initialize Discord alert message');
+      log.warn('Failed to initialize Discord alert message');
     }
 
     const vodDir = pathMod.join(config.settings.vodPath || '', String(userId), vodId);
 
     try {
       await fsPromises.mkdir(vodDir, { recursive: true });
-      console.info(`[${vodId}] Created download directory: ${vodDir}`);
+      log.info(`[${vodId}] Created download directory: ${vodDir}`);
     } catch (error: any) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
         throw new Error(`Failed to create VOD directory ${vodDir}: ${(error as Error).message}`);
@@ -131,7 +138,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
     let noChangePollCounter = 0;
     let baseURL: string = '';
 
-    console.info(`[${vodId}] Starting HLS polling loop...`);
+    log.info(`[${vodId}] Starting HLS polling loop...`);
 
     while (true) {
       try {
@@ -140,7 +147,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
           await updateDiscordMessage(messageId, `[Live Stream] ${vodId} - Downloading segments... (${segmentCount} TS files so far)`);
         }
 
-        console.info(`[${vodId}] Polling HLS playlist (attempt #${retryCount + 1})...`);
+        log.info(`[${vodId}] Polling HLS playlist (attempt #${retryCount + 1})...`);
 
         let variantM3u8String = '';
 
@@ -151,13 +158,13 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
             const masterPlaylistContent = await getTwitchM3u8(vodId, tokenSig.value, tokenSig.signature);
 
             if (!masterPlaylistContent) {
-              console.error(`[${vodId}] Failed to fetch Twitch master playlist`);
+              log.error(`[${vodId}] Failed to fetch Twitch master playlist`);
 
               retryCount++;
               await new Promise((resolve) => setTimeout(resolve, 5000 * Math.min(retryCount, 6)));
 
               if (retryCount > maxRetryBeforeEndDetection) {
-                console.warn(`[${vodId}] Too many consecutive failures. Assuming stream ended or platform issue.`);
+                log.warn(`[${vodId}] Too many consecutive failures. Assuming stream ended or platform issue.`);
                 break;
               }
 
@@ -167,7 +174,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
             const parsedMaster: any = HLS.parse(masterPlaylistContent);
 
             if (!parsedMaster) {
-              console.error(`[${vodId}] Failed to parse Twitch master playlist`);
+              log.error(`[${vodId}] Failed to parse Twitch master playlist`);
               retryCount++;
               await new Promise((resolve) => setTimeout(resolve, 5000));
 
@@ -184,13 +191,13 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
               variantM3u8String = await axios.get(bestVariantUrl).then((r) => r.data);
             }
           } catch (error: any) {
-            console.error(`[${vodId}] Failed to fetch Twitch HLS playlist:`, error.message);
+            log.error(`[${vodId}] Failed to fetch Twitch HLS playlist:`, error.message);
 
             retryCount++;
             await new Promise((resolve) => setTimeout(resolve, 5000 * Math.min(retryCount, 6)));
 
             if (retryCount > maxRetryBeforeEndDetection) {
-              console.warn(`[${vodId}] Too many consecutive failures. Assuming stream ended or platform issue.`);
+              log.warn(`[${vodId}] Too many consecutive failures. Assuming stream ended or platform issue.`);
               break;
             }
 
@@ -200,13 +207,13 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
           const fetchUrl = sourceUrl || '';
 
           if (!fetchUrl) {
-            console.error(`[${vodId}] No Kick HLS source URL provided. Cannot continue download.`);
+            log.error(`[${vodId}] No Kick HLS source URL provided. Cannot continue download.`);
 
             retryCount++;
             await new Promise((resolve) => setTimeout(resolve, 5000));
 
             if (retryCount > maxRetryBeforeEndDetection * 2) {
-              console.error(`[${vodId}] Aborting download - no source URL available after multiple attempts`);
+              log.error(`[${vodId}] Aborting download - no source URL available after multiple attempts`);
 
               await prisma.vod.update({ where: { id: vodId }, data: { is_live: false, ended_at: new Date() } as any });
 
@@ -229,13 +236,13 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
 
               variantM3u8String = response.data;
             } catch (error: any) {
-              console.error(`[${vodId}] Failed to fetch Kick HLS playlist from ${fetchUrl}:`, error.message);
+              log.error(`[${vodId}] Failed to fetch Kick HLS playlist from ${fetchUrl}:`, error.message);
 
               retryCount++;
               await new Promise((resolve) => setTimeout(resolve, 5000 * Math.min(retryCount, 6)));
 
               if (retryCount > maxRetryBeforeEndDetection) {
-                console.warn(`[${vodId}] Too many consecutive failures. Assuming stream ended or platform issue.`);
+                log.warn(`[${vodId}] Too many consecutive failures. Assuming stream ended or platform issue.`);
                 break;
               }
 
@@ -247,7 +254,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
         const parsedM3u8: any = HLS.parse(variantM3u8String);
 
         if (!parsedM3u8) {
-          console.error(`[${vodId}] Invalid HLS playlist structure`);
+          log.error(`[${vodId}] Invalid HLS playlist structure`);
 
           retryCount++;
           await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -260,18 +267,18 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
         if (lastSegmentUri === currentLastSegment && lastSegmentUri !== null) {
           noChangePollCounter++;
 
-          console.info(`[${vodId}] No new segments detected. Poll #${noChangePollCounter} without change.`);
+          log.info(`[${vodId}] No new segments detected. Poll #${noChangePollCounter} without change.`);
 
           const maxNoChangeThreshold = 60; // 60 polls * 5s = ~300 seconds (5 minutes) for Kick stream end detection
 
           if (noChangePollCounter >= maxNoChangeThreshold) {
-            console.info(`[${vodId}] Stream end detected after ${noChangePollCounter} unchanged polls (${noChangePollCounter * 5}s)`);
+            log.info(`[${vodId}] Stream end detected after ${noChangePollCounter} unchanged polls (${noChangePollCounter * 5}s)`);
 
             break; // Exit polling loop - assume stream has ended naturally or platform stopped sending updates
           }
         } else {
           if (noChangePollCounter > 0) {
-            console.info(`[${vodId}] New segment detected. Resuming download after ${noChangePollCounter} idle polls.`);
+            log.info(`[${vodId}] New segment detected. Resuming download after ${noChangePollCounter} idle polls.`);
           }
 
           lastSegmentUri = currentLastSegment;
@@ -280,17 +287,17 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
 
         await fsPromises.writeFile(m3u8Path, variantM3u8String);
 
-        console.debug(`[${vodId}] Playlist written. Total segments so far: ${parsedM3u8.segments?.length || 0}`);
+        log.debug(`[${vodId}] Playlist written. Total segments so far: ${parsedM3u8.segments?.length || 0}`);
 
         const newSegments = (parsedM3u8.segments || []).filter((seg: any) => !fileExists(`${vodDir}/${seg.uri}`));
 
         if (newSegments.length > 0) {
-          console.info(`[${vodId}] Found ${newSegments.length} new TS segments to download...`);
+          log.info(`[${vodId}] Found ${newSegments.length} new TS segments to download...`);
 
           try {
             await downloadTSSegmentsSequentially(newSegments, vodDir, baseURL);
           } catch (error: any) {
-            console.error(`[${vodId}] Error downloading segments:`, error.message);
+            log.error(`[${vodId}] Error downloading segments:`, error.message);
 
             retryCount++;
 
@@ -303,14 +310,14 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
             continue; // Skip to next poll cycle without incrementing noChange counter (we still got playlist data)
           }
         } else {
-          console.debug(`[${vodId}] No new segments. Last segment: ${currentLastSegment}`);
+          log.debug(`[${vodId}] No new segments. Last segment: ${currentLastSegment}`);
         }
 
         retryCount = 0;
 
         await new Promise((resolve) => setTimeout(resolve, 5000)); // Poll every 5 seconds for live streams
       } catch (error: any) {
-        console.error(`[${vodId}] Error in HLS poll cycle:`, error.message);
+        log.error(`[${vodId}] Error in HLS poll cycle:`, error.message);
 
         retryCount++;
 
@@ -318,7 +325,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
 
         if (retryCount > maxRetryBeforeEndDetection + 12) {
           // Higher threshold for complete failures vs just no segments
-          console.error(`[${vodId}] Aborting live HLS download after ${retryCount} consecutive errors`);
+          log.error(`[${vodId}] Aborting live HLS download after ${retryCount} consecutive errors`);
 
           throw new Error('Live HLS polling failed repeatedly');
         }
@@ -331,7 +338,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
       await updateDiscordMessage(messageId, `[Live Stream] ${vodId} - Download complete. Converting to MP4...`);
     }
 
-    console.info(`[${vodId}] Stream download complete. Starting finalization...`);
+    log.info(`[${vodId}] Stream download complete. Starting finalization...`);
 
     try {
       const filesInDir = await fsPromises.readdir(vodDir);
@@ -339,13 +346,13 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
 
       if (tsFilesCount === 0) throw new Error(`No TS segments found in ${vodDir}. Download may have failed or stream was empty.`);
 
-      console.info(`[${vodId}] Found ${tsFilesCount} TS segments. Starting MP4 conversion...`);
+      log.info(`[${vodId}] Found ${tsFilesCount} TS segments. Starting MP4 conversion...`);
 
       const finalMp4Path = pathMod.join(config.settings.vodPath || '', String(userId), `${vodId}.mp4`);
 
       await convertHlsToMp4(m3u8Path, vodId, finalMp4Path);
 
-      console.info(`[${vodId}] MP4 conversion complete. File saved to ${finalMp4Path}`);
+      log.info(`[${vodId}] MP4 conversion complete. File saved to ${finalMp4Path}`);
 
       const actualDuration = await getVideoDuration(finalMp4Path);
 
@@ -354,13 +361,13 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
 
         await prisma.vod.update({ where: { id: vodId }, data: { duration: formattedDuration, is_live: false, ended_at: new Date() } as any });
 
-        console.info(`[${vodId}] Updated VOD with duration ${formattedDuration} and marked as ended`);
+        log.info(`[${vodId}] Updated VOD with duration ${formattedDuration} and marked as ended`);
 
         if (isAlertsEnabled() && messageId) {
           await updateDiscordMessage(messageId, `[Live Stream] ${vodId} - Complete! Duration: ${formattedDuration}`);
         }
       } else {
-        console.warn(`[${vodId}] Could not determine video duration from MP4 file`);
+        log.warn(`[${vodId}] Could not determine video duration from MP4 file`);
         await prisma.vod.update({ where: { id: vodId }, data: { is_live: false, ended_at: new Date() } as any });
       }
 
@@ -374,7 +381,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
           type: 'vod' as const,
         };
         await (getYoutubeUploadQueue() as any).add(youtubeJob, { id: `youtube:${vodId}` });
-        console.info(`[${vodId}] YouTube upload job queued`);
+        log.info(`[${vodId}] YouTube upload job queued`);
       }
 
       if (!config.settings.saveHLS) {
@@ -382,17 +389,17 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
           await fsPromises.rm(vodDir, { recursive: true });
         } catch (error: any) {
           // Non-critical cleanup failure
-          console.warn(`[${vodId}] Failed to clean up temporary directory ${vodDir}:`, error.message);
+          log.warn(`[${vodId}] Failed to clean up temporary directory ${vodDir}:`, error.message);
         }
       } else {
-        console.info(`[${vodId}] HLS files preserved in ${vodDir} (saveHLS=true)`);
+        log.info(`[${vodId}] HLS files preserved in ${vodDir} (saveHLS=true)`);
       }
 
       resetFailures(String(userId));
 
       return { success: true, finalPath: finalMp4Path, durationSeconds: actualDuration };
     } catch (error: any) {
-      console.error(`[${vodId}] Finalization failed:`, error.message);
+      log.error(`[${vodId}] Finalization failed:`, error.message);
 
       if (messageId && isAlertsEnabled()) {
         await updateDiscordMessage(messageId, `[Live Stream] ${vodId} FAILED: ${(error as Error).message}`);
@@ -400,6 +407,125 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
 
       throw new Error('Stream finalization failed: ' + (error as Error).message);
     }
+  } else {
+    // Alerts disabled - just do the download without Discord notifications
+    const vodDir = pathMod.join(config.settings.vodPath || '', String(userId), vodId);
+
+    try {
+      await fsPromises.mkdir(vodDir, { recursive: true });
+      log.info(`[${vodId}] Created download directory (alerts disabled): ${vodDir}`);
+    } catch (error: any) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+        throw new Error(`Failed to create VOD directory ${vodDir}: ${(error as Error).message}`);
+      }
+    }
+
+    const m3u8Path = pathMod.join(vodDir, `${vodId}.m3u8`);
+    let retryCount = 0;
+    let lastSegmentUri: string | null = null;
+    let noChangePollCounter = 0;
+    let baseURL: string = '';
+
+    log.info(`[${vodId}] Starting HLS polling loop (alerts disabled)...`);
+
+    while (true) {
+      try {
+        log.debug(`[${vodId}] Polling HLS playlist...`);
+
+        let variantM3u8String = '';
+
+        if (platform === 'twitch') {
+          const tokenSig = await getVodTokenSig(vodId);
+          const masterPlaylistContent = await getTwitchM3u8(vodId, tokenSig.value, tokenSig.signature);
+
+          if (!masterPlaylistContent) throw new Error('Failed to fetch Twitch master playlist');
+
+          const parsedMaster: any = HLS.parse(masterPlaylistContent);
+
+          if (!parsedMaster) throw new Error('Failed to parse Twitch master playlist');
+
+          const bestVariantUrl = parsedMaster.variants?.[0]?.uri || parsedMaster.uri;
+
+          baseURL = masterPlaylistContent.substring(0, masterPlaylistContent.lastIndexOf('/'));
+          variantM3u8String = await axios.get(bestVariantUrl.includes('/') ? bestVariantUrl : `${baseURL}/${bestVariantUrl}`).then((r) => r.data);
+        } else if (platform === 'kick') {
+          const fetchUrl = sourceUrl || '';
+
+          if (!fetchUrl) throw new Error('No Kick HLS source URL provided');
+
+          baseURL = fetchUrl.substring(0, fetchUrl.lastIndexOf('/'));
+          variantM3u8String = await axios.get(fetchUrl).then((r) => r.data);
+        }
+
+        const parsedM3u8: any = HLS.parse(variantM3u8String);
+
+        if (!parsedM3u8) throw new Error('Invalid HLS playlist structure');
+
+        await fsPromises.writeFile(m3u8Path, variantM3u8String);
+
+        const currentLastSegment = parsedM3u8.segments?.[parsedM3u8.segments.length - 1]?.uri || '';
+
+        if (lastSegmentUri === currentLastSegment && lastSegmentUri !== null) {
+          noChangePollCounter++;
+
+          if (noChangePollCounter >= 60) break; // Stream end detection
+        } else {
+          lastSegmentUri = currentLastSegment;
+          noChangePollCounter = 0;
+        }
+
+        const newSegments = (parsedM3u8.segments || []).filter((seg: any) => !fileExists(`${vodDir}/${seg.uri}`));
+
+        if (newSegments.length > 0) {
+          await downloadTSSegmentsSequentially(newSegments, vodDir, baseURL);
+        }
+
+        retryCount = 0;
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      } catch (error: any) {
+        log.error(`[${vodId}] Error in poll cycle:`, error.message);
+
+        retryCount++;
+        if (retryCount > 24) throw new Error('HLS polling failed repeatedly'); // Using hardcoded value instead of constant reference
+
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
+    }
+
+    log.info(`[${vodId}] Stream download complete. Starting finalization...`);
+
+    const filesInDir = await fsPromises.readdir(vodDir);
+    const tsFilesCount = filesInDir.filter((f) => f.endsWith('.ts')).length;
+
+    if (tsFilesCount === 0) throw new Error('No TS segments found');
+
+    log.info(`[${vodId}] Found ${tsFilesCount} TS segments. Starting MP4 conversion...`);
+
+    const finalMp4Path = pathMod.join(config.settings.vodPath || '', String(userId), `${vodId}.mp4`);
+    await convertHlsToMp4(m3u8Path, vodId, finalMp4Path);
+
+    log.info(`[${vodId}] MP4 conversion complete.`);
+
+    const actualDuration = await getVideoDuration(finalMp4Path);
+
+    if (actualDuration) {
+      const formattedDuration = toHHMMSS(Math.round(actualDuration));
+      await prisma.vod.update({ where: { id: vodId }, data: { duration: formattedDuration, is_live: false, ended_at: new Date() } as any });
+    }
+
+    if (config.youtube) {
+      const youtubeJob = { streamerId: String(userId), vodId, filePath: finalMp4Path, title: `Live Stream - ${vodId}`, description: '', type: 'vod' as const };
+      await (getYoutubeUploadQueue() as any).add(youtubeJob, { id: `youtube:${vodId}` });
+    }
+
+    if (!config.settings.saveHLS) {
+      try {
+        await fsPromises.rm(vodDir, { recursive: true });
+      } catch {}
+    }
+
+    resetFailures(String(userId));
+    return { success: true, finalPath: finalMp4Path };
   }
 }
 
