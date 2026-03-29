@@ -7,53 +7,36 @@ datasource db {
   provider = "postgresql"
 }
 
-enum UploadStatus {
-  PENDING
-  UPLOADING
-  COMPLETED
-  FAILED
-}
-
 model Vod {
-  id            String    @id
+  id            String      @id(map: "vods_new_pkey")
   platform      String
   title         String?
-  duration      Int       @default(0)
+  duration      Int         @default(0)
   thumbnail_url String?
   stream_id     String?
-  created_at    DateTime  @default(now())
+  created_at    DateTime    @default(now())
   downloaded_at DateTime?
-  
-  // Live streaming fields (consolidated from streams table)
-  is_live       Boolean   @default(false)
-  started_at    DateTime?
-  ended_at      DateTime?
-  user_id       String?   // Channel/user identifier for tracking
-  
-  vod_uploads   VodUpload[]
-  games         Game[]
-  emotes        Emote[]
   chapters      Chapter[]
+  emotes        Emote?
+  games         Game[]
+  vod_uploads   VodUpload[]
 
   @@unique([platform, id])
-  @@index([platform])
-  @@index([is_live])
-  @@index([user_id, platform])
+  @@index([platform], map: "vods_new_platform_idx")
   @@map("vods")
 }
 
 model VodUpload {
   vod_id        String
   platform      String
-  upload_id     String    @id
+  upload_id     String       @id
   type          String?
-  duration      Int       @default(0)
-  part          Int       @default(0)
+  duration      Int          @default(0)
+  part          Int          @default(0)
   status        UploadStatus @default(PENDING)
   thumbnail_url String?
-  created_at    DateTime  @default(now())
-
-  vod Vod @relation(fields: [vod_id], references: [id], onDelete: Cascade)
+  created_at    DateTime     @default(now())
+  vod           Vod          @relation(fields: [vod_id], references: [id], onDelete: Cascade)
 
   @@index([vod_id, platform])
   @@index([platform])
@@ -64,62 +47,118 @@ model VodUpload {
 }
 
 model Emote {
-  id              Int       @id @default(autoincrement())
-  vod_id          String    @unique
+  id              Int    @id(map: "emotes_new_pkey") @default(autoincrement())
+  vod_id          String @unique(map: "emotes_new_vod_id_key")
   ffz_emotes      Json?
   bttv_emotes     Json?
   seven_tv_emotes Json?
-
-  vod Vod @relation(fields: [vod_id], references: [id], onDelete: Cascade)
+  vod             Vod    @relation(fields: [vod_id], references: [id], onDelete: Cascade, map: "emotes_new_vod_id_fkey")
 
   @@map("emotes")
 }
 
 model Game {
-  id            Int       @id @default(autoincrement())
-  vod_id        String
-  start_time    Decimal?
-  end_time      Decimal?
+  id             Int      @id(map: "games_new_pkey") @default(autoincrement())
+  vod_id         String
+  start_time     Decimal?
+  end_time       Decimal?
   video_provider String?
-  video_id      String?
-  thumbnail_url String?
-  game_id       String?
-  game_name     String?
-  title         String?
-  chapter_image String?
+  video_id       String?
+  thumbnail_url  String?
+  game_id        String?
+  game_name      String?
+  title          String?
+  chapter_image  String?
+  vod            Vod      @relation(fields: [vod_id], references: [id], onDelete: Cascade, map: "games_new_vod_id_fkey")
 
-  vod Vod @relation(fields: [vod_id], references: [id], onDelete: Cascade)
-
-  @@index([vod_id, start_time])
-  @@index([game_name])
+  @@index([game_name], map: "games_new_game_name_idx")
+  @@index([vod_id, start_time], map: "games_new_vod_id_start_time_idx")
   @@map("games")
 }
 
 model Chapter {
-  id            Int       @id @default(autoincrement())
-  vod_id        String
-  game_id       String?
-  name          String?
-  image         String?
-  duration      String?
-  start         Int       @default(0)
-  end           Int?
-
-  vod Vod @relation(fields: [vod_id], references: [id], onDelete: Cascade)
+  id       Int     @id @default(autoincrement())
+  vod_id   String
+  game_id  String?
+  name     String?
+  image    String?
+  duration String?
+  start    Int     @default(0)
+  end      Int?
+  vod      Vod     @relation(fields: [vod_id], references: [id], onDelete: Cascade)
 
   @@index([vod_id])
   @@map("chapters")
 }
 
 model ChatMessage {
-   id                     String   @id
-   vod_id                 String
-   display_name           String?
-   content_offset_seconds Decimal
-   message                Json
-   user_badges            Json
-   user_color             String
+  id                     String    @id(map: "logs_pkey") @db.Uuid
+  vod_id                 String
+  display_name           String?
+  content_offset_seconds Decimal   @db.Decimal
+  user_color             String?
+  createdAt              DateTime? @db.Timestamptz(6)
+  updatedAt              DateTime? @db.Timestamptz(6)
+  message                Json?
+  user_badges            Json?
 
-   @@index([vod_id, content_offset_seconds, id])
-   @@map("chat_messages")
- }
+  @@index([vod_id, content_offset_seconds, id], map: "idx_logs_vod_offset_id")
+  @@map("chat_messages")
+}
+
+model emotes_legacy {
+  vod_id      String    @id(map: "emotes_pkey")
+  ffz_emotes  Json?
+  tv_emotes   Json?     @map("7tv_emotes")
+  bttv_emotes Json?
+  createdAt   DateTime? @db.Timestamptz(6)
+  updatedAt   DateTime? @db.Timestamptz(6)
+}
+
+model games_legacy {
+  id             BigInt    @id(map: "games_pkey") @default(autoincrement())
+  vod_id         String?
+  start_time     Decimal?  @db.Decimal
+  end_time       Decimal?  @db.Decimal
+  video_provider String?
+  video_id       String?
+  video_url      String?
+  thumbnail_url  String?
+  game_id        String?
+  game_name      String?
+  createdAt      DateTime? @db.Timestamptz(6)
+  updatedAt      DateTime? @db.Timestamptz(6)
+  chapter_image  String?
+  title          String?
+
+  @@index([vod_id, id, game_id], map: "games_index")
+}
+
+model streams_legacy {
+  id         BigInt    @id(map: "streams_pkey")
+  started_at DateTime? @db.Timestamptz(6)
+  platform   String
+  is_live    Boolean?
+}
+
+model vods_legacy {
+  id            String    @id(map: "vods_pkey")
+  title         String?
+  date          String?
+  createdAt     DateTime? @db.Timestamptz(6)
+  updatedAt     DateTime? @db.Timestamptz(6)
+  duration      String?
+  thumbnail_url String?
+  chapters      Json?
+  youtube       Json?
+  stream_id     String?
+  drive         Json?
+  platform      String
+}
+
+enum UploadStatus {
+  PENDING
+  UPLOADING
+  COMPLETED
+  FAILED
+}

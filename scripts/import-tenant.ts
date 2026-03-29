@@ -47,12 +47,6 @@ interface KickConfig {
   id?: string;
 }
 
-interface GoogleConfig {
-  client_id: string;
-  client_secret: string;
-  redirect_url: string;
-}
-
 interface SettingsConfig {
   channel?: string;
   domainName: string;
@@ -68,7 +62,6 @@ interface SettingsConfig {
 interface RawConfig {
   twitch?: TwitchConfig;
   kick?: KickConfig;
-  google?: GoogleConfig;
   youtube?: YoutubeConfig;
   channel?: string;
   domainName?: string;
@@ -136,16 +129,6 @@ function processKick(config: KickConfig | undefined) {
   return kick;
 }
 
-function processGoogle(config: GoogleConfig | undefined) {
-  if (!config) return null;
-
-  return {
-    client_id: config.client_id,
-    client_secret: config.client_secret,
-    redirect_url: config.redirect_url,
-  };
-}
-
 function processSettings(raw: RawConfig) {
   const settings: Record<string, unknown> = {};
 
@@ -196,7 +179,6 @@ async function importConfig(channelName: string, dbUrl: string): Promise<void> {
   const twitch = processTwitch(rawConfig.twitch);
   const youtube = processYoutube(rawConfig.youtube);
   const kick = processKick(rawConfig.kick);
-  const google = processGoogle(rawConfig.google);
   const settings = processSettings(rawConfig);
 
   const encryptedDbUrl = encryptScalar(dbUrl);
@@ -213,7 +195,6 @@ async function importConfig(channelName: string, dbUrl: string): Promise<void> {
   if (twitch) createData.twitch = twitch;
   if (youtube) createData.youtube = youtube;
   if (kick) createData.kick = kick;
-  if (google) createData.google = google;
 
   await metaClient.tenant.create({ data: createData as any });
 

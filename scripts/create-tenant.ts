@@ -321,7 +321,6 @@ async function main(): Promise<void> {
 
     const enableYouTube = await confirm('Enable YouTube uploads?');
     let youtubeData: any = null;
-    let googleData: any = null;
 
     if (enableYouTube) {
       console.log('\nYouTube API:');
@@ -365,22 +364,6 @@ async function main(): Promise<void> {
         upload: youtubeUploadEnabled,
         accessToken: youtubeAccessToken,
         refreshToken: youtubeRefreshToken,
-      };
-
-      // Google OAuth for YouTube token refresh
-      console.log('\n─'.repeat(50));
-      console.log('GOOGLE OAUTH (for YouTube token refresh)');
-      console.log('─'.repeat(50));
-      console.log('These are PUBLIC credentials for OAuth flow, not secrets\n');
-
-      const googleClientId = await prompt('Google OAuth Client ID: ');
-      const googleClientSecret = await prompt('Google OAuth Client Secret: ');
-      const googleRedirectUrl = await prompt('Redirect URL (or press Enter to leave empty): ');
-
-      googleData = {
-        client_id: googleClientId,
-        client_secret: googleClientSecret,
-        redirect_url: googleRedirectUrl,
       };
     }
 
@@ -500,10 +483,6 @@ async function main(): Promise<void> {
       configData.kick = { enabled: false };
     }
 
-    if (googleData) {
-      configData.google = googleData;
-    }
-
     if (youtubeData) {
       configData.youtube = {
         description: youtubeData.description,
@@ -512,7 +491,7 @@ async function main(): Promise<void> {
         perGameUpload: youtubeData.perGameUpload,
         restrictedGames: youtubeData.restrictedGames,
         splitDuration: youtubeData.splitDuration,
-        api_key: youtubeData.api_key,
+        apiKey: youtubeData.apiKey,
         liveUpload: youtubeData.liveUpload,
         multiTrack: youtubeData.multiTrack,
         upload: youtubeData.upload,
@@ -599,7 +578,7 @@ async function main(): Promise<void> {
         perGameUpload: youtubeData.perGameUpload,
         restrictedGames: youtubeData.restrictedGames,
         splitDuration: youtubeData.splitDuration,
-        api_key: encryptScalar(youtubeData.api_key),
+        apiKey: encryptScalar(youtubeData.apiKey),
         liveUpload: youtubeData.liveUpload,
         multiTrack: youtubeData.multiTrack,
         upload: youtubeData.upload,
@@ -612,10 +591,6 @@ async function main(): Promise<void> {
           refresh_token: youtubeData.refreshToken,
         }),
       };
-    }
-
-    if (googleData) {
-      tenantData.google = googleData; // NOT encrypted - public OAuth credentials
     }
 
     // Step 4: Insert into meta DB with explicit ID
@@ -643,9 +618,6 @@ async function main(): Promise<void> {
     console.log('   - Twitch Client Secret, Access Token');
     if (youtubeData) {
       console.log('   - YouTube API Key, Refresh Token');
-    }
-    if (googleData) {
-      console.log('   - Google OAuth Client Secret');
     }
   } catch (error: any) {
     console.error('\n❌ Error during tenant creation:');

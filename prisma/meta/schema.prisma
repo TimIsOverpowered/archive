@@ -13,7 +13,6 @@ model Tenant {
   twitch      Json?    @map("twitch")
   youtube     Json?    @map("youtube")
   kick        Json?    @map("kick")
-  google      Json?    @map("google")
   databaseUrl String?  @map("database_url")
   settings    Json     @default("{}") @map("settings")
   createdAt   DateTime @default(now()) @map("created_at")
