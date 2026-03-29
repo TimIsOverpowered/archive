@@ -301,7 +301,7 @@ async function checkHasActiveDownload(tenantId: string, vodId: string): Promise<
       console.debug(`[${tenantId}] No download directory found for VOD ${vodId}`);
       return false;
     }
-  } catch (_error) {
+  } catch {
     return false;
   }
 }
@@ -381,7 +381,7 @@ async function cleanupDedupKey(vodId: string): Promise<void> {
     await redis.del(`vod_download:${vodId}`);
 
     console.debug(`[Redis] Dedup key cleared for VOD ${vodId} (stream ended or completed)`);
-  } catch (_error) {
+  } catch {
     // Non-critical - just logging
   } finally {
     if (redis && redis.quit) await redis.quit().catch(() => {});
