@@ -36,7 +36,8 @@
     "tenant:create": "tsx scripts/create-tenant.ts",
     "tenant:import": "tsx scripts/import-tenant.ts",
     "admin:create": "tsx scripts/create-admin.ts",
-    "admin:reset": "tsx scripts/reset-admin-key.ts"
+    "admin:reset": "tsx scripts/reset-admin-key.ts",
+    "prisma:meta:generate": "npx prisma generate --schema=./prisma/meta/schema.prisma"
   },
   "standard": {
     "env": [

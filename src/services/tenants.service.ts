@@ -74,7 +74,7 @@ export async function getTenantStats(client: PrismaClient, streamerId: string): 
   const kick = tenant.kick as Record<string, unknown> | null;
 
   if (twitch?.username) platforms.push('twitch');
-  if (youtube?.api_key || youtube?.auth) platforms.push('youtube');
+  if (youtube?.apiKey || youtube?.auth) platforms.push('youtube');
   if (kick?.username) platforms.push('kick');
 
   const [vods, vodUploads, chatMessages, chapters] = await Promise.all([
@@ -200,7 +200,7 @@ export async function getAllTenants(): Promise<
     const kick = t.kick as Record<string, unknown> | null;
 
     if (twitch?.username) platforms.push('twitch');
-    if (youtube?.api_key || youtube?.auth) platforms.push('youtube');
+    if (youtube?.apiKey || youtube?.auth) platforms.push('youtube');
     if (kick?.username) platforms.push('kick');
 
     return {
