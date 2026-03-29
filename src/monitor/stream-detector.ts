@@ -3,6 +3,7 @@ import { getKickStreamStatus, waitForKickVodObject } from '../services/kick-live
 import { createClient, getClient } from '../db/client.js';
 import type { StreamerConfig } from '../config/types.js';
 import path from 'path';
+import { loggerWithTenant } from '../utils/logger.js';
 
 type PlatformType = 'twitch' | 'kick';
 
@@ -10,6 +11,7 @@ type PlatformType = 'twitch' | 'kick';
  * Main polling function - called every 30 seconds per tenant/platform pair
  */
 export async function checkPlatformStatus(tenantId: string, platform: PlatformType, config: StreamerConfig): Promise<void> {
+  const log = loggerWithTenant(tenantId);
   try {
     const prisma = getClient(tenantId) || (await createClient(config));
 
@@ -19,7 +21,7 @@ export async function checkPlatformStatus(tenantId: string, platform: PlatformTy
       await handleKickLiveCheck(prisma, tenantId, platform, config);
     }
   } catch (error: any) {
-    console.error(`[${tenantId}:${platform}] Error in stream status check:`, error.message || error);
+    log.error(`[Platform]: ${platform}] Error in stream status check:`, error.message || error);
   }
 }
 
@@ -27,6 +29,7 @@ export async function checkPlatformStatus(tenantId: string, platform: PlatformTy
  * Handle Twitch-specific live detection logic - NO FALLBACK, only downloads after VOD object confirmed available
  */
 async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: PlatformType, config: StreamerConfig): Promise<void> {
+  const log = loggerWithTenant(tenantId);
   const twitchUsername = config.twitch?.username;
 
   if (!twitchUsername || !config.twitch?.enabled) return;
@@ -45,7 +48,7 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
     if (lastVod && lastVod.userId) {
       userIdCache = String(lastVod.userId);
     } else {
-      console.warn(`[${tenantId}] No user_id cached for Twitch channel ${twitchUsername}. Skipping check.`);
+      log.warn(`[Monitor]:  No user_id cached for Twitch channel ${twitchUsername}. Skipping check.`);
       return;
     }
   }
@@ -56,14 +59,14 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
 
   // Streamer is OFFLINE - mark any active live record as ended:
   if (!streamStatus || !Array.isArray(streamStatus.type) || !streamStatus.type.includes('live')) {
-    console.info(`[${tenantId}] Twitch user ${userIdCache} is OFFLINE`);
+    log.info(`[Monitor]:  Twitch user ${userIdCache} is OFFLINE`);
 
     const activeLiveVod = await prisma.vod.findFirst({
       where: { platform, userId: userIdCache, is_live: true },
     });
 
     if (activeLiveVod) {
-      console.info(`[${tenantId}] Marking VOD ${String(activeLiveVod.id)} as ended`);
+      log.info(`[Monitor]:  Marking VOD ${String(activeLiveVod.id)} as ended`);
 
       await prisma.vod.update({
         where: { id: String(activeLiveVod.id) },
@@ -73,7 +76,7 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
       // Clean up Redis dedup key for re-downloads later (stream ended = safe to clear)
       await cleanupDedupKey(String(activeLiveVod.id));
     } else {
-      console.debug(`[${tenantId}] No active live VOD to update for offline stream`);
+      log.debug(`[Monitor]:  No active live VOD to update for offline stream`);
     }
 
     return; // Nothing more to do - offline handled by worker independently
@@ -85,18 +88,18 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
   });
 
   if (!existingVod) {
-    console.info(`[${tenantId}] New Twitch live detected! Stream ID: ${streamStatus.id}. Waiting for VOD object...`);
+    log.info(`[Monitor]:  New Twitch live detected! Stream ID: ${streamStatus.id}. Waiting for VOD object...`);
 
     const vodResult = await waitForTwitchVodObject(userIdCache, streamStatus.id, tenantId);
 
     // NO FALLBACK - Only proceed if VOD object is available
     if (!vodResult || !vodResult.vodId) {
-      console.warn(`[${tenantId}] Timeout waiting for Twitch VOD object. Skipping download (will retry on next poll cycle).`);
+      log.warn(`[Monitor]:  Timeout waiting for Twitch VOD object. Skipping download (will retry on next poll cycle).`);
       return; // Exit without creating record or queuing job - will detect again in 30s and try waiting again
     }
 
     // VOD object confirmed available - create consolidated record with full metadata
-    console.info(`[${tenantId}] Created VOD record ${vodResult.vodId} for live stream. Started at: ${streamStatus.started_at}`);
+    log.info(`[Monitor]:  Created VOD record ${vodResult.vodId} for live stream. Started at: ${streamStatus.started_at}`);
 
     await prisma.vod.create({
       data: {
@@ -119,7 +122,7 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
   } else if (existingVod && !existingVod.is_live) {
     // Record exists but not marked live - update and queue download
 
-    console.info(`[${tenantId}] Existing VOD ${String(existingVod.id)} is now active. Updating fields...`);
+    log.info(`[Monitor]:  Existing VOD ${String(existingVod.id)} is now active. Updating fields...`);
 
     await prisma.vod.update({
       where: { id: existingVod.id },
@@ -133,7 +136,7 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
     const hasDownloadJob = await checkHasActiveDownload(tenantId, String(existingVod.id));
 
     if (!hasDownloadJob) {
-      console.info(`[${tenantId}] Queuing HLS download for resumed VOD ${String(existingVod.id)}`);
+      log.info(`[Monitor]:  Queuing HLS download for resumed VOD ${String(existingVod.id)}`);
 
       await enqueueLiveHlsDownload({
         vodId: String(existingVod.id),
@@ -142,12 +145,12 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
         startedAt: new Date(streamStatus.started_at),
       });
     } else {
-      console.debug(`[${tenantId}] Download already in progress for VOD ${String(existingVod.id)}`);
+      log.debug(`[Monitor]:  Download already in progress for VOD ${String(existingVod.id)}`);
     }
   } else if (existingVod && existingVod.is_live) {
     // Already tracked as live with correct fields - no action needed
 
-    console.debug(`[${tenantId}] Already tracking live VOD ${String(existingVod.id)}. No action needed.`);
+    log.debug(`[Monitor]:  Already tracking live VOD ${String(existingVod.id)}. No action needed.`);
     return;
   }
 }
@@ -156,17 +159,18 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
  * Handle Kick-specific live detection logic - NO FALLBACK, only downloads after video object confirmed available
  */
 async function handleKickLiveCheck(prisma: any, tenantId: string, platform: PlatformType, config: StreamerConfig): Promise<void> {
+  const log = loggerWithTenant(tenantId);
   const kickUsername = config.kick?.username;
 
   if (!kickUsername || !config.kick?.enabled) return;
 
-  console.info(`[${tenantId}] Checking Kick status for channel ${kickUsername}...`);
+  log.info(`[Monitor]:  Checking Kick status for channel ${kickUsername}...`);
 
   const streamStatus = await getKickStreamStatus(kickUsername);
 
   // Streamer is OFFLINE - mark any active live record as ended
   if (!streamStatus || !streamStatus.id || streamStatus.id <= 0) {
-    console.info(`[${tenantId}] Kick channel ${kickUsername} is offline`);
+    log.info(`[Monitor]:  Kick channel ${kickUsername} is offline`);
 
     const activeLiveVod = await prisma.vod.findFirst({
       where: {
@@ -177,7 +181,7 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
     });
 
     if (activeLiveVod) {
-      console.info(`[${tenantId}] Marking Kick VOD ${String(activeLiveVod.id)} as ended`);
+      log.info(`[Monitor]:  Marking Kick VOD ${String(activeLiveVod.id)} as ended`);
 
       await prisma.vod.update({
         where: { id: String(activeLiveVod.id) },
@@ -190,7 +194,7 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
       // Clean up Redis dedup key for re-downloads later (stream ended = safe to clear)
       await cleanupDedupKey(String(activeLiveVod.id));
     } else {
-      console.debug(`[${tenantId}] No active live Kick VOD to update`);
+      log.debug(`[Monitor]:  No active live Kick VOD to update`);
     }
 
     return; // Nothing more to do - offline handled by worker independently
@@ -199,21 +203,21 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
   // LIVE STREAM DETECTED on Kick
   const kickStreamIdStr = String(streamStatus.id);
 
-  console.info(`[${tenantId}] New Kick live detected! Stream ID: ${kickStreamIdStr}, Title: "${streamStatus.session_title}"`);
+  log.info(`[Monitor]:  New Kick live detected! Stream ID: ${kickStreamIdStr}, Title: "${streamStatus.session_title}"`);
 
   const existingVod = await prisma.vod.findUnique({
     where: { id: kickStreamIdStr, platform },
   });
 
   if (!existingVod) {
-    console.info(`[${tenantId}] No record exists. Waiting for video object in Kick system...`);
+    log.info(`[Monitor]:  No record exists. Waiting for video object in Kick system...`);
 
     // Wait for VOD metadata finalization (though ID won't change - ensures platform has finalized data)
     const vodObject = await waitForKickVodObject(kickUsername, streamStatus.id);
 
     // NO FALLBACK - Only proceed if VOD/video object is available from Kick API
     if (!vodObject || !vodObject.id) {
-      console.warn(`[${tenantId}] Timeout waiting for Kick video object. Skipping download (will retry on next poll cycle).`);
+      log.warn(`[Monitor]:  Timeout waiting for Kick video object. Skipping download (will retry on next poll cycle).`);
       return; // Exit without creating record or queuing job - will detect again in 30s and try waiting again
     }
 
@@ -231,7 +235,7 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
       },
     });
 
-    console.info(`[${tenantId}] Created Kick VOD record ${kickStreamIdStr}. Started at: ${streamStatus.created_at}`);
+    log.info(`[Monitor]:  Created Kick VOD record ${kickStreamIdStr}. Started at: ${streamStatus.created_at}`);
 
     await enqueueLiveHlsDownload({
       vodId: kickStreamIdStr,
@@ -243,7 +247,7 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
   } else if (existingVod && !existingVod.is_live) {
     // Record exists but not marked live - update and queue download
 
-    console.info(`[${tenantId}] Existing Kick VOD ${kickStreamIdStr} is now active. Updating fields...`);
+    log.info(`[Monitor]:  Existing Kick VOD ${kickStreamIdStr} is now active. Updating fields...`);
 
     await prisma.vod.update({
       where: { id: existingVod.id },
@@ -257,7 +261,7 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
     const hasDownloadJob = await checkHasActiveDownload(tenantId, kickStreamIdStr);
 
     if (!hasDownloadJob) {
-      console.info(`[${tenantId}] Queuing HLS download for resumed Kick VOD ${kickStreamIdStr}`);
+      log.info(`[Monitor]:  Queuing HLS download for resumed Kick VOD ${kickStreamIdStr}`);
 
       await enqueueLiveHlsDownload({
         vodId: kickStreamIdStr,
@@ -267,12 +271,12 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
         sourceUrl: streamStatus.source || undefined,
       });
     } else {
-      console.debug(`[${tenantId}] Download already in progress for Kick VOD ${kickStreamIdStr}`);
+      log.debug(`[Monitor]:  Download already in progress for Kick VOD ${kickStreamIdStr}`);
     }
   } else if (existingVod && existingVod.is_live) {
     // Already tracked as live with correct fields - no action needed
 
-    console.debug(`[${tenantId}] Already tracking live Kick VOD ${kickStreamIdStr}. No action needed.`);
+    log.debug(`[Monitor]:  Already tracking live Kick VOD ${kickStreamIdStr}. No action needed.`);
     return;
   }
 }
@@ -281,6 +285,7 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
  * Check if a VOD already has an active download running (prevents duplicate jobs)
  */
 async function checkHasActiveDownload(tenantId: string, vodId: string): Promise<boolean> {
+  const log = loggerWithTenant(tenantId);
   try {
     const fs = await import('fs/promises');
 
@@ -295,10 +300,10 @@ async function checkHasActiveDownload(tenantId: string, vodId: string): Promise<
 
     try {
       await fs.access(vodDir);
-      console.debug(`[${tenantId}] Download directory exists for VOD ${vodId} - active download detected`);
+      log.debug(`[Monitor]:  Download directory exists for VOD ${vodId} - active download detected`);
       return true;
     } catch {
-      console.debug(`[${tenantId}] No download directory found for VOD ${vodId}`);
+      log.debug(`[Monitor]:  No download directory found for VOD ${vodId}`);
       return false;
     }
   } catch {
@@ -310,6 +315,7 @@ async function checkHasActiveDownload(tenantId: string, vodId: string): Promise<
  * Enqueue Live HLS Download job with Redis deduplication check (48-hour TTL)
  */
 async function enqueueLiveHlsDownload(params: { vodId: string; platform: PlatformType; userId: string; startedAt: Date; sourceUrl?: string }): Promise<void> {
+  const log = loggerWithTenant(params.userId);
   const Redis = (await import('ioredis')).default;
 
   // Use global Redis connection for deduplication checks only (not BullMQ queues)
@@ -323,13 +329,13 @@ async function enqueueLiveHlsDownload(params: { vodId: string; platform: Platfor
     const acquired = await redis.set(dedupKey, 'locked', 'EX', 172800, 'NX');
 
     if (!acquired) {
-      console.info(`[${params.vodId}] Download already queued or in progress (Redis dedup lock exists). Skipping.`);
+      log.info(`[${params.vodId}] Download already queued or in progress (Redis dedup lock exists). Skipping.`);
       return; // Another instance is handling this - don't queue duplicate job
     }
 
-    console.info(`[${params.vodId}] Redis dedup key acquired. Enqueuing Live HLS download...`);
+    log.info(`[${params.vodId}] Redis dedup key acquired. Enqueuing Live HLS download...`);
   } catch (error: any) {
-    console.error(`[Redis] Failed to acquire dedup lock for VOD ${params.vodId}:`, error.message);
+    log.error(`[Redis] Failed to acquire dedup lock for VOD ${params.vodId}:`, error.message);
 
     // If Redis fails, still try to queue the job - BullMQ will handle duplicates at worker level
   } finally {
@@ -357,9 +363,9 @@ async function enqueueLiveHlsDownload(params: { vodId: string; platform: Platfor
       } as any // timeout is not in default options but supported by worker-side processing
     );
 
-    console.info(`[${params.vodId}] Live HLS download job enqueued successfully`);
+    log.info(`[${params.vodId}] Live HLS download job enqueued successfully`);
   } catch (error: any) {
-    console.error(`[Queue] Failed to enqueue Live HLS download for ${params.vodId}:`, error.message);
+    log.error(`[Queue] Failed to enqueue Live HLS download for ${params.vodId}:`, error.message);
 
     // Release dedup key on failure so it can be retried later
     if (redis?.del) {
@@ -392,14 +398,15 @@ async function cleanupDedupKey(vodId: string): Promise<void> {
  * Start independent polling loop per tenant/platform pair (concurrent async execution)
  */
 export function startStreamDetectionLoop(tenantId: string, platform: PlatformType, config: StreamerConfig): void {
-  console.info(`[${tenantId}:${platform}] Starting stream detection polling every 30 seconds...`);
+  const log = loggerWithTenant(tenantId);
+  log.info(`[Platform]: ${platform}] Starting stream detection polling every 30 seconds...`);
 
   const intervalId = setInterval(async () => {
     try {
       await checkPlatformStatus(tenantId, platform, config);
     } catch (error: any) {
       // Prevent one failed poll from crashing the entire loop for this tenant/platform pair
-      console.error(`[${tenantId}:${platform}] Error in polling cycle:`, error.message || error);
+      log.error(`[Platform]: ${platform}] Error in polling cycle:`, error.message || error);
     }
   }, 30_000); // Fixed 30-second polling interval per requirements spec
 
@@ -410,7 +417,7 @@ export function startStreamDetectionLoop(tenantId: string, platform: PlatformTyp
   }
   ((globalThis as any).monitorIntervals as Map<string, NodeJS.Timeout>).set(key, intervalId);
 
-  console.info(`[${tenantId}:${platform}] Polling loop started with interval ID: ${intervalId}`);
+  log.info(`[Platform]: ${platform}] Polling loop started with interval ID: ${intervalId}`);
 }
 
 // Export utility function if other modules need it

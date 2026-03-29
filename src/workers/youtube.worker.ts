@@ -10,9 +10,16 @@ import { getClient, createClient } from '../db/client.js';
 import { splitVideo, trimVideo, getDuration, deleteFile } from '../utils/ffmpeg.js';
 import { uploadVideo, linkParts } from '../services/youtube.js';
 import { sendDiscordAlert, updateDiscordMessage, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/alerts';
+import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 
 const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUploadJob>) => {
   const { streamerId, vodId, filePath, title, description, type, part, chapter } = job.data;
+
+  // Create logger with tenant context ONCE at start of processing scope
+  const log = createAutoLogger({
+    tenantId: String(streamerId),
+    component: 'YouTube-Worker',
+  });
 
   const config = getStreamerConfig(streamerId);
 
@@ -96,7 +103,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUpl
         const isMainPlatform = job.data.platform === 'twitch' ? config.twitch?.mainPlatform : config.kick?.mainPlatform;
 
         if (!isMainPlatform) {
-          console.info(`[${vodId}] Skipping game upload: ${job.data.platform} is not main platform (simulcast mode)`);
+          log.info(`[${vodId}] Skipping game upload: ${job.data.platform} is not main platform (simulcast mode)`);
 
           await db.game.updateMany({
             where: { vod_id: vodId },
@@ -141,7 +148,17 @@ const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUpl
       return { success: true, videoId: result.videoId };
     }
   } catch (error) {
-    console.error(`YouTube upload failed for ${vodId}:`, error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    log.error(
+      {
+        vodId,
+        streamerId,
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      `YouTube upload failed for ${vodId}`
+    );
 
     await db?.vodUpload.updateMany({
       where: { vod_id: vodId },

@@ -1,5 +1,6 @@
 export interface StreamerConfig {
   id: string;
+  displayName?: string;
   twitch?: { enabled: boolean; auth?: string; username?: string; mainPlatform?: boolean };
   youtube?: {
     auth?: string;

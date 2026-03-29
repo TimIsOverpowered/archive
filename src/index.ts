@@ -13,9 +13,7 @@ import { logger } from './utils/logger';
 const PORT = process.env.PORT || 3030;
 const HOST = process.env.HOST || '0.0.0.0';
 
-import type { FastifyInstance } from 'fastify';
-
-let server: FastifyInstance | null = null;
+let server: Awaited<ReturnType<typeof buildServer>> | null = null;
 
 async function start() {
   try {
