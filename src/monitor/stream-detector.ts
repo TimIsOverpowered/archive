@@ -12,13 +12,32 @@ type PlatformType = 'twitch' | 'kick';
  */
 export async function checkPlatformStatus(tenantId: string, platform: PlatformType, config: StreamerConfig): Promise<void> {
   const log = loggerWithTenant(tenantId);
+
+  log.debug(`[Monitor]: Polling ${platform} status for streamer...`);
+
   try {
     const prisma = getClient(tenantId) || (await createClient(config));
 
     if (platform === 'twitch' && config.twitch?.enabled && config.settings.vodDownload) {
+      log.debug(`[Monitor]: Twitch monitoring enabled, VOD download: ${config.settings.vodDownload}`);
       await handleTwitchLiveCheck(prisma, tenantId, platform, config);
     } else if (platform === 'kick' && config.kick?.enabled && config.settings.vodDownload) {
+      log.debug(`[Monitor]: Kick monitoring enabled, VOD download: ${config.settings.vodDownload}`);
       await handleKickLiveCheck(prisma, tenantId, platform, config);
+    } else {
+      const reasons = [];
+
+      if (platform === 'twitch' && !config.twitch?.enabled) {
+        reasons.push('Twitch not enabled');
+      }
+      if (platform === 'kick' && !config.kick?.enabled) {
+        reasons.push(`${platform} not enabled`);
+      }
+      if (!config.settings.vodDownload) {
+        reasons.push('VOD download disabled');
+      }
+
+      log.debug(`[Monitor]: ${platform} monitoring skipped: ${reasons.join(', ')}`);
     }
   } catch (error: any) {
     log.error(`[Platform]: ${platform}] Error in stream status check:`, error.message || error);
@@ -47,11 +66,13 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
 
   if (!userIdCache) return;
 
+  log.debug(`[Twitch]: Checking live status for user_id: ${userIdCache}`);
+
   const streamStatus = await getTwitchStreamStatus(userIdCache, tenantId);
 
   // Streamer is OFFLINE - mark any active live record as ended:
   if (!streamStatus || !Array.isArray(streamStatus.type) || !streamStatus.type.includes('live')) {
-    log.info(`[Monitor]:  Twitch user ${userIdCache} is OFFLINE`);
+    log.info(`[Monitor]: Twitch user ${userIdCache} is OFFLINE`);
 
     const activeLiveVod = await prisma.vod.findFirst({
       where: { platform, is_live: true },
@@ -75,12 +96,14 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
   }
 
   // LIVE STREAM DETECTED
+  log.debug(`[Twitch]: Stream is LIVE - ID: ${streamStatus.id}, Title: "${streamStatus.title}", Started: ${streamStatus.started_at}`);
+
   const existingVod = await prisma.vod.findUnique({
     where: { id: String(streamStatus.id), platform },
   });
 
   if (!existingVod) {
-    log.info(`[Monitor]:  New Twitch live detected! Stream ID: ${streamStatus.id}. Waiting for VOD object...`);
+    log.info(`[Monitor]: New Twitch live detected! Stream ID: ${streamStatus.id}. Waiting for VOD object...`);
 
     const vodResult = await waitForTwitchVodObject(userIdCache, streamStatus.id, tenantId);
 
@@ -154,13 +177,13 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
 
   if (!kickUsername || !config.kick?.enabled) return;
 
-  log.info(`[Monitor]:  Checking Kick status for channel ${kickUsername}...`);
+  log.debug(`[Kick]: Checking live status for channel ${kickUsername}...`);
 
   const streamStatus = await getKickStreamStatus(kickUsername);
 
   // Streamer is OFFLINE - mark any active live record as ended
   if (!streamStatus || !streamStatus.id || streamStatus.id <= 0) {
-    log.info(`[Monitor]:  Kick channel ${kickUsername} is offline`);
+    log.info(`[Monitor]: Kick channel ${kickUsername} is offline`);
 
     const activeLiveVod = await prisma.vod.findFirst({
       where: { platform, is_live: true },
@@ -186,7 +209,9 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
   // LIVE STREAM DETECTED on Kick
   const kickStreamIdStr = String(streamStatus.id);
 
-  log.info(`[Monitor]:  New Kick live detected! Stream ID: ${kickStreamIdStr}, Title: "${streamStatus.session_title}"`);
+  log.debug(`[Kick]: Stream is LIVE - ID: ${kickStreamIdStr}, Title: "${streamStatus.session_title}", Started: ${streamStatus.created_at}`);
+
+  log.info(`[Monitor]: New Kick live detected! Stream ID: ${kickStreamIdStr}, Title: "${streamStatus.session_title}"`);
 
   const existingVod = await prisma.vod.findUnique({
     where: { id: kickStreamIdStr, platform },
