@@ -83,10 +83,7 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
   const { vodId, platform, streamerId, startedAt, sourceUrl } = job.data;
 
   // Create logger with tenant context ONCE at start of processing scope
-  const log = createAutoLogger({
-    tenantId: String(streamerId),
-    component: 'VOD-Worker',
-  });
+  const log = createAutoLogger(String(streamerId));
 
   log.info(`[${vodId}] Starting Live HLS Download mode for ${platform} stream`);
 

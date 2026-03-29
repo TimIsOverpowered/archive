@@ -1,231 +1,76 @@
-import pino from 'pino';
+import type { Logger } from 'pino';
 import { getTenantDisplayName } from '../config/loader.js';
-import { resolveCurrentDisplayName } from './async-context.js';
-
-// Import base logger to reuse its configuration
-const logLevel = process.env.LOG_LEVEL || 'info';
-
-export const baseLogger = pino({
-  level: logLevel,
-  customLevels: {
-    metric: 35, // Between info and warn
-  },
-  mixin: () => ({
-    service: 'archive-api',
-    env: process.env.NODE_ENV || 'development',
-    tenant: resolveCurrentDisplayName() || undefined, // Auto-inject from async context
-  }),
-});
+import { logger as baseLogger } from './logger.js';
 
 /**
- * Creates a logger instance that automatically prefixes all messages with [TenantDisplayName]
- * and includes tenant as a structured field for filtering.
- *
- * Tenant resolution priority (first found wins):
- * 1. Explicit options.tenantId parameter
- * 2. Async context from runWithTenantContext() calls
- * 3. Fallback to undefined if no tenant info available anywhere
+ * Creates a logger instance that automatically prefixes messages with [TenantDisplayName].
+ * Output format: [March 29 2026 HH:mm:ss] LEVEL: [TenantName] message text here
  */
-export function createAutoLogger(options?: { tenantId?: string | null; component?: string }): pino.Logger & Record<string, unknown> {
-  // Determine display name with priority order: explicit param > async context > fallback
-
-  let displayName: string | undefined = undefined;
-
-  if (options?.tenantId && options.tenantId !== 'null') {
-    // Priority 1: Explicit parameter provided - use it directly
-    const cachedName = getTenantDisplayName(options.tenantId);
-    displayName = cachedName || String(options.tenantId);
-  } else {
-    // Priority 2: Check async context (set by middleware or worker scope)
-    const fromContext = resolveCurrentDisplayName();
-    if (fromContext && fromContext !== 'null') {
-      displayName = fromContext;
-    }
+export function createAutoLogger(tenantId?: string | null): Logger & Record<string, unknown> {
+  if (!tenantId || tenantId === 'null') {
+    return baseLogger as never;
   }
 
-  // Create base child logger with tenant context field for structured filtering
-  const childLogger = baseLogger.child({
-    ...(displayName ? { tenant: displayName } : {}),
-  });
+  const displayName = getTenantDisplayName(tenantId);
 
-  /**
-   * Formats a log message to add [TenantDisplayName] prefix before component prefixes like [YouTube], [Twitch], etc.
-   */
-  function formatMessage(msg?: string): string | undefined {
-    if (!msg || !displayName) return msg;
+  // Create base child logger with tenant field for structured filtering
+  const childLog = baseLogger.child({ tenant: displayName });
 
-    const tenantPrefix = `[${displayName}]`;
+  /** Wraps log methods to prepend [TenantName] prefix */
+  function wrapMethod(methodName: string): ((...args: any[]) => void) | undefined {
+    if (!(methodName in childLog)) return undefined;
 
-    // Skip duplicate prefixes (already formatted with this tenant name)
-    if (msg.startsWith(tenantPrefix)) return msg;
+    const original = (childLog as unknown as Record<string, any>)[methodName];
+    if (!original || typeof original !== 'function') return undefined;
 
-    let formattedMsg: string;
-
-    // Check for component prefix pattern like [YouTube], [Twitch], etc.
-    const match = msg.match(/^\[([^\]]+)\](.*)$/);
-
-    if (match && options?.component) {
-      // Has existing component - insert tenant before it
-      const [, componentName, messageBody] = match;
-      formattedMsg = `${tenantPrefix} [${componentName}] ${messageBody.trim()}`.replace(/  +/g, ' ');
-    } else if (match) {
-      // Has component prefix but no override - just add tenant at front
-      const [, componentName, messageBody] = match;
-      formattedMsg = `${tenantPrefix} [${componentName}] ${messageBody.trim()}`.replace(/  +/g, ' ');
-    } else if (options?.component) {
-      // No component in message but we have one specified - add both tenant and component prefixes
-      const prefixedComponent = `[${displayName}] [${options.component}]`;
-      formattedMsg = `${prefixedComponent} ${msg}`;
-    } else {
-      // Simple readable log statement with no brackets or explicit component - just prefix tenant name for clarity
-      formattedMsg = `${tenantPrefix} ${msg}`;
-    }
-
-    return formattedMsg.trim();
-  }
-
-  /**
-   * Wraps a pino logger method to intercept and format messages before passing through.
-   */
-  function wrapLogMethod(methodName: string): ((...args: any[]) => void) | undefined {
-    if (!(methodName in childLogger)) return undefined;
-
-    const originalMethod = (childLogger as unknown as Record<string, any>)[methodName];
-
-    if (!originalMethod || typeof originalMethod !== 'function') {
-      return undefined;
-    }
+    const boundOriginal = original.bind(childLog);
 
     return (...args: any[]) => {
-      const modifiedArgs = [...args] as any[];
-
-      if (modifiedArgs.length > 0) {
-        const firstArg = modifiedArgs[0];
-
-        // Case A: First arg is a string message - format it directly unless it's metadata
-        if (typeof firstArg === 'string') {
-          const originalMsg = firstArg;
-
-          // Skip system/metadata logs like "Request error" or structured messages with colons at start to avoid cluttering startup/shutdown output
-          if (!originalMsg.match(/^\w+:/)) {
-            modifiedArgs[0] = formatMessage(originalMsg);
-          } else if (modifiedArgs.length > 1 && typeof modifiedArgs[1] === 'string') {
-            // If first arg looks like metadata, try formatting the second arg instead of cluttering system logs with tenant prefixes unnecessarily
-            const msg2 = modifiedArgs[1];
-
-            if (!msg2.match(/^\w+:/)) {
-              modifiedArgs[1] = formatMessage(msg2);
-            } else {
-              // Both args are metadata - add structured field only, don't prefix text
-              (modifiedArgs as any)[0].tenantDisplayName = displayName || undefined;
-            }
-          }
-
-          // Case B: First arg is an object with msg/message property - format that field if readable log statement
-        } else if (typeof firstArg === 'object' && !Array.isArray(firstArg) && firstArg !== null) {
-          const obj: Record<string, unknown> = firstArg;
-
-          let messageField: string | undefined;
-          for (const prop of ['msg', 'message']) {
-            if (typeof obj[prop] === 'string') {
-              const candidateMsg = obj[prop];
-
-              // Skip system/metadata logs to avoid cluttering normal startup/shutdown messages unnecessarily
-              if (!candidateMsg.match(/^\w+:/)) {
-                messageField = prop;
-                break;
-              }
-            }
-          }
-
-          if (messageField) {
-            const originalMsg = obj[messageField] as string;
-
-            // Only prefix bracket notation for structured logs to keep system metadata clean
-            if (originalMsg.startsWith('[')) {
-              modifiedArgs[0] = Object.assign({}, obj, { [messageField]: formatMessage(originalMsg) });
-            } else {
-              const objWithTenant: Record<string, unknown> = Object.assign({}, obj);
-
-              // Check second arg for readable messages that should be formatted
-              if (modifiedArgs.length > 1 && typeof modifiedArgs[1] === 'string') {
-                const msg2 = modifiedArgs[1];
-
-                if (!msg2.match(/^\w+:/) || msg2.startsWith('[')) {
-                  objWithTenant.message = formatMessage(msg2);
-                } else {
-                  (objWithTenant as Record<string, unknown>).tenantDisplayName = displayName || undefined;
-                }
-              }
-
-              modifiedArgs[0] = objWithTenant;
-            }
-          } else if (!('msg' in obj) && !('message' in obj)) {
-            // Object doesn't have message field - add tenant as context and format second arg if readable
-            const metaObjWithTenant: Record<string, unknown> = Object.assign({}, obj);
-
-            modifiedArgs[0] = metaObjWithTenant;
-
-            if (modifiedArgs.length > 1 && typeof modifiedArgs[1] === 'string') {
-              const msg2 = modifiedArgs[1];
-
-              // Format bracket notation or readable statements without colon prefix at start
-              if (!msg2.match(/^\w+:/) || msg2.startsWith('[')) {
-                modifiedArgs[1] = formatMessage(msg2);
-              } else {
-                (metaObjWithTenant as Record<string, unknown>).tenantDisplayName = displayName || undefined;
-              }
-            }
-          }
-
-          return originalMethod(...modifiedArgs) as never;
-        }
+      // Skip prefixing for system/metadata logs or already prefixed messages
+      if (typeof args[0] === 'string' && !args[0].match(/^\w+:/) && !args[0].startsWith(`[${displayName}]`)) {
+        const msg = `[${displayName}] ${args[0]}`;
+        return boundOriginal(msg, ...args.slice(1));
       }
 
-      // Fallback - call with modified args if we got here through some other path
-      return originalMethod(...modifiedArgs);
+      // Handle object logs with message property
+      if (typeof args[0] === 'object' && !Array.isArray(args[0]) && args[0] !== null) {
+        const obj = args[0];
+        for (const key of ['msg', 'message']) {
+          if (typeof obj[key] === 'string') {
+            if (!obj[key].match(/^\w+:/) && !obj[key].startsWith(`[${displayName}]`)) {
+              return boundOriginal({ ...obj, [key]: `[${displayName}] ${obj[key]}` }, ...args.slice(1));
+            }
+          }
+        }
+
+        // Handle second arg as message string
+        if (args.length > 1 && typeof args[1] === 'string' && !args[1].match(/^\w+:/) && !args[1].startsWith(`[${displayName}]`)) {
+          const newArgs = [...args];
+          newArgs[1] = `[${displayName}] ${args[1]}`;
+          return boundOriginal(...newArgs);
+        }
+
+        (obj as Record<string, unknown>).tenantDisplayName = displayName;
+      }
+
+      return boundOriginal(...args);
     };
   }
 
   try {
-    const methodsToWrap: string[] = ['info', 'error', 'warn', 'debug', 'trace'];
+    const methods: string[] = ['info', 'error', 'warn', 'debug', 'trace'];
+    const wrappedLog: Record<string, any> = { ...childLog };
 
-    const wrappedLogger: Record<string, unknown> = { ...childLogger };
-
-    for (const method of methodsToWrap) {
-      wrappedLogger[method] = wrapLogMethod(method);
+    for (const method of methods) {
+      wrappedLog[method] = wrapMethod(method);
     }
 
-    return wrappedLogger as never;
-  } catch (_err: unknown) {
-    // If wrapping fails for any reason, log warning to console but don't break request processing or job execution
+    return wrappedLog as never;
+  } catch (_err) {
+    // Fallback to unwrapped logger if wrapping fails
     const errStr = _err instanceof Error ? _err.message : String(_err);
+    console.warn(`[createAutoLogger] Failed to wrap methods:`, errStr);
 
-    if (!displayName || displayName === 'null') {
-      console.warn(`[createAutoLogger] Failed to wrap logger methods:`, errStr);
-    } else {
-      // Use base logger directly for error reporting when tenant context unavailable in wrapper itself
-      const fallbackLog = childLogger;
-
-      (fallbackLog as any).warn(
-        {
-          tenantDisplayName: displayName || undefined,
-          component: options?.component,
-          error: errStr,
-        },
-        '[createAutoLogger] Failed to wrap logger methods'
-      );
-    }
-
-    return childLogger as never; // Return unwrapped but still functional logger with structured fields intact
+    return childLog as never;
   }
-}
-
-/**
- * Convenience function for getting current tenant display name from async context.
- * Returns null if no active tenant context exists (e.g., outside request/job scope).
- */
-export function getCurrentTenantDisplayName(): string | undefined {
-  const displayName = resolveCurrentDisplayName();
-  return displayName && displayName !== 'null' ? displayName : undefined;
 }
