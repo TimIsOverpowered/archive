@@ -12,10 +12,11 @@ model Vod {
   platform      String
   title         String?
   duration      Int         @default(0)
-  thumbnail_url String?
   stream_id     String?
   created_at    DateTime    @default(now())
-  downloaded_at DateTime?
+  updated_at    DateTime    @updatedAt
+  is_live       Boolean     @default(false)
+  started_at    DateTime?
   chapters      Chapter[]
   emotes        Emote?
   games         Game[]
@@ -104,56 +105,6 @@ model ChatMessage {
 
   @@index([vod_id, content_offset_seconds, id], map: "idx_logs_vod_offset_id")
   @@map("chat_messages")
-}
-
-model emotes_legacy {
-  vod_id      String    @id(map: "emotes_pkey")
-  ffz_emotes  Json?
-  tv_emotes   Json?     @map("7tv_emotes")
-  bttv_emotes Json?
-  createdAt   DateTime? @db.Timestamptz(6)
-  updatedAt   DateTime? @db.Timestamptz(6)
-}
-
-model games_legacy {
-  id             BigInt    @id(map: "games_pkey") @default(autoincrement())
-  vod_id         String?
-  start_time     Decimal?  @db.Decimal
-  end_time       Decimal?  @db.Decimal
-  video_provider String?
-  video_id       String?
-  video_url      String?
-  thumbnail_url  String?
-  game_id        String?
-  game_name      String?
-  createdAt      DateTime? @db.Timestamptz(6)
-  updatedAt      DateTime? @db.Timestamptz(6)
-  chapter_image  String?
-  title          String?
-
-  @@index([vod_id, id, game_id], map: "games_index")
-}
-
-model streams_legacy {
-  id         BigInt    @id(map: "streams_pkey")
-  started_at DateTime? @db.Timestamptz(6)
-  platform   String
-  is_live    Boolean?
-}
-
-model vods_legacy {
-  id            String    @id(map: "vods_pkey")
-  title         String?
-  date          String?
-  createdAt     DateTime? @db.Timestamptz(6)
-  updatedAt     DateTime? @db.Timestamptz(6)
-  duration      String?
-  thumbnail_url String?
-  chapters      Json?
-  youtube       Json?
-  stream_id     String?
-  drive         Json?
-  platform      String
 }
 
 enum UploadStatus {
