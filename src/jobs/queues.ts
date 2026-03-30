@@ -43,12 +43,27 @@ export interface YoutubeUploadJob {
     end: number;
     gameId?: string;
   };
+  dmcaProcessed?: boolean;
+}
+
+export interface DmcaProcessingJob {
+  streamerId: string;
+  vodId: string;
+  receivedClaims: Array<{
+    type: 'CLAIM_TYPE_AUDIO' | 'CLAIM_TYPE_VISUAL' | 'CLAIM_TYPE_AUDIOVISUAL';
+    claimPolicy: { primaryPolicy: { policyType: string } };
+    matchDetails: { longestMatchStartTimeSeconds: number; longestMatchDurationSeconds: string };
+  }>;
+  type: 'vod' | 'live';
+  platform: 'twitch' | 'kick';
+  part?: number;
 }
 
 export const QUEUE_NAMES = {
   VOD_DOWNLOAD: 'vod_download',
   CHAT_DOWNLOAD: 'chat_download',
   YOUTUBE_UPLOAD: 'youtube_upload',
+  DMCA_PROCESSING: 'dmca_processing',
 } as const;
 
 export const defaultJobOptions = {
@@ -93,6 +108,10 @@ export function getChatDownloadQueue(): Queue<ChatDownloadJob, ChatDownloadJob, 
 
 export function getYoutubeUploadQueue(): Queue<YoutubeUploadJob, YoutubeUploadJob, string> {
   return getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD, youtubeJobOptions) as unknown as Queue<YoutubeUploadJob, YoutubeUploadJob, string>;
+}
+
+export function getDmcaProcessingQueue(): Queue<DmcaProcessingJob, DmcaProcessingJob, string> {
+  return getQueue(QUEUE_NAMES.DMCA_PROCESSING) as unknown as Queue<DmcaProcessingJob, DmcaProcessingJob, string>;
 }
 
 export async function closeQueues(): Promise<void> {

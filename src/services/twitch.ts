@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
+import { getStreamerConfig as getConfig } from '../config/loader.js';
 
 interface VodData {
   id: string;
@@ -254,4 +255,63 @@ export async function getGameData(gameId: string, streamerId: string): Promise<a
   }
 
   return response.data.data[0];
+}
+
+export async function getChannelBadges(streamerId: string): Promise<Record<string, unknown> | null> {
+  const creds = getCreds(streamerId);
+  const config = getConfig(streamerId);
+
+  if (!creds?.clientId || !config?.twitch?.id) {
+    console.warn(`Twitch credentials not configured for streamer ${streamerId}`);
+    return null;
+  }
+
+  try {
+    const accessToken = await getAppAccessToken(streamerId);
+
+    if (!accessToken) throw new Error('Twitch OAuth access token unavailable');
+
+    const response = await axios.get(`https://api.twitch.tv/helix/chat/badges?broadcaster_id=${config.twitch.id}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Client-Id': creds.clientId,
+      },
+    });
+
+    const badgesData = response.data?.data || null;
+
+    if (!badgesData) {
+      console.warn(`No channel badges found for Twitch user ${config.twitch.id}`);
+    }
+
+    return badgesData as Record<string, unknown>;
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`Failed to fetch channel badges for ${streamerId}:`, errorMessage);
+
+    return null;
+  }
+}
+
+export async function getGlobalBadges(streamerId: string): Promise<Record<string, unknown> | null> {
+  const creds = getCreds(streamerId);
+
+  if (!creds?.clientId) return null;
+
+  try {
+    const accessToken = await getAppAccessToken(streamerId);
+
+    if (!accessToken) throw new Error('Twitch OAuth access token unavailable');
+
+    const response = await axios.get('https://api.twitch.tv/helix/chat/badges/global', {
+      headers: { Authorization: `Bearer ${accessToken}`, 'Client-Id': creds.clientId },
+    });
+
+    return (response.data?.data || null) as Record<string, unknown>;
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`Failed to fetch global badges for ${streamerId}:`, errorMessage);
+
+    return null;
+  }
 }

@@ -6,6 +6,7 @@ import { QUEUE_NAMES, closeQueues } from '../jobs/queues.js';
 import vodProcessor from './vod.worker.js';
 import chatProcessor from './chat.worker.js';
 import youtubeProcessor from './youtube.worker.js';
+import dmcaProcessor from './dmca.worker.js';
 import { releaseKickBrowser } from '../utils/puppeteer-manager.js';
 
 import { startTokenHealthCron } from '../cron/token-health.js';
@@ -45,6 +46,11 @@ async function bootstrap() {
       concurrency: 1,
     });
 
+    const dmcaWorker = new Worker(QUEUE_NAMES.DMCA_PROCESSING as any, dmcaProcessor as any, {
+      connection: redisConnection,
+      concurrency: 1, // CPU-intensive re-encoding operations
+    });
+
     vodWorker.on('completed', (job) => {
       logger.info(`VOD job ${job?.id} completed`);
     });
@@ -69,6 +75,14 @@ async function bootstrap() {
       logger.error({ jobId: job?.id }, `YouTube job failed`);
     });
 
+    dmcaWorker.on('completed', (job) => {
+      logger.info(`DMCA job ${job?.id} completed`);
+    });
+
+    dmcaWorker.on('failed', (job, _err) => {
+      logger.error({ jobId: job?.id }, `DMCA job failed`);
+    });
+
     startTokenHealthCron();
     logger.info('Token health check cron started');
 
@@ -81,6 +95,7 @@ async function bootstrap() {
       await vodWorker.close();
       await chatWorker.close();
       await youtubeWorker.close();
+      await dmcaWorker.close();
 
       const clientModule = await import('../db/client.js');
       await clientModule.closeAllClients();
