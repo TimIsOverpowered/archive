@@ -19,6 +19,7 @@ export interface StreamerConfig {
   database: { url: string; connectionLimit?: number };
   settings: {
     vodPath?: string;
+    livePath?: string;
     vodDownload?: boolean;
     chatDownload?: boolean;
     domainName: string;

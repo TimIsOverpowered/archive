@@ -17,7 +17,8 @@ module.exports = {
 
       script: './src/index.ts', // Direct TypeScript via tsx interpreter
 
-      interpreter: 'tsx', // Use tsx for TS execution without build step
+      interpreter: 'node',
+      interpreter_args: '--import tsx',
 
       env: {
         // Production environment (default)
@@ -53,7 +54,8 @@ module.exports = {
 
       script: './src/workers/index.ts', // Worker entry point - BullMQ job processors
 
-      interpreter: 'tsx', // TypeScript support via tsx
+      interpreter: 'node',
+      interpreter_args: '--import tsx',
 
       env: {
         // Production worker settings

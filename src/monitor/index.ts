@@ -1,21 +1,22 @@
 import { loadStreamerConfigs } from '../config/loader.js';
 import { startStreamDetectionLoop } from './stream-detector.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Main entry point - loads ALL tenant configs and starts concurrent monitoring loops
  */
 export async function startMonitorService(): Promise<void> {
-  console.log('🚀 Starting Archive Monitor Service...');
+  logger.info('🚀 Starting Archive Monitor Service...');
 
   try {
     const allConfigs = await loadStreamerConfigs();
 
     if (allConfigs.length === 0) {
-      console.warn('[Monitor] No tenant configs loaded. Check META_DATABASE_URL and Tenant table.');
+      logger.warn('[Monitor] No tenant configs loaded. Check META_DATABASE_URL and Tenant table.');
       return;
     }
 
-    console.info(`[Monitor] Loaded ${allConfigs.length} tenant config(s). Starting concurrent polling loops...`);
+    logger.info(`[Monitor] Loaded ${allConfigs.length} tenant config(s). Starting concurrent polling loops...`);
 
     for (const config of allConfigs) {
       // Start independent loop per platform - mainPlatform flag is ONLY for YouTube game uploads, NOT stream detection
@@ -29,9 +30,9 @@ export async function startMonitorService(): Promise<void> {
       }
     }
 
-    console.info(`[Monitor] Started polling loops across all tenants/platforms`);
+    logger.info(`[Monitor] Started polling loops across all tenants/platforms`);
   } catch (error: any) {
-    console.error('[Monitor] Failed to start monitoring service:', error.message || error);
+    logger.error('[Monitor] Failed to start monitoring service:', error.message || error);
 
     // Exit with non-zero code so PM2 can restart the process automatically
     process.exit(1);
@@ -42,7 +43,7 @@ export async function startMonitorService(): Promise<void> {
  * Graceful shutdown handler - clears all polling intervals and closes browser instances
  */
 export async function stopMonitorService(): Promise<void> {
-  console.info('[Monitor] Received shutdown signal. Cleaning up...');
+  logger.info('[Monitor] Received shutdown signal. Cleaning up...');
 
   // Clear all monitor intervals
   const intervals = (globalThis as any).monitorIntervals;
@@ -50,7 +51,7 @@ export async function stopMonitorService(): Promise<void> {
   if (intervals) {
     for (const [key, intervalId] of intervals.entries()) {
       clearInterval(intervalId);
-      console.info(`[Monitor] Cleared polling loop: ${key}`);
+      logger.info(`[Monitor] Cleared polling loop: ${key}`);
     }
 
     intervals.clear();
@@ -60,12 +61,15 @@ export async function stopMonitorService(): Promise<void> {
   try {
     const closeKickBrowser = (await import('../services/kick-live.js')).closeKickBrowser;
     await closeKickBrowser?.();
-    console.info('[Monitor] Closed Kick browser instance');
+    logger.info('[Monitor] Closed Kick browser instance');
   } catch (err) {
-    console.warn('[Monitor]', err instanceof Error ? err.message : 'Error during shutdown cleanup');
+    const errMsg = err instanceof Error ? `Error during shutdown cleanup: ${err.message}` : 'Error during shutdown cleanup';
+    logger.warn(errMsg);
   }
 
-  console.info('[Monitor] Shutdown complete.');
+  logger.info('[Monitor] Shutdown complete.');
+
+  logger.info('[Monitor] Shutdown complete.');
 }
 
 // Register shutdown handlers for PM2 restarts/process termination (when running as standalone service)

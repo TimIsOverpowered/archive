@@ -69,7 +69,7 @@ export function createAutoLogger(tenantId?: string | null): Logger & Record<stri
   } catch (_err) {
     // Fallback to unwrapped logger if wrapping fails
     const errStr = _err instanceof Error ? _err.message : String(_err);
-    console.warn(`[createAutoLogger] Failed to wrap methods:`, errStr);
+    baseLogger.warn({ err: errStr }, '[createAutoLogger] Failed to wrap methods');
 
     return childLog as never;
   }

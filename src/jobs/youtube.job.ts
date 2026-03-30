@@ -12,10 +12,8 @@ export async function enqueueYoutubeUpload(job: Omit<YoutubeUploadJob, 'id'>): P
       timeout: 900000, // 15 min for YouTube upload
     });
 
-    console.log(`[YouTube Job] Enqueued ${job.type} upload: ${job.vodId}${job.part ? ` (part ${job.part})` : ''}`);
     return jobId;
-  } catch (error) {
-    console.error('[YouTube Job] Failed to enqueue job:', error);
+  } catch {
     return null;
   }
 }

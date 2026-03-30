@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { logger } from './logger.js';
 
 const globalDiscordAlertsEnabled = process.env.DISCORD_ALERTS_ENABLED !== 'false';
 
@@ -43,14 +44,12 @@ export async function sendDiscordAlert(message: string): Promise<string | null> 
       content: message,
     });
 
-    console.log('Discord alert sent:', message.substring(0, 80));
-
     if (response.data.id) {
       return response.data.id;
     }
     return null;
   } catch (err) {
-    console.error('Failed to send Discord alert:', err);
+    logger.error({ err }, 'Failed to send Discord alert');
     return null;
   }
 }
@@ -75,10 +74,8 @@ export async function updateDiscordMessage(messageId: string, message: string): 
     await axios.patch(updateUrl, {
       content: message,
     });
-
-    console.log('Discord message updated:', messageId.substring(0, 8));
   } catch (err) {
-    console.error('Failed to update Discord message:', err);
+    logger.error({ err }, 'Failed to update Discord message');
   }
 }
 
@@ -125,14 +122,12 @@ export async function sendRichAlert(data: RichEmbedData): Promise<string | null>
       embeds: [embed],
     });
 
-    console.log('Rich Discord alert sent:', data.title);
-
     if (response.data.id) {
       return response.data.id;
     }
     return null;
   } catch (err) {
-    console.error('Failed to send rich Discord alert:', err);
+    logger.error({ err }, 'Failed to send rich Discord alert');
     return null;
   }
 }
@@ -185,10 +180,8 @@ export async function updateDiscordEmbed(messageId: string, data: RichEmbedData)
     await axios.patch(updateUrl, {
       embeds: [embed],
     });
-
-    console.log('Discord embed updated:', messageId.substring(0, 8));
   } catch (err) {
-    console.error('Failed to update Discord embed:', err);
+    logger.error({ err }, 'Failed to update Discord embed');
   }
 }
 

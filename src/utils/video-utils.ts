@@ -1,4 +1,5 @@
 import ffmpeg from 'fluent-ffmpeg';
+import { logger } from './logger.js';
 
 /**
  * Convert HLS playlist to MP4 using fluent-ffmpeg (same as legacy convertToMp4)
@@ -17,8 +18,8 @@ export async function convertHlsToMp4(m3u8Path: string, vodId: string, mp4Path: 
           process.stdout.write(`\rM3U8 CONVERT TO MP4 PROGRESS: ${Math.round(progress.percent)}%`);
         }
       })
-      .on('start', (cmd: string) => {
-        console.info(`Converting VOD ${vodId} m3u8 to mp4 (${cmd})`);
+      .on('start', (_cmd: string) => {
+        logger.info({ vodId }, 'Converting VOD m3u8 to mp4');
       })
       .on('error', (err: any, stdout: string | null, stderr: string | null) => {
         ffmpegProcess.kill('SIGKILL');
@@ -36,7 +37,7 @@ export async function getDuration(filePath: string): Promise<number | null> {
   return new Promise((resolve) => {
     ffmpeg.ffprobe(filePath, (err: any, metadata: any) => {
       if (err) {
-        console.error(`Failed to probe ${filePath}:`, err.message);
+        logger.error({ filePath }, `Failed to probe video file: ${(err as Error).message}`);
         resolve(null);
       } else {
         const duration = Math.round(metadata.format.duration || 0);

@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import bcrypt from 'bcrypt';
 import { metaClient } from '../db/meta-client.js';
+import { logger } from '../utils/logger.js';
 
 interface AdminUser {
   id: number;
@@ -43,7 +44,7 @@ export function adminAuth() {
     }
 
     if (!authHeader) {
-      console.warn(`[AUTH FAIL] ${new Date().toISOString()} | IP: ${clientIP} | Path: ${req.url} | Reason: Missing Authorization header`);
+      logger.warn({ ip: clientIP, path: req.url }, '[AUTH FAIL] Missing Authorization header');
       return reply.status(401).send({
         error: true,
         msg: 'Missing Authorization header',
@@ -51,7 +52,7 @@ export function adminAuth() {
     }
 
     if (!authHeader.startsWith('Bearer ')) {
-      console.warn(`[AUTH FAIL] ${new Date().toISOString()} | IP: ${clientIP} | Path: ${req.url} | Reason: Invalid header format (must use Bearer scheme)`);
+      logger.warn({ ip: clientIP, path: req.url }, '[AUTH FAIL] Invalid header format (must use Bearer scheme)');
       return reply.status(401).send({
         error: true,
         msg: 'Authorization header must use Bearer scheme',
@@ -66,7 +67,7 @@ export function adminAuth() {
     });
 
     if (!admin) {
-      console.warn(`[AUTH FAIL] ${new Date().toISOString()} | IP: ${clientIP} | Path: ${req.url} | Reason: API key not found`);
+      logger.warn({ ip: clientIP, path: req.url }, '[AUTH FAIL] API key not found');
       return reply.status(401).send({
         error: true,
         msg: 'Invalid API key',
@@ -77,7 +78,7 @@ export function adminAuth() {
     const valid = await bcrypt.compare(apiKey, admin.api_key_hash);
 
     if (!valid) {
-      console.warn(`[AUTH FAIL] ${new Date().toISOString()} | IP: ${clientIP} | Path: ${req.url} | Reason: API key hash mismatch`);
+      logger.warn({ ip: clientIP, path: req.url }, '[AUTH FAIL] API key hash mismatch');
       return reply.status(403).send({
         error: true,
         msg: 'Invalid API key',
@@ -90,6 +91,6 @@ export function adminAuth() {
       username: admin.username,
     };
 
-    console.info(`[AUTH SUCCESS] ${new Date().toISOString()} | IP: ${clientIP} | Path: ${req.url} | User: ${admin.username}`);
+    logger.info({ ip: clientIP, path: req.url, user: admin.username }, '[AUTH SUCCESS]');
   };
 }

@@ -1,6 +1,7 @@
 import { PrismaClient } from '../../generated/streamer/client';
 import { redisClient } from '../api/plugins/redis.plugin';
 import { compressChatData, decompressChatData } from '../utils/compression';
+import { logger } from '../utils/logger.js';
 
 const PAGE_SIZE = 200;
 const DEFAULT_BUCKET_SIZE = 120;
@@ -12,7 +13,6 @@ const OFFSET_TTL = parseInt(process.env.CHAT_OFFSET_TTL || '259200', 10);
 const BUCKET_SIZE_TTL = parseInt(process.env.CHAT_BUCKET_SIZE_TTL || '2592000', 10);
 
 const DISABLE_CACHE = process.env.DISABLE_REDIS_CACHE === 'true';
-const ENABLE_CACHE_LOGGER = process.env.ENABLE_REDIS_CACHE_LOGGER === 'true';
 
 interface ChatMessage {
   id: string;
@@ -21,7 +21,7 @@ interface ChatMessage {
   content_offset_seconds: number;
   message: unknown;
   user_badges: unknown;
-  user_color: string;
+  user_color: string | null;
 }
 
 interface CursorData {
@@ -42,7 +42,7 @@ async function getVodBucketSize(streamerId: string, vodId: string): Promise<numb
   try {
     const cached = await redisClient.get(key);
     if (cached) {
-      if (ENABLE_CACHE_LOGGER) console.log(`[CACHE HIT] bucketSize:${vodId}`);
+      logger.debug({ vodId }, '[CACHE HIT] bucketSize');
       return parseInt(cached, 10);
     }
   } catch {
@@ -82,7 +82,7 @@ export async function getLogsByOffset(client: PrismaClient, streamerId: string, 
     try {
       const cached = await (redisClient as unknown as { getBuffer: (key: string) => Promise<Buffer | null> }).getBuffer(cacheKey);
       if (cached) {
-        if (ENABLE_CACHE_LOGGER) console.log(`[CACHE HIT] bucket:${vodId}:${bucket}`);
+        logger.debug({ vodId, bucket }, '[CACHE HIT] bucket');
         const data = (await decompressChatData(cached)) as { comments: ChatMessage[]; cursor?: string };
         return data;
       }
@@ -129,7 +129,7 @@ export async function getLogsByOffset(client: PrismaClient, streamerId: string, 
     try {
       const compressed = await compressChatData(response);
       await (redisClient as unknown as { setBuffer: (key: string, value: Buffer, options?: { EX?: number }) => Promise<string> }).setBuffer(cacheKey, compressed, { EX: OFFSET_TTL });
-      if (ENABLE_CACHE_LOGGER) console.log(`[CACHE SET] bucket:${vodId}:${bucket}`);
+      logger.debug({ vodId, bucket }, '[CACHE SET] bucket');
     } catch {
       // Ignore cache errors
     }
@@ -145,7 +145,8 @@ export async function getLogsByCursor(client: PrismaClient, streamerId: string, 
     try {
       const cached = await (redisClient as unknown as { getBuffer: (key: string) => Promise<Buffer | null> }).getBuffer(cacheKey);
       if (cached) {
-        if (ENABLE_CACHE_LOGGER) console.log(`[CACHE HIT] cursor:${vodId}`);
+        logger.debug({ vodId }, '[CACHE HIT] cursor');
+
         const data = (await decompressChatData(cached)) as { comments: ChatMessage[]; cursor?: string };
         return data;
       }
@@ -209,7 +210,7 @@ export async function getLogsByCursor(client: PrismaClient, streamerId: string, 
     try {
       const compressed = await compressChatData(response);
       await (redisClient as unknown as { setBuffer: (key: string, value: Buffer, options?: { EX?: number }) => Promise<string> }).setBuffer(cacheKey, compressed, { EX: CURSOR_TTL });
-      if (ENABLE_CACHE_LOGGER) console.log(`[CACHE SET] cursor:${vodId}`);
+      logger.debug({ vodId }, '[CACHE SET] cursor');
     } catch {
       // Ignore cache errors
     }

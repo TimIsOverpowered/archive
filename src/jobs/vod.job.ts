@@ -12,10 +12,8 @@ export async function enqueueVodDownload(job: Omit<VODDownloadJob, 'id'>): Promi
       timeout: 600000, // 10 min for VOD download
     });
 
-    console.log(`[VOD Job] Enqueued ${job.platform} VOD download: ${job.vodId}`);
     return jobId;
-  } catch (error) {
-    console.error('[VOD Job] Failed to enqueue job:', error);
+  } catch {
     return null;
   }
 }

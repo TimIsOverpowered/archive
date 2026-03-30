@@ -2,6 +2,7 @@ import { getAppAccessToken } from '../services/twitch';
 import type { StreamerConfig as ConfigType } from '../config/types';
 import { sendDiscordAlert, trackFailure, resetFailures } from '../utils/alerts.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
+import { logger } from '../utils/logger.js';
 
 const MAX_FAILURES = 3;
 
@@ -56,7 +57,7 @@ export function startTokenHealthCron(): NodeJS.Timeout {
 
   return setInterval(
     () => {
-      checkTokenHealth().catch(console.error);
+      checkTokenHealth().catch((err) => logger.error({ err }, 'Token health cron failed'));
     },
     60 * 60 * 1000
   );

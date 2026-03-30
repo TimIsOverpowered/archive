@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getStreamerConfig } from '../config/loader.js';
+import { logger } from '../utils/logger.js';
 
 export type AlertType = 'in_progress' | 'failure' | 'success';
 
@@ -35,7 +36,6 @@ function getAlertTitle(alert: DiscordAlert): string {
   }
 }
 
- 
 export async function sendDiscordAlert(alert: DiscordAlert): Promise<void> {
   getStreamerConfig(alert.tenantId); // Fetch to validate tenant exists
 
@@ -47,7 +47,7 @@ export async function sendDiscordAlert(alert: DiscordAlert): Promise<void> {
   const webhookUrl = process.env.DISCORD_ALERT_WEBHOOK_URL;
 
   if (!webhookUrl) {
-    console.warn('[Discord Alert] DISCORD_ALERT_WEBHOOK_URL not configured in environment');
+    logger.warn('[Discord Alert] DISCORD_ALERT_WEBHOOK_URL not configured in environment');
     return;
   }
 
@@ -83,7 +83,7 @@ export async function sendDiscordAlert(alert: DiscordAlert): Promise<void> {
   try {
     await axios.post(webhookUrl, { embeds });
   } catch (error) {
-    console.error(`[Discord Alert] Failed to send alert for VOD ${alert.vodId}:`, error);
+    logger.error({ vodId: alert.vodId, err: error }, '[Discord Alert] Failed to send alert');
   }
 }
 

@@ -24,11 +24,17 @@ export async function loadStreamerConfigs(): Promise<StreamerConfig[]> {
         saveMP4: typeof settingsObj.saveMP4 === 'boolean' ? settingsObj.saveMP4 : false,
         saveHLS: typeof settingsObj.saveHLS === 'boolean' ? settingsObj.saveHLS : false,
         timezone: typeof settingsObj.timezone === 'string' ? settingsObj.timezone : '',
+        vodDownload: typeof settingsObj.vodDownload === 'boolean' ? settingsObj.vodDownload : true,
+        chatDownload: typeof settingsObj.chatDownload === 'boolean' ? settingsObj.chatDownload : true,
       },
     };
 
     if ('vodPath' in settingsObj && settingsObj.vodPath) {
       streamerConfig.settings.vodPath = settingsObj.vodPath as string;
+    }
+
+    if ('livePath' in settingsObj && settingsObj.livePath) {
+      streamerConfig.settings.livePath = settingsObj.livePath as string;
     }
 
     // Validate required fields in settings
@@ -48,6 +54,10 @@ export async function loadStreamerConfigs(): Promise<StreamerConfig[]> {
 
       if ('username' in twitch && twitch.username) {
         streamerConfig.twitch.username = twitch.username as string;
+      }
+
+      if ('id' in twitch && twitch.id) {
+        streamerConfig.twitch.id = String(twitch.id);
       }
 
       streamerConfig.twitch.enabled = (twitch.enabled ?? false) as boolean;

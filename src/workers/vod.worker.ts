@@ -27,9 +27,8 @@ async function clearVodDedupKey(vodId: string): Promise<void> {
   try {
     const dedupKey = `vod_download:${vodId}`;
     await redis.del(dedupKey);
-    console.info(`[${vodId}] Cleared Redis deduplication key for re-download`);
-  } catch (error) {
-    console.warn('Failed to clear dedup key:', error instanceof Error ? error.message : String(error));
+  } catch {
+    // Silent fail
   }
 }
 
@@ -61,7 +60,7 @@ async function downloadTSSegment(segmentUri: string, vodDir: string, baseURL: st
       writer.on('error', reject);
     });
   } catch (error: any) {
-    console.error(`Failed to download segment ${segmentUri}:`, error.message);
+    throw error;
     throw error;
   }
 }
@@ -147,7 +146,6 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
     let noChangePollCounter = 0;
     let baseURL: string = '';
     let totalSegmentsFound = 0;
-    let lastAlertPercentage = -1;
 
     log.info(`[${vodId}] Starting HLS polling loop...`);
 
@@ -171,7 +169,6 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
               updatedTimestamp: new Date().toISOString(),
             });
 
-            lastAlertPercentage = 15;
           } else if (totalSegmentsFound > 20 && totalSegmentsFound < 40) {
             updateDiscordEmbed(messageId, {
               title: `📥 Downloading ${vodId}`,
@@ -186,7 +183,6 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
               updatedTimestamp: new Date().toISOString(),
             });
 
-            lastAlertPercentage = 30;
           } else if (totalSegmentsFound > 45 && totalSegmentsFound < 80) {
             updateDiscordEmbed(messageId, {
               title: `📥 Downloading ${vodId}`,
@@ -201,7 +197,6 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
               updatedTimestamp: new Date().toISOString(),
             });
 
-            lastAlertPercentage = 60;
           } else if (totalSegmentsFound > 150) {
             updateDiscordEmbed(messageId, {
               title: `📥 Downloading ${vodId}`,
@@ -216,7 +211,6 @@ async function processLiveHlsDownload(job: Job<LiveHlsDownloadJobData>): Promise
               updatedTimestamp: new Date().toISOString(),
             });
 
-            lastAlertPercentage = 90;
           }
         }
 
