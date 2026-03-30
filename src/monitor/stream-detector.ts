@@ -1,5 +1,5 @@
-import { getTwitchStreamStatus, waitForTwitchVodObject } from '../services/twitch-live.js';
-import { getKickStreamStatus, waitForKickVodObject } from '../services/kick-live.js';
+import { getTwitchStreamStatus, getLatestTwitchVodObject } from '../services/twitch-live.js';
+import { getKickStreamStatus, getLatestKickVodObject } from '../services/kick-live.js';
 import { createClient, getClient } from '../db/client.js';
 import type { StreamerConfig } from '../config/types.js';
 import path from 'path';
@@ -14,6 +14,7 @@ export async function checkPlatformStatus(tenantId: string, platform: PlatformTy
   const log = loggerWithTenant(tenantId);
 
   log.debug(`[Monitor]: Polling ${platform} status for streamer...`);
+  log.debug(`[Monitor]: Config values - vodDownload: ${config.settings?.vodDownload}, ${platform}.enabled: ${config[platform as 'twitch' | 'kick']?.enabled}`);
 
   try {
     const prisma = getClient(tenantId) || (await createClient(config));
@@ -40,7 +41,17 @@ export async function checkPlatformStatus(tenantId: string, platform: PlatformTy
       log.debug(`[Monitor]: ${platform} monitoring skipped: ${reasons.join(', ')}`);
     }
   } catch (error: any) {
-    log.error(`[Platform]: ${platform}] Error in stream status check:`, error.message || error);
+    const errorMsg = error?.message || String(error);
+    let details = errorMsg;
+
+    if (error.response) {
+      details += `\nHTTP ${error.response.status}: ${JSON.stringify(error.response.data)}`;
+    } else if (error.request) {
+      details += '\nNo response received from server';
+    }
+
+    const stackTrace = error?.stack ? `\nStack: ${error.stack}` : '';
+    log.error({ platform, error }, `[Platform]: ${platform}] Error in stream status check:\n${details}${stackTrace}`);
   }
 }
 
@@ -70,9 +81,9 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
 
   const streamStatus = await getTwitchStreamStatus(userIdCache, tenantId);
 
-  // Streamer is OFFLINE - mark any active live record as ended:
+  // Streamer is OFFLINE - mark any active live record as ended
   if (!streamStatus || !Array.isArray(streamStatus.type) || !streamStatus.type.includes('live')) {
-    log.info(`[Monitor]: Twitch user ${userIdCache} is OFFLINE`);
+    log.debug(`[Monitor]: Twitch user ${userIdCache} is OFFLINE`);
 
     const activeLiveVod = await prisma.vod.findFirst({
       where: { platform, is_live: true },
@@ -103,18 +114,35 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
   });
 
   if (!existingVod) {
-    log.info(`[Monitor]: New Twitch live detected! Stream ID: ${streamStatus.id}. Waiting for VOD object...`);
+    log.info(`[Monitor]: New Twitch live detected! Stream ID: ${streamStatus.id}. Checking for VOD object...`);
 
-    const vodResult = await waitForTwitchVodObject(userIdCache, streamStatus.id, tenantId);
+    // IMMEDIATE check - don't block waiting (legacy pattern!)
+    const vodResult = await getLatestTwitchVodObject(userIdCache, streamStatus.id, tenantId);
 
-    // NO FALLBACK - Only proceed if VOD object is available
     if (!vodResult || !vodResult.vodId) {
-      log.warn(`[Monitor]:  Timeout waiting for Twitch VOD object. Skipping download (will retry on next poll cycle).`);
-      return; // Exit without creating record or queuing job - will detect again in 30s and try waiting again
+      log.debug(`[Monitor]: VOD object not ready yet for stream ${streamStatus.id}. Will retry on next poll.`);
+      return; // Exit immediately - don't block! Next poll in 30s will check again
     }
 
-    // VOD object confirmed available - create consolidated record with full metadata
-    log.info(`[Monitor]:  Created VOD record ${vodResult.vodId} for live stream. Started at: ${streamStatus.started_at}`);
+    if (vodResult.stream_id !== String(streamStatus.id)) {
+      log.debug(`[Monitor]: Latest VOD (${vodResult.vodId}) doesn't match current stream. Will retry on next poll.`);
+      return; // Wrong VOD - exit immediately, don't block!
+    }
+
+    // Re-check if another concurrent poll already created this record (race guard)
+    const vodAlreadyExists = await prisma.vod.findUnique({
+      where: { id: vodResult.vodId, platform },
+    });
+
+    if (vodAlreadyExists) {
+      log.debug(`[Monitor]: VOD ${vodResult.vodId} was created by concurrent poll. Skipping duplicate creation.`);
+
+      // Another instance handling it - nothing more to do here
+      return;
+    }
+
+    // Safe to create now - no other poll has claimed this stream yet
+    log.info(`[Monitor]: Created VOD record ${vodResult.vodId} for live stream. Started at: ${streamStatus.started_at}`);
 
     await prisma.vod.create({
       data: {
@@ -126,12 +154,21 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
       },
     });
 
-    await enqueueLiveHlsDownload({
-      vodId: vodResult.vodId,
-      platform,
-      streamerId: userIdCache,
-      startedAt: new Date(streamStatus.started_at),
-    });
+    // Check if download already queued/running before queuing (legacy pattern)
+    const hasActiveJob = await checkHasActiveDownload(tenantId, vodResult.vodId);
+
+    if (!hasActiveJob) {
+      log.info(`[Monitor]: Queuing HLS download for ${vodResult.vodId}`);
+
+      await enqueueLiveHlsDownload({
+        vodId: vodResult.vodId,
+        platform,
+        streamerId: userIdCache,
+        startedAt: new Date(streamStatus.started_at),
+      });
+    } else {
+      log.debug(`[Monitor]: Download already queued/running for ${vodResult.vodId}, skipping.`);
+    }
   } else if (existingVod && !existingVod.is_live) {
     // Record exists but not marked live - update and queue download
 
@@ -183,7 +220,7 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
 
   // Streamer is OFFLINE - mark any active live record as ended
   if (!streamStatus || !streamStatus.id || streamStatus.id <= 0) {
-    log.info(`[Monitor]: Kick channel ${kickUsername} is offline`);
+    log.debug(`[Monitor]: Kick channel ${kickUsername} is offline`);
 
     const activeLiveVod = await prisma.vod.findFirst({
       where: { platform, is_live: true },
@@ -211,26 +248,34 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
 
   log.debug(`[Kick]: Stream is LIVE - ID: ${kickStreamIdStr}, Title: "${streamStatus.session_title}", Started: ${streamStatus.created_at}`);
 
-  log.info(`[Monitor]: New Kick live detected! Stream ID: ${kickStreamIdStr}, Title: "${streamStatus.session_title}"`);
-
   const existingVod = await prisma.vod.findUnique({
     where: { id: kickStreamIdStr, platform },
   });
 
   if (!existingVod) {
-    log.info(`[Monitor]:  No record exists. Waiting for video object in Kick system...`);
+    log.info(`[Monitor]: New Kick live detected! Stream ID: ${kickStreamIdStr}. Checking for video object...`);
 
-    // Wait for VOD metadata finalization (though ID won't change - ensures platform has finalized data)
-    const vodObject = await waitForKickVodObject(kickUsername, streamStatus.id);
+    // IMMEDIATE check - don't block waiting (legacy pattern!)
+    const vodObject = await getLatestKickVodObject(kickUsername, streamStatus.id);
 
-    // NO FALLBACK - Only proceed if VOD/video object is available from Kick API
     if (!vodObject || !vodObject.id) {
-      log.warn(`[Monitor]:  Timeout waiting for Kick video object. Skipping download (will retry on next poll cycle).`);
-      return; // Exit without creating record or queuing job - will detect again in 30s and try waiting again
+      log.debug(`[Monitor]: Video object not ready yet for Kick stream ${kickStreamIdStr}. Will retry on next poll.`);
+      return; // Exit immediately - don't block! Next poll in 30s will check again
     }
 
-    // Video object confirmed available - create consolidated VOD record with full metadata
+    // Re-check if another concurrent poll already created this record (race guard)
+    const vodAlreadyExists = await prisma.vod.findUnique({
+      where: { id: kickStreamIdStr, platform },
+    });
 
+    if (vodAlreadyExists) {
+      log.debug(`[Monitor]: VOD ${kickStreamIdStr} was created by concurrent poll. Skipping duplicate creation.`);
+
+      // Another instance handling it - nothing more to do here
+      return;
+    }
+
+    // Safe to create now - no other poll has claimed this stream yet
     await prisma.vod.create({
       data: {
         id: kickStreamIdStr, // Kick uses single ID throughout lifecycle
@@ -241,15 +286,24 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
       },
     });
 
-    log.info(`[Monitor]:  Created Kick VOD record ${kickStreamIdStr}. Started at: ${streamStatus.created_at}`);
+    log.info(`[Monitor]: Created Kick VOD record ${kickStreamIdStr}. Started at: ${streamStatus.created_at}`);
 
-    await enqueueLiveHlsDownload({
-      vodId: kickStreamIdStr,
-      platform,
-      streamerId: kickUsername,
-      startedAt: new Date(streamStatus.created_at),
-      sourceUrl: streamStatus.source || undefined,
-    });
+    // Check if download already queued/running before queuing (legacy pattern)
+    const hasActiveJob = await checkHasActiveDownload(tenantId, kickStreamIdStr);
+
+    if (!hasActiveJob) {
+      log.info(`[Monitor]: Queuing HLS download for ${kickStreamIdStr}`);
+
+      await enqueueLiveHlsDownload({
+        vodId: kickStreamIdStr,
+        platform,
+        streamerId: kickUsername,
+        startedAt: new Date(streamStatus.created_at),
+        sourceUrl: streamStatus.source || undefined,
+      });
+    } else {
+      log.debug(`[Monitor]: Download already queued/running for ${kickStreamIdStr}, skipping.`);
+    }
   } else if (existingVod && !existingVod.is_live) {
     // Record exists but not marked live - update and queue download
 
@@ -406,6 +460,15 @@ async function cleanupDedupKey(vodId: string): Promise<void> {
 export function startStreamDetectionLoop(tenantId: string, platform: PlatformType, config: StreamerConfig): void {
   const log = loggerWithTenant(tenantId);
   log.info(`[Platform]: ${platform}] Starting stream detection polling every 30 seconds...`);
+
+  // Run immediately on startup, then every 30s
+  (async () => {
+    try {
+      await checkPlatformStatus(tenantId, platform, config);
+    } catch (error: any) {
+      log.error(`[Platform]: ${platform}] Error in initial poll cycle:`, error.message || error);
+    }
+  })();
 
   const intervalId = setInterval(async () => {
     try {

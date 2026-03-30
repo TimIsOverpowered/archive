@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { startMonitorService } from './monitor/index.js';
+import { logger } from './utils/logger.js';
 
 // Load environment variables based on NODE_ENV
 const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : process.env.NODE_ENV === 'development' ? '.env.development' : '.env';
@@ -11,12 +12,12 @@ async function bootstrap() {
     await startMonitorService();
 
     // Keep the process running - monitoring loops are already started via intervals
-    console.info('[Monitor Service] Running. Waiting for shutdown signal...');
+    logger.info('[Monitor Service] Running. Waiting for shutdown signal...');
 
     // Wait indefinitely until interrupted
     await new Promise(() => {});
   } catch (error: any) {
-    console.error('[Monitor Service] Fatal error:', error);
+    logger.error('[Monitor Service] Fatal error:', error.message || error);
     process.exit(1);
   }
 }

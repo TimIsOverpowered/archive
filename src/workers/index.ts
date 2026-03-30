@@ -1,14 +1,8 @@
-import dotenv from 'dotenv';
-import path from 'path';
+import 'dotenv/config';
 import { Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { loadStreamerConfigs, clearConfigCache } from '../config/loader.js';
 import { QUEUE_NAMES, closeQueues } from '../jobs/queues.js';
-
-// Load environment variables based on NODE_ENV (same as src/index.ts)
-const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : process.env.NODE_ENV === 'development' ? '.env.development' : '.env';
-dotenv.config({ path: path.resolve(process.cwd(), envFile) });
-
 import vodProcessor from './vod.worker.js';
 import chatProcessor from './chat.worker.js';
 import youtubeProcessor from './youtube.worker.js';
@@ -16,15 +10,13 @@ import { releaseKickBrowser } from '../utils/puppeteer-manager.js';
 
 import { startTokenHealthCron } from '../cron/token-health.js';
 import { startMonitorService, stopMonitorService } from '../monitor/index.js';
+import { logger as baseLogger } from '../utils/logger.js';
 
-const logger = {
-  info: console.info,
-  error: console.error,
-  warn: console.warn,
-};
+const logger = baseLogger;
 
 async function bootstrap() {
   logger.info('Starting worker process...');
+  logger.info(`NODE_ENV: ${process.env.NODE_ENV}`);
 
   try {
     await loadStreamerConfigs();
@@ -57,24 +49,24 @@ async function bootstrap() {
       logger.info(`VOD job ${job?.id} completed`);
     });
 
-    vodWorker.on('failed', (job, err) => {
-      logger.error(`VOD job ${job?.id} failed:`, err);
+    vodWorker.on('failed', (job, _err) => {
+      logger.error({ jobId: job?.id }, `VOD job failed`);
     });
 
     chatWorker.on('completed', (job) => {
       logger.info(`Chat job ${job?.id} completed`);
     });
 
-    chatWorker.on('failed', (job, err) => {
-      logger.error(`Chat job ${job?.id} failed:`, err);
+    chatWorker.on('failed', (job, _err) => {
+      logger.error({ jobId: job?.id }, `Chat job failed`);
     });
 
     youtubeWorker.on('completed', (job) => {
       logger.info(`YouTube job ${job?.id} completed`);
     });
 
-    youtubeWorker.on('failed', (job, err) => {
-      logger.error(`YouTube job ${job?.id} failed:`, err);
+    youtubeWorker.on('failed', (job, _err) => {
+      logger.error({ jobId: job?.id }, `YouTube job failed`);
     });
 
     startTokenHealthCron();
@@ -107,7 +99,7 @@ async function bootstrap() {
 
     logger.info('Workers started successfully');
   } catch (error: any) {
-    logger.error('Failed to start workers:', error);
+    logger.error({ error }, 'Failed to start workers');
     process.exit(1);
   }
 }

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { logger } from '../utils/logger.js';
 
 export interface EmoteData {
   id: string;
@@ -75,8 +76,8 @@ export async function fetchAndSaveEmotes(streamerId: string, vodId: string, plat
           code: e.name,
           flags: e.flags,
         })) || [];
-    } catch (err) {
-      console.error('Failed to fetch Twitch emotes:', err);
+    } catch {
+      logger.error({ platform, channelId }, 'Failed to fetch Twitch emotes');
     }
   } else if (platform === 'kick' && channelId) {
     try {
@@ -90,8 +91,8 @@ export async function fetchAndSaveEmotes(streamerId: string, vodId: string, plat
           code: e.name,
           flags: e.flags,
         })) || [];
-    } catch (err) {
-      console.error('Failed to fetch Kick emotes:', err);
+    } catch {
+      logger.error({ platform, channelId }, 'Failed to fetch Kick emotes');
     }
   }
 
@@ -111,7 +112,7 @@ export async function fetchAndSaveEmotes(streamerId: string, vodId: string, plat
     const db = getClient(streamerId);
 
     if (!db) {
-      console.error('Database client not available for streamer:', streamerId);
+      logger.error({ streamerId }, 'Database client not available for streamer');
       return;
     }
 
@@ -129,7 +130,7 @@ export async function fetchAndSaveEmotes(streamerId: string, vodId: string, plat
         '7tv_emotes': emoteData['7tv_emotes'] as any,
       },
     });
-  } catch (err) {
-    console.error('Failed to save emotes:', err);
+  } catch {
+    logger.error({ vodId }, 'Failed to save emotes');
   }
 }

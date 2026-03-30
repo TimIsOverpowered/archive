@@ -1,6 +1,7 @@
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../services/twitch.js';
 import HLS from 'hls-parser';
 import axios from 'axios';
+import { logger } from './logger.js';
 
 export async function validateVideoDuration(filePath: string): Promise<number | null> {
   try {
@@ -20,7 +21,7 @@ export async function validateVideoDuration(filePath: string): Promise<number | 
 
     return null;
   } catch (error) {
-    console.error(`Failed to validate video duration for ${filePath}:`, error instanceof Error ? error.message : error);
+    logger.error({ filePath }, `Failed to validate video duration: ${(error as Error).message}`);
     return null;
   }
 }
@@ -35,18 +36,18 @@ export async function getTwitchHlsDuration(m3u8Path: string, vodId: string): Pro
       masterPlaylistContent = await getTwitchM3u8(vodId, tokenSig.value, tokenSig.signature);
 
       if (!masterPlaylistContent) {
-        console.error(`Failed to fetch Twitch master playlist for ${vodId}`);
+        logger.error({ vodId }, 'Failed to fetch Twitch master playlist');
         return null;
       }
     } catch (error) {
-      console.error(`Error fetching Twitch HLS:`, error instanceof Error ? error.message : error);
+      logger.error({ vodId }, `Error fetching Twitch HLS: ${(error as Error).message}`);
       return null;
     }
 
     const parsedMaster: any = HLS.parse(masterPlaylistContent);
 
     if (!parsedMaster || !parsedMaster.variants?.[0]?.uri) {
-      console.error(`Invalid Twitch master playlist structure for ${vodId}`);
+      logger.error({ vodId }, 'Invalid Twitch master playlist structure');
       return null;
     }
 
@@ -66,7 +67,7 @@ export async function getTwitchHlsDuration(m3u8Path: string, vodId: string): Pro
     const parsedPlaylist: any = HLS.parse(variantM3u8String);
 
     if (!parsedPlaylist || !parsedPlaylist.segments?.length) {
-      console.error(`No segments found in Twitch playlist for ${vodId}`);
+      logger.error({ vodId }, 'No segments found in Twitch playlist');
       return null;
     }
 
@@ -80,7 +81,7 @@ export async function getTwitchHlsDuration(m3u8Path: string, vodId: string): Pro
 
     return Math.round(totalDuration);
   } catch (error) {
-    console.error(`Failed to get Twitch HLS duration:`, error instanceof Error ? error.message : error);
+    logger.error({ vodId }, `Failed to get Twitch HLS duration: ${(error as Error).message}`);
     return null;
   }
 }

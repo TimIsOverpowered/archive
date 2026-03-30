@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { getAppAccessToken } from '../services/twitch.js';
+import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
+import { logger } from '../utils/logger.js';
 
 export interface TwitchStreamStatus {
   id: string;
@@ -18,12 +20,18 @@ export interface TwitchStreamStatus {
 export async function getTwitchStreamStatus(userId: string, tenantId: string): Promise<TwitchStreamStatus | null> {
   try {
     const accessToken = await getAppAccessToken(tenantId);
+    const creds = getCreds(tenantId);
+
+    if (!creds) {
+      logger.warn({ tenantId }, `[Twitch Live Check] No credentials configured for tenant ${tenantId}`);
+      return null;
+    }
 
     const response = await axios.get('https://api.twitch.tv/helix/streams', {
       params: { user_id: userId },
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        'Client-Id': process.env.TWITCH_CLIENT_ID || '',
+        'Client-Id': creds.clientId,
       },
       timeout: 10000,
     });
@@ -48,55 +56,59 @@ export async function getTwitchStreamStatus(userId: string, tenantId: string): P
       viewer_count: streamData.viewer_count,
     };
   } catch (error: any) {
-    console.error(`[Twitch Live Check] Failed to get stream status for user ${userId}:`, error.message);
+    logger.error({ userId }, `[Twitch Live Check] Failed to get stream status for user ${userId}:`, error.message);
     return null;
   }
 }
 
 /**
- * Wait for Twitch VOD object to appear after live detection
- * Polls /helix/videos until a matching VOD with correct stream_id is found
+ * Immediate check for Twitch VOD object matching current stream (NON-BLOCKING)
+
+
+/**
+ * Immediate check for Twitch VOD object matching current stream (NON-BLOCKING)
+ * Returns immediately with result or null if not ready yet - matches legacy behavior
  */
-export async function waitForTwitchVodObject(userId: string, expectedStreamId: string, tenantId: string): Promise<{ vodId: string; data?: any } | null> {
-  const maxAttempts = 30; // ~5 minutes (10s * 30)
+export async function getLatestTwitchVodObject(userId: string, expectedStreamId: string, tenantId: string): Promise<{ vodId: string; stream_id: string } | null> {
+  try {
+    const accessToken = await getAppAccessToken(tenantId);
+    const creds = getCreds(tenantId);
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await new Promise((resolve) => setTimeout(resolve, 10000)); // Wait 10 seconds between attempts
-
-    try {
-      const accessToken = await getAppAccessToken(tenantId);
-
-      const response = await axios.get('https://api.twitch.tv/helix/videos', {
-        params: { user_id: userId, first: 1 },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Client-Id': process.env.TWITCH_CLIENT_ID || '',
-        },
-        timeout: 10000,
-      });
-
-      if (!response.data.data || response.data.data.length === 0) {
-        continue;
-      }
-
-      const latestVod = response.data.data[0];
-
-      // CRITICAL CHECK: VOD is ready when stream_id matches active stream
-      if (latestVod.stream_id === expectedStreamId && latestVod.id) {
-        console.info(`[Twitch] VOD object created! Match found: stream_id=${latestVod.stream_id}, vod_id=${latestVod.id}`);
-
-        return {
-          vodId: latestVod.id,
-          data: latestVod,
-        };
-      }
-    } catch (error: any) {
-      console.warn(`[Twitch] Attempt ${attempt + 1}/${maxAttempts} failed while waiting for VOD object:`, error.message);
+    if (!creds) {
+      logger.warn({ tenantId }, `[Twitch] No credentials configured for tenant ${tenantId}`);
+      return null;
     }
-  }
 
-  console.error(`[Twitch] Timeout waiting for VOD object after ${maxAttempts} attempts (~5 minutes)`);
-  return null;
+    const response = await axios.get('https://api.twitch.tv/helix/videos', {
+      params: { user_id: userId, first: 1 },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Client-Id': creds.clientId,
+      },
+      timeout: 10000,
+    });
+
+    if (!response.data.data || response.data.data.length === 0) {
+      return null; // No VODs exist yet
+    }
+
+    const latestVod = response.data.data[0];
+
+    // CRITICAL CHECK - legacy pattern: fail immediately if stream_id doesn't match
+    if (latestVod.stream_id !== expectedStreamId || !latestVod.id) {
+      return null; // Wrong VOD or no ID yet - caller should retry later
+    }
+
+    logger.info({ userId, stream_id: latestVod.stream_id, vodId: latestVod.id }, `[Twitch] VOD object ready! Match found: stream_id=${latestVod.stream_id}, vod_id=${latestVod.id}`);
+
+    return {
+      vodId: latestVod.id,
+      stream_id: latestVod.stream_id,
+    };
+  } catch (error: any) {
+    logger.error({ userId }, `[Twitch] Failed to get VOD object for user ${userId}:`, error.message);
+    return null;
+  }
 }
 
 /**
@@ -105,12 +117,18 @@ export async function waitForTwitchVodObject(userId: string, expectedStreamId: s
 export async function getTwitchVodDetails(vodId: string, tenantId: string): Promise<any | null> {
   try {
     const accessToken = await getAppAccessToken(tenantId);
+    const creds = getCreds(tenantId);
+
+    if (!creds) {
+      logger.error({ tenantId }, `[Twitch] No credentials configured for tenant ${tenantId}`);
+      return null;
+    }
 
     const response = await axios.get('https://api.twitch.tv/helix/videos', {
       params: { id: vodId },
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        'Client-Id': process.env.TWITCH_CLIENT_ID || '',
+        'Client-Id': creds.clientId,
       },
       timeout: 10000,
     });
@@ -121,7 +139,7 @@ export async function getTwitchVodDetails(vodId: string, tenantId: string): Prom
 
     return response.data.data[0];
   } catch (error: any) {
-    console.error(`[Twitch] Failed to get VOD details for ${vodId}:`, error.message);
+    logger.error({ vodId }, `[Twitch] Failed to get VOD details for ${vodId}:`, error.message);
     return null;
   }
 }

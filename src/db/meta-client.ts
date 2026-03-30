@@ -1,11 +1,13 @@
+import 'dotenv/config';
 import { PrismaClient } from '../../prisma/generated/meta';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { logger } from '../utils/logger.js';
 
 const globalForPrisma = globalThis as unknown as { prismaMeta: PrismaClient | undefined };
 
 if (!process.env.META_DATABASE_URL) {
   if (process.argv[1]?.includes('workers')) {
-    console.warn('[meta-client] META_DATABASE_URL not set. Skipping meta client initialization.');
+    logger.warn('[meta-client] META_DATABASE_URL not set. Skipping meta client initialization.');
     process.exit(0);
   } else {
     throw new Error('META_DATABASE_URL environment variable is required');

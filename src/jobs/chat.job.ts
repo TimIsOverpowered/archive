@@ -12,10 +12,8 @@ export async function enqueueChatDownload(job: Omit<ChatDownloadJob, 'id'>): Pro
       timeout: 600000, // 10 min for chat download
     });
 
-    console.log(`[Chat Job] Enqueued ${job.platform} chat download: ${job.vodId}`);
     return jobId;
-  } catch (error) {
-    console.error('[Chat Job] Failed to enqueue job:', error);
+  } catch {
     return null;
   }
 }
@@ -35,14 +33,12 @@ export async function triggerChatDownload(streamerId: string, vodId: string, pla
 export async function triggerChatAfterVod(vodJob: VODDownloadJob): Promise<string | null> {
   // Kick chat is deferred for now - no implementation yet
   if (vodJob.platform === 'kick') {
-    console.log('[Chat Job] Chat download deferred for Kick platform');
     return null;
   }
 
   const streamerId = vodJob.streamerId || undefined;
 
   if (!streamerId) {
-    console.warn('[Chat Job] No streamerId available, skipping chat download');
     return null;
   }
 

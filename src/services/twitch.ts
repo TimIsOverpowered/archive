@@ -1,6 +1,5 @@
 import axios from 'axios';
-import { getStreamerConfig } from '../config/loader.js';
-import { decryptObject } from '../utils/encryption.js';
+import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
 
 interface VodData {
   id: string;
@@ -25,24 +24,8 @@ interface VodTokenSig {
 
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();
 
-function getTwitchCredentials(streamerId: string): { clientId: string; clientSecret: string } | null {
-  const config = getStreamerConfig(streamerId);
-
-  if (!config?.twitch?.auth) {
-    return null;
-  }
-
-  try {
-    const auth = decryptObject<{ client_id: string; client_secret: string; access_token: string }>(config.twitch.auth);
-    return { clientId: auth.client_id, clientSecret: auth.client_secret };
-  } catch (error) {
-    console.error(`Failed to decrypt Twitch credentials for ${streamerId}:`, error);
-    return null;
-  }
-}
-
 export async function getAppAccessToken(streamerId: string): Promise<string> {
-  const creds = getTwitchCredentials(streamerId);
+  const creds = getCreds(streamerId);
 
   if (!creds) {
     throw new Error('Twitch credentials not configured');
@@ -72,7 +55,7 @@ export async function getAppAccessToken(streamerId: string): Promise<string> {
 
 export async function getVodData(vodId: string, streamerId: string): Promise<VodData> {
   const accessToken = await getAppAccessToken(streamerId);
-  const creds = getTwitchCredentials(streamerId)!;
+  const creds = getCreds(streamerId)!;
 
   const response = await axios.get('https://api.twitch.tv/helix/videos', {
     params: { id: vodId },
@@ -256,7 +239,7 @@ export async function getChapter(vodId: string): Promise<any | null> {
 export async function getGameData(gameId: string, streamerId: string): Promise<any | null> {
   const accessToken = await getAppAccessToken(streamerId);
 
-  const creds = getTwitchCredentials(streamerId)!;
+  const creds = getCreds(streamerId)!;
 
   const response = await axios.get('https://api.twitch.tv/helix/games', {
     params: { id: gameId },

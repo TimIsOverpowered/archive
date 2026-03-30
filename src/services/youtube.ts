@@ -5,7 +5,7 @@ import { getStreamerConfig, clearConfigCache } from '../config/loader.js';
 import { decryptObject, encryptObject } from '../utils/encryption.js';
 import { metaClient } from '../db/meta-client.js';
 
-import { loggerWithTenant } from '../utils/logger.js';
+import { loggerWithTenant, logger as baseLogger } from '../utils/logger.js';
 interface AuthObject {
   access_token?: string; // Optional - may not exist if expired and not refreshed yet
   refresh_token: string; // Always required for persistence
@@ -108,7 +108,8 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
             refresh_token: client.credentials.refresh_token || '',
             expiry_date: Date.now() + (client.credentials.expiry_date as number) - Date.now(), // Convert back to relative for builder
           },
-          config.youtube.auth
+          config.youtube.auth,
+          log
         );
 
         const updatedAuth: AuthObject = {
@@ -135,7 +136,9 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
         log.info(`[YouTube] Pre-emptive token refresh persisted to DB`);
       } else {
         // No auth configured - just refresh the existing client credentials but skip persistence
-        client.setCredentials(buildCredentialsObject(client.credentials, undefined));
+        const credsUpdate = buildCredentialsObject(client.credentials, undefined, log);
+
+        client.setCredentials(credsUpdate);
 
         oauthClients.delete(streamerId);
       }
@@ -188,7 +191,7 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
 
     try {
       // Build complete updated auth object from event data + preserved values
-      const credsUpdate = buildCredentialsObject(newTokens, config.youtube.auth);
+      const credsUpdate = buildCredentialsObject(newTokens, config.youtube.auth, log);
 
       const updatedAuth: AuthObject = {
         access_token: newTokens.access_token || undefined,
@@ -210,7 +213,7 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
       log.error(`[YouTube] Failed to persist auto-refreshed tokens to DB for ${streamerId}:`, dbError.message || dbError);
     } finally {
       // CRITICAL: Always update OAuth client's internal state regardless of DB write success/failure
-      const credsUpdate = buildCredentialsObject(newTokens, config.youtube.auth);
+      const credsUpdate = buildCredentialsObject(newTokens, config.youtube.auth, log);
 
       try {
         newClient.setCredentials(credsUpdate);
@@ -273,7 +276,7 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
  * Convert token expiry information to absolute timestamp for local validation.
  * Handles both relative seconds (expires_in/expiresIn) and absolute timestamps (expiry_date).
  */
-function calculateExpiryDate(newTokens: any): number {
+function calculateExpiryDate(newTokens: any, log?: ReturnType<typeof loggerWithTenant>): number {
   // If already provided as absolute timestamp, use directly
   if (typeof newTokens.expiry_date === 'number') return newTokens.expiry_date;
 
@@ -284,7 +287,8 @@ function calculateExpiryDate(newTokens: any): number {
     return Date.now() + relativeSeconds * 1000; // Convert to absolute timestamp in ms
   }
 
-  console.warn('[YouTube] No expiry information in token event, using default 1-hour validity');
+  const logger = log || baseLogger;
+  logger.warn('[YouTube] No expiry information in token event, using default 1-hour validity');
   return Date.now() + 3600_000; // Default: expire in 1 hour (safe fallback)
 }
 
@@ -294,7 +298,8 @@ function calculateExpiryDate(newTokens: any): number {
  */
 function buildCredentialsObject(
   newTokens: any,
-  currentAuthEncrypted?: string
+  currentAuthEncrypted?: string,
+  log?: ReturnType<typeof loggerWithTenant>
 ): {
   access_token?: null | string;
   refresh_token: string;
@@ -303,18 +308,20 @@ function buildCredentialsObject(
   let refreshToken = '';
 
   // Try to load existing refresh token if not provided in event (Google often doesn't rotate it)
+  const logger = log || baseLogger;
+
   if (!newTokens.refresh_token && currentAuthEncrypted) {
     try {
       const existing = decryptObject<AuthObject>(currentAuthEncrypted);
       refreshToken = existing?.refresh_token || '';
 
-      console.log(`[YouTube] Preserved existing refresh token from DB`);
+      logger.info(`[YouTube] Preserved existing refresh token from DB`);
     } catch {
       // Ignore - will use empty string, OAuth client may fail gracefully on next API call if needed
     }
   } else if (newTokens.refresh_token) {
     refreshToken = newTokens.refresh_token;
-    console.log(`[YouTube] Using fresh refresh token from event`);
+    logger.info(`[YouTube] Using fresh refresh token from event`);
   }
 
   const creds: any = {
@@ -330,13 +337,13 @@ function buildCredentialsObject(
     if (!isNaN(expiryDate)) {
       creds.expiry_date = expiryDate;
 
-      console.log(`[YouTube] Access token valid until ${new Date(expiryDate).toISOString()}`);
+      logger.info(`[YouTube] Access token valid until ${new Date(expiryDate).toISOString()}`);
     }
   } else {
     // No access token in event - ensure client state is clean (will force refresh on next API call)
     delete creds.expiry_date; // Clear old expiry date if present
 
-    console.log(`[YouTube] No access token provided, will refresh on next API call`);
+    logger.info(`[YouTube] No access token provided, will refresh on next API call`);
   }
 
   return creds as {
@@ -478,7 +485,7 @@ export function clearYoutubeOAuthClient(streamerId?: string): void {
   } else {
     oauthClients.clear();
 
-    console.log('[YouTube] Cleared all OAuth clients');
+    baseLogger.info('[YouTube] Cleared all OAuth clients');
   }
 }
 
@@ -488,9 +495,9 @@ function shutdown() {
   oauthClients.clear();
 
   if (count > 0) {
-    console.log(`[YouTube] Shutdown: cleared ${count} cached OAuth clients`);
+    baseLogger.info(`[YouTube] Shutdown: cleared ${count} cached OAuth clients`);
   } else {
-    console.log('[YouTube] Shutdown: no cached clients to clear');
+    baseLogger.info('[YouTube] Shutdown: no cached clients to clear');
   }
 }
 

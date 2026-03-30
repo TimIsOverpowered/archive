@@ -4,6 +4,7 @@ import { getStreamerConfig } from '../config/loader';
 import { fetchComments, fetchNextComments } from '../services/twitch';
 import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/alerts';
 import { ChatDownloadJob } from '../jobs/queues';
+import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 
 const BATCH_SIZE = 2500;
 const RATE_LIMIT_MS = 150;
@@ -11,8 +12,11 @@ const RATE_LIMIT_MS = 150;
 const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJob>) => {
   const { streamerId, vodId, platform, duration } = job.data;
 
+  // Create logger with tenant context ONCE at start of processing scope
+  const log = createAutoLogger(String(streamerId));
+
   if (platform !== 'twitch') {
-    console.log(`Chat download for ${platform} is deferred`);
+    log.info(`Chat download for ${platform} is deferred`);
     return { success: true, skipped: true };
   }
 
@@ -122,7 +126,7 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
 
     return { success: true, totalMessages };
   } catch (error) {
-    console.error(`Chat download failed for ${vodId}:`, error);
+    log.error({ vodId, platform }, `Chat download failed: ${(error as Error).message}`);
 
     if (messageId && isAlertsEnabled()) {
       updateDiscordEmbed(messageId, {

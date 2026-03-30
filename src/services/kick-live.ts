@@ -1,4 +1,5 @@
 import puppeteer, { Browser } from 'puppeteer';
+import { logger } from '../utils/logger.js';
 
 let browserInstance: Browser | null = null;
 
@@ -11,14 +12,14 @@ async function getBrowser(): Promise<Browser> {
       await browserInstance.close().catch(() => {});
     }
 
-    console.info('[Kick Live] Initializing Puppeteer browser...');
+    logger.info('[Kick Live] Initializing Puppeteer browser...');
 
     browserInstance = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
     });
 
-    console.info('[Kick Live] Browser initialized successfully');
+    logger.info('[Kick Live] Browser initialized successfully');
   }
 
   return browserInstance;
@@ -54,7 +55,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
 
     const apiUrl = `https://kick.com/api/v2/channels/${username}/livestream`;
 
-    console.debug(`[Kick] Fetching livestream data for ${username} from ${apiUrl}`);
+    logger.debug({ username }, `[Kick] Fetching livestream data for ${username} from ${apiUrl}`);
 
     await page.goto(apiUrl, {
       waitUntil: 'networkidle0',
@@ -70,7 +71,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
       const data = JSON.parse(content);
 
       if (!data || !data.id) {
-        console.debug(`[Kick] Channel ${username} is offline (no livestream data)`);
+        logger.debug({ username }, `[Kick] Channel ${username} is offline (no livestream data)`);
         await page.close();
         return null;
       }
@@ -85,81 +86,74 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
         viewer_count: data.viewer_count || 0,
       };
 
-      console.debug(`[Kick] Live stream detected for ${username}: ID=${streamData.id}, Title="${streamData.session_title}"`);
+      logger.debug({ username }, `[Kick] Live stream detected for ${username}: ID=${streamData.id}, Title="${streamData.session_title}"`);
 
       await page.close();
       return streamData;
     } catch (parseError) {
-      console.error(`[Kick] Failed to parse JSON response from livestream endpoint:`, parseError);
+      logger.error({ username }, `[Kick] Failed to parse JSON response from livestream endpoint:`, parseError);
       await page.close();
       return null;
     }
   } catch (error: any) {
-    console.error(`[Kick Live Check] Failed to get stream status for ${username}:`, error.message);
+    logger.error({ username }, `[Kick Live Check] Failed to get stream status for ${username}:`, error.message);
     return null;
   }
 }
 
 /**
- * Wait for Kick VOD object to appear in their system after live detection
- * Note: For Kick, the livestream ID IS the permanent ID, but we still wait for metadata finalization
+ * Immediate check for Kick VOD/video object matching current stream (NON-BLOCKING)
+ * Returns immediately with result or null if not ready yet - matches legacy behavior
  */
-export async function waitForKickVodObject(username: string, streamId: number): Promise<{ id: string; title?: string; source?: string } | null> {
-  const maxAttempts = 12; // ~60 seconds (5s * 12) - shorter since Kick uses same ID throughout
+export async function getLatestKickVodObject(username: string, expectedStreamId: number): Promise<{ id: string; title?: string; source?: string } | null> {
+  try {
+    const browser = await getBrowser();
+    const page = await browser.newPage();
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds between attempts
+    page.setDefaultTimeout(15000);
 
-    try {
-      const browser = await getBrowser();
-      const page = await browser.newPage();
+    const videosUrl = `https://kick.com/api/v2/channels/${username}/videos`;
 
-      page.setDefaultTimeout(15000);
+    logger.debug({ username }, `[Kick] Fetching video data for ${username} from ${videosUrl}`);
 
-      const videosUrl = `https://kick.com/api/v2/channels/${username}/videos`;
+    await page.goto(videosUrl, {
+      waitUntil: 'networkidle0',
+      timeout: 15000,
+    });
 
-      await page.goto(videosUrl, {
-        waitUntil: 'networkidle0',
-        timeout: 15000,
-      });
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+    const content = await page.content();
+    const data = JSON.parse(content);
 
-      const content = await page.content();
-      const data = JSON.parse(content);
-
-      if (!data || !Array.isArray(data)) {
-        await page.close();
-        continue;
-      }
-
-      // Find matching VOD by ID (Kick uses same ID for stream and video)
-      const vodObject = data.find((v: any) => v.id === streamId || String(v.id) === String(streamId));
-
-      if (vodObject) {
-        console.info(`[Kick] Video object found in system: ID=${streamId}, Title="${vodObject.session_title || vodObject.title}"`);
-
-        await page.close();
-
-        return {
-          id: String(streamId),
-          title: vodObject.session_title || vodObject.title,
-          source: vodObject.source || undefined,
-        };
-      }
-
+    if (!data || !Array.isArray(data)) {
+      logger.debug({ username }, `[Kick] No video data found for ${username}`);
       await page.close();
-    } catch (error: any) {
-      console.warn(`[Kick] Attempt ${attempt + 1}/${maxAttempts} failed while waiting for video object:`, error.message);
+      return null; // No videos exist yet
     }
+
+    // Find matching VOD by ID (Kick uses same ID for stream and video)
+    const vodObject = data.find((v: any) => v.id === expectedStreamId || String(v.id) === String(expectedStreamId));
+
+    if (!vodObject) {
+      logger.debug({ username, expectedStreamId }, `[Kick] Video object not found yet for stream ${expectedStreamId}`);
+      await page.close();
+      return null; // Not ready - caller should retry later
+    }
+
+    logger.info({ username, expectedStreamId }, `[Kick] Video object ready! ID=${expectedStreamId}, Title="${vodObject.session_title || vodObject.title}"`);
+
+    await page.close();
+
+    return {
+      id: String(expectedStreamId),
+      title: vodObject.session_title || vodObject.title,
+      source: vodObject.source || undefined,
+    };
+  } catch (error: any) {
+    logger.error({ username }, `[Kick] Failed to get video object for ${username}:`, error.message);
+    return null;
   }
-
-  // Return basic info even if VOD object not found - Kick uses stream ID as permanent identifier
-  console.info(`[Kick] Using livestream ID directly (video object may still be processing)`);
-
-  return {
-    id: String(streamId),
-  };
 }
 
 /**
@@ -167,7 +161,7 @@ export async function waitForKickVodObject(username: string, streamId: number): 
  */
 export async function closeKickBrowser(): Promise<void> {
   if (browserInstance && browserInstance.isConnected()) {
-    console.info('[Kick Live] Closing Puppeteer browser...');
+    logger.info('[Kick Live] Closing Puppeteer browser...');
     await browserInstance.close().catch(() => {});
     browserInstance = null;
   }
