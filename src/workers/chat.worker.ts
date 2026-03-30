@@ -10,7 +10,7 @@ const BATCH_SIZE = 2500;
 const RATE_LIMIT_MS = 150;
 
 const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJob>) => {
-  const { streamerId, vodId, platform, duration } = job.data;
+  const { streamerId, vodId, platform, duration, startOffset } = job.data;
 
   // Create logger with tenant context ONCE at start of processing scope
   const log = createAutoLogger(String(streamerId));
@@ -33,11 +33,12 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
   const messageId = isAlertsEnabled()
     ? await sendRichAlert({
         title: `💬 Chat Download Started`,
-        description: `${streamerId} - Fetching chat messages for ${vodId}`,
+        description: `${streamerId} - Fetching chat messages for ${vodId}${startOffset ? ` (resuming from offset ${startOffset}s)` : ''}`,
         status: 'warning',
         fields: [
           { name: 'Platform', value: platform, inline: true },
           { name: 'VOD ID', value: vodId, inline: false },
+          ...(startOffset ? [{ name: 'Start Offset', value: `${startOffset}s`, inline: true }] : []),
         ],
         timestamp: new Date().toISOString(),
       })
@@ -47,12 +48,15 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
     let cursor: string | null = null;
     let totalMessages = 0;
     let batchCount = 0;
+    const initialOffset = startOffset || 0;
+
+    log.info(`[${vodId}] Starting chat download${initialOffset > 0 ? ` from offset ${initialOffset}s` : ''}`);
 
     while (true) {
       let page: any;
 
       if (cursor === null) {
-        page = await fetchComments(vodId, 0);
+        page = await fetchComments(vodId, initialOffset);
       } else {
         await new Promise((r) => setTimeout(r, RATE_LIMIT_MS));
         page = await fetchNextComments(vodId, cursor);
