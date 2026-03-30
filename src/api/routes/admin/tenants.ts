@@ -2,12 +2,18 @@ import { FastifyInstance } from 'fastify';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import Redis from 'ioredis';
 import fsPromises from 'fs/promises';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc.js';
+import timezone from 'dayjs/plugin/timezone.js';
 import { getTenantStats, getAllTenants } from '../../../services/tenants.service.js';
-import { getClient, createClient } from '../../../db/client.js';
+import { getClient } from '../../../db/client.js';
 import { getStreamerConfig } from '../../../config/loader.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import { getYoutubeUploadQueue, getVODDownloadQueue, getChatDownloadQueue } from '../../../jobs/queues.js';
+import { getYoutubeUploadQueue, getVODDownloadQueue, getChatDownloadQueue, getDmcaProcessingQueue } from '../../../jobs/queues.js';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 type TenantsRoutesOptions = Record<string, unknown>;
 
@@ -328,8 +334,10 @@ export default async function tenantsRoutes(fastify: FastifyInstance, _options: 
         return { data: { message: `Created ${body.game_name} in games DB for ${body.vod_id}`, gameId: newGame.id, vodId: body.vod_id } };
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
-        request.log.error(`[${id}] Game creation failed: ${errorMsg}`);
-        throw new Error('Failed to create game record');
+
+        request.log.error(`[${id}] Download failed: ${errorMsg}`);
+
+        throw new Error('Failed to queue download jobs');
       }
     }
   );
@@ -1322,4 +1330,324 @@ export default async function tenantsRoutes(fastify: FastifyInstance, _options: 
       }
     }
   );
+
+  fastify.post(
+    '/:id/live',
+    {
+      schema: {
+        tags: ['Admin', 'Tenants'],
+        description: 'External webhook handler when live HLS download completes',
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string' } },
+          required: ['id'],
+        },
+        body: {
+          type: 'object',
+          properties: {
+            streamId: { type: 'string' },
+            path: { type: 'string' },
+            platform: { type: 'string', enum: ['twitch', 'kick'] },
+          },
+          required: ['streamId', 'path'],
+        },
+        security: [{ apiKey: [] }],
+      },
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
+    },
+    async (request) => {
+      const { id } = request.params as { id: string };
+      const body = request.body as any;
+
+      if (!body.streamId || !body.path) throw new Error('Missing streamId or path');
+
+      try {
+        const client = getClient(id);
+        if (!client) throw new Error('Database not available');
+
+        let vodRecord: any;
+        try {
+          vodRecord = await (client as any).vod.findUnique({ where: { stream_id: body.streamId } });
+        } catch {
+          vodRecord = null;
+        }
+
+        if (!vodRecord) throw new Error('VOD not found for streamId');
+
+        const config = getStreamerConfig(id);
+
+        if (body.platform && vodRecord.platform !== body.platform) {
+          request.log.warn(`[${id}] Platform mismatch: VOD=${vodRecord.platform}, param=${body.platform}`);
+        }
+
+        if (!(config?.youtube?.multiTrack || false)) {
+          const err = new Error('Not Uploading to youtube as per multitrack var');
+          (err as any).statusCode = 404;
+          throw err;
+        }
+
+        request.log.info(`[${id}] Queuing YouTube upload for live VOD ${vodRecord.id}`);
+
+        const finalTitle = `${config.settings.domainName} ${vodRecord.platform?.toUpperCase() || body.platform?.toUpperCase()} LIVE VOD`;
+
+        const youtubeJobData = {
+          streamerId: id,
+          vodId: String(vodRecord.id),
+          filePath: body.path,
+          title: finalTitle,
+          description: config.youtube.description || '',
+          type: 'vod' as const,
+          platform: (body.platform || vodRecord.platform) as 'twitch' | 'kick',
+        };
+
+        await (getYoutubeUploadQueue() as any).add(youtubeJobData, { id: `youtube-live:${vodRecord.id}:${Date.now()}` });
+
+        return { data: { message: 'Starting upload to youtube', vodId: String(vodRecord.id) } };
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        const statusCode = (error as any).statusCode || 500;
+
+        request.log.error(`[${id}] Live callback failed: ${errorMsg}`);
+
+        if (statusCode === 404) {
+          throw new Error('YouTube multi-track upload not enabled');
+        }
+
+        throw error;
+      }
+    }
+  );
+
+  type DmcaRequestBody = {
+    vodId: string;
+    claims: any[] | string;
+    platform?: 'twitch' | 'kick';
+    type?: 'vod' | 'live';
+    partIndex?: number;
+  };
+
+  fastify.post(
+    '/:id/dmca',
+    {
+      schema: {
+        tags: ['Admin', 'Tenants'],
+        description: 'Process DMCA claims for a VOD (or specific part if provided) - mutes audio or applies blackout, then queues YouTube upload',
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string' } },
+          required: ['id'],
+        },
+        body: {
+          type: 'object',
+          properties: {
+            vodId: { type: 'string' },
+            claims: {},
+            partIndex: { type: 'number' }, // Optional - if provided, processes only that part (1-indexed)
+            platform: { type: 'string', enum: ['twitch', 'kick'] },
+            type: { type: 'string', enum: ['vod', 'live'] },
+          },
+          required: ['vodId', 'claims'],
+        },
+        security: [{ apiKey: [] }],
+      },
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
+    },
+    async (request) => {
+      const { id } = request.params as { id: string };
+      const body = request.body as DmcaRequestBody;
+
+      try {
+        const config = getStreamerConfig(id);
+        if (!config) throw new Error('Tenant not found');
+
+        const client = getClient(id);
+        if (!client) throw new Error('Database not available');
+
+        let vodRecord: any;
+        try {
+          vodRecord = await (client as any).vod.findUnique({ where: { id: body.vodId } });
+        } catch {
+          vodRecord = null;
+        }
+
+        if (!vodRecord) throw new Error('VOD not found');
+
+        const claimsArray = Array.isArray(body.claims) ? body.claims : JSON.parse(typeof body.claims === 'string' ? body.claims : JSON.stringify(body.claims));
+
+        // Build job data - only include part field if partIndex is provided
+        const dmcaJobData: any = {
+          streamerId: id,
+          vodId: String(vodRecord.id),
+          receivedClaims: claimsArray,
+          type: body.type || 'vod',
+          platform: body.platform || (vodRecord.platform as 'twitch' | 'kick'),
+        };
+
+        // Only add part field if partIndex is explicitly provided and valid
+        if (body.partIndex !== undefined && body.partIndex !== null) {
+          dmcaJobData.part = Number(body.partIndex) + 1; // Convert to 1-indexed for worker
+        }
+
+        await (getDmcaProcessingQueue() as any).add(dmcaJobData);
+
+        if (body.partIndex !== undefined && body.partIndex !== null) {
+          request.log.info(`[${id}] DMCA processing job queued for ${body.vodId} Part ${Number(body.partIndex) + 1}`);
+        } else {
+          request.log.info(`[${id}] DMCA processing job queued for full VOD ${body.vodId}`);
+        }
+
+        return {
+          data: {
+            message: body.partIndex !== undefined ? `DMCA part processing started` : 'DMCA processing started',
+            vodId: String(vodRecord.id),
+            ...(body.partIndex !== undefined && { part: Number(body.partIndex) + 1 }),
+          },
+        };
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        request.log.error(`[${id}] DMCA failed: ${errorMsg}`);
+
+        throw new Error('Failed to queue DMCA processing job');
+      }
+    }
+  );
+
+  fastify.post(
+    '/:id/part-dmca',
+    {
+      schema: {
+        tags: ['Admin', 'Tenants'],
+        description: 'Process DMCA claim for specific part of VOD (or full VOD if no part specified) - applies blackout, then queues YouTube upload',
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string' } },
+          required: ['id'],
+        },
+        body: {
+          type: 'object',
+          properties: {
+            vodId: { type: 'string' },
+            claims: {},
+            partIndex: { type: 'number' }, // Optional - if not provided, processes full VOD like /dmca endpoint
+            platform: { type: 'string', enum: ['twitch', 'kick'] },
+            type: { type: 'string', enum: ['vod', 'live'] },
+          },
+          required: ['vodId', 'claims'],
+        },
+        security: [{ apiKey: [] }],
+      },
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
+    },
+    async (request) => {
+      const { id } = request.params as { id: string };
+      const body = request.body as DmcaRequestBody;
+
+      try {
+        const config = getStreamerConfig(id);
+        if (!config) throw new Error('Tenant not found');
+
+        const client = getClient(id);
+        if (!client) throw new Error('Database not available');
+
+        let vodRecord: any;
+        try {
+          vodRecord = await (client as any).vod.findUnique({ where: { id: body.vodId } });
+        } catch {
+          vodRecord = null;
+        }
+
+        if (!vodRecord) throw new Error('VOD not found');
+
+        const claimsArray = Array.isArray(body.claims) ? body.claims : JSON.parse(typeof body.claims === 'string' ? body.claims : JSON.stringify(body.claims));
+
+        // Build job data - only include part field if partIndex is provided
+        const dmcaJobData: any = {
+          streamerId: id,
+          vodId: String(vodRecord.id),
+          receivedClaims: claimsArray,
+          type: body.type || 'vod',
+          platform: body.platform || (vodRecord.platform as 'twitch' | 'kick'),
+        };
+
+        // Only add part field if partIndex is explicitly provided and valid
+        if (body.partIndex !== undefined && body.partIndex !== null) {
+          dmcaJobData.part = Number(body.partIndex) + 1; // Convert to 1-indexed for worker
+        }
+
+        await (getDmcaProcessingQueue() as any).add(dmcaJobData);
+
+        if (body.partIndex !== undefined && body.partIndex !== null) {
+          request.log.info(`[${id}] DMCA processing job queued for ${body.vodId} Part ${Number(body.partIndex) + 1}`);
+        } else {
+          request.log.info(`[${id}] DMCA processing job queued for full VOD ${body.vodId}`);
+        }
+
+        return {
+          data: {
+            message: body.partIndex !== undefined ? `DMCA part processing started` : 'DMCA processing started',
+            vodId: String(vodRecord.id),
+            ...(body.partIndex !== undefined && { part: Number(body.partIndex) + 1 }),
+          },
+        };
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        request.log.error(`[${id}] DMCA failed: ${errorMsg}`);
+
+        throw new Error('Failed to queue DMCA processing job');
+      }
+    }
+  );
+
+  fastify.get(
+    '/:id/badges/twitch',
+    {
+      schema: {
+        tags: ['Admin', 'Tenants'],
+        description: 'Get Twitch badges for a channel (global + subscriber)',
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string' } },
+          required: ['id'],
+        },
+      },
+    },
+    async (request) => {
+      const { id } = request.params as { id: string };
+
+      try {
+        const config = getStreamerConfig(id);
+        if (!config?.twitch?.id) throw new Error('Twitch not configured for this tenant');
+
+        // Check Redis cache first (60-minute TTL)
+        const redisInstance = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+        const cachedBadges = await redisInstance.get(`twitch_badges:${id}`);
+
+        if (cachedBadges) {
+          request.log.info(`[${id}] Returning cached Twitch badges`);
+          return { data: JSON.parse(cachedBadges) };
+        }
+
+        // Fetch from Twitch API on cache miss
+        const twitch = await import('../../../services/twitch.js');
+
+        const [channelBadges, globalBadges] = await Promise.all([twitch.getChannelBadges(id).catch(() => null), twitch.getGlobalBadges(id).catch(() => null)]);
+
+        const badgesData = { channel: channelBadges || null, global: globalBadges || null };
+
+        // Cache in Redis with 60-minute TTL (3600 seconds)
+        await redisInstance.set(`twitch_badges:${id}`, JSON.stringify(badgesData), 'EX', 3600);
+
+        request.log.info(`[${id}] Fetched and cached Twitch badges`);
+
+        return { data: badgesData };
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        request.log.error(`[${id}] Failed to fetch Twitch badges: ${errorMsg}`);
+
+        throw new Error('Something went wrong trying to retrieve channel badges..');
+      }
+    }
+  );
+
+  return fastify;
 }

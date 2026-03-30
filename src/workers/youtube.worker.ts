@@ -12,6 +12,8 @@ import { uploadVideo, linkParts } from '../services/youtube.js';
 import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/alerts';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 
+type ExtendedYoutubeUploadJob = YoutubeUploadJob & { dmcaProcessed?: boolean };
+
 const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUploadJob>) => {
   const { streamerId, vodId, filePath, title, description, type, part, chapter } = job.data;
 
@@ -47,7 +49,9 @@ const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUpl
 
     if (type === 'vod') {
       const duration = await getDuration(filePath);
-      const needsSplitting = duration > splitDuration;
+
+      const extendedData = job.data as ExtendedYoutubeUploadJob;
+      const needsSplitting = !extendedData.dmcaProcessed && duration > splitDuration;
 
       const uploadedVideos: Array<{ id: string; part: number }> = [];
 
