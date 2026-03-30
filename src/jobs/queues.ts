@@ -25,6 +25,7 @@ export interface ChatDownloadJob {
   platform: 'twitch' | 'kick';
   duration: number;
   vodStartDate?: string;
+  startOffset?: number; // Resume from this offset (in seconds) when regenerating chat
 }
 
 export interface YoutubeUploadJob {
