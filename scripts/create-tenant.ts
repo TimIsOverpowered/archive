@@ -204,9 +204,9 @@ async function main(): Promise<void> {
     console.log('');
 
     // Phase 1: Basic Information
-    console.log('─'.repeat(50));
+    console.log('='.repeat(50));
     console.log('BASIC INFORMATION');
-    console.log('─'.repeat(50));
+    console.log('='.repeat(50));
 
     let channelName = await prompt('Channel Name (tenant ID, lowercase alphanumeric + underscore, max 25 chars): ');
 
@@ -233,9 +233,9 @@ async function main(): Promise<void> {
 
     const displayName = (await prompt('Display Name (or press Enter to use channel name): ')) || channelName;
 
-    console.log('\n─'.repeat(50));
+    console.log('\n='.repeat(50));
     console.log('POSTGRESQL SERVER');
-    console.log('─'.repeat(50));
+    console.log('='.repeat(50));
 
     const dbHost = (await prompt('PostgreSQL host: ')) || 'localhost';
     const dbPort = parseInt((await prompt('PostgreSQL port: ')) || '5432') || 5432;
@@ -252,9 +252,9 @@ async function main(): Promise<void> {
     console.log('✓ Connection validated');
 
     // Phase 2: Database Setup
-    console.log('\n─'.repeat(50));
+    console.log('\n='.repeat(50));
     console.log('DATABASE SETUP');
-    console.log('─'.repeat(50));
+    console.log('='.repeat(50));
 
     const dbCreated = await createDatabase(dbHost, dbPort, dbUser, dbPassword, dbName);
     if (!dbCreated) {
@@ -262,14 +262,14 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
-    const dbUrl = ` postgresql://<user>:***@<host>:5432/<db>
+    const dbUrl = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}`;
 
     await runMigrations(channelName, dbUrl);
 
     // Phase 3: Streaming Platforms
-    console.log('\n─'.repeat(50));
+    console.log('\n='.repeat(50));
     console.log('STREAMING PLATFORMS');
-    console.log('─'.repeat(50));
+    console.log('='.repeat(50));
 
     const enableTwitch = await confirm('Enable Twitch?');
     let twitchData: any = null;
@@ -279,18 +279,13 @@ async function main(): Promise<void> {
       const twitchId = await prompt('User ID (numeric): ');
       const twitchUsername = await prompt('Username: ');
 
-      console.log('\nTwitch OAuth App Credentials:');
-      const twitchClientId = await prompt('Client ID: ');
-      const twitchClientSecret = await promptHidden('Client Secret: ');
-      const twitchAccessToken = await promptHidden('Access Token: ');
+      console.log('\nNote: OAuth credentials are NOT collected here.');
+      console.log('      Run "npm run auth:twitch" after tenant creation to configure authentication.\n');
 
       twitchData = {
         enabled: true,
         id: twitchId,
         username: twitchUsername,
-        clientId: twitchClientId,
-        clientSecret: twitchClientSecret,
-        accessToken: twitchAccessToken,
       };
     }
 
@@ -315,17 +310,14 @@ async function main(): Promise<void> {
     }
 
     // Phase 4: YouTube Upload Settings
-    console.log('\n─'.repeat(50));
+    console.log('\n='.repeat(50));
     console.log('YOUTUBE UPLOAD SETTINGS');
-    console.log('─'.repeat(50));
+    console.log('='.repeat(50));
 
     const enableYouTube = await confirm('Enable YouTube uploads?');
     let youtubeData: any = null;
 
     if (enableYouTube) {
-      console.log('\nYouTube API:');
-      const youtubeApiKey = await promptHidden('YouTube Data API Key: ');
-
       console.log('\nUpload Behavior:');
       const youtubeDescription = await prompt('Video description template (use {channel} for name): ');
       const youtubePublic = await confirm('Videos public by default?');
@@ -347,12 +339,10 @@ async function main(): Promise<void> {
       const youtubeMultiTrack = await confirm('Multi-track audio upload?');
       const youtubeUploadEnabled = await confirm('Enable uploads overall?');
 
-      console.log('\nYouTube OAuth Credentials:');
-      const youtubeAccessToken = await promptHidden('Access Token: ');
-      const youtubeRefreshToken = await promptHidden('Refresh Token: ');
+      console.log('\nNote: OAuth credentials are NOT collected here.');
+      console.log('      Run "npm run auth:youtube" after tenant creation to configure authentication.\n');
 
       youtubeData = {
-        apiKey: youtubeApiKey,
         description: youtubeDescription,
         public: youtubePublic,
         vodUpload: youtubeVodUpload,
@@ -362,15 +352,13 @@ async function main(): Promise<void> {
         liveUpload: youtubeLiveUpload,
         multiTrack: youtubeMultiTrack,
         upload: youtubeUploadEnabled,
-        accessToken: youtubeAccessToken,
-        refreshToken: youtubeRefreshToken,
       };
     }
 
     // Phase 5: Archive Settings
-    console.log('\n─'.repeat(50));
+    console.log('\n='.repeat(50));
     console.log('ARCHIVE SETTINGS');
-    console.log('─'.repeat(50));
+    console.log('='.repeat(50));
 
     const domainName = await prompt('Domain name (e.g., moon2.tv): ');
     const vodPath = (await prompt('VOD storage path: ')) || '/mnt/storage/vods';
@@ -389,7 +377,7 @@ async function main(): Promise<void> {
 
     console.log(`\nStreamer ID: ${channelName}`);
     console.log(`Display Name: ${displayName}`);
-    console.log(`Database:  postgresql://<user>:***@<host>:5432/<db>
+    console.log(`Database: postgresql://${dbUser}:***@${dbHost}:${dbPort}/${dbName}`);
 
     console.log('\nStreaming Platforms:');
     if (twitchData) {
@@ -461,11 +449,6 @@ async function main(): Promise<void> {
     if (twitchData) {
       configData.twitch = {
         enabled: true,
-        auth: {
-          client_id: twitchData.clientId,
-          client_secret: twitchData.clientSecret,
-          access_token: twitchData.accessToken,
-        },
         id: twitchData.id,
         username: twitchData.username,
       };
@@ -491,18 +474,9 @@ async function main(): Promise<void> {
         perGameUpload: youtubeData.perGameUpload,
         restrictedGames: youtubeData.restrictedGames,
         splitDuration: youtubeData.splitDuration,
-        apiKey: youtubeData.apiKey,
         liveUpload: youtubeData.liveUpload,
         multiTrack: youtubeData.multiTrack,
         upload: youtubeData.upload,
-        auth: {
-          access_token: youtubeData.accessToken,
-          scope:
-            'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.force-ssl',
-          token_type: 'Bearer',
-          expires_in: 3599,
-          refresh_token: youtubeData.refreshToken,
-        },
       };
     }
 
@@ -554,11 +528,6 @@ async function main(): Promise<void> {
         enabled: true,
         id: twitchData.id,
         username: twitchData.username,
-        auth: encryptObject({
-          client_id: twitchData.clientId,
-          client_secret: twitchData.clientSecret,
-          access_token: twitchData.accessToken,
-        }),
       };
     }
 
@@ -578,18 +547,9 @@ async function main(): Promise<void> {
         perGameUpload: youtubeData.perGameUpload,
         restrictedGames: youtubeData.restrictedGames,
         splitDuration: youtubeData.splitDuration,
-        apiKey: encryptScalar(youtubeData.apiKey),
         liveUpload: youtubeData.liveUpload,
         multiTrack: youtubeData.multiTrack,
         upload: youtubeData.upload,
-        auth: encryptObject({
-          access_token: youtubeData.accessToken,
-          scope:
-            'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.force-ssl',
-          token_type: 'Bearer',
-          expires_in: 3599,
-          refresh_token: youtubeData.refreshToken,
-        }),
       };
     }
 
@@ -611,13 +571,20 @@ async function main(): Promise<void> {
     console.log(`\n📁 Config files created:`);
     console.log(`   - config/config.json.${channelName}`);
     console.log(`   - config/default.json.${channelName}`);
-    console.log(`\n🗄️  Database:  postgresql://<user>:***@<host>:5432/<db>
-    console.log(`   Schema: Migrated with normalized tables`);
-    console.log('\n⚠️  IMPORTANT: Store these credentials securely:');
-    console.log('   Plaintext credentials are stored in config/config.json.${channelName}');
-    console.log('   - Twitch Client Secret, Access Token');
-    if (youtubeData) {
-      console.log('   - YouTube API Key, Refresh Token');
+    console.log(`\n🗄️  Database: postgresql://${dbUser}:***@${dbHost}:${dbPort}/${dbName}`);
+    console.log('   Schema: Migrated with normalized tables');
+
+    // Optional Authentication Setup section
+    if (twitchData || youtubeData) {
+      console.log('\nOptional Authentication Setup:');
+      console.log('-'.repeat(35));
+      if (twitchData) {
+        console.log(`  • Twitch Auth: npm run auth:twitch (then enter tenant ID "${channelName}")`);
+      }
+      if (youtubeData) {
+        console.log(`  • YouTube Auth: npm run auth:youtube (then enter tenant ID "${channelName}")`);
+      }
+      console.log('\nThese scripts will guide you through the OAuth flow and securely store credentials.');
     }
   } catch (error: any) {
     console.error('\n❌ Error during tenant creation:');
