@@ -273,13 +273,14 @@ The script validates the channel name (which becomes the tenant ID):
 3. Validates PostgreSQL connection before starting prompts
 4. Attempts to create the PostgreSQL database (or asks you to create manually)
 5. Runs Prisma migrations to set up the normalized schema
-6. Collects streaming platform credentials (Twitch, Kick)
-7. Collects YouTube upload settings and OAuth credentials
-8. Collects Google OAuth credentials (for YouTube token refresh)
-9. Collects general archive settings (paths, timezone, download preferences)
-10. Shows a summary and requires confirmation before proceeding
-11. Generates config files with plaintext credentials for backup
-12. Registers tenant in meta database with encrypted sensitive fields and explicit `id`
+6. Collects streaming platform metadata only (Twitch, Kick user IDs/usernames - **no OAuth credentials**)
+7. Collects YouTube upload behavior settings (**no API key or OAuth tokens**)
+8. Collects general archive settings (paths, timezone, download preferences)
+9. Shows a summary and requires confirmation before proceeding
+10. Generates config files with non-sensitive configuration data only
+11. Registers tenant in meta database without encrypted credentials
+
+**Note:** After creating the tenant, use `npm run auth:twitch` or `npm run auth:youtube` to configure OAuth authentication separately.
 
 **Prerequisites:**
 
@@ -322,22 +323,20 @@ DATABASE SETUP
 ✓ Migrations completed successfully
 
 ──────────────────────────────────────────
-STREAMING PLATFORMS
-──────────────────────────────────────────
-Enable Twitch? (y/N): y
+STREAMING PLATFORMS (Metadata Only)
+ ────────────────────────────────────────
+ Enable Twitch? (y/N): y
 
-Twitch Stream Info:
-User ID (numeric): 121059319
-Username: moonmoon
+ Twitch Stream Info:
+ User ID (numeric, optional): 121059319
+ Username (optional): moonmoon
 
-Twitch OAuth App Credentials:
-Client ID:  <your-client-id>
-Client Secret: ********
-Access Token: ********
+ Note: OAuth credentials are NOT collected here.
+       Run "npm run auth:twitch" after tenant creation to configure authentication.
 
-Enable Kick? (y/N): n
+ Enable Kick? (y/N): n
 
-...
+ ... [YouTube upload behavior settings] ...
 
 ==================================================
 TENANT CREATION SUMMARY
@@ -347,10 +346,10 @@ Display Name: MOONMOON
 Database:   postgresql://<user>:***@<host>:5432/<db>
 
 Streaming Platforms:
-  ✓ Twitch (121059319 / moonmoon)
-  ✗ Kick disabled
+   ✓ Twitch (metadata only - user_id, username)
+   ✗ Kick disabled
 
-YouTube Uploads:
+ YouTube Uploads:
   ✓ Enabled
     - VOD upload: yes
     - Per-game upload: no
@@ -358,9 +357,9 @@ YouTube Uploads:
     - Split duration: 10800s
 
 Settings:
-  Domain: moon2.tv
-  VOD Path: /mnt/storage/vods
-  Timezone: America/New_York
+   Domain: <your-domain>
+   VOD Path: /mnt/storage/vods
+   Timezone: America/New_York
   Chat Download: yes
   VOD Download: yes
   Save HLS: no
@@ -373,33 +372,40 @@ Proceed with tenant creation? (y/N): y
 
 ✅ TENANT CREATED SUCCESSFULLY!
 
-Channel Name: moonmoon
-Tenant ID in meta DB: moonmoon
+ Channel Name: moonmoon
+ Tenant ID in meta DB: moonmoon
 
-📁 Config files created:
-   - config/config.json.moonmoon
-   - config/default.json.moonmoon
+ 📁 Config files created:
+    - config/config.json.moonmoon
+    - config/default.json.moonmoon
 
-🗄️  Database:   postgresql://<user>:***@<host>:5432/<db>
-   Schema: Migrated with normalized tables
+ 🗄️  Database: postgresql://<user>:***@<host>:5432/<db>
+    Schema: Migrated with normalized tables
 
-⚠️  IMPORTANT: Store these credentials securely:
-   Plaintext credentials are stored in config/config.json.moonmoon
+ Optional Authentication Setup:
+ ────────────────────────────────
+ To configure OAuth authentication for this tenant, run:
+
+   • Twitch Auth: npm run auth:twitch (then enter tenant ID "moonmoon")
+   • YouTube Auth: npm run auth:youtube (then enter tenant ID "moonmoon")
+
+ These scripts will guide you through the OAuth flow and securely store credentials.
 ```
 
 **Generated files:**
 
-- `config/config.json.<channel_name>` - Full configuration with plaintext credentials for backup
+- `config/config.json.<channel_name>` - Non-sensitive configuration (metadata and upload settings only, no credentials)
 - `config/default.json.<channel_name>` - Server defaults with database connection string
 
 **Encrypted fields in meta DB:**
 
-- `twitch.auth` (client_id, client_secret, access_token)
-- `youtube.api_key`
-- `youtube.auth` (access_token, refresh_token, etc.)
+After running auth scripts separately:
+
+- `twitch.auth` (client_id, client_secret) - configured via `npm run auth:twitch`
+- `youtube.auth` (access_token, refresh_token) - configured via `npm run auth:youtube`
 - `database_url`
 
-**Note:** This script is for interactive tenant creation. For bulk imports from existing config files, use `import-tenant.ts`.
+**Note:** This script is for interactive tenant creation. For bulk imports from existing config files, use `import-tenant.ts`. OAuth credentials must be added separately using the dedicated authentication scripts after tenant creation.
 
 ---
 
