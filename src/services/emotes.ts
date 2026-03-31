@@ -10,7 +10,7 @@ export interface VodEmotes {
   vodId: string;
   ffz_emotes: EmoteData[];
   bttv_emotes: EmoteData[];
-  '7tv_emotes': EmoteData[];
+  seventv_emotes: EmoteData[];
 }
 
 interface FFZResponse {
@@ -39,7 +39,7 @@ interface BTTVChannelResponse {
   }>;
 }
 
-interface TVUserResponse {
+interface SevenTVUserResponse {
   emotes?: Array<{
     id: string;
     name: string;
@@ -68,7 +68,7 @@ export async function fetchAndSaveEmotes(streamerId: string, vodId: string, plat
           .catch(() => ({ channelEmotes: [] })),
 
         fetch(`https://7tv.io/v3/users/twitch/${channelId}`, { signal: AbortSignal.timeout(5000) })
-          .then((r) => (r.ok ? (r.json() as Promise<TVUserResponse>) : {}))
+          .then((r) => (r.ok ? (r.json() as Promise<SevenTVUserResponse>) : {}))
           .catch(() => ({ emotes: [] })),
       ]);
 
@@ -79,19 +79,19 @@ export async function fetchAndSaveEmotes(streamerId: string, vodId: string, plat
         ...(((bttvChannelRes as BTTVChannelResponse).channelEmotes || [])?.map(({ id, code }) => ({ id, code })) || []),
       ];
 
-      sevenTvEmotes = ((sevenTvRes as TVUserResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
+      sevenTvEmotes = ((sevenTvRes as SevenTVUserResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
     } catch {
       logger.error({ platform, channelId }, 'Failed to fetch Twitch emotes');
     }
   } else if (platform === 'kick' && channelId) {
     try {
       const sevenTvRes = await fetch(`https://7tv.io/v3/users/kick/${channelId}`, { signal: AbortSignal.timeout(5000) })
-        .then((r) => (r.ok ? (r.json() as Promise<TVUserResponse>) : {}))
+        .then((r) => (r.ok ? (r.json() as Promise<SevenTVUserResponse>) : {}))
         .catch(() => ({ emotes: [] }));
 
       ffzEmotes = [];
       bttvEmotes = [];
-      sevenTvEmotes = ((sevenTvRes as TVUserResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
+      sevenTvEmotes = ((sevenTvRes as SevenTVUserResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
     } catch {
       logger.error({ platform, channelId }, 'Failed to fetch Kick emotes');
     }
@@ -105,7 +105,7 @@ export async function fetchAndSaveEmotes(streamerId: string, vodId: string, plat
     vodId,
     ffz_emotes: ffzEmotes,
     bttv_emotes: bttvEmotes,
-    '7tv_emotes': sevenTvEmotes,
+    seventv_emotes: sevenTvEmotes,
   };
 
   try {
@@ -123,12 +123,12 @@ export async function fetchAndSaveEmotes(streamerId: string, vodId: string, plat
         vod_id: vodId,
         ffz_emotes: emoteData.ffz_emotes as any,
         bttv_emotes: emoteData.bttv_emotes as any,
-        '7tv_emotes': emoteData['7tv_emotes'] as any,
+        seventv_emotes: emoteData.seventv_emotes as any,
       },
       update: {
         ffz_emotes: emoteData.ffz_emotes as any,
         bttv_emotes: emoteData.bttv_emotes as any,
-        '7tv_emotes': emoteData['7tv_emotes'] as any,
+        seventv_emotes: emoteData.seventv_emotes as any,
       },
     });
   } catch {

@@ -207,12 +207,12 @@ const main = async () => {
           for (const emote of emotes.rows) {
             await client.query(
               `
-               INSERT INTO "emotes_new" (vod_id, ffz_emotes, bttv_emotes, seven_tv_emotes)
+               INSERT INTO "emotes_new" (vod_id, ffz_emotes, bttv_emotes, seventv_emotes)
                VALUES ($1, $2, $3, $4)
                ON CONFLICT (vod_id) DO UPDATE SET
                  ffz_emotes = EXCLUDED.ffz_emotes,
                  bttv_emotes = EXCLUDED.bttv_emotes,
-                 seven_tv_emotes = EXCLUDED.seven_tv_emotes
+                 seventv_emotes = EXCLUDED.seventv_emotes
              `,
               [emote.vod_id, JSON.stringify(emote.ffz_emotes), JSON.stringify(emote.bttv_emotes), JSON.stringify(emote['7tv_emotes'])]
             );

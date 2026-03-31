@@ -52,7 +52,7 @@ model Emote {
   vod_id          String @unique(map: "emotes_new_vod_id_key")
   ffz_emotes      Json?
   bttv_emotes     Json?
-  seven_tv_emotes Json?
+  seventv_emotes Json?
   vod             Vod    @relation(fields: [vod_id], references: [id], onDelete: Cascade, map: "emotes_new_vod_id_fkey")
 
   @@map("emotes")
