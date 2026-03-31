@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import fsPromises from 'fs/promises';
+import path from 'path';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import Redis from 'ioredis';
 import { getStreamerConfig } from '../../../config/loader';
@@ -54,7 +55,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
         if (!vodRecord) throw new Error(`VOD ${vodId} not found`);
 
-        const finalMp4Path = `${config.settings.vodPath}/${streamerId}/${vodId}.mp4`;
+        const finalMp4Path = path.join(config.settings.vodPath!, streamerId, `${vodId}.mp4`);
 
         try {
           await fsPromises.access(finalMp4Path);

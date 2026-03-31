@@ -1,5 +1,6 @@
 import { metaClient } from '../db/meta-client';
 import { decryptScalar } from '../utils/encryption';
+import { normalizePath } from '../utils/path';
 import { StreamerConfig } from './types';
 
 const configCache = new Map<string, StreamerConfig>();
@@ -30,11 +31,11 @@ export async function loadStreamerConfigs(): Promise<StreamerConfig[]> {
     };
 
     if ('vodPath' in settingsObj && settingsObj.vodPath) {
-      streamerConfig.settings.vodPath = settingsObj.vodPath as string;
+      streamerConfig.settings.vodPath = normalizePath(settingsObj.vodPath as string);
     }
 
     if ('livePath' in settingsObj && settingsObj.livePath) {
-      streamerConfig.settings.livePath = settingsObj.livePath as string;
+      streamerConfig.settings.livePath = normalizePath(settingsObj.livePath as string);
     }
 
     // Validate required fields in settings

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { Pool } from 'pg';
 import { metaClient } from '../src/db/meta-client';
 import { encryptScalar, validateEncryptionKey } from '../src/utils/encryption';
+import { normalizePath as pathNormalize } from '../src/utils/path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -395,9 +396,13 @@ async function main(): Promise<void> {
     console.log('='.repeat(50));
 
     const domainName = await prompt('Domain name (e.g., moon2.tv): ');
-    const vodPath = await prompt('VOD storage path: ');
-    const livePath = await prompt('Live stream path: ');
+    const vodPathInput = await prompt('VOD storage path: ');
+    const livePathInput = await prompt('Live stream path: ');
     const timezone = (await prompt('Timezone (e.g., America/Chicago): ')) || 'UTC';
+
+    // Normalize paths for cross-platform compatibility
+    const vodPath = pathNormalize(vodPathInput);
+    const livePath = pathNormalize(livePathInput);
 
     const chatDownload = await confirm('Download chat logs?');
     const vodDownload = await confirm('Download VODs?');
