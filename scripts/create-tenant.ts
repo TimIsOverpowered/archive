@@ -46,15 +46,16 @@ function validatePostgresConnection(host: string, port: number, user: string, pa
   }
 }
 
-// Interactive prompts
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-
+// Interactive prompts - create fresh readline interface for each prompt to avoid duplication issues
 function prompt(question: string): Promise<string> {
   return new Promise((resolve) => {
-    rl.question(question, (answer) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    rl.question(question + ': ', (answer) => {
+      rl.close();
       resolve(answer.trim());
     });
   });
@@ -62,58 +63,39 @@ function prompt(question: string): Promise<string> {
 
 function promptHidden(question: string): Promise<string> {
   return new Promise((resolve) => {
-    const rlHidden = readline.createInterface({
+    const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
     });
 
-    // Disable terminal echo for hidden input
-    process.stdin.setRawMode(true);
-    process.stdin.resume();
-
-    console.log(question);
-
-    const buffer: string[] = [];
-    let hasInput = false;
-
-    const listener = (chunk: Buffer) => {
-      for (const char of chunk.toString()) {
-        if (char === '\r' || char === '\n') {
-          process.stdin.setRawMode(false);
-          process.stdin.removeListener('data', listener);
-          rlHidden.close();
-          resolve(buffer.join(''));
-          hasInput = true;
-          return;
-        }
-        if (char === '\u007F' || char === '\b') {
-          // Backspace
-          if (buffer.length > 0) {
-            buffer.pop();
-            process.stdout.write('\b \b');
-          }
-        } else if (char >= '\x20' && char <= '\x7E') {
-          // Printable ASCII
-          buffer.push(char);
-          process.stdout.write('*');
-        }
-      }
-    };
-
-    process.stdin.on('data', listener);
+    rl.question(question + ' (shown in plain text): ', (answer) => {
+      rl.close();
+      resolve(answer);
+    });
   });
 }
 
 function confirm(question: string): Promise<boolean> {
   return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
     rl.question(`${question} (y/N): `, (answer) => {
+      rl.close();
       resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
     });
   });
 }
 
+interface DatabaseResult {
+  success: boolean;
+  isNew: boolean;
+}
+
 // Database operations
-async function createDatabase(host: string, port: number, user: string, password: string, dbName: string): Promise<boolean> {
+async function createDatabase(host: string, port: number, user: string, password: string, dbName: string): Promise<DatabaseResult> {
   try {
     const pool = new Pool({
       host,
@@ -133,15 +115,32 @@ async function createDatabase(host: string, port: number, user: string, password
 
     if (existsResult.rows.length > 0) {
       console.log(`ℹ️  Database '${dbName}' already exists`);
+
+      // Use readline for reliable prompt after password input
+      const rl2 = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
+
+      const forceAnswer = await new Promise<string>((resolve) => {
+        rl2.question('Run migrations anyway? (y/N): ', (answer) => {
+          resolve(answer.trim().toLowerCase());
+        });
+      });
+
+      rl2.close();
+
+      const forceMigrations = forceAnswer === 'y' || forceAnswer === 'yes';
       pool.end();
-      return true;
+      // If user wants to run migrations on existing DB, treat as "isNew" (needs migrations)
+      return { success: true, isNew: forceMigrations };
     }
 
     // Try to create database
     await pool.query(`CREATE DATABASE "${dbName}"`);
     console.log(`✓ Created database '${dbName}'`);
     pool.end();
-    return true;
+    return { success: true, isNew: true };
   } catch (error: any) {
     if (error.code === '42501' || error.message.includes('permission denied')) {
       console.log(`⚠️  Could not create database '${dbName}' automatically (insufficient privileges)`);
@@ -162,10 +161,27 @@ async function createDatabase(host: string, port: number, user: string, password
         });
         await verifyPool.query('SELECT 1');
         verifyPool.end();
-        return true;
+
+        // Use readline for reliable prompt after password input
+        const rl2 = readline.createInterface({
+          input: process.stdin,
+          output: process.stdout,
+        });
+
+        const forceAnswer = await new Promise<string>((resolve) => {
+          rl2.question('Run migrations anyway? (y/N): ', (answer) => {
+            resolve(answer.trim().toLowerCase());
+          });
+        });
+
+        rl2.close();
+
+        const forceMigrations = forceAnswer === 'y' || forceAnswer === 'yes';
+        // If user wants to run migrations on existing DB, treat as "isNew" (needs migrations)
+        return { success: true, isNew: forceMigrations };
       } catch (verifyError) {
         console.error(`❌ Could not connect to database '${dbName}' after manual creation`);
-        return false;
+        return { success: false, isNew: false };
       }
     }
     throw error;
@@ -180,8 +196,10 @@ async function runMigrations(channelName: string, dbUrl: string): Promise<void> 
   try {
     process.env.DATABASE_URL = dbUrl;
 
-    // Run migrations
-    execSync('npx prisma migrate deploy --schema=./prisma/schema.prisma', { stdio: 'inherit' });
+    // Run migrations with captured output to avoid stdin issues
+    execSync('npx prisma migrate deploy --schema=./prisma/schema.prisma', {
+      stdio: ['pipe', 'inherit', 'inherit'],
+    });
 
     console.log('✓ Migrations completed successfully');
   } catch (error) {
@@ -255,15 +273,24 @@ async function main(): Promise<void> {
     console.log('DATABASE SETUP');
     console.log('='.repeat(50));
 
-    const dbCreated = await createDatabase(dbHost, dbPort, dbUser, dbPassword, dbName);
-    if (!dbCreated) {
+    const dbResult = await createDatabase(dbHost, dbPort, dbUser, dbPassword, dbName);
+    if (!dbResult.success) {
       console.error('❌ Could not set up database. Aborting.');
       process.exit(1);
     }
 
     const dbUrl = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}`;
 
-    await runMigrations(channelName, dbUrl);
+    // Only run migrations for new databases or if explicitly requested
+    if (dbResult.isNew) {
+      await runMigrations(channelName, dbUrl);
+
+      // Reset stdin after execSync to fix readline issues
+      process.stdin.setRawMode(false);
+      process.stdin.resume();
+    } else {
+      console.log(`ℹ️  Skipping migrations - database '${dbName}' already exists`);
+    }
 
     // Phase 3: Streaming Platforms
     console.log('\n='.repeat(50));
@@ -293,7 +320,7 @@ async function main(): Promise<void> {
 
     if (enableKick) {
       console.log('\nKick Stream Info:');
-      const kickId = await prompt('User ID (numeric, optional): ');
+      const kickId = await prompt('User ID (numeric): ');
       const kickUsername = await prompt('Username: ');
 
       kickData = {
@@ -313,46 +340,54 @@ async function main(): Promise<void> {
     console.log('YOUTUBE UPLOAD SETTINGS');
     console.log('='.repeat(50));
 
-    const enableYouTube = await confirm('Enable YouTube uploads?');
+    // YouTube uploads are always enabled - no prompt needed
     let youtubeData: any = null;
 
-    if (enableYouTube) {
-      console.log('\nUpload Behavior:');
-      const youtubeDescription = await prompt('Video description template (use {channel} for name): ');
-      const youtubePublic = await confirm('Videos public by default?');
-      const youtubeVodUpload = await confirm('Enable VOD uploads?');
-      const youtubePerGame = await confirm('Per-game upload?');
+    console.log('\nUpload Behavior:');
+    const youtubeDescription = await prompt('Video description template (use {channel} for name): ');
+    const youtubePublic = await confirm('Videos public by default?');
+    const youtubeVodUpload = await confirm('Enable VOD uploads?');
+    const youtubePerGame = await confirm('Per-game upload?');
 
-      let youtubeRestrictedGames: (string | null)[] = [];
-      if (youtubePerGame) {
-        const excluded = await prompt('Games to EXCLUDE from upload (comma-separated, or "none"): ');
-        if (excluded.toLowerCase() !== 'none') {
-          youtubeRestrictedGames = excluded.split(',').map((g) => g.trim() || null);
-        }
+    let youtubeRestrictedGames: (string | null)[] = [];
+    if (youtubePerGame) {
+      const excluded = await prompt('Games to EXCLUDE from upload (comma-separated, or "none"): ');
+      if (excluded.toLowerCase() !== 'none') {
+        youtubeRestrictedGames = excluded.split(',').map((g) => g.trim() || null);
       }
-
-      const splitDurationStr = (await prompt('Max VOD split duration (seconds): ')) || '10800';
-      const youtubeSplitDuration = parseInt(splitDurationStr) || 10800;
-
-      const youtubeLiveUpload = await confirm('Enable live stream upload?');
-      const youtubeMultiTrack = await confirm('Multi-track audio upload?');
-      const youtubeUploadEnabled = await confirm('Enable uploads overall?');
-
-      console.log('\nNote: OAuth credentials are NOT collected here.');
-      console.log('      Run "npm run auth:youtube" after tenant creation to configure authentication.\n');
-
-      youtubeData = {
-        description: youtubeDescription,
-        public: youtubePublic,
-        vodUpload: youtubeVodUpload,
-        perGameUpload: youtubePerGame,
-        restrictedGames: youtubeRestrictedGames,
-        splitDuration: youtubeSplitDuration,
-        liveUpload: youtubeLiveUpload,
-        multiTrack: youtubeMultiTrack,
-        upload: youtubeUploadEnabled,
-      };
     }
+
+    const splitDurationStr = await prompt('Max VOD split duration (seconds, min: 10800/3hrs, max: 43199/12hrs): ');
+    let youtubeSplitDuration = parseInt(splitDurationStr) || 10800;
+
+    // Validate YouTube's limits: minimum 3 hours (10800s), maximum ~12 hours (43199s)
+    if (youtubeSplitDuration < 10800) {
+      console.log('⚠️  Minimum split duration is 3 hours (10800 seconds). Setting to minimum.');
+      youtubeSplitDuration = 10800;
+    } else if (youtubeSplitDuration > 43199) {
+      console.log('⚠️  Maximum split duration is ~12 hours (43199 seconds). Setting to maximum.');
+      youtubeSplitDuration = 43199;
+    }
+
+    const youtubeLiveUpload = await confirm('Enable live stream upload?');
+    const youtubeMultiTrack = await confirm('Multi-track audio upload?');
+    // YouTube uploads always enabled by default
+    const youtubeUploadEnabled = true;
+
+    console.log('\nNote: OAuth credentials are NOT collected here.');
+    console.log('      Run "npm run auth:youtube" after tenant creation to configure authentication.\n');
+
+    youtubeData = {
+      description: youtubeDescription,
+      public: youtubePublic,
+      vodUpload: youtubeVodUpload,
+      perGameUpload: youtubePerGame,
+      restrictedGames: youtubeRestrictedGames,
+      splitDuration: youtubeSplitDuration,
+      liveUpload: youtubeLiveUpload,
+      multiTrack: youtubeMultiTrack,
+      upload: youtubeUploadEnabled,
+    };
 
     // Phase 5: Archive Settings
     console.log('\n='.repeat(50));
@@ -360,14 +395,14 @@ async function main(): Promise<void> {
     console.log('='.repeat(50));
 
     const domainName = await prompt('Domain name (e.g., moon2.tv): ');
-    const vodPath = (await prompt('VOD storage path: ')) || '/mnt/storage/vods';
-    const livePath = (await prompt('Live stream path: ')) || '/mnt/live';
-    const timezone = (await prompt('Timezone (e.g., America/Chicago): ')) || 'America/Chicago';
+    const vodPath = await prompt('VOD storage path: ');
+    const livePath = await prompt('Live stream path: ');
+    const timezone = (await prompt('Timezone (e.g., America/Chicago): ')) || 'UTC';
 
     const chatDownload = await confirm('Download chat logs?');
     const vodDownload = await confirm('Download VODs?');
-    const saveHLS = await confirm('Save as HLS (.ts segments)?');
-    const saveMP4 = await confirm('Save as MP4?');
+    const saveHLS = await confirm('Save HLS to disk?');
+    const saveMP4 = await confirm('Save MP4 to disk?');
 
     // Phase 6: Summary & Confirmation
     console.log('\n' + '='.repeat(50));
@@ -429,8 +464,8 @@ async function main(): Promise<void> {
     // Phase 7: Execution - Register tenant in meta database
 
     const tenantData: any = {
-      display_name: displayName,
-      database_url: encryptScalar(dbUrl),
+      displayName: displayName,
+      databaseUrl: encryptScalar(dbUrl),
       settings: {
         domain_name: domainName,
         vodPath: vodPath,
@@ -524,7 +559,6 @@ async function main(): Promise<void> {
 
     process.exit(1);
   } finally {
-    rl.close();
     await metaClient.$disconnect();
   }
 }
