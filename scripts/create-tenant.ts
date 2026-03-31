@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 
 import 'dotenv/config';
-import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { Pool } from 'pg';
 import { metaClient } from '../src/db/meta-client';
-import { encryptObject, encryptScalar, validateEncryptionKey } from '../src/utils/encryption';
+import { encryptScalar, validateEncryptionKey } from '../src/utils/encryption';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -419,11 +418,7 @@ async function main(): Promise<void> {
     console.log('ACTIONS TO BE TAKEN:');
     console.log('='.repeat(50));
     console.log('1. ✓ Database created/verified');
-    console.log('2. ✓ Prisma migrations applied');
-    console.log('3. Generate config files:');
-    console.log(`   - config/config.json.${channelName}`);
-    console.log(`   - config/default.json.${channelName}`);
-    console.log('4. Register tenant in meta database (with encryption)');
+    console.log('2. Register tenant in meta database (with encryption)');
 
     const proceed = await confirm('\nProceed with tenant creation?');
     if (!proceed) {
@@ -431,83 +426,8 @@ async function main(): Promise<void> {
       process.exit(0);
     }
 
-    // Phase 7: Execution
+    // Phase 7: Execution - Register tenant in meta database
 
-    // Step 1: Generate config/config.json.<channelName>
-    const configData: any = {
-      channel: displayName,
-      domainName: domainName,
-      vodPath: vodPath,
-      livePath: livePath,
-      timezone: timezone,
-      chatDownload: chatDownload,
-      vodDownload: vodDownload,
-      saveHLS: saveHLS,
-      saveMP4: saveMP4,
-    };
-
-    if (twitchData) {
-      configData.twitch = {
-        enabled: true,
-        id: twitchData.id,
-        username: twitchData.username,
-      };
-    } else {
-      configData.twitch = { enabled: false };
-    }
-
-    if (kickData) {
-      configData.kick = {
-        enabled: true,
-        id: kickData.id || '',
-        username: kickData.username,
-      };
-    } else {
-      configData.kick = { enabled: false };
-    }
-
-    if (youtubeData) {
-      configData.youtube = {
-        description: youtubeData.description,
-        public: youtubeData.public,
-        vodUpload: youtubeData.vodUpload,
-        perGameUpload: youtubeData.perGameUpload,
-        restrictedGames: youtubeData.restrictedGames,
-        splitDuration: youtubeData.splitDuration,
-        liveUpload: youtubeData.liveUpload,
-        multiTrack: youtubeData.multiTrack,
-        upload: youtubeData.upload,
-      };
-    }
-
-    const configDir = path.join(__dirname, '..', 'config');
-    if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true });
-    }
-
-    fs.writeFileSync(path.join(configDir, `config.json.${channelName}`), JSON.stringify(configData, null, 2));
-    console.log(`✓ Created config/config.json.${channelName}`);
-
-    // Step 2: Generate config/default.json.<channelName>
-    const defaultConfig = {
-      host: 'localhost',
-      port: 3030,
-      public: './public/',
-      paginate: { default: 10, max: 50 },
-      postgres: dbUrl,
-      ADMIN_API_KEY: 'YOUR_ADMIN_API_KEY',
-      redis: {
-        host: '127.0.0.1',
-        port: 6379,
-        useSocket: false,
-        path: '/tmp/redis.sock',
-      },
-    };
-
-    fs.writeFileSync(path.join(configDir, `default.json.${channelName}`), JSON.stringify(defaultConfig, null, 2));
-    console.log(`✓ Created config/default.json.${channelName}`);
-
-    // Step 3: Prepare meta DB record with encryption
     const tenantData: any = {
       display_name: displayName,
       database_url: encryptScalar(dbUrl),
@@ -553,7 +473,7 @@ async function main(): Promise<void> {
       };
     }
 
-    // Step 4: Insert into meta DB with explicit ID
+    // Step 2: Insert into meta DB with explicit ID
     const createdTenant = await metaClient.tenant.create({
       data: {
         id: channelName,
@@ -562,15 +482,13 @@ async function main(): Promise<void> {
     });
     tenantId = createdTenant.id;
 
-    // Step 5: Success message
+    // Success message
     console.log('\n' + '✅'.repeat(20));
     console.log('TENANT CREATED SUCCESSFULLY!');
     console.log('✅'.repeat(20));
     console.log(`\nStreamer ID: ${channelName}`);
     console.log(`Tenant ID in meta DB: ${createdTenant.id}`);
-    console.log(`\n📁 Config files created:`);
-    console.log(`   - config/config.json.${channelName}`);
-    console.log(`   - config/default.json.${channelName}`);
+    console.log(`\n🗄️  Database: postgresql://${dbUser}:***@${dbHost}:${dbPort}/${dbName}`);
     console.log(`\n🗄️  Database: postgresql://${dbUser}:***@${dbHost}:${dbPort}/${dbName}`);
     console.log('   Schema: Migrated with normalized tables');
 
