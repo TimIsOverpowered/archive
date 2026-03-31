@@ -102,6 +102,7 @@ export async function buildServer() {
     const healthRoutes = await import('./routes/health');
     const vodsRoutes = await import('./routes/vods');
     const logsRoutes = await import('./routes/logs');
+    const badgesRoutes = await import('./routes/badges');
 
     await instance.register(healthRoutes.default, { prefix: '/api/v1' });
 
@@ -113,6 +114,9 @@ export async function buildServer() {
       },
       { prefix: '/api/v1/vods' }
     );
+
+    // Register badges route under /api/v1/:id/badges/twitch
+    await instance.register(badgesRoutes.default, { prefix: '/api/v1' });
   });
 
   // Register admin routes
