@@ -398,7 +398,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
       log.debug(`[${vodId}] Playlist written. Total segments so far: ${parsedM3u8.segments?.length || 0}`);
 
-      const newSegments = (parsedM3u8.segments || []).filter((seg: any) => !fileExists(`${vodDir}/${seg.uri}`));
+      const newSegments = (parsedM3u8.segments || []).filter((seg: any) => !fileExists(pathMod.join(vodDir, seg.uri)));
 
       if (newSegments.length > 0) {
         log.info(`[${vodId}] Found ${newSegments.length} new TS segments to download...`);

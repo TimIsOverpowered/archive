@@ -2,6 +2,7 @@ import { Processor, Job } from 'bullmq';
 import dayjs from 'dayjs';
 import utcPlugin from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
+import path from 'path';
 
 dayjs.extend(utcPlugin);
 dayjs.extend(timezone);
@@ -42,10 +43,11 @@ const dmcaProcessor: Processor<DmcaProcessingJob> = async (job: Job<DmcaProcessi
   let videoPath: string;
 
   if (type === 'live') {
-    const liveDir = `${config.settings.livePath}/${platform === 'twitch' ? config.twitch?.username : config.kick?.username}/${vodRecord.stream_id || vodId}`;
-    videoPath = `${liveDir}/${vodRecord.stream_id}.mp4`;
+    const username = platform === 'twitch' ? config.twitch!.username! : config.kick!.username!;
+    const liveDir = path.join(config.settings.livePath!, username, vodRecord.stream_id || vodId);
+    videoPath = path.join(liveDir, `${vodRecord.stream_id}.mp4`);
   } else {
-    videoPath = `${config.settings.vodPath}/${streamerId}/${vodId}.mp4`;
+    videoPath = path.join(config.settings.vodPath!, streamerId, `${vodId}.mp4`);
   }
 
   if (!(await fileExists(videoPath))) {
