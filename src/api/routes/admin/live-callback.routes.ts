@@ -39,6 +39,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
           required: ['streamId', 'path', 'platform'],
         },
       },
+      onRequest: rateLimitMiddleware,
     },
     async (request: any) => {
       const streamerId = request.params.id;
