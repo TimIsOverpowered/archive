@@ -116,7 +116,7 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
 
     if (messageId && isAlertsEnabled()) {
       updateDiscordEmbed(messageId, {
-        title: `✅ Chat Download Complete`,
+        title: `[Chat] Download Complete`,
         description: `${streamerId} - Successfully fetched ${totalMessages.toLocaleString()} chat messages for ${vodId}`,
         status: 'success',
         fields: [
@@ -134,7 +134,7 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
 
     if (messageId && isAlertsEnabled()) {
       updateDiscordEmbed(messageId, {
-        title: `❌ Chat Download Failed`,
+        title: `[Chat] Download Failed`,
         description: `${streamerId} - Error fetching chat messages for ${vodId}`,
         status: 'error',
         fields: [

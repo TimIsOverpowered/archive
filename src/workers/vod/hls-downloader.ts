@@ -214,7 +214,16 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
   // Create logger with tenant context ONCE at start of processing scope
   const log = createAutoLogger(String(streamerId));
 
-  log.info(`[${vodId}] Starting Live HLS Download mode for ${platform} stream`);
+  log.info(
+    {
+      vodId,
+      platform,
+      streamerId: String(streamerId),
+      startedAt,
+      hasSourceUrl: !!sourceUrl,
+    },
+    `[HLS-Downloader] Starting Live HLS Download mode for ${platform} stream`
+  );
 
   let prisma: any;
   try {
@@ -234,7 +243,12 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
   const config = getStreamerConfig(String(streamerId)) || getStreamerConfig(vodId.split('-')[0]);
 
-  if (!config) throw new Error(`Stream config not found for VOD ${vodId}`);
+  if (!config) {
+    log.error({ vodId, streamerId: String(streamerId), platform }, `[HLS-Downloader] CRITICAL - Stream config not found. Cannot proceed with download.`);
+    throw new Error(`Stream config not found for VOD ${vodId} (streamerId: ${String(streamerId)})`);
+  }
+
+  log.debug({ vodId, streamerId: String(streamerId), vodPath: config.settings.vodPath }, `[HLS-Downloader] Configuration loaded successfully`);
 
   // Initialize alert state
   let messageId: string | null = null;
@@ -244,7 +258,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
       const startTime = new Date().toISOString();
 
       messageId = await sendRichAlert({
-        title: `🎬 Live Stream Started: ${vodId}`,
+        title: `[HLS] Live Stream Started: ${vodId}`,
         description: `${platform.toUpperCase()} live HLS download in progress`,
         status: 'warning',
         fields: [
@@ -289,9 +303,11 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         totalSegmentsFound = segmentCount;
 
         updateAlertProgress(messageId, platform, totalSegmentsFound, vodId, startedAt);
+
+        log.debug({ vodId, newSegmentCount: totalSegmentsFound }, `[HLS-Downloader] Detected ${totalSegmentsFound} TS segments on disk`);
       }
 
-      log.info(`[${vodId}] Polling HLS playlist (attempt #${retryCount + 1})...`);
+      log.trace({ vodId, retryCount: retryCount + 1 }, `Polling HLS playlist (attempt #${retryCount + 1})...`);
 
       let variantM3u8String: string = '';
       let fetchedBaseURL: string = '';
@@ -418,7 +434,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
   if (isAlertsEnabled() && messageId) {
     updateDiscordEmbed(messageId, {
-      title: `🔄 Converting ${vodId}`,
+      title: `[HLS] Converting ${vodId}`,
       description: 'Download complete. MP4 conversion in progress...',
       status: 'warning',
       fields: [
@@ -430,7 +446,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
     });
   }
 
-  log.info(`[${vodId}] Stream download complete. Starting finalization...`);
+  log.info({ vodId, platform, totalSegmentsDownloaded: totalSegmentsFound }, `[HLS-Downloader] Stream download complete. Starting finalization and MP4 conversion...`);
 
   try {
     const filesInDir = await fsPromises.readdir(vodDir);
@@ -457,7 +473,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
       if (isAlertsEnabled() && messageId) {
         updateDiscordEmbed(messageId, {
-          title: `✅ ${vodId} Complete!`,
+          title: `[HLS] ${vodId} Complete!`,
           description: `${platform.toUpperCase()} live stream successfully processed and converted to MP4`,
           status: 'success',
           fields: [
@@ -481,7 +497,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
     if (messageId && isAlertsEnabled()) {
       updateDiscordEmbed(messageId, {
-        title: `❌ ${vodId} FAILED`,
+        title: `[HLS] ${vodId} FAILED`,
         description: `${platform.toUpperCase()} live stream processing failed`,
         status: 'error',
         fields: [

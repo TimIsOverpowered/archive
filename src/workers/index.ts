@@ -51,36 +51,135 @@ async function bootstrap() {
       concurrency: 1, // CPU-intensive re-encoding operations
     });
 
-    vodWorker.on('completed', (job) => {
-      logger.info(`VOD job ${job?.id} completed`);
+    vodWorker.on('completed', async (job) => {
+      if (!job) return;
+
+      const data = await job.data;
+      logger.info(
+        {
+          jobId: String(job.id),
+          vodId: data?.vodId,
+          platform: data?.platform,
+          streamerId: data?.streamerId,
+        },
+        `VOD download completed successfully`
+      );
     });
 
-    vodWorker.on('failed', (job, _err) => {
-      logger.error({ jobId: job?.id }, `VOD job failed`);
+    vodWorker.on('failed', async (job, err) => {
+      if (!job || !err) return;
+
+      const jobData = await job.data;
+      logger.error(
+        {
+          jobId: String(job.id),
+          vodId: jobData?.vodId,
+          platform: jobData?.platform,
+          streamerId: jobData?.streamerId,
+          attemptsMade: job.attemptsMade,
+          maxAttempts: (job.opts as any).attempts ?? 3,
+          errorMessage: err.message || String(err),
+          errorStack: 'stack' in err ? String((err as Error & { stack?: string }).stack) : 'No stack trace available',
+        },
+        `VOD download failed - check logs for details`
+      );
     });
 
-    chatWorker.on('completed', (job) => {
-      logger.info(`Chat job ${job?.id} completed`);
+    vodWorker.on('progress', async (job, progress) => {
+      if (!job) return;
+
+      const data = await job.data;
+      logger.debug({ jobId: String(job.id), vodId: data?.vodId, progress }, `VOD download progress update`);
     });
 
-    chatWorker.on('failed', (job, _err) => {
-      logger.error({ jobId: job?.id }, `Chat job failed`);
+    chatWorker.on('completed', async (job) => {
+      if (!job) return;
+
+      const data = await job.data;
+      logger.info(
+        {
+          jobId: String(job.id),
+          vodId: data?.vodId,
+          platform: data?.platform,
+        },
+        `Chat download completed successfully`
+      );
     });
 
-    youtubeWorker.on('completed', (job) => {
-      logger.info(`YouTube job ${job?.id} completed`);
+    chatWorker.on('failed', async (job, err) => {
+      if (!job || !err) return;
+
+      const jobData = await job.data;
+      logger.error(
+        {
+          jobId: String(job.id),
+          vodId: jobData?.vodId,
+          platform: jobData?.platform,
+          attemptsMade: job.attemptsMade,
+          errorMessage: err.message || String(err),
+        },
+        `Chat download failed`
+      );
     });
 
-    youtubeWorker.on('failed', (job, _err) => {
-      logger.error({ jobId: job?.id }, `YouTube job failed`);
+    youtubeWorker.on('completed', async (job) => {
+      if (!job) return;
+
+      const data = await job.data;
+      logger.info(
+        {
+          jobId: String(job.id),
+          vodId: data?.vodId,
+          type: data?.type,
+        },
+        `YouTube upload completed successfully`
+      );
     });
 
-    dmcaWorker.on('completed', (job) => {
-      logger.info(`DMCA job ${job?.id} completed`);
+    youtubeWorker.on('failed', async (job, err) => {
+      if (!job || !err) return;
+
+      const jobData = await job.data;
+      logger.error(
+        {
+          jobId: String(job.id),
+          vodId: jobData?.vodId,
+          type: jobData?.type,
+          attemptsMade: job.attemptsMade,
+          errorMessage: err.message || String(err),
+        },
+        `YouTube upload failed`
+      );
     });
 
-    dmcaWorker.on('failed', (job, _err) => {
-      logger.error({ jobId: job?.id }, `DMCA job failed`);
+    dmcaWorker.on('completed', async (job) => {
+      if (!job) return;
+
+      const data = await job.data;
+      logger.info(
+        {
+          jobId: String(job.id),
+          vodId: data?.vodId,
+          type: data?.type,
+        },
+        `DMCA processing completed successfully`
+      );
+    });
+
+    dmcaWorker.on('failed', async (job, err) => {
+      if (!job || !err) return;
+
+      const jobData = await job.data;
+      logger.error(
+        {
+          jobId: String(job.id),
+          vodId: jobData?.vodId,
+          type: jobData?.type,
+          attemptsMade: job.attemptsMade,
+          errorMessage: err.message || String(err),
+        },
+        `DMCA processing failed`
+      );
     });
 
     startTokenHealthCron();

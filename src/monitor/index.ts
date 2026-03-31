@@ -6,7 +6,7 @@ import { logger } from '../utils/logger.js';
  * Main entry point - loads ALL tenant configs and starts concurrent monitoring loops
  */
 export async function startMonitorService(): Promise<void> {
-  logger.info('🚀 Starting Archive Monitor Service...');
+  logger.info('[Monitor] Starting Archive Monitor Service...');
 
   try {
     const allConfigs = await loadStreamerConfigs();
