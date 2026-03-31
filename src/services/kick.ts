@@ -1,21 +1,29 @@
-import axios from 'axios';
 import fsPromises from 'fs/promises';
 import { getKickBrowser } from '../utils/puppeteer-manager.js';
 import { downloadM3u8 } from '../utils/ffmpeg.js';
 import path from 'path';
 
 export interface KickVod {
-  id: number;
-  slug: string;
-  title: string;
-  duration: number;
-  views: number;
-  published_at: string;
+  id: string;
+  slug?: string | null;
+  channel_id?: number | null;
+  title?: string | null;
+  session_title?: string | null;
+  duration?: number | null;
+  views?: number | null;
+  published_at?: string | null;
   created_at: string;
-  source?: string;
+  source?: string | null;
+  is_live?: boolean | null;
+  start_time?: string | null;
+  language?: string | null;
+  is_mature?: boolean | null;
+  viewer_count?: number | null;
+  tags?: string[] | null;
   thumbnail?: {
-    url: string;
-  };
+    src?: string | null;
+    srcset?: string | null;
+  } | null;
 }
 
 export async function getVods(channelName: string): Promise<KickVod[]> {
@@ -36,15 +44,16 @@ export async function getVods(channelName: string): Promise<KickVod[]> {
       const videos = data.props?.pageProps?.videos?.edges || [];
 
       return videos.map((edge: any) => ({
-        id: edge.node.id,
-        slug: edge.node.slug,
-        title: edge.node.title,
-        duration: edge.node.duration,
-        views: edge.node.views,
-        published_at: edge.node.publishedAt,
-        created_at: edge.node.createdAt,
-        source: edge.node.source,
-        thumbnail: edge.node.thumbnail ? { url: edge.node.thumbnail.url } : undefined,
+        id: String(edge.node.id),
+        slug: edge.node.slug ?? null,
+        title: edge.node.title ?? null,
+        session_title: edge.node.session_title ?? null,
+        duration: edge.node.duration ?? null,
+        views: edge.node.views ?? null,
+        published_at: edge.node.publishedAt ?? null,
+        created_at: edge.node.createdAt || '',
+        source: edge.node.source ?? null,
+        thumbnail: edge.node.thumbnail ? { src: edge.node.thumbnail.src ?? null, srcset: edge.node.thumbnail.srcset ?? null } : null,
       }));
     });
 
@@ -74,15 +83,16 @@ export async function getVod(channelName: string, vodId: string): Promise<KickVo
       if (!video) return null;
 
       return {
-        id: video.id,
-        slug: video.slug,
-        title: video.title,
-        duration: video.duration,
-        views: video.views,
-        published_at: video.publishedAt,
-        created_at: video.createdAt,
-        source: video.source,
-        thumbnail: video.thumbnail ? { url: video.thumbnail.url } : undefined,
+        id: String(video.id),
+        slug: video.slug ?? null,
+        title: video.title ?? null,
+        session_title: video.session_title ?? null,
+        duration: video.duration ?? null,
+        views: video.views ?? null,
+        published_at: video.publishedAt ?? null,
+        created_at: video.createdAt || '',
+        source: video.source ?? null,
+        thumbnail: video.thumbnail ? { src: video.thumbnail.src ?? null } : null,
       };
     });
 
@@ -109,13 +119,15 @@ export async function downloadMP4(_streamerId: string, vod: KickVod): Promise<st
 
   const outputPath = path.join(outputDir, `${vod.id}.mp4`);
 
-  const m3u8Response = await axios.get(vod.source, {
+  const response1 = await fetch(vod.source, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     },
   });
 
-  const m3u8Content = m3u8Response.data;
+  if (!response1.ok) throw new Error(`Kick HLS fetch failed with status ${response1.status}`);
+
+  const m3u8Content = await response1.text();
   const variantMatch = m3u8Content.match(/#EXT-X-STREAM-INF:[^\\n]*\\n(.+\.m3u8)/);
 
   if (!variantMatch) {

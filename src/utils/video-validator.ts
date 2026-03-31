@@ -1,6 +1,5 @@
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../services/twitch.js';
 import HLS from 'hls-parser';
-import axios from 'axios';
 import { logger } from './logger.js';
 
 export async function validateVideoDuration(filePath: string): Promise<number | null> {
@@ -58,10 +57,16 @@ export async function getTwitchHlsDuration(m3u8Path: string, vodId: string): Pro
 
     if (!variantUrl.startsWith('http')) {
       baseURL = masterPlaylistContent.substring(0, masterPlaylistContent.lastIndexOf('/'));
-      variantM3u8String = await axios.get(variantUrl.includes('/') ? variantUrl : `${baseURL}/${variantUrl}`).then((r) => r.data);
+
+      const response1 = await fetch(variantUrl.includes('/') ? variantUrl : `${baseURL}/${variantUrl}`);
+      if (!response1.ok) throw new Error(`Fetch failed with status ${response1.status}`);
+      variantM3u8String = await response1.text();
     } else {
       baseURL = variantUrl.substring(0, variantUrl.lastIndexOf('/'));
-      variantM3u8String = await axios.get(variantUrl).then((r) => r.data);
+
+      const response2 = await fetch(variantUrl);
+      if (!response2.ok) throw new Error(`Fetch failed with status ${response2.status}`);
+      variantM3u8String = await response2.text();
     }
 
     const parsedPlaylist: any = HLS.parse(variantM3u8String);

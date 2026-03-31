@@ -29,12 +29,22 @@ async function getBrowser(): Promise<Browser> {
  * Kick livestream data structure from /api/v2/channels/{username}/livestream endpoint
  */
 export interface KickStreamStatus {
-  id: number;
-  session_title: string;
+  id: string;
+  session_title: string | null;
   created_at: string;
-  source?: string; // HLS master playlist URL
-  channel_id: number;
-  viewer_count?: number;
+  playback_url?: string; // HLS master playlist URL with auth token
+  viewers?: number;
+  slug?: string;
+  language?: string;
+  is_mature?: boolean;
+  category?: {
+    id: number;
+    name: string | null;
+  } | null;
+  thumbnail?: {
+    src: string | null;
+    srcset?: string | null;
+  } | null;
 }
 
 /**
@@ -76,14 +86,18 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
         return null;
       }
 
-      // Extract HLS source URL from response
+      // Extract HLS playback URL from response (Kick uses playback_url field)
       const streamData: KickStreamStatus = {
-        id: data.id,
-        session_title: data.session_title || '',
-        created_at: data.created_at,
-        source: data.source || undefined,
-        channel_id: data.channel?.id || 0,
-        viewer_count: data.viewer_count || 0,
+        id: String(data.id),
+        session_title: data.session_title ?? null,
+        created_at: data.created_at || '',
+        playback_url: data.playback_url || undefined,
+        viewers: data.viewers,
+        slug: data.slug,
+        language: data.language,
+        is_mature: data.is_mature,
+        category: data.category || null,
+        thumbnail: data.thumbnail || null,
       };
 
       logger.debug({ username }, `[Kick] Live stream detected for ${username}: ID=${streamData.id}, Title="${streamData.session_title}"`);
@@ -105,7 +119,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
  * Immediate check for Kick VOD/video object matching current stream (NON-BLOCKING)
  * Returns immediately with result or null if not ready yet - matches legacy behavior
  */
-export async function getLatestKickVodObject(username: string, expectedStreamId: number): Promise<{ id: string; title?: string; source?: string } | null> {
+export async function getLatestKickVodObject(username: string, expectedStreamId: string): Promise<{ id: string; title?: string; source?: string } | null> {
   try {
     const browser = await getBrowser();
     const page = await browser.newPage();

@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { logger } from './logger.js';
 
 const globalDiscordAlertsEnabled = process.env.DISCORD_ALERTS_ENABLED !== 'false';
@@ -40,12 +39,21 @@ export async function sendDiscordAlert(message: string): Promise<string | null> 
   }
 
   try {
-    const response = await axios.post(webhookUrl, {
-      content: message,
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json' as any,
+      },
+      body: JSON.stringify({ content: message }),
+      signal: AbortSignal.timeout(10000),
     });
 
-    if (response.data.id) {
-      return response.data.id;
+    if (!response.ok) throw new Error(`Webhook failed with status ${response.status}`);
+
+    const data = await response.json();
+
+    if (data.id) {
+      return data.id;
     }
     return null;
   } catch (err) {
@@ -71,8 +79,13 @@ export async function updateDiscordMessage(messageId: string, message: string): 
     const webhookId = webhookData.pop();
     const updateUrl = `${webhookData.join('/')}/${guildId}/${webhookId}/messages/${messageId}`;
 
-    await axios.patch(updateUrl, {
-      content: message,
+    await fetch(updateUrl, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json' as any,
+      },
+      body: JSON.stringify({ content: message }),
+      signal: AbortSignal.timeout(10000),
     });
   } catch (err) {
     logger.error({ err }, 'Failed to update Discord message');
@@ -118,12 +131,21 @@ export async function sendRichAlert(data: RichEmbedData): Promise<string | null>
       embed.timestamp = timestamp;
     }
 
-    const response = await axios.post(webhookUrl, {
-      embeds: [embed],
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json' as any,
+      },
+      body: JSON.stringify({ embeds: [embed] }),
+      signal: AbortSignal.timeout(10000),
     });
 
-    if (response.data.id) {
-      return response.data.id;
+    if (!response.ok) throw new Error(`Webhook failed with status ${response.status}`);
+
+    const responseData = await response.json();
+
+    if (responseData.id) {
+      return responseData.id;
     }
     return null;
   } catch (err) {
@@ -177,8 +199,13 @@ export async function updateDiscordEmbed(messageId: string, data: RichEmbedData)
       embed.timestamp = timestamp;
     }
 
-    await axios.patch(updateUrl, {
-      embeds: [embed],
+    await fetch(updateUrl, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json' as any,
+      },
+      body: JSON.stringify({ embeds: [embed] }),
+      signal: AbortSignal.timeout(10000),
     });
   } catch (err) {
     logger.error({ err }, 'Failed to update Discord embed');

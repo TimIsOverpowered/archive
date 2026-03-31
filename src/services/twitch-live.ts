@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { getAppAccessToken } from '../services/twitch.js';
+import { getAppAccessToken, VodData } from '../services/twitch.js';
 import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
 import { logger } from '../utils/logger.js';
 
@@ -7,11 +6,16 @@ export interface TwitchStreamStatus {
   id: string;
   user_id: string;
   user_login: string;
-  game_id?: string;
-  type: string[];
+  user_name: string;
+  game_id?: string | null;
+  game_name?: string | null;
+  type: string;
   title: string;
-  started_at: string;
+  tags?: string[] | null;
   viewer_count: number;
+  started_at: string;
+  language: string;
+  thumbnail_url?: string | null;
 }
 
 /**
@@ -27,33 +31,42 @@ export async function getTwitchStreamStatus(userId: string, tenantId: string): P
       return null;
     }
 
-    const response = await axios.get('https://api.twitch.tv/helix/streams', {
-      params: { user_id: userId },
+    const url = new URL('https://api.twitch.tv/helix/streams');
+    url.searchParams.append('user_id', userId);
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Client-Id': creds.clientId,
       },
-      timeout: 10000,
+      signal: AbortSignal.timeout(10000),
     });
 
-    if (!response.data.data || response.data.data.length === 0) {
+    if (!response.ok) throw new Error(`Twitch API failed with status ${response.status}`);
+
+    const data = await response.json();
+
+    if (!data.data || data.data.length === 0) {
       return null;
     }
 
-    const streamData = response.data.data[0];
-
-    // Normalize type field to array (Twitch API returns "live" string for live streams)
-    const normalizedType: string[] = Array.isArray(streamData.type) ? streamData.type : [streamData.type || ''];
+    const streamData = data.data[0];
 
     return {
       id: streamData.id,
       user_id: streamData.user_id,
       user_login: streamData.user_login,
-      game_id: streamData.game_id,
-      type: normalizedType.includes('live') ? ['live'] : [],
+      user_name: streamData.user_name || '',
+      game_id: streamData.game_id ?? undefined,
+      game_name: streamData.game_name ?? undefined,
+      type: streamData.type || '',
       title: streamData.title || '',
-      started_at: streamData.started_at,
+      tags: streamData.tags ?? undefined,
       viewer_count: streamData.viewer_count,
+      started_at: streamData.started_at,
+      language: streamData.language || 'other',
+      thumbnail_url: streamData.thumbnail_url ?? undefined,
     };
   } catch (error: any) {
     logger.error({ userId }, `[Twitch Live Check] Failed to get stream status for user ${userId}:`, error.message);
@@ -63,13 +76,9 @@ export async function getTwitchStreamStatus(userId: string, tenantId: string): P
 
 /**
  * Immediate check for Twitch VOD object matching current stream (NON-BLOCKING)
-
-
-/**
- * Immediate check for Twitch VOD object matching current stream (NON-BLOCKING)
  * Returns immediately with result or null if not ready yet - matches legacy behavior
  */
-export async function getLatestTwitchVodObject(userId: string, expectedStreamId: string, tenantId: string): Promise<{ vodId: string; stream_id: string } | null> {
+export async function getLatestTwitchVodObject(userId: string, expectedStreamId: string, tenantId: string): Promise<VodData | null> {
   try {
     const accessToken = await getAppAccessToken(tenantId);
     const creds = getCreds(tenantId);
@@ -79,67 +88,39 @@ export async function getLatestTwitchVodObject(userId: string, expectedStreamId:
       return null;
     }
 
-    const response = await axios.get('https://api.twitch.tv/helix/videos', {
-      params: { user_id: userId, first: 1 },
+    const url = new URL('https://api.twitch.tv/helix/videos');
+    url.searchParams.append('user_id', userId);
+    url.searchParams.append('first', '1');
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Client-Id': creds.clientId,
       },
-      timeout: 10000,
+      signal: AbortSignal.timeout(10000),
     });
 
-    if (!response.data.data || response.data.data.length === 0) {
+    if (!response.ok) throw new Error(`Twitch API failed with status ${response.status}`);
+
+    const data = await response.json();
+
+    if (!data.data || data.data.length === 0) {
       return null; // No VODs exist yet
     }
 
-    const latestVod = response.data.data[0];
+    const latestVod = data.data[0];
 
     // CRITICAL CHECK - legacy pattern: fail immediately if stream_id doesn't match
     if (latestVod.stream_id !== expectedStreamId || !latestVod.id) {
       return null; // Wrong VOD or no ID yet - caller should retry later
     }
 
-    logger.info({ userId, stream_id: latestVod.stream_id, vodId: latestVod.id }, `[Twitch] VOD object ready! Match found: stream_id=${latestVod.stream_id}, vod_id=${latestVod.id}`);
+    logger.info({ userId, stream_id: latestVod.stream_id, id: latestVod.id }, `[Twitch] VOD object ready! Match found: stream_id=${latestVod.stream_id}, vod_id=${latestVod.id}`);
 
-    return {
-      vodId: latestVod.id,
-      stream_id: latestVod.stream_id,
-    };
+    return latestVod;
   } catch (error: any) {
     logger.error({ userId }, `[Twitch] Failed to get VOD object for user ${userId}:`, error.message);
-    return null;
-  }
-}
-
-/**
- * Get full Twitch VOD details by ID
- */
-export async function getTwitchVodDetails(vodId: string, tenantId: string): Promise<any | null> {
-  try {
-    const accessToken = await getAppAccessToken(tenantId);
-    const creds = getCreds(tenantId);
-
-    if (!creds) {
-      logger.error({ tenantId }, `[Twitch] No credentials configured for tenant ${tenantId}`);
-      return null;
-    }
-
-    const response = await axios.get('https://api.twitch.tv/helix/videos', {
-      params: { id: vodId },
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Client-Id': creds.clientId,
-      },
-      timeout: 10000,
-    });
-
-    if (!response.data.data || response.data.data.length === 0) {
-      return null;
-    }
-
-    return response.data.data[0];
-  } catch (error: any) {
-    logger.error({ vodId }, `[Twitch] Failed to get VOD details for ${vodId}:`, error.message);
     return null;
   }
 }
