@@ -98,8 +98,8 @@ model ChatMessage {
   display_name           String?
   content_offset_seconds Decimal   @db.Decimal
   user_color             String?
-  createdAt              DateTime? @db.Timestamptz(6)
-  updatedAt              DateTime? @db.Timestamptz(6)
+  createdAt              DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime? @map("updated_at") @db.Timestamptz(6)
   message                Json?
   user_badges            Json?
 
