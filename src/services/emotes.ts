@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { logger } from '../utils/logger.js';
 
 export interface EmoteData {
@@ -56,41 +55,43 @@ export async function fetchAndSaveEmotes(streamerId: string, vodId: string, plat
   if (platform === 'twitch' && channelId) {
     try {
       const [ffzRes, bttvGlobalRes, bttvChannelRes, sevenTvRes] = await Promise.all([
-        axios.get<FFZResponse>(`https://api.frankerfacez.com/v1/room/id/${channelId}`),
-        axios.get<BTTVGlobalResponse>('https://api.betterttv.net/3/cached/emotes/global'),
-        axios.get<BTTVChannelResponse>(`https://api.betterttv.net/3/cached/users/twitch/${channelId}`),
-        axios.get<TVUserResponse>(`https://7tv.io/v3/users/twitch/${channelId}`),
+        fetch(`https://api.frankerfacez.com/v1/room/id/${channelId}`, { signal: AbortSignal.timeout(5000) })
+          .then((r) => (r.ok ? (r.json() as Promise<FFZResponse>) : {}))
+          .catch(() => ({})),
+
+        fetch('https://api.betterttv.net/3/cached/emotes/global', { signal: AbortSignal.timeout(5000) })
+          .then((r) => (r.ok ? (r.json() as Promise<BTTVGlobalResponse>) : { emotes: [] }))
+          .catch(() => ({ emotes: [] })),
+
+        fetch(`https://api.betterttv.net/3/cached/users/twitch/${channelId}`, { signal: AbortSignal.timeout(5000) })
+          .then((r) => (r.ok ? (r.json() as Promise<BTTVChannelResponse>) : {}))
+          .catch(() => ({ channelEmotes: [] })),
+
+        fetch(`https://7tv.io/v3/users/twitch/${channelId}`, { signal: AbortSignal.timeout(5000) })
+          .then((r) => (r.ok ? (r.json() as Promise<TVUserResponse>) : {}))
+          .catch(() => ({ emotes: [] })),
       ]);
 
-      ffzEmotes =
-        ffzRes.data.channels?.[channelId]?.emotes?.map((e) => ({
-          id: String(e.id),
-          code: e.code,
-        })) || [];
+      ffzEmotes = ((ffzRes as FFZResponse).channels?.[channelId]?.emotes || []).map((e) => ({ id: String(e.id), code: e.code })) || [];
 
-      bttvEmotes = [...(bttvGlobalRes.data.emotes?.map((e) => ({ id: e.id, code: e.code })) || []), ...(bttvChannelRes.data.channelEmotes?.map((e) => ({ id: e.id, code: e.code })) || [])];
+      bttvEmotes = [
+        ...(bttvGlobalRes.emotes || []).map(({ id, code }) => ({ id, code })),
+        ...(((bttvChannelRes as BTTVChannelResponse).channelEmotes || [])?.map(({ id, code }) => ({ id, code })) || []),
+      ];
 
-      sevenTvEmotes =
-        sevenTvRes.data.emotes?.map((e) => ({
-          id: e.id,
-          code: e.name,
-          flags: e.flags,
-        })) || [];
+      sevenTvEmotes = ((sevenTvRes as TVUserResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
     } catch {
       logger.error({ platform, channelId }, 'Failed to fetch Twitch emotes');
     }
   } else if (platform === 'kick' && channelId) {
     try {
-      const sevenTvRes = await axios.get<TVUserResponse>(`https://7tv.io/v3/users/kick/${channelId}`);
+      const sevenTvRes = await fetch(`https://7tv.io/v3/users/kick/${channelId}`, { signal: AbortSignal.timeout(5000) })
+        .then((r) => (r.ok ? (r.json() as Promise<TVUserResponse>) : {}))
+        .catch(() => ({ emotes: [] }));
 
       ffzEmotes = [];
       bttvEmotes = [];
-      sevenTvEmotes =
-        sevenTvRes.data.emotes?.map((e) => ({
-          id: e.id,
-          code: e.name,
-          flags: e.flags,
-        })) || [];
+      sevenTvEmotes = ((sevenTvRes as TVUserResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
     } catch {
       logger.error({ platform, channelId }, 'Failed to fetch Kick emotes');
     }

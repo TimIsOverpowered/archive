@@ -1,21 +1,24 @@
-import axios from 'axios';
 import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
 import { getStreamerConfig as getConfig } from '../config/loader.js';
 
-interface VodData {
+export interface VodData {
   id: string;
+  stream_id?: string | null;
   user_id: string;
   user_login: string;
+  user_name: string;
   title: string;
-  duration: string;
-  started_at: string;
+  description?: string | null;
+  created_at: string;
   published_at: string;
+  url?: string | null;
   thumbnail_url: string;
   viewable: string;
   language: string;
   type: string;
-  views: number;
-  game_id?: string;
+  duration: string;
+  view_count: number;
+  muted_segments?: Array<{ duration: number; offset: number }> | null;
 }
 
 interface VodTokenSig {
@@ -37,15 +40,21 @@ export async function getAppAccessToken(streamerId: string): Promise<string> {
     return cached.token;
   }
 
-  const response = await axios.post('https://id.twitch.tv/oauth2/token', null, {
-    params: {
-      client_id: creds.clientId,
-      client_secret: creds.clientSecret,
-      grant_type: 'client_credentials',
-    },
+  const url = new URL('https://id.twitch.tv/oauth2/token');
+  url.searchParams.append('client_id', creds.clientId);
+  url.searchParams.append('client_secret', creds.clientSecret);
+  url.searchParams.append('grant_type', 'client_credentials');
+
+  const response = await fetch(url.toString(), {
+    method: 'POST',
+    signal: AbortSignal.timeout(10000),
   });
 
-  const { access_token, expires_in } = response.data;
+  if (!response.ok) throw new Error(`Twitch token failed with status ${response.status}`);
+
+  const data = await response.json();
+
+  const { access_token, expires_in } = data;
   tokenCache.set(streamerId, {
     token: access_token,
     expiresAt: Date.now() + expires_in * 1000,
@@ -58,25 +67,37 @@ export async function getVodData(vodId: string, streamerId: string): Promise<Vod
   const accessToken = await getAppAccessToken(streamerId);
   const creds = getCreds(streamerId)!;
 
-  const response = await axios.get('https://api.twitch.tv/helix/videos', {
-    params: { id: vodId },
+  const url = new URL('https://api.twitch.tv/helix/videos');
+  url.searchParams.append('id', vodId);
+
+  const response = await fetch(url.toString(), {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Client-Id': creds.clientId,
     },
+    signal: AbortSignal.timeout(10000),
   });
 
-  if (!response.data.data || response.data.data.length === 0) {
+  if (!response.ok) throw new Error(`Twitch API failed with status ${response.status}`);
+
+  const data = await response.json();
+
+  if (!data.data || data.data.length === 0) {
     throw new Error(`VOD ${vodId} not found`);
   }
 
-  return response.data.data[0];
+  return data.data[0] as VodData;
 }
 
 export async function getVodTokenSig(vodId: string): Promise<VodTokenSig> {
-  const response = await axios.post(
-    'https://gql.twitch.tv/gql',
-    {
+  const response = await fetch('https://gql.twitch.tv/gql', {
+    method: 'POST',
+    headers: {
+      Accept: '*/*',
+      'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
+      'Content-Type': 'text/plain;charset=UTF-8' as any,
+    },
+    body: JSON.stringify({
       operationName: 'PlaybackAccessToken',
       variables: {
         isLive: false,
@@ -93,17 +114,15 @@ export async function getVodTokenSig(vodId: string): Promise<VodTokenSig> {
           sha256Hash: '0828119ded1c13477966434e15800ff57ddacf13ba1911c129dc2200705b0712',
         },
       },
-    },
-    {
-      headers: {
-        Accept: '*/*',
-        'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
-        'Content-Type': 'text/plain;charset=UTF-8',
-      },
-    }
-  );
+    }),
+    signal: AbortSignal.timeout(10000),
+  });
 
-  const token = response.data.data.videoPlaybackAccessToken;
+  if (!response.ok) throw new Error(`Twitch token sig failed with status ${response.status}`);
+
+  const data = await response.json();
+
+  const token = data.data.videoPlaybackAccessToken;
   if (!token) {
     throw new Error('Failed to get VOD token');
   }
@@ -115,17 +134,24 @@ export async function getVodTokenSig(vodId: string): Promise<VodTokenSig> {
 }
 
 export async function getM3u8(vodId: string, token: string, sig: string): Promise<string> {
-  const response = await axios.get(
-    `https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h265,h264&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`
-  );
+  const url = `https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h265,h264&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`;
 
-  return response.data;
+  const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
+
+  if (!response.ok) throw new Error(`Twitch M3U8 failed with status ${response.status}`);
+
+  return response.text();
 }
 
 export async function fetchComments(vodId: string, offset = 0): Promise<any | null> {
-  const response = await axios.post(
-    'https://gql.twitch.tv/gql',
-    {
+  const response = await fetch('https://gql.twitch.tv/gql', {
+    method: 'POST',
+    headers: {
+      Accept: '*/*',
+      'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
+      'Content-Type': 'text/plain;charset=UTF-8' as any,
+    },
+    body: JSON.stringify({
       operationName: 'VideoCommentsByOffsetOrCursor',
       variables: {
         videoID: vodId,
@@ -137,23 +163,26 @@ export async function fetchComments(vodId: string, offset = 0): Promise<any | nu
           sha256Hash: 'b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a',
         },
       },
-    },
-    {
-      headers: {
-        Accept: '*/*',
-        'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
-        'Content-Type': 'text/plain;charset=UTF-8',
-      },
-    }
-  );
+    }),
+    signal: AbortSignal.timeout(10000),
+  });
 
-  return response.data.data?.video || null;
+  if (!response.ok) throw new Error(`Twitch comments failed with status ${response.status}`);
+
+  const data = await response.json();
+
+  return data.data?.video || null;
 }
 
 export async function fetchNextComments(vodId: string, cursor: string): Promise<any | null> {
-  const response = await axios.post(
-    'https://gql.twitch.tv/gql',
-    {
+  const response = await fetch('https://gql.twitch.tv/gql', {
+    method: 'POST',
+    headers: {
+      Accept: '*/*',
+      'Client-Id': 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
+      'Content-Type': 'text/plain;charset=UTF-8' as any,
+    },
+    body: JSON.stringify({
       operationName: 'VideoCommentsByOffsetOrCursor',
       variables: {
         videoID: vodId,
@@ -165,23 +194,26 @@ export async function fetchNextComments(vodId: string, cursor: string): Promise<
           sha256Hash: 'b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a',
         },
       },
-    },
-    {
-      headers: {
-        Accept: '*/*',
-        'Client-Id': 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
-        'Content-Type': 'text/plain;charset=UTF-8',
-      },
-    }
-  );
+    }),
+    signal: AbortSignal.timeout(10000),
+  });
 
-  return response.data.data?.video || null;
+  if (!response.ok) throw new Error(`Twitch next comments failed with status ${response.status}`);
+
+  const data = await response.json();
+
+  return data.data?.video || null;
 }
 
 export async function getChapters(vodId: string): Promise<any | null> {
-  const response = await axios.post(
-    'https://gql.twitch.tv/gql',
-    {
+  const response = await fetch('https://gql.twitch.tv/gql', {
+    method: 'POST',
+    headers: {
+      Accept: '*/*',
+      'Client-Id': 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
+      'Content-Type': 'text/plain;charset=UTF-8' as any,
+    },
+    body: JSON.stringify({
       operationName: 'VideoPreviewCard__VideoMoments',
       variables: {
         videoId: vodId,
@@ -192,23 +224,26 @@ export async function getChapters(vodId: string): Promise<any | null> {
           sha256Hash: '7399051b2d46f528d5f0eedf8b0db8d485bb1bb4c0a2c6707be6f1290cdcb31a',
         },
       },
-    },
-    {
-      headers: {
-        Accept: '*/*',
-        'Client-Id': 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
-        'Content-Type': 'text/plain;charset=UTF-8',
-      },
-    }
-  );
+    }),
+    signal: AbortSignal.timeout(10000),
+  });
 
-  return response.data?.data || null;
+  if (!response.ok) throw new Error(`Twitch chapters failed with status ${response.status}`);
+
+  const data = await response.json();
+
+  return data?.data || null;
 }
 
 export async function getChapter(vodId: string): Promise<any | null> {
-  const response = await axios.post(
-    'https://gql.twitch.tv/gql',
-    {
+  const response = await fetch('https://gql.twitch.tv/gql', {
+    method: 'POST',
+    headers: {
+      Accept: '*/*',
+      'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
+      'Content-Type': 'text/plain;charset=UTF-8' as any,
+    },
+    body: JSON.stringify({
       operationName: 'NielsenContentMetadata',
       variables: {
         isCollectionContent: false,
@@ -224,17 +259,15 @@ export async function getChapter(vodId: string): Promise<any | null> {
           sha256Hash: '2dbf505ee929438369e68e72319d1106bb3c142e295332fac157c90638968586',
         },
       },
-    },
-    {
-      headers: {
-        Accept: '*/*',
-        'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
-        'Content-Type': 'text/plain;charset=UTF-8',
-      },
-    }
-  );
+    }),
+    signal: AbortSignal.timeout(10000),
+  });
 
-  return response.data.data?.video || null;
+  if (!response.ok) throw new Error(`Twitch chapter failed with status ${response.status}`);
+
+  const data = await response.json();
+
+  return data.data?.video || null;
 }
 
 export async function getGameData(gameId: string, streamerId: string): Promise<any | null> {
@@ -242,19 +275,26 @@ export async function getGameData(gameId: string, streamerId: string): Promise<a
 
   const creds = getCreds(streamerId)!;
 
-  const response = await axios.get('https://api.twitch.tv/helix/games', {
-    params: { id: gameId },
+  const url = new URL('https://api.twitch.tv/helix/games');
+  url.searchParams.append('id', gameId);
+
+  const response = await fetch(url.toString(), {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Client-Id': creds.clientId,
     },
+    signal: AbortSignal.timeout(10000),
   });
 
-  if (!response.data.data || response.data.data.length === 0) {
+  if (!response.ok) throw new Error(`Twitch game data failed with status ${response.status}`);
+
+  const data = await response.json();
+
+  if (!data.data || data.data.length === 0) {
     return null;
   }
 
-  return response.data.data[0];
+  return data.data[0];
 }
 
 export async function getChannelBadges(streamerId: string): Promise<Record<string, unknown> | null> {
@@ -271,14 +311,22 @@ export async function getChannelBadges(streamerId: string): Promise<Record<strin
 
     if (!accessToken) throw new Error('Twitch OAuth access token unavailable');
 
-    const response = await axios.get(`https://api.twitch.tv/helix/chat/badges?broadcaster_id=${config.twitch.id}`, {
+    const url = new URL(`https://api.twitch.tv/helix/chat/badges`);
+    url.searchParams.append('broadcaster_id', config.twitch.id.toString());
+
+    const response = await fetch(url.toString(), {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Client-Id': creds.clientId,
       },
+      signal: AbortSignal.timeout(10000),
     });
 
-    const badgesData = response.data?.data || null;
+    if (!response.ok) throw new Error(`Twitch badges failed with status ${response.status}`);
+
+    const data = await response.json();
+
+    const badgesData = data?.data || null;
 
     if (!badgesData) {
       console.warn(`No channel badges found for Twitch user ${config.twitch.id}`);
@@ -303,11 +351,16 @@ export async function getGlobalBadges(streamerId: string): Promise<Record<string
 
     if (!accessToken) throw new Error('Twitch OAuth access token unavailable');
 
-    const response = await axios.get('https://api.twitch.tv/helix/chat/badges/global', {
+    const response = await fetch('https://api.twitch.tv/helix/chat/badges/global', {
       headers: { Authorization: `Bearer ${accessToken}`, 'Client-Id': creds.clientId },
+      signal: AbortSignal.timeout(10000),
     });
 
-    return (response.data?.data || null) as Record<string, unknown>;
+    if (!response.ok) throw new Error(`Twitch global badges failed with status ${response.status}`);
+
+    const data = await response.json();
+
+    return (data?.data || null) as Record<string, unknown>;
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`Failed to fetch global badges for ${streamerId}:`, errorMessage);

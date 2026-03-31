@@ -83,7 +83,7 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
   const streamStatus = await getTwitchStreamStatus(userIdCache, tenantId);
 
   // Streamer is OFFLINE - mark any active live record as ended
-  if (!streamStatus || !Array.isArray(streamStatus.type) || !streamStatus.type.includes('live')) {
+  if (!streamStatus || streamStatus.type !== 'live') {
     log.debug(`[Monitor]: Twitch user ${userIdCache} is OFFLINE`);
 
     const activeLiveVod = await prisma.vod.findFirst({
@@ -120,55 +120,57 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
     // IMMEDIATE check - don't block waiting (legacy pattern!)
     const vodResult = await getLatestTwitchVodObject(userIdCache, streamStatus.id, tenantId);
 
-    if (!vodResult || !vodResult.vodId) {
+    if (!vodResult || !vodResult.id) {
       log.debug(`[Monitor]: VOD object not ready yet for stream ${streamStatus.id}. Will retry on next poll.`);
       return; // Exit immediately - don't block! Next poll in 30s will check again
     }
 
     if (vodResult.stream_id !== String(streamStatus.id)) {
-      log.debug(`[Monitor]: Latest VOD (${vodResult.vodId}) doesn't match current stream. Will retry on next poll.`);
+      log.debug(`[Monitor]: Latest VOD (${vodResult.id}) doesn't match current stream. Will retry on next poll.`);
       return; // Wrong VOD - exit immediately, don't block!
     }
 
     // Re-check if another concurrent poll already created this record (race guard)
     const vodAlreadyExists = await prisma.vod.findUnique({
-      where: { id: vodResult.vodId, platform },
+      where: { id: vodResult.id, platform },
     });
 
     if (vodAlreadyExists) {
-      log.debug(`[Monitor]: VOD ${vodResult.vodId} was created by concurrent poll. Skipping duplicate creation.`);
+      log.debug(`[Monitor]: VOD ${vodResult.id} was created by concurrent poll. Skipping duplicate creation.`);
 
       // Another instance handling it - nothing more to do here
       return;
     }
 
     // Safe to create now - no other poll has claimed this stream yet
-    log.info(`[Monitor]: Created VOD record ${vodResult.vodId} for live stream. Started at: ${streamStatus.started_at}`);
+    log.info(`[Monitor]: Created VOD record ${vodResult.id} for live stream. Started at: ${streamStatus.started_at}`);
 
     await prisma.vod.create({
       data: {
-        id: vodResult.vodId, // Permanent Twitch-assigned ID
+        id: vodResult.id, // Permanent Twitch-assigned ID
         platform,
         is_live: true,
+        created_at: new Date(vodResult.created_at),
         started_at: new Date(streamStatus.started_at),
         title: streamStatus.title || 'Live Stream',
+        stream_id: vodResult.stream_id,
       },
     });
 
     // Check if download already queued/running before queuing (legacy pattern)
-    const hasActiveJob = await checkHasActiveDownload(tenantId, vodResult.vodId);
+    const hasActiveJob = await checkHasActiveDownload(tenantId, vodResult.id);
 
     if (!hasActiveJob) {
-      log.info(`[Monitor]: Queuing HLS download for ${vodResult.vodId}`);
+      log.info(`[Monitor]: Queuing HLS download for ${vodResult.id}`);
 
       await enqueueLiveHlsDownload({
-        vodId: vodResult.vodId,
+        vodId: vodResult.id,
         platform,
         streamerId: userIdCache,
         startedAt: new Date(streamStatus.started_at),
       });
     } else {
-      log.debug(`[Monitor]: Download already queued/running for ${vodResult.vodId}, skipping.`);
+      log.debug(`[Monitor]: Download already queued/running for ${vodResult.id}, skipping.`);
     }
   } else if (existingVod && !existingVod.is_live) {
     // Record exists but not marked live - update and queue download
@@ -220,7 +222,7 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
   const streamStatus = await getKickStreamStatus(kickUsername);
 
   // Streamer is OFFLINE - mark any active live record as ended
-  if (!streamStatus || !streamStatus.id || streamStatus.id <= 0) {
+  if (!streamStatus || !streamStatus.id) {
     log.debug(`[Monitor]: Kick channel ${kickUsername} is offline`);
 
     const activeLiveVod = await prisma.vod.findFirst({
@@ -279,11 +281,13 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
     // Safe to create now - no other poll has claimed this stream yet
     await prisma.vod.create({
       data: {
-        id: kickStreamIdStr, // Kick uses single ID throughout lifecycle
+        id: vodObject.id,
         platform,
         is_live: true,
+        created_at: new Date(streamStatus.created_at),
         started_at: new Date(streamStatus.created_at),
-        title: vodObject.title || streamStatus.session_title,
+        title: streamStatus.session_title,
+        stream_id: kickStreamIdStr,
       },
     });
 
@@ -300,7 +304,7 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
         platform,
         streamerId: kickUsername,
         startedAt: new Date(streamStatus.created_at),
-        sourceUrl: streamStatus.source || undefined,
+        sourceUrl: vodObject?.source ?? streamStatus.playback_url ?? undefined,
       });
     } else {
       log.debug(`[Monitor]: Download already queued/running for ${kickStreamIdStr}, skipping.`);
@@ -324,12 +328,15 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
     if (!hasDownloadJob) {
       log.info(`[Monitor]:  Queuing HLS download for resumed Kick VOD ${kickStreamIdStr}`);
 
+      // Re-fetch vod object to get source URL (vodObject not in scope here - different code path)
+      const vodObject = await getLatestKickVodObject(kickUsername, streamStatus.id);
+
       await enqueueLiveHlsDownload({
         vodId: kickStreamIdStr,
         platform,
         streamerId: kickUsername,
         startedAt: new Date(streamStatus.created_at),
-        sourceUrl: streamStatus.source || undefined,
+        sourceUrl: vodObject?.source ?? streamStatus.playback_url ?? undefined,
       });
     } else {
       log.debug(`[Monitor]:  Download already in progress for Kick VOD ${kickStreamIdStr}`);

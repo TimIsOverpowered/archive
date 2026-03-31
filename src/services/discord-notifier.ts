@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { getStreamerConfig } from '../config/loader.js';
 import { logger } from '../utils/logger.js';
 
@@ -39,7 +38,6 @@ function getAlertTitle(alert: DiscordAlert): string {
 export async function sendDiscordAlert(alert: DiscordAlert): Promise<void> {
   getStreamerConfig(alert.tenantId); // Fetch to validate tenant exists
 
-  // Only check global alert enabled flag - no per-tenant webhook URLs (use only env var)
   if (!process.env.DISCORD_ALERTS_ENABLED || process.env.DISCORD_ALERTS_ENABLED === 'false') {
     return;
   }
@@ -81,7 +79,18 @@ export async function sendDiscordAlert(alert: DiscordAlert): Promise<void> {
   ];
 
   try {
-    await axios.post(webhookUrl, { embeds });
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json' as any,
+      },
+      body: JSON.stringify({ embeds }),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Discord webhook failed with status ${response.status}`);
+    }
   } catch (error) {
     logger.error({ vodId: alert.vodId, err: error }, '[Discord Alert] Failed to send alert');
   }
