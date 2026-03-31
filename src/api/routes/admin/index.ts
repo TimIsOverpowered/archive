@@ -4,6 +4,7 @@ import downloadJobsRoutes from './download-jobs.routes';
 import youtubeUploadRoutes from './youtube-upload.routes';
 import dmcaProcessingRoutes from './dmca-processing.routes';
 import metadataFetchingRoutes from './metadata-fetching.routes';
+import liveCallbackRoutes from './live-callback.routes';
 
 interface AdminRoutesOptions {
   prefix: string;
@@ -21,4 +22,7 @@ export default async function adminRoutes(fastify: FastifyInstance, _options: Ad
   await fastify.register(dmcaProcessingRoutes);
 
   await fastify.register(metadataFetchingRoutes);
+
+  // Live callback endpoint for external recorders (twitch-recorder-go)
+  await fastify.register(liveCallbackRoutes, { prefix: '' });
 }
