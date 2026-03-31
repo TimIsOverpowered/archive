@@ -186,7 +186,7 @@ npx tsx scripts/migrate-streamer.ts --streamer quin69 --db-url " postgresql://<u
 2. **Creates new schema:** Generates `_new` tables (vods_new, emotes_new, games_new) + new tables (vod_uploads, chapters)
 3. **Migrates data:**
    - VODs: Converts duration from seconds to Int, extracts YouTube uploads to separate table
-   - Emotes: Maps 7tv_emotes column to seven_tv_emotes
+   - Emotes: Maps 7tv_emotes column to seventv_emotes
    - Games: Migrates game chapter timestamps
    - Chapters: Extracts Kick-specific chapters from JSONB `chapters[]` array in vods table
    - Chat messages: Renames `logs` table to `chat_messages` (no data migration needed)
