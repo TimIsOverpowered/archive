@@ -66,11 +66,25 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
       const kickConfig = streamerConfigs.find((c) => c.kick?.enabled);
       const puppeteerHealth = await checkPuppeteerHealth();
 
+      let workersStatus;
+      try {
+        const workersModule = await import('../../workers/index');
+
+        if (typeof workersModule.getWorkersHealth === 'function') {
+          workersStatus = await workersModule.getWorkersHealth();
+        } else {
+          workersStatus = {};
+        }
+      } catch {
+        workersStatus = {};
+      }
+
       const response = {
         data: {
           status: 'ok',
           redis: redisStatus,
           streamers,
+          workers: workersStatus,
           ...(kickConfig && {
             kick: {
               puppeteer: puppeteerHealth.status,
