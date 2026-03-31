@@ -36,7 +36,7 @@ CREATE TABLE "emotes" (
     "vod_id" TEXT NOT NULL,
     "ffz_emotes" JSONB,
     "bttv_emotes" JSONB,
-    "seven_tv_emotes" JSONB,
+    "seventv_emotes" JSONB,
 
     CONSTRAINT "emotes_pkey" PRIMARY KEY ("id")
 );
