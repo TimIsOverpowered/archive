@@ -110,7 +110,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUpl
 
       if (messageId && isAlertsEnabled()) {
         updateDiscordEmbed(messageId, {
-          title: `✅ Game Upload Complete`,
+          title: `[YouTube] Game Upload Complete`,
           description: `${streamerId} - Successfully uploaded to YouTube`,
           status: 'success',
           fields: [{ name: 'Type', value: type, inline: true }],
@@ -182,7 +182,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUpl
 
       if (messageId && isAlertsEnabled()) {
         updateDiscordEmbed(messageId, {
-          title: `✅ Upload Complete`,
+          title: `[YouTube] Upload Complete`,
           description: `${streamerId} - Successfully uploaded to YouTube`,
           status: 'success',
           fields: [{ name: 'Type', value: type, inline: true }],
@@ -213,7 +213,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUpl
 
     if (messageId && isAlertsEnabled()) {
       updateDiscordEmbed(messageId, {
-        title: `❌ YouTube Upload Failed`,
+        title: `[YouTube] Upload Failed`,
         description: `${streamerId} - Video upload encountered an error`,
         status: 'error',
         fields: [

@@ -58,9 +58,9 @@ export async function sendDiscordAlert(alert: DiscordAlert): Promise<void> {
   };
 
   const emojiMap: Record<AlertType, string> = {
-    in_progress: '🔄',
-    failure: '❌',
-    success: '✅',
+    in_progress: '[IN_PROGRESS]',
+    failure: '[FAILED]',
+    success: '[SUCCESS]',
   };
 
   const embeds = [

@@ -4,6 +4,7 @@ import { createClient, getClient } from '../db/client.js';
 import type { StreamerConfig } from '../config/types.js';
 import path from 'path';
 import { loggerWithTenant } from '../utils/logger.js';
+import { QUEUE_NAMES } from '../jobs/queues.js';
 
 type PlatformType = 'twitch' | 'kick';
 
@@ -353,6 +354,7 @@ async function checkHasActiveDownload(tenantId: string, vodId: string): Promise<
     const streamerConfig = (await import('../config/loader.js')).getStreamerConfig(tenantId);
 
     if (!streamerConfig?.settings.vodPath) {
+      log.warn({ tenantId, vodId }, `[Monitor] No VOD path configured for tenant ${tenantId} - cannot check active download`);
       return false;
     }
 
@@ -360,14 +362,59 @@ async function checkHasActiveDownload(tenantId: string, vodId: string): Promise<
 
     try {
       await fs.access(vodDir);
-      log.debug(`[Monitor]:  Download directory exists for VOD ${vodId} - active download detected`);
+      log.debug({ vodId, vodDir }, `[Monitor] Download directory exists - active download detected`);
       return true;
-    } catch {
-      log.debug(`[Monitor]:  No download directory found for VOD ${vodId}`);
+    } catch (accessError) {
+      log.trace({ vodId, vodDir, error: accessError instanceof Error ? accessError.message : String(accessError) }, `[Monitor] No download directory found for VOD ${vodId}`);
       return false;
     }
-  } catch {
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    log.warn({ vodId, error: errorMsg }, `[Monitor] Failed to check active download status`);
     return false;
+  }
+}
+
+/**
+ * Validate that the VOD path exists and is writable before queuing a download job
+ */
+async function validateVodPath(tenantId: string): Promise<{ valid: boolean }> {
+  const log = loggerWithTenant(tenantId);
+
+  try {
+    const fs = await import('fs/promises');
+    const streamerConfig = (await import('../config/loader.js')).getStreamerConfig(tenantId);
+
+    if (!streamerConfig?.settings.vodPath) {
+      log.error({ tenantId }, `[Monitor] VOD path not configured for tenant - cannot queue downloads`);
+      return { valid: false };
+    }
+
+    const vodDirBase = streamerConfig.settings.vodPath;
+
+    try {
+      await fs.access(vodDirBase, fs.constants.R_OK | fs.constants.W_OK);
+
+      // Verify we can actually create a directory in this path
+      const testSubdir = path.join(vodDirBase, tenantId);
+      try {
+        await fs.mkdir(testSubdir, { recursive: true });
+        log.trace({ vodPath: vodDirBase }, `[Monitor] VOD path validated successfully`);
+        return { valid: true };
+      } catch (mkdirError) {
+        const errorMsg = mkdirError instanceof Error ? mkdirError.message : String(mkdirError);
+        log.error({ tenantId, vodPath: testSubdir, error: errorMsg }, `[Monitor] Cannot write to VOD path - directory creation failed`);
+        return { valid: false };
+      }
+    } catch (accessError) {
+      const errorMsg = accessError instanceof Error ? accessError.message : String(accessError);
+      log.error({ tenantId, vodPath: vodDirBase, error: errorMsg }, `[Monitor] VOD path not accessible - check permissions`);
+      return { valid: false };
+    }
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    log.error({ tenantId, error: errorMsg }, `[Monitor] Unexpected error validating VOD path`);
+    return { valid: false };
   }
 }
 
@@ -376,11 +423,21 @@ async function checkHasActiveDownload(tenantId: string, vodId: string): Promise<
  */
 async function enqueueLiveHlsDownload(params: { vodId: string; platform: PlatformType; streamerId: string; startedAt: Date; sourceUrl?: string }): Promise<void> {
   const log = loggerWithTenant(params.streamerId);
+
+  // Validate VOD path before attempting to queue job
+  const validationResult = await validateVodPath(params.streamerId);
+  if (!validationResult.valid) {
+    log.error({ vodId: params.vodId, platform: params.platform }, `[Monitor] Aborting download queue - VOD path validation failed`);
+    return; // Don't attempt to queue job if path is invalid
+  }
+
   const Redis = (await import('ioredis')).default;
 
   // Use global Redis connection for deduplication checks only (not BullMQ queues)
   let redis: any;
   try {
+    log.info({ vodId: params.vodId, platform: params.platform, streamerId: params.streamerId }, `[Monitor] Attempting to enqueue Live HLS download job`);
+
     redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
     const dedupKey = `vod_download:${params.vodId}`;
@@ -389,13 +446,14 @@ async function enqueueLiveHlsDownload(params: { vodId: string; platform: Platfor
     const acquired = await redis.set(dedupKey, 'locked', 'EX', 172800, 'NX');
 
     if (!acquired) {
-      log.info(`[${params.vodId}] Download already queued or in progress (Redis dedup lock exists). Skipping.`);
+      log.info({ vodId: params.vodId }, `[Monitor] Download already queued or in progress (Redis dedup lock exists). Skipping.`);
       return; // Another instance is handling this - don't queue duplicate job
     }
 
-    log.info(`[${params.vodId}] Redis dedup key acquired. Enqueuing Live HLS download...`);
+    log.debug({ vodId: params.vodId, dedupKey }, `[Monitor] Redis dedup key acquired successfully`);
   } catch (error: any) {
-    log.error(`[Redis] Failed to acquire dedup lock for VOD ${params.vodId}:`, error.message);
+    const errorMsg = error?.message || String(error);
+    log.error({ vodId: params.vodId, error: errorMsg }, `[Monitor] Failed to acquire Redis dedup lock - attempting queue anyway`);
 
     // If Redis fails, still try to queue the job - BullMQ will handle duplicates at worker level
   } finally {
@@ -408,7 +466,9 @@ async function enqueueLiveHlsDownload(params: { vodId: string; platform: Platfor
 
   try {
     // Note: The worker will handle the actual download logic (Live HLS mode vs one-shot)
-    await queue.add(
+    log.debug({ vodId: params.vodId, platform: params.platform }, `[Monitor] Adding job to BullMQ VOD download queue`);
+
+    const jobId = await queue.add(
       'live_hls_download',
       {
         vodId: params.vodId,
@@ -423,13 +483,19 @@ async function enqueueLiveHlsDownload(params: { vodId: string; platform: Platfor
       } as any // timeout is not in default options but supported by worker-side processing
     );
 
-    log.info(`[${params.vodId}] Live HLS download job enqueued successfully`);
+    log.info({ vodId: params.vodId, jobId: String(jobId), platform: params.platform, queueName: QUEUE_NAMES.VOD_DOWNLOAD }, `[Monitor] Live HLS download job enqueued successfully`);
   } catch (error: any) {
-    log.error(`[Queue] Failed to enqueue Live HLS download for ${params.vodId}:`, error.message);
+    const errorMsg = error?.message || String(error);
+    log.error({ vodId: params.vodId, error: errorMsg, stack: error?.stack }, `[Monitor] CRITICAL - Failed to enqueue Live HLS download job`);
 
-    // Release dedup key on failure so it can be retried later
-    if (redis?.del) {
-      await redis.del(`vod_download:${params.vodId}`).catch(() => {});
+    // Release dedup key on failure so it can be retried later (redis may not exist if earlier Redis call failed)
+    try {
+      const cleanupRedis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+      await cleanupRedis.del(`vod_download:${params.vodId}`).catch(() => {});
+      await cleanupRedis.quit().catch(() => {});
+      log.debug({ vodId: params.vodId }, `[Monitor] Released dedup key after queue failure`);
+    } catch {
+      // Non-critical - just logging the cleanup attempt failure
     }
   }
 }

@@ -166,7 +166,7 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
     if (refreshedClient && !isTokenExpired(refreshedClient)) {
       log.info(`[YouTube] Using pre-fetched token`);
 
-      return refreshedClient; // ✅ Valid token guaranteed - no race conditions!
+      return refreshedClient; // Valid token guaranteed - no race conditions!
     }
 
     // If still expired or cache was cleared, fall through to create fresh client below
