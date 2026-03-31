@@ -1,5 +1,5 @@
-import { getChatDownloadQueue } from './queues.js';
 import type { ChatDownloadJob, VODDownloadJob } from './queues.js';
+import { getChatDownloadQueue } from './queues.js';
 
 export async function enqueueChatDownload(job: Omit<ChatDownloadJob, 'id'>): Promise<string | null> {
   const queue = getChatDownloadQueue();
