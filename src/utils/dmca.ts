@@ -45,7 +45,9 @@ export async function fileExists(filePath: string): Promise<boolean> {
 
 export async function deleteFileIfExists(filePath: string): Promise<void> {
   if (await fileExists(filePath)) {
-    await fsPromises.unlink(filePath).catch(() => {});
+    await fsPromises.unlink(filePath).catch((err) => {
+      console.warn(`Failed to delete file ${filePath}:`, err instanceof Error ? err.message : String(err));
+    });
   }
 }
 
@@ -216,7 +218,9 @@ export async function blackoutVideoSection(videoPath: string, vodId: string, sta
 
       try {
         await deleteFileIfExists(file);
-      } catch {}
+      } catch (err) {
+        console.warn('Failed to cleanup temp file:', file, err instanceof Error ? err.message : String(err));
+      }
     }
 
     return outputPath;
@@ -227,7 +231,9 @@ export async function blackoutVideoSection(videoPath: string, vodId: string, sta
     for (const file of tempFiles) {
       try {
         await deleteFileIfExists(file);
-      } catch {}
+      } catch (err) {
+        console.warn('Failed to cleanup temp file during error handling:', file, err instanceof Error ? err.message : String(err));
+      }
     }
 
     return null;
@@ -240,6 +246,8 @@ export async function cleanupTempFiles(files: string[]): Promise<void> {
   for (const file of uniqueFiles) {
     try {
       await deleteFileIfExists(file);
-    } catch {}
+    } catch (err) {
+      console.warn('Failed to cleanup temp file:', file, err instanceof Error ? err.message : String(err));
+    }
   }
 }

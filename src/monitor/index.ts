@@ -68,8 +68,6 @@ export async function stopMonitorService(): Promise<void> {
   }
 
   logger.info('[Monitor] Shutdown complete.');
-
-  logger.info('[Monitor] Shutdown complete.');
 }
 
 // Register shutdown handlers for PM2 restarts/process termination (when running as standalone service)

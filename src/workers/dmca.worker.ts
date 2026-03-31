@@ -11,7 +11,7 @@ import { getStreamerConfig } from '../config/loader.js';
 import { getClient, createClient } from '../db/client.js';
 import { getYoutubeUploadQueue } from '../jobs/queues.js';
 import { isBlockingPolicy, buildMuteFilters, muteAudioSections, blackoutVideoSection, cleanupTempFiles, fileExists } from '../utils/dmca.js';
-import { trimVideo as ffmpegTrim, deleteFile } from '../utils/ffmpeg.js';
+import { trimVideo as ffmpegTrim } from '../utils/ffmpeg.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob> = async (job: Job<DmcaProcessingJob>) => {
   const { streamerId, vodId, receivedClaims, type, platform, part } = job.data;
@@ -126,8 +126,6 @@ const dmcaProcessor: Processor<DmcaProcessingJob> = async (job: Job<DmcaProcessi
     }
 
     const finalTitle = part ? `${baseTitle} PART ${part}` : baseTitle;
-
-    const privacyStatus = config.youtube.multiTrack && type === 'live' ? 'public' : !config.youtube.multiTrack && type === 'vod' ? 'public' : 'unlisted';
 
     console.info(`[${streamerId}] Queuing YouTube upload for ${finalTitle}`);
 

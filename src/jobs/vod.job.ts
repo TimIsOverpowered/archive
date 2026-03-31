@@ -1,5 +1,5 @@
-import { getVODDownloadQueue } from './queues.js';
 import type { VODDownloadJob } from './queues.js';
+import { getVODDownloadQueue } from './queues.js';
 
 export async function enqueueVodDownload(job: Omit<VODDownloadJob, 'id'>): Promise<string | null> {
   const queue = getVODDownloadQueue();

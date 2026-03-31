@@ -1,5 +1,5 @@
-import { getYoutubeUploadQueue } from './queues.js';
 import type { YoutubeUploadJob } from './queues.js';
+import { getYoutubeUploadQueue } from './queues.js';
 
 export async function enqueueYoutubeUpload(job: Omit<YoutubeUploadJob, 'id'>): Promise<string | null> {
   const queue = getYoutubeUploadQueue();
