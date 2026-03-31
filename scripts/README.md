@@ -20,13 +20,13 @@ Import a streamer's configuration from JSON file into the meta database.
 **Usage:**
 
 ```bash
-npx tsx scripts/import-tenant.ts <channel_name> " postgresql://<user>:***@<host>:5432/<db>"
+npx tsx scripts/import-tenant.ts <channel_name> "postgresql://<user>:***@<host>:5432/<db>"
 ```
 
 **Example:**
 
 ```bash
-npx tsx scripts/import-tenant.ts moonmoon "  postgresql://<user>:***@<host>:5432/<db>"
+npx tsx scripts/import-tenant.ts moonmoon "postgresql://<user>:***@<host>:5432/<db>"
 ```
 
 **Channel Name Validation:**
@@ -156,44 +156,56 @@ New API Key: archive_<new-64-hex-chars>
 
 ### migrate-streamer.ts
 
-Migrate a streamer's database from legacy Sequelize schema to new Prisma schema.
+Migrate a streamer's database from legacy Sequelize schema to new Prisma schema. Interactive mode only - no flags required.
 
 **Usage:**
 
 ```bash
-npx tsx scripts/migrate-streamer.ts --streamer <id> --db-url <url> [--dry-run]
+npx tsx scripts/migrate-streamer.ts
 ```
 
-**Options:**
+The script will prompt for:
 
-- `--streamer <id>` - Streamer ID (required)
-- `--db-url <url>` - PostgreSQL connection URL for the streamer's database (required)
-- `--dry-run` - Validate and show what would be migrated without making changes
+- Streamer name (tenant identifier)
+- Dry run mode (validation-only, defaults to NO if skipped)
 
 **Examples:**
 
 ```bash
-# Dry run to see what would migrate
-npx tsx scripts/migrate-streamer.ts --streamer quin69 --db-url " postgresql://<user>:***@<host>:5432/<db>" --dry-run
+# Run migration interactively
+$ npx tsx scripts/migrate-streamer.ts
 
-# Execute migration
-npx tsx scripts/migrate-streamer.ts --streamer quin69 --db-url " postgresql://<user>:***@<host>:5432/<db>"
+🚀 Starting migration
+
+Streamer name (tenant identifier): quin69
+Dry run only? (y/N to skip validation-only mode): y
+
+📋 Migration details:
+   Streamer: quin69
+   Database URL: postgresql://***:***@<host>:5432/quin69
+   Dry run mode: YES
 ```
 
 **What it does:**
 
-1. **Pre-flight validation:** Checks legacy table row counts (vods, emotes, games, logs)
-2. **Creates new schema:** Generates `_new` tables (vods_new, emotes_new, games_new) + new tables (vod_uploads, chapters)
-3. **Migrates data:**
+1. Fetches database URL from meta database for the tenant (automatically decrypted)
+2. **Pre-flight validation:** Checks legacy table row counts (vods, emotes, games, logs)
+3. **Creates new schema:** Generates `_new` tables (vods_new, emotes_new, games_new) + new tables (vod_uploads, chapters)
+4. **Migrates data:**
    - VODs: Converts duration from seconds to Int, extracts YouTube uploads to separate table
    - Emotes: Maps 7tv_emotes column to seventv_emotes
    - Games: Migrates game chapter timestamps
    - Chapters: Extracts Kick-specific chapters from JSONB `chapters[]` array in vods table
    - Chat messages: Renames `logs` table to `chat_messages` (no data migration needed)
-4. **Transaction-based:** All operations in single transaction with automatic rollback on error
-5. **Legacy rename:** After confirmation, renames old tables to `*_legacy` for safe rollback capability
+5. **Transaction-based:** All operations in single transaction with automatic rollback on error
+6. **Legacy rename:** After confirmation, renames old tables to `*_legacy` for safe rollback capability
 
-**Migration Output:**
+**Prerequisites:**
+
+- Tenant must exist in meta database with encrypted `databaseUrl` field
+- Streamer's PostgreSQL database must be accessible via the stored connection string
+
+**Migration Output (Interactive):**
 
 ```
 📊 Legacy database row counts:
