@@ -9,6 +9,40 @@ import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 const BATCH_SIZE = 2500;
 const RATE_LIMIT_MS = 150;
 
+function stripTypename(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => stripTypename(item));
+  }
+  
+  if (typeof obj === 'object') {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (key !== '__typename') {
+        cleaned[key] = stripTypename(value);
+      }
+    }
+    return cleaned;
+  }
+  
+  return obj;
+}
+
+function extractMessageData(node: any): { message: Record<string, any>; userBadges: Record<string, any> } {
+  const fragments = node.message?.fragments || [];
+  const cleanFragments = stripTypename(fragments);
+  const badges = node.user_badges || [];
+  
+  return {
+    message: {
+      content: (cleanFragments as Array<{ text?: string }> | undefined)?.map((f: any) => f.text).join('') || '',
+      fragments: cleanFragments,
+    },
+    userBadges: stripTypename(badges),
+  };
+}
+
 const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJob>) => {
   const { streamerId, vodId, platform, duration, startOffset } = job.data;
 
@@ -33,12 +67,12 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
   const messageId = isAlertsEnabled()
     ? await sendRichAlert({
         title: `💬 Chat Download Started`,
-        description: `${streamerId} - Fetching chat messages for ${vodId}${startOffset ? ` (resuming from offset ${startOffset}s)` : ''}`,
+        description: `${streamerId} - Fetching chat messages for ${vodId}${startOffset ? ' (resuming from offset ' + startOffset + 's)' : ''}`,
         status: 'warning',
         fields: [
           { name: 'Platform', value: platform, inline: true },
           { name: 'VOD ID', value: vodId, inline: false },
-          ...(startOffset ? [{ name: 'Start Offset', value: `${startOffset}s`, inline: true }] : []),
+          ...(startOffset ? [{ name: 'Start Offset', value: startOffset + 's', inline: true }] : []),
         ],
         timestamp: new Date().toISOString(),
       })
@@ -50,7 +84,7 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
     let batchCount = 0;
     const initialOffset = startOffset || 0;
 
-    log.info(`[${vodId}] Starting chat download${initialOffset > 0 ? ` from offset ${initialOffset}s` : ''}`);
+    log.info('[' + vodId + '] Starting chat download' + (initialOffset > 0 ? ' from offset ' + initialOffset + 's' : ''));
 
     while (true) {
       let page: any;
@@ -62,19 +96,26 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
         page = await fetchNextComments(vodId, cursor);
       }
 
-      if (!page || page.comments.length === 0) {
+      if (!page || !page.comments?.edges) {
         break;
       }
 
-      const messagesToInsert = page.comments.map((c: any) => ({
-        id: `${vodId}-${c.content_offset_seconds}-${c.sender.login}`,
-        vod_id: vodId,
-        display_name: c.sender.display_name,
-        content_offset_seconds: c.content_offset_seconds,
-        message: { content: c.comment.content },
-        user_badges: {},
-        user_color: '#FFFFFF',
-      }));
+      const messagesToInsert = page.comments.edges.map((edge: any) => {
+        const node = edge.node;
+        const { message, userBadges } = extractMessageData(node);
+        
+        return {
+          id: vodId + '-' + (node.content_offset_seconds || 0) + '-' + (node.sender?.login || 'unknown'),
+          vod_id: vodId,
+          display_name: node.commenter?.display_name,
+          content_offset_seconds: node.content_offset_seconds,
+          created_at: node.created_at ? new Date(node.created_at) : null,
+          updated_at: node.updated_at ? new Date(node.updated_at) : null,
+          message,
+          user_badges: userBadges,
+          user_color: node.message?.user_color || '#FFFFFF',
+        };
+      });
 
       for (const msg of messagesToInsert) {
         await db.chatMessage.upsert({
@@ -90,8 +131,8 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
       if (messageId && isAlertsEnabled() && batchCount * 50 >= BATCH_SIZE) {
         const percent = Math.min(Math.round((totalMessages / ((duration / 60) * 50)) * 100), 100);
         updateDiscordEmbed(messageId, {
-          title: `💬 Downloading Chat`,
-          description: `${streamerId} - Fetching chat messages for ${vodId}`,
+          title: '💬 Downloading Chat',
+          description: streamerId + ' - Fetching chat messages for ' + vodId,
           status: 'warning',
           fields: [
             { name: 'Messages Fetched', value: String(totalMessages), inline: true },
@@ -116,8 +157,8 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
 
     if (messageId && isAlertsEnabled()) {
       updateDiscordEmbed(messageId, {
-        title: `[Chat] Download Complete`,
-        description: `${streamerId} - Successfully fetched ${totalMessages.toLocaleString()} chat messages for ${vodId}`,
+        title: '[Chat] Download Complete',
+        description: streamerId + ' - Successfully fetched ' + totalMessages.toLocaleString() + ' chat messages for ' + vodId,
         status: 'success',
         fields: [
           { name: 'Platform', value: platform, inline: true },
@@ -130,12 +171,12 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
 
     return { success: true, totalMessages };
   } catch (error) {
-    log.error({ vodId, platform }, `Chat download failed: ${(error as Error).message}`);
+    log.error({ vodId, platform }, 'Chat download failed: ' + (error as Error).message);
 
     if (messageId && isAlertsEnabled()) {
       updateDiscordEmbed(messageId, {
-        title: `[Chat] Download Failed`,
-        description: `${streamerId} - Error fetching chat messages for ${vodId}`,
+        title: '[Chat] Download Failed',
+        description: streamerId + ' - Error fetching chat messages for ' + vodId,
         status: 'error',
         fields: [
           { name: 'Platform', value: platform, inline: true },
