@@ -97,6 +97,7 @@ const main = async () => {
   console.log(`   Dry run mode: ${dryRunMode ? 'YES' : 'NO'}\n`);
 
   const errors: string[] = [];
+  let poolEnded = false;
 
   try {
     const pg = await import('pg');
@@ -110,6 +111,7 @@ const main = async () => {
       if (isAlreadyMigrated) {
         console.log('⚠️  Migration appears to already be completed or partially done');
         console.log('   Check tables: vods, emotes, games, chapters, chat_messages\n');
+        poolEnded = true;
         await oldPool.end();
         return;
       }
@@ -131,6 +133,7 @@ const main = async () => {
         console.log(`   Would migrate: ${oldEmotesCount.rows[0].count} emote records`);
         console.log(`   Would migrate: ${oldGamesCount.rows[0].count} game records`);
         console.log(`   Would migrate: ${oldLogsCount.rows[0].count} chat messages\n`);
+        poolEnded = true;
         await oldPool.end();
         return;
       }
@@ -443,7 +446,9 @@ const main = async () => {
 
       process.exit(1);
     } finally {
-      await oldPool.end();
+      if (!poolEnded) {
+        await oldPool.end();
+      }
       await metaClient.$disconnect();
     }
   } catch (initError) {
