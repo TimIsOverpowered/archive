@@ -4,18 +4,18 @@ import timezone from 'dayjs/plugin/timezone';
 
 dayjs.extend(timezone);
 
-import type { YoutubeUploadJob } from '../jobs/queues.js';
+import type { YoutubeUploadJob, YoutubeUploadResult } from '../jobs/queues.js';
 import { getStreamerConfig } from '../config/loader.js';
 import { getClient, createClient } from '../db/client.js';
 import { splitVideo, trimVideo, getDuration, deleteFile } from '../utils/ffmpeg.js';
 import { uploadVideo, linkParts } from '../services/youtube.js';
-import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/alerts';
+import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/alerts.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 
 type ExtendedYoutubeUploadJob = YoutubeUploadJob & { dmcaProcessed?: boolean };
 
-const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUploadJob>) => {
+const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async (job: Job<YoutubeUploadJob>) => {
   const { streamerId, vodId, filePath, title, description, type, part, chapter } = job.data;
 
   const log = createAutoLogger(String(streamerId));
@@ -85,7 +85,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUpl
 
         uploadedVideos.push({ id: result.videoId, part: 1 });
 
-        if (!config.settings.saveMP4) {
+        if (!config.settings.saveMP4 || extendedData.dmcaProcessed === true) {
           await deleteFile(filePath);
         }
       }

@@ -1,5 +1,6 @@
 import { Queue, QueueOptions } from 'bullmq';
 import Redis from 'ioredis';
+import type { DMCAClaim } from '../utils/dmca.js';
 
 export type VodJobType = 'STANDARD_VOD_DOWNLOAD' | 'LIVE_HLS_DOWNLOAD';
 
@@ -49,15 +50,43 @@ export interface YoutubeUploadJob {
 export interface DmcaProcessingJob {
   streamerId: string;
   vodId: string;
-  receivedClaims: Array<{
-    type: 'CLAIM_TYPE_AUDIO' | 'CLAIM_TYPE_VISUAL' | 'CLAIM_TYPE_AUDIOVISUAL';
-    claimPolicy: { primaryPolicy: { policyType: string } };
-    matchDetails: { longestMatchStartTimeSeconds: number; longestMatchDurationSeconds: string };
-  }>;
+  receivedClaims: DMCAClaim[];
   type: 'vod' | 'live';
   platform: 'twitch' | 'kick';
   part?: number;
 }
+
+export interface ChatDownloadResult {
+  success: true;
+  totalMessages?: number;
+  skipped?: boolean;
+}
+
+export interface YoutubeUploadVodResult {
+  success: true;
+  videos: Array<{ id: string; part: number }>;
+}
+
+export interface YoutubeUploadGameResult {
+  success: true;
+  videoId: string;
+}
+
+export interface YoutubeUploadSkippedResult {
+  success: true;
+  skipped: boolean;
+}
+
+export type YoutubeUploadResult = YoutubeUploadVodResult | YoutubeUploadGameResult | YoutubeUploadSkippedResult;
+
+export interface DmcaProcessingSuccessResult {
+  success: true;
+  youtubeJobId?: string;
+  vodId?: string;
+  message?: string;
+}
+
+export type DmcaProcessingResult = DmcaProcessingSuccessResult;
 
 export const QUEUE_NAMES = {
   VOD_DOWNLOAD: 'vod_download',
