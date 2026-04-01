@@ -1,9 +1,14 @@
-import { FastifyInstance } from 'fastify';
-import Redis from 'ioredis';
+import type { FastifyInstance } from 'fastify';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
+import dayjs from 'dayjs';
+import durationPlugin from 'dayjs/plugin/duration';
 import { getStreamerConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
+import { getClient } from '../../../db/client.js';
+import type { VodData as TwitchVodData } from '../../../services/twitch.js';
+
+dayjs.extend(durationPlugin);
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -11,11 +16,34 @@ declare module 'fastify' {
   }
 }
 
+type RouteParams = { id: string; vodId: string };
+
+interface ChapterGame {
+  id?: string;
+  displayName?: string;
+}
+
+interface ChapterNode {
+  positionMilliseconds: number;
+  durationMilliseconds: number;
+  details?: {
+    game?: ChapterGame;
+  };
+}
+
+interface ChapterEdge {
+  node?: ChapterNode;
+}
+
+type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
+
+type VodRecord = { id: string; platform: 'twitch' | 'kick'; duration: number | string; stream_id?: string | null };
+
 export default async function metadataFetchingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
 
   // Fetch and save game chapters from Twitch API (Twitch only)
-  fastify.post(
+  fastify.post<{ Params: RouteParams }>(
     '/:id/vods/:vodId/chapters/save',
     {
       schema: {
@@ -26,7 +54,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
-    async (request: any) => {
+    async (request) => {
       const streamerId = request.params.id;
       const vodId = request.params.vodId;
 
@@ -35,19 +63,14 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
         if (!config) throw new Error('Tenant not found');
 
-        let client: any;
+        const client: StreamerDbClient | undefined = getClient(streamerId);
 
-        try {
-          const ClientModule = await import('../../../db/client');
-          client = ClientModule.getClient(streamerId);
-
-          if (!client) throw new Error('Database not available');
-        } catch (error: any) {
-          request.log.error(`[${streamerId}] Database error: ${error.message}`);
+        if (!client) {
+          request.log.error(`[${streamerId}] Database error: Database not available`);
           throw new Error('Database not available');
         }
 
-        const vodRecord: any = await client.vod.findUnique({ where: { id: vodId } });
+        const vodRecord: VodRecord | null = (await client.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
 
         if (!vodRecord) throw new Error(`VOD ${vodId} not found`);
 
@@ -58,75 +81,116 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
         const durationSeconds = vodRecord.duration ? parseInt(vodRecord.duration.toString()) : 0;
 
-        // Fetch chapters from Twitch API with error handling
-        let chaptersData: any | null = null;
+        let savedCount = 0;
+        let chapterEdges: ChapterEdge[] | null = [];
 
         try {
           const twitch = await import('../../../services/twitch');
-          chaptersData = await twitch.getChapters(vodId);
+          const rawChapters = (await twitch.getChapters(vodId)) as ChapterEdge[] | null;
+          chapterEdges = rawChapters || [];
         } catch (_err) {
           request.log.warn(`[${vodId}] Failed to fetch chapter data from Twitch API`);
         }
 
-        if (!chaptersData || !chaptersData.video?.previewCardMetadata?.gameClips) {
-          return { data: { message: `No chapters found for ${vodId}`, vodId, count: 0 } };
-        }
+        if (chapterEdges && chapterEdges.length > 0) {
+          // Multiple chapters case - process each one
+          for (const chapter of chapterEdges) {
+            try {
+              const node = chapter.node;
+              if (!node || !node.details?.game) continue;
 
-        const gameClips = chaptersData.video.previewCardMetadata.gameClips;
-        let savedCount = 0;
+              const gameNode = node.details.game;
+              let image: string | null = null;
 
-        // Handle array format (multiple clips)
-        if (Array.isArray(gameClips)) {
-          await Promise.all(
-            gameClips.map(async (gameClip: any) => {
+              // Fetch box art URL from separate API call
               try {
-                const gameId: string | undefined = gameClip.id ? String(gameClip.id).replace('game_', '') : undefined;
-                const chapterName: string | null = gameClip.game?.displayName || null;
-
-                await client.chapter.upsert({
-                  where: { id: savedCount },
-                  create: {
-                    vod_id: vodId,
-                    name: chapterName,
-                    duration: String(gameClip.duration),
-                    start: 0,
-                    end: Number(durationSeconds) + gameClip.offsetInSeconds,
-                    image: gameClip.game?.color || null,
-                    game_id: gameId,
-                  },
-                  update: {},
-                });
-
-                savedCount++;
-              } catch (_e) {
-                request.log.warn(`[${vodId}] Failed to save chapter`);
+                const twitch = await import('../../../services/twitch');
+                if (gameNode.id) {
+                  const gameData = await twitch.getGameData(gameNode.id, streamerId);
+                  if (gameData && 'box_art_url' in gameData) {
+                    image = String(gameData.box_art_url).replace('{width}x{height}', '40x53');
+                  }
+                }
+              } catch (_err2) {
+                request.log.warn(`[${vodId}] Failed to fetch game data`);
               }
-            })
-          );
-        } else if ('game' in gameClips && 'offsetInSeconds' in gameClips) {
-          // Handle single object format
-          try {
-            const gameId: string | undefined = (gameClips as any).id ? String((gameClips as any).id).replace('game_', '') : undefined;
-            const singleChapterName: string | null = ((gameClips as any).game?.displayName || null) as string | null;
 
-            await client.chapter.upsert({
-              where: { id: savedCount },
-              create: {
+              const startSeconds = node.positionMilliseconds / 1000;
+              let endSeconds: number;
+
+              if (node.durationMilliseconds === 0) {
+                // Last chapter - extend to end of VOD
+                endSeconds = durationSeconds - startSeconds;
+              } else {
+                endSeconds = node.durationMilliseconds / 1000;
+              }
+
+              const durationFormatted = dayjs.duration(node.durationMilliseconds, 'ms').format('HH:mm:ss');
+
+              await client.chapter.create({
+                data: {
+                  vod_id: vodId,
+                  name: gameNode.displayName || null,
+                  duration: durationFormatted,
+                  start: startSeconds,
+                  end: endSeconds,
+                  image,
+                  game_id: gameNode.id ? String(gameNode.id) : undefined,
+                },
+              });
+
+              savedCount++;
+            } catch (_e) {
+              request.log.warn(`[${vodId}] Failed to save chapter`);
+            }
+          }
+        } else {
+          // Single chapter case - use getChapter fallback
+          let chapterData: Record<string, unknown> | null = null;
+
+          try {
+            const twitch = await import('../../../services/twitch');
+            chapterData = await twitch.getChapter(vodId);
+          } catch (_err) {
+            request.log.warn(`[${vodId}] Failed to fetch single chapter data from Twitch API`);
+          }
+
+          if (chapterData && 'game' in chapterData) {
+            const gameNode = chapterData.game as ChapterGame;
+            let image: string | null = null;
+
+            try {
+              const twitch = await import('../../../services/twitch');
+              if (gameNode.id) {
+                const gameData = await twitch.getGameData(gameNode.id, streamerId);
+                if (gameData && 'box_art_url' in gameData) {
+                  image = String(gameData.box_art_url).replace('{width}x{height}', '40x53');
+                }
+              }
+            } catch (_err2) {
+              request.log.warn(`[${vodId}] Failed to fetch game data`);
+            }
+
+            await client.chapter.create({
+              data: {
                 vod_id: vodId,
-                name: singleChapterName,
-                duration: String((gameClips as any).duration),
+                name: gameNode.displayName || null,
+                duration: '00:00:00',
                 start: 0,
-                end: Number(durationSeconds) + gameClips.offsetInSeconds,
-                image: ((gameClips as any).game?.color || null) as string | undefined,
-                game_id: gameId,
+                end: durationSeconds,
+                image,
+                game_id: gameNode.id ? String(gameNode.id) : undefined,
               },
-              update: {},
             });
 
             savedCount++;
-          } catch (_e) {
-            request.log.warn(`[${vodId}] Failed to save chapter`);
+          } else {
+            return { data: { message: `No chapters found for ${vodId}`, vodId, count: 0 } };
           }
+        }
+
+        if (savedCount === 0) {
+          return { data: { message: `No chapters found for ${vodId}`, vodId, count: 0 } };
         }
 
         return { data: { message: `Saved chapters for ${vodId}`, vodId, count: savedCount } };
@@ -140,7 +204,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
   );
 
   // Fetch and save emote metadata for a VOD
-  fastify.post(
+  fastify.post<{ Params: RouteParams }>(
     '/:id/vods/:vodId/emotes/save',
     {
       schema: {
@@ -151,7 +215,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
-    async (request: any) => {
+    async (request) => {
       const streamerId = request.params.id;
       const vodId = request.params.vodId;
 
@@ -160,19 +224,14 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
         if (!config) throw new Error('Tenant not found');
 
-        let client: any;
+        const client: StreamerDbClient | undefined = getClient(streamerId);
 
-        try {
-          const ClientModule = await import('../../../db/client');
-          client = ClientModule.getClient(streamerId);
-
-          if (!client) throw new Error('Database not available');
-        } catch (error: any) {
-          request.log.error(`[${streamerId}] Database error: ${error.message}`);
+        if (!client) {
+          request.log.error(`[${streamerId}] Database error: Database not available`);
           throw new Error('Database not available');
         }
 
-        const vodRecord: any = await client.vod.findUnique({ where: { id: vodId } });
+        const vodRecord: VodRecord | null = (await client.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
 
         if (!vodRecord) throw new Error(`VOD ${vodId} not found`);
 
@@ -181,19 +240,19 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
         // Only supported for Twitch with stream_id available
         if (vodRecord.platform === 'twitch' && vodRecord.stream_id) {
           const twitch = await import('../../../services/twitch');
-          const vodData: any = await twitch.getVodData(vodId, streamerId);
+          const vodData: TwitchVodData = await twitch.getVodData(vodId, streamerId);
 
-          channelId = vodData.user_id?.toString();
+          channelId = vodData.user_id;
 
           if (channelId) {
             request.log.info(`[${vodId}] Fetching emotes for channel ${channelId}`);
 
             const EmoteModule = await import('../../../services/emotes');
-            await EmoteModule.fetchAndSaveEmotes(streamerId, vodId, vodRecord.platform as 'twitch' | 'kick', channelId.toString());
+            await EmoteModule.fetchAndSaveEmotes(streamerId, vodId, vodRecord.platform, channelId);
 
             request.log.info(`[${vodId}] Successfully fetched and saved emotes`);
           } else {
-            request.warn?.(`[${streamerId}] No channel ID available for Twitch VOD ${vodId}`);
+            request.log.warn(`[${streamerId}] No channel ID available for Twitch VOD ${vodId}`);
           }
         } else if (vodRecord.platform !== 'twitch') {
           request.log.info(`[${vodId}] Emote fetching only supported for Twitch platform`);
