@@ -4,6 +4,7 @@ import fsPromises from 'fs/promises';
 import { getStreamerConfig, clearConfigCache } from '../config/loader.js';
 import { decryptObject, encryptObject } from '../utils/encryption.js';
 import { metaClient } from '../db/meta-client.js';
+import { extractErrorDetails } from '../utils/error.js';
 
 import { loggerWithTenant, logger as baseLogger } from '../utils/logger.js';
 interface AuthObject {
@@ -144,14 +145,14 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
         oauthClients.delete(streamerId);
       }
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const details = extractErrorDetails(error);
 
-      if (errorMessage.includes('invalid_grant') || errorMessage.includes('token_expired')) {
+      if (details.message.includes('invalid_grant') || details.message.includes('token_expired')) {
         // Refresh token is invalid/revoked - crash with clear message
-        throw new Error(`Token refresh failed for ${streamerId} - re-authentication required. Original error: ${errorMessage}`);
+        throw new Error(`Token refresh failed for ${streamerId} - re-authentication required. Original error: ${details.message}`);
       }
 
-      log.error({ err: errorMessage || String(error) }, `[YouTube] Pre-emptive refresh error for ${streamerId}`);
+      log.error(details, `[YouTube] Pre-emptive refresh error for ${streamerId}`);
 
       // Don't clear cache yet - fall through to create fresh client below (graceful degradation)
     } finally {
@@ -213,10 +214,10 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
       });
 
       log.info(`[YouTube] Auth object persisted to DB`);
-    } catch (dbError: unknown) {
-      const errorMessage = dbError instanceof Error ? dbError.message : String(dbError);
+    } catch (error: unknown) {
+      const details = extractErrorDetails(error);
 
-      log.error({ err: errorMessage }, `[YouTube] Failed to persist auto-refreshed tokens to DB for ${streamerId}`);
+      log.error(details, `[YouTube] Failed to persist auto-refreshed tokens to DB for ${streamerId}`);
     } finally {
       // CRITICAL: Always update OAuth client's internal state regardless of DB write success/failure
       const credsUpdate = buildCredentialsObject(newTokens, config.youtube.auth, log);
@@ -225,10 +226,10 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
         newClient.setCredentials(credsUpdate);
 
         log.info(`[YouTube] OAuth client credentials updated`);
-      } catch (setCredsError: unknown) {
-        const errorMessage = setCredsError instanceof Error ? setCredsError.message : String(setCredsError);
+      } catch (error: unknown) {
+        const details = extractErrorDetails(error);
 
-        log.error({ err: errorMessage }, '[YouTube] Failed to update OAuth client credentials');
+        log.error(details, '[YouTube] Failed to update OAuth client credentials');
         throw new Error('Token refresh failed - cannot proceed with API call'); // Crash the current operation correctly
       }
     }
@@ -425,8 +426,10 @@ function getYoutubeCredentials(streamerId: string): DecryptedYoutubeCreds | null
     }
 
     return creds;
-  } catch (error: any) {
-    log.error(`Failed to decrypt YouTube credentials for ${streamerId}:`, error.message || error);
+  } catch (error: unknown) {
+    const details = extractErrorDetails(error);
+
+    log.error(details, `Failed to decrypt YouTube credentials for ${streamerId}`);
     return null; // Return null instead of throwing - let caller handle gracefully
   }
 }
@@ -459,9 +462,11 @@ export async function validateYoutubeToken(streamerId: string): Promise<boolean>
     // No cached access token - will refresh on next API call automatically
     log.info(`[YouTube] No cached token for ${streamerId}, will auto-refresh on first use`);
     return true;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const details = extractErrorDetails(error);
+
     if (client && client.credentials.access_token) {
-      log.warn(`[YouTube] Token validation failed for ${streamerId}:`, error.message);
+      log.warn(details, `[YouTube] Token validation failed for ${streamerId}`);
     }
     // Don't clear cache - let next API call handle refresh naturally
     return false;
@@ -502,7 +507,7 @@ export function clearYoutubeOAuthClient(streamerId?: string): void {
 }
 
 // Graceful shutdown - clear cached resources
-function shutdown() {
+export function shutdown() {
   const count = oauthClients.size;
   oauthClients.clear();
 
@@ -565,7 +570,8 @@ export async function uploadVideo(
       thumbnailUrl = thumbnails?.high?.url || thumbnails?.medium?.url || '';
     }
   } catch (err) {
-    log.error({ err }, 'Failed to fetch thumbnail URL');
+    const details = extractErrorDetails(err);
+    log.error(details, 'Failed to fetch thumbnail URL');
   }
 
   return { videoId, thumbnailUrl };

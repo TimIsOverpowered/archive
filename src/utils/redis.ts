@@ -1,5 +1,6 @@
 import Redis from 'ioredis';
 import { logger } from './logger.js';
+import { extractErrorDetails } from './error.js';
 
 export async function connectWithBackoff(url: string, maxAttempts = 6): Promise<Redis> {
   let attempt = 0;
@@ -16,8 +17,8 @@ export async function connectWithBackoff(url: string, maxAttempts = 6): Promise<
       attempt++;
       if (attempt >= maxAttempts) throw error;
 
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.info({ attempt, maxAttempts, delay: delay / 1000 }, `Redis connection failed: ${errorMessage}, retrying...`);
+      const details = extractErrorDetails(error);
+      logger.info({ ...details, attempt, maxAttempts, delay: delay / 1000 }, 'Redis connection failed');
       await new Promise((resolve) => setTimeout(resolve, delay));
       delay *= 2;
     }

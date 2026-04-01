@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import Redis from 'ioredis';
 import { getStreamerConfig } from '../../config/loader';
+import { extractErrorDetails } from '../../utils/error.js';
 
 interface BadgesRoutesOptions {
   prefix: string;
@@ -65,8 +66,8 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
           await redisInstance.quit().catch(() => {}); // Graceful disconnect - ignore errors
         }
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        request.log.error(`[${streamerId}] Failed to fetch Twitch badges: ${errorMsg}`);
+        const details = extractErrorDetails(error);
+        request.log.error({ ...details, streamerId }, 'Failed to fetch Twitch badges');
 
         throw new Error('Something went wrong trying to retrieve channel badges..');
       }

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { extractErrorDetails } from '../../../utils/error.js';
 import fs from 'fs/promises';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { getStreamerConfig } from '../../../config/loader';
@@ -100,8 +101,8 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
 
           client = retrievedClient;
         } catch (error: unknown) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          request.log.error(`[${streamerId}] Database error: ${errorMessage}`);
+            const details = extractErrorDetails(error);
+            request.log.error({ ...details, streamerId }, `[${streamerId}] Database error`);
           throw new Error('Database connection failed');
         }
 
@@ -184,7 +185,8 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
           },
         };
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const details = extractErrorDetails(error);
+        const errorMsg = details.message;
 
         // Only throw if not already a proper HTTP error response scenario
         request.log.error(`[${streamerId}] Live callback failed for ${request.body.streamId}: ${errorMsg}`);

@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { extractErrorDetails } from '../../../utils/error.js';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import type { VodData as TwitchVodData } from '../../../services/twitch.js';
 import { getStreamerConfig } from '../../../config/loader';
@@ -228,7 +229,8 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
         return { data: { message: 'Download jobs queued', vodId: request.body.vodId, jobId: vodJobId, chatJobId } };
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const details = extractErrorDetails(error);
+        const errorMsg = details.message;
         request.log.error(`[${streamerId}] Download failed: ${errorMsg}`);
 
         throw new Error('Failed to queue download jobs');
@@ -318,7 +320,8 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
         return { data: { message: 'HLS download jobs queued', vodId: request.body.vodId, platform, jobId: `hls:${request.body.vodId}:${Date.now()}` } };
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const details = extractErrorDetails(error);
+        const errorMsg = details.message;
         request.log.error(`[${streamerId}] HLS download failed for ${request.body.vodId}: ${errorMsg}`);
 
         throw new Error('Failed to queue HLS download jobs');

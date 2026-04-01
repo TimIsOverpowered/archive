@@ -35,7 +35,7 @@ const vodProcessor: Processor<any> = async (job: Job<any>) => {
         startedAt: liveJob.data.startedAt,
         sourceUrl: liveJob.data.sourceUrl,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Re-throw to trigger BullMQ retry logic
       throw error;
     } finally {

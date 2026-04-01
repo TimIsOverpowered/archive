@@ -1,5 +1,6 @@
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../services/twitch.js';
 import HLS from 'hls-parser';
+import { extractErrorDetails } from './error.js';
 import { logger } from './logger.js';
 
 export async function validateVideoDuration(filePath: string): Promise<number | null> {
@@ -20,7 +21,8 @@ export async function validateVideoDuration(filePath: string): Promise<number | 
 
     return null;
   } catch (error) {
-    logger.error({ filePath }, `Failed to validate video duration: ${(error as Error).message}`);
+    const details = extractErrorDetails(error);
+    logger.error({ filePath, ...details }, `Failed to validate video duration`);
     return null;
   }
 }
@@ -39,7 +41,8 @@ export async function getTwitchHlsDuration(m3u8Path: string, vodId: string): Pro
         return null;
       }
     } catch (error) {
-      logger.error({ vodId }, `Error fetching Twitch HLS: ${(error as Error).message}`);
+      const details = extractErrorDetails(error);
+      logger.error({ vodId, ...details }, 'Failed to fetch Twitch master playlist');
       return null;
     }
 
@@ -86,7 +89,8 @@ export async function getTwitchHlsDuration(m3u8Path: string, vodId: string): Pro
 
     return Math.round(totalDuration);
   } catch (error) {
-    logger.error({ vodId }, `Failed to get Twitch HLS duration: ${(error as Error).message}`);
+    const details = extractErrorDetails(error);
+    logger.error({ vodId, ...details }, 'Failed to get Twitch HLS duration');
     return null;
   }
 }

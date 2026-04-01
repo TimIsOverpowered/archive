@@ -1,4 +1,5 @@
 import type { DmcaProcessingJob } from '../../../jobs/queues.js';
+import { extractErrorDetails } from '../../../utils/error.js';
 import { FastifyInstance } from 'fastify';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { getStreamerConfig } from '../../../config/loader';
@@ -139,7 +140,8 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
       try {
         return await processDmcaRequest(streamerId, request.body, request.log);
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const details = extractErrorDetails(error);
+        const errorMsg = details.message;
         request.log.error(`[${streamerId}] DMCA processing failed: ${errorMsg}`);
 
         throw new Error('Failed to queue DMCA processing job');
@@ -179,7 +181,8 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
 
         return await processDmcaRequest(streamerId, request.body, request.log);
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const details = extractErrorDetails(error);
+        const errorMsg = details.message;
         request.log.error(`[${streamerId}] DMCA processing failed: ${errorMsg}`);
 
         throw new Error('Failed to queue DMCA processing job');

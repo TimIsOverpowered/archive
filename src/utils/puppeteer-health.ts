@@ -1,3 +1,4 @@
+import { extractErrorDetails } from './error.js';
 import { logger } from './logger';
 
 interface PuppeteerHealthStatus {
@@ -36,7 +37,8 @@ export async function checkPuppeteerHealth(): Promise<PuppeteerHealthStatus> {
     cacheTimestamp = now;
     return cachedStatus;
   } catch (error) {
-    logger.warn({ error }, 'Failed to check Puppeteer health');
+    const details = extractErrorDetails(error);
+    logger.warn(details, 'Failed to check Puppeteer health');
     cachedStatus = { status: 'unavailable' };
     cacheTimestamp = now;
     return cachedStatus;

@@ -9,6 +9,7 @@ import metrics from 'fastify-metrics';
 import redisPlugin from './plugins/redis.plugin';
 import createTenantLoggerMiddleware from './middleware/tenant-logger';
 import { resolveCurrentDisplayName } from '../utils/async-context.js';
+import { extractErrorDetails } from '../utils/error.js';
 
 export async function buildServer() {
   const fastify = Fastify({
@@ -127,7 +128,8 @@ export async function buildServer() {
 
   // Error handler
   fastify.setErrorHandler((error, request, reply) => {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const details = extractErrorDetails(error);
+    const errorMessage = details.message;
     const statusCode = (error as { statusCode?: number }).statusCode || 500;
     const code = (error as { code?: string }).code || 'INTERNAL_ERROR';
 

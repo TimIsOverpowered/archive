@@ -4,6 +4,7 @@ import 'dotenv/config';
 import * as readline from 'readline';
 import { metaClient } from '../src/db/meta-client.js';
 import { encryptObject, validateEncryptionKey } from '../src/utils/encryption.js';
+import { extractErrorDetails } from '../src/utils/error.js';
 
 // Validate encryption key at startup
 if (!process.env.ENCRYPTION_MASTER_KEY || !validateEncryptionKey(process.env.ENCRYPTION_MASTER_KEY)) {
@@ -177,9 +178,9 @@ async function main(): Promise<void> {
       accessToken = await generateAccessToken(clientId, clientSecret);
       console.log('✓ Access token generated successfully!');
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
+      const details = extractErrorDetails(error);
       console.error('\n❌ Failed to generate access token:');
-      console.error(`   ${errorMsg}`);
+      console.error(`   ${details.message}`);
       console.error('Check your credentials and try again.');
       process.exit(1);
     }
@@ -258,10 +259,10 @@ async function main(): Promise<void> {
     console.log('Note: Access token expires after ~6 hours but can be refreshed');
     console.log('      automatically using the stored client_id + client_secret.');
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const details = extractErrorDetails(error);
 
     console.error('\n❌ Error during Twitch auth configuration:');
-    console.error(errorMessage);
+    console.error(details.message);
 
     // Rollback if tenant was partially updated
     if (tenantIdToUpdate !== null && process.argv.includes('--rollback')) {
@@ -269,8 +270,8 @@ async function main(): Promise<void> {
         await metaClient.tenant.delete({ where: { id: tenantIdToUpdate } });
         console.log('✓ Rolled back changes from meta DB');
       } catch (rollbackError) {
-        const rollbackMsg = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
-        console.error('⚠️  Could not rollback:', rollbackMsg);
+        const rollbackDetails = extractErrorDetails(rollbackError);
+        console.error('⚠️  Could not rollback:', rollbackDetails.message);
       }
     }
 

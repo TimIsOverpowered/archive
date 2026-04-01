@@ -1,3 +1,4 @@
+import { extractErrorDetails } from './error.js';
 import { logger } from './logger.js';
 
 const globalDiscordAlertsEnabled = process.env.DISCORD_ALERTS_ENABLED !== 'false';
@@ -57,7 +58,8 @@ export async function sendDiscordAlert(message: string): Promise<string | null> 
     }
     return null;
   } catch (err) {
-    logger.error({ err }, 'Failed to send Discord alert');
+    const details = extractErrorDetails(err);
+    logger.error(details, 'Failed to send Discord alert');
     return null;
   }
 }
@@ -88,7 +90,8 @@ export async function updateDiscordMessage(messageId: string, message: string): 
       signal: AbortSignal.timeout(10000),
     });
   } catch (err) {
-    logger.error({ err }, 'Failed to update Discord message');
+    const details = extractErrorDetails(err);
+    logger.error(details, 'Failed to update Discord message');
   }
 }
 
@@ -149,7 +152,8 @@ export async function sendRichAlert(data: RichEmbedData): Promise<string | null>
     }
     return null;
   } catch (err) {
-    logger.error({ err }, 'Failed to send rich Discord alert');
+    const details = extractErrorDetails(err);
+    logger.error(details, 'Failed to send rich Discord alert');
     return null;
   }
 }
@@ -208,7 +212,8 @@ export async function updateDiscordEmbed(messageId: string, data: RichEmbedData)
       signal: AbortSignal.timeout(10000),
     });
   } catch (err) {
-    logger.error({ err }, 'Failed to update Discord embed');
+    const details = extractErrorDetails(err);
+    logger.error(details, 'Failed to update Discord embed');
   }
 }
 

@@ -80,7 +80,8 @@ const redisConnection = new Redis(process.env.REDIS_URL || 'redis://localhost:63
   maxRetriesPerRequest: null, // Required by BullMQ workers
 });
 
-const queueCache = new Map<string, Queue<unknown, unknown, string>>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const queueCache = new Map<string, Queue<any, any, string>>();
 
 export function getQueue<TData = unknown, TFinishedData = unknown>(name: string, jobOptions?: QueueOptions['defaultJobOptions']): Queue<TData, TFinishedData, string> {
   const cacheKey = `${name}:${JSON.stringify(jobOptions)}`;
@@ -100,6 +101,10 @@ export function getQueue<TData = unknown, TFinishedData = unknown>(name: string,
 
 export function getVODDownloadQueue(): Queue<VODDownloadJob, VODDownloadJob, string> {
   return getQueue(QUEUE_NAMES.VOD_DOWNLOAD);
+}
+
+export function getLiveHlsDownloadQueue(): Queue<LiveHlsDownloadJob, LiveHlsDownloadJob, string> {
+  return getQueue(QUEUE_NAMES.VOD_DOWNLOAD) as unknown as Queue<LiveHlsDownloadJob, LiveHlsDownloadJob, string>;
 }
 
 export function getChatDownloadQueue(): Queue<ChatDownloadJob, ChatDownloadJob, string> {

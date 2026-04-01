@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { extractErrorDetails } from '../../../utils/error.js';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { getTenantStats, getAllTenants } from '../../../services/tenants.service';
 import { getClient } from '../../../db/client.js';
@@ -141,7 +142,8 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
 
         return { data: { message: `${newVod.id} created!`, vodId: newVod.id } };
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const details = extractErrorDetails(error);
+        const errorMsg = details.message;
         request.log.error(`[${streamerId}] VOD creation failed: ${errorMsg}`);
 
         throw new Error('Failed to create VOD record');
@@ -181,7 +183,8 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
 
         return { data: { message: `Deleted VOD ${vodId}`, vodId } };
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const details = extractErrorDetails(error);
+        const errorMsg = details.message;
         request.log.error(`[${streamerId}] VOD deletion failed: ${errorMsg}`);
 
         throw new Error('Failed to delete VOD record');

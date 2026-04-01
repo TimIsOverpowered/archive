@@ -10,6 +10,7 @@ import { buildServer } from './api/server';
 import { closeAllClients } from './db/client';
 import { logger } from './utils/logger';
 import { closeRedisClient } from './api/plugins/redis.plugin';
+import { extractErrorDetails } from './utils/error.js';
 
 const PORT = process.env.PORT || 3030;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -28,8 +29,8 @@ async function start() {
     logger.info({ docs: `http://${HOST}:${PORT}/docs` }, 'Swagger documentation available');
     logger.info({ metrics: `http://${HOST}:${PORT}/metrics` }, 'Prometheus metrics available');
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : JSON.stringify(error, Object.getOwnPropertyNames(error));
-    logger.fatal({ error: errorMessage, stack: error instanceof Error ? error.stack : 'no-stack' }, 'Failed to start server');
+    const details = extractErrorDetails(error);
+    logger.fatal({ ...details }, 'Failed to start server');
     process.exit(1);
   }
 }

@@ -57,8 +57,9 @@ async function decryptField(value: string | null): Promise<DecryptionResult> {
           ? { error: 'Could not parse - may be encrypted', rawValue: value.substring(0, 100) + (value.length > 100 ? '...' : '') }
           : parsedValue;
     }
-  } catch (error: any) {
-    result.decrypted = { error: `Decryption failed: ${error.message}` };
+  } catch (error: unknown) {
+    const err = error as Error;
+    result.decrypted = { error: `Decryption failed: ${err.message}` };
   }
 
   return result;
@@ -275,11 +276,12 @@ async function main(): Promise<void> {
         displayField('Auth Credentials', youtubeAuthResult);
       }
     }
-  } catch (error: any) {
-    console.error('\n❌ Error:', error.message || error);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('\n❌ Error:', err.message || String(error));
 
     if (process.env.NODE_ENV !== 'production') {
-      console.log(error.stack);
+      console.log(err.stack);
     }
 
     process.exit(1);
@@ -288,7 +290,8 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: any) => {
-  console.error('Fatal error:', error.message || error);
+main().catch((error: unknown) => {
+  const err = error as Error;
+  console.error('Fatal error:', err.message || String(error));
   process.exit(1);
 });

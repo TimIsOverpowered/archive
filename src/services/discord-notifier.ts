@@ -1,4 +1,5 @@
 import { getStreamerConfig } from '../config/loader.js';
+import { extractErrorDetails } from '../utils/error.js';
 import { logger } from '../utils/logger.js';
 
 export type AlertType = 'in_progress' | 'failure' | 'success';
@@ -92,7 +93,8 @@ export async function sendDiscordAlert(alert: DiscordAlert): Promise<void> {
       throw new Error(`Discord webhook failed with status ${response.status}`);
     }
   } catch (error) {
-    logger.error({ vodId: alert.vodId, err: error }, '[Discord Alert] Failed to send alert');
+    const details = extractErrorDetails(error);
+    logger.error({ vodId: alert.vodId, ...details }, '[Discord Alert] Failed to send alert');
   }
 }
 

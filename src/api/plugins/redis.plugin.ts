@@ -1,6 +1,7 @@
 import { createClient, RedisClientType } from 'redis';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { logger } from '../../utils/logger';
+import { extractErrorDetails } from '../../utils/error.js';
 import type { FastifyPluginAsync } from 'fastify';
 
 interface RedisPluginOptions {
@@ -133,7 +134,8 @@ const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, opti
     logger.info({ vodLimit, chatLimit, adminGetLimit }, 'Rate limiters initialized');
   } catch (error) {
     const isProduction = process.env.NODE_ENV === 'production';
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const details = extractErrorDetails(error);
+      const errorMessage = details.message;
 
     if (isProduction) {
       logger.fatal({ error: errorMessage }, 'Failed to connect to Redis - server cannot start in production without Redis');
@@ -177,7 +179,8 @@ export async function closeRedisClient(): Promise<void> {
       await redisClient.quit();
       logger.info('Redis client closed');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const details = extractErrorDetails(error);
+      const errorMessage = details.message;
       logger.warn({ error: errorMessage }, 'Error closing Redis client during shutdown');
     } finally {
       redisClient = null;

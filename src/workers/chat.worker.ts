@@ -1,6 +1,7 @@
 import { Processor, Job } from 'bullmq';
-import { getClient, createClient } from '../db/client';
-import { getStreamerConfig } from '../config/loader';
+import { getClient, createClient } from '../db/client.js';
+import { getStreamerConfig } from '../config/loader.js';
+import { extractErrorDetails } from '../utils/error.js';
 import { fetchComments, fetchNextComments } from '../services/twitch';
 import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/alerts';
 import { ChatDownloadJob } from '../jobs/queues';
@@ -11,11 +12,11 @@ const RATE_LIMIT_MS = 150;
 
 function stripTypename(obj: any): any {
   if (obj === null || obj === undefined) return obj;
-  
+
   if (Array.isArray(obj)) {
-    return obj.map(item => stripTypename(item));
+    return obj.map((item) => stripTypename(item));
   }
-  
+
   if (typeof obj === 'object') {
     const cleaned: Record<string, any> = {};
     for (const [key, value] of Object.entries(obj)) {
@@ -25,7 +26,7 @@ function stripTypename(obj: any): any {
     }
     return cleaned;
   }
-  
+
   return obj;
 }
 
@@ -33,7 +34,7 @@ function extractMessageData(node: any): { message: Record<string, any>; userBadg
   const fragments = node.message?.fragments || [];
   const cleanFragments = stripTypename(fragments);
   const badges = node.user_badges || [];
-  
+
   return {
     message: {
       content: (cleanFragments as Array<{ text?: string }> | undefined)?.map((f: any) => f.text).join('') || '',
@@ -103,7 +104,7 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
       const messagesToInsert = page.comments.edges.map((edge: any) => {
         const node = edge.node;
         const { message, userBadges } = extractMessageData(node);
-        
+
         return {
           id: vodId + '-' + (node.content_offset_seconds || 0) + '-' + (node.sender?.login || 'unknown'),
           vod_id: vodId,
@@ -171,7 +172,8 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
 
     return { success: true, totalMessages };
   } catch (error) {
-    log.error({ vodId, platform }, 'Chat download failed: ' + (error as Error).message);
+    const details = extractErrorDetails(error);
+    log.error({ vodId, platform, ...details }, 'Chat download failed');
 
     if (messageId && isAlertsEnabled()) {
       updateDiscordEmbed(messageId, {
@@ -180,7 +182,7 @@ const chatProcessor: Processor<ChatDownloadJob> = async (job: Job<ChatDownloadJo
         status: 'error',
         fields: [
           { name: 'Platform', value: platform, inline: true },
-          { name: 'Error', value: (error as Error).message.substring(0, 500), inline: false },
+          { name: 'Error', value: details.message.substring(0, 500), inline: false },
         ],
         timestamp: new Date().toISOString(),
         updatedTimestamp: new Date().toISOString(),

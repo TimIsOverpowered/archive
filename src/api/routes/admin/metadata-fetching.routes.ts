@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { extractErrorDetails } from '../../../utils/error.js';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import dayjs from 'dayjs';
 import durationPlugin from 'dayjs/plugin/duration';
@@ -195,7 +196,8 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
         return { data: { message: `Saved chapters for ${vodId}`, vodId, count: savedCount } };
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const details = extractErrorDetails(error);
+        const errorMsg = details.message;
         request.log.error(`[${streamerId}] Chapter save failed: ${errorMsg}`);
 
         throw new Error('Failed to fetch and save chapters');
@@ -260,7 +262,8 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
         return { data: { message: `Emote saving completed for ${vodId}`, vodId, platform: vodRecord.platform } };
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const details = extractErrorDetails(error);
+        const errorMsg = details.message;
         request.log.error(`[${streamerId}] Emote save failed: ${errorMsg}`);
 
         throw new Error('Failed to queue emote saving job');

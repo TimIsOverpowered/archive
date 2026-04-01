@@ -1,12 +1,19 @@
-import { getTwitchStreamStatus, getLatestTwitchVodObject } from '../services/twitch-live.js';
-import { getKickStreamStatus, getLatestKickVodObject } from '../services/kick-live.js';
+import fs from 'fs/promises';
+import Redis from 'ioredis';
+import path from 'path';
+import { getStreamerConfig } from '../config/loader.js';
+import { loggerWithTenant, logger } from '../utils/logger.js';
+import { QUEUE_NAMES, type LiveHlsDownloadJob, getLiveHlsDownloadQueue } from '../jobs/queues.js';
 import { createClient, getClient } from '../db/client.js';
 import type { StreamerConfig } from '../config/types.js';
-import path from 'path';
-import { loggerWithTenant } from '../utils/logger.js';
-import { QUEUE_NAMES } from '../jobs/queues.js';
+import { getTwitchStreamStatus, getLatestTwitchVodObject } from '../services/twitch-live.js';
+import { getKickStreamStatus, getLatestKickVodObject } from '../services/kick-live.js';
+import { extractErrorDetails } from '../utils/error.js';
 
 type PlatformType = 'twitch' | 'kick';
+type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
+
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 /**
  * Main polling function - called every 30 seconds per tenant/platform pair
@@ -41,25 +48,23 @@ export async function checkPlatformStatus(tenantId: string, platform: PlatformTy
 
       log.debug(`[Monitor]: ${platform} monitoring skipped: ${reasons.join(', ')}`);
     }
-  } catch (error: any) {
-    const errorMsg = error?.message || String(error);
-    let details = errorMsg;
+  } catch (error: unknown) {
+    const details = extractErrorDetails(error);
 
-    if (error.response) {
-      details += `\nHTTP ${error.response.status}: ${JSON.stringify(error.response.data)}`;
-    } else if (error.request) {
-      details += '\nNo response received from server';
+    if (typeof error === 'object' && error !== null && 'response' in error) {
+      log.error({ platform, ...details }, `[Platform]: ${platform}] Error in stream status check`);
+    } else if (typeof error === 'object' && error !== null && 'request' in error) {
+      log.error({ platform, ...details }, `[Platform]: ${platform}] Error in stream status check (no response)`);
+    } else {
+      log.error({ platform, ...details }, `[Platform]: ${platform}] Error in stream status check`);
     }
-
-    const stackTrace = error?.stack ? `\nStack: ${error.stack}` : '';
-    log.error({ platform, error }, `[Platform]: ${platform}] Error in stream status check:\n${details}${stackTrace}`);
   }
 }
 
 /**
  * Handle Twitch-specific live detection logic - NO FALLBACK, only downloads after VOD object confirmed available
  */
-async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: PlatformType, config: StreamerConfig): Promise<void> {
+async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string, platform: PlatformType, config: StreamerConfig): Promise<void> {
   const log = loggerWithTenant(tenantId);
   const twitchUsername = config.twitch?.username;
 
@@ -211,7 +216,7 @@ async function handleTwitchLiveCheck(prisma: any, tenantId: string, platform: Pl
 /**
  * Handle Kick-specific live detection logic - NO FALLBACK, only downloads after video object confirmed available
  */
-async function handleKickLiveCheck(prisma: any, tenantId: string, platform: PlatformType, config: StreamerConfig): Promise<void> {
+async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, platform: PlatformType, config: StreamerConfig): Promise<void> {
   const log = loggerWithTenant(tenantId);
   const kickUsername = config.kick?.username;
 
@@ -355,29 +360,33 @@ async function handleKickLiveCheck(prisma: any, tenantId: string, platform: Plat
 async function checkHasActiveDownload(tenantId: string, vodId: string): Promise<boolean> {
   const log = loggerWithTenant(tenantId);
   try {
-    const fs = await import('fs/promises');
-
     // Get tenant's vodPath from config to construct correct path
-    const streamerConfig = (await import('../config/loader.js')).getStreamerConfig(tenantId);
+    const streamerConfig = getStreamerConfig(tenantId);
 
-    if (!streamerConfig?.settings.vodPath) {
-      log.warn({ tenantId, vodId }, `[Monitor] No VOD path configured for tenant ${tenantId} - cannot check active download`);
+    if (!streamerConfig?.settings.vodDownload) {
+      log.warn({ tenantId, vodId }, `[Monitor] No VOD download configured for tenant ${tenantId} - cannot check active download`);
       return false;
     }
 
-    const vodDir = path.join(streamerConfig.settings.vodPath, tenantId, vodId); // /mnt/live/{tenant.id}/{vodId}/ structure
+    const vodPath = streamerConfig.settings.vodPath;
+    if (!vodPath) {
+      log.warn({ tenantId, vodId }, `[Monitor] VOD path not configured for tenant ${tenantId}`);
+      return false;
+    }
+
+    const vodDir = path.join(vodPath, tenantId, vodId); // /mnt/live/{tenant.id}/{vodId}/ structure
 
     try {
       await fs.access(vodDir);
       log.debug({ vodId, vodDir }, `[Monitor] Download directory exists - active download detected`);
       return true;
     } catch (accessError) {
-      log.trace({ vodId, vodDir, error: accessError instanceof Error ? accessError.message : String(accessError) }, `[Monitor] No download directory found for VOD ${vodId}`);
+      log.trace({ vodId, vodDir, error: extractErrorDetails(accessError).message }, `[Monitor] No download directory found for VOD ${vodId}`);
       return false;
     }
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    log.warn({ vodId, error: errorMsg }, `[Monitor] Failed to check active download status`);
+    const details = extractErrorDetails(error);
+    log.warn({ vodId, error: details.message }, `[Monitor] Failed to check active download status`);
     return false;
   }
 }
@@ -389,8 +398,7 @@ async function validateVodPath(tenantId: string): Promise<{ valid: boolean }> {
   const log = loggerWithTenant(tenantId);
 
   try {
-    const fs = await import('fs/promises');
-    const streamerConfig = (await import('../config/loader.js')).getStreamerConfig(tenantId);
+    const streamerConfig = getStreamerConfig(tenantId);
 
     if (!streamerConfig?.settings.vodPath) {
       log.error({ tenantId }, `[Monitor] VOD path not configured for tenant - cannot queue downloads`);
@@ -409,24 +417,25 @@ async function validateVodPath(tenantId: string): Promise<{ valid: boolean }> {
         log.trace({ vodPath: vodDirBase }, `[Monitor] VOD path validated successfully`);
         return { valid: true };
       } catch (mkdirError) {
-        const errorMsg = mkdirError instanceof Error ? mkdirError.message : String(mkdirError);
-        log.error({ tenantId, vodPath: testSubdir, error: errorMsg }, `[Monitor] Cannot write to VOD path - directory creation failed`);
+        const details = extractErrorDetails(mkdirError);
+        log.error({ tenantId, vodPath: testSubdir, error: details.message }, `[Monitor] Cannot write to VOD path - directory creation failed`);
         return { valid: false };
       }
     } catch (accessError) {
-      const errorMsg = accessError instanceof Error ? accessError.message : String(accessError);
-      log.error({ tenantId, vodPath: vodDirBase, error: errorMsg }, `[Monitor] VOD path not accessible - check permissions`);
+      const details = extractErrorDetails(accessError);
+      log.error({ tenantId, vodPath: vodDirBase, error: details.message }, `[Monitor] VOD path not accessible - check permissions`);
       return { valid: false };
     }
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    log.error({ tenantId, error: errorMsg }, `[Monitor] Unexpected error validating VOD path`);
+    const details = extractErrorDetails(error);
+    log.error({ tenantId, error: details.message }, `[Monitor] Unexpected error validating VOD path`);
     return { valid: false };
   }
 }
 
 /**
  * Enqueue Live HLS Download job with Redis deduplication check (48-hour TTL)
+
  */
 async function enqueueLiveHlsDownload(params: { vodId: string; platform: PlatformType; streamerId: string; startedAt: Date; sourceUrl?: string }): Promise<void> {
   const log = loggerWithTenant(params.streamerId);
@@ -438,14 +447,8 @@ async function enqueueLiveHlsDownload(params: { vodId: string; platform: Platfor
     return; // Don't attempt to queue job if path is invalid
   }
 
-  const Redis = (await import('ioredis')).default;
-
-  // Use global Redis connection for deduplication checks only (not BullMQ queues)
-  let redis: any;
   try {
     log.info({ vodId: params.vodId, platform: params.platform, streamerId: params.streamerId }, `[Monitor] Attempting to enqueue Live HLS download job`);
-
-    redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
     const dedupKey = `vod_download:${params.vodId}`;
 
@@ -458,48 +461,41 @@ async function enqueueLiveHlsDownload(params: { vodId: string; platform: Platfor
     }
 
     log.debug({ vodId: params.vodId, dedupKey }, `[Monitor] Redis dedup key acquired successfully`);
-  } catch (error: any) {
-    const errorMsg = error?.message || String(error);
-    log.error({ vodId: params.vodId, error: errorMsg }, `[Monitor] Failed to acquire Redis dedup lock - attempting queue anyway`);
+  } catch (error) {
+    const details = extractErrorDetails(error);
+    log.error({ vodId: params.vodId, error: details.message }, `[Monitor] Failed to acquire Redis dedup lock - attempting queue anyway`);
 
     // If Redis fails, still try to queue the job - BullMQ will handle duplicates at worker level
-  } finally {
-    if (redis && redis.quit) await redis.quit().catch(() => {});
   }
 
-  const { getVODDownloadQueue } = await import('../jobs/queues.js');
-
-  const queue = getVODDownloadQueue();
+  const queue = getLiveHlsDownloadQueue();
 
   try {
-    // Note: The worker will handle the actual download logic (Live HLS mode vs one-shot)
     log.debug({ vodId: params.vodId, platform: params.platform }, `[Monitor] Adding job to BullMQ VOD download queue`);
 
-    const jobId = await queue.add(
+    const job = await queue.add(
       'live_hls_download',
       {
         vodId: params.vodId,
         platform: params.platform,
         streamerId: params.streamerId,
         startedAt: params.startedAt.toISOString(),
-        sourceUrl: params.sourceUrl || undefined,
-      } as any, // Cast to bypass BullMQ type inference for extended job data
+        sourceUrl: params.sourceUrl,
+      } satisfies LiveHlsDownloadJob,
       {
         attempts: 3,
         backoff: { type: 'exponential' as const, delay: 5000 },
-      } as any // timeout is not in default options but supported by worker-side processing
+      }
     );
 
-    log.info({ vodId: params.vodId, jobId: String(jobId), platform: params.platform, queueName: QUEUE_NAMES.VOD_DOWNLOAD }, `[Monitor] Live HLS download job enqueued successfully`);
-  } catch (error: any) {
-    const errorMsg = error?.message || String(error);
-    log.error({ vodId: params.vodId, error: errorMsg, stack: error?.stack }, `[Monitor] CRITICAL - Failed to enqueue Live HLS download job`);
+    log.info({ vodId: params.vodId, jobId: String(job.id), platform: params.platform, queueName: QUEUE_NAMES.VOD_DOWNLOAD }, `[Monitor] Live HLS download job enqueued successfully`);
+  } catch (error) {
+    const details = extractErrorDetails(error);
+    log.error({ vodId: params.vodId, ...details }, `[Monitor] CRITICAL - Failed to enqueue Live HLS download job`);
 
-    // Release dedup key on failure so it can be retried later (redis may not exist if earlier Redis call failed)
+    // Release dedup key on failure so it can be retried later
     try {
-      const cleanupRedis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
-      await cleanupRedis.del(`vod_download:${params.vodId}`).catch(() => {});
-      await cleanupRedis.quit().catch(() => {});
+      await redis.del(`vod_download:${params.vodId}`).catch(() => {});
       log.debug({ vodId: params.vodId }, `[Monitor] Released dedup key after queue failure`);
     } catch {
       // Non-critical - just logging the cleanup attempt failure
@@ -511,19 +507,12 @@ async function enqueueLiveHlsDownload(params: { vodId: string; platform: Platfor
  * Clean up Redis deduplication key when stream ends or worker completes successfully
  */
 async function cleanupDedupKey(vodId: string): Promise<void> {
-  const Redis = (await import('ioredis')).default;
-
-  let redis: any;
   try {
-    redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
-
     await redis.del(`vod_download:${vodId}`);
 
-    console.debug(`[Redis] Dedup key cleared for VOD ${vodId} (stream ended or completed)`);
+    logger.debug(`[Redis] Dedup key cleared for VOD ${vodId} (stream ended or completed)`);
   } catch {
     // Non-critical - just logging
-  } finally {
-    if (redis && redis.quit) await redis.quit().catch(() => {});
   }
 }
 
@@ -538,19 +527,21 @@ export function startStreamDetectionLoop(tenantId: string, platform: PlatformTyp
   (async () => {
     try {
       await checkPlatformStatus(tenantId, platform, config);
-    } catch (error: any) {
-      log.error(`[Platform]: ${platform}] Error in initial poll cycle:`, error.message || error);
+    } catch (error: unknown) {
+      const details = extractErrorDetails(error);
+      log.error({ err: details.message }, `[Platform]: ${platform}] Error in initial poll cycle`);
     }
   })();
 
   const intervalId = setInterval(async () => {
     try {
       await checkPlatformStatus(tenantId, platform, config);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Prevent one failed poll from crashing the entire loop for this tenant/platform pair
-      log.error(`[Platform]: ${platform}] Error in polling cycle:`, error.message || error);
+      const details = extractErrorDetails(error);
+      log.error({ err: details.message }, `[Platform]: ${platform}] Error in polling cycle`);
     }
-  }, 30_000); // Fixed 30-second polling interval per requirements spec
+  }, 30_000);
 
   // Store interval ID for potential cleanup on shutdown (can be expanded later)
   const key = `${tenantId}:${platform}`;

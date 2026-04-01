@@ -3,6 +3,7 @@ import type { StreamerConfig as ConfigType } from '../config/types';
 import { sendDiscordAlert, trackFailure, resetFailures } from '../utils/alerts.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { logger } from '../utils/logger.js';
+import { extractErrorDetails } from '../utils/error.js';
 
 const MAX_FAILURES = 3;
 
@@ -23,8 +24,8 @@ export async function checkTokenHealth(): Promise<void> {
         await getAppAccessToken(streamerId);
         resetFailures(`${streamerId}:twitch`);
       } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        log.error({ error: errorMessage, platform: 'Twitch' }, `Token health check failed for ${streamerId}`);
+        const { message } = extractErrorDetails(err);
+        log.error({ error: message, platform: 'Twitch' }, `Token health check failed for ${streamerId}`);
 
         if (trackFailure(`${streamerId}:twitch`, MAX_FAILURES)) {
           await sendDiscordAlert(`🚨 Twitch token health check failed for ${streamerId} after ${MAX_FAILURES} attempts`);
@@ -45,8 +46,8 @@ export async function checkTokenHealth(): Promise<void> {
           }
         }
       } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        log.error({ error: errorMessage, platform: 'YouTube' }, `Token health check error for ${streamerId}`);
+        const { message } = extractErrorDetails(err);
+        log.error({ error: message, platform: 'YouTube' }, `Token health check error for ${streamerId}`);
 
         if (trackFailure(`${streamerId}:youtube`, MAX_FAILURES)) {
           await sendDiscordAlert(`🚨 YouTube token health check failed for ${streamerId} after ${MAX_FAILURES} attempts`);
