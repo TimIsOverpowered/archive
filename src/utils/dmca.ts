@@ -76,48 +76,65 @@ export async function muteAudioSections(videoPath: string, filters: string[], ou
   });
 }
 
-export async function getStartVideo(vodPath: string, vodId: string, startSeconds: number): Promise<string | null> {
-  const outputPath = `${vodId}-start.mp4`;
-
-  return new Promise((resolve) => {
-    ffmpeg(vodPath)
-      .videoCodec('copy')
-      .audioCodec('copy')
-      .duration(startSeconds)
-      .on('end', () => resolve(outputPath))
-      .on('error', (err) => {
-        console.error(`FFmpeg start video error: ${err.message}`);
-        resolve(null);
-      })
-      .saveToFile(outputPath);
-  });
+export interface BlackoutSection {
+  startSeconds: number;
+  durationSeconds: number;
+  endSeconds: number;
 }
 
-export async function getClip(vodPath: string, vodId: string, startSeconds: number, durationSeconds: number): Promise<string | null> {
-  const outputPath = `${vodId}-clip.mp4`;
+/**
+ * Applies multiple video blackouts in a single FFmpeg pass using overlay filters.
+ * This is significantly more efficient than the old concat-based approach as it only reads/writes once.
+ */
+export async function blackoutVideoSections(videoPath: string, vodId: string, sections: BlackoutSection[]): Promise<string | null> {
+  if (sections.length === 0) return videoPath;
 
-  return new Promise((resolve) => {
-    ffmpeg(vodPath)
-      .seekInput(startSeconds)
-      .duration(durationSeconds)
-      .videoCodec('copy')
-      .audioCodec('copy')
-      .on('end', () => resolve(outputPath))
-      .on('error', (err) => {
-        console.error(`FFmpeg clip error: ${err.message}`);
-        resolve(null);
-      })
-      .saveToFile(outputPath);
-  });
-}
+  const outputPath = `${vodId}-blackouted.mp4`;
 
-export async function getTrimmedClip(clipPath: string, vodId: string): Promise<string | null> {
-  const outputPath = `${vodId}-clip-muted.mp4`;
+  // Sort sections by start time to ensure proper processing order
+  const sortedSections = [...sections].sort((a, b) => a.startSeconds - b.startSeconds);
 
-  return new Promise((resolve) => {
-    ffmpeg(clipPath)
-      .audioCodec('copy')
-      .videoFilter(`color=black:s=${1920}x${1080}`)
+  if (sortedSections.length === 1) {
+    return new Promise<string | null>((resolve) => {
+      const section = sortedSections[0];
+
+      ffmpeg(videoPath)
+        .input('color=c=black:s=hd1080')
+        .videoFilters(`[1:v]overlay=0:0:enable='between(t,${section.startSeconds},${section.endSeconds})'[v_out]`)
+        .outputOptions(['-map', '[v_out]', '-map', '0:a'])
+        .toFormat('mp4')
+        .on('end', () => resolve(outputPath))
+        .on('error', (err) => {
+          console.error(`FFmpeg blackout error: ${err.message}`);
+          resolve(null);
+        })
+        .saveToFile(outputPath);
+    });
+  }
+
+  // Multiple sections - build chained overlay filter complex string
+  return new Promise<string | null>((resolve) => {
+    const ffmpegProcess = ffmpeg(videoPath);
+
+    for (let i = 0; i < sortedSections.length; i++) {
+      ffmpegProcess.input('color=c=black:s=hd1080');
+    }
+
+    let filterComplex = '';
+
+    for (let i = 0; i < sortedSections.length; i++) {
+      const section = sortedSections[i];
+      const inputLabel = i === 0 ? '0:v' : `v_${i - 1}`;
+      const colorInput = `${i + 1}:v`;
+      const outputLabel = i === sortedSections.length - 1 ? '[v_final]' : `[v_${i}]`;
+
+      filterComplex += `[${inputLabel}][${colorInput}]overlay=0:0:enable='between(t,${section.startSeconds},${section.endSeconds})'${outputLabel};`;
+    }
+
+    ffmpegProcess
+      .videoFilters(filterComplex)
+      .outputOptions(['-map', '[v_final]', '-map', '0:a'])
+      .toFormat('mp4')
       .on('end', () => resolve(outputPath))
       .on('error', (err) => {
         console.error(`FFmpeg blackout error: ${err.message}`);
@@ -127,123 +144,12 @@ export async function getTrimmedClip(clipPath: string, vodId: string): Promise<s
   });
 }
 
-export async function getEndVideo(vodPath: string, vodId: string, startSeconds: number): Promise<string | null> {
-  const outputPath = `${vodId}-end.mp4`;
-
-  return new Promise((resolve) => {
-    ffmpeg(vodPath)
-      .seekInput(startSeconds)
-      .videoCodec('copy')
-      .audioCodec('copy')
-      .on('end', () => resolve(outputPath))
-      .on('error', (err) => {
-        console.error(`FFmpeg end video error: ${err.message}`);
-        resolve(null);
-      })
-      .saveToFile(outputPath);
-  });
-}
-
-export async function getTextList(vodId: string, startVideoPath: string, mutedClipPath: string, endVideoPath: string): Promise<string | null> {
-  const listFilePath = `${vodId}-list.txt`;
-
-  try {
-    const content = [`file '${startVideoPath}'`, `file '${mutedClipPath}'`, `file '${endVideoPath}'`].join('\n');
-
-    await fsPromises.writeFile(listFilePath, content);
-    return listFilePath;
-  } catch (error) {
-    const details = extractErrorDetails(error);
-    console.error(`Failed to write concat list file: ${details.message}`);
-    return null;
-  }
-}
-
-export async function concat(vodId: string, listFilePath: string): Promise<string | null> {
-  const outputPath = `${vodId}-trimmed.mp4`;
-
-  return new Promise((resolve) => {
-    ffmpeg(listFilePath)
-      .inputOptions(['-f', 'concat', '-safe', '0'])
-      .videoCodec('copy')
-      .audioCodec('copy')
-      .on('end', () => resolve(outputPath))
-      .on('error', (err) => {
-        console.error(`FFmpeg concat error: ${err.message}`);
-        resolve(null);
-      })
-      .saveToFile(outputPath);
-  });
-}
-
+/**
+ * Legacy single-section blackout function for backwards compatibility.
+ */
 export async function blackoutVideoSection(videoPath: string, vodId: string, startSeconds: number, durationSeconds: number, endSeconds: number): Promise<string | null> {
-  const tempFiles = [];
-
-  try {
-    // Step 1: Split at start point
-    const startPath = await getStartVideo(videoPath, vodId, startSeconds);
-    if (!startPath) return null;
-    tempFiles.push(startPath);
-
-    // Step 2: Extract claim segment
-    const clipPath = await getClip(videoPath, vodId, startSeconds, durationSeconds);
-    if (!clipPath) return null;
-    tempFiles.push(clipPath);
-
-    // Step 3: Create black screen clip
-    const mutedClipPath = await getTrimmedClip(clipPath, vodId);
-    if (!mutedClipPath) return null;
-    tempFiles.push(mutedClipPath);
-
-    // Step 4: Split at end point
-    const endPath = await getEndVideo(videoPath, vodId, endSeconds);
-    if (!endPath) return null;
-    tempFiles.push(endPath);
-
-    // Step 5: Create concat list file
-    const listFilePath = await getTextList(vodId, startPath, mutedClipPath, endPath);
-    if (!listFilePath) return null;
-    tempFiles.push(listFilePath);
-
-    // Step 6: Concatenate parts
-    const outputPath = await concat(vodId, listFilePath);
-
-    // Cleanup intermediate files (keep final output)
-    for (const file of [startPath, clipPath, mutedClipPath, endPath, listFilePath]) {
-      if (
-        file !== outputPath &&
-        !(await fsPromises
-          .access(file)
-          .then(() => true)
-          .catch(() => false))
-      )
-        continue;
-
-      try {
-        await deleteFileIfExists(file);
-      } catch (err) {
-        const details = extractErrorDetails(err);
-        console.warn('Failed to cleanup temp file:', file, details.message);
-      }
-    }
-
-    return outputPath;
-  } catch (error) {
-    const details = extractErrorDetails(error);
-    console.error(`Blackout video section error: ${details.message}`);
-
-    // Cleanup on error
-    for (const file of tempFiles) {
-      try {
-        await deleteFileIfExists(file);
-      } catch (err) {
-        const details = extractErrorDetails(err);
-        console.warn('Failed to cleanup temp file during error handling:', file, details.message);
-      }
-    }
-
-    return null;
-  }
+  const section = { startSeconds, durationSeconds, endSeconds };
+  return await blackoutVideoSections(videoPath, vodId, [section]);
 }
 
 export async function cleanupTempFiles(files: string[]): Promise<void> {
