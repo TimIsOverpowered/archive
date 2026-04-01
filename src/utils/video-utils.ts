@@ -1,4 +1,4 @@
-import ffmpeg from 'fluent-ffmpeg';
+import ffmpeg, { FfprobeData } from 'fluent-ffmpeg';
 import { logger } from './logger.js';
 
 /**
@@ -13,17 +13,17 @@ export async function convertHlsToMp4(m3u8Path: string, vodId: string, mp4Path: 
       .audioCodec('copy')
       .outputOptions(['-bsf:a aac_adtstoasc', '-movflags +faststart'])
       .toFormat('mp4')
-      .on('progress', (progress: any) => {
+      .on('progress', (progress) => {
         if (process.env.NODE_ENV !== 'production') {
-          process.stdout.write(`\rM3U8 CONVERT TO MP4 PROGRESS: ${Math.round(progress.percent)}%`);
+          process.stdout.write(`\rM3U8 CONVERT TO MP4 PROGRESS: ${Math.round(progress.percent ?? 0)}%`);
         }
       })
       .on('start', (_cmd: string) => {
         logger.info({ vodId }, 'Converting VOD m3u8 to mp4');
       })
-      .on('error', (err: any, stdout: string | null, stderr: string | null) => {
+      .on('error', (err, _stdout, _stderr) => {
         ffmpegProcess.kill('SIGKILL');
-        reject(err || new Error(stderr?.toString() || 'Unknown error'));
+        reject(err || new Error(_stderr?.toString() || 'Unknown error'));
       })
       .on('end', () => resolve())
       .saveToFile(mp4Path);
@@ -35,12 +35,12 @@ export async function convertHlsToMp4(m3u8Path: string, vodId: string, mp4Path: 
  */
 export async function getDuration(filePath: string): Promise<number | null> {
   return new Promise((resolve) => {
-    ffmpeg.ffprobe(filePath, (err: any, metadata: any) => {
-      if (err) {
-        logger.error({ filePath }, `Failed to probe video file: ${(err as Error).message}`);
+    ffmpeg.ffprobe(filePath, (err, metadata) => {
+      if (err || !metadata.format?.duration) {
+        logger.error({ filePath }, `Failed to probe video file: ${err?.message}`);
         resolve(null);
       } else {
-        const duration = Math.round(metadata.format.duration || 0);
+        const duration = Math.round(metadata.format.duration);
         resolve(duration > 0 ? duration : null);
       }
     });
