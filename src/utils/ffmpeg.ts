@@ -1,4 +1,4 @@
-import ffmpeg, { FfprobeData } from 'fluent-ffmpeg';
+import ffmpeg from 'fluent-ffmpeg';
 import fs from 'fs/promises';
 import fsSync from 'fs';
 import path from 'path';
@@ -111,9 +111,6 @@ export async function convertHlsToMp4(m3u8Path: string, vodId: string, mp4Path: 
       .outputOptions(['-bsf:a aac_adtstoasc', '-movflags +faststart'])
       .toFormat('mp4')
       .on('progress', (progress: ProgressEvent) => {
-        if (process.env.NODE_ENV !== 'production' && progress.percent != null) {
-          process.stdout.write(`\rM3U8 CONVERT TO MP4 PROGRESS: ${Math.round(progress.percent)}%`);
-        }
         onProgress?.(progress.percent != null ? Math.round(progress.percent) : 0);
       })
       .on('start', () => {

@@ -455,7 +455,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
     const mp4Segments = filesInDir.filter((f) => f.endsWith('.mp4'));
     const tsSegments = filesInDir.filter((f) => f.endsWith('.ts'));
 
-    let finalMp4Path = pathMod.join(config.settings.vodPath || '', String(streamerId), `${vodId}.mp4`);
+    const finalMp4Path = pathMod.join(config.settings.vodPath || '', String(streamerId), `${vodId}.mp4`);
 
     if (hasInitSegment && mp4Segments.length > 0) {
       log.info(`[${vodId}] Detected fMP4 segments (${mp4Segments.length} files). Using specialized finalization...`);
