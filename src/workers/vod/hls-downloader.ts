@@ -574,10 +574,6 @@ export async function fileExists(filePath: string): Promise<boolean> {
     return false;
   }
 }
+import { toHHMMSS } from '../../utils/formatting.js';
 
-export function toHHMMSS(seconds: number): string {
-  const hrs = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = Math.round(seconds % 60);
-  return [hrs, mins, secs].map((v) => (v < 10 ? '0' + String(v) : String(v))).join(':');
-}
+export default downloadLiveHls;

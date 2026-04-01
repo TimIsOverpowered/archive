@@ -1,6 +1,7 @@
 import { getStreamerConfig } from '../config/loader.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { logger } from '../utils/logger.js';
+import { formatDuration } from '../utils/formatting.js';
 
 export type AlertType = 'in_progress' | 'failure' | 'success';
 
@@ -12,17 +13,6 @@ interface DiscordAlert {
   streamerName?: string;
   durationSeconds?: number;
   errorMessage?: string;
-}
-
-function formatDuration(seconds: number): string {
-  const hrs = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = Math.round(seconds % 60);
-
-  if (hrs > 0) {
-    return `${hrs}h ${mins}m`;
-  }
-  return `${mins}m ${secs}s`;
 }
 
 function getAlertTitle(alert: DiscordAlert): string {
