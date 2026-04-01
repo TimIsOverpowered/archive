@@ -1,4 +1,3 @@
-import { pipeline } from 'node:stream/promises';
 import fs from 'fs';
 
 /**

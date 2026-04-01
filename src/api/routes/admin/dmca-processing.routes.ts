@@ -1,8 +1,10 @@
+import type { DmcaProcessingJob } from '../../../jobs/queues.js';
 import { FastifyInstance } from 'fastify';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { getStreamerConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
+import { getClient } from '../../../db/client.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -10,12 +12,34 @@ declare module 'fastify' {
   }
 }
 
+type VodRecord = { id: string; platform: 'twitch' | 'kick' };
+
+type StreamerDbClient = ReturnType<typeof getClient>;
+
+interface DmcaClaim {
+  type?: string;
+  reason?: string;
+  url?: string;
+  [key: string]: unknown;
+}
+
+// Cast to match the strict queue definition - incoming API data is loose but we cast at boundary
+type StrictDmcaClaims = Array<{
+  type: 'CLAIM_TYPE_AUDIO' | 'CLAIM_TYPE_VISUAL' | 'CLAIM_TYPE_AUDIOVISUAL';
+  claimPolicy: { primaryPolicy: { policyType: string } };
+  matchDetails: { longestMatchStartTimeSeconds: number; longestMatchDurationSeconds: string };
+}>;
+
 interface DmcaRequestBody {
   vodId: string;
-  claims: any[] | string;
+  claims: DmcaClaim[] | string;
   platform?: 'twitch' | 'kick';
   type?: 'vod' | 'live';
   partIndex?: number; // Optional - if provided, processes only that part (0-indexed from API)
+}
+
+interface ProcessDmcaResponse {
+  data: { message: string; vodId: string; part?: number };
 }
 
 export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
@@ -24,41 +48,41 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
   /**
    * Shared DMCA processing logic - handles both full VOD and specific part processing
    */
-  async function processDmcaRequest(streamerId: string, body: DmcaRequestBody, requestLog: any): Promise<any> {
+  async function processDmcaRequest(streamerId: string, body: DmcaRequestBody, requestLog: FastifyInstance['log']): Promise<ProcessDmcaResponse> {
     const config = getStreamerConfig(streamerId);
 
     if (!config) throw new Error('Tenant not found');
 
-    let client: any;
+    let client: StreamerDbClient | null = null;
 
-    try {
-      const ClientModule = await import('../../../db/client');
-      client = ClientModule.getClient(streamerId);
+    client = getClient(streamerId);
 
-      if (!client) throw new Error('Database not available');
-    } catch (error: any) {
-      requestLog.error(`[${streamerId}] Database error in DMCA processing: ${error.message}`);
+    if (!client) {
+      requestLog.error(`[${streamerId}] Database error in DMCA processing`);
       throw new Error('Database not available');
     }
 
-    let vodRecord: any;
+    let vodRecord: VodRecord | null = null;
 
     try {
-      vodRecord = await client.vod.findUnique({ where: { id: body.vodId } });
+      const dbResult = await client.vod.findUnique({ where: { id: body.vodId } });
+      if (dbResult) {
+        vodRecord = dbResult as VodRecord;
+      }
     } catch {
-      vodRecord = null;
+      // VOD not found or error looking up
     }
 
     if (!vodRecord) throw new Error('VOD not found');
 
     // Parse claims from various formats (array or JSON string)
-    const claimsArray = Array.isArray(body.claims) ? body.claims : JSON.parse(typeof body.claims === 'string' ? body.claims : JSON.stringify(body.claims));
+    const claimsArray: DmcaClaim[] = Array.isArray(body.claims) ? body.claims : JSON.parse(typeof body.claims === 'string' ? body.claims : JSON.stringify(body.claims));
 
-    // Build job data - only include part field if partIndex is provided
-    const dmcaJobData: any = {
+    // Cast at boundary to match strict queue type definition
+    const dmcaJobData: Omit<DmcaProcessingJob, 'receivedClaims'> & { receivedClaims: StrictDmcaClaims } = {
       streamerId,
       vodId: String(vodRecord.id),
-      receivedClaims: claimsArray,
+      receivedClaims: claimsArray as StrictDmcaClaims,
       type: body.type || 'vod',
       platform: body.platform || (vodRecord.platform as 'twitch' | 'kick'),
     };
@@ -75,7 +99,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
     const DmcaQueueModule = await import('../../../jobs/queues');
 
     // Queue the DMCA processing job (handles both full and part processing in worker)
-    await (DmcaQueueModule.getDmcaProcessingQueue() as any).add(dmcaJobData);
+    void DmcaQueueModule.getDmcaProcessingQueue().add('dmca_processing', dmcaJobData);
 
     return {
       data: {
@@ -87,7 +111,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
   }
 
   // Main DMCA endpoint - process claims for full VOD or specific part
-  fastify.post(
+  fastify.post<{ Body: DmcaRequestBody; Params: { id: string } }>(
     '/:id/dmca',
     {
       schema: {
@@ -109,11 +133,11 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
-    async (request: any) => {
+    async (request) => {
       const streamerId = request.params.id;
 
       try {
-        return await processDmcaRequest(streamerId, request.body as DmcaRequestBody, request.log);
+        return await processDmcaRequest(streamerId, request.body, request.log);
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         request.log.error(`[${streamerId}] DMCA processing failed: ${errorMsg}`);
@@ -124,7 +148,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
   );
 
   // Legacy endpoint - kept for backward compatibility, uses same logic as /dmca
-  fastify.post(
+  fastify.post<{ Body: DmcaRequestBody; Params: { id: string } }>(
     '/:id/part-dmca',
     {
       schema: {
@@ -146,14 +170,14 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
-    async (request: any) => {
+    async (request) => {
       const streamerId = request.params.id;
 
       try {
         // Log deprecation warning but continue processing for backward compatibility
         request.log.warn(`[${streamerId}] /part-dmca endpoint is deprecated. Use /dmca with partIndex parameter instead.`);
 
-        return await processDmcaRequest(streamerId, request.body as DmcaRequestBody, request.log);
+        return await processDmcaRequest(streamerId, request.body, request.log);
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         request.log.error(`[${streamerId}] DMCA processing failed: ${errorMsg}`);

@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { getTenantStats, getAllTenants } from '../../../services/tenants.service';
-import { getClient } from '../../../db/client';
+import { getClient } from '../../../db/client.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 
@@ -9,6 +9,24 @@ declare module 'fastify' {
   interface FastifyInstance {
     adminRateLimiter: RateLimiterRedis;
   }
+}
+
+interface CreateVodParams {
+  id: string;
+}
+interface DeleteVodParams {
+  id: string;
+  vodId: string;
+}
+interface StatsParams {
+  id: string;
+}
+interface CreateVodBody {
+  vodId?: string;
+  title?: string;
+  createdAt?: string;
+  duration?: number;
+  platform?: 'twitch' | 'kick';
 }
 
 export default async function vodManagementRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
@@ -32,14 +50,14 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
-    async () => {
+    async (_request) => {
       const tenants = await getAllTenants();
       return { data: tenants };
     }
   );
 
   // Get detailed stats for a tenant
-  fastify.get(
+  fastify.get<{ Params: StatsParams }>(
     '/:id/stats',
     {
       schema: {
@@ -54,7 +72,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
-    async (request: any) => {
+    async (request) => {
       const streamerId = request.params.id;
       const client = getClient(streamerId);
 
@@ -68,7 +86,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
   );
 
   // Create a VOD record manually
-  fastify.post(
+  fastify.post<{ Params: CreateVodParams; Body: CreateVodBody }>(
     '/:id/vods/create',
     {
       schema: {
@@ -89,7 +107,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
-    async (request: any) => {
+    async (request) => {
       const streamerId = request.params.id;
       const body = request.body;
 
@@ -98,7 +116,12 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
 
         if (!client) throw new Error('Database not available');
 
-        const existing: any = await client.vod.findUnique({ where: { id: body.vodId } });
+        // Validate vodId is provided
+        if (!body.vodId) {
+          throw new Error('vodId is required');
+        }
+
+        const existing = await client.vod.findUnique({ where: { id: body.vodId } });
 
         if (existing) {
           return { data: { message: `${body.vodId} already exists!`, vodId: body.vodId } };
@@ -127,7 +150,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
   );
 
   // Delete a VOD and all related data
-  fastify.delete(
+  fastify.delete<{ Params: DeleteVodParams }>(
     '/:id/vods/:vodId/delete',
     {
       schema: {
@@ -142,7 +165,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
-    async (request: any) => {
+    async (request) => {
       const streamerId = request.params.id;
       const vodId = request.params.vodId;
 

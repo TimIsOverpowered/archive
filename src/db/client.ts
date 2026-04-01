@@ -26,7 +26,9 @@ export async function createClient(config: StreamerConfig): Promise<PrismaClient
 export async function closeClient(streamerId: string): Promise<void> {
   const client = clients.get(streamerId);
   if (client) {
-    await client.$disconnect();
+    try {
+      await client.$disconnect();
+    } catch {}
     clients.delete(streamerId);
   }
 }
@@ -39,6 +41,3 @@ export async function closeAllClients(): Promise<void> {
     clients.delete(streamerId);
   }
 }
-
-process.on('SIGTERM', () => closeAllClients());
-process.on('SIGINT', () => closeAllClients());

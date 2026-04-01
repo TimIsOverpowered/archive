@@ -167,3 +167,20 @@ const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, opti
 };
 
 export default redisPlugin;
+
+/**
+ * Gracefully close Redis client connection during shutdown
+ */
+export async function closeRedisClient(): Promise<void> {
+  if (redisClient) {
+    try {
+      await redisClient.quit();
+      logger.info('Redis client closed');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.warn({ error: errorMessage }, 'Error closing Redis client during shutdown');
+    } finally {
+      redisClient = null;
+    }
+  }
+}

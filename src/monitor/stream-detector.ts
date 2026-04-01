@@ -554,10 +554,12 @@ export function startStreamDetectionLoop(tenantId: string, platform: PlatformTyp
 
   // Store interval ID for potential cleanup on shutdown (can be expanded later)
   const key = `${tenantId}:${platform}`;
-  if (!(globalThis as any).monitorIntervals) {
-    (globalThis as any).monitorIntervals = new Map();
+
+  const globalObj = global as unknown as NodeJS.Global;
+  if (!globalObj.monitorIntervals) {
+    globalObj.monitorIntervals = new Map();
   }
-  ((globalThis as any).monitorIntervals as Map<string, NodeJS.Timeout>).set(key, intervalId);
+  globalObj.monitorIntervals.set(key, intervalId);
 
   log.info(`[Platform]: ${platform}] Polling loop started with interval ID: ${intervalId}`);
 }

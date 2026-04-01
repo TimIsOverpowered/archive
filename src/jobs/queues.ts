@@ -80,16 +80,16 @@ const redisConnection = new Redis(process.env.REDIS_URL || 'redis://localhost:63
   maxRetriesPerRequest: null, // Required by BullMQ workers
 });
 
-const queueCache = new Map<string, Queue>();
+const queueCache = new Map<string, Queue<unknown, unknown, string>>();
 
-export function getQueue(name: string, jobOptions?: QueueOptions['defaultJobOptions']): Queue {
+export function getQueue<TData = unknown, TFinishedData = unknown>(name: string, jobOptions?: QueueOptions['defaultJobOptions']): Queue<TData, TFinishedData, string> {
   const cacheKey = `${name}:${JSON.stringify(jobOptions)}`;
 
   if (queueCache.has(cacheKey)) {
-    return queueCache.get(cacheKey)!;
+    return queueCache.get(cacheKey)! as Queue<TData, TFinishedData, string>;
   }
 
-  const queue = new Queue(name as any, {
+  const queue = new Queue<TData, TFinishedData, string>(name, {
     connection: redisConnection,
     defaultJobOptions: jobOptions || defaultJobOptions,
   });
@@ -99,19 +99,19 @@ export function getQueue(name: string, jobOptions?: QueueOptions['defaultJobOpti
 }
 
 export function getVODDownloadQueue(): Queue<VODDownloadJob, VODDownloadJob, string> {
-  return getQueue(QUEUE_NAMES.VOD_DOWNLOAD) as unknown as Queue<VODDownloadJob, VODDownloadJob, string>;
+  return getQueue(QUEUE_NAMES.VOD_DOWNLOAD);
 }
 
 export function getChatDownloadQueue(): Queue<ChatDownloadJob, ChatDownloadJob, string> {
-  return getQueue(QUEUE_NAMES.CHAT_DOWNLOAD) as unknown as Queue<ChatDownloadJob, ChatDownloadJob, string>;
+  return getQueue(QUEUE_NAMES.CHAT_DOWNLOAD);
 }
 
 export function getYoutubeUploadQueue(): Queue<YoutubeUploadJob, YoutubeUploadJob, string> {
-  return getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD, youtubeJobOptions) as unknown as Queue<YoutubeUploadJob, YoutubeUploadJob, string>;
+  return getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD, youtubeJobOptions);
 }
 
 export function getDmcaProcessingQueue(): Queue<DmcaProcessingJob, DmcaProcessingJob, string> {
-  return getQueue(QUEUE_NAMES.DMCA_PROCESSING) as unknown as Queue<DmcaProcessingJob, DmcaProcessingJob, string>;
+  return getQueue(QUEUE_NAMES.DMCA_PROCESSING);
 }
 
 export async function closeQueues(): Promise<void> {

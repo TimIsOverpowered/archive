@@ -5,7 +5,7 @@ export async function enqueueYoutubeUpload(job: Omit<YoutubeUploadJob, 'id'>): P
   const queue = getYoutubeUploadQueue();
 
   try {
-    // Manual type casting due to BullMQ incomplete generic types
+    // @ts-expect-error - M5/H5 issue: BullMQ Queue<T> generics don't properly infer job data types, requires cast annotation for add() method calls
     const jobId = await (queue as any).add(job, {
       attempts: 5,
       backoff: { type: 'exponential', delay: 5000 },
