@@ -15,8 +15,10 @@ import { extractErrorDetails } from '../utils/error.js';
 
 type ExtendedYoutubeUploadJob = YoutubeUploadJob & { dmcaProcessed?: boolean };
 
+const YOUTUBE_MAX_DURATION = 43199; // YouTube hard limit: 12 hours - 1 second (720 minutes)
+
 const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async (job: Job<YoutubeUploadJob>) => {
-  const { streamerId, vodId, filePath, title, description, type, part, chapter } = job.data;
+  const { streamerId, vodId, filePath, type, part, chapter } = job.data;
 
   const log = createAutoLogger(String(streamerId));
 
@@ -49,15 +51,40 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
     const splitDuration = config.youtube.splitDuration;
 
     if (type === 'vod') {
-      const duration = (await getDuration(filePath)) ?? 0; // Handle potential null for invalid videos
+      const vodRecord = await db.vod.findUnique({ where: { id: vodId } });
+
+      if (!vodRecord) throw new Error(`VOD record not found for ${vodId}`);
+
+      const platformName = vodRecord.platform.charAt(0).toUpperCase() + vodRecord.platform.slice(1);
+      const channelName = config.displayName || streamerId;
+      const dateFormatted = dayjs(vodRecord.created_at)
+        .tz(config.settings?.timezone || 'UTC')
+        .format('MMMM DD YYYY')
+        .toUpperCase();
+
+      const duration = (await getDuration(filePath)) ?? 0;
 
       const extendedData = job.data as ExtendedYoutubeUploadJob;
-      const needsSplitting = !extendedData.dmcaProcessed && duration > splitDuration;
+
+      let effectiveSplitDuration: number;
+
+      if (!splitDuration || splitDuration <= 0) {
+        effectiveSplitDuration = YOUTUBE_MAX_DURATION;
+      } else if (splitDuration > YOUTUBE_MAX_DURATION) {
+        log.warn({ configured: splitDuration, capped: YOUTUBE_MAX_DURATION }, 'YouTube splitDuration exceeds max limit, capping to YouTube maximum');
+        effectiveSplitDuration = YOUTUBE_MAX_DURATION;
+      } else {
+        effectiveSplitDuration = splitDuration;
+      }
+
+      const exceedsYouTubeMax = duration > YOUTUBE_MAX_DURATION;
+      const exceedsUserLimit = !extendedData.dmcaProcessed && duration > effectiveSplitDuration;
+      const needsSplitting = exceedsYouTubeMax || exceedsUserLimit;
 
       const uploadedVideos: Array<{ id: string; part: number }> = [];
 
       if (needsSplitting) {
-        const parts = await splitVideo(filePath, duration, splitDuration, vodId, (percent: number) => {
+        const parts = await splitVideo(filePath, duration, effectiveSplitDuration, vodId, (percent: number) => {
           if (messageId && isAlertsEnabled()) {
             updateDiscordEmbed(messageId, {
               title: `📺 Splitting VOD`,
@@ -71,8 +98,13 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
         });
 
         for (let i = 0; i < parts.length; i++) {
-          const partTitle = `${title} - Part ${i + 1}`;
-          const result = await uploadVideo(streamerId, parts[i], partTitle, description, privacyStatus);
+          const partTitle = `${channelName} ${platformName} VOD - ${dateFormatted} PART ${i + 1}`;
+
+          const vodStreamTitle = vodRecord.title ? vodRecord.title.replace(/>|</gi, '') : '';
+          const domainName = config.settings?.domainName || 'localhost';
+          const legacyDescription = `Chat Replay: https://${domainName}/youtube/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description || ''}`;
+
+          const result = await uploadVideo(streamerId, parts[i], partTitle, legacyDescription, privacyStatus);
 
           uploadedVideos.push({ id: result.videoId, part: i + 1 });
 
@@ -81,7 +113,13 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
           }
         }
       } else {
-        const result = await uploadVideo(streamerId, filePath, title, description, privacyStatus);
+        const vodStreamTitle = vodRecord.title ? vodRecord.title.replace(/>|</gi, '') : '';
+        const domainName = config.settings?.domainName || 'localhost';
+        const legacyDescription = `Chat Replay: https://${domainName}/youtube/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description || ''}`;
+
+        const vodTitle = `${channelName} ${platformName} VOD - ${dateFormatted}`;
+
+        const result = await uploadVideo(streamerId, filePath, vodTitle, legacyDescription, privacyStatus);
 
         uploadedVideos.push({ id: result.videoId, part: 1 });
 
@@ -113,7 +151,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
       if (messageId && isAlertsEnabled()) {
         updateDiscordEmbed(messageId, {
-          title: `[YouTube] Game Upload Complete`,
+          title: `[YouTube] Vod Upload Complete`,
           description: `${streamerId} - Successfully uploaded to YouTube`,
           status: 'success',
           fields: [{ name: 'Type', value: type, inline: true }],
@@ -156,6 +194,30 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
       }
       if (!chapter) throw new Error('Chapter data required for game upload type');
 
+      const vodRecord = await db.vod.findUnique({ where: { id: vodId } });
+
+      if (!vodRecord) throw new Error(`VOD record not found for ${vodId}`);
+
+      const channelName = config.displayName || streamerId;
+      const dateFormatted = dayjs(vodRecord.created_at)
+        .tz(config.settings?.timezone || 'UTC')
+        .format('MMMM DD YYYY')
+        .toUpperCase();
+
+      let totalGames: number | undefined;
+
+      try {
+        const gameCountResult = await db.game.count({
+          where: {
+            game_name: chapter.name,
+            vod_id: { not: vodId }, // Exclude current VOD from count
+          },
+        });
+        totalGames = gameCountResult;
+      } catch {
+        log.warn(`Failed to count previous games for ${chapter.name}, using title without EP number`);
+      }
+
       const trimmedPath = await trimVideo(filePath, chapter.start, chapter.end, `${vodId}-${part}`, (percent: number) => {
         if (messageId && isAlertsEnabled()) {
           updateDiscordEmbed(messageId, {
@@ -169,34 +231,154 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
         }
       });
 
-      await getDuration(trimmedPath);
-      const dateStr = dayjs().tz(config?.settings?.timezone).format('MMMM DD YYYY');
+      const trimmedDuration = (await getDuration(trimmedPath)) ?? 0;
 
-      const gameTitle = `${title} EP ${part} - ${dateStr}`;
+      const vodStreamTitle = vodRecord.title ? vodRecord.title.replace(/>|</gi, '') : '';
+      const domainName = config.settings?.domainName || 'localhost';
 
-      const result = await uploadVideo(streamerId, trimmedPath, gameTitle, config.youtube.description || '', privacyStatus);
+      const gameExceedsYoutubeMax = trimmedDuration > YOUTUBE_MAX_DURATION;
 
-      await db.game.updateMany({
-        where: { vod_id: vodId },
-        data: { video_id: result.videoId, thumbnail_url: result.thumbnailUrl },
-      });
+      if (gameExceedsYoutubeMax) {
+        log.info({ duration: trimmedDuration, parts: Math.ceil(trimmedDuration / YOUTUBE_MAX_DURATION) }, `Game clip exceeds YouTube max duration, auto-splitting`);
 
-      await deleteFile(trimmedPath);
-
-      resetFailures(streamerId);
-
-      if (messageId && isAlertsEnabled()) {
-        updateDiscordEmbed(messageId, {
-          title: `[YouTube] Upload Complete`,
-          description: `${streamerId} - Successfully uploaded to YouTube`,
-          status: 'success',
-          fields: [{ name: 'Type', value: type, inline: true }],
-          timestamp: new Date().toISOString(),
-          updatedTimestamp: new Date().toISOString(),
+        const totalParts = Math.ceil(trimmedDuration / YOUTUBE_MAX_DURATION);
+        const splitPaths = await splitVideo(trimmedPath, trimmedDuration, YOUTUBE_MAX_DURATION, `${vodId}-game`, (percent: number) => {
+          if (messageId && isAlertsEnabled()) {
+            updateDiscordEmbed(messageId, {
+              title: `✂️ Splitting Game Clip`,
+              description: `${streamerId} - Game clip exceeds YouTube max duration`,
+              status: 'warning',
+              fields: [{ name: 'Progress', value: formatProgressMessage('Game Splitting', streamerId, percent), inline: false }],
+              timestamp: new Date().toISOString(),
+              updatedTimestamp: new Date().toISOString(),
+            });
+          }
         });
-      }
 
-      return { success: true, videoId: result.videoId };
+        const uploadedGameVideos: Array<{ id: string; part: number; startTime: number; endTime: number; gameId?: number }> = [];
+
+        for (let i = 0; i < totalParts; i++) {
+          const currentPartNum = i + 1;
+          const startTime = i * YOUTUBE_MAX_DURATION;
+          const endTime = Math.min(startTime + YOUTUBE_MAX_DURATION, trimmedDuration);
+
+          let ytTitle = '';
+
+          if (totalGames !== undefined) {
+            const epNumber = totalGames + 1;
+
+            if (currentPartNum > 1) {
+              ytTitle = `${channelName} plays ${chapter.name} EP ${epNumber} - ${dateFormatted} PART ${currentPartNum}`;
+            } else {
+              ytTitle = `${channelName} plays ${chapter.name} EP ${epNumber} - ${dateFormatted}`;
+            }
+          } else {
+            if (currentPartNum > 1) {
+              ytTitle = `${channelName} plays ${chapter.name} - ${dateFormatted} PART ${currentPartNum}`;
+            } else {
+              ytTitle = `${channelName} plays ${chapter.name} - ${dateFormatted}`;
+            }
+          }
+
+          const legacyDescription = `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description || ''}`;
+
+          const result = await uploadVideo(streamerId, splitPaths[i], ytTitle, legacyDescription, 'public');
+
+          const createdGameRecord = await db.game.create({
+            data: {
+              vod_id: vodId,
+              start_time: (startTime + chapter.start).toString(),
+              end_time: (endTime + chapter.start).toString(),
+              video_provider: 'youtube',
+              video_id: result.videoId,
+              thumbnail_url: result.thumbnailUrl || null,
+              game_id: chapter.gameId || null,
+              game_name: chapter.name,
+              title: `${chapter.name} EP ${totalGames !== undefined ? totalGames + 1 : ''}`.trim(),
+            },
+          });
+
+          uploadedGameVideos.push({
+            id: result.videoId,
+            part: currentPartNum,
+            startTime,
+            endTime,
+            gameId: createdGameRecord.id,
+          });
+
+          if (!config.settings.saveMP4) {
+            await deleteFile(splitPaths[i]);
+          }
+        }
+
+        resetFailures(streamerId);
+
+        if (messageId && isAlertsEnabled()) {
+          updateDiscordEmbed(messageId, {
+            title: `[YouTube] Game Upload Complete`,
+            description: `${streamerId} - Successfully uploaded ${totalParts} parts to YouTube`,
+            status: 'success',
+            fields: [{ name: 'Type', value: type, inline: true }],
+            timestamp: new Date().toISOString(),
+            updatedTimestamp: new Date().toISOString(),
+          });
+        }
+
+        return { success: true, videos: uploadedGameVideos };
+      } else {
+        let ytTitle = '';
+
+        if (totalGames !== undefined) {
+          const epNumber = totalGames + 1;
+
+          if (part && part > 1) {
+            ytTitle = `${channelName} plays ${chapter.name} EP ${epNumber} - ${dateFormatted} PART ${part}`;
+          } else {
+            ytTitle = `${channelName} plays ${chapter.name} EP ${epNumber} - ${dateFormatted}`;
+          }
+        } else {
+          if (part && part > 1) {
+            ytTitle = `${channelName} plays ${chapter.name} - ${dateFormatted} PART ${part}`;
+          } else {
+            ytTitle = `${channelName} plays ${chapter.name} - ${dateFormatted}`;
+          }
+        }
+
+        const legacyDescription = `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description || ''}`;
+
+        const result = await uploadVideo(streamerId, trimmedPath, ytTitle, legacyDescription, 'public');
+
+        const createdGameRecord = await db.game.create({
+          data: {
+            vod_id: vodId,
+            start_time: chapter.start.toString(),
+            end_time: chapter.end.toString(),
+            video_provider: 'youtube',
+            video_id: result.videoId,
+            thumbnail_url: result.thumbnailUrl || null,
+            game_id: chapter.gameId || null,
+            game_name: chapter.name,
+            title: `${chapter.name} EP ${totalGames !== undefined ? totalGames + 1 : ''}`.trim(),
+          },
+        });
+
+        await deleteFile(trimmedPath);
+
+        resetFailures(streamerId);
+
+        if (messageId && isAlertsEnabled()) {
+          updateDiscordEmbed(messageId, {
+            title: `[YouTube] Game Upload Complete`,
+            description: `${streamerId} - Successfully uploaded to YouTube`,
+            status: 'success',
+            fields: [{ name: 'Type', value: type, inline: true }],
+            timestamp: new Date().toISOString(),
+            updatedTimestamp: new Date().toISOString(),
+          });
+        }
+
+        return { success: true, videoId: result.videoId, gameId: createdGameRecord.id };
+      }
     }
   } catch (error) {
     const details = extractErrorDetails(error);
