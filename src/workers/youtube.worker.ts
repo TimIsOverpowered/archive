@@ -49,7 +49,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
     const splitDuration = config.youtube.splitDuration;
 
     if (type === 'vod') {
-      const duration = await getDuration(filePath);
+      const duration = (await getDuration(filePath)) ?? 0; // Handle potential null for invalid videos
 
       const extendedData = job.data as ExtendedYoutubeUploadJob;
       const needsSplitting = !extendedData.dmcaProcessed && duration > splitDuration;

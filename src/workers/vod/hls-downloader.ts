@@ -459,13 +459,13 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
     // Import video-utils for convertHlsToMp4 and getDuration
     try {
-      const { convertHlsToMp4, getDuration: getVideoDuration } = await import('../../utils/video-utils.js');
+      const { convertHlsToMp4, getDuration } = await import('../../utils/ffmpeg.js');
 
       await convertHlsToMp4(m3u8Path, vodId, finalMp4Path);
 
       log.info(`[${vodId}] MP4 conversion complete. File saved to ${finalMp4Path}`);
 
-      const actualDuration = await getVideoDuration(finalMp4Path);
+      const actualDuration = await getDuration(finalMp4Path);
 
       if (actualDuration) {
         const formattedDuration = toHHMMSS(Math.round(actualDuration));

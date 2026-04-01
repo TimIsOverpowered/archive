@@ -1,10 +1,7 @@
-import ffmpeg from 'fluent-ffmpeg';
+import ffmpeg, { FfprobeData } from 'fluent-ffmpeg';
 import fs from 'fs/promises';
 import path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import { logger } from './logger.js';
 
 interface ProgressEvent {
   percent?: number;
@@ -16,7 +13,7 @@ export async function downloadM3u8(m3u8Url: string, outputPath: string, onProgre
       .outputOptions('-c copy')
       .save(outputPath)
       .on('progress', (progress: ProgressEvent) => {
-        if (onProgress && progress.percent) {
+        if (onProgress && progress.percent != null) {
           onProgress(Math.round(progress.percent));
         }
       })
@@ -74,7 +71,7 @@ export async function trimVideo(filePath: string, start: number, end: number, vo
       .outputOptions('-c copy')
       .save(outputFile)
       .on('progress', (progress: ProgressEvent) => {
-        if (onProgress && progress.percent) {
+        if (onProgress && progress.percent != null) {
           onProgress(Math.round(progress.percent));
         }
       })
@@ -87,29 +84,44 @@ export async function trimVideo(filePath: string, start: number, end: number, vo
   });
 }
 
-export async function getDuration(filePath: string): Promise<number> {
-  const command = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`;
-  const { stdout } = await execAsync(command);
-  const duration = parseFloat(stdout.trim());
-  return Math.round(duration);
+export async function getDuration(filePath: string): Promise<number | null> {
+  return new Promise((resolve) => {
+    ffmpeg.ffprobe(filePath, (err, metadata) => {
+      if (err || !metadata.format?.duration) {
+        logger.error({ filePath }, `Failed to probe video file: ${err?.message}`);
+        resolve(null);
+      } else {
+        const duration = Math.round(metadata.format.duration);
+        resolve(duration > 0 ? duration : null);
+      }
+    });
+  });
 }
 
-export async function convertM3u8ToMp4(m3u8Path: string, outputPath: string, onProgress?: (percent: number) => void): Promise<void> {
+export async function convertHlsToMp4(m3u8Path: string, vodId: string, mp4Path: string, onProgress?: (percent: number) => void): Promise<void> {
   return new Promise((resolve, reject) => {
-    ffmpeg(m3u8Path)
-      .outputOptions('-c copy')
-      .save(outputPath)
+    const ffmpegProcess = ffmpeg(m3u8Path);
+
+    ffmpegProcess
+      .videoCodec('copy')
+      .audioCodec('copy')
+      .outputOptions(['-bsf:a aac_adtstoasc', '-movflags +faststart'])
+      .toFormat('mp4')
       .on('progress', (progress: ProgressEvent) => {
-        if (onProgress && progress.percent) {
-          onProgress(Math.round(progress.percent));
+        if (process.env.NODE_ENV !== 'production' && progress.percent != null) {
+          process.stdout.write(`\rM3U8 CONVERT TO MP4 PROGRESS: ${Math.round(progress.percent)}%`);
         }
+        onProgress?.(progress.percent != null ? Math.round(progress.percent) : 0);
       })
-      .on('end', () => {
-        resolve();
+      .on('start', () => {
+        logger.info({ vodId }, 'Converting VOD m3u8 to mp4');
       })
-      .on('error', (err: Error) => {
-        reject(err);
-      });
+      .on('error', (err, _stdout, _stderr) => {
+        ffmpegProcess.kill('SIGKILL');
+        reject(err || new Error(_stderr?.toString() || 'Unknown error'));
+      })
+      .on('end', () => resolve())
+      .saveToFile(mp4Path);
   });
 }
 
