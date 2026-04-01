@@ -1,5 +1,6 @@
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../services/twitch.js';
-import HLS from 'hls-parser';
+import HLSParser from 'hls-parser';
+import type { MasterPlaylist, MediaPlaylist } from 'hls-parser/types';
 import { extractErrorDetails } from './error.js';
 import { logger } from './logger.js';
 
@@ -46,7 +47,7 @@ export async function getTwitchHlsDuration(m3u8Path: string, vodId: string): Pro
       return null;
     }
 
-    const parsedMaster: any = HLS.parse(masterPlaylistContent);
+    const parsedMaster = HLSParser.parse(masterPlaylistContent) as MasterPlaylist;
 
     if (!parsedMaster || !parsedMaster.variants?.[0]?.uri) {
       logger.error({ vodId }, 'Invalid Twitch master playlist structure');
@@ -55,24 +56,24 @@ export async function getTwitchHlsDuration(m3u8Path: string, vodId: string): Pro
 
     const variantUrl = parsedMaster.variants[0].uri;
 
-    let baseURL: string;
-    let variantM3u8String: string;
+    // Construct the base URL for resolving relative paths (same as getTwitchM3u8)
+    const baseUrl = `https://usher.ttvnw.net/vod/${vodId}.m3u8`;
 
-    if (!variantUrl.startsWith('http')) {
-      baseURL = masterPlaylistContent.substring(0, masterPlaylistContent.lastIndexOf('/'));
+    // Use native URL class for robust resolution of relative/absolute variant URLs
+    const absoluteVariantUrl = new URL(variantUrl, baseUrl).href;
 
-      const response1 = await fetch(variantUrl.includes('/') ? variantUrl : `${baseURL}/${variantUrl}`);
-      if (!response1.ok) throw new Error(`Fetch failed with status ${response1.status}`);
-      variantM3u8String = await response1.text();
-    } else {
-      baseURL = variantUrl.substring(0, variantUrl.lastIndexOf('/'));
-
-      const response2 = await fetch(variantUrl);
-      if (!response2.ok) throw new Error(`Fetch failed with status ${response2.status}`);
-      variantM3u8String = await response2.text();
+    const response = await fetch(absoluteVariantUrl);
+    if (!response.ok) throw new Error(`Fetch failed with status ${response.status}`);
+    
+    // Fast path: extract Twitch's total seconds tag if present (avoids segment parsing overhead)
+    const twitchTotalSecondsMatch = masterPlaylistContent.match(/#EXT-X-TWITCH-TOTAL-SECS:(\d+)/);
+    if (twitchTotalSecondsMatch) {
+      return parseInt(twitchTotalSecondsMatch[1], 10);
     }
 
-    const parsedPlaylist: any = HLS.parse(variantM3u8String);
+    const variantM3u8String = await response.text();
+
+    const parsedPlaylist = HLSParser.parse(variantM3u8String) as MediaPlaylist;
 
     if (!parsedPlaylist || !parsedPlaylist.segments?.length) {
       logger.error({ vodId }, 'No segments found in Twitch playlist');
