@@ -1,22 +1,24 @@
 import 'dotenv/config';
 import { extractErrorDetails } from '../utils/error.js';
-import { Worker, Queue } from 'bullmq';
+import { Worker, Queue, BaseJobOptions } from 'bullmq';
 import Redis from 'ioredis';
 import { loadStreamerConfigs, clearConfigCache } from '../config/loader.js';
-import { QUEUE_NAMES, closeQueues } from '../jobs/queues.js';
+import { QUEUE_NAMES, closeQueues, ChatDownloadJob, YoutubeUploadJob, DmcaProcessingJob, ChatDownloadResult, YoutubeUploadResult, DmcaProcessingResult } from '../jobs/queues.js';
 import vodProcessor from './vod.worker.js';
 import chatProcessor from './chat.worker.js';
 import youtubeProcessor from './youtube.worker.js';
 import dmcaProcessor from './dmca.worker.js';
 import { releaseKickBrowser } from '../utils/puppeteer-manager.js';
-
 import { startTokenHealthCron } from '../cron/token-health.js';
 import { startMonitorService, stopMonitorService } from '../monitor/index.js';
 import { logger as baseLogger } from '../utils/logger.js';
+import type { LiveHlsDownloadJobData, LiveHlsDownloadResult } from './vod.worker.js';
 
 const logger = baseLogger;
 
 export type WorkerName = 'vod_download' | 'chat_download' | 'youtube_upload' | 'dmca_processing';
+
+type AllJobData = LiveHlsDownloadJobData | ChatDownloadJob | YoutubeUploadJob | DmcaProcessingJob;
 
 interface LastFailedJob {
   jobId: string;
@@ -35,6 +37,7 @@ export interface WorkerHealthStatus {
 }
 
 const workers = new Map<WorkerName, Worker>();
+const queues = new Map<WorkerName, Queue>();
 let redisConnectionForWorkers: Redis | null = null;
 
 export function registerWorker(name: WorkerName, worker: Worker) {
@@ -55,15 +58,15 @@ async function getLastFailedJob(queue: Queue): Promise<LastFailedJob | null> {
       return null;
     }
 
-    const rawData = (await job.data) as any;
+    const rawData = (await job.data) as AllJobData;
     const finishedAtTimestamp = typeof job.finishedOn === 'number' ? new Date(job.finishedOn) : undefined;
 
     return {
       jobId: String(job.id),
       errorMessage: (job.failedReason || 'Unknown error').substring(0, 500),
       attemptsMade: job.attemptsMade ?? 0,
-      maxAttempts: ((job.opts as any)?.attempts ?? 3) as number,
-      vodId: rawData?.vodId ? String(rawData.vodId) : undefined,
+      maxAttempts: ((job.opts as Partial<BaseJobOptions>).attempts ?? 3) as number,
+      vodId: 'vodId' in rawData ? String(rawData.vodId) : undefined,
       failedAt: finishedAtTimestamp ?? new Date(),
     };
   } catch {
@@ -87,10 +90,8 @@ export async function getWorkersHealth(): Promise<Record<string, WorkerHealthSta
     return result;
   }
 
-  for (const [name] of workers) {
+  for (const [name, queue] of queues) {
     try {
-      const queue = new Queue(name as any, { connection: redisConnectionForWorkers });
-
       if (!queue || !workers.get(name)) continue;
 
       const counts = await queue.getJobCounts();
@@ -147,38 +148,42 @@ async function bootstrap() {
 
     redisConnectionForWorkers = redisConnection;
 
-    const vodWorker = new Worker(QUEUE_NAMES.VOD_DOWNLOAD as any, vodProcessor as any, {
+    const vodWorker = new Worker<LiveHlsDownloadJobData, LiveHlsDownloadResult>(QUEUE_NAMES.VOD_DOWNLOAD as string, vodProcessor, {
       connection: redisConnection,
       concurrency: 2,
     });
 
     registerWorker('vod_download', vodWorker);
+    queues.set('vod_download', new Queue<LiveHlsDownloadJobData, unknown, string>(QUEUE_NAMES.VOD_DOWNLOAD as string, { connection: redisConnection }));
 
-    const chatWorker = new Worker(QUEUE_NAMES.CHAT_DOWNLOAD as any, chatProcessor as any, {
+    const chatWorker = new Worker<ChatDownloadJob, ChatDownloadResult>(QUEUE_NAMES.CHAT_DOWNLOAD as string, chatProcessor, {
       connection: redisConnection,
       concurrency: 1,
     });
 
     registerWorker('chat_download', chatWorker);
+    queues.set('chat_download', new Queue<ChatDownloadJob, unknown, string>(QUEUE_NAMES.CHAT_DOWNLOAD as string, { connection: redisConnection }));
 
-    const youtubeWorker = new Worker(QUEUE_NAMES.YOUTUBE_UPLOAD as any, youtubeProcessor as any, {
+    const youtubeWorker = new Worker<YoutubeUploadJob, YoutubeUploadResult>(QUEUE_NAMES.YOUTUBE_UPLOAD as string, youtubeProcessor, {
       connection: redisConnection,
       concurrency: 1,
     });
 
     registerWorker('youtube_upload', youtubeWorker);
+    queues.set('youtube_upload', new Queue<YoutubeUploadJob, unknown, string>(QUEUE_NAMES.YOUTUBE_UPLOAD as string, { connection: redisConnection }));
 
-    const dmcaWorker = new Worker(QUEUE_NAMES.DMCA_PROCESSING as any, dmcaProcessor as any, {
+    const dmcaWorker = new Worker<DmcaProcessingJob, DmcaProcessingResult>(QUEUE_NAMES.DMCA_PROCESSING as string, dmcaProcessor, {
       connection: redisConnection,
       concurrency: 1, // CPU-intensive re-encoding operations
     });
 
     registerWorker('dmca_processing', dmcaWorker);
+    queues.set('dmca_processing', new Queue<DmcaProcessingJob, unknown, string>(QUEUE_NAMES.DMCA_PROCESSING as string, { connection: redisConnection }));
 
     vodWorker.on('completed', async (job) => {
       if (!job) return;
 
-      const data = await job.data;
+      const data = job.data;
       logger.info(
         {
           jobId: String(job.id),
@@ -193,7 +198,7 @@ async function bootstrap() {
     vodWorker.on('failed', async (job, err) => {
       if (!job || !err) return;
 
-      const jobData = await job.data;
+      const jobData = job.data;
       logger.error(
         {
           jobId: String(job.id),
@@ -201,7 +206,7 @@ async function bootstrap() {
           platform: jobData?.platform,
           streamerId: jobData?.streamerId,
           attemptsMade: job.attemptsMade,
-          maxAttempts: (job.opts as any).attempts ?? 3,
+          maxAttempts: (job.opts as Partial<BaseJobOptions>).attempts ?? 3,
           errorMessage: err.message || String(err),
           errorStack: 'stack' in err ? String((err as Error & { stack?: string }).stack) : 'No stack trace available',
         },
@@ -212,14 +217,14 @@ async function bootstrap() {
     vodWorker.on('progress', async (job, progress) => {
       if (!job) return;
 
-      const data = await job.data;
+      const data = job.data;
       logger.debug({ jobId: String(job.id), vodId: data?.vodId, progress }, `VOD download progress update`);
     });
 
     chatWorker.on('completed', async (job) => {
       if (!job) return;
 
-      const data = await job.data;
+      const data = job.data;
       logger.info(
         {
           jobId: String(job.id),
@@ -233,7 +238,7 @@ async function bootstrap() {
     chatWorker.on('failed', async (job, err) => {
       if (!job || !err) return;
 
-      const jobData = await job.data;
+      const jobData = job.data;
       logger.error(
         {
           jobId: String(job.id),
@@ -249,7 +254,7 @@ async function bootstrap() {
     youtubeWorker.on('completed', async (job) => {
       if (!job) return;
 
-      const data = await job.data;
+      const data = job.data;
       logger.info(
         {
           jobId: String(job.id),
@@ -263,7 +268,7 @@ async function bootstrap() {
     youtubeWorker.on('failed', async (job, err) => {
       if (!job || !err) return;
 
-      const jobData = await job.data;
+      const jobData = job.data;
       logger.error(
         {
           jobId: String(job.id),
@@ -279,7 +284,7 @@ async function bootstrap() {
     dmcaWorker.on('completed', async (job) => {
       if (!job) return;
 
-      const data = await job.data;
+      const data = job.data;
       logger.info(
         {
           jobId: String(job.id),
@@ -293,7 +298,7 @@ async function bootstrap() {
     dmcaWorker.on('failed', async (job, err) => {
       if (!job || !err) return;
 
-      const jobData = await job.data;
+      const jobData = job.data;
       logger.error(
         {
           jobId: String(job.id),
@@ -337,6 +342,10 @@ async function bootstrap() {
       await youtubeWorker.close();
       await dmcaWorker.close();
 
+      for (const queue of queues.values()) {
+        await queue.close();
+      }
+
       const clientModule = await import('../db/client.js');
       await clientModule.closeAllClients();
       await releaseKickBrowser();
@@ -346,9 +355,7 @@ async function bootstrap() {
       process.exit(0);
     };
 
-    // Override default shutdown handlers (monitor/index.ts registers its own)
-    process.removeAllListeners('SIGTERM');
-    process.removeAllListeners('SIGINT');
+    // Register shutdown handlers (don't remove existing listeners from other modules)
     process.on('SIGTERM', shutdown);
     process.on('SIGINT', shutdown);
 

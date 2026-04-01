@@ -302,3 +302,57 @@ export async function getGlobalBadges(streamerId: string): Promise<Record<string
     return null;
   }
 }
+
+export interface TwitchEmoteFragment {
+  __typename?: 'EmoteFragment';
+  id: string;
+  text: string | null;
+}
+
+export interface TwitchBadgeSetItem {
+  __typename?: 'BadgeSetItem';
+  badgeVersionId: string;
+  setID: string;
+}
+
+export type TwitchUserBadgesArray = TwitchBadgeSetItem[];
+
+export interface TwitchCommentMessageNode {
+  __typename?: 'CommentMessageNode';
+  emote: boolean | null;
+  fragments: TwitchEmoteFragment[] | null;
+  userBadges: TwitchUserBadgesArray | null;
+  userColor: string | null;
+}
+
+export interface TwitchCommenterProfile {
+  __typename?: 'UserProfile';
+  displayName: string | null;
+}
+
+export interface TwitchChatMessageNode {
+  __typename?: 'ChatMessageNode';
+  id: string;
+  commenter: TwitchCommenterProfile | null;
+  contentOffsetSeconds: number | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  message: TwitchCommentMessageNode | null;
+}
+
+export interface TwitchChatEdge {
+  __typename?: 'ChatEdge';
+  cursor: string | null;
+  node: TwitchChatMessageNode | null;
+}
+
+export interface TwitchCommentsConnection {
+  __typename?: 'VideoCommentsConnection';
+  edges: TwitchChatEdge[] | null;
+}
+
+export interface TwitchVideoCommentResponse {
+  __typename?: 'VideoObject';
+  id: string | null;
+  comments: TwitchCommentsConnection | null;
+}
