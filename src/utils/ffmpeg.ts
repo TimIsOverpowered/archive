@@ -1,6 +1,9 @@
 import ffmpeg, { FfprobeData } from 'fluent-ffmpeg';
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
+import { pipeline } from 'stream/promises';
+import { spawn } from 'child_process';
 import { logger } from './logger.js';
 
 interface ProgressEvent {
@@ -134,4 +137,76 @@ export async function deleteFile(filePath: string): Promise<void> {
       throw err;
     }
   }
+}
+
+function sortFmp4SegmentPaths(files: string[]): string[] {
+  return [...files].sort((a, b) => {
+    const nameA = path.basename(a);
+    const nameB = path.basename(b);
+
+    if (nameA.includes('init')) return -1;
+    if (nameB.includes('init')) return 1;
+
+    const matchA = nameA.match(/^(\d+)/);
+    const matchB = nameB.match(/^(\d+)/);
+
+    const numA = matchA ? parseInt(matchA[1], 10) : Infinity;
+    const numB = matchB ? parseInt(matchB[1], 10) : Infinity;
+
+    return numA - numB;
+  });
+}
+
+export async function finalizeFmp4Segments(vodDir: string, outputPath: string, onProgress?: (percent: number) => void): Promise<void> {
+  const segmentFiles = await fs.readdir(vodDir).then((files) => files.filter((f) => f.endsWith('.mp4')).map((f) => path.join(vodDir, f)));
+
+  if (segmentFiles.length === 0) {
+    throw new Error('No MP4 segments found in directory');
+  }
+
+  const sortedSegments = sortFmp4SegmentPaths(segmentFiles);
+
+  logger.debug({ vodDir, count: sortedSegments.length }, 'Finalizing fMP4 segments');
+
+  return new Promise((resolve, reject) => {
+    const cmd = spawn('ffmpeg', ['-y', '-i', 'pipe:0', '-c', 'copy', '-avoid_negative_ts', 'make_zero', '-fflags', '+genpts', '-movflags', '+faststart', outputPath]);
+
+    let totalBytes = 0;
+    const segmentSizes: number[] = [];
+
+    for (const segPath of sortedSegments) {
+      const stat = fsSync.statSync(segPath);
+      segmentSizes.push(stat.size);
+      totalBytes += stat.size;
+    }
+
+    let processedBytes = 0;
+
+    cmd.on('error', reject);
+    cmd.stderr.on('data', (data) => {
+      logger.debug({ stderr: data.toString() }, 'FFmpeg fMP4 output');
+    });
+
+    cmd.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`ffmpeg exited with code ${code}`));
+    });
+
+    const pipeSegments = async () => {
+      for (let i = 0; i < sortedSegments.length; i++) {
+        const segPath = sortedSegments[i];
+        const readStream = fsSync.createReadStream(segPath);
+
+        await pipeline(readStream, cmd.stdin!);
+
+        processedBytes += segmentSizes[i];
+        const percent = Math.round((processedBytes / totalBytes) * 100);
+        onProgress?.(percent);
+      }
+
+      cmd.stdin.end();
+    };
+
+    pipeSegments().catch(reject);
+  });
 }

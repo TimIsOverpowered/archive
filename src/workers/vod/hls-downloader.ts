@@ -449,56 +449,67 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
   try {
     const filesInDir = await fsPromises.readdir(vodDir);
-    const tsFilesCount = filesInDir.filter((f) => f.endsWith('.ts')).length;
 
-    if (tsFilesCount === 0) throw new Error(`No TS segments found in ${vodDir}. Download may have failed or stream was empty.`);
+    // Detect segment format: fMP4 vs traditional TS HLS
+    const hasInitSegment = filesInDir.some((f) => f.includes('init') && f.endsWith('.mp4'));
+    const mp4Segments = filesInDir.filter((f) => f.endsWith('.mp4'));
+    const tsSegments = filesInDir.filter((f) => f.endsWith('.ts'));
 
-    log.info(`[${vodId}] Found ${tsFilesCount} TS segments. Starting MP4 conversion...`);
+    let finalMp4Path = pathMod.join(config.settings.vodPath || '', String(streamerId), `${vodId}.mp4`);
 
-    const finalMp4Path = pathMod.join(config.settings.vodPath || '', String(streamerId), `${vodId}.mp4`);
+    if (hasInitSegment && mp4Segments.length > 0) {
+      log.info(`[${vodId}] Detected fMP4 segments (${mp4Segments.length} files). Using specialized finalization...`);
 
-    // Import video-utils for convertHlsToMp4 and getDuration
-    try {
-      const { convertHlsToMp4, getDuration } = await import('../../utils/ffmpeg.js');
+      const { finalizeFmp4Segments } = await import('../../utils/ffmpeg.js');
+
+      await finalizeFmp4Segments(vodDir, finalMp4Path);
+
+      log.info(`[${vodId}] fMP4 merging complete. File saved to ${finalMp4Path}`);
+    } else if (tsSegments.length > 0) {
+      const tsFilesCount = tsSegments.length;
+
+      log.info(`[${vodId}] Found ${tsFilesCount} TS segments. Starting MP4 conversion...`);
+
+      const { convertHlsToMp4 } = await import('../../utils/ffmpeg.js');
 
       await convertHlsToMp4(m3u8Path, vodId, finalMp4Path);
 
       log.info(`[${vodId}] MP4 conversion complete. File saved to ${finalMp4Path}`);
+    } else {
+      throw new Error(`No valid segments found in ${vodDir}. Download may have failed or stream was empty.`);
+    }
 
-      const actualDuration = await getDuration(finalMp4Path);
+    const { getDuration } = await import('../../utils/ffmpeg.js');
 
-      if (actualDuration) {
-        const formattedDuration = toHHMMSS(Math.round(actualDuration));
+    const actualDuration = await getDuration(finalMp4Path);
 
-        await streamerClient.vod.update({ where: { id: vodId }, data: { duration: Math.round(actualDuration), is_live: false } });
+    if (actualDuration) {
+      const formattedDuration = toHHMMSS(Math.round(actualDuration));
 
-        log.info(`[${vodId}] Updated VOD with duration ${formattedDuration} and marked as ended`);
+      await streamerClient.vod.update({ where: { id: vodId }, data: { duration: Math.round(actualDuration), is_live: false } });
 
-        if (isAlertsEnabled() && messageId) {
-          updateDiscordEmbed(messageId, {
-            title: `[HLS] ${vodId} Complete!`,
-            description: `${platform.toUpperCase()} live stream successfully processed and converted to MP4`,
-            status: 'success',
-            fields: [
-              { name: 'Platform', value: platform, inline: true },
-              { name: 'Duration', value: formattedDuration, inline: false },
-            ],
-            timestamp: startedAt || new Date().toISOString(),
-            updatedTimestamp: new Date().toISOString(),
-          });
-        }
+      log.info(`[${vodId}] Updated VOD with duration ${formattedDuration} and marked as ended`);
 
-        return { success: true as const, finalPath: finalMp4Path, durationSeconds: actualDuration };
-      } else {
-        log.warn(`[${vodId}] Could not determine video duration from MP4 file`);
-        await streamerClient.vod.update({ where: { id: vodId }, data: { is_live: false } });
-
-        return { success: true as const, finalPath: finalMp4Path };
+      if (isAlertsEnabled() && messageId) {
+        updateDiscordEmbed(messageId, {
+          title: `[HLS] ${vodId} Complete!`,
+          description: `${platform.toUpperCase()} live stream successfully processed and converted to MP4`,
+          status: 'success',
+          fields: [
+            { name: 'Platform', value: platform, inline: true },
+            { name: 'Duration', value: formattedDuration, inline: false },
+          ],
+          timestamp: startedAt || new Date().toISOString(),
+          updatedTimestamp: new Date().toISOString(),
+        });
       }
-    } catch (importError) {
-      const importErr = extractErrorDetails(importError);
-      log.error({ ...importErr, vodId }, `[${vodId}] Failed to import video-utils for MP4 conversion`);
-      throw new Error('MP4 conversion module not available');
+
+      return { success: true as const, finalPath: finalMp4Path, durationSeconds: actualDuration };
+    } else {
+      log.warn(`[${vodId}] Could not determine video duration from MP4 file`);
+      await streamerClient.vod.update({ where: { id: vodId }, data: { is_live: false } });
+
+      return { success: true as const, finalPath: finalMp4Path };
     }
   } catch (error: unknown) {
     const details = extractErrorDetails(error);
@@ -518,16 +529,13 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
       });
     }
 
-    throw new Error('Stream finalization failed: ' + (error as Error).message);
+    throw error;
   } finally {
-    // Queue YouTube upload if configured - removed for brevity, original logic preserved
-
     const finalMp4Path = pathMod.join(config.settings.vodPath || '', String(streamerId), `${vodId}.mp4`);
 
     try {
       await fsPromises.access(finalMp4Path);
 
-      // Cleanup temporary directory if not configured to save HLS files
       if (!config.settings.saveHLS) {
         try {
           await fsPromises.rm(vodDir, { recursive: true });
@@ -536,7 +544,6 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
           log.info(`[${vodId}] Cleaned up temporary directory ${vodDir}`);
         } catch (error: unknown) {
           const details = extractErrorDetails(error);
-          // Non-critical cleanup failure - still mark as success but warn about cleanup issue
           log.warn({ ...details, vodId }, `[${vodId}] Failed to clean up temporary directory`);
         }
       } else {
@@ -545,7 +552,6 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         log.info(`[${vodId}] HLS files preserved in ${vodDir} (saveHLS=true)`);
       }
     } catch {
-      // File doesn't exist - this shouldn't happen but handle gracefully
       log.error(`[${vodId}] Final MP4 file not found at expected path: ${finalMp4Path}`);
 
       if (!config.settings.saveHLS) {
@@ -556,8 +562,6 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
           log.warn({ ...details, vodId }, `[${vodId}] Cleanup failed`);
         }
       }
-
-      // Don't reset failures since the job didn't fully succeed
     }
   }
 }
