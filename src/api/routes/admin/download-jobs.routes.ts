@@ -1,9 +1,12 @@
 import { FastifyInstance } from 'fastify';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
+import type { VodData as TwitchVodData } from '../../../services/twitch.js';
 import { getStreamerConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { validateTenantPlatform, findVodRecord, parseDurationToSeconds, queueEmoteFetch } from './utils/vod-helpers';
+import type { KickVod } from '../../../services/kick.js';
+import { getClient } from '../../../db/client.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -11,76 +14,95 @@ declare module 'fastify' {
   }
 }
 
+type StreamerDbClient = ReturnType<typeof getClient>;
+
+type VodRecord = {
+  id: string;
+  title: string | null;
+  created_at: Date;
+  duration: number;
+  stream_id: string | null;
+  platform: string;
+};
+
 export default async function downloadJobsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
 
   /**
    * Shared VOD creation logic for both /download and /hlsDownload endpoints
    */
-  async function ensureVodRecord(streamerId: string, vodId: string, platform: 'twitch' | 'kick', log: any): Promise<any> {
+  async function ensureVodRecord(
+    streamerId: string,
+    vodId: string,
+    platform: 'twitch' | 'kick',
+    logInstance: { info: (msg: string) => void; warn: (msg: string) => void; error: (msg: string) => void }
+  ): Promise<VodRecord> {
     const config = getStreamerConfig(streamerId);
 
     if (!config) throw new Error('Tenant not found');
 
-    let client: any;
+    let client: StreamerDbClient | null = null;
 
     try {
       // Try to get tenant-specific client first, fall back to meta for VOD lookup
-      client = await import('../../../db/client').then((m) => m.getClient(streamerId));
+      client = getClient(streamerId);
 
       if (!client) throw new Error('Database not available');
 
-      let vodRecord: any;
+      let vodRecord: VodRecord | null = null;
       try {
-        vodRecord = await findVodRecord(client, vodId);
+        const rawVodRecord = await findVodRecord(client, vodId);
+        if (rawVodRecord) {
+          vodRecord = rawVodRecord as VodRecord;
+        }
       } catch {
-        vodRecord = null;
+        // VOD not found or error looking up
       }
 
       // VOD exists - return it with platform validation warning if needed
       if (vodRecord) {
-        if (vodRecord.platform !== platform) {
-          log.warn(`[${streamerId}] VOD ${vodId} exists but has different platform: expected=${platform}, actual=${vodRecord.platform}`);
+        const typedRecord: Record<string, unknown> = vodRecord as Record<string, unknown>;
+        if ((typedRecord.platform as string | undefined) !== platform) {
+          logInstance.warn(`[${streamerId}] VOD ${vodId} exists but has different platform: expected=${platform}, actual=${typedRecord.platform}`);
         }
 
-        log.info(`[${streamerId}] Using existing VOD record for ${vodId}`);
+        logInstance.info(`[${streamerId}] Using existing VOD record for ${vodId}`);
 
         return vodRecord;
       }
 
       // Create new VOD record by fetching metadata from platform API
-      log.info(`[${streamerId}] Creating new VOD ${vodId} for platform ${platform}`);
-
-      let vodMetadata: any;
+      logInstance.info(`[${streamerId}] Creating new VOD ${vodId} for platform ${platform}`);
 
       if (platform === 'twitch') {
         const twitch = await import('../../../services/twitch');
-        vodMetadata = await twitch.getVodData(vodId, streamerId);
+        const vodMetadata: TwitchVodData = await twitch.getVodData(vodId, streamerId);
 
         // Validate ownership
         if (!config.twitch?.id || vodMetadata.user_id !== config.twitch.id) {
           throw new Error('This VOD belongs to another Twitch channel');
         }
 
-        const durationParts: any[] = vodMetadata.duration.replace('PT', '').split(/[HMS]/);
+        const durationStr = String(vodMetadata.duration);
+        const durationParts: string[] = durationStr.replace('PT', '').split(/[HMS]/);
         let totalSeconds = 0;
 
-        if (durationParts.length >= 3 && !isNaN(durationParts[1])) {
+        if (durationParts.length >= 3 && !isNaN(parseInt(durationParts[1]))) {
           totalSeconds += parseInt(durationParts[0] || '0') * 3600 + parseInt(durationParts[1]) * 60 + parseInt(durationParts[2]);
         }
 
-        vodRecord = await client.vod.create({
+        vodRecord = (await client.vod.create({
           data: {
             id: vodId,
             title: vodMetadata.title || null,
-            created_at: new Date(vodMetadata.started_at),
+            created_at: new Date(vodMetadata.created_at),
             duration: totalSeconds,
             stream_id: vodMetadata.stream_id || null,
             platform: 'twitch',
           },
-        });
+        })) as VodRecord;
 
-        log.info(`[${streamerId}] Created Twitch VOD ${vodId} with user_id=${vodMetadata.user_id}`);
+        logInstance.info(`[${streamerId}] Created Twitch VOD ${vodId} with user_id=${vodMetadata.user_id}`);
       } else if (platform === 'kick') {
         const kick = await import('../../../services/kick');
 
@@ -88,12 +110,11 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           throw new Error('Kick username not configured for this tenant');
         }
 
-        vodMetadata = await kick.getVod(config.kick.username, vodId);
+        const vodMetadata: KickVod = await kick.getVod(config.kick.username, vodId);
 
-        // Trust URL path for ownership validation - if fetch succeeds, it belongs to that channel
-        log.info(`[${streamerId}] Fetched Kick VOD ${vodId} from channel ${config.kick.username}`);
+        logInstance.info(`[${streamerId}] Fetched Kick VOD ${vodId} from channel ${config.kick.username}`);
 
-        vodRecord = await client.vod.create({
+        vodRecord = (await client.vod.create({
           data: {
             id: String(vodId),
             title: vodMetadata.title || null,
@@ -102,17 +123,17 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
             stream_id: `${vodMetadata.id}`,
             platform: 'kick',
           },
-        });
+        })) as VodRecord;
 
-        log.info(`[${streamerId}] Created Kick VOD ${vodId} with duration=${Number(vodMetadata.duration)}ms`);
+        logInstance.info(`[${streamerId}] Created Kick VOD ${vodId} with duration=${Number(vodMetadata.duration)}ms`);
       } else {
         throw new Error('Unsupported platform');
       }
 
       return vodRecord;
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (!client) {
-        log.error(`[${streamerId}] Database not available for VOD creation`);
+        logInstance.error(`[${streamerId}] Database not available for VOD creation`);
       }
 
       throw error;
@@ -120,7 +141,10 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
   }
 
   // Main download endpoint - creates VOD record if missing, then queues download + emote + chat jobs (Twitch/Kick)
-  fastify.post(
+  fastify.post<{
+    Body: { vodId: string; type?: 'live' | 'vod'; platform: 'twitch' | 'kick'; path?: string };
+    Params: { id: string };
+  }>(
     '/:id/download',
     {
       schema: {
@@ -141,17 +165,21 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
-    async (request: any) => {
+    async (request) => {
       const streamerId = request.params.id;
 
       try {
         // Validate tenant and platform enablement
-        const validation = validateTenantPlatform(streamerId, request.body.platform as 'twitch' | 'kick');
+        const validation = validateTenantPlatform(streamerId, request.body.platform);
 
         if (validation.error) throw validation.error;
 
         // Ensure VOD record exists or create it from platform API metadata
-        const vodRecord: any = await ensureVodRecord(streamerId, request.body.vodId, request.body.platform as 'twitch' | 'kick', request.log);
+        const vodRecord: VodRecord | null = await ensureVodRecord(streamerId, request.body.vodId, request.body.platform as 'twitch' | 'kick', request.log);
+
+        if (!vodRecord) {
+          throw new Error('Failed to create VOD record');
+        }
 
         // Queue emote save job (fire-and-forget within request context)
         const channelId = vodRecord.stream_id ? String(vodRecord.stream_id) : undefined;
@@ -173,20 +201,25 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           streamerId,
           vodId: request.body.vodId,
           platform: request.body.platform as 'twitch' | 'kick',
-          userId: streamerId,
         };
 
         const VodQueueModule = await import('../../../jobs/queues');
-        await (VodQueueModule.getVODDownloadQueue() as any).add(vodDownloadJob, { name: 'vod_download', id: `download:${request.body.vodId}:${Date.now()}` });
+
+        void VodQueueModule.getVODDownloadQueue().add('vod_download', vodDownloadJob, {
+          jobId: `download:${request.body.vodId}:${Date.now()}`,
+        });
 
         const vodJobId = `download:${request.body.vodId}:${Date.now()}`;
 
-        // Queue chat download job
+        // Calculate duration for chat download job
         const durationSeconds = parseDurationToSeconds(vodRecord.duration, request.body.platform as 'twitch' | 'kick');
 
-        await (VodQueueModule.getChatDownloadQueue() as any).add(
+        void VodQueueModule.getChatDownloadQueue().add(
+          'chat_download',
           { streamerId, vodId: request.body.vodId, platform: request.body.platform as 'twitch' | 'kick', duration: durationSeconds },
-          { name: 'chat_download', id: `chat:${request.body.vodId}:${Date.now()}` }
+          {
+            jobId: `chat:${request.body.vodId}:${Date.now()}`,
+          }
         );
 
         const chatJobId = `chat:${request.body.vodId}:${Date.now()}`;
@@ -204,7 +237,10 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
   );
 
   // Convenience endpoint - trigger VOD + chat download together (Twitch/Kick with optional platform param)
-  fastify.post(
+  fastify.post<{
+    Body: { vodId: string; platform?: 'twitch' | 'kick'; skipEmotes?: boolean };
+    Params: { id: string };
+  }>(
     '/:id/hlsDownload',
     {
       schema: {
@@ -216,6 +252,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           properties: {
             vodId: { type: 'string' },
             platform: { type: 'string', enum: ['twitch', 'kick'] },
+            skipEmotes: { type: 'boolean' },
           },
           required: ['vodId'],
         },
@@ -223,20 +260,24 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
-    async (request: any) => {
+    async (request) => {
       const streamerId = request.params.id;
 
       try {
         // Default to Twitch for backward compatibility if platform not specified
-        const platform = request.body.platform || 'twitch';
+        const platform = (request.body.platform as 'twitch' | 'kick') || 'twitch';
 
         // Validate tenant and platform enablement
-        const validation = validateTenantPlatform(streamerId, platform as 'twitch' | 'kick');
+        const validation = validateTenantPlatform(streamerId, platform);
 
         if (validation.error) throw validation.error;
 
         // Ensure VOD record exists or create it from platform API metadata
-        const vodRecord: any = await ensureVodRecord(streamerId, request.body.vodId, platform as 'twitch' | 'kick', request.log);
+        const vodRecord: VodRecord = await ensureVodRecord(streamerId, request.body.vodId, platform, request.log);
+
+        if (!vodRecord) {
+          throw new Error('Failed to create VOD record');
+        }
 
         // Queue emote save (fire-and-forget)
         const channelId = vodRecord.stream_id ? String(vodRecord.stream_id) : undefined;
@@ -245,7 +286,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           await queueEmoteFetch({
             streamerId,
             vodId: request.body.vodId,
-            platform: platform as 'twitch' | 'kick',
+            platform: platform,
             channelId,
             log: request.log,
           });
@@ -254,18 +295,23 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         }
 
         // Queue VOD download job
-        const vodDownloadJob = { streamerId, vodId: request.body.vodId, platform: platform as 'twitch' | 'kick', userId: streamerId };
+        const vodDownloadJob = { streamerId, vodId: request.body.vodId, platform: platform };
 
         const VodQueueModule = await import('../../../jobs/queues');
 
-        await (VodQueueModule.getVODDownloadQueue() as any).add(vodDownloadJob, { name: 'vod_download', id: `hls:${request.body.vodId}:${Date.now()}` });
+        void VodQueueModule.getVODDownloadQueue().add('vod_download', vodDownloadJob, {
+          jobId: `hls:${request.body.vodId}:${Date.now()}`,
+        });
 
         // Queue chat download job
-        const durationSeconds = parseDurationToSeconds(vodRecord.duration, platform as 'twitch' | 'kick');
+        const durationSeconds = parseDurationToSeconds(vodRecord.duration, platform);
 
-        await (VodQueueModule.getChatDownloadQueue() as any).add(
-          { streamerId, vodId: request.body.vodId, platform: platform as 'twitch' | 'kick', duration: durationSeconds },
-          { name: 'chat_download', id: `hls-chat:${request.body.vodId}:${Date.now()}` }
+        void VodQueueModule.getChatDownloadQueue().add(
+          'chat_download',
+          { streamerId, vodId: request.body.vodId, platform: platform, duration: durationSeconds },
+          {
+            jobId: `hls-chat:${request.body.vodId}:${Date.now()}`,
+          }
         );
 
         request.log.info(`[${streamerId}] Queued HLS download jobs for ${request.body.vodId} (platform=${platform})`);

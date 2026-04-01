@@ -45,8 +45,9 @@ export async function startMonitorService(): Promise<void> {
 export async function stopMonitorService(): Promise<void> {
   logger.info('[Monitor] Received shutdown signal. Cleaning up...');
 
-  // Clear all monitor intervals
-  const intervals = (globalThis as any).monitorIntervals;
+  // Clear all monitor intervals (now type-safe via src/types/global.d.ts)
+  const globalObj = global as unknown as NodeJS.Global;
+  const intervals: Map<string, ReturnType<typeof setInterval>> | undefined = globalObj.monitorIntervals;
 
   if (intervals) {
     for (const [key, intervalId] of intervals.entries()) {
@@ -69,7 +70,3 @@ export async function stopMonitorService(): Promise<void> {
 
   logger.info('[Monitor] Shutdown complete.');
 }
-
-// Register shutdown handlers for PM2 restarts/process termination (when running as standalone service)
-process.on('SIGTERM', stopMonitorService);
-process.on('SIGINT', stopMonitorService);

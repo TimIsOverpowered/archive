@@ -310,9 +310,26 @@ async function bootstrap() {
     const shutdown = async () => {
       logger.info('Shutting down workers...');
 
-      // Stop monitor polling loops first
+      // Stop monitor polling loops first (also clears intervals)
       await stopMonitorService();
 
+      // Close Kick Puppeteer browser instance
+      try {
+        const kickModule = await import('../services/kick-live.js');
+        if (kickModule.closeKickBrowser) {
+          await kickModule.closeKickBrowser();
+        }
+      } catch (_err) {}
+
+      // Clear YouTube OAuth clients cache
+      try {
+        const youtubeModule = await import('../services/youtube.js');
+        if (youtubeModule.shutdown) {
+          youtubeModule.shutdown();
+        }
+      } catch (_err) {}
+
+      // Close workers and queues
       await vodWorker.close();
       await chatWorker.close();
       await youtubeWorker.close();

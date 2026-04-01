@@ -1,4 +1,4 @@
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import Redis from 'ioredis';
 import { getStreamerConfig } from '../../config/loader';
 
@@ -17,7 +17,7 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
         params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
       },
     },
-    async (request: any) => {
+    async (request: FastifyRequest<{ Params: { id: string }; Body?: unknown }>): Promise<unknown> => {
       const streamerId = request.params.id;
 
       try {
@@ -57,7 +57,7 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
             return { data: badgesData };
           } catch (_cacheError) {
             // Cache write failure - still return the fetched data even if caching fails
-            (request as any).warn?.(`Failed to cache Twitch badges in Redis, returning uncached result for ${streamerId}`);
+            request.log.warn(`Failed to cache Twitch badges in Redis, returning uncached result for ${streamerId}`);
 
             return { data: badgesData };
           }

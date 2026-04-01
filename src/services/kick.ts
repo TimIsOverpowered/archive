@@ -43,7 +43,7 @@ export async function getVods(channelName: string): Promise<KickVod[]> {
       const data = JSON.parse(script.innerHTML);
       const videos = data.props?.pageProps?.videos?.edges || [];
 
-      return videos.map((edge: any) => ({
+      return videos.map((edge: { node: Record<string, unknown> }) => ({
         id: String(edge.node.id),
         slug: edge.node.slug ?? null,
         title: edge.node.title ?? null,
@@ -53,7 +53,9 @@ export async function getVods(channelName: string): Promise<KickVod[]> {
         published_at: edge.node.publishedAt ?? null,
         created_at: edge.node.createdAt || '',
         source: edge.node.source ?? null,
-        thumbnail: edge.node.thumbnail ? { src: edge.node.thumbnail.src ?? null, srcset: edge.node.thumbnail.srcset ?? null } : null,
+        thumbnail: edge.node.thumbnail
+          ? { src: (edge.node.thumbnail as Record<string, string | null>)?.src ?? null, srcset: (edge.node.thumbnail as Record<string, string | null>)?.srcset ?? null }
+          : null,
       }));
     });
 

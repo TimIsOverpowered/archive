@@ -147,7 +147,10 @@ export async function getLatestKickVodObject(username: string, expectedStreamId:
     }
 
     // Find matching VOD by ID (Kick uses same ID for stream and video)
-    const vodObject = data.find((v: any) => v.id === expectedStreamId || String(v.id) === String(expectedStreamId));
+    const vodObject = data.find((v: unknown) => {
+      const vid = typeof v === 'object' && v !== null ? (v as Record<string, unknown>).id : undefined;
+      return vid === expectedStreamId || String(vid ?? '') === String(expectedStreamId);
+    });
 
     if (!vodObject) {
       logger.debug({ username, expectedStreamId }, `[Kick] Video object not found yet for stream ${expectedStreamId}`);
@@ -180,7 +183,3 @@ export async function closeKickBrowser(): Promise<void> {
     browserInstance = null;
   }
 }
-
-// Graceful shutdown handler
-process.on('SIGTERM', () => closeKickBrowser());
-process.on('SIGINT', () => closeKickBrowser());

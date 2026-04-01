@@ -13,11 +13,25 @@ declare module 'fastify' {
   }
 }
 
+type VodRecord = { id: string; title?: string | null; duration: number | string; platform: 'twitch' | 'kick' };
+
+interface ReUploadYoutubeParams {
+  id: string;
+  vodId: string;
+}
+
+interface ReDownloadVodParams {
+  id: string;
+  vodId: string;
+}
+
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+
 export default async function youtubeUploadRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
 
   // Manually trigger YouTube re-upload for a VOD with duration validation
-  fastify.post(
+  fastify.post<{ Params: ReUploadYoutubeParams }>(
     '/:id/vods/:vodId/re-upload-youtube',
     {
       schema: {
@@ -28,7 +42,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
-    async (request: any) => {
+    async (request) => {
       const streamerId = request.params.id;
       const vodId = request.params.vodId;
 
@@ -39,19 +53,16 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
         if (!config.youtube) throw new Error('YouTube integration not configured for this tenant');
 
-        let client: any;
+        const { getClient } = await import('../../../db/client.js');
 
-        try {
-          const ClientModule = await import('../../../db/client');
-          client = ClientModule.getClient(streamerId);
+        const dbClient = getClient(streamerId);
 
-          if (!client) throw new Error('Database not available');
-        } catch (error: any) {
-          request.log.error(`[${streamerId}] Database error: ${error.message}`);
+        if (!dbClient) {
+          request.log.error(`[${streamerId}] Database not available`);
           throw new Error('Database not available');
         }
 
-        const vodRecord: any = await client.vod.findUnique({ where: { id: vodId } });
+        const vodRecord = (await dbClient.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
 
         if (!vodRecord) throw new Error(`VOD ${vodId} not found`);
 
@@ -75,10 +86,10 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
           let expectedSeconds: number | null = null;
 
           // Parse duration based on platform format
-          const durationStr = vodRecord.duration as string;
+          const durationStr = String(vodRecord.duration);
 
-          if (vodRecord.platform === 'twitch' && typeof durationStr === 'string') {
-            const [hrs, mins, secs] = String(durationStr).split(':').map(Number);
+          if (vodRecord.platform === 'twitch') {
+            const [hrs, mins, secs] = durationStr.split(':').map(Number);
             expectedSeconds = hrs * 3600 + mins * 60 + secs;
 
             if (expectedSeconds > 0) {
@@ -89,7 +100,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
           }
         } catch (validationError) {
           // Non-critical - just log and continue with upload anyway
-          request.warn?.(validationError instanceof Error ? `Duration check failed: ${validationError.message}` : 'Duration validation skipped');
+          request.log.warn(validationError instanceof Error ? `Duration check failed: ${validationError.message}` : 'Duration validation skipped');
         }
 
         const youtubeJob = {
@@ -101,7 +112,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
           type: 'vod' as const,
         };
 
-        await (YouTubeQueueModule.getYoutubeUploadQueue() as any).add(youtubeJob, { id: `youtube-reupload:${vodId}:${Date.now()}` });
+        await YouTubeQueueModule.getYoutubeUploadQueue().add('youtube_upload', youtubeJob, { jobId: `youtube-reupload:${vodId}:${Date.now()}` });
 
         return { data: { message: 'YouTube re-upload job queued', vodId, jobId: `youtube-reupload:${vodId}:${Date.now()}`, durationValidation: null } };
       } catch (error) {
@@ -114,7 +125,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
   );
 
   // Manually trigger VOD download (clears Redis dedup key first)
-  fastify.post(
+  fastify.post<{ Params: ReDownloadVodParams }>(
     '/:id/vods/:vodId/re-download',
     {
       schema: {
@@ -125,7 +136,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
-    async (request: any) => {
+    async (request) => {
       const streamerId = request.params.id;
       const vodId = request.params.vodId;
 
@@ -134,27 +145,22 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
         if (!config) throw new Error('Tenant not found');
 
-        let client: any;
+        const { getClient } = await import('../../../db/client.js');
 
-        try {
-          const ClientModule = await import('../../../db/client');
-          client = ClientModule.getClient(streamerId);
+        const dbClient = getClient(streamerId);
 
-          if (!client) throw new Error('Database not available');
-        } catch (error: any) {
-          request.log.error(`[${streamerId}] Database error: ${error.message}`);
+        if (!dbClient) {
+          request.log.error(`[${streamerId}] Database not available`);
           throw new Error('Database not available');
         }
 
-        const vodRecord: any = await client.vod.findUnique({ where: { id: vodId } });
+        const vodRecord = (await dbClient.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
 
         if (!vodRecord) throw new Error(`VOD ${vodId} not found`);
 
         // Clear Redis dedup key to allow re-download
         try {
-          const redisInstance = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
-
-          await redisInstance.del(`vod_download:${vodId}`);
+          await redis.del(`vod_download:${vodId}`);
 
           request.log.info(`[${streamerId}] Cleared Redis dedup key for manual re-download of ${vodId}`);
         } catch (err) {
@@ -172,7 +178,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
           userId: streamerId,
         };
 
-        await (YouTubeQueueModule.getVODDownloadQueue() as any).add(downloadJob, { name: 'vod_download', id: `download:${vodId}:${Date.now()}` });
+        void YouTubeQueueModule.getVODDownloadQueue().add('vod_download', downloadJob, { jobId: `download:${vodId}:${Date.now()}` });
 
         return { data: { message: 'Re-download job queued', vodId, jobId: `download:${vodId}:${Date.now()}` } };
       } catch (error) {

@@ -9,6 +9,7 @@ dotenv.config({ path: path.resolve(process.cwd(), envFile) });
 import { buildServer } from './api/server';
 import { closeAllClients } from './db/client';
 import { logger } from './utils/logger';
+import { closeRedisClient } from './api/plugins/redis.plugin';
 
 const PORT = process.env.PORT || 3030;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -52,6 +53,10 @@ async function shutdown(signal: string) {
     // Close HTTP server (waits for in-flight requests)
     await server.close();
     logger.info('HTTP server closed');
+
+    // Close Redis client connection
+    await closeRedisClient();
+    logger.info('Redis connections closed');
 
     // Close all Prisma DB clients
     await closeAllClients();

@@ -7,7 +7,7 @@ import { logger } from '../utils/logger.js';
 const MAX_FAILURES = 3;
 
 export async function checkTokenHealth(): Promise<void> {
-  const loaderModule: any = await import('../config/loader');
+  const loaderModule = await import('../config/loader');
   if (!loaderModule.getConfigs) return;
 
   const streamerConfigs: ConfigType[] = loaderModule.getConfigs();
@@ -22,8 +22,9 @@ export async function checkTokenHealth(): Promise<void> {
       try {
         await getAppAccessToken(streamerId);
         resetFailures(`${streamerId}:twitch`);
-      } catch (err: any) {
-        log.error({ error: err.message || String(err), platform: 'Twitch' }, `Token health check failed for ${streamerId}`);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        log.error({ error: errorMessage, platform: 'Twitch' }, `Token health check failed for ${streamerId}`);
 
         if (trackFailure(`${streamerId}:twitch`, MAX_FAILURES)) {
           await sendDiscordAlert(`🚨 Twitch token health check failed for ${streamerId} after ${MAX_FAILURES} attempts`);
@@ -33,16 +34,19 @@ export async function checkTokenHealth(): Promise<void> {
 
     if (config.youtube?.auth) {
       try {
-        const youtubeModule: any = await import('../services/youtube');
+        const youtubeModule = await import('../services/youtube');
 
         // Use lightweight validation instead of forcing token refresh
-        if (await youtubeModule.validateYoutubeToken(streamerId)) {
-          resetFailures(`${streamerId}:youtube`);
-        } else if (trackFailure(`${streamerId}:youtube`, MAX_FAILURES)) {
-          await sendDiscordAlert(`🚨 YouTube token health check failed for ${streamerId} after ${MAX_FAILURES} attempts`);
+        if ('validateYoutubeToken' in youtubeModule && typeof youtubeModule.validateYoutubeToken === 'function') {
+          if (await youtubeModule.validateYoutubeToken(streamerId)) {
+            resetFailures(`${streamerId}:youtube`);
+          } else if (trackFailure(`${streamerId}:youtube`, MAX_FAILURES)) {
+            await sendDiscordAlert(`🚨 YouTube token health check failed for ${streamerId} after ${MAX_FAILURES} attempts`);
+          }
         }
-      } catch (err: any) {
-        log.error({ error: err.message || String(err), platform: 'YouTube' }, `Token health check error for ${streamerId}`);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        log.error({ error: errorMessage, platform: 'YouTube' }, `Token health check error for ${streamerId}`);
 
         if (trackFailure(`${streamerId}:youtube`, MAX_FAILURES)) {
           await sendDiscordAlert(`🚨 YouTube token health check failed for ${streamerId} after ${MAX_FAILURES} attempts`);

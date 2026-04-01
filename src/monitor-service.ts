@@ -16,8 +16,9 @@ async function bootstrap() {
 
     // Wait indefinitely until interrupted
     await new Promise(() => {});
-  } catch (error: any) {
-    logger.error('[Monitor Service] Fatal error:', error.message || error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error('[Monitor Service] Fatal error:', errorMessage);
     process.exit(1);
   }
 }

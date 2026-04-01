@@ -1,6 +1,8 @@
 import { FastifyRequest } from 'fastify';
 import { getStreamerConfig } from '../../../../config/loader';
-import { getClient } from '../../../../db/client';
+import { getClient } from '../../../../db/client.js';
+
+type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
 
 export interface VodCreateOptions {
   vodId: string;
@@ -23,11 +25,11 @@ export interface QueueEmoteOptions {
 /**
  * Validates tenant config and platform enablement
  */
-export function validateTenantPlatform(streamerId: string, platform: 'twitch' | 'kick'): { config: ReturnType<typeof getStreamerConfig>; error?: Error } {
+export function validateTenantPlatform(streamerId: string, platform: 'twitch' | 'kick'): { config: ReturnType<typeof getStreamerConfig> | null; error?: Error } {
   const config = getStreamerConfig(streamerId);
 
   if (!config) {
-    return { config: null as any, error: new Error('Tenant not found') };
+    return { config: null, error: new Error('Tenant not found') };
   }
 
   if (platform === 'twitch' && !config.twitch?.enabled) {
@@ -44,20 +46,16 @@ export function validateTenantPlatform(streamerId: string, platform: 'twitch' | 
 /**
  * Gets and validates database client for streamer
  */
-export function getValidatedClient(streamerId: string): { client: any; error?: Error } {
+export function getValidatedClient(streamerId: string): { client: StreamerDbClient | null; error?: Error } {
   const client = getClient(streamerId);
-
-  if (!client) {
-    return { client: null as any, error: new Error('Database not available') };
-  }
-
+  if (!client) return { client: null, error: new Error('Database not available') };
   return { client };
 }
 
 /**
  * Fetches VOD record or returns null if not found
  */
-export async function findVodRecord(client: any, vodId: string): Promise<any> {
+export async function findVodRecord(client: StreamerDbClient, vodId: string): Promise<unknown> {
   try {
     return await client.vod.findUnique({ where: { id: vodId } });
   } catch {
@@ -92,7 +90,7 @@ export function parseTwitchDuration(durationStr: string): number {
 /**
  * Parses duration from various formats to seconds
  */
-export function parseDurationToSeconds(duration: any, platform?: 'twitch' | 'kick'): number {
+export function parseDurationToSeconds(duration: number | string, platform?: 'twitch' | 'kick'): number {
   if (typeof duration === 'number') {
     return Number(duration);
   }
@@ -115,14 +113,16 @@ export function parseDurationToSeconds(duration: any, platform?: 'twitch' | 'kic
 export async function queueEmoteFetch(options: QueueEmoteOptions): Promise<void> {
   const { streamerId, vodId, platform, channelId, log } = options;
 
-  import('../../../../services/emotes')
+  void import('../../../../services/emotes')
     .then(({ fetchAndSaveEmotes }) =>
-      fetchAndSaveEmotes(streamerId, vodId, platform, channelId).catch((err: any) => {
-        log.error(`[${vodId}] Emote save failed: ${err.message}`);
+      fetchAndSaveEmotes(streamerId, vodId, platform, channelId).catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        log.error(`[${vodId}] Emote save failed: ${msg}`);
       })
     )
-    .catch((err: any) => {
-      log.error(`[${vodId}] Failed to load emotes module: ${err.message}`);
+    .catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      log.error(`[${vodId}] Emote save failed: ${msg}`);
     });
 
   log.info(`[${streamerId}] Queued async emote fetch for ${vodId} (channel=${channelId})`);

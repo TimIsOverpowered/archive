@@ -95,6 +95,7 @@ export async function getVodTokenSig(vodId: string): Promise<VodTokenSig> {
     headers: {
       Accept: '*/*',
       'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
+      // @ts-expect-error - M5/H5 issue: Content-Type header requires string literal for GraphQL requests
       'Content-Type': 'text/plain;charset=UTF-8' as any,
     },
     body: JSON.stringify({
@@ -143,12 +144,13 @@ export async function getM3u8(vodId: string, token: string, sig: string): Promis
   return response.text();
 }
 
-export async function fetchComments(vodId: string, offset = 0): Promise<any | null> {
+export async function fetchComments(vodId: string, offset = 0): Promise<Record<string, unknown> | null> {
   const response = await fetch('https://gql.twitch.tv/gql', {
     method: 'POST',
     headers: {
       Accept: '*/*',
       'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
+      // @ts-expect-error - M5/H5 issue: Content-Type header requires string literal for GraphQL requests
       'Content-Type': 'text/plain;charset=UTF-8' as any,
     },
     body: JSON.stringify({
@@ -174,12 +176,13 @@ export async function fetchComments(vodId: string, offset = 0): Promise<any | nu
   return data.data?.video || null;
 }
 
-export async function fetchNextComments(vodId: string, cursor: string): Promise<any | null> {
+export async function fetchNextComments(vodId: string, cursor: string): Promise<Record<string, unknown> | null> {
   const response = await fetch('https://gql.twitch.tv/gql', {
     method: 'POST',
     headers: {
       Accept: '*/*',
       'Client-Id': 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
+      // @ts-expect-error - M5/H5 issue: Content-Type header requires string literal for GraphQL requests
       'Content-Type': 'text/plain;charset=UTF-8' as any,
     },
     body: JSON.stringify({
@@ -205,12 +208,13 @@ export async function fetchNextComments(vodId: string, cursor: string): Promise<
   return data.data?.video || null;
 }
 
-export async function getChapters(vodId: string): Promise<any | null> {
+export async function getChapters(vodId: string): Promise<Record<string, unknown> | null> {
   const response = await fetch('https://gql.twitch.tv/gql', {
     method: 'POST',
     headers: {
       Accept: '*/*',
       'Client-Id': 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
+      // @ts-expect-error - M5/H5 issue: Content-Type header requires string literal for GraphQL requests
       'Content-Type': 'text/plain;charset=UTF-8' as any,
     },
     body: JSON.stringify({
@@ -235,12 +239,13 @@ export async function getChapters(vodId: string): Promise<any | null> {
   return data?.data || null;
 }
 
-export async function getChapter(vodId: string): Promise<any | null> {
+export async function getChapter(vodId: string): Promise<Record<string, unknown> | null> {
   const response = await fetch('https://gql.twitch.tv/gql', {
     method: 'POST',
     headers: {
       Accept: '*/*',
       'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
+      // @ts-expect-error - M5/H5 issue: Content-Type header requires string literal for GraphQL requests
       'Content-Type': 'text/plain;charset=UTF-8' as any,
     },
     body: JSON.stringify({
@@ -270,7 +275,7 @@ export async function getChapter(vodId: string): Promise<any | null> {
   return data.data?.video || null;
 }
 
-export async function getGameData(gameId: string, streamerId: string): Promise<any | null> {
+export async function getGameData(gameId: string, streamerId: string): Promise<Record<string, unknown> | null> {
   const accessToken = await getAppAccessToken(streamerId);
 
   const creds = getCreds(streamerId)!;

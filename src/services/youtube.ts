@@ -1,4 +1,4 @@
-import { google } from 'googleapis';
+import { google, Auth } from 'googleapis';
 import fs from 'fs';
 import fsPromises from 'fs/promises';
 import { getStreamerConfig, clearConfigCache } from '../config/loader.js';
@@ -25,7 +25,7 @@ interface DecryptedYoutubeCreds {
 const REDIRECT_URI = 'https://developers.google.com/oauthplayground';
 
 // Per-tenant cached OAuth2 clients (long-lived across API calls, enables auto-refresh)
-const oauthClients = new Map<any, any>();
+const oauthClients = new Map<string, Auth.OAuth2Client>();
 
 // Note: authCache and decryptedAuthCache removed per requirement #3 - always read fresh from DB after persistence to ensure consistency
 
@@ -33,7 +33,7 @@ const oauthClients = new Map<any, any>();
  * Fast local expiry check without network call.
  * Returns true if token is expired or will expire within next minute (clock skew buffer).
  */
-function isTokenExpired(client: any): boolean {
+function isTokenExpired(client: Auth.OAuth2Client): boolean {
   const expiry = client.credentials.expiry_date as number | undefined;
 
   // No expiry set means no valid access token cached - assume needs refresh
@@ -49,7 +49,7 @@ function isTokenExpired(client: any): boolean {
  * Check if token is expiring soon based on configurable buffer.
  * Used for pre-emptive refresh before API calls to guarantee no mid-operation expiration.
  */
-function isTokenExpiringSoon(client: any, bufferMs = 120_000): boolean {
+function isTokenExpiringSoon(client: Auth.OAuth2Client, bufferMs = 120_000): boolean {
   const expiry = client.credentials.expiry_date as number | undefined;
 
   // No expiry means no valid token cached - assume needs refresh
@@ -65,7 +65,7 @@ function isTokenExpiringSoon(client: any, bufferMs = 120_000): boolean {
 /**
  * Get human-readable seconds remaining for logging/debugging.
  */
-function getRemainingSeconds(client: any): number {
+function getRemainingSeconds(client: Auth.OAuth2Client): number {
   const expiry = client.credentials.expiry_date as number | undefined;
 
   if (!expiry) return 0;
@@ -77,7 +77,7 @@ function getRemainingSeconds(client: any): number {
  * Get OAuth2 client with guaranteed valid token via pre-emptive refresh.
  * Forces refresh when <120s remaining to prevent mid-operation expiration during long tasks like uploads.
  */
-async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<any> {
+async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<Auth.OAuth2Client> {
   const log = loggerWithTenant(streamerId);
   const creds = getYoutubeCredentials(streamerId);
 
@@ -121,6 +121,7 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
         // Persist to DB immediately after successful pre-refresh (requirement #2)
         const encryptedAuth = encryptObject(updatedAuth);
 
+        // H5/M5 - Prisma type casting required due to dynamic tenant field structure
         await metaClient.tenant.update({
           where: { id: streamerId },
           data: { youtube: { ...config.youtube, auth: encryptedAuth } as any },
@@ -142,13 +143,15 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
 
         oauthClients.delete(streamerId);
       }
-    } catch (error: any) {
-      if (error.message?.includes('invalid_grant') || error.message?.includes('token_expired')) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      if (errorMessage.includes('invalid_grant') || errorMessage.includes('token_expired')) {
         // Refresh token is invalid/revoked - crash with clear message
-        throw new Error(`Token refresh failed for ${streamerId} - re-authentication required. Original error: ${error.message}`);
+        throw new Error(`Token refresh failed for ${streamerId} - re-authentication required. Original error: ${errorMessage}`);
       }
 
-      log.error(`[YouTube] Pre-emptive refresh error for ${streamerId}:`, error.message || error);
+      log.error({ err: errorMessage || String(error) }, `[YouTube] Pre-emptive refresh error for ${streamerId}`);
 
       // Don't clear cache yet - fall through to create fresh client below (graceful degradation)
     } finally {
@@ -176,7 +179,7 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
   const newClient = new google.auth.OAuth2(creds.clientId, creds.clientSecret, REDIRECT_URI);
 
   // Set up 'tokens' event listener for persistence on future refreshes
-  newClient.on('tokens', async (newTokens: any) => {
+  newClient.on('tokens', async (newTokens: Auth.Credentials) => {
     log.info(`[YouTube] Tokens refreshed via auto-refresh`);
 
     const config = getStreamerConfig(streamerId);
@@ -203,14 +206,17 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
 
       const encryptedAuth = encryptObject(updatedAuth);
 
+      // H5/M5 - Prisma type casting required due to dynamic tenant field structure
       await metaClient.tenant.update({
         where: { id: streamerId },
         data: { youtube: { ...config.youtube, auth: encryptedAuth } as any },
       });
 
       log.info(`[YouTube] Auth object persisted to DB`);
-    } catch (dbError: any) {
-      log.error(`[YouTube] Failed to persist auto-refreshed tokens to DB for ${streamerId}:`, dbError.message || dbError);
+    } catch (dbError: unknown) {
+      const errorMessage = dbError instanceof Error ? dbError.message : String(dbError);
+
+      log.error({ err: errorMessage }, `[YouTube] Failed to persist auto-refreshed tokens to DB for ${streamerId}`);
     } finally {
       // CRITICAL: Always update OAuth client's internal state regardless of DB write success/failure
       const credsUpdate = buildCredentialsObject(newTokens, config.youtube.auth, log);
@@ -219,9 +225,10 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
         newClient.setCredentials(credsUpdate);
 
         log.info(`[YouTube] OAuth client credentials updated`);
-      } catch (setCredsError: any) {
-        log.error('[YouTube] Failed to update OAuth client credentials:', setCredsError.message || setCredsError);
+      } catch (setCredsError: unknown) {
+        const errorMessage = setCredsError instanceof Error ? setCredsError.message : String(setCredsError);
 
+        log.error({ err: errorMessage }, '[YouTube] Failed to update OAuth client credentials');
         throw new Error('Token refresh failed - cannot proceed with API call'); // Crash the current operation correctly
       }
     }
@@ -276,12 +283,16 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
  * Convert token expiry information to absolute timestamp for local validation.
  * Handles both relative seconds (expires_in/expiresIn) and absolute timestamps (expiry_date).
  */
-function calculateExpiryDate(newTokens: any, log?: ReturnType<typeof loggerWithTenant>): number {
+// H5/M5 - Auth.Credentials has dynamic shape; using type assertion for Google API compatibility
+function calculateExpiryDate(newTokens: Auth.Credentials, log?: ReturnType<typeof loggerWithTenant>): number {
   // If already provided as absolute timestamp, use directly
   if (typeof newTokens.expiry_date === 'number') return newTokens.expiry_date;
 
   // Try camelCase variant first (googleapis standard)
-  const relativeSeconds = typeof newTokens.expiresIn === 'number' ? newTokens.expiresIn : typeof newTokens.expires_in === 'number' ? newTokens.expires_in : undefined;
+  const tokenWithExpiry = newTokens as Record<string, unknown>;
+
+  const relativeSeconds =
+    typeof tokenWithExpiry['expiresIn'] === 'number' ? tokenWithExpiry['expiresIn'] : typeof tokenWithExpiry['expires_in'] === 'number' ? tokenWithExpiry['expires_in'] : undefined;
 
   if (relativeSeconds !== undefined && !isNaN(relativeSeconds)) {
     return Date.now() + relativeSeconds * 1000; // Convert to absolute timestamp in ms
@@ -296,8 +307,9 @@ function calculateExpiryDate(newTokens: any, log?: ReturnType<typeof loggerWithT
  * Build credentials object for OAuth2 client state management.
  * Handles both fresh tokens and preserves existing refresh token if not rotated by Google.
  */
+// H5/M5 - Auth.Credentials has dynamic shape; using type assertion for Google API compatibility
 function buildCredentialsObject(
-  newTokens: any,
+  newTokens: Auth.Credentials,
   currentAuthEncrypted?: string,
   log?: ReturnType<typeof loggerWithTenant>
 ): {
@@ -324,24 +336,24 @@ function buildCredentialsObject(
     logger.info(`[YouTube] Using fresh refresh token from event`);
   }
 
-  const creds: any = {
-    access_token: null, // Default - will be updated below
+  const creds = {
+    access_token: null as string | null, // Default - will be updated below
     refresh_token: refreshToken,
   };
 
+  // Add optional expiry_date property dynamically to avoid type errors
   if (newTokens.access_token) {
     creds.access_token = newTokens.access_token;
 
     // Calculate and set expiry_date for local validation checks
     const expiryDate = calculateExpiryDate(newTokens);
     if (!isNaN(expiryDate)) {
-      creds.expiry_date = expiryDate;
+      (creds as Record<string, unknown>).expiry_date = expiryDate;
 
       logger.info(`[YouTube] Access token valid until ${new Date(expiryDate).toISOString()}`);
     }
   } else {
-    // No access token in event - ensure client state is clean (will force refresh on next API call)
-    delete creds.expiry_date; // Clear old expiry date if present
+    // No access token in event - ensure client state is clean (will force refresh on next API call) delete (creds as Record<string, unknown>)['expiry_date']; // Clear old expiry date if present
 
     logger.info(`[YouTube] No access token provided, will refresh on next API call`);
   }

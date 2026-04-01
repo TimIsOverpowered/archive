@@ -1,8 +1,10 @@
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import fs from 'fs/promises';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { getStreamerConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
+import type { PrismaClient } from '../../../../generated/streamer/client';
+import type { VodRecordBase } from './types';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -17,33 +19,40 @@ interface LiveCallbackBody {
   platform: 'twitch' | 'kick';
 }
 
+type LiveCallbackParams = { id: string };
+
+interface LiveCallbackResponseData {
+  message: string;
+  vodId: string;
+  jobId?: string | undefined;
+  path: string;
+}
+
 export default async function liveCallbackRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
 
   // Callback endpoint for twitch-recorder-go when live stream recording completes
-  fastify.post(
-    '/:id/live',
-    {
-      schema: {
-        tags: ['Admin', 'Live Recording'],
-        description: 'Callback from external recorder when live HLS download/merge completes. Queues YouTube upload.',
-        params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
-        body: {
-          type: 'object',
-          properties: {
-            streamId: { type: 'string', description: 'VOD/Stream ID' },
-            path: { type: 'string', description: 'Local filesystem path to recorded MP4 file' },
-            durationSecs: { type: 'number', description: 'Duration in seconds (optional)' },
-            platform: { type: 'string', enum: ['twitch', 'kick'] },
-          },
-          required: ['streamId', 'path', 'platform'],
+  fastify.route<{ Params: LiveCallbackParams; Body: LiveCallbackBody }>({
+    method: 'POST',
+    url: '/:id/live',
+    schema: {
+      tags: ['Admin', 'Live Recording'],
+      description: 'Callback from external recorder when live HLS download/merge completes. Queues YouTube upload.',
+      params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+      body: {
+        type: 'object',
+        properties: {
+          streamId: { type: 'string', description: 'VOD/Stream ID' },
+          path: { type: 'string', description: 'Local filesystem path to recorded MP4 file' },
+          durationSecs: { type: 'number', description: 'Duration in seconds (optional)' },
+          platform: { type: 'string', enum: ['twitch', 'kick'] },
         },
+        required: ['streamId', 'path', 'platform'],
       },
-      onRequest: rateLimitMiddleware,
     },
-    async (request: any) => {
+    onRequest: rateLimitMiddleware,
+    handler: async (request) => {
       const streamerId = request.params.id;
-      const body: LiveCallbackBody = request.body;
 
       try {
         // Validate tenant exists
@@ -54,80 +63,83 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         }
 
         // Validate platform is enabled for this tenant
-        if (body.platform === 'twitch' && !config.twitch?.enabled) {
+        if (request.body.platform === 'twitch' && !config.twitch?.enabled) {
           throw new Error('Twitch is not enabled for this tenant');
         }
 
-        if (body.platform === 'kick' && !config.kick?.enabled) {
+        if (request.body.platform === 'kick' && !config.kick?.enabled) {
           throw new Error('Kick is not enabled for this tenant');
         }
 
         // Validate file path exists and is accessible
         try {
-          await fs.access(body.path);
+          await fs.access(request.body.path);
 
-          const stats = await fs.stat(body.path);
+          const stats = await fs.stat(request.body.path);
           if (!stats.isFile() || stats.size === 0) {
-            throw new Error(`File at ${body.path} is invalid (not a regular file or empty)`);
+            throw new Error(`File at ${request.body.path} is invalid (not a regular file or empty)`);
           }
 
-          request.log.info(`[${streamerId}] Validated recording file: ${body.path} (${(stats.size / (1024 * 1024)).toFixed(2)} MB)`);
+          request.log.info(`[${streamerId}] Validated recording file: ${request.body.path} (${(stats.size / (1024 * 1024)).toFixed(2)} MB)`);
         } catch (accessError) {
           const errorMessage = accessError instanceof Error ? accessError.message : String(accessError);
-          request.log.error(`[${streamerId}] File validation failed for ${body.path}: ${errorMessage}`);
+          request.log.error(`[${streamerId}] File validation failed for ${request.body.path}: ${errorMessage}`);
 
           throw new Error('Recording file not found or inaccessible');
         }
 
         // Get database client
-        let client: any;
+        let client: PrismaClient;
         try {
           const ClientModule = await import('../../../db/client');
-          client = ClientModule.getClient(streamerId);
+          const retrievedClient = ClientModule.getClient(streamerId);
 
-          if (!client) {
+          if (!retrievedClient) {
             throw new Error('Database not available for tenant');
           }
-        } catch (error: any) {
-          request.log.error(`[${streamerId}] Database error: ${error.message}`);
+
+          client = retrievedClient;
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          request.log.error(`[${streamerId}] Database error: ${errorMessage}`);
           throw new Error('Database connection failed');
         }
 
         // Look up VOD record by stream_id or id
-        let vodRecord: any = await client.vod.findFirst({
+        let vodRecord: VodRecordBase | null = await client.vod.findFirst({
           where: {
-            OR: [{ id: body.streamId }, { stream_id: body.streamId }],
+            OR: [{ id: request.body.streamId }, { stream_id: request.body.streamId }],
           },
         });
 
         if (!vodRecord) {
           // VOD doesn't exist - create placeholder for live recording callback
-          request.log.warn(`[${streamerId}] No VOD record found for ${body.streamId}. Creating placeholder...`);
+          request.log.warn(`[${streamerId}] No VOD record found for ${request.body.streamId}. Creating placeholder...`);
 
           vodRecord = await client.vod.create({
             data: {
-              id: body.streamId,
-              platform: body.platform,
-              title: `${body.platform.toUpperCase()} Live Recording`,
-              duration: body.durationSecs || 0,
-              stream_id: body.streamId,
+              id: request.body.streamId,
+              platform: request.body.platform,
+              title: `${request.body.platform.toUpperCase()} Live Recording`,
+              duration: request.body.durationSecs || 0,
+              stream_id: request.body.streamId,
             },
           });
 
-          request.log.info(`[${streamerId}] Created placeholder VOD ${body.streamId}`);
-        } else if (vodRecord.platform !== body.platform) {
-          request.log.warn(`[${streamerId}] Platform mismatch for VOD ${body.streamId}: expected=${body.platform}, actual=${vodRecord.platform}`);
+          request.log.info(`[${streamerId}] Created placeholder VOD ${request.body.streamId}`);
+        } else if (vodRecord.platform !== request.body.platform) {
+          request.log.warn(`[${streamerId}] Platform mismatch for VOD ${request.body.streamId}: expected=${request.body.platform}, actual=${vodRecord.platform}`);
         }
 
         // Update duration if provided and different from current value
-        if (body.durationSecs && vodRecord.duration !== body.durationSecs) {
+        if (request.body.durationSecs && vodRecord.duration !== request.body.durationSecs) {
           await client.vod.update({
             where: { id: vodRecord.id },
-            data: { duration: body.durationSecs },
+            data: { duration: request.body.durationSecs },
           });
 
-          request.log.info(`[${streamerId}] Updated VOD ${vodRecord.id} duration to ${body.durationSecs}s`);
-        } else if (!body.durationSecs && vodRecord.duration === 0) {
+          request.log.info(`[${streamerId}] Updated VOD ${vodRecord.id} duration to ${request.body.durationSecs}s`);
+        } else if (!request.body.durationSecs && vodRecord.duration === 0) {
           // Duration not provided and current is 0 - try to get from file metadata or skip update
           request.log.debug(`[${streamerId}] No duration update needed for VOD ${vodRecord.id}`);
         }
@@ -136,52 +148,51 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         const YoutubeQueueModule = await import('../../../jobs/queues');
 
         if (!config.youtube?.liveUpload) {
-          request.log.warn(`[${streamerId}] YouTube live upload not enabled, skipping queue for ${body.streamId}`);
+          request.log.warn(`[${streamerId}] YouTube live upload not enabled, skipping queue for ${request.body.streamId}`);
 
-          return {
+          return <{ data: LiveCallbackResponseData }>{
             data: {
               message: 'YouTube live upload is disabled for this tenant. Recording processed but no upload queued.',
-              vodId: body.streamId,
-              path: body.path,
+              vodId: request.body.streamId,
+              path: request.body.path,
             },
           };
         }
 
         const youtubeJobData = {
           streamerId,
-          vodId: body.streamId,
-          filePath: body.path, // Pre-recorded MP4 path from recorder
-          title: vodRecord.title || `${body.platform.toUpperCase()} VOD`,
+          vodId: request.body.streamId,
+          filePath: request.body.path, // Pre-recorded MP4 path from recorder
+          title: vodRecord.title || `${request.body.platform.toUpperCase()} VOD`,
           description: config.youtube.description || '',
           type: 'live' as const, // Special live upload type (no splitting/trimming)
-          platform: body.platform,
+          platform: request.body.platform,
         };
 
-        const job = await (YoutubeQueueModule.getYoutubeUploadQueue() as any).add(youtubeJobData, {
-          name: 'youtube_upload',
-          id: `youtube-live:${body.streamId}:${Date.now()}`,
-        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const queue = YoutubeQueueModule.getYoutubeUploadQueue() as any;
+        const job = await queue.add(youtubeJobData, { name: 'youtube_upload', id: `youtube-live:${request.body.streamId}:${Date.now()}` });
 
-        request.log.info(`[${streamerId}] Queued YouTube upload job ${job.id} for live recording at ${body.path}`);
+        request.log.info(`[${streamerId}] Queued YouTube upload job ${job.id} for live recording at ${request.body.path}`);
 
-        return {
+        return <{ data: LiveCallbackResponseData }>{
           data: {
             message: 'YouTube upload queued successfully',
-            vodId: body.streamId,
+            vodId: request.body.streamId,
             jobId: String(job.id),
-            path: body.path,
+            path: request.body.path,
           },
         };
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
 
         // Only throw if not already a proper HTTP error response scenario
-        request.log.error(`[${streamerId}] Live callback failed for ${body?.streamId}: ${errorMsg}`);
+        request.log.error(`[${streamerId}] Live callback failed for ${request.body.streamId}: ${errorMsg}`);
 
         throw new Error('Failed to process live recording callback');
       }
-    }
-  );
+    },
+  });
 
   return fastify;
 }
