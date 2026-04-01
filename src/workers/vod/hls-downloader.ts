@@ -3,10 +3,14 @@ import { extractErrorDetails } from '../../utils/error.js';
 import fs from 'fs';
 import pathMod from 'path';
 import HLS from 'hls-parser';
+import { pipeline } from 'stream/promises';
+import { Readable } from 'stream';
 import { getStreamerConfig } from '../../config/loader';
 import { getClient } from '../../db/client';
 import { sendRichAlert, updateDiscordEmbed, resetFailures, isAlertsEnabled } from '../../utils/alerts';
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch';
+import { loggerWithTenant } from '../../utils/logger.js';
+import type { ReadableStream as NodeWebStream } from 'node:stream/web';
 
 export interface HlsDownloadOptions {
   vodId: string;
@@ -29,16 +33,15 @@ async function downloadTSSegment(segmentUri: string, vodDir: string, baseURL: st
 
     const writer = fs.createWriteStream(outputPath);
 
-    for await (const chunk of response.body as any) {
-      writer.write(chunk);
-    }
-    writer.end();
+    const nodeWebStream = response.body as unknown as NodeWebStream<Uint8Array>;
+
+    await pipeline(Readable.fromWeb(nodeWebStream), writer);
   } catch (error: unknown) {
     throw error;
   }
 }
 
-async function downloadTSSegmentsSequentially(segments: any[], vodDir: string, baseURL: string): Promise<void> {
+async function downloadTSSegmentsSequentially(segments: HLS.types.Segment[], vodDir: string, baseURL: string): Promise<void> {
   for (const segment of segments) {
     const outputPath = pathMod.join(vodDir, segment.uri);
 
@@ -79,7 +82,7 @@ function updateAlertProgress(messageId: string | null, platform: string, totalSe
 
 async function fetchTwitchPlaylist(
   vodId: string,
-  log: ReturnType<typeof createAutoLogger>,
+  log: ReturnType<typeof loggerWithTenant>,
   retryCount: number,
   maxRetryBeforeEndDetection: number
 ): Promise<{ variantM3u8String: string; baseURL: string } | null> {
@@ -100,7 +103,7 @@ async function fetchTwitchPlaylist(
       return null;
     }
 
-    const parsedMaster: any = HLS.parse(masterPlaylistContent);
+    const parsedMaster: HLS.types.MasterPlaylist | HLS.types.MediaPlaylist = HLS.parse(masterPlaylistContent);
 
     if (!parsedMaster) {
       log.error(`[${vodId}] Failed to parse Twitch master playlist`);
@@ -109,7 +112,12 @@ async function fetchTwitchPlaylist(
       return null;
     }
 
-    const bestVariantUrl = parsedMaster.variants?.[0]?.uri || parsedMaster.uri;
+    const bestVariantUrl = (parsedMaster as HLS.types.MasterPlaylist).variants?.[0]?.uri || parsedMaster.uri;
+
+    if (!bestVariantUrl) {
+      log.error(`[${vodId}] No variant URL found in master playlist`);
+      return null;
+    }
     let baseURL: string = '';
     let variantM3u8String: string = '';
 
@@ -145,7 +153,7 @@ async function fetchTwitchPlaylist(
 async function fetchKickPlaylist(
   vodId: string,
   sourceUrl: string | undefined,
-  log: ReturnType<typeof createAutoLogger>,
+  log: ReturnType<typeof loggerWithTenant>,
   retryCount: number,
   maxRetryBeforeEndDetection: number
 ): Promise<{ variantM3u8String: string; baseURL: string } | null> {
@@ -201,32 +209,10 @@ async function fetchKickPlaylist(
   }
 }
 
-function createAutoLogger(tenantId: string): any {
-  // Mock logger - actual implementation in auto-tenant-logger.ts
-  const methods = ['info', 'debug', 'warn', 'error', 'trace'];
-  const mockLog: any = {};
-
-  for (const method of methods) {
-    mockLog[method] = (...args: any[]) => console.log(`[${method.toUpperCase()}][${tenantId}]`, ...args);
-  }
-
-  return mockLog;
-}
-
 export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ success: true; finalPath: string; durationSeconds?: number }> {
   const { vodId, platform, streamerId, startedAt, sourceUrl } = options;
 
-  // Create logger with tenant context ONCE at start of processing scope
-  let log: any;
-
-  try {
-    const autoLoggerModule = await import('../../utils/auto-tenant-logger.js');
-    const createAutoLogFn = (autoLoggerModule as any).createAutoLogger || createAutoLogger;
-    log = createAutoLogFn(String(streamerId));
-  } catch {
-    // Fallback to mock logger if module not available during build/test
-    log = createAutoLogger(String(streamerId));
-  }
+  const log = loggerWithTenant(String(streamerId));
 
   log.info(
     {
@@ -238,18 +224,13 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
     },
     `[HLS-Downloader] Starting Live HLS Download mode for ${platform} stream`
   );
-
-  let prisma: any;
+  const streamerClient = getClient(streamerId);
   try {
-    const metaClient = getClient('meta');
+    if (!streamerClient) throw new Error('Streamer database client not available');
 
-    if (!metaClient) throw new Error('Meta database client not available');
-
-    const vodRecord = await metaClient.vod.findUnique({ where: { id: vodId } });
+    const vodRecord = await streamerClient.vod.findUnique({ where: { id: vodId } });
 
     if (!vodRecord || !vodRecord.id) throw new Error(`VOD record not found for ${vodId}`);
-
-    prisma = getClient(String(streamerId));
   } catch (error: unknown) {
     const details = extractErrorDetails(error);
     log.error({ ...details, vodId }, `[${vodId}] Failed to get database connection`);
@@ -349,7 +330,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         if (!result) {
           // Special handling for Kick - may need to update DB on abort
           if (retryCount > maxRetryBeforeEndDetection * 2 && !sourceUrl) {
-            await prisma.vod.update({ where: { id: vodId }, data: { is_live: false, ended_at: new Date() } as any });
+            await streamerClient.vod.update({ where: { id: vodId }, data: { is_live: false } });
 
             throw new Error('Kick HLS source URL not available');
           }
@@ -363,7 +344,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         fetchedBaseURL = result.baseURL;
       }
 
-      const parsedM3u8: any = HLS.parse(variantM3u8String);
+      const parsedM3u8: HLS.types.MasterPlaylist | HLS.types.MediaPlaylist = HLS.parse(variantM3u8String);
 
       if (!parsedM3u8) {
         log.error(`[${vodId}] Invalid HLS playlist structure`);
@@ -375,7 +356,8 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
       }
 
       baseURL = fetchedBaseURL;
-      const currentLastSegment = parsedM3u8.segments?.[parsedM3u8.segments.length - 1]?.uri || '';
+      const segments: HLS.types.Segment[] = (parsedM3u8 as HLS.types.MediaPlaylist).segments || [];
+      const currentLastSegment = segments?.[segments.length - 1]?.uri || '';
 
       if (lastSegmentUri === currentLastSegment && lastSegmentUri !== null) {
         noChangePollCounter++;
@@ -400,9 +382,9 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
       await fsPromises.writeFile(m3u8Path, variantM3u8String);
 
-      log.debug(`[${vodId}] Playlist written. Total segments so far: ${parsedM3u8.segments?.length || 0}`);
+      log.debug(`[${vodId}] Playlist written. Total segments so far: ${segments.length}`);
 
-      const newSegments = (parsedM3u8.segments || []).filter((seg: any) => !fileExists(pathMod.join(vodDir, seg.uri)));
+      const newSegments = segments.filter((seg) => !fs.existsSync(pathMod.join(vodDir, seg.uri)));
 
       if (newSegments.length > 0) {
         log.info(`[${vodId}] Found ${newSegments.length} new TS segments to download...`);
@@ -488,7 +470,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
       if (actualDuration) {
         const formattedDuration = toHHMMSS(Math.round(actualDuration));
 
-        await prisma.vod.update({ where: { id: vodId }, data: { duration: formattedDuration, is_live: false, ended_at: new Date() } as any });
+        await streamerClient.vod.update({ where: { id: vodId }, data: { duration: Math.round(actualDuration), is_live: false } });
 
         log.info(`[${vodId}] Updated VOD with duration ${formattedDuration} and marked as ended`);
 
@@ -509,12 +491,13 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         return { success: true as const, finalPath: finalMp4Path, durationSeconds: actualDuration };
       } else {
         log.warn(`[${vodId}] Could not determine video duration from MP4 file`);
-        await prisma.vod.update({ where: { id: vodId }, data: { is_live: false, ended_at: new Date() } as any });
+        await streamerClient.vod.update({ where: { id: vodId }, data: { is_live: false } });
 
         return { success: true as const, finalPath: finalMp4Path };
       }
     } catch (importError) {
-      log.error(`[${vodId}] Failed to import video-utils for MP4 conversion`, importError);
+      const importErr = extractErrorDetails(importError);
+      log.error({ ...importErr, vodId }, `[${vodId}] Failed to import video-utils for MP4 conversion`);
       throw new Error('MP4 conversion module not available');
     }
   } catch (error: unknown) {
