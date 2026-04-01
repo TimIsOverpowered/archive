@@ -70,6 +70,12 @@ export interface YoutubeUploadVodResult {
 export interface YoutubeUploadGameResult {
   success: true;
   videoId: string;
+  gameId?: number;
+}
+
+export interface YoutubeUploadSplitGamesResult {
+  success: true;
+  videos: Array<{ id: string; part: number; startTime: number; endTime: number; gameId?: number }>;
 }
 
 export interface YoutubeUploadSkippedResult {
@@ -77,7 +83,7 @@ export interface YoutubeUploadSkippedResult {
   skipped: boolean;
 }
 
-export type YoutubeUploadResult = YoutubeUploadVodResult | YoutubeUploadGameResult | YoutubeUploadSkippedResult;
+export type YoutubeUploadResult = YoutubeUploadVodResult | YoutubeUploadGameResult | YoutubeUploadSplitGamesResult | YoutubeUploadSkippedResult;
 
 export interface DmcaProcessingSuccessResult {
   success: true;
