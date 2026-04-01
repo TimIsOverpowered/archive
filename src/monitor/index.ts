@@ -1,6 +1,7 @@
 import { loadStreamerConfigs } from '../config/loader.js';
 import { startStreamDetectionLoop } from './stream-detector.js';
 import { logger } from '../utils/logger.js';
+import { extractErrorDetails } from '../utils/error.js';
 
 /**
  * Main entry point - loads ALL tenant configs and starts concurrent monitoring loops
@@ -31,8 +32,9 @@ export async function startMonitorService(): Promise<void> {
     }
 
     logger.info(`[Monitor] Started polling loops across all tenants/platforms`);
-  } catch (error: any) {
-    logger.error('[Monitor] Failed to start monitoring service:', error.message || error);
+  } catch (error: unknown) {
+    const details = extractErrorDetails(error);
+    logger.error(details, '[Monitor] Failed to start monitoring service');
 
     // Exit with non-zero code so PM2 can restart the process automatically
     process.exit(1);
@@ -64,8 +66,8 @@ export async function stopMonitorService(): Promise<void> {
     await closeKickBrowser?.();
     logger.info('[Monitor] Closed Kick browser instance');
   } catch (err) {
-    const errMsg = err instanceof Error ? `Error during shutdown cleanup: ${err.message}` : 'Error during shutdown cleanup';
-    logger.warn(errMsg);
+    const details = extractErrorDetails(err);
+    logger.warn(`Error during shutdown cleanup: ${details.message}`);
   }
 
   logger.info('[Monitor] Shutdown complete.');

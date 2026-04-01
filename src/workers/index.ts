@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { extractErrorDetails } from '../utils/error.js';
 import { Worker, Queue } from 'bullmq';
 import Redis from 'ioredis';
 import { loadStreamerConfigs, clearConfigCache } from '../config/loader.js';
@@ -112,7 +113,8 @@ export async function getWorkersHealth(): Promise<Record<string, WorkerHealthSta
         status,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const details = extractErrorDetails(error);
+      const errorMessage = details.message;
       logger.error({ workerName: name, error: errorMessage }, `Health check failed for ${name} queue`);
 
       result[name] = {
@@ -351,8 +353,9 @@ async function bootstrap() {
     process.on('SIGINT', shutdown);
 
     logger.info('Workers started successfully');
-  } catch (error: any) {
-    logger.error({ error }, 'Failed to start workers');
+  } catch (error: unknown) {
+    const details = extractErrorDetails(error);
+    logger.error(details, 'Failed to start workers');
     process.exit(1);
   }
 }

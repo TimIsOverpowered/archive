@@ -1,4 +1,5 @@
 import { getAppAccessToken, VodData } from '../services/twitch.js';
+import { extractErrorDetails } from '../utils/error.js';
 import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
 import { logger } from '../utils/logger.js';
 
@@ -68,8 +69,9 @@ export async function getTwitchStreamStatus(userId: string, tenantId: string): P
       language: streamData.language || 'other',
       thumbnail_url: streamData.thumbnail_url ?? undefined,
     };
-  } catch (error: any) {
-    logger.error({ userId }, `[Twitch Live Check] Failed to get stream status for user ${userId}:`, error.message);
+  } catch (error: unknown) {
+    const { message } = extractErrorDetails(error);
+    logger.error({ userId, err: message }, `[Twitch Live Check] Failed to get stream status for user ${userId}`);
     return null;
   }
 }
@@ -119,8 +121,9 @@ export async function getLatestTwitchVodObject(userId: string, expectedStreamId:
     logger.info({ userId, stream_id: latestVod.stream_id, id: latestVod.id }, `[Twitch] VOD object ready! Match found: stream_id=${latestVod.stream_id}, vod_id=${latestVod.id}`);
 
     return latestVod;
-  } catch (error: any) {
-    logger.error({ userId }, `[Twitch] Failed to get VOD object for user ${userId}:`, error.message);
+  } catch (error: unknown) {
+    const { message } = extractErrorDetails(error);
+    logger.error({ userId, err: message }, `[Twitch] Failed to get VOD object for user ${userId}`);
     return null;
   }
 }

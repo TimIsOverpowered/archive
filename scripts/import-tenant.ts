@@ -4,8 +4,9 @@ import 'dotenv/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { metaClient } from '../src/db/meta-client';
-import { encryptObject, encryptScalar } from '../src/utils/encryption';
+import { metaClient } from '../src/db/meta-client.js';
+import { encryptObject, encryptScalar } from '../src/utils/encryption.js';
+import { extractErrorDetails } from '../src/utils/error.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -221,7 +222,8 @@ async function main(): Promise<void> {
     await importConfig(channelName, dbUrl);
     console.log('Done!');
   } catch (error) {
-    console.error('Error importing config:', error);
+    const details = extractErrorDetails(error);
+    console.error('Error importing config:', details.message);
     process.exit(1);
   } finally {
     await metaClient.$disconnect();

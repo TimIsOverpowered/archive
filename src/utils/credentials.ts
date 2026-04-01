@@ -35,8 +35,7 @@ export function getTwitchCredentials(tenantId: string): TwitchCredentials | null
     }
 
     return { clientId: auth.client_id, clientSecret: auth.client_secret };
-  } catch (error: any) {
-    log.error(`[Twitch] Failed to decrypt credentials for ${tenantId}:`, error.message || error);
+  } catch (_error) {
     return null;
   }
 }

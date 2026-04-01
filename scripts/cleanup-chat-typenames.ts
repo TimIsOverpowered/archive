@@ -2,6 +2,7 @@
 import 'dotenv/config';
 import { PrismaClient } from '../prisma/generated/meta/index.js';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { extractErrorDetails } from '../src/utils/error.js';
 
 const META_DB_URL = process.env.META_DATABASE_URL;
 if (!META_DB_URL) {
@@ -99,12 +100,14 @@ async function main() {
     try {
       dbUrl = decryptScalar(tenant.databaseUrl as string);
     } catch (decryptError) {
-      console.error('\n❌ Failed to decrypt database URL:', String(decryptError));
+      const details = extractErrorDetails(decryptError);
+      console.error('\n❌ Failed to decrypt database URL:', details.message);
       await metaClient.$disconnect();
       process.exit(1);
     }
   } catch (error) {
-    console.error(`\n❌ Failed to fetch tenant from meta database: ${String(error)}`);
+    const details = extractErrorDetails(error);
+    console.error(`\n❌ Failed to fetch tenant from meta database: ${details.message}`);
     await metaClient.$disconnect();
     process.exit(1);
   }
@@ -136,9 +139,9 @@ async function main() {
         WHERE c.relname = 'chat_messages'
       `);
 
-      // Get the row count from PostgreSQL statistics  
+      // Get the row count from PostgreSQL statistics
       const rowCountValue: number | null = statsResult.rows[0].live_tuple_estimate ?? statsResult.rows[0].estimated_total_rows;
-      
+
       totalRecords = rowCountValue !== null ? Math.round(rowCountValue) : null;
 
       if (totalRecords && totalRecords > 0) {
@@ -275,15 +278,17 @@ async function main() {
     } else {
       console.log('🎉 Cleanup completed successfully!\n');
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     errors.push(`Operation failed: ${String(error)}`);
 
-    if ((error as any)?.message?.includes('ECONNREFUSED')) {
+    const isConnectionError = typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string' && error.message.includes('ECONNREFUSED');
+
+    if (isConnectionError) {
       console.error('\n❌ Cannot connect to database. Check that the connection string is valid and server is running.');
-    } else if (error.code === '28P01') {
+    } else if (typeof error === 'object' && error !== null && 'code' in error && error.code === '28P01') {
       console.error('\n❌ Authentication failed for database user.');
     } else {
-      console.error(`\n❌ Database error: ${error.message}`);
+      const message = typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : String(error);
     }
 
     await metaClient.$disconnect();

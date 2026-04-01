@@ -1,4 +1,5 @@
 import puppeteer, { Browser } from 'puppeteer';
+import { extractErrorDetails } from '../utils/error.js';
 import { logger } from '../utils/logger.js';
 
 let browserInstance: Browser | null = null;
@@ -109,8 +110,9 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
       await page.close();
       return null;
     }
-  } catch (error: any) {
-    logger.error({ username }, `[Kick Live Check] Failed to get stream status for ${username}:`, error.message);
+  } catch (error: unknown) {
+    const { message } = extractErrorDetails(error);
+    logger.error({ username, err: message }, `[Kick Live Check] Failed to get stream status for ${username}`);
     return null;
   }
 }
@@ -167,8 +169,9 @@ export async function getLatestKickVodObject(username: string, expectedStreamId:
       title: vodObject.session_title || vodObject.title,
       source: vodObject.source || undefined,
     };
-  } catch (error: any) {
-    logger.error({ username }, `[Kick] Failed to get video object for ${username}:`, error.message);
+  } catch (error: unknown) {
+    const { message } = extractErrorDetails(error);
+    logger.error({ username, err: message }, `[Kick] Failed to get video object for ${username}`);
     return null;
   }
 }

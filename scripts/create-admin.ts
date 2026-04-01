@@ -3,7 +3,8 @@
 import 'dotenv/config';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
-import { metaClient } from '../src/db/meta-client';
+import { metaClient } from '../src/db/meta-client.js';
+import { extractErrorDetails } from '../src/utils/error.js';
 
 const API_KEY_PREFIX = 'archive_';
 const API_KEY_LENGTH = 64; // hex chars after prefix
@@ -57,7 +58,8 @@ async function main(): Promise<void> {
   try {
     await createAdmin(username);
   } catch (error) {
-    console.error('Error creating admin user:', error);
+    const details = extractErrorDetails(error);
+    console.error('Error creating admin user:', details.message);
     process.exit(1);
   } finally {
     await metaClient.$disconnect();

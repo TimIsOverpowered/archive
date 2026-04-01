@@ -1,4 +1,5 @@
 import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
+import { extractErrorDetails } from '../utils/error.js';
 import { getStreamerConfig as getConfig } from '../config/loader.js';
 export interface VodData {
   id: string;
@@ -75,7 +76,7 @@ export async function getVodTokenSig(vodId: string): Promise<VodTokenSig> {
     headers: {
       Accept: '*/*',
       'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
-      
+
       'Content-Type': 'text/plain;charset=UTF-8',
     },
     body: JSON.stringify({
@@ -121,7 +122,7 @@ export async function fetchComments(vodId: string, offset = 0): Promise<Record<s
     headers: {
       Accept: '*/*',
       'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
-      
+
       'Content-Type': 'text/plain;charset=UTF-8',
     },
     body: JSON.stringify({
@@ -149,7 +150,7 @@ export async function fetchNextComments(vodId: string, cursor: string): Promise<
     headers: {
       Accept: '*/*',
       'Client-Id': 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
-      
+
       'Content-Type': 'text/plain;charset=UTF-8',
     },
     body: JSON.stringify({
@@ -177,7 +178,7 @@ export async function getChapters(vodId: string): Promise<Record<string, unknown
     headers: {
       Accept: '*/*',
       'Client-Id': 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
-      
+
       'Content-Type': 'text/plain;charset=UTF-8',
     },
     body: JSON.stringify({
@@ -204,7 +205,7 @@ export async function getChapter(vodId: string): Promise<Record<string, unknown>
     headers: {
       Accept: '*/*',
       'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
-      
+
       'Content-Type': 'text/plain;charset=UTF-8',
     },
     body: JSON.stringify({
@@ -276,11 +277,12 @@ export async function getChannelBadges(streamerId: string): Promise<Record<strin
     }
     return badgesData as Record<string, unknown>;
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`Failed to fetch channel badges for ${streamerId}:`, errorMessage);
+    const { message } = extractErrorDetails(error);
+    console.error(`Failed to fetch channel badges for ${streamerId}:`, message);
     return null;
   }
 }
+
 export async function getGlobalBadges(streamerId: string): Promise<Record<string, unknown> | null> {
   const creds = getCreds(streamerId);
   if (!creds?.clientId) return null;
@@ -295,8 +297,8 @@ export async function getGlobalBadges(streamerId: string): Promise<Record<string
     const data = await response.json();
     return (data?.data || null) as Record<string, unknown>;
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`Failed to fetch global badges for ${streamerId}:`, errorMessage);
+    const { message } = extractErrorDetails(error);
+    console.error(`Failed to fetch global badges for ${streamerId}:`, message);
     return null;
   }
 }

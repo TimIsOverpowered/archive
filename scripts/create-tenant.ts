@@ -6,8 +6,9 @@ import * as readline from 'readline';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { Pool } from 'pg';
-import { metaClient } from '../src/db/meta-client';
-import { encryptScalar, validateEncryptionKey } from '../src/utils/encryption';
+import { metaClient } from '../src/db/meta-client.js';
+import { encryptScalar, validateEncryptionKey } from '../src/utils/encryption.js';
+import { extractErrorDetails } from '../src/utils/error.js';
 import { normalizePath as pathNormalize } from '../src/utils/path';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -40,9 +41,9 @@ function validatePostgresConnection(host: string, port: number, user: string, pa
     pool.end();
     return true;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const details = extractErrorDetails(error);
     console.error(`❌ Cannot connect to PostgreSQL server at ${host}:${port}`);
-    console.error(`   Error: ${errorMessage}`);
+    console.error(`   Error: ${details.message}`);
     return false;
   }
 }
@@ -142,8 +143,13 @@ async function createDatabase(host: string, port: number, user: string, password
     console.log(`✓ Created database '${dbName}'`);
     pool.end();
     return { success: true, isNew: true };
-  } catch (error: any) {
-    if (error.code === '42501' || error.message.includes('permission denied')) {
+  } catch (error: unknown) {
+    const isPermissionError =
+      typeof error === 'object' &&
+      error !== null &&
+      (('code' in error && (error as { code: string }).code === '42501') || ('message' in error && typeof error.message === 'string' && error.message.includes('permission denied')));
+
+    if (isPermissionError) {
       console.log(`⚠️  Could not create database '${dbName}' automatically (insufficient privileges)`);
       console.log(`   Please create the database manually:`);
       console.log(`   psql -h ${host} -p ${port} -U ${user} -c "CREATE DATABASE \\"${dbName}\\""`);
@@ -204,7 +210,8 @@ async function runMigrations(channelName: string, dbUrl: string): Promise<void> 
 
     console.log('✓ Migrations completed successfully');
   } catch (error) {
-    console.error('❌ Migration failed');
+    const details = extractErrorDetails(error);
+    console.error('❌ Migration failed:', details.message);
     throw error;
   } finally {
     process.env.DATABASE_URL = envDbUrl;
@@ -544,9 +551,9 @@ async function main(): Promise<void> {
       }
       console.log('\nThese scripts will guide you through the OAuth flow and securely store credentials.');
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('\n❌ Error during tenant creation:');
-    console.error(error.message || error);
+    const message = typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : String(error);
 
     // Rollback if tenant was created
     if (tenantId !== null) {

@@ -131,7 +131,7 @@ export function clearConfigCache(): void {
   configCache.clear();
 }
 
-export function getConfigs(): Array<{ id: string }> {
+export function getConfigs(): StreamerConfig[] {
   return Array.from(configCache.values());
 }
 

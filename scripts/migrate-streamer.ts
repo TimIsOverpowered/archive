@@ -5,6 +5,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import readline from 'readline';
 import path from 'path';
 import fs from 'fs';
+import { extractErrorDetails } from '../src/utils/error.js';
 
 const { decryptScalar } = await import('../src/utils/encryption');
 
@@ -75,12 +76,14 @@ const main = async () => {
     try {
       dbUrl = decryptScalar(tenant.databaseUrl as string);
     } catch (decryptError) {
-      console.error('❌ Failed to decrypt database URL:', String(decryptError));
+      const details = extractErrorDetails(decryptError);
+      console.error('❌ Failed to decrypt database URL:', details.message);
       await metaClient.$disconnect();
       process.exit(1);
     }
   } catch (error) {
-    console.error('❌ Failed to fetch tenant from meta database:', String(error));
+    const details = extractErrorDetails(error);
+    console.error('❌ Failed to fetch tenant from meta database:', details.message);
     await metaClient.$disconnect();
     process.exit(1);
   }

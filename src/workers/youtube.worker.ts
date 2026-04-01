@@ -11,6 +11,7 @@ import { splitVideo, trimVideo, getDuration, deleteFile } from '../utils/ffmpeg.
 import { uploadVideo, linkParts } from '../services/youtube.js';
 import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/alerts';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
+import { extractErrorDetails } from '../utils/error.js';
 
 type ExtendedYoutubeUploadJob = YoutubeUploadJob & { dmcaProcessed?: boolean };
 
@@ -194,14 +195,13 @@ const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUpl
       return { success: true, videoId: result.videoId };
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const details = extractErrorDetails(error);
 
     log.error(
       {
+        ...details,
         vodId,
         streamerId,
-        error: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined,
       },
       `YouTube upload failed for ${vodId}`
     );

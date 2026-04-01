@@ -1,5 +1,6 @@
 import ffmpeg from 'fluent-ffmpeg';
 import fsPromises from 'fs/promises';
+import { extractErrorDetails } from './error.js';
 
 export interface DMCAClaim {
   type: 'CLAIM_TYPE_AUDIO' | 'CLAIM_TYPE_VISUAL' | 'CLAIM_TYPE_AUDIOVISUAL';
@@ -46,7 +47,8 @@ export async function fileExists(filePath: string): Promise<boolean> {
 export async function deleteFileIfExists(filePath: string): Promise<void> {
   if (await fileExists(filePath)) {
     await fsPromises.unlink(filePath).catch((err) => {
-      console.warn(`Failed to delete file ${filePath}:`, err instanceof Error ? err.message : String(err));
+      const details = extractErrorDetails(err);
+      console.warn(`Failed to delete file ${filePath}:`, details.message);
     });
   }
 }
@@ -151,7 +153,8 @@ export async function getTextList(vodId: string, startVideoPath: string, mutedCl
     await fsPromises.writeFile(listFilePath, content);
     return listFilePath;
   } catch (error) {
-    console.error(`Failed to write concat list file: ${error}`);
+    const details = extractErrorDetails(error);
+    console.error(`Failed to write concat list file: ${details.message}`);
     return null;
   }
 }
@@ -219,20 +222,23 @@ export async function blackoutVideoSection(videoPath: string, vodId: string, sta
       try {
         await deleteFileIfExists(file);
       } catch (err) {
-        console.warn('Failed to cleanup temp file:', file, err instanceof Error ? err.message : String(err));
+        const details = extractErrorDetails(err);
+        console.warn('Failed to cleanup temp file:', file, details.message);
       }
     }
 
     return outputPath;
   } catch (error) {
-    console.error(`Blackout video section error: ${error}`);
+    const details = extractErrorDetails(error);
+    console.error(`Blackout video section error: ${details.message}`);
 
     // Cleanup on error
     for (const file of tempFiles) {
       try {
         await deleteFileIfExists(file);
       } catch (err) {
-        console.warn('Failed to cleanup temp file during error handling:', file, err instanceof Error ? err.message : String(err));
+        const details = extractErrorDetails(err);
+        console.warn('Failed to cleanup temp file during error handling:', file, details.message);
       }
     }
 
@@ -247,7 +253,8 @@ export async function cleanupTempFiles(files: string[]): Promise<void> {
     try {
       await deleteFileIfExists(file);
     } catch (err) {
-      console.warn('Failed to cleanup temp file:', file, err instanceof Error ? err.message : String(err));
+      const details = extractErrorDetails(err);
+      console.warn('Failed to cleanup temp file:', file, details.message);
     }
   }
 }

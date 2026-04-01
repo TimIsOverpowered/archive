@@ -1,4 +1,5 @@
 import fsPromises from 'fs/promises';
+import { extractErrorDetails } from '../../utils/error.js';
 import fs from 'fs';
 import pathMod from 'path';
 import HLS from 'hls-parser';
@@ -32,7 +33,7 @@ async function downloadTSSegment(segmentUri: string, vodDir: string, baseURL: st
       writer.write(chunk);
     }
     writer.end();
-  } catch (error: any) {
+  } catch (error: unknown) {
     throw error;
   }
 }
@@ -127,8 +128,9 @@ async function fetchTwitchPlaylist(
     }
 
     return { variantM3u8String, baseURL };
-  } catch (error: any) {
-    log.error(`[${vodId}] Failed to fetch Twitch HLS playlist:`, error.message);
+  } catch (error: unknown) {
+    const { message } = extractErrorDetails(error);
+    log.error({ error: message }, `[${vodId}] Failed to get Twitch HLS playlist`);
 
     if (retryCount > maxRetryBeforeEndDetection) {
       log.warn(`[${vodId}] Too many consecutive failures. Assuming stream ended or platform issue.`);
@@ -184,8 +186,9 @@ async function fetchKickPlaylist(
     }
 
     return { variantM3u8String, baseURL };
-  } catch (error: any) {
-    log.error(`[${vodId}] Failed to fetch Kick HLS playlist from ${fetchUrl}:`, error.message);
+  } catch (error: unknown) {
+    const details = extractErrorDetails(error);
+    log.error({ ...details, vodId }, `[${vodId}] Failed to fetch Kick HLS playlist`);
 
     await new Promise((resolve) => setTimeout(resolve, 5000 * Math.min(retryCount, 6)));
 
@@ -247,8 +250,9 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
     if (!vodRecord || !vodRecord.id) throw new Error(`VOD record not found for ${vodId}`);
 
     prisma = getClient(String(streamerId));
-  } catch (error: any) {
-    log.error(`[${vodId}] Failed to get database connection:`, error.message);
+  } catch (error: unknown) {
+    const details = extractErrorDetails(error);
+    log.error({ ...details, vodId }, `[${vodId}] Failed to get database connection`);
     throw error;
   }
 
@@ -289,7 +293,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
   try {
     await fsPromises.mkdir(vodDir, { recursive: true });
     log.info(`[${vodId}] Created download directory: ${vodDir}`);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
       throw new Error(`Failed to create VOD directory ${vodDir}: ${(error as Error).message}`);
     }
@@ -405,8 +409,9 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
         try {
           await downloadTSSegmentsSequentially(newSegments, vodDir, baseURL);
-        } catch (error: any) {
-          log.error(`[${vodId}] Error downloading segments:`, error.message);
+        } catch (error: unknown) {
+          const details = extractErrorDetails(error);
+          log.error({ ...details, vodId }, `[${vodId}] Error downloading segments`);
 
           retryCount++;
 
@@ -425,8 +430,9 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
       retryCount = 0;
 
       await new Promise((resolve) => setTimeout(resolve, 5000)); // Poll every 5 seconds for live streams
-    } catch (error: any) {
-      log.error(`[${vodId}] Error in HLS poll cycle:`, error.message);
+    } catch (error: unknown) {
+      const details = extractErrorDetails(error);
+      log.error({ ...details, vodId }, `[${vodId}] Error in HLS poll cycle`);
 
       retryCount++;
 
@@ -511,8 +517,9 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
       log.error(`[${vodId}] Failed to import video-utils for MP4 conversion`, importError);
       throw new Error('MP4 conversion module not available');
     }
-  } catch (error: any) {
-    log.error(`[${vodId}] Finalization failed:`, error.message);
+  } catch (error: unknown) {
+    const details = extractErrorDetails(error);
+    log.error({ ...details, vodId }, `[${vodId}] Finalization failed`);
 
     if (messageId && isAlertsEnabled()) {
       updateDiscordEmbed(messageId, {
@@ -544,9 +551,10 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
           resetFailures(String(streamerId));
 
           log.info(`[${vodId}] Cleaned up temporary directory ${vodDir}`);
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const details = extractErrorDetails(error);
           // Non-critical cleanup failure - still mark as success but warn about cleanup issue
-          log.warn(`[${vodId}] Failed to clean up temporary directory ${vodDir}:`, error.message);
+          log.warn({ ...details, vodId }, `[${vodId}] Failed to clean up temporary directory`);
         }
       } else {
         resetFailures(String(streamerId));
@@ -560,8 +568,9 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
       if (!config.settings.saveHLS) {
         try {
           await fsPromises.rm(vodDir, { recursive: true });
-        } catch (error: any) {
-          log.warn(`[${vodId}] Failed to clean up temporary directory during error handling:`, error.message);
+        } catch (error: unknown) {
+          const details = extractErrorDetails(error);
+          log.warn({ ...details, vodId }, `[${vodId}] Cleanup failed`);
         }
       }
 

@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { extractErrorDetails } from '../../../utils/error.js';
 import fsPromises from 'fs/promises';
 import path from 'path';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
@@ -116,7 +117,8 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
         return { data: { message: 'YouTube re-upload job queued', vodId, jobId: `youtube-reupload:${vodId}:${Date.now()}`, durationValidation: null } };
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const details = extractErrorDetails(error);
+        const errorMsg = details.message;
         request.log.error(`[${streamerId}] Re-upload failed for ${vodId}: ${errorMsg}`);
 
         throw new Error('Failed to queue re-upload job');
@@ -164,8 +166,8 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
           request.log.info(`[${streamerId}] Cleared Redis dedup key for manual re-download of ${vodId}`);
         } catch (err) {
-          const errStr = err instanceof Error ? err.message : String(err);
-          request.log.warn(`Failed to clear dedup key: ${errStr}`);
+          const details = extractErrorDetails(err);
+          request.log.warn(`Failed to clear dedup key: ${details.message}`);
         }
 
         // Queue download job
@@ -182,7 +184,8 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
         return { data: { message: 'Re-download job queued', vodId, jobId: `download:${vodId}:${Date.now()}` } };
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const details = extractErrorDetails(error);
+        const errorMsg = details.message;
         request.log.error(`[${streamerId}] Re-download failed for ${vodId}: ${errorMsg}`);
 
         throw new Error('Failed to queue re-download job');

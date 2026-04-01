@@ -10,6 +10,7 @@ import http from 'http';
 import open from 'open';
 import readline from 'readline';
 import { metaClient } from '../src/db/meta-client.js';
+import { extractErrorDetails } from '../src/utils/error.js';
 
 program.name('auth-youtube').description('YouTube OAuth authentication CLI tool').version('1.0.0');
 
@@ -114,8 +115,9 @@ async function getTenant(streamerIdOrName: string): Promise<Tenant | null> {
     }
 
     return tenant as Tenant;
-  } catch (error: any) {
-    console.error('Error getting tenant:', error.message || error);
+    return tenant as Tenant;
+  } catch (error: unknown) {
+    console.error('Error getting tenant:', typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : String(error));
     return null;
   }
 }
@@ -206,9 +208,8 @@ function startCallbackServer(streamerId: string, expectedState: string): void {
         console.log('\n✓ Callback server closed. Authentication complete.');
         process.exit(0);
       });
-    } catch (error: any) {
-      console.error('[OAuth] Error:', error.message || error);
-      res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' });
+    } catch (error: unknown) {
+      const message = typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : String(error);
       res.write(`<!DOCTYPE html><html><head><title>Authentication Failed</title></head>
 <body style="font-family: sans-serif; text-align: center;">
   <h1>✗ Authentication Failed</h1>
@@ -342,7 +343,8 @@ async function completeOAuth(streamerId: string, expectedState: string, urlOrCod
 
     return true; // Signal success to caller
   } catch (error) {
-    console.error('[OAuth] Token exchange error:', error);
+    const details = extractErrorDetails(error);
+    console.error('[OAuth] Token exchange error:', details.message);
     throw error;
   }
 }
@@ -424,12 +426,12 @@ async function storeAuthObject(tenantId: string, authObject: any): Promise<void>
     });
 
     console.log('\n=== Auth Object Stored Successfully ===\n');
-  } catch (error: any) {
-    if ((error as any).code === 'P2025') {
-      throw new Error(`Tenant not found in database: ${tenantId}`);
-    }
-    throw error;
-  }
+} catch (error: unknown) {
+      const isTenantNotFound = typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2025';
+      
+      if (isTenantNotFound) {
+        throw new Error(`Tenant not found in database: ${tenantId}`);
+      }
 }
 
 program
@@ -444,8 +446,8 @@ program
       process.exit(1);
     }
 
-    startOAuthFlow(tenant.id).catch((error: any) => {
-      console.error('Error during OAuth flow:', error.message || error);
+    startOAuthFlow(tenant.id).catch((error: unknown) => {
+      const details = extractErrorDetails(error);
       callbackServer?.close();
       process.exit(1);
     });

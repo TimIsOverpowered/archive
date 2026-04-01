@@ -13,6 +13,7 @@ import { getClient, createClient } from '../db/client.js';
 import { getYoutubeUploadQueue } from '../jobs/queues.js';
 import { isBlockingPolicy, buildMuteFilters, muteAudioSections, blackoutVideoSection, cleanupTempFiles, fileExists } from '../utils/dmca.js';
 import { trimVideo as ffmpegTrim } from '../utils/ffmpeg.js';
+import { extractErrorDetails } from '../utils/error.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob> = async (job: Job<DmcaProcessingJob>) => {
   const { streamerId, vodId, receivedClaims, type, platform, part } = job.data;
@@ -149,8 +150,8 @@ const dmcaProcessor: Processor<DmcaProcessingJob> = async (job: Job<DmcaProcessi
 
     return { success: true, youtubeJobId: (uploadJob.id || '').toString(), vodId: String(vodId) };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[${streamerId}] DMCA processing failed for ${vodId}:`, errorMessage);
+    const details = extractErrorDetails(error);
+    console.error({ ...details, streamerId }, `DMCA processing failed for ${vodId}`);
 
     throw error;
   } finally {

@@ -2,6 +2,7 @@
 import 'dotenv/config';
 import { program } from 'commander';
 import { metaClient } from '../src/db/meta-client.js';
+import { extractErrorDetails } from '../src/utils/error.js';
 
 interface YoutubeAuth {
   access_token?: string;
@@ -138,7 +139,8 @@ program
         console.log('Mode: Check-only (--check-only). No refresh performed.');
       }
     } catch (error) {
-      console.error('Error:', error instanceof Error ? error.message : String(error));
+      const details = extractErrorDetails(error);
+      console.error('Error:', details.message);
       process.exit(1);
     } finally {
       await metaClient.$disconnect();
