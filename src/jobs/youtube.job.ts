@@ -5,14 +5,8 @@ export async function enqueueYoutubeUpload(job: Omit<YoutubeUploadJob, 'id'>): P
   const queue = getYoutubeUploadQueue();
 
   try {
-    // @ts-expect-error - M5/H5 issue: BullMQ Queue<T> generics don't properly infer job data types, requires cast annotation for add() method calls
-    const jobId = await (queue as any).add(job, {
-      attempts: 5,
-      backoff: { type: 'exponential', delay: 5000 },
-      timeout: 900000, // 15 min for YouTube upload
-    });
-
-    return jobId;
+    const addedJob = await queue.add('youtube_upload', job);
+    return addedJob.id ?? null;
   } catch {
     return null;
   }
@@ -47,8 +41,7 @@ export async function triggerYoutubeUpload(
     // For parts without chapters, no chapter field needed
   }
 
-  const jobId = await enqueueYoutubeUpload(jobData);
-  return jobId;
+  return enqueueYoutubeUpload(jobData);
 }
 
 export async function triggerYoutubeUploadWithChapters(

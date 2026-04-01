@@ -5,33 +5,24 @@ export async function enqueueChatDownload(job: Omit<ChatDownloadJob, 'id'>): Pro
   const queue = getChatDownloadQueue();
 
   try {
-    // @ts-expect-error - M5/H5 issue: BullMQ Queue<T> generics don't properly infer job data types, requires cast annotation for add() method calls
-    const jobId = await (queue as any).add(job, {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 5000 },
-      timeout: 600000, // 10 min for chat download
-    });
-
-    return jobId;
+    const addedJob = await queue.add('chat_download', job);
+    return addedJob.id ?? null;
   } catch {
     return null;
   }
 }
 
 export async function triggerChatDownload(streamerId: string, vodId: string, platform: 'twitch' | 'kick', duration: number, vodStartDate?: string): Promise<string | null> {
-  const job = enqueueChatDownload({
+  return enqueueChatDownload({
     streamerId,
     vodId,
     platform,
     duration,
     vodStartDate,
   });
-
-  return job;
 }
 
 export async function triggerChatAfterVod(vodJob: VODDownloadJob): Promise<string | null> {
-  // Kick chat is deferred for now - no implementation yet
   if (vodJob.platform === 'kick') {
     return null;
   }
@@ -42,12 +33,10 @@ export async function triggerChatAfterVod(vodJob: VODDownloadJob): Promise<strin
     return null;
   }
 
-  const job = enqueueChatDownload({
+  return enqueueChatDownload({
     streamerId: streamerId as string,
     vodId: vodJob.vodId,
     platform: vodJob.platform,
-    duration: 0, // Will be fetched from VOD metadata in worker if needed
+    duration: 0,
   });
-
-  return job;
 }

@@ -1,6 +1,5 @@
 import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
 import { getStreamerConfig as getConfig } from '../config/loader.js';
-
 export interface VodData {
   id: string;
   stream_id?: string | null;
@@ -20,56 +19,42 @@ export interface VodData {
   view_count: number;
   muted_segments?: Array<{ duration: number; offset: number }> | null;
 }
-
 interface VodTokenSig {
   value: string;
   signature: string;
 }
-
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();
-
 export async function getAppAccessToken(streamerId: string): Promise<string> {
   const creds = getCreds(streamerId);
-
   if (!creds) {
     throw new Error('Twitch credentials not configured');
   }
-
   const cached = tokenCache.get(streamerId);
   if (cached && cached.expiresAt > Date.now() + 24 * 60 * 60 * 1000) {
     return cached.token;
   }
-
   const url = new URL('https://id.twitch.tv/oauth2/token');
   url.searchParams.append('client_id', creds.clientId);
   url.searchParams.append('client_secret', creds.clientSecret);
   url.searchParams.append('grant_type', 'client_credentials');
-
   const response = await fetch(url.toString(), {
     method: 'POST',
     signal: AbortSignal.timeout(10000),
   });
-
   if (!response.ok) throw new Error(`Twitch token failed with status ${response.status}`);
-
   const data = await response.json();
-
   const { access_token, expires_in } = data;
   tokenCache.set(streamerId, {
     token: access_token,
     expiresAt: Date.now() + expires_in * 1000,
   });
-
   return access_token;
 }
-
 export async function getVodData(vodId: string, streamerId: string): Promise<VodData> {
   const accessToken = await getAppAccessToken(streamerId);
   const creds = getCreds(streamerId)!;
-
   const url = new URL('https://api.twitch.tv/helix/videos');
   url.searchParams.append('id', vodId);
-
   const response = await fetch(url.toString(), {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -77,26 +62,21 @@ export async function getVodData(vodId: string, streamerId: string): Promise<Vod
     },
     signal: AbortSignal.timeout(10000),
   });
-
   if (!response.ok) throw new Error(`Twitch API failed with status ${response.status}`);
-
   const data = await response.json();
-
   if (!data.data || data.data.length === 0) {
     throw new Error(`VOD ${vodId} not found`);
   }
-
   return data.data[0] as VodData;
 }
-
 export async function getVodTokenSig(vodId: string): Promise<VodTokenSig> {
   const response = await fetch('https://gql.twitch.tv/gql', {
     method: 'POST',
     headers: {
       Accept: '*/*',
       'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
-      // @ts-expect-error - M5/H5 issue: Content-Type header requires string literal for GraphQL requests
-      'Content-Type': 'text/plain;charset=UTF-8' as any,
+      
+      'Content-Type': 'text/plain;charset=UTF-8',
     },
     body: JSON.stringify({
       operationName: 'PlaybackAccessToken',
@@ -118,40 +98,31 @@ export async function getVodTokenSig(vodId: string): Promise<VodTokenSig> {
     }),
     signal: AbortSignal.timeout(10000),
   });
-
   if (!response.ok) throw new Error(`Twitch token sig failed with status ${response.status}`);
-
   const data = await response.json();
-
   const token = data.data.videoPlaybackAccessToken;
   if (!token) {
     throw new Error('Failed to get VOD token');
   }
-
   return {
     value: token.value,
     signature: token.signature,
   };
 }
-
 export async function getM3u8(vodId: string, token: string, sig: string): Promise<string> {
   const url = `https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h265,h264&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`;
-
   const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
-
   if (!response.ok) throw new Error(`Twitch M3U8 failed with status ${response.status}`);
-
   return response.text();
 }
-
 export async function fetchComments(vodId: string, offset = 0): Promise<Record<string, unknown> | null> {
   const response = await fetch('https://gql.twitch.tv/gql', {
     method: 'POST',
     headers: {
       Accept: '*/*',
       'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
-      // @ts-expect-error - M5/H5 issue: Content-Type header requires string literal for GraphQL requests
-      'Content-Type': 'text/plain;charset=UTF-8' as any,
+      
+      'Content-Type': 'text/plain;charset=UTF-8',
     },
     body: JSON.stringify({
       operationName: 'VideoCommentsByOffsetOrCursor',
@@ -168,22 +139,18 @@ export async function fetchComments(vodId: string, offset = 0): Promise<Record<s
     }),
     signal: AbortSignal.timeout(10000),
   });
-
   if (!response.ok) throw new Error(`Twitch comments failed with status ${response.status}`);
-
   const data = await response.json();
-
   return data.data?.video || null;
 }
-
 export async function fetchNextComments(vodId: string, cursor: string): Promise<Record<string, unknown> | null> {
   const response = await fetch('https://gql.twitch.tv/gql', {
     method: 'POST',
     headers: {
       Accept: '*/*',
       'Client-Id': 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
-      // @ts-expect-error - M5/H5 issue: Content-Type header requires string literal for GraphQL requests
-      'Content-Type': 'text/plain;charset=UTF-8' as any,
+      
+      'Content-Type': 'text/plain;charset=UTF-8',
     },
     body: JSON.stringify({
       operationName: 'VideoCommentsByOffsetOrCursor',
@@ -200,22 +167,18 @@ export async function fetchNextComments(vodId: string, cursor: string): Promise<
     }),
     signal: AbortSignal.timeout(10000),
   });
-
   if (!response.ok) throw new Error(`Twitch next comments failed with status ${response.status}`);
-
   const data = await response.json();
-
   return data.data?.video || null;
 }
-
 export async function getChapters(vodId: string): Promise<Record<string, unknown> | null> {
   const response = await fetch('https://gql.twitch.tv/gql', {
     method: 'POST',
     headers: {
       Accept: '*/*',
       'Client-Id': 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
-      // @ts-expect-error - M5/H5 issue: Content-Type header requires string literal for GraphQL requests
-      'Content-Type': 'text/plain;charset=UTF-8' as any,
+      
+      'Content-Type': 'text/plain;charset=UTF-8',
     },
     body: JSON.stringify({
       operationName: 'VideoPreviewCard__VideoMoments',
@@ -231,22 +194,18 @@ export async function getChapters(vodId: string): Promise<Record<string, unknown
     }),
     signal: AbortSignal.timeout(10000),
   });
-
   if (!response.ok) throw new Error(`Twitch chapters failed with status ${response.status}`);
-
   const data = await response.json();
-
   return data?.data || null;
 }
-
 export async function getChapter(vodId: string): Promise<Record<string, unknown> | null> {
   const response = await fetch('https://gql.twitch.tv/gql', {
     method: 'POST',
     headers: {
       Accept: '*/*',
       'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
-      // @ts-expect-error - M5/H5 issue: Content-Type header requires string literal for GraphQL requests
-      'Content-Type': 'text/plain;charset=UTF-8' as any,
+      
+      'Content-Type': 'text/plain;charset=UTF-8',
     },
     body: JSON.stringify({
       operationName: 'NielsenContentMetadata',
@@ -267,22 +226,15 @@ export async function getChapter(vodId: string): Promise<Record<string, unknown>
     }),
     signal: AbortSignal.timeout(10000),
   });
-
   if (!response.ok) throw new Error(`Twitch chapter failed with status ${response.status}`);
-
   const data = await response.json();
-
   return data.data?.video || null;
 }
-
 export async function getGameData(gameId: string, streamerId: string): Promise<Record<string, unknown> | null> {
   const accessToken = await getAppAccessToken(streamerId);
-
   const creds = getCreds(streamerId)!;
-
   const url = new URL('https://api.twitch.tv/helix/games');
   url.searchParams.append('id', gameId);
-
   const response = await fetch(url.toString(), {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -290,35 +242,25 @@ export async function getGameData(gameId: string, streamerId: string): Promise<R
     },
     signal: AbortSignal.timeout(10000),
   });
-
   if (!response.ok) throw new Error(`Twitch game data failed with status ${response.status}`);
-
   const data = await response.json();
-
   if (!data.data || data.data.length === 0) {
     return null;
   }
-
   return data.data[0];
 }
-
 export async function getChannelBadges(streamerId: string): Promise<Record<string, unknown> | null> {
   const creds = getCreds(streamerId);
   const config = getConfig(streamerId);
-
   if (!creds?.clientId || !config?.twitch?.id) {
     console.warn(`Twitch credentials not configured for streamer ${streamerId}`);
     return null;
   }
-
   try {
     const accessToken = await getAppAccessToken(streamerId);
-
     if (!accessToken) throw new Error('Twitch OAuth access token unavailable');
-
     const url = new URL(`https://api.twitch.tv/helix/chat/badges`);
     url.searchParams.append('broadcaster_id', config.twitch.id.toString());
-
     const response = await fetch(url.toString(), {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -326,50 +268,35 @@ export async function getChannelBadges(streamerId: string): Promise<Record<strin
       },
       signal: AbortSignal.timeout(10000),
     });
-
     if (!response.ok) throw new Error(`Twitch badges failed with status ${response.status}`);
-
     const data = await response.json();
-
     const badgesData = data?.data || null;
-
     if (!badgesData) {
       console.warn(`No channel badges found for Twitch user ${config.twitch.id}`);
     }
-
     return badgesData as Record<string, unknown>;
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`Failed to fetch channel badges for ${streamerId}:`, errorMessage);
-
     return null;
   }
 }
-
 export async function getGlobalBadges(streamerId: string): Promise<Record<string, unknown> | null> {
   const creds = getCreds(streamerId);
-
   if (!creds?.clientId) return null;
-
   try {
     const accessToken = await getAppAccessToken(streamerId);
-
     if (!accessToken) throw new Error('Twitch OAuth access token unavailable');
-
     const response = await fetch('https://api.twitch.tv/helix/chat/badges/global', {
       headers: { Authorization: `Bearer ${accessToken}`, 'Client-Id': creds.clientId },
       signal: AbortSignal.timeout(10000),
     });
-
     if (!response.ok) throw new Error(`Twitch global badges failed with status ${response.status}`);
-
     const data = await response.json();
-
     return (data?.data || null) as Record<string, unknown>;
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`Failed to fetch global badges for ${streamerId}:`, errorMessage);
-
     return null;
   }
 }
