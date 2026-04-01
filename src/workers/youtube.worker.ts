@@ -57,7 +57,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUpl
       const uploadedVideos: Array<{ id: string; part: number }> = [];
 
       if (needsSplitting) {
-        const parts = await splitVideo(filePath, duration, splitDuration, vodId, (percent: any) => {
+        const parts = await splitVideo(filePath, duration, splitDuration, vodId, (percent: number) => {
           if (messageId && isAlertsEnabled()) {
             updateDiscordEmbed(messageId, {
               title: `📺 Splitting VOD`,
@@ -104,7 +104,9 @@ const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUpl
       }
 
       if (uploadedVideos.length > 1) {
-        setTimeout(() => linkParts(streamerId, uploadedVideos), 60000);
+        setTimeout(() => {
+          void linkParts(streamerId, uploadedVideos);
+        }, 60000);
       }
 
       resetFailures(streamerId);
@@ -152,7 +154,9 @@ const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUpl
           return { success: true, skipped: true };
         }
       }
-      const trimmedPath = await trimVideo(filePath, chapter!.start, chapter!.end, `${vodId}-${part}`, (percent: any) => {
+      if (!chapter) throw new Error('Chapter data required for game upload type');
+
+      const trimmedPath = await trimVideo(filePath, chapter.start, chapter.end, `${vodId}-${part}`, (percent: number) => {
         if (messageId && isAlertsEnabled()) {
           updateDiscordEmbed(messageId, {
             title: `✂️ Trimming Game Clip`,
@@ -206,7 +210,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUpl
       `YouTube upload failed for ${vodId}`
     );
 
-    await db?.vodUpload.updateMany({
+    await db.vodUpload.updateMany({
       where: { vod_id: vodId },
       data: { status: 'FAILED' },
     });
@@ -218,7 +222,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob> = async (job: Job<YoutubeUpl
         status: 'error',
         fields: [
           { name: 'Type', value: type, inline: true },
-          { name: 'Error', value: (error as Error).message.substring(0, 500), inline: false },
+          { name: 'Error', value: details.message.substring(0, 500), inline: false },
         ],
         timestamp: new Date().toISOString(),
         updatedTimestamp: new Date().toISOString(),
