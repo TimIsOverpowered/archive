@@ -12,6 +12,7 @@ import { uploadVideo, linkParts } from '../services/youtube.js';
 import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/alerts.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../utils/error.js';
+import { toHHMMSS } from '../utils/formatting.js';
 
 type ExtendedYoutubeUploadJob = YoutubeUploadJob & { dmcaProcessed?: boolean };
 
@@ -84,9 +85,27 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
       const uploadedVideos: Array<{ id: string; part: number }> = [];
 
       if (needsSplitting) {
+        const totalParts = Math.ceil(duration / effectiveSplitDuration);
+
+        // Create splitting progress alert
+        let splitAlertMessageId: string | null = null;
+        if (isAlertsEnabled()) {
+          splitAlertMessageId = await sendRichAlert({
+            title: `📺 VOD Splitting in Progress`,
+            description: `${streamerId} - Preparing ${totalParts} parts...`,
+            status: 'warning',
+            fields: [
+              { name: 'VOD ID', value: vodId, inline: true },
+              { name: 'Total Duration', value: toHHMMSS(duration), inline: true },
+              { name: 'Parts Count', value: String(totalParts), inline: false },
+            ],
+            timestamp: new Date().toISOString(),
+          });
+        }
+
         const parts = await splitVideo(filePath, duration, effectiveSplitDuration, vodId, (percent: number) => {
-          if (messageId && isAlertsEnabled()) {
-            updateDiscordEmbed(messageId, {
+          if (splitAlertMessageId && isAlertsEnabled()) {
+            updateDiscordEmbed(splitAlertMessageId, {
               title: `📺 Splitting VOD`,
               description: `${streamerId} - Preparing video parts for upload`,
               status: 'warning',
@@ -98,19 +117,88 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
         });
 
         for (let i = 0; i < parts.length; i++) {
+          const currentPartNum = i + 1;
+
+          // Create individual upload progress alert per part
+          let uploadAlertMessageId: string | null = null;
+          if (isAlertsEnabled()) {
+            uploadAlertMessageId = await sendRichAlert({
+              title: `📺 YouTube Upload (Part ${currentPartNum}/${totalParts})`,
+              description: `${streamerId} - Uploading video part to YouTube...`,
+              status: 'warning',
+              fields: [
+                { name: 'VOD ID', value: vodId, inline: true },
+                { name: 'Platform', value: platformName.toUpperCase(), inline: true },
+                { name: 'Part', value: `${currentPartNum} of ${totalParts}`, inline: false },
+              ],
+              timestamp: new Date().toISOString(),
+            });
+          }
+
           const partTitle = `${channelName} ${platformName} VOD - ${dateFormatted} PART ${i + 1}`;
 
           const vodStreamTitle = vodRecord.title ? vodRecord.title.replace(/>|</gi, '') : '';
           const domainName = config.settings?.domainName || 'localhost';
           const legacyDescription = `Chat Replay: https://${domainName}/youtube/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description || ''}`;
 
-          const result = await uploadVideo(streamerId, parts[i], partTitle, legacyDescription, privacyStatus);
+          let result;
+          try {
+            result = await uploadVideo(streamerId, parts[i], partTitle, legacyDescription, privacyStatus);
 
-          uploadedVideos.push({ id: result.videoId, part: i + 1 });
+            uploadedVideos.push({ id: result.videoId, part: i + 1 });
+
+            // Update alert on success
+            if (uploadAlertMessageId && isAlertsEnabled()) {
+              updateDiscordEmbed(uploadAlertMessageId, {
+                title: `✅ Upload Complete (Part ${currentPartNum}/${totalParts})`,
+                description: `${streamerId} - Successfully uploaded to YouTube!`,
+                status: 'success',
+                fields: [
+                  { name: 'YouTube Video ID', value: result.videoId.substring(0, 12) + '...', inline: false },
+                  { name: 'Part', value: `${currentPartNum} of ${totalParts}`, inline: false },
+                ],
+                timestamp: new Date().toISOString(),
+                updatedTimestamp: new Date().toISOString(),
+              });
+            }
+          } catch (error) {
+            // Update alert on failure
+            if (uploadAlertMessageId && isAlertsEnabled()) {
+              const errorDetails = extractErrorDetails(error);
+              updateDiscordEmbed(uploadAlertMessageId, {
+                title: `❌ Upload Failed (Part ${currentPartNum}/${totalParts})`,
+                description: `${streamerId} - Video upload encountered an error`,
+                status: 'error',
+                fields: [
+                  { name: 'Error', value: errorDetails.message.substring(0, 500), inline: false },
+                  { name: 'Part', value: `${currentPartNum} of ${totalParts}`, inline: false },
+                ],
+                timestamp: new Date().toISOString(),
+                updatedTimestamp: new Date().toISOString(),
+              });
+            }
+
+            throw error; // Re-throw to trigger retry mechanism
+          }
 
           if (!config.settings.saveMP4) {
             await deleteFile(parts[i]);
           }
+        }
+
+        // Update splitting alert on completion
+        if (splitAlertMessageId && isAlertsEnabled()) {
+          updateDiscordEmbed(splitAlertMessageId, {
+            title: `✅ VOD Splitting Complete`,
+            description: `${streamerId} - Successfully split into ${totalParts} parts`,
+            status: 'success',
+            fields: [
+              { name: 'Total Duration', value: toHHMMSS(duration), inline: true },
+              { name: 'Parts Count', value: String(totalParts), inline: false },
+            ],
+            timestamp: new Date().toISOString(),
+            updatedTimestamp: new Date().toISOString(),
+          });
         }
       } else {
         const vodStreamTitle = vodRecord.title ? vodRecord.title.replace(/>|</gi, '') : '';
@@ -242,9 +330,26 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
         log.info({ duration: trimmedDuration, parts: Math.ceil(trimmedDuration / YOUTUBE_MAX_DURATION) }, `Game clip exceeds YouTube max duration, auto-splitting`);
 
         const totalParts = Math.ceil(trimmedDuration / YOUTUBE_MAX_DURATION);
+
+        // Create splitting progress alert for game clips
+        let splitAlertMessageId: string | null = null;
+        if (isAlertsEnabled()) {
+          splitAlertMessageId = await sendRichAlert({
+            title: `✂️ Game Clip Splitting in Progress`,
+            description: `${streamerId} - Preparing ${totalParts} parts...`,
+            status: 'warning',
+            fields: [
+              { name: 'Game Name', value: chapter.name, inline: true },
+              { name: 'Total Duration', value: toHHMMSS(trimmedDuration), inline: true },
+              { name: 'Parts Count', value: String(totalParts), inline: false },
+            ],
+            timestamp: new Date().toISOString(),
+          });
+        }
+
         const splitPaths = await splitVideo(trimmedPath, trimmedDuration, YOUTUBE_MAX_DURATION, `${vodId}-game`, (percent: number) => {
-          if (messageId && isAlertsEnabled()) {
-            updateDiscordEmbed(messageId, {
+          if (splitAlertMessageId && isAlertsEnabled()) {
+            updateDiscordEmbed(splitAlertMessageId, {
               title: `✂️ Splitting Game Clip`,
               description: `${streamerId} - Game clip exceeds YouTube max duration`,
               status: 'warning',
@@ -282,33 +387,100 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
           const legacyDescription = `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description || ''}`;
 
-          const result = await uploadVideo(streamerId, splitPaths[i], ytTitle, legacyDescription, 'public');
+          // Create individual upload progress alert per game part
+          let uploadAlertMessageId: string | null = null;
+          if (isAlertsEnabled()) {
+            uploadAlertMessageId = await sendRichAlert({
+              title: `🎮 Game Upload (Part ${currentPartNum}/${totalParts})`,
+              description: `${streamerId} - Uploading game clip part to YouTube...`,
+              status: 'warning',
+              fields: [
+                { name: 'Game Name', value: chapter.name, inline: true },
+                { name: 'VOD ID', value: vodId, inline: true },
+                { name: 'Part', value: `${currentPartNum} of ${totalParts}`, inline: false },
+              ],
+              timestamp: new Date().toISOString(),
+            });
+          }
 
-          const createdGameRecord = await db.game.create({
-            data: {
-              vod_id: vodId,
-              start_time: (startTime + chapter.start).toString(),
-              end_time: (endTime + chapter.start).toString(),
-              video_provider: 'youtube',
-              video_id: result.videoId,
-              thumbnail_url: result.thumbnailUrl || null,
-              game_id: chapter.gameId || null,
-              game_name: chapter.name,
-              title: `${chapter.name} EP ${totalGames !== undefined ? totalGames + 1 : ''}`.trim(),
-            },
-          });
+          let result;
+          try {
+            result = await uploadVideo(streamerId, splitPaths[i], ytTitle, legacyDescription, 'public');
 
-          uploadedGameVideos.push({
-            id: result.videoId,
-            part: currentPartNum,
-            startTime,
-            endTime,
-            gameId: createdGameRecord.id,
-          });
+            const createdGameRecord = await db.game.create({
+              data: {
+                vod_id: vodId,
+                start_time: (startTime + chapter.start).toString(),
+                end_time: (endTime + chapter.start).toString(),
+                video_provider: 'youtube',
+                video_id: result.videoId,
+                thumbnail_url: result.thumbnailUrl || null,
+                game_id: chapter.gameId || null,
+                game_name: chapter.name,
+                title: `${chapter.name} EP ${totalGames !== undefined ? totalGames + 1 : ''}`.trim(),
+              },
+            });
+
+            uploadedGameVideos.push({
+              id: result.videoId,
+              part: currentPartNum,
+              startTime,
+              endTime,
+              gameId: createdGameRecord.id,
+            });
+
+            // Update alert on success
+            if (uploadAlertMessageId && isAlertsEnabled()) {
+              updateDiscordEmbed(uploadAlertMessageId, {
+                title: `✅ Game Upload Complete (Part ${currentPartNum}/${totalParts})`,
+                description: `${streamerId} - Successfully uploaded to YouTube!`,
+                status: 'success',
+                fields: [
+                  { name: 'YouTube Video ID', value: result.videoId.substring(0, 12) + '...', inline: false },
+                  { name: 'Part', value: `${currentPartNum} of ${totalParts}`, inline: false },
+                ],
+                timestamp: new Date().toISOString(),
+                updatedTimestamp: new Date().toISOString(),
+              });
+            }
+          } catch (error) {
+            // Update alert on failure
+            if (uploadAlertMessageId && isAlertsEnabled()) {
+              const errorDetails = extractErrorDetails(error);
+              updateDiscordEmbed(uploadAlertMessageId, {
+                title: `❌ Game Upload Failed (Part ${currentPartNum}/${totalParts})`,
+                description: `${streamerId} - Video upload encountered an error`,
+                status: 'error',
+                fields: [
+                  { name: 'Error', value: errorDetails.message.substring(0, 500), inline: false },
+                  { name: 'Part', value: `${currentPartNum} of ${totalParts}`, inline: false },
+                ],
+                timestamp: new Date().toISOString(),
+                updatedTimestamp: new Date().toISOString(),
+              });
+            }
+
+            throw error; // Re-throw to trigger retry mechanism
+          }
 
           if (!config.settings.saveMP4) {
             await deleteFile(splitPaths[i]);
           }
+        }
+
+        // Update splitting alert on completion
+        if (splitAlertMessageId && isAlertsEnabled()) {
+          updateDiscordEmbed(splitAlertMessageId, {
+            title: `✅ Game Clip Splitting Complete`,
+            description: `${streamerId} - Successfully split into ${totalParts} parts`,
+            status: 'success',
+            fields: [
+              { name: 'Total Duration', value: toHHMMSS(trimmedDuration), inline: true },
+              { name: 'Parts Count', value: String(totalParts), inline: false },
+            ],
+            timestamp: new Date().toISOString(),
+            updatedTimestamp: new Date().toISOString(),
+          });
         }
 
         resetFailures(streamerId);
