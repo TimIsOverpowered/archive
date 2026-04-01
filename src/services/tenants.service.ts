@@ -125,7 +125,7 @@ export async function getTenantStats(client: PrismaClient, streamerId: string): 
   const messagesThisMonth = await client.chatMessage.count({
     where: {
       vod_id: { startsWith: streamerId },
-      created_at: { gte: thisMonthChatStart },
+      createdAt: { gte: thisMonthChatStart },
     },
   });
 
