@@ -1,12 +1,20 @@
-import { Processor, Job } from 'bullmq';
+import { Processor } from 'bullmq';
 import Redis from 'ioredis';
 
-interface LiveHlsDownloadJobData {
+// Define the shape of your job data
+export interface LiveHlsDownloadJobData {
   vodId: string;
   platform: 'twitch' | 'kick';
   streamerId: string;
   startedAt?: string;
   sourceUrl?: string;
+}
+
+// Define what the job returns when it finishes
+export interface LiveHlsDownloadResult {
+  success: true;
+  finalPath: string;
+  durationSeconds?: number;
 }
 
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
@@ -16,33 +24,42 @@ async function clearVodDedupKey(vodId: string): Promise<void> {
     const dedupKey = `vod_download:${vodId}`;
     await redis.del(dedupKey);
   } catch {
-    // Silent fail - non-critical cleanup operation
+    // Silent fail - Redis connection issues shouldn't crash the worker
   }
 }
 
-const vodProcessor: Processor<any> = async (job: Job<any>) => {
-  if (job.name === 'live_hls_download') {
-    const liveJob = job as Job<LiveHlsDownloadJobData>;
+/**
+ * BullMQ Processor for VOD tasks with full type safety
+ */
+const vodProcessor: Processor<LiveHlsDownloadJobData, LiveHlsDownloadResult, string> = async (job) => {
+  // Check the job name
+  if (job.name !== 'live_hls_download') {
+    throw new Error(`Unsupported job type: ${job.name}`);
+  }
 
-    try {
-      // Import the consolidated HLS downloader dynamically to avoid circular dependencies
-      const { downloadLiveHls } = await import('./vod/hls-downloader');
+  const { vodId, platform, streamerId, startedAt, sourceUrl } = job.data;
 
-      return await downloadLiveHls({
-        vodId: liveJob.data.vodId,
-        platform: liveJob.data.platform,
-        streamerId: liveJob.data.streamerId,
-        startedAt: liveJob.data.startedAt,
-        sourceUrl: liveJob.data.sourceUrl,
-      });
-    } catch (error: unknown) {
-      // Re-throw to trigger BullMQ retry logic
-      throw error;
-    } finally {
-      await clearVodDedupKey(liveJob.data.vodId);
-    }
-  } else {
-    throw new Error(`Unknown job type: ${job.name}. Only 'live_hls_download' is supported.`);
+  try {
+    // Dynamic import to keep the worker entrypoint light and avoid circular deps
+    const { downloadLiveHls } = await import('./vod/hls-downloader.js');
+
+    // Execute the download
+    const result = await downloadLiveHls({
+      vodId,
+      platform,
+      streamerId,
+      startedAt,
+      sourceUrl,
+    });
+
+    return result;
+  } catch (error: unknown) {
+    // BullMQ automatically handles re-thrown errors by moving the job to 'failed'
+    // or retrying based on your Queue configuration.
+    throw error;
+  } finally {
+    // Always clear the deduplication key so a new job can be queued if the stream restarts
+    await clearVodDedupKey(vodId);
   }
 };
 
