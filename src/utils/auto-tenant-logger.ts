@@ -1,76 +1,76 @@
-import type { Logger } from 'pino';
+import type { LogFn } from 'pino';
 import { getTenantDisplayName } from '../config/loader.js';
 import { logger as baseLogger } from './logger.js';
 
-/**
- * Creates a logger instance that automatically prefixes messages with [TenantDisplayName].
- * Output format: [March 29 2026 HH:mm:ss] LEVEL: [TenantName] message text here
- */
-export function createAutoLogger(tenantId?: string | null): Logger & Record<string, unknown> {
+type AppLogger = typeof baseLogger;
+
+// Define a specific call signature for the wrapper to satisfy ESLint
+type InternalLogCall = (arg1: unknown, ...args: unknown[]) => void;
+
+export function createAutoLogger(tenantId?: string | null): AppLogger {
   if (!tenantId || tenantId === 'null') {
-    return baseLogger as never;
+    return baseLogger;
   }
 
   const displayName = getTenantDisplayName(tenantId);
-
-  // Create base child logger with tenant field for structured filtering
   const childLog = baseLogger.child({ tenant: displayName });
 
-  /** Wraps log methods to prepend [TenantName] prefix */
-  function wrapMethod(methodName: string): ((...args: any[]) => void) | undefined {
-    if (!(methodName in childLog)) return undefined;
+  const prefix = (msg: string): string => {
+    if (msg.match(/^\w+:/) || msg.startsWith(`[${displayName}]`)) {
+      return msg;
+    }
+    return `[${displayName}] ${msg}`;
+  };
 
-    const original = (childLog as unknown as Record<string, any>)[methodName];
-    if (!original || typeof original !== 'function') return undefined;
+  function wrapMethod(method: LogFn): LogFn {
+    return (firstArg: unknown, ...rest: unknown[]): void => {
+      // Cast the method to our explicit InternalLogCall signature.
+      // This satisfies the 'no-unsafe-function-type' rule because it defines params/return.
+      const log = method as InternalLogCall;
 
-    const boundOriginal = original.bind(childLog);
-
-    return (...args: any[]) => {
-      // Skip prefixing for system/metadata logs or already prefixed messages
-      if (typeof args[0] === 'string' && !args[0].match(/^\w+:/) && !args[0].startsWith(`[${displayName}]`)) {
-        const msg = `[${displayName}] ${args[0]}`;
-        return boundOriginal(msg, ...args.slice(1));
+      if (typeof firstArg === 'string') {
+        const msg = prefix(firstArg);
+        return log.call(childLog, msg, ...rest);
       }
 
-      // Handle object logs with message property
-      if (typeof args[0] === 'object' && !Array.isArray(args[0]) && args[0] !== null) {
-        const obj = args[0];
-        for (const key of ['msg', 'message']) {
-          if (typeof obj[key] === 'string') {
-            if (!obj[key].match(/^\w+:/) && !obj[key].startsWith(`[${displayName}]`)) {
-              return boundOriginal({ ...obj, [key]: `[${displayName}] ${obj[key]}` }, ...args.slice(1));
-            }
-          }
+      if (typeof firstArg === 'object' && firstArg !== null) {
+        const obj = { ...(firstArg as Record<string, unknown>) };
+
+        if (typeof obj.msg === 'string') {
+          obj.msg = prefix(obj.msg);
+        } else if (typeof obj.message === 'string') {
+          obj.message = prefix(obj.message);
         }
 
-        // Handle second arg as message string
-        if (args.length > 1 && typeof args[1] === 'string' && !args[1].match(/^\w+:/) && !args[1].startsWith(`[${displayName}]`)) {
-          const newArgs = [...args];
-          newArgs[1] = `[${displayName}] ${args[1]}`;
-          return boundOriginal(...newArgs);
+        const secondArg = rest[0];
+        if (typeof secondArg === 'string') {
+          const msg = prefix(secondArg);
+          return log.call(childLog, obj, msg, ...rest.slice(1));
         }
 
-        (obj as Record<string, unknown>).tenantDisplayName = displayName;
+        return log.call(childLog, obj, ...rest);
       }
 
-      return boundOriginal(...args);
+      return log.call(childLog, firstArg, ...rest);
     };
   }
 
-  try {
-    const methods: string[] = ['info', 'error', 'warn', 'debug', 'trace'];
-    const wrappedLog: Record<string, any> = { ...childLog };
+  const wrappedLog = Object.create(childLog) as AppLogger;
 
-    for (const method of methods) {
-      wrappedLog[method] = wrapMethod(method);
+  const logLevels: (keyof AppLogger)[] = ['info', 'error', 'warn', 'debug', 'trace', 'fatal', 'metric'];
+
+  for (const level of logLevels) {
+    const original = childLog[level];
+
+    if (typeof original === 'function') {
+      Object.defineProperty(wrappedLog, level, {
+        value: wrapMethod(original.bind(childLog) as LogFn),
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
     }
-
-    return wrappedLog as never;
-  } catch (_err) {
-    // Fallback to unwrapped logger if wrapping fails
-    const errStr = _err instanceof Error ? _err.message : String(_err);
-    baseLogger.warn({ err: errStr }, '[createAutoLogger] Failed to wrap methods');
-
-    return childLog as never;
   }
+
+  return wrappedLog;
 }
