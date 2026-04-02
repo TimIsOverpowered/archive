@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { PrismaClient } from '../../prisma/generated/meta';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { logger } from '../utils/logger.js';

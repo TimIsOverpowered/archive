@@ -1,5 +1,5 @@
 import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
-import { extractErrorDetails } from '../utils/error.js';
+import { extractErrorDetails, silentFail } from '../utils/error.js';
 import { getStreamerConfig as getConfig } from '../config/loader.js';
 import { toHHMMSS } from '../utils/formatting.js';
 import { PrismaClient } from '../../generated/streamer/client.js';
@@ -393,9 +393,8 @@ export async function downloadVodAsMp4(vodId: string, streamerId: string): Promi
 
     // Send Discord "Download Started" alert
     if (isAlertsEnabled()) {
-      try {
+      silentFail(async () => {
         const streamerName = config.displayName || streamerId;
-
         messageId = await sendRichAlert({
           title: '📥 Twitch VOD Download Started',
           description: `${vodId} download in progress for ${streamerName}`,
@@ -406,7 +405,7 @@ export async function downloadVodAsMp4(vodId: string, streamerId: string): Promi
           ],
           timestamp: new Date().toISOString(),
         });
-      } catch {} // Silent fail for alerts
+      });
     }
 
     // Fetch m3u8 playlist and detect fMP4 format (Twitch can use both .ts or fMP4)
@@ -426,10 +425,10 @@ export async function downloadVodAsMp4(vodId: string, streamerId: string): Promi
 
     // Success alert
     if (isAlertsEnabled() && messageId) {
-      try {
+      silentFail(async () => {
         const streamerName = config.displayName || streamerId;
 
-        await updateDiscordEmbed(messageId, {
+        await updateDiscordEmbed(messageId!, {
           title: '✅ Twitch VOD Download Complete!',
           description: `${vodId} successfully downloaded and converted to MP4 for ${streamerName}`,
           status: 'success',
@@ -440,7 +439,7 @@ export async function downloadVodAsMp4(vodId: string, streamerId: string): Promi
           timestamp: new Date().toISOString(),
           updatedTimestamp: new Date().toISOString(),
         });
-      } catch {} // Silent fail for alerts
+      });
     }
 
     return vodPath;
@@ -452,8 +451,8 @@ export async function downloadVodAsMp4(vodId: string, streamerId: string): Promi
 
     // Failure alert
     if (isAlertsEnabled() && messageId) {
-      try {
-        await updateDiscordEmbed(messageId, {
+      silentFail(async () => {
+        await updateDiscordEmbed(messageId!, {
           title: '❌ Twitch VOD Download Failed',
           description: `${vodId} download failed for ${streamerId}`,
           status: 'error',
@@ -464,7 +463,7 @@ export async function downloadVodAsMp4(vodId: string, streamerId: string): Promi
           timestamp: new Date().toISOString(),
           updatedTimestamp: new Date().toISOString(),
         });
-      } catch {} // Silent fail for alerts
+      });
     }
 
     throw error;

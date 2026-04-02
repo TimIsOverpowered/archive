@@ -171,7 +171,6 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
   if (!existingVod) {
     log.info(`[Monitor]: New Twitch live detected! Stream ID: ${streamStatus.id}. Checking for VOD object...`);
 
-    // IMMEDIATE check - don't block waiting (legacy pattern!)
     const vodResult = await getLatestTwitchVodObject(userIdCache, streamStatus.id, tenantId);
 
     if (!vodResult || !vodResult.id) {
@@ -213,7 +212,6 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
 
     // Send Discord stream started alert
     await sendStreamLiveAlert(platform, vodResult.id, streamStatus.title || 'Live Stream', twitchUsername, config.displayName);
-    // Check if download already queued/running before queuing (legacy pattern)
     const hasActiveJob = await checkHasActiveDownload(tenantId, vodResult.id);
 
     if (!hasActiveJob) {
@@ -311,10 +309,6 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
       // Send Discord stream ended alert
       const kickUsername = config.kick?.username;
       await sendStreamOfflineAlert(platform, String(activeLiveVod.id), activeLiveVod.started_at ?? undefined, kickUsername || undefined, config.displayName);
-
-      // Send Discord stream ended alert
-      const twitchUsername = config.twitch?.username;
-      await sendStreamOfflineAlert(platform, String(activeLiveVod.id), activeLiveVod.started_at ?? undefined, twitchUsername || undefined, config.displayName);
     } else {
       log.debug(`[Monitor]:  No active live Kick VOD to update`);
     }
@@ -334,7 +328,6 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
   if (!existingVod) {
     log.info(`[Monitor]: New Kick live detected! Stream ID: ${kickStreamIdStr}. Checking for video object...`);
 
-    // IMMEDIATE check - don't block waiting (legacy pattern!)
     const vodObject = await getLatestKickVodObject(kickUsername, streamStatus.id);
 
     if (!vodObject || !vodObject.id) {
@@ -371,7 +364,6 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
 
     // Send Discord stream started alert
     await sendStreamLiveAlert(platform, kickStreamIdStr, streamStatus.session_title || 'Live Stream', kickUsername, config.displayName);
-    // Check if download already queued/running before queuing (legacy pattern)
     const hasActiveJob = await checkHasActiveDownload(tenantId, kickStreamIdStr);
 
     if (!hasActiveJob) {

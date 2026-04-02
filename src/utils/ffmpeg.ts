@@ -53,25 +53,6 @@ export function detectFmp4FromPlaylist(m3u8Content: string): boolean {
   }
 }
 
-export async function downloadM3u8(m3u8Url: string, outputPath: string, onProgress?: (percent: number) => void): Promise<void> {
-  return new Promise((resolve, reject) => {
-    ffmpeg(m3u8Url)
-      .outputOptions('-c copy')
-      .save(outputPath)
-      .on('progress', (progress: ProgressEvent) => {
-        if (onProgress && progress.percent != null) {
-          onProgress(Math.round(progress.percent));
-        }
-      })
-      .on('end', () => {
-        resolve();
-      })
-      .on('error', (err: Error) => {
-        reject(err);
-      });
-  });
-}
-
 export async function splitVideo(filePath: string, duration: number, splitDuration: number, vodId: string, onProgress?: (percent: number, part: number) => void): Promise<string[]> {
   const outputDir = path.dirname(filePath);
   const parts: string[] = [];

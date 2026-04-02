@@ -89,7 +89,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
           const twitch = await import('../../../services/twitch');
           const rawChapters = (await twitch.getChapters(vodId)) as ChapterEdge[] | null;
           chapterEdges = rawChapters || [];
-        } catch (_err) {
+        } catch {
           request.log.warn(`[${vodId}] Failed to fetch chapter data from Twitch API`);
         }
 
@@ -112,7 +112,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
                     image = String(gameData.box_art_url).replace('{width}x{height}', '40x53');
                   }
                 }
-              } catch (_err2) {
+              } catch {
                 request.log.warn(`[${vodId}] Failed to fetch game data`);
               }
 
@@ -141,7 +141,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
               });
 
               savedCount++;
-            } catch (_e) {
+            } catch {
               request.log.warn(`[${vodId}] Failed to save chapter`);
             }
           }
@@ -152,7 +152,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
           try {
             const twitch = await import('../../../services/twitch');
             chapterData = await twitch.getChapter(vodId);
-          } catch (_err) {
+          } catch {
             request.log.warn(`[${vodId}] Failed to fetch single chapter data from Twitch API`);
           }
 
@@ -168,7 +168,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
                   image = String(gameData.box_art_url).replace('{width}x{height}', '40x53');
                 }
               }
-            } catch (_err2) {
+            } catch {
               request.log.warn(`[${vodId}] Failed to fetch game data`);
             }
 

@@ -325,7 +325,7 @@ async function bootstrap() {
         if (youtubeModule.shutdown) {
           youtubeModule.shutdown();
         }
-      } catch (_err) {}
+      } catch {}
 
       // Close workers and queues
       await vodWorker.close();

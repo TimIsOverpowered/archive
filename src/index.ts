@@ -1,11 +1,4 @@
-import dotenv from 'dotenv';
-import path from 'path';
-
-// Load environment variables based on NODE_ENV
-const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : process.env.NODE_ENV === 'development' ? '.env.development' : '.env';
-
-dotenv.config({ path: path.resolve(process.cwd(), envFile) });
-
+import 'dotenv/config';
 import { buildServer } from './api/server';
 import { closeAllClients } from './db/client';
 import { logger } from './utils/logger';

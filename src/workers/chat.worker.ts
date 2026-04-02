@@ -25,9 +25,7 @@ const BATCH_SIZE = 2500;
 const RATE_LIMIT_MS = 150;
 
 function formatTime(seconds: number): string {
-  const hrs = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
+  const { hrs, mins, secs } = { hrs: Math.floor(seconds / 3600), mins: Math.floor((seconds % 3600) / 60), secs: seconds % 60 };
   return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toFixed(1).toString()}`;
 }
 

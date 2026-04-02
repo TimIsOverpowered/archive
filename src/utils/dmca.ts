@@ -1,6 +1,6 @@
 import ffmpeg from 'fluent-ffmpeg';
-import fsPromises from 'fs/promises';
 import { extractErrorDetails } from './error.js';
+import { deleteFileIfExists } from './path.js';
 
 export interface DMCAClaim {
   type: 'CLAIM_TYPE_AUDIO' | 'CLAIM_TYPE_VISUAL' | 'CLAIM_TYPE_AUDIOVISUAL';
@@ -33,24 +33,6 @@ export function buildMuteFilters(claims: DMCAClaim[]): string[] {
   }
 
   return muteSection;
-}
-
-export async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await fsPromises.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export async function deleteFileIfExists(filePath: string): Promise<void> {
-  if (await fileExists(filePath)) {
-    await fsPromises.unlink(filePath).catch((err) => {
-      const details = extractErrorDetails(err);
-      console.warn(`Failed to delete file ${filePath}:`, details.message);
-    });
-  }
 }
 
 export async function muteAudioSections(videoPath: string, filters: string[], outputPath: string): Promise<string | null> {
@@ -142,14 +124,6 @@ export async function blackoutVideoSections(videoPath: string, vodId: string, se
       })
       .saveToFile(outputPath);
   });
-}
-
-/**
- * Legacy single-section blackout function for backwards compatibility.
- */
-export async function blackoutVideoSection(videoPath: string, vodId: string, startSeconds: number, durationSeconds: number, endSeconds: number): Promise<string | null> {
-  const section = { startSeconds, durationSeconds, endSeconds };
-  return await blackoutVideoSections(videoPath, vodId, [section]);
 }
 
 export async function cleanupTempFiles(files: string[]): Promise<void> {

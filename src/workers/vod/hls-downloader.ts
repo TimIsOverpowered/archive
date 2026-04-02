@@ -771,13 +771,4 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
   }
 }
 
-export async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await fsPromises.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export default downloadLiveHls;

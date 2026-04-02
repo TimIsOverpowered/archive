@@ -78,7 +78,7 @@ export async function getTwitchStreamStatus(userId: string, tenantId: string): P
 
 /**
  * Immediate check for Twitch VOD object matching current stream (NON-BLOCKING)
- * Returns immediately with result or null if not ready yet - matches legacy behavior
+ * Returns immediately with result or null if not ready yet
  */
 export async function getLatestTwitchVodObject(userId: string, expectedStreamId: string, tenantId: string): Promise<VodData | null> {
   try {
@@ -113,7 +113,6 @@ export async function getLatestTwitchVodObject(userId: string, expectedStreamId:
 
     const latestVod = data.data[0];
 
-    // CRITICAL CHECK - legacy pattern: fail immediately if stream_id doesn't match
     if (latestVod.stream_id !== expectedStreamId || !latestVod.id) {
       return null; // Wrong VOD or no ID yet - caller should retry later
     }
