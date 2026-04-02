@@ -62,9 +62,9 @@ export async function stopMonitorService(): Promise<void> {
 
   // Close Kick Puppeteer browser instance if it exists
   try {
-    const closeKickBrowser = (await import('../services/kick-live.js')).closeKickBrowser;
-    await closeKickBrowser?.();
-    logger.info('[Monitor] Closed Kick browser instance');
+    const { releaseBrowser } = await import('../utils/puppeteer-manager.js');
+    await releaseBrowser();
+    logger.info('[Monitor] Released puppeteer browser instance');
   } catch (err) {
     const details = extractErrorDetails(err);
     logger.warn(`Error during shutdown cleanup: ${details.message}`);

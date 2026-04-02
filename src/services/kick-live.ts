@@ -1,4 +1,4 @@
-import { navigateToUrl, releaseBrowser } from '../utils/puppeteer-manager.js';
+import { navigateToUrl } from '../utils/puppeteer-manager.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { logger } from '../utils/logger.js';
 
@@ -79,10 +79,10 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
 
       await page.close();
       return streamData;
-    } catch (parseError) {
-      const errorMsg = String(parseError);
-      if (!errorMsg.includes('Unexpected token') && !errorMsg.includes('JSON.parse')) {
-        logger.error({ username, err: parseError }, `[Kick] Failed to parse JSON response from livestream endpoint`);
+    } catch (error) {
+      const details = extractErrorDetails(error);
+      if (!details.message.includes('Unexpected token') && !details.message.includes('JSON.parse')) {
+        logger.error({ username, err: error }, `[Kick] Failed to parse JSON response from livestream endpoint`);
       }
       await page.close();
       return null;
@@ -158,11 +158,4 @@ export async function getLatestKickVodObject(username: string, expectedStreamId:
     logger.error({ username, ...details }, `[Kick] Failed to get video object for ${username}`);
     return null;
   }
-}
-
-/**
- * Clean up browser instance on shutdown
- */
-export async function closeKickBrowser(): Promise<void> {
-  await releaseBrowser();
 }
