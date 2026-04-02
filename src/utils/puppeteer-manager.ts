@@ -1,4 +1,6 @@
 import { connect } from 'puppeteer-real-browser';
+import type { Browser, Page, HTTPResponse, PuppeteerLifeCycleEvent } from 'puppeteer';
+import type { PuppeteerExtraPlugin } from 'puppeteer-extra';
 
 type BrowserResult = Awaited<ReturnType<typeof connect>>;
 
@@ -10,14 +12,14 @@ interface FailureResult {
   code?: NavigationErrorCode;
 }
 
-export interface SuccessResult<T = any> {
+export interface SuccessResult<T> {
   success: true;
-  page: any;
+  page: Page;
   data?: T;
   status?: number;
 }
 
-export type NavigationResult<T = any> = FailureResult | SuccessResult<T>;
+export type NavigationResult<T> = FailureResult | SuccessResult<T>;
 
 export interface NavigateOptions {
   timeoutMs?: number;
@@ -36,54 +38,47 @@ export interface MemoryStats {
 let browserInstance: BrowserResult | null = null;
 const GLOBAL_NAV_TIMEOUT_MS = 5 * 60 * 1000;
 
-export async function getBrowser(): Promise<{ browser: any }> {
+/**
+ * Gets or initializes the singleton browser instance.
+ * Uses 'unknown' casts to bridge the gap between puppeteer-real-browser and standard Puppeteer types.
+ */
+export async function getBrowser(): Promise<{ browser: Browser }> {
   if (browserInstance && browserInstance.browser.connected) {
-    return { browser: browserInstance.browser };
+    return { browser: browserInstance.browser as unknown as Browser };
   }
 
   const memoryLimit = parseInt(process.env.PUPPETEER_MEMORY_LIMIT_MB || '512', 10);
 
-  type PluginModule = { default: () => unknown };
-  const pluginMod = (await import('puppeteer-extra-plugin-click-and-wait')) as PluginModule;
+  const pluginMod = (await import('puppeteer-extra-plugin-click-and-wait')) as {
+    default: () => PuppeteerExtraPlugin;
+  };
   const clickAndWaitPlugin = pluginMod.default;
 
   browserInstance = await connect({
-    headless: 'auto' as any,
+    headless: 'auto' as unknown as boolean,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    customConfig: { chromeFlags: [`--js-flags=--max-old-space-size=${memoryLimit}`] } as any,
+    customConfig: {
+      chromeFlags: [`--js-flags=--max-old-space-size=${memoryLimit}`],
+    } as unknown as object,
     turnstile: true,
     connectOption: { defaultViewport: null },
-    plugins: [clickAndWaitPlugin()] as any,
+    plugins: [clickAndWaitPlugin()],
   });
 
-  const initialPage = await browserInstance.browser.newPage();
-  initialPage.setDefaultNavigationTimeout(GLOBAL_NAV_TIMEOUT_MS);
-  await initialPage.close();
-
-  return { browser: browserInstance.browser };
+  return { browser: browserInstance.browser as unknown as Browser };
 }
 
 /**
- * Navigate to URL with Turnstile/Cloudflare protection and retry logic.
- *
- * CRITICAL: Caller MUST close returned page in a finally block!
- * Failure to call await result.page.close() will cause memory leaks.
- *
- * Example usage pattern:
- *   const result = await navigateToUrl(url);
- *   try {
- *     if (!result.success) return;
- *     // Use result.page...
- *   } finally {
- *     await result.page?.close(); // ← REQUIRED to prevent memory leaks!
- *   }
+ * Navigates to a URL and handles anti-bot/JSON extraction.
+ * @template T The expected shape of the JSON response.
  */
-export async function navigateToUrl<T = any>(url: string, options?: NavigateOptions): Promise<NavigationResult<T>> {
+export async function navigateToUrl<T = unknown>(url: string, options?: NavigateOptions): Promise<NavigationResult<T>> {
   const timeoutMs = options?.timeoutMs ?? GLOBAL_NAV_TIMEOUT_MS;
   const maxRetries = options?.maxRetries ?? 3;
   const isJsonEndpoint = options?.isJsonUrl ?? false;
+  const waitCondition: PuppeteerLifeCycleEvent = 'networkidle2';
 
-  let browserData: Awaited<ReturnType<typeof getBrowser>> | null = null;
+  let browserData: { browser: Browser };
 
   try {
     browserData = await getBrowser();
@@ -99,128 +94,104 @@ export async function navigateToUrl<T = any>(url: string, options?: NavigateOpti
       await new Promise((r) => setTimeout(r, baseDelay + jitter));
     }
 
+    let page: Page | null = null;
+
     try {
-      const page = await browserData.browser.newPage();
+      page = await browserData.browser.newPage();
       page.setDefaultNavigationTimeout(timeoutMs);
 
-      const response = await page.goto(url, { waitUntil: 'networkidle2' });
-
-      // Check for HTTP error status codes (4xx/5xx) - "Hard" failures
+      const response: HTTPResponse | null = await page.goto(url, { waitUntil: waitCondition });
       const status = response?.status();
+
+      // 1. Check HTTP Hard Errors
       if (status && status >= 400) {
         await page.close();
         return { success: false, error: `HTTP ${status}`, code: 'HTTP_ERROR' };
       }
 
-      // Check for Cloudflare/Turnstile blocking pages
+      // 2. Check Cloudflare/Turnstile
       const isBlocked = await page.evaluate(() => {
         return !!document.querySelector('#turnstile-wrapper') || document.title.includes('Just a moment') || document.title.includes('Attention Required!');
       });
 
       if (isBlocked) {
         await page.close();
-
         if (attempt === maxRetries) {
-          return { success: false, error: 'Turnstile/Cloudflare wall detected', code: 'CAPTCHA_DETECTED' };
+          return { success: false, error: 'Turnstile wall detected', code: 'CAPTCHA_DETECTED' };
         }
-
-        continue; // Retry with backoff on next iteration
+        continue;
       }
 
+      // 3. Handle JSON Endpoints
       if (isJsonEndpoint) {
         const contentType = response?.headers()['content-type'] || '';
-
         if (!contentType.includes('application/json')) {
           await page.close();
-
           if (attempt === maxRetries) {
-            return { success: false, error: 'Expected JSON but got HTML/content', code: 'INVALID_JSON_RESPONSE' };
+            return { success: false, error: 'Expected JSON but got HTML', code: 'INVALID_JSON_RESPONSE' };
           }
-
-          continue; // Retry with backoff on next iteration
+          continue;
         }
 
+        let jsonData: T | null = null;
         try {
-          // FAST PATH: Try native response.json() first (avoids page.evaluate overhead for large payloads)
-          const jsonData = await response?.json();
-
-          if (jsonData !== undefined) {
-            return { success: true, page, data: jsonData as T, status };
-          }
-
-          // FALLBACK: DOM-based extraction only when native fails (<pre> tag or body text)
-          const fallbackData = await page.evaluate(() => {
-            const preTag = document.querySelector('pre')?.innerText;
-            if (preTag) return JSON.parse(preTag);
-
-            const bodyText = document.body.innerText.trim();
-            return JSON.parse(bodyText);
-          });
-
-          return { success: true, page, data: fallbackData as T, status };
+          // Attempt 1: Native JSON
+          jsonData = (await response?.json()) as T;
         } catch {
-          await page.close(); // CRITICAL cleanup on parse failure to prevent memory leaks
-
-          if (attempt === maxRetries) {
-            return {
-              success: false,
-              error: `Failed to parse JSON response from ${url}`,
-              code: 'INVALID_JSON_RESPONSE',
-            };
+          try {
+            // Attempt 2: DOM Extraction (Fallback)
+            const text = await page.evaluate(() => {
+              const pre = document.querySelector('pre')?.innerText;
+              return pre || document.body.innerText.trim();
+            });
+            jsonData = JSON.parse(text) as T;
+          } catch (parseError) {
+            await page.close();
+            if (attempt === maxRetries) {
+              return { success: false, error: `JSON Parse Failed: ${String(parseError)}`, code: 'INVALID_JSON_RESPONSE' };
+            }
+            continue;
           }
-
-          // Continue retry loop for transient parsing issues - will automatically continue to next iteration
         }
+        return { success: true, page, data: jsonData as T, status };
       }
 
-      // For non-JSON endpoints (HTML pages), return immediately on success
-      if (!isJsonEndpoint) {
-        return { success: true, page, status };
-      }
+      // 4. Handle HTML Success
+      return { success: true, page, status };
     } catch (navError) {
-      const err = navError as Error;
+      if (page) await page.close();
+      const error = navError as Error;
 
       if (attempt === maxRetries) {
         return {
           success: false,
-          error: `Navigation failed after ${maxRetries + 1} attempts: ${err.message}`,
-          code: err.message.includes('timeout') ? 'NAVIGATION_TIMEOUT' : 'NETWORK_ERROR',
+          error: `Failed after ${maxRetries + 1} attempts: ${error.message}`,
+          code: error.message.includes('timeout') ? 'NAVIGATION_TIMEOUT' : 'NETWORK_ERROR',
         };
       }
-
-      console.debug(`[Navigate] Attempt ${attempt + 1}/${maxRetries + 1} failed for ${url}:`, err.message);
-
-      // Loop continues to next retry iteration automatically - no break needed!
+      console.debug(`[Navigate] Attempt ${attempt + 1} failed:`, error.message);
     }
   }
 
   return { success: false, error: 'MAX_RETRIES_EXCEEDED', code: 'MAX_RETRIES_EXCEEDED' };
 }
 
-export function getMemoryUsage(): MemoryStats {
+export const navigateToKickUrl = navigateToUrl;
+
+export async function getFullMemoryStats(browser?: Browser): Promise<MemoryStats> {
   const mem = process.memoryUsage();
-
-  return {
-    nodeHeapMb: Math.round(mem.heapUsed / (1024 * 1024)),
-    externalMb: Math.round(mem.external / (1024 * 1024)),
-    chromiumJSHeapMb: 0,
-    totalRssMb: Math.round(mem.rss / (1024 * 1024)),
-  };
-}
-
-export async function getFullMemoryStats(browser?: any): Promise<MemoryStats> {
-  const mem = process.memoryUsage();
-
   let chromiumJSHeapMb = 0;
 
-  if (browser) {
+  if (browser && browser.connected) {
     try {
-      const pages: any[] = await browser.pages();
+      const pages = await browser.pages();
       if (pages.length > 0) {
         const metrics = await pages[0].metrics();
         chromiumJSHeapMb = Math.round((metrics.JSHeapUsedSize || 0) / (1024 * 1024));
       }
-    } catch {}
+    } catch {
+      // Browser or page might have closed during metric collection
+    }
   }
 
   return {
@@ -233,19 +204,10 @@ export async function getFullMemoryStats(browser?: any): Promise<MemoryStats> {
 
 export async function releaseBrowser(): Promise<void> {
   if (!browserInstance) return;
-
   try {
-    const pages = await browserInstance.browser.pages();
-
-    if (pages.length > 0) {
-      console.debug(`[Browser] Closing ${pages.length} page(s)...`);
-      await Promise.all(pages.map((p: any) => p.close()));
-    }
-
-    await browserInstance.browser.close();
-    console.info('[Browser] Browser closed successfully');
+    await (browserInstance.browser as unknown as Browser).close();
   } catch (err) {
-    console.error('[Browser] Error during shutdown:', err);
+    console.error('[Browser] Shutdown error:', err);
   } finally {
     browserInstance = null;
   }
