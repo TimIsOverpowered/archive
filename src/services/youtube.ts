@@ -5,6 +5,7 @@ import { decryptObject, encryptObject } from '../utils/encryption.js';
 import { metaClient } from '../db/meta-client.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { loggerWithTenant, logger as baseLogger } from '../utils/logger.js';
+import { Prisma } from '../../prisma/generated/meta/client.js';
 
 export interface UploadProgressCallbackData {
   milestone: 'starting' | 'processing_metadata' | 'success' | 'error';
@@ -31,7 +32,7 @@ interface DecryptedYoutubeCreds {
 }
 
 // Define structure of youtube JSONB field for type safety
-export interface YoutubeJson {
+export interface YoutubeJson extends Prisma.JsonObject {
   // Encrypted string containing the AuthObject (access_token, refresh_token, etc.)
   auth: string;
 
@@ -190,12 +191,12 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
       const encryptedAuth = encryptObject(updatedAuth);
 
       // H5/M5 - Use type-safe YoutubeJson interface for JSONB field updates with explicit cast
-      const currentYoutubeConfig = config.youtube as unknown as YoutubeJson;
+      const currentYoutubeConfig = config.youtube as YoutubeJson;
 
       await metaClient.tenant.update({
         where: { id: streamerId },
         data: {
-          youtube: { ...currentYoutubeConfig, auth: encryptedAuth } as any, // Required for Prisma JSONB updates
+          youtube: { ...currentYoutubeConfig, auth: encryptedAuth } as YoutubeJson, // Required for Prisma JSONB updates
         },
       });
 

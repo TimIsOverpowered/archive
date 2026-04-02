@@ -8,6 +8,8 @@ import { createClient, getClient } from '../db/client.js';
 import type { StreamerConfig } from '../config/types.js';
 import { getTwitchStreamStatus, getLatestTwitchVodObject } from '../services/twitch-live.js';
 import { getKickStreamStatus, getLatestKickVodObject } from '../services/kick-live.js';
+import { sendRichAlert } from '../utils/discord-alerts.js';
+import { formatDuration } from '../utils/formatting.js';
 import { extractErrorDetails } from '../utils/error.js';
 
 type PlatformType = 'twitch' | 'kick';
@@ -64,6 +66,56 @@ export async function checkPlatformStatus(tenantId: string, platform: PlatformTy
 /**
  * Handle Twitch-specific live detection logic - NO FALLBACK, only downloads after VOD object confirmed available
  */
+
+
+async function sendStreamLiveAlert(platform: PlatformType, vodId: string, title: string, username: string, displayName?: string): Promise<void> {
+  const streamerName = displayName || username;
+
+  try {
+    await sendRichAlert({
+      title: '🔴 Stream Going Live',
+      description: `${platform.toUpperCase()} live stream detected for ${streamerName}`,
+      status: 'success',
+      fields: [
+        { name: 'Platform', value: platform, inline: true },
+        { name: 'Streamer', value: `\`${streamerName}\``, inline: true },
+        { name: 'Stream ID', value: `\`${vodId}\``, inline: false },
+        { name: 'Title', value: title.substring(0, 1024), inline: false }
+      ],
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.warn({ error: extractErrorDetails(error).message }, `Failed to send stream live alert for ${vodId}`);
+  }
+}
+
+async function sendStreamOfflineAlert(platform: PlatformType, vodId: string, startedAt?: Date, username?: string, displayName?: string): Promise<void> {
+  const streamerName = displayName || username;
+
+  try {
+    const fields: Array<{ name: string; value: string; inline?: boolean }> = [
+      { name: 'Platform', value: platform, inline: true },
+      { name: 'Streamer', value: `\`${streamerName}\``, inline: true },
+      { name: 'Stream ID', value: `\`${vodId}\``, inline: false }
+    ];
+
+    if (startedAt) {
+      const durationSeconds = Math.floor((Date.now() - startedAt.getTime()) / 1000);
+      fields.push({ name: 'Duration', value: formatDuration(durationSeconds), inline: true });
+    }
+
+    await sendRichAlert({
+      title: '⚫ Stream Ended',
+      description: `${platform.toUpperCase()} stream has gone offline for ${streamerName}`,
+      status: 'warning',
+      fields,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.warn({ error: extractErrorDetails(error).message }, `Failed to send stream offline alert for ${vodId}`);
+  }
+}
+
 async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string, platform: PlatformType, config: StreamerConfig): Promise<void> {
   const log = loggerWithTenant(tenantId);
   const twitchUsername = config.twitch?.username;
@@ -105,6 +157,10 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
 
       // Clean up Redis dedup key for re-downloads later (stream ended = safe to clear)
       await cleanupDedupKey(String(activeLiveVod.id));
+      
+      // Send Discord stream ended alert
+      const twitchUsername = config.twitch?.username;
+      await sendStreamOfflineAlert(platform, String(activeLiveVod.id), activeLiveVod.started_at ?? undefined, twitchUsername || undefined, config.displayName);
     } else {
       log.debug(`[Monitor]:  No active live VOD to update for offline stream`);
     }
@@ -162,6 +218,9 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
       },
     });
 
+    
+    // Send Discord stream started alert
+    await sendStreamLiveAlert(platform, vodResult.id, streamStatus.title || 'Live Stream', twitchUsername, config.displayName);
     // Check if download already queued/running before queuing (legacy pattern)
     const hasActiveJob = await checkHasActiveDownload(tenantId, vodResult.id);
 
@@ -244,6 +303,14 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
 
       // Clean up Redis dedup key for re-downloads later (stream ended = safe to clear)
       await cleanupDedupKey(String(activeLiveVod.id));
+      
+      // Send Discord stream ended alert
+      const kickUsername = config.kick?.username;
+      await sendStreamOfflineAlert(platform, String(activeLiveVod.id), activeLiveVod.started_at ?? undefined, kickUsername || undefined, config.displayName);
+      
+      // Send Discord stream ended alert
+      const twitchUsername = config.twitch?.username;
+      await sendStreamOfflineAlert(platform, String(activeLiveVod.id), activeLiveVod.started_at ?? undefined, twitchUsername || undefined, config.displayName);
     } else {
       log.debug(`[Monitor]:  No active live Kick VOD to update`);
     }
@@ -298,6 +365,9 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
 
     log.info(`[Monitor]: Created Kick VOD record ${kickStreamIdStr}. Started at: ${streamStatus.created_at}`);
 
+    
+    // Send Discord stream started alert
+    await sendStreamLiveAlert(platform, kickStreamIdStr, streamStatus.session_title || 'Live Stream', kickUsername, config.displayName);
     // Check if download already queued/running before queuing (legacy pattern)
     const hasActiveJob = await checkHasActiveDownload(tenantId, kickStreamIdStr);
 

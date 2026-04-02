@@ -260,12 +260,6 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
     return null;
   }
 
-  const colorMap: Record<'in_progress' | 'failure' | 'success', number> = {
-    in_progress: 3447003,
-    failure: 15158332,
-    success: 3066992,
-  };
-
   const emojiMap: Record<'in_progress' | 'failure' | 'success', string> = {
     in_progress: '[IN_PROGRESS]',
     failure: '[FAILED]',
@@ -297,7 +291,7 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
     timestamp: new Date().toISOString(),
   };
   const embed = constructEmbed(embedData);
-  (embed as any).footer = { text: 'Archive System' };
+  embed.footer = { text: 'Archive System' };
 
   try {
     const response = await fetch(`${webhookUrl}?wait=true`, {
