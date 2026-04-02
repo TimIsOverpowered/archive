@@ -149,46 +149,5 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
     }
   );
 
-  // Legacy endpoint - kept for backward compatibility, uses same logic as /dmca
-  fastify.post<{ Body: DmcaRequestBody; Params: { id: string } }>(
-    '/:id/part-dmca',
-    {
-      schema: {
-        tags: ['Admin', 'Tenants'],
-        description: '[DEPRECATED] Use /dmca with partIndex parameter instead. Process DMCA claim for specific part of VOD.',
-        params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
-        body: {
-          type: 'object',
-          properties: {
-            vodId: { type: 'string' },
-            claims: {}, // Accept any format - array or JSON string
-            partIndex: { type: 'number' }, // Optional - if not provided, processes full VOD like /dmca endpoint
-            platform: { type: 'string', enum: ['twitch', 'kick'] },
-            type: { type: 'string', enum: ['vod', 'live'] },
-          },
-          required: ['vodId', 'claims'],
-        },
-        security: [{ apiKey: [] }],
-      },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
-    },
-    async (request) => {
-      const streamerId = request.params.id;
-
-      try {
-        // Log deprecation warning but continue processing for backward compatibility
-        request.log.warn(`[${streamerId}] /part-dmca endpoint is deprecated. Use /dmca with partIndex parameter instead.`);
-
-        return await processDmcaRequest(streamerId, request.body, request.log);
-      } catch (error) {
-        const details = extractErrorDetails(error);
-        const errorMsg = details.message;
-        request.log.error(`[${streamerId}] DMCA processing failed: ${errorMsg}`);
-
-        throw new Error('Failed to queue DMCA processing job');
-      }
-    }
-  );
-
   return fastify;
 }

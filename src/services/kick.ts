@@ -3,7 +3,7 @@ import { createSession } from '../utils/cycletls.js';
 import { navigateToUrl } from '../utils/puppeteer-manager.js';
 import dayjs from 'dayjs';
 import durationPlugin from 'dayjs/plugin/duration';
-import { extractErrorDetails } from '../utils/error.js';
+import { extractErrorDetails, silentFail } from '../utils/error.js';
 import { sendRichAlert, updateDiscordEmbed, isAlertsEnabled } from '../utils/discord-alerts.js';
 import { convertHlsToMp4 } from '../utils/ffmpeg.js';
 import { childLogger } from '../utils/logger.js';
@@ -244,7 +244,7 @@ export async function downloadMP4(streamerId: string, vod: KickVod): Promise<str
 
     // Send Discord "Download Started" alert
     if (isAlertsEnabled()) {
-      try {
+      silentFail(async () => {
         const streamerName = config.displayName || streamerId;
 
         messageId = await sendRichAlert({
@@ -257,7 +257,7 @@ export async function downloadMP4(streamerId: string, vod: KickVod): Promise<str
           ],
           timestamp: new Date().toISOString(),
         });
-      } catch {} // Silent fail for alerts
+      });
     }
 
     // Download directly to MP4 using ffmpeg HLS streaming (reference kick.js line 160-205, consolidated in ffmpeg.ts)
@@ -268,10 +268,10 @@ export async function downloadMP4(streamerId: string, vod: KickVod): Promise<str
 
     // Success alert
     if (isAlertsEnabled() && messageId) {
-      try {
+      silentFail(async () => {
         const streamerName = config.displayName || streamerId;
 
-        await updateDiscordEmbed(messageId, {
+        await updateDiscordEmbed(messageId!, {
           title: '✅ Kick VOD Download Complete!',
           description: `${vod.id} successfully downloaded and converted to MP4 for ${streamerName}`,
           status: 'success',
@@ -282,7 +282,7 @@ export async function downloadMP4(streamerId: string, vod: KickVod): Promise<str
           timestamp: new Date().toISOString(),
           updatedTimestamp: new Date().toISOString(),
         });
-      } catch {} // Silent fail for alerts
+      });
     }
 
     return vodPath;
@@ -294,8 +294,8 @@ export async function downloadMP4(streamerId: string, vod: KickVod): Promise<str
 
     // Failure alert
     if (isAlertsEnabled() && messageId) {
-      try {
-        await updateDiscordEmbed(messageId, {
+      silentFail(async () => {
+        await updateDiscordEmbed(messageId!, {
           title: '❌ Kick VOD Download Failed',
           description: `${vod.id} download failed for ${streamerId}`,
           status: 'error',
@@ -306,7 +306,7 @@ export async function downloadMP4(streamerId: string, vod: KickVod): Promise<str
           timestamp: new Date().toISOString(),
           updatedTimestamp: new Date().toISOString(),
         });
-      } catch {} // Silent fail for alerts
+      });
     }
 
     throw error;

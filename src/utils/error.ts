@@ -51,3 +51,18 @@ export async function safeAsync<T>(fn: () => Promise<T>, onError?: (err: Error) 
     throw error;
   }
 }
+
+/**
+ * Silently catches and ignores errors (for non-critical operations like alerts).
+ * Use sparingly - only for truly optional operations where failure is acceptable.
+ */
+export function silentFail(fn: () => void | Promise<void>): void {
+  try {
+    const result = fn();
+    if (result instanceof Promise) {
+      result.catch(() => {});
+    }
+  } catch {
+    // Silently ignore
+  }
+}

@@ -35,7 +35,7 @@ export function getTwitchCredentials(tenantId: string): TwitchCredentials | null
     }
 
     return { clientId: auth.client_id, clientSecret: auth.client_secret };
-  } catch (_error) {
+  } catch {
     return null;
   }
 }

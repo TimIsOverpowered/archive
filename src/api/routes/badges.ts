@@ -37,7 +37,7 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
 
             return { data: JSON.parse(cachedBadges) };
           }
-        } catch (_err) {
+        } catch {
           // Cache miss or Redis error - continue to fetch from API
         }
 
@@ -56,7 +56,7 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
             request.log.info(`[${streamerId}] Fetched and cached Twitch badges`);
 
             return { data: badgesData };
-          } catch (_cacheError) {
+          } catch {
             // Cache write failure - still return the fetched data even if caching fails
             request.log.warn(`Failed to cache Twitch badges in Redis, returning uncached result for ${streamerId}`);
 

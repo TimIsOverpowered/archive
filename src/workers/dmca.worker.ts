@@ -12,8 +12,9 @@ import { getStreamerConfig } from '../config/loader.js';
 import { getClient, createClient } from '../db/client.js';
 import { getYoutubeUploadQueue } from '../jobs/queues.js';
 import type { DMCAClaim } from '../utils/dmca.js';
-import { isBlockingPolicy, buildMuteFilters, muteAudioSections, blackoutVideoSections, cleanupTempFiles, fileExists, BlackoutSection } from '../utils/dmca.js';
+import { isBlockingPolicy, buildMuteFilters, muteAudioSections, blackoutVideoSections, cleanupTempFiles, BlackoutSection } from '../utils/dmca.js';
 import { trimVideo as ffmpegTrim } from '../utils/ffmpeg.js';
+import { fileExists } from '../utils/path.js';
 import { extractErrorDetails } from '../utils/error.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {

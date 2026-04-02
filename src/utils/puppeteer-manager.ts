@@ -145,7 +145,7 @@ export async function navigateToUrl<T = unknown>(url: string, options?: Navigate
       if (isJsonEndpoint) {
         try {
           finalData = await response?.json();
-        } catch (error) {
+        } catch {
           // Direct parse failed - attempt DOM-based extraction
 
           // First fallback: use already-extracted innerText from pageState.content
