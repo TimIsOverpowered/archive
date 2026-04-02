@@ -12,6 +12,7 @@ import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch'
 import { loggerWithTenant } from '../../utils/logger.js';
 import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
 import { toHHMMSS } from '../../utils/formatting.js';
+import { sleep, getRetryDelay } from '../../utils/delay.js';
 import Redis from 'ioredis';
 import type { ReadableStream as NodeWebStream } from 'node:stream/web';
 import { updateChapterDuringDownload, finalizeKickChapters } from '../../services/kick.js';
@@ -479,7 +480,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
           }
 
           retryCount++;
-          await new Promise((resolve) => setTimeout(resolve, 5000 * Math.min(retryCount, 6)));
+          await sleep(getRetryDelay(retryCount));
           continue;
         }
 
@@ -510,7 +511,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
           }
 
           retryCount++;
-          await new Promise((resolve) => setTimeout(resolve, 5000 * Math.min(retryCount, 6)));
+          await sleep(getRetryDelay(retryCount));
           continue;
         }
 
@@ -524,7 +525,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         log.error(`[${vodId}] Invalid HLS playlist structure`);
 
         retryCount++;
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+        await sleep(60000);
 
         continue;
       }
@@ -581,7 +582,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
             throw new Error('Segment download failed after multiple retries'); // Will trigger worker retry logic
           }
 
-          await new Promise((resolve) => setTimeout(resolve, 5000 * Math.min(retryCount, 6)));
+          await sleep(getRetryDelay(retryCount));
 
           continue; // Skip to next poll cycle without incrementing noChange counter (we still got playlist data)
         }
@@ -595,14 +596,14 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         await updateChapterDuringDownload(vodId, streamerId, streamerClient);
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 60000)); // Poll every 60 seconds for VOD downloads
+      await sleep(60000); // Poll every 60 seconds for VOD downloads
     } catch (error: unknown) {
       const details = extractErrorDetails(error);
       log.error({ ...details, vodId }, `[${vodId}] Error in HLS poll cycle`);
 
       retryCount++;
 
-      await new Promise((resolve) => setTimeout(resolve, 5000 * Math.min(retryCount, 6)));
+      await sleep(getRetryDelay(retryCount));
 
       if (retryCount > maxRetryBeforeEndDetection + 12) {
         // Higher threshold for complete failures vs just no segments
