@@ -7,7 +7,7 @@ import { pipeline } from 'stream/promises';
 import { Readable } from 'stream';
 import { getStreamerConfig } from '../../config/loader';
 import { getClient } from '../../db/client';
-import { sendRichAlert, updateDiscordEmbed, resetFailures, isAlertsEnabled } from '../../utils/alerts';
+import { sendRichAlert, updateDiscordEmbed, resetFailures, isAlertsEnabled } from '../../utils/discord-alerts.js';
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch';
 import { loggerWithTenant } from '../../utils/logger.js';
 import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
