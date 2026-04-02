@@ -356,3 +356,111 @@ export interface TwitchVideoCommentResponse {
   id: string | null;
   comments: TwitchCommentsConnection | null;
 }
+
+import { sendRichAlert, updateDiscordEmbed, isAlertsEnabled } from '../utils/discord-alerts.js';
+import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
+
+/**
+ * Download Twitch VOD directly to MP4 using ffmpeg HLS streaming (reference: vod.js line 1209-1237)
+ */
+export async function downloadVodAsMp4(vodId: string, streamerId: string): Promise<string | null> {
+  const config = getConfig(streamerId);
+
+  if (!config?.settings.vodPath) {
+    throw new Error(`No vodPath configured for streamer ${streamerId}`);
+  }
+
+  let messageId: string | null = null;
+
+  try {
+    // Get token/sig for authentication (reference line 1209-1214)
+    const tokenSig = await getVodTokenSig(vodId);
+
+    if (!tokenSig) {
+      throw new Error(`Failed to get token/sig for ${vodId}`);
+    }
+
+    // Build authenticated HLS URL (reference line 136-205 + hls-downloader.ts pattern with allow_source=true)
+    const m3u8Url = `https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h264,hevc&playlist_include_framerate=true&nauthsig=${tokenSig.signature}&nauth=${tokenSig.value}`;
+
+    const vodPath = `${config.settings.vodPath}/${vodId}.mp4`;
+
+    // Send Discord "Download Started" alert
+    if (isAlertsEnabled()) {
+      try {
+        const streamerName = config.displayName || streamerId;
+
+        messageId = await sendRichAlert({
+          title: '📥 Twitch VOD Download Started',
+          description: `${vodId} download in progress for ${streamerName}`,
+          status: 'warning',
+          fields: [
+            { name: 'VOD ID', value: `\`${vodId}\``, inline: false },
+            { name: 'Streamer', value: `\`${streamerName}\`` },
+          ],
+          timestamp: new Date().toISOString(),
+        });
+      } catch {} // Silent fail for alerts
+    }
+
+    // Fetch m3u8 playlist and detect fMP4 format (Twitch can use both .ts or fMP4)
+    const response = await fetch(m3u8Url);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch Twitch HLS playlist: ${response.status} ${response.statusText}`);
+    }
+
+    const m3u8Content = await response.text();
+    const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
+
+    // Download directly to MP4 using ffmpeg HLS streaming (reference line 1209-1237, consolidated in ffmpeg.ts)
+    await convertHlsToMp4(m3u8Url, vodPath, { vodId, isFmp4 });
+
+    console.info(`Downloaded ${vodId}.mp4`); // Reference pattern line 1207-209
+
+    // Success alert
+    if (isAlertsEnabled() && messageId) {
+      try {
+        const streamerName = config.displayName || streamerId;
+
+        await updateDiscordEmbed(messageId, {
+          title: '✅ Twitch VOD Download Complete!',
+          description: `${vodId} successfully downloaded and converted to MP4 for ${streamerName}`,
+          status: 'success',
+          fields: [
+            { name: 'VOD ID', value: `\`${vodId}\``, inline: false },
+            { name: 'Output Path', value: vodPath, inline: false },
+          ],
+          timestamp: new Date().toISOString(),
+          updatedTimestamp: new Date().toISOString(),
+        });
+      } catch {} // Silent fail for alerts
+    }
+
+    return vodPath;
+  } catch (error) {
+    const details = extractErrorDetails(error);
+    const errorMsg = details.message.substring(0, 500);
+
+    console.error(`\nffmpeg error occurred: ${errorMsg}`); // Reference pattern line 1209-214
+
+    // Failure alert
+    if (isAlertsEnabled() && messageId) {
+      try {
+        await updateDiscordEmbed(messageId, {
+          title: '❌ Twitch VOD Download Failed',
+          description: `${vodId} download failed for ${streamerId}`,
+          status: 'error',
+          fields: [
+            { name: 'VOD ID', value: `\`${vodId}\``, inline: false },
+            { name: 'Error', value: errorMsg, inline: false },
+          ],
+          timestamp: new Date().toISOString(),
+          updatedTimestamp: new Date().toISOString(),
+        });
+      } catch {} // Silent fail for alerts
+    }
+
+    throw error;
+  }
+}

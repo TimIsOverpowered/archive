@@ -1,13 +1,56 @@
 import ffmpeg from 'fluent-ffmpeg';
 import fs from 'fs/promises';
-import fsSync from 'fs';
 import path from 'path';
-import { pipeline } from 'stream/promises';
-import { spawn } from 'child_process';
 import { logger } from './logger.js';
+import HLS from 'hls-parser';
 
 interface ProgressEvent {
   percent?: number;
+}
+
+/**
+ * Options for HLS to MP4 conversion
+ */
+export interface HlsToMp4Options {
+  vodId?: string; // for logging context (optional)
+  onProgress?: (percent: number) => void; // progress callback (optional - not using now)
+  isFmp4?: boolean; // whether source uses fragmented MP4 segments (caller determines this)
+}
+
+/**
+ * Detects if HLS playlist uses fragmented MP4 segments.
+ * Shared utility function for callers to determine fMP4 status before calling convertHlsToMp4.
+ *
+ * @param m3u8Content - Raw m3u8 playlist text content
+ * @returns true if fMP4 detected, false for standard .ts segments
+ */
+export function detectFmp4FromPlaylist(m3u8Content: string): boolean {
+  try {
+    const parsed = HLS.parse(m3u8Content);
+
+    // Check if this is a media playlist (not master) with segments
+    if (!parsed || !('segments' in parsed)) {
+      return false;
+    }
+
+    const mediaPlaylist = parsed as typeof parsed & {
+      segments: Array<{ uri?: string; map?: { uri?: string } }>;
+    };
+
+    // Check for init segment (EXT-X-MAP tag) - strongest fMP4 indicator
+    if (mediaPlaylist.segments.some((seg) => seg.map && seg.map.uri)) {
+      return true;
+    }
+
+    // Check segment extensions (.mp4 or .m4s but not .ts)
+    const hasFmp4Segments = mediaPlaylist.segments.some(
+      (seg) => seg?.uri?.endsWith('.mp4') || seg?.uri?.endsWith('.m4s') || (!seg?.uri?.endsWith('.ts') && (seg.uri?.includes('fMP4') || seg.uri?.includes('init')))
+    );
+
+    return hasFmp4Segments;
+  } catch {
+    throw new Error('Failed to parse m3u8 playlist for fMP4 detection');
+  }
 }
 
 export async function downloadM3u8(m3u8Url: string, outputPath: string, onProgress?: (percent: number) => void): Promise<void> {
@@ -101,27 +144,55 @@ export async function getDuration(filePath: string): Promise<number | null> {
   });
 }
 
-export async function convertHlsToMp4(m3u8Path: string, vodId: string, mp4Path: string, onProgress?: (percent: number) => void): Promise<void> {
+/**
+ * Converts HLS stream to MP4 using ffmpeg.
+ * Caller is responsible for determining fMP4 status and passing it via options.isFmp4.
+ *
+ * @param source - Can be local file path or remote URL (m3u8 media playlist)
+ * @param outputPath - Output .mp4 file path
+ * @param options - Optional vodId for logging, progress callback, isFmp4 flag from caller
+ */
+export async function convertHlsToMp4(source: string, outputPath: string, options?: HlsToMp4Options): Promise<void> {
+  // Use fMP4 status provided by caller (defaults to false for standard .ts segments)
+  const isFmp4 = options?.isFmp4 ?? false;
+
+  logger.debug({ vodId: options?.vodId || source.substring(0, 30), isFmp4 }, `HLS format determined`);
+
+  // Build ffmpeg output options based on caller-provided fMP4 status
+  const baseOptions: string[] = ['-bsf:a', 'aac_adtstoasc', '-movflags', '+faststart'];
+
+  if (isFmp4) {
+    baseOptions.push('-avoid_negative_ts', 'make_zero', '-fflags', '+genpts');
+  }
+
+  // Execute ffmpeg conversion with fluent API
   return new Promise((resolve, reject) => {
-    const ffmpegProcess = ffmpeg(m3u8Path);
+    const ffmpegProcess = ffmpeg(source);
 
     ffmpegProcess
       .videoCodec('copy')
       .audioCodec('copy')
-      .outputOptions(['-bsf:a aac_adtstoasc', '-movflags +faststart'])
+      .outputOptions(baseOptions)
       .toFormat('mp4')
+      // Progress callback (optional - not currently used by callers per requirement Z/skip)
       .on('progress', (progress: ProgressEvent) => {
-        onProgress?.(progress.percent != null ? Math.round(progress.percent) : 0);
+        const percent = progress.percent != null ? Math.round(progress.percent) : 0;
+        options?.onProgress?.(percent);
       })
+      // Start logging with format context
       .on('start', () => {
-        logger.info({ vodId }, 'Converting VOD m3u8 to mp4');
+        const ctx = options?.vodId ? `VOD ${options.vodId}` : source.substring(0, 40);
+
+        logger.info({ isFmp4 }, `${ctx} - Converting HLS to MP4${isFmp4 ? ' (fMP4)' : ''}`);
       })
-      .on('error', (err, _stdout, _stderr) => {
+      // Error handling with process cleanup
+      .on('error', (err: Error, _stdout: string | null, stderr: string | null) => {
         ffmpegProcess.kill('SIGKILL');
-        reject(err || new Error(_stderr?.toString() || 'Unknown error'));
+        reject(err || new Error(stderr?.toString() || 'Unknown error'));
       })
+      // Success completion
       .on('end', () => resolve())
-      .saveToFile(mp4Path);
+      .saveToFile(outputPath);
   });
 }
 
@@ -134,76 +205,4 @@ export async function deleteFile(filePath: string): Promise<void> {
       throw err;
     }
   }
-}
-
-function sortFmp4SegmentPaths(files: string[]): string[] {
-  return [...files].sort((a, b) => {
-    const nameA = path.basename(a);
-    const nameB = path.basename(b);
-
-    if (nameA.includes('init')) return -1;
-    if (nameB.includes('init')) return 1;
-
-    const matchA = nameA.match(/^(\d+)/);
-    const matchB = nameB.match(/^(\d+)/);
-
-    const numA = matchA ? parseInt(matchA[1], 10) : Infinity;
-    const numB = matchB ? parseInt(matchB[1], 10) : Infinity;
-
-    return numA - numB;
-  });
-}
-
-export async function finalizeFmp4Segments(vodDir: string, outputPath: string, onProgress?: (percent: number) => void): Promise<void> {
-  const segmentFiles = await fs.readdir(vodDir).then((files) => files.filter((f) => f.endsWith('.mp4')).map((f) => path.join(vodDir, f)));
-
-  if (segmentFiles.length === 0) {
-    throw new Error('No MP4 segments found in directory');
-  }
-
-  const sortedSegments = sortFmp4SegmentPaths(segmentFiles);
-
-  logger.debug({ vodDir, count: sortedSegments.length }, 'Finalizing fMP4 segments');
-
-  return new Promise((resolve, reject) => {
-    const cmd = spawn('ffmpeg', ['-y', '-i', 'pipe:0', '-c', 'copy', '-avoid_negative_ts', 'make_zero', '-fflags', '+genpts', '-movflags', '+faststart', outputPath]);
-
-    let totalBytes = 0;
-    const segmentSizes: number[] = [];
-
-    for (const segPath of sortedSegments) {
-      const stat = fsSync.statSync(segPath);
-      segmentSizes.push(stat.size);
-      totalBytes += stat.size;
-    }
-
-    let processedBytes = 0;
-
-    cmd.on('error', reject);
-    cmd.stderr.on('data', (data) => {
-      logger.debug({ stderr: data.toString() }, 'FFmpeg fMP4 output');
-    });
-
-    cmd.on('close', (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`ffmpeg exited with code ${code}`));
-    });
-
-    const pipeSegments = async () => {
-      for (let i = 0; i < sortedSegments.length; i++) {
-        const segPath = sortedSegments[i];
-        const readStream = fsSync.createReadStream(segPath);
-
-        await pipeline(readStream, cmd.stdin!);
-
-        processedBytes += segmentSizes[i];
-        const percent = Math.round((processedBytes / totalBytes) * 100);
-        onProgress?.(percent);
-      }
-
-      cmd.stdin.end();
-    };
-
-    pipeSegments().catch(reject);
-  });
 }
