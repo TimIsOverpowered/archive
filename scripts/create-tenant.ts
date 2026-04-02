@@ -480,7 +480,7 @@ async function main(): Promise<void> {
       displayName: displayName,
       databaseUrl: encryptScalar(dbUrl),
       settings: {
-        domain_name: domainName,
+        domainName: domainName,
         vodPath: vodPath,
         livePath: livePath,
         timezone: timezone,
