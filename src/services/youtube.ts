@@ -1,12 +1,20 @@
 import { google, Auth } from 'googleapis';
 import fs from 'fs';
-import fsPromises from 'fs/promises';
 import { getStreamerConfig, clearConfigCache } from '../config/loader.js';
 import { decryptObject, encryptObject } from '../utils/encryption.js';
 import { metaClient } from '../db/meta-client.js';
 import { extractErrorDetails } from '../utils/error.js';
-
 import { loggerWithTenant, logger as baseLogger } from '../utils/logger.js';
+
+export interface UploadProgressCallbackData {
+  milestone: 'starting' | 'processing_metadata' | 'success' | 'error';
+  videoId?: string;
+  thumbnailUrl?: string;
+  errorDetails?: Error;
+}
+
+export type YoutubeUploadProgress = (data: UploadProgressCallbackData) => void | Promise<void>;
+
 interface AuthObject {
   access_token?: string; // Optional - may not exist if expired and not refreshed yet
   refresh_token: string; // Always required for persistence
@@ -20,6 +28,26 @@ interface DecryptedYoutubeCreds {
   clientSecret: string;
   refreshToken: string;
   accessToken?: string; // Optional cached short-lived token if still valid
+}
+
+// Define structure of youtube JSONB field for type safety
+export interface YoutubeJson {
+  // Encrypted string containing the AuthObject (access_token, refresh_token, etc.)
+  auth: string;
+
+  // Metadata and Settings from your sample
+  description: string;
+  public: boolean;
+  vodUpload: boolean;
+  perGameUpload: boolean;
+  restrictedGames: string[];
+  splitDuration: number;
+  liveUpload: boolean;
+  multiTrack: boolean;
+  upload: boolean;
+
+  // Optional/Legacy fields
+  apiKey?: string;
 }
 
 // Global redirect URI for Google OAuth flow (Google playground)
@@ -97,53 +125,9 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
     log.info(`[YouTube] Token expiring soon (${getRemainingSeconds(client)}s remaining), pre-emptive refresh`);
 
     try {
-      await client.refreshAccessToken(); // Google's explicit async refresh method
+      await client.refreshAccessToken(); // Google's explicit async refresh method - tokens event fires automatically and handles persistence
 
-      const config = getStreamerConfig(streamerId);
-
-      if (config?.youtube?.auth) {
-        // Build complete updated auth object from refreshed credentials + preserved values
-        const credsUpdate = buildCredentialsObject(
-          {
-            access_token: client.credentials.access_token,
-            refresh_token: client.credentials.refresh_token || '',
-            expiry_date: Date.now() + (client.credentials.expiry_date as number) - Date.now(), // Convert back to relative for builder
-          },
-          config.youtube.auth,
-          log
-        );
-
-        const updatedAuth: AuthObject = {
-          access_token: credsUpdate.access_token ?? undefined, // Convert null to undefined for type safety
-          refresh_token: credsUpdate.refresh_token,
-          expiry_date: (client.credentials.expiry_date as number) || calculateExpiryDate(credsUpdate),
-        };
-
-        // Persist to DB immediately after successful pre-refresh (requirement #2)
-        const encryptedAuth = encryptObject(updatedAuth);
-
-        // H5/M5 - Prisma type casting required due to dynamic tenant field structure
-        await metaClient.tenant.update({
-          where: { id: streamerId },
-          data: { youtube: { ...config.youtube, auth: encryptedAuth } as any },
-        });
-
-        // Clear all caches after persistence (requirement #3 - ensure consistency)
-        oauthClients.delete(streamerId);
-
-        if (clearConfigCache) {
-          clearConfigCache();
-        }
-
-        log.info(`[YouTube] Pre-emptive token refresh persisted to DB`);
-      } else {
-        // No auth configured - just refresh the existing client credentials but skip persistence
-        const credsUpdate = buildCredentialsObject(client.credentials, undefined, log);
-
-        client.setCredentials(credsUpdate);
-
-        oauthClients.delete(streamerId);
-      }
+      log.info(`[YouTube] Pre-emptive token refresh completed`);
     } catch (error: unknown) {
       const details = extractErrorDetails(error);
 
@@ -179,14 +163,12 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
   // Create fresh OAuth2 client with auto-refresh listener (same as getYoutubeOAuthClient lines 143-250)
   const newClient = new google.auth.OAuth2(creds.clientId, creds.clientSecret, REDIRECT_URI);
 
-  // Set up 'tokens' event listener for persistence on future refreshes
+  // Set up 'tokens' event listener for persistence on ALL refreshes (pre-emptive and auto)
   newClient.on('tokens', async (newTokens: Auth.Credentials) => {
-    log.info(`[YouTube] Tokens refreshed via auto-refresh`);
-
     const config = getStreamerConfig(streamerId);
 
     if (!config?.youtube?.auth) {
-      log.error('[YouTube] No YouTube auth configured, cannot persist tokens');
+      log.warn('[YouTube] No YouTube auth configured, cannot persist tokens');
 
       newClient.setCredentials(buildCredentialsObject(newTokens));
 
@@ -194,7 +176,7 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
     }
 
     try {
-      // Build complete updated auth object from event data + preserved values
+      // Build complete updated auth object from event data + preserved values (merge with existing state for safety)
       const credsUpdate = buildCredentialsObject(newTokens, config.youtube.auth, log);
 
       const updatedAuth: AuthObject = {
@@ -203,21 +185,25 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
         expiry_date: calculateExpiryDate(newTokens), // Always include absolute timestamp (Option A)
       };
 
-      log.info(`[YouTube] Persisting auto-refreshed auth object`);
+      log.info(`[YouTube] Persisting refreshed auth object`);
 
       const encryptedAuth = encryptObject(updatedAuth);
 
-      // H5/M5 - Prisma type casting required due to dynamic tenant field structure
+      // H5/M5 - Use type-safe YoutubeJson interface for JSONB field updates with explicit cast
+      const currentYoutubeConfig = config.youtube as unknown as YoutubeJson;
+
       await metaClient.tenant.update({
         where: { id: streamerId },
-        data: { youtube: { ...config.youtube, auth: encryptedAuth } as any },
+        data: {
+          youtube: { ...currentYoutubeConfig, auth: encryptedAuth } as any, // Required for Prisma JSONB updates
+        },
       });
 
       log.info(`[YouTube] Auth object persisted to DB`);
     } catch (error: unknown) {
       const details = extractErrorDetails(error);
 
-      log.error(details, `[YouTube] Failed to persist auto-refreshed tokens to DB for ${streamerId}`);
+      log.error(details, `[YouTube] Failed to persist refreshed tokens to DB for ${streamerId}`);
     } finally {
       // CRITICAL: Always update OAuth client's internal state regardless of DB write success/failure
       const credsUpdate = buildCredentialsObject(newTokens, config.youtube.auth, log);
@@ -283,10 +269,11 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
 /**
  * Convert token expiry information to absolute timestamp for local validation.
  * Handles both relative seconds (expires_in/expiresIn) and absolute timestamps (expiry_date).
+ * Merges with existing auth state when available for safer expiry calculation.
  */
 // H5/M5 - Auth.Credentials has dynamic shape; using type assertion for Google API compatibility
-function calculateExpiryDate(newTokens: Auth.Credentials, log?: ReturnType<typeof loggerWithTenant>): number {
-  // If already provided as absolute timestamp, use directly
+function calculateExpiryDate(newTokens: Auth.Credentials, existingAuth?: AuthObject | null, log?: ReturnType<typeof loggerWithTenant>): number {
+  // If already provided as absolute timestamp in event data, use directly
   if (typeof newTokens.expiry_date === 'number') return newTokens.expiry_date;
 
   // Try camelCase variant first (googleapis standard)
@@ -297,6 +284,13 @@ function calculateExpiryDate(newTokens: Auth.Credentials, log?: ReturnType<typeo
 
   if (relativeSeconds !== undefined && !isNaN(relativeSeconds)) {
     return Date.now() + relativeSeconds * 1000; // Convert to absolute timestamp in ms
+  }
+
+  // Fallback: try to use existing auth expiry as reference point for next refresh cycle
+  if (existingAuth?.expiry_date) {
+    const logger = log || baseLogger;
+    logger.info(`[YouTube] Using existing auth expiry pattern, adding standard token lifetime`);
+    return Date.now() + 3600_000; // Standard YouTube access token: 1 hour from now
   }
 
   const logger = log || baseLogger;
@@ -320,13 +314,15 @@ function buildCredentialsObject(
 } {
   let refreshToken = '';
 
-  // Try to load existing refresh token if not provided in event (Google often doesn't rotate it)
+  // Try to load existing auth state for merging (safer than relying solely on event data)
   const logger = log || baseLogger;
+
+  let existingAuth: AuthObject | null = null;
 
   if (!newTokens.refresh_token && currentAuthEncrypted) {
     try {
-      const existing = decryptObject<AuthObject>(currentAuthEncrypted);
-      refreshToken = existing?.refresh_token || '';
+      existingAuth = decryptObject<AuthObject>(currentAuthEncrypted);
+      refreshToken = existingAuth?.refresh_token || '';
 
       logger.info(`[YouTube] Preserved existing refresh token from DB`);
     } catch {
@@ -346,15 +342,16 @@ function buildCredentialsObject(
   if (newTokens.access_token) {
     creds.access_token = newTokens.access_token;
 
-    // Calculate and set expiry_date for local validation checks
-    const expiryDate = calculateExpiryDate(newTokens);
+    // Calculate and set expiry_date for local validation checks using merged state
+    const expiryDate = calculateExpiryDate(newTokens, existingAuth, log);
     if (!isNaN(expiryDate)) {
       (creds as Record<string, unknown>).expiry_date = expiryDate;
 
       logger.info(`[YouTube] Access token valid until ${new Date(expiryDate).toISOString()}`);
     }
   } else {
-    // No access token in event - ensure client state is clean (will force refresh on next API call) delete (creds as Record<string, unknown>)['expiry_date']; // Clear old expiry date if present
+    // No access token in event - clear old expiry to force refresh on next API call
+    delete (creds as Record<string, unknown>)['expiry_date'];
 
     logger.info(`[YouTube] No access token provided, will refresh on next API call`);
   }
@@ -523,58 +520,68 @@ process.on('SIGINT', shutdown);
 
 export async function uploadVideo(
   streamerId: string,
+  displayName: string,
   filePath: string,
   title: string,
   description: string,
-  privacyStatus: 'public' | 'unlisted' | 'private'
+  privacyStatus: 'public' | 'unlisted' | 'private',
+  onProgress?: YoutubeUploadProgress
 ): Promise<{ videoId: string; thumbnailUrl: string }> {
-  // Use guaranteed-valid-token helper (pre-emptive refresh if <120s remaining)
   const log = loggerWithTenant(streamerId);
-  const oauth2Client = await getYoutubeOAuthClientWithValidToken(streamerId);
 
-  const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
-
-  await fsPromises.stat(filePath);
-
-  const response = await youtube.videos.insert({
-    part: ['snippet', 'status'],
-    requestBody: {
-      snippet: {
-        title,
-        description,
-      },
-      status: {
-        privacyStatus,
-      },
-    },
-    media: {
-      body: fs.createReadStream(filePath),
-    },
-  });
-
-  if (!response.data?.id) {
-    throw new Error('Video upload failed - no video ID returned');
+  // Milestone 1: Starting - notify progress callback if provided (worker handles Discord)
+  if (onProgress) {
+    await onProgress({ milestone: 'starting' });
   }
 
-  const videoId = response.data.id;
-
-  let thumbnailUrl = '';
   try {
-    const thumbnailsResponse = await youtube.videos.list({
-      part: ['snippet'],
-      id: [videoId],
+    const oauth2Client = await getYoutubeOAuthClientWithValidToken(streamerId);
+    const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
+
+    log.info(`[YouTube] Starting upload for ${displayName}: ${title}`);
+
+    const response = await youtube.videos.insert({
+      part: ['snippet', 'status'],
+      requestBody: {
+        snippet: { title, description },
+        status: { privacyStatus },
+      },
+      media: { body: fs.createReadStream(filePath) }, // Stream-based upload handles large files efficiently with built-in retry logic
     });
 
-    if (thumbnailsResponse.data?.items && thumbnailsResponse.data.items.length > 0) {
-      const thumbnails = thumbnailsResponse.data.items[0]?.snippet?.thumbnails;
-      thumbnailUrl = thumbnails?.high?.url || thumbnails?.medium?.url || '';
+    const videoId = response.data?.id;
+    if (!videoId) throw new Error('Upload completed but no video ID returned');
+
+    // Milestone 2: Processing metadata - notify progress callback (worker updates Discord)
+    if (onProgress) {
+      await onProgress({ milestone: 'processing_metadata', videoId });
     }
+
+    // Wait for YouTube to generate thumbnails before fetching
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    let thumbnailUrl = '';
+    const meta = await youtube.videos.list({ part: ['snippet'], id: [videoId] });
+    const thumbs = meta.data?.items?.[0]?.snippet?.thumbnails;
+    thumbnailUrl = thumbs?.high?.url || thumbs?.medium?.url || '';
+
+    // Milestone 3: Success with metadata - worker sends final Discord embed with auto-expandable thumbnail
+    if (onProgress) {
+      await onProgress({ milestone: 'success', videoId, thumbnailUrl });
+    }
+
+    return { videoId, thumbnailUrl };
   } catch (err) {
     const details = extractErrorDetails(err);
-    log.error(details, 'Failed to fetch thumbnail URL');
-  }
+    log.error(details, `[YouTube] Upload failed for ${displayName}`);
 
-  return { videoId, thumbnailUrl };
+    // Milestone 4: Error - worker sends failure Discord embed with error message
+    if (onProgress) {
+      await onProgress({ milestone: 'error', errorDetails: err as Error });
+    }
+
+    throw err; // Re-throw for upstream retry handling in worker
+  }
 }
 
 export async function addChapters(streamerId: string, videoId: string, chapters: { time: string; title: string }[]): Promise<void> {
