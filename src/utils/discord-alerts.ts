@@ -12,6 +12,16 @@ interface RichEmbedData {
   fields?: Array<{ name: string; value: string; inline?: boolean }>;
   timestamp?: string;
   updatedTimestamp?: string;
+  mention?: 'everyone' | 'here' | string;
+}
+
+interface DiscordEmbed {
+  title: string;
+  color: number;
+  description?: string;
+  fields: Array<{ name: string; value: string; inline: boolean }>;
+  timestamp?: string;
+  footer?: { text: string };
 }
 
 export function isAlertsEnabled(): boolean {
@@ -29,6 +39,41 @@ function getEmbedColor(status: AlertStatus): number {
   }
 }
 
+function constructEmbed(data: RichEmbedData): DiscordEmbed {
+  const timestamp = data.timestamp ? new Date(data.timestamp) : new Date();
+
+  const embed: DiscordEmbed = {
+    title: data.title,
+    color: getEmbedColor(data.status),
+    fields:
+      data.fields?.map((f) => ({
+        name: f.name,
+        value: f.value,
+        inline: !!f.inline,
+      })) || [],
+  };
+
+  if (data.description) {
+    embed.description = data.description;
+  }
+
+  if (data.updatedTimestamp) {
+    embed.footer = {
+      text: `Started: ${timestamp.toLocaleString()} | Updated: ${new Date(data.updatedTimestamp).toLocaleString()}`,
+    };
+  } else {
+    embed.timestamp = timestamp.toISOString();
+  }
+
+  return embed;
+}
+
+function getUpdateUrl(webhookUrl: string, messageId: string): string {
+  const url = new URL(webhookUrl);
+  url.pathname = `${url.pathname}/messages/${messageId}`;
+  return url.toString();
+}
+
 export async function sendDiscordAlert(message: string): Promise<string | null> {
   if (!isAlertsEnabled()) {
     return null;
@@ -40,10 +85,10 @@ export async function sendDiscordAlert(message: string): Promise<string | null> 
   }
 
   try {
-    const response = await fetch(webhookUrl, {
+    const response = await fetch(`${webhookUrl}?wait=true`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json' as any,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({ content: message }),
       signal: AbortSignal.timeout(10000),
@@ -58,8 +103,7 @@ export async function sendDiscordAlert(message: string): Promise<string | null> 
     }
     return null;
   } catch (err) {
-    const details = extractErrorDetails(err);
-    logger.error(details, 'Failed to send Discord alert');
+    logger.error(extractErrorDetails(err), 'Failed to send Discord alert');
     return null;
   }
 }
@@ -75,23 +119,20 @@ export async function updateDiscordMessage(messageId: string, message: string): 
   }
 
   try {
-    const webhookData = webhookUrl.split('/');
-    webhookData.pop();
-    const guildId = webhookData.pop();
-    const webhookId = webhookData.pop();
-    const updateUrl = `${webhookData.join('/')}/${guildId}/${webhookId}/messages/${messageId}`;
+    const updateUrl = getUpdateUrl(webhookUrl, messageId);
 
-    await fetch(updateUrl, {
+    const response = await fetch(updateUrl, {
       method: 'PATCH',
       headers: {
-        'Content-Type': 'application/json' as any,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({ content: message }),
       signal: AbortSignal.timeout(10000),
     });
+
+    if (!response.ok) throw new Error(`Webhook failed with status ${response.status}`);
   } catch (err) {
-    const details = extractErrorDetails(err);
-    logger.error(details, 'Failed to update Discord message');
+    logger.error(extractErrorDetails(err), 'Failed to update Discord message');
   }
 }
 
@@ -106,40 +147,24 @@ export async function sendRichAlert(data: RichEmbedData): Promise<string | null>
   }
 
   try {
-    const embed: any = {
-      title: data.title,
-      color: getEmbedColor(data.status),
-      fields: [],
-    };
+    const embed = constructEmbed(data);
 
-    if (data.description) {
-      embed.description = data.description;
+    const payload: Record<string, unknown> = { embeds: [embed] };
+
+    if (data.mention === 'everyone') {
+      payload.content = '@everyone';
+    } else if (data.mention === 'here') {
+      payload.content = '@here';
+    } else if (data.mention) {
+      payload.content = `<@&${data.mention}>`;
     }
 
-    if (data.fields && data.fields.length > 0) {
-      embed.fields = data.fields.map((f) => ({
-        name: f.name,
-        value: f.value,
-        inline: f.inline || false,
-      }));
-    }
-
-    const timestamp = data.timestamp ? new Date(data.timestamp).toISOString() : new Date().toISOString();
-
-    if (data.updatedTimestamp) {
-      embed.footer = {
-        text: `Started: ${new Date(timestamp).toLocaleString()} | Updated: ${new Date(data.updatedTimestamp).toLocaleString()}`,
-      };
-    } else {
-      embed.timestamp = timestamp;
-    }
-
-    const response = await fetch(webhookUrl, {
+    const response = await fetch(`${webhookUrl}?wait=true`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json' as any,
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ embeds: [embed] }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(10000),
     });
 
@@ -152,8 +177,7 @@ export async function sendRichAlert(data: RichEmbedData): Promise<string | null>
     }
     return null;
   } catch (err) {
-    const details = extractErrorDetails(err);
-    logger.error(details, 'Failed to send rich Discord alert');
+    logger.error(extractErrorDetails(err), 'Failed to send rich Discord alert');
     return null;
   }
 }
@@ -169,51 +193,19 @@ export async function updateDiscordEmbed(messageId: string, data: RichEmbedData)
   }
 
   try {
-    const webhookData = webhookUrl.split('/');
-    webhookData.pop();
-    const guildId = webhookData.pop();
-    const webhookId = webhookData.pop();
-    const updateUrl = `${webhookData.join('/')}/${guildId}/${webhookId}/messages/${messageId}`;
-
-    const embed: any = {
-      title: data.title,
-      color: getEmbedColor(data.status),
-      fields: [],
-    };
-
-    if (data.description) {
-      embed.description = data.description;
-    }
-
-    if (data.fields && data.fields.length > 0) {
-      embed.fields = data.fields.map((f) => ({
-        name: f.name,
-        value: f.value,
-        inline: f.inline || false,
-      }));
-    }
-
-    const timestamp = data.timestamp ? new Date(data.timestamp).toISOString() : new Date().toISOString();
-
-    if (data.updatedTimestamp) {
-      embed.footer = {
-        text: `Started: ${new Date(timestamp).toLocaleString()} | Updated: ${new Date(data.updatedTimestamp).toLocaleString()}`,
-      };
-    } else {
-      embed.timestamp = timestamp;
-    }
+    const updateUrl = getUpdateUrl(webhookUrl, messageId);
+    const embed = constructEmbed(data);
 
     await fetch(updateUrl, {
       method: 'PATCH',
       headers: {
-        'Content-Type': 'application/json' as any,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({ embeds: [embed] }),
       signal: AbortSignal.timeout(10000),
     });
   } catch (err) {
-    const details = extractErrorDetails(err);
-    logger.error(details, 'Failed to update Discord embed');
+    logger.error(extractErrorDetails(err), 'Failed to update Discord embed');
   }
 }
 

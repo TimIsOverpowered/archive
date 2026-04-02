@@ -9,7 +9,7 @@ import { getStreamerConfig } from '../config/loader.js';
 import { getClient, createClient } from '../db/client.js';
 import { splitVideo, trimVideo, getDuration, deleteFile } from '../utils/ffmpeg.js';
 import { uploadVideo, linkParts } from '../services/youtube.js';
-import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/alerts.js';
+import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/discord-alerts.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { toHHMMSS } from '../utils/formatting.js';

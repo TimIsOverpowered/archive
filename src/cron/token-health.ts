@@ -1,6 +1,6 @@
 import { getAppAccessToken } from '../services/twitch';
 import type { StreamerConfig as ConfigType } from '../config/types';
-import { sendDiscordAlert, trackFailure, resetFailures } from '../utils/alerts.js';
+import { sendDiscordAlert, trackFailure, resetFailures } from '../utils/discord-alerts.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { logger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
