@@ -53,8 +53,7 @@ async function downloadKickSegmentsWithCycleTLS(segmentUris: string[], vodDir: s
     try {
       await fsPromises.access(outputPath); // Check if exists - matches reference lines 476-477
       continue; // Skip existing files
-    } catch (error) {
-      const details = extractErrorDetails(error);
+    } catch {
       // File does not exist, continue to download
     }
     // Download with cycletls using streamToFile - matches reference lines 478-501
@@ -77,9 +76,8 @@ async function downloadTSSegmentsSequentially(segments: HLS.types.Segment[], vod
     try {
       await fsPromises.access(outputPath);
       continue; // File exists - skip download
-    } catch (error) {
-        const details = extractErrorDetails(error);
-await downloadTSSegment(segment.uri, vodDir, baseURL);
+    } catch {
+      await downloadTSSegment(segment.uri, vodDir, baseURL);
     }
   }
 }
@@ -301,8 +299,8 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         timestamp: startTime,
       });
     } catch (error) {
-        const details = extractErrorDetails(error);
-log.warn(`Failed to initialize Discord alert: ${details.message}`);
+      const details = extractErrorDetails(error);
+      log.warn(`Failed to initialize Discord alert: ${details.message}`);
     }
   }
 
@@ -611,8 +609,8 @@ log.warn(`Failed to initialize Discord alert: ${details.message}`);
         log.info(`[${vodId}] HLS files preserved in ${vodDir} (saveHLS=true)`);
       }
     } catch (error) {
-        const details = extractErrorDetails(error);
-log.error({ ...details, vodId }, `[${vodId}] Final MP4 file not found`);
+      const details = extractErrorDetails(error);
+      log.error({ ...details, vodId }, `[${vodId}] Final MP4 file not found`);
 
       if (!config.settings.saveHLS) {
         try {
@@ -630,9 +628,8 @@ export async function fileExists(filePath: string): Promise<boolean> {
   try {
     await fsPromises.access(filePath);
     return true;
-  } catch (error) {
-      const details = extractErrorDetails(error);
-return false;
+  } catch {
+    return false;
   }
 }
 
