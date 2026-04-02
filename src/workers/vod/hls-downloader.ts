@@ -14,6 +14,8 @@ import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 import Redis from 'ioredis';
 import type { ReadableStream as NodeWebStream } from 'node:stream/web';
+import { updateChapterDuringDownload, finalizeKickChapters } from '../../services/kick.js';
+import { saveVodChapters as saveTwitchVodChapters } from '../../services/twitch.js';
 
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
@@ -589,6 +591,10 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
       retryCount = 0;
 
+      if (platform === 'kick' && streamerClient) {
+        await updateChapterDuringDownload(vodId, streamerId, streamerClient);
+      }
+
       await new Promise((resolve) => setTimeout(resolve, 5000)); // Poll every 5 seconds for live streams
     } catch (error: unknown) {
       const details = extractErrorDetails(error);
@@ -663,8 +669,15 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
     if (actualDuration) {
       const formattedDuration = toHHMMSS(Math.round(actualDuration));
+      const durationSeconds = Math.round(actualDuration);
 
-      await streamerClient.vod.update({ where: { id: vodId }, data: { duration: Math.round(actualDuration), is_live: false } });
+      if (platform === 'kick') {
+        await finalizeKickChapters(vodId, durationSeconds, streamerClient);
+      } else if (platform === 'twitch') {
+        await saveTwitchVodChapters(vodId, streamerId, durationSeconds, streamerClient);
+      }
+
+      await streamerClient.vod.update({ where: { id: vodId }, data: { duration: durationSeconds, is_live: false } });
 
       log.info(`[${vodId}] Updated VOD with duration ${formattedDuration} and marked as ended`);
 
