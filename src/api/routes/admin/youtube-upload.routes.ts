@@ -3,7 +3,6 @@ import { extractErrorDetails } from '../../../utils/error.js';
 import fsPromises from 'fs/promises';
 import path from 'path';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
-import Redis from 'ioredis';
 import { getStreamerConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
@@ -25,8 +24,6 @@ interface ReDownloadVodParams {
   id: string;
   vodId: string;
 }
-
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 export default async function youtubeUploadRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
@@ -159,16 +156,6 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
         const vodRecord = (await dbClient.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
 
         if (!vodRecord) throw new Error(`VOD ${vodId} not found`);
-
-        // Clear Redis dedup key to allow re-download
-        try {
-          await redis.del(`vod_download:${vodId}`);
-
-          request.log.info(`[${streamerId}] Cleared Redis dedup key for manual re-download of ${vodId}`);
-        } catch (err) {
-          const details = extractErrorDetails(err);
-          request.log.warn(`Failed to clear dedup key: ${details.message}`);
-        }
 
         // Queue download job
         const YouTubeQueueModule = await import('../../../jobs/queues');

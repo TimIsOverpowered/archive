@@ -1,5 +1,4 @@
 import fs from 'fs/promises';
-import Redis from 'ioredis';
 import path from 'path';
 import { getStreamerConfig } from '../config/loader.js';
 import { loggerWithTenant, logger } from '../utils/logger.js';
@@ -14,8 +13,6 @@ import { extractErrorDetails } from '../utils/error.js';
 
 type PlatformType = 'twitch' | 'kick';
 type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
-
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 /**
  * Main polling function - called every 30 seconds per tenant/platform pair
@@ -67,7 +64,6 @@ export async function checkPlatformStatus(tenantId: string, platform: PlatformTy
  * Handle Twitch-specific live detection logic - NO FALLBACK, only downloads after VOD object confirmed available
  */
 
-
 async function sendStreamLiveAlert(platform: PlatformType, vodId: string, title: string, username: string, displayName?: string): Promise<void> {
   const streamerName = displayName || username;
 
@@ -80,9 +76,9 @@ async function sendStreamLiveAlert(platform: PlatformType, vodId: string, title:
         { name: 'Platform', value: platform, inline: true },
         { name: 'Streamer', value: `\`${streamerName}\``, inline: true },
         { name: 'Stream ID', value: `\`${vodId}\``, inline: false },
-        { name: 'Title', value: title.substring(0, 1024), inline: false }
+        { name: 'Title', value: title.substring(0, 1024), inline: false },
       ],
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     logger.warn({ error: extractErrorDetails(error).message }, `Failed to send stream live alert for ${vodId}`);
@@ -96,7 +92,7 @@ async function sendStreamOfflineAlert(platform: PlatformType, vodId: string, sta
     const fields: Array<{ name: string; value: string; inline?: boolean }> = [
       { name: 'Platform', value: platform, inline: true },
       { name: 'Streamer', value: `\`${streamerName}\``, inline: true },
-      { name: 'Stream ID', value: `\`${vodId}\``, inline: false }
+      { name: 'Stream ID', value: `\`${vodId}\``, inline: false },
     ];
 
     if (startedAt) {
@@ -109,7 +105,7 @@ async function sendStreamOfflineAlert(platform: PlatformType, vodId: string, sta
       description: `${platform.toUpperCase()} stream has gone offline for ${streamerName}`,
       status: 'warning',
       fields,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     logger.warn({ error: extractErrorDetails(error).message }, `Failed to send stream offline alert for ${vodId}`);
@@ -155,9 +151,6 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
         data: { is_live: false },
       });
 
-      // Clean up Redis dedup key for re-downloads later (stream ended = safe to clear)
-      await cleanupDedupKey(String(activeLiveVod.id));
-      
       // Send Discord stream ended alert
       const twitchUsername = config.twitch?.username;
       await sendStreamOfflineAlert(platform, String(activeLiveVod.id), activeLiveVod.started_at ?? undefined, twitchUsername || undefined, config.displayName);
@@ -218,7 +211,6 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
       },
     });
 
-    
     // Send Discord stream started alert
     await sendStreamLiveAlert(platform, vodResult.id, streamStatus.title || 'Live Stream', twitchUsername, config.displayName);
     // Check if download already queued/running before queuing (legacy pattern)
@@ -250,10 +242,12 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
       },
     });
 
-    const hasDownloadJob = await checkHasActiveDownload(tenantId, String(existingVod.id));
+    // [CRASH RECOVERY] Check for crash recovery scenario - partial segments exist from previous run?
+    const hasPartialSegments = await checkForCrashRecovery(tenantId, String(existingVod.id));
 
-    if (!hasDownloadJob) {
-      log.info(`[Monitor]:  Queuing HLS download for resumed VOD ${String(existingVod.id)}`);
+    if (hasPartialSegments) {
+      // Worker crashed mid-download - re-queue immediately to resume
+      log.info({ vodId: existingVod.id }, `[Monitor]: Crash detected for ${existingVod.id} - resuming download`);
 
       await enqueueLiveHlsDownload({
         vodId: String(existingVod.id),
@@ -262,7 +256,20 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
         startedAt: new Date(streamStatus.started_at),
       });
     } else {
-      log.debug(`[Monitor]:  Download already in progress for VOD ${String(existingVod.id)}`);
+      const hasDownloadJob = await checkHasActiveDownload(tenantId, String(existingVod.id));
+
+      if (!hasDownloadJob) {
+        log.info(`[Monitor]:  Queuing HLS download for resumed VOD ${String(existingVod.id)}`);
+
+        await enqueueLiveHlsDownload({
+          vodId: String(existingVod.id),
+          platform,
+          streamerId: userIdCache,
+          startedAt: new Date(streamStatus.started_at),
+        });
+      } else {
+        log.debug(`[Monitor]:  Download already in progress for VOD ${String(existingVod.id)}`);
+      }
     }
   } else if (existingVod && existingVod.is_live) {
     // Already tracked as live with correct fields - no action needed
@@ -301,13 +308,10 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
         data: { is_live: false },
       });
 
-      // Clean up Redis dedup key for re-downloads later (stream ended = safe to clear)
-      await cleanupDedupKey(String(activeLiveVod.id));
-      
       // Send Discord stream ended alert
       const kickUsername = config.kick?.username;
       await sendStreamOfflineAlert(platform, String(activeLiveVod.id), activeLiveVod.started_at ?? undefined, kickUsername || undefined, config.displayName);
-      
+
       // Send Discord stream ended alert
       const twitchUsername = config.twitch?.username;
       await sendStreamOfflineAlert(platform, String(activeLiveVod.id), activeLiveVod.started_at ?? undefined, twitchUsername || undefined, config.displayName);
@@ -365,7 +369,6 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
 
     log.info(`[Monitor]: Created Kick VOD record ${kickStreamIdStr}. Started at: ${streamStatus.created_at}`);
 
-    
     // Send Discord stream started alert
     await sendStreamLiveAlert(platform, kickStreamIdStr, streamStatus.session_title || 'Live Stream', kickUsername, config.displayName);
     // Check if download already queued/running before queuing (legacy pattern)
@@ -398,12 +401,14 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
       },
     });
 
-    const hasDownloadJob = await checkHasActiveDownload(tenantId, kickStreamIdStr);
+    // [CRASH RECOVERY] Check for crash recovery scenario - partial segments exist from previous run?
+    const hasPartialSegments = await checkForCrashRecovery(tenantId, kickStreamIdStr);
 
-    if (!hasDownloadJob) {
-      log.info(`[Monitor]:  Queuing HLS download for resumed Kick VOD ${kickStreamIdStr}`);
+    if (hasPartialSegments) {
+      // Worker crashed mid-download - re-queue immediately to resume
+      log.info({ vodId: kickStreamIdStr }, `[Monitor]: Crash detected for ${kickStreamIdStr} - resuming download`);
 
-      // Re-fetch vod object to get source URL (vodObject not in scope here - different code path)
+      // Re-fetch vod object to get source URL
       const vodObject = await getLatestKickVodObject(kickUsername, streamStatus.id);
 
       await enqueueLiveHlsDownload({
@@ -504,8 +509,7 @@ async function validateVodPath(tenantId: string): Promise<{ valid: boolean }> {
 }
 
 /**
- * Enqueue Live HLS Download job with Redis deduplication check (48-hour TTL)
-
+ * Enqueue Live HLS Download job
  */
 async function enqueueLiveHlsDownload(params: { vodId: string; platform: PlatformType; streamerId: string; startedAt: Date; sourceUrl?: string }): Promise<void> {
   const log = loggerWithTenant(params.streamerId);
@@ -517,30 +521,11 @@ async function enqueueLiveHlsDownload(params: { vodId: string; platform: Platfor
     return; // Don't attempt to queue job if path is invalid
   }
 
-  try {
-    log.info({ vodId: params.vodId, platform: params.platform, streamerId: params.streamerId }, `[Monitor] Attempting to enqueue Live HLS download job`);
-
-    const dedupKey = `vod_download:${params.vodId}`;
-
-    // SETNX with 48-hour TTL (172800 seconds) - survives worker restarts during active streams
-    const acquired = await redis.set(dedupKey, 'locked', 'EX', 172800, 'NX');
-
-    if (!acquired) {
-      log.info({ vodId: params.vodId }, `[Monitor] Download already queued or in progress (Redis dedup lock exists). Skipping.`);
-      return; // Another instance is handling this - don't queue duplicate job
-    }
-
-    log.debug({ vodId: params.vodId, dedupKey }, `[Monitor] Redis dedup key acquired successfully`);
-  } catch (error) {
-    const details = extractErrorDetails(error);
-    log.error({ vodId: params.vodId, error: details.message }, `[Monitor] Failed to acquire Redis dedup lock - attempting queue anyway`);
-
-    // If Redis fails, still try to queue the job - BullMQ will handle duplicates at worker level
-  }
-
   const queue = getLiveHlsDownloadQueue();
 
   try {
+    log.info({ vodId: params.vodId, platform: params.platform, streamerId: params.streamerId }, `[Monitor] Attempting to enqueue Live HLS download job`);
+
     log.debug({ vodId: params.vodId, platform: params.platform }, `[Monitor] Adding job to BullMQ VOD download queue`);
 
     const job = await queue.add(
@@ -553,7 +538,8 @@ async function enqueueLiveHlsDownload(params: { vodId: string; platform: Platfor
         sourceUrl: params.sourceUrl,
       } satisfies LiveHlsDownloadJob,
       {
-        attempts: 3,
+        jobId: `live_hls:${params.vodId}`, // Native BullMQ deduplication - prevents duplicate jobs in queue
+        attempts: 10, // Increased for long-running live streams and crash recovery
         backoff: { type: 'exponential' as const, delay: 5000 },
       }
     );
@@ -562,27 +548,40 @@ async function enqueueLiveHlsDownload(params: { vodId: string; platform: Platfor
   } catch (error) {
     const details = extractErrorDetails(error);
     log.error({ vodId: params.vodId, ...details }, `[Monitor] CRITICAL - Failed to enqueue Live HLS download job`);
-
-    // Release dedup key on failure so it can be retried later
-    try {
-      await redis.del(`vod_download:${params.vodId}`).catch(() => {});
-      log.debug({ vodId: params.vodId }, `[Monitor] Released dedup key after queue failure`);
-    } catch {
-      // Non-critical - just logging the cleanup attempt failure
-    }
   }
 }
 
 /**
- * Clean up Redis deduplication key when stream ends or worker completes successfully
+ * Check if a crash occurred mid-download by scanning for partial segments on disk
  */
-async function cleanupDedupKey(vodId: string): Promise<void> {
-  try {
-    await redis.del(`vod_download:${vodId}`);
+async function checkForCrashRecovery(tenantId: string, vodId: string): Promise<boolean> {
+  const log = loggerWithTenant(tenantId);
 
-    logger.debug(`[Redis] Dedup key cleared for VOD ${vodId} (stream ended or completed)`);
-  } catch {
-    // Non-critical - just logging
+  try {
+    const streamerConfig = getStreamerConfig(tenantId);
+
+    if (!streamerConfig?.settings.vodPath) {
+      return false;
+    }
+
+    const vodDir = path.join(streamerConfig.settings.vodPath, tenantId, vodId);
+
+    // Check if directory exists (indicates download was in progress when crash occurred)
+    try {
+      await fs.access(vodDir);
+
+      // Scan for segments - if any exist but no final MP4, this is a crash recovery scenario
+      const files = await fs.readdir(vodDir);
+      const hasSegments = files.some((f) => f.endsWith('.ts') || (f.endsWith('.mp4') && !f.includes('_final.mp4')));
+
+      return hasSegments;
+    } catch {
+      // Directory doesn't exist - no crash to recover from
+      return false;
+    }
+  } catch (error) {
+    log.warn({ vodId, error: extractErrorDetails(error).message }, `Failed to check for crash recovery`);
+    return false;
   }
 }
 

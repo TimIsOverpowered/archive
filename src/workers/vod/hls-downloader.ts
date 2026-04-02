@@ -12,7 +12,10 @@ import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch'
 import { loggerWithTenant } from '../../utils/logger.js';
 import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
 import { toHHMMSS } from '../../utils/formatting.js';
+import Redis from 'ioredis';
 import type { ReadableStream as NodeWebStream } from 'node:stream/web';
+
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 export interface HlsDownloadOptions {
   vodId: string;
@@ -25,6 +28,7 @@ export interface HlsDownloadOptions {
 async function downloadTSSegment(segmentUri: string, vodDir: string, baseURL: string): Promise<void> {
   const url = `${baseURL}/${segmentUri}`;
   const outputPath = pathMod.join(vodDir, segmentUri);
+  const tempPath = outputPath + '.tmp';
 
   try {
     const response = await fetch(url);
@@ -33,12 +37,17 @@ async function downloadTSSegment(segmentUri: string, vodDir: string, baseURL: st
       throw new Error(`Failed to download segment ${url}: status ${response.status}`);
     }
 
-    const writer = fs.createWriteStream(outputPath);
+    const writer = fs.createWriteStream(tempPath);
 
     const nodeWebStream = response.body as unknown as NodeWebStream<Uint8Array>;
 
     await pipeline(Readable.fromWeb(nodeWebStream), writer);
+
+    await fsPromises.rename(tempPath, outputPath);
   } catch (error: unknown) {
+    try {
+      await fsPromises.unlink(tempPath).catch(() => {});
+    } catch {}
     throw error;
   }
 }
@@ -49,6 +58,7 @@ async function downloadTSSegment(segmentUri: string, vodDir: string, baseURL: st
 async function downloadKickSegmentsWithCycleTLS(segmentUris: string[], vodDir: string, baseURL: string, session: CycleTLSSession, log: ReturnType<typeof loggerWithTenant>): Promise<void> {
   for (const uri of segmentUris) {
     const outputPath = pathMod.join(vodDir, uri);
+    const tempPath = outputPath + '.tmp';
 
     try {
       await fsPromises.access(outputPath); // Check if exists - matches reference lines 476-477
@@ -56,10 +66,17 @@ async function downloadKickSegmentsWithCycleTLS(segmentUris: string[], vodDir: s
     } catch {
       // File does not exist, continue to download
     }
-    // Download with cycletls using streamToFile - matches reference lines 478-501
+
     const url = `${baseURL}/${uri}`;
 
-    await session.streamToFile(url, outputPath);
+    await session.streamToFile(url, tempPath);
+
+    try {
+      await fsPromises.rename(tempPath, outputPath);
+    } catch (error) {
+      await fsPromises.unlink(tempPath).catch(() => {});
+      throw error;
+    }
 
     log.debug({ uri }, `Downloaded ${uri}`); // matches line 493-496
   }
@@ -79,6 +96,87 @@ async function downloadTSSegmentsSequentially(segments: HLS.types.Segment[], vod
     } catch {
       await downloadTSSegment(segment.uri, vodDir, baseURL);
     }
+  }
+}
+
+/**
+ * Scan directory for existing segments from crash recovery scenario
+ * Returns count and highest segment filename found (for logging)
+ */
+export async function recoverPartialDownload(vodDir: string, log: ReturnType<typeof loggerWithTenant>): Promise<{ lastCompleteSegment?: string; totalSegments: number }> {
+  try {
+    const files = await fsPromises.readdir(vodDir);
+
+    // Scan for .ts OR .mp4 segments ONLY (exclude final merged output file)
+    const tsSegments = files.filter((f) => f.endsWith('.ts'));
+    const mp4Segments = files.filter(
+      (f) => f.endsWith('.mp4') && !f.includes('_final.mp4') // Exclude merged output file if exists
+    );
+
+    const totalSegments = Math.max(tsSegments.length, mp4Segments.length);
+
+    // Find highest-numbered segment for logging purposes (optional)
+    let lastCompleteSegment: string | undefined;
+
+    if (tsSegments.length > 0 && tsSegments[0]) {
+      lastCompleteSegment = tsSegments[tsSegments.length - 1];
+    } else if (mp4Segments.length > 0 && mp4Segments[0]) {
+      lastCompleteSegment = mp4Segments[mp4Segments.length - 1];
+    }
+
+    return {
+      totalSegments,
+      lastCompleteSegment: lastCompleteSegment || undefined,
+    };
+  } catch (error) {
+    log.warn({ error: extractErrorDetails(error).message }, `Failed to scan directory for recovery`);
+    return { totalSegments: 0 };
+  }
+}
+
+export async function cleanupOrphanedTmpFiles(vodDir: string, log: ReturnType<typeof loggerWithTenant>): Promise<void> {
+  try {
+    const files = await fsPromises.readdir(vodDir);
+
+    for (const file of files) {
+      if (file.endsWith('.tmp')) {
+        const filePath = pathMod.join(vodDir, file);
+
+        try {
+          await fsPromises.unlink(filePath);
+          log.debug(`Cleaned up orphaned .tmp file: ${file}`);
+        } catch (error) {
+          log.warn({ error: extractErrorDetails(error).message }, `Failed to clean up orphaned .tmp file: ${file}`);
+        }
+      }
+    }
+  } catch (error) {
+    log.warn({ error: extractErrorDetails(error).message }, `Failed to scan for orphaned files in directory`);
+  }
+}
+
+/**
+ * Check if partial download exists by scanning for segments on disk
+ */
+export async function checkForPartialDownload(vodDir: string): Promise<boolean> {
+  try {
+    const files = await fsPromises.readdir(vodDir);
+
+    // Check for any .ts or .mp4 segments (excluding final merged output)
+    return files.some((f) => f.endsWith('.ts') || (f.endsWith('.mp4') && !f.includes('_final.mp4')));
+  } catch {
+    // Directory doesn't exist - no partial download
+    return false;
+  }
+}
+
+async function cleanupVodProgress(vodId: string): Promise<void> {
+  try {
+    const key = `vod_progress:${vodId}`;
+
+    await redis.del(key);
+  } catch (error) {
+    console.warn(`Failed to cleanup VOD progress in Redis for ${vodId}:`, extractErrorDetails(error).message);
   }
 }
 
@@ -336,7 +434,11 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
   while (true) {
     try {
-      const segmentCount = await fsPromises.readdir(vodDir).then((files) => files.filter((f) => f.endsWith('.ts')).length);
+      const filesInDir = await fsPromises.readdir(vodDir);
+
+      const mp4Segments = filesInDir.filter((f) => f.endsWith('.mp4'));
+      const tsSegments = filesInDir.filter((f) => f.endsWith('.ts'));
+      const segmentCount = mp4Segments.length || tsSegments.length;
 
       if (segmentCount > totalSegmentsFound && isAlertsEnabled() && messageId) {
         totalSegmentsFound = segmentCount;
@@ -357,7 +459,21 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         if (!result) {
           // Check if we should break or continue based on error type
           if (retryCount > maxRetryBeforeEndDetection) {
-            break; // Exit loop - assume stream ended
+            // [OFFLINE AFTER CRASH] Check for crash recovery - partial segments exist?
+
+            const hasExistingSegments = await checkForPartialDownload(vodDir);
+
+            if (hasExistingSegments && totalSegmentsFound > 0) {
+              log.warn({ vodId, segmentCount: totalSegmentsFound }, `[${vodId}] Stream ended but ${totalSegmentsFound} segments already downloaded. Attempting finalization...`);
+
+              // Continue to MP4 conversion - don't throw error yet
+              break; // Exit loop, proceed with existing data
+            } else {
+              log.error({ vodId }, `[${vodId}] No segments found and stream is offline. Failing job.`);
+              await cleanupVodProgress(vodId);
+
+              throw new Error('Stream ended before any segments were downloaded');
+            }
           }
 
           retryCount++;
@@ -372,10 +488,23 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
         if (!result) {
           // Special handling for Kick - may need to update DB on abort
-          if (retryCount > maxRetryBeforeEndDetection * 2 && !sourceUrl) {
-            await streamerClient.vod.update({ where: { id: vodId }, data: { is_live: false } });
 
-            throw new Error('Kick HLS source URL not available');
+          // [OFFLINE AFTER CRASH] Check before giving up completely
+          if (retryCount > maxRetryBeforeEndDetection * 2 && !sourceUrl) {
+            const hasExistingSegments = await checkForPartialDownload(vodDir);
+
+            if (hasExistingSegments && totalSegmentsFound > 0) {
+              log.warn({ vodId, segmentCount: totalSegmentsFound }, `[${vodId}] Stream ended but ${totalSegmentsFound} segments already downloaded. Attempting finalization...`);
+
+              await streamerClient.vod.update({ where: { id: vodId }, data: { is_live: false } });
+              break; // Exit loop, proceed with existing data
+            } else {
+              log.error({ vodId }, `[${vodId}] Kick HLS source URL not available and no segments downloaded`);
+
+              await streamerClient.vod.update({ where: { id: vodId }, data: { is_live: false } });
+
+              throw new Error('Kick HLS source URL not available');
+            }
           }
 
           retryCount++;
@@ -434,12 +563,10 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
         try {
           if (platform === 'kick' && kickSession) {
-            // Use cycletls for Kick - matches reference downloadTSFiles pattern lines 467-509
             const segmentUris = newSegments.map((seg) => seg.uri);
 
             await downloadKickSegmentsWithCycleTLS(segmentUris, vodDir, baseURL, kickSession!, log);
           } else {
-            // Standard fetch for Twitch/other platforms - existing code unchanged
             await downloadTSSegmentsSequentially(newSegments, vodDir, baseURL);
           }
         } catch (error: unknown) {
@@ -593,6 +720,9 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
     try {
       await fsPromises.access(finalMp4Path);
 
+      // Download completed successfully
+      await cleanupVodProgress(vodId);
+
       if (!config.settings.saveHLS) {
         try {
           await fsPromises.rm(vodDir, { recursive: true });
@@ -611,6 +741,9 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
     } catch (error) {
       const details = extractErrorDetails(error);
       log.error({ ...details, vodId }, `[${vodId}] Final MP4 file not found`);
+
+      // Download failed - cleanup progress but keep dedup lock for retry
+      await cleanupVodProgress(vodId);
 
       if (!config.settings.saveHLS) {
         try {
