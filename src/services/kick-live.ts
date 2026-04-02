@@ -17,6 +17,7 @@ export interface KickStreamStatus {
   category?: {
     id: number;
     name: string | null;
+    slug?: string | null;
   } | null;
   thumbnail?: {
     src: string | null;

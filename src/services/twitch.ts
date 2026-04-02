@@ -1,6 +1,10 @@
 import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { getStreamerConfig as getConfig } from '../config/loader.js';
+import { toHHMMSS } from '../utils/formatting.js';
+import { PrismaClient } from '../../generated/streamer/client.js';
+import { childLogger } from '../utils/logger.js';
+
 export interface VodData {
   id: string;
   stream_id?: string | null;
@@ -25,6 +29,8 @@ interface VodTokenSig {
   signature: string;
 }
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();
+const log = childLogger({ module: 'twitch' });
+
 export async function getAppAccessToken(streamerId: string): Promise<string> {
   const creds = getCreds(streamerId);
   if (!creds) {
@@ -254,7 +260,7 @@ export async function getChannelBadges(streamerId: string): Promise<Record<strin
   const creds = getCreds(streamerId);
   const config = getConfig(streamerId);
   if (!creds?.clientId || !config?.twitch?.id) {
-    console.warn(`Twitch credentials not configured for streamer ${streamerId}`);
+    log.warn(`Twitch credentials not configured for streamer ${streamerId}`);
     return null;
   }
   try {
@@ -273,12 +279,12 @@ export async function getChannelBadges(streamerId: string): Promise<Record<strin
     const data = await response.json();
     const badgesData = data?.data || null;
     if (!badgesData) {
-      console.warn(`No channel badges found for Twitch user ${config.twitch.id}`);
+      log.warn(`No channel badges found for Twitch user ${config.twitch.id}`);
     }
     return badgesData as Record<string, unknown>;
   } catch (error: unknown) {
     const { message } = extractErrorDetails(error);
-    console.error(`Failed to fetch channel badges for ${streamerId}:`, message);
+    log.error(`Failed to fetch channel badges for ${streamerId}: ${message}`);
     return null;
   }
 }
@@ -298,7 +304,7 @@ export async function getGlobalBadges(streamerId: string): Promise<Record<string
     return (data?.data || null) as Record<string, unknown>;
   } catch (error: unknown) {
     const { message } = extractErrorDetails(error);
-    console.error(`Failed to fetch global badges for ${streamerId}:`, message);
+    log.error(`Failed to fetch global badges for ${streamerId}: ${message}`);
     return null;
   }
 }
@@ -416,7 +422,7 @@ export async function downloadVodAsMp4(vodId: string, streamerId: string): Promi
     // Download directly to MP4 using ffmpeg HLS streaming (reference line 1209-1237, consolidated in ffmpeg.ts)
     await convertHlsToMp4(m3u8Url, vodPath, { vodId, isFmp4 });
 
-    console.info(`Downloaded ${vodId}.mp4`); // Reference pattern line 1207-209
+    log.info(`Downloaded ${vodId}.mp4`); // Reference pattern line 1207-209
 
     // Success alert
     if (isAlertsEnabled() && messageId) {
@@ -442,7 +448,7 @@ export async function downloadVodAsMp4(vodId: string, streamerId: string): Promi
     const details = extractErrorDetails(error);
     const errorMsg = details.message.substring(0, 500);
 
-    console.error(`\nffmpeg error occurred: ${errorMsg}`); // Reference pattern line 1209-214
+    log.error(`\nffmpeg error occurred: ${errorMsg}`); // Reference pattern line 1209-214
 
     // Failure alert
     if (isAlertsEnabled() && messageId) {
@@ -462,5 +468,79 @@ export async function downloadVodAsMp4(vodId: string, streamerId: string): Promi
     }
 
     throw error;
+  }
+}
+
+export async function saveVodChapters(vodId: string, streamerId: string, finalDurationSeconds: number, client: PrismaClient): Promise<void> {
+  try {
+    await client.chapter.deleteMany({
+      where: { vod_id: vodId },
+    });
+
+    const chaptersData = await getChapters(vodId);
+    if (!chaptersData) {
+      log.warn({ vodId }, 'No chapters data available from Twitch API');
+      return;
+    }
+
+    const chapters = Array.isArray(chaptersData) ? chaptersData : [chaptersData as unknown as Record<string, unknown>];
+
+    if (chapters.length === 0) {
+      const chapter = await getChapter(vodId);
+      if (!chapter || !chapter.game) {
+        log.warn({ vodId }, 'No game info available');
+        return;
+      }
+
+      const game = chapter.game as Record<string, unknown>;
+      const gameId = typeof game.id === 'string' ? game.id : null;
+      const gameData = gameId ? await getGameData(gameId, streamerId) : null;
+
+      await client.chapter.create({
+        data: {
+          vod_id: vodId,
+          game_id: gameId,
+          name: typeof game.displayName === 'string' ? game.displayName : null,
+          image: gameData && typeof gameData.box_art_url === 'string' ? gameData.box_art_url.replace('{width}x{height}', '40x53') : null,
+          duration: '00:00:00',
+          start: 0,
+          end: finalDurationSeconds,
+        },
+      });
+
+      log.info({ vodId, game: typeof game.displayName === 'string' ? game.displayName : 'unknown' }, 'Created single chapter from game info');
+      return;
+    }
+
+    const chaptersToCreate = chapters.map((ch: Record<string, unknown>) => {
+      const node = (ch.node as Record<string, unknown>) ?? {};
+      const details = (node.details as Record<string, unknown>) ?? {};
+      const game = details.game as Record<string, unknown> | undefined;
+
+      const positionMs = Number(node.positionMilliseconds ?? 0);
+      const durationMs = Number(node.durationMilliseconds ?? 0);
+
+      const gameId = typeof game?.id === 'string' ? (game.id as string) : null;
+      const gameName = typeof game?.displayName === 'string' ? (game.displayName as string) : null;
+      const gameImage = typeof game?.boxArtURL === 'string' ? (game.boxArtURL as string) : null;
+
+      return {
+        vod_id: vodId,
+        game_id: gameId,
+        name: gameName,
+        image: gameImage,
+        duration: toHHMMSS(Math.floor(positionMs / 1000)),
+        start: Math.floor(positionMs / 1000),
+        end: durationMs === 0 ? finalDurationSeconds - Math.floor(positionMs / 1000) : Math.floor(durationMs / 1000),
+      };
+    });
+
+    await client.chapter.createMany({
+      data: chaptersToCreate,
+    });
+
+    log.info({ vodId, chapterCount: chaptersToCreate.length }, 'Saved all chapters');
+  } catch (error) {
+    log.error({ vodId, error: extractErrorDetails(error).message }, 'Failed to save chapters');
   }
 }

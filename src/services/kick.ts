@@ -8,6 +8,9 @@ import { sendRichAlert, updateDiscordEmbed, isAlertsEnabled } from '../utils/dis
 import { convertHlsToMp4 } from '../utils/ffmpeg.js';
 import { childLogger } from '../utils/logger.js';
 import { getStreamerConfig } from '../config/loader.js';
+import { toHHMMSS } from '../utils/formatting.js';
+import { PrismaClient } from '../../generated/streamer/client.js';
+import { getKickStreamStatus } from './kick-live.js';
 
 dayjs.extend(durationPlugin);
 
@@ -346,3 +349,133 @@ async function getKickParsedM3u8ForFfmpeg(sourceUrl: string): Promise<string | n
 }
 
 export default downloadMP4;
+
+export async function getKickCategoryInfo(slug: string): Promise<Record<string, unknown> | null> {
+  try {
+    const result = await navigateToUrl(`https://kick.com/api/v1/subcategories/${slug}`, {
+      isJsonUrl: true,
+      timeoutMs: 10000,
+    });
+
+    if (!result.success) return null;
+
+    const page = result.page;
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    let response: Record<string, unknown> | undefined;
+    if ('data' in result && result.data !== undefined) {
+      response = result.data as Record<string, unknown>;
+    } else {
+      const content = await page.content();
+      response = JSON.parse(content);
+    }
+
+    await page.close();
+    return response ?? null;
+  } catch (error) {
+    log.warn({ slug, error: extractErrorDetails(error).message }, 'Failed to fetch category info');
+    return null;
+  }
+}
+
+export async function updateChapterDuringDownload(vodId: string, streamerId: string, streamerClient: PrismaClient): Promise<void> {
+  try {
+    const config = getStreamerConfig(streamerId);
+    const username = config?.kick?.username;
+    if (!username) {
+      log.warn({ vodId }, 'Kick username not configured');
+      return;
+    }
+
+    const streamData = await getKickStreamStatus(username);
+    if (!streamData || !streamData.category) {
+      log.debug({ vodId }, 'No active stream or category data');
+      return;
+    }
+
+    const { category, created_at } = streamData;
+    const currentTimeSeconds = Math.round((Date.now() - new Date(created_at).getTime()) / 1000);
+
+    const lastChapter = await streamerClient.chapter.findFirst({
+      where: { vod_id: vodId },
+      orderBy: { start: 'desc' },
+    });
+
+    if (lastChapter && lastChapter.game_id === String(category.id)) {
+      await streamerClient.chapter.update({
+        where: { id: lastChapter.id },
+        data: { end: currentTimeSeconds },
+      });
+
+      log.debug({ vodId, chapterId: lastChapter.id, currentTime: currentTimeSeconds }, 'Updated chapter end time');
+      return;
+    }
+
+    if (lastChapter) {
+      await streamerClient.chapter.update({
+        where: { id: lastChapter.id },
+        data: { end: currentTimeSeconds },
+      });
+      log.debug({ vodId, chapterId: lastChapter.id }, 'Closed previous chapter');
+    }
+
+    let bannerImage: string | null = null;
+    if (category.slug) {
+      try {
+        const categoryInfo = await getKickCategoryInfo(category.slug);
+        if (categoryInfo && typeof categoryInfo.banner === 'object' && categoryInfo.banner !== null) {
+          bannerImage = (categoryInfo.banner as Record<string, unknown>).src as string | null;
+        }
+      } catch (error) {
+        log.warn({ vodId, error: extractErrorDetails(error).message }, 'Failed to fetch category info');
+      }
+    }
+
+    const duration = lastChapter ? toHHMMSS(currentTimeSeconds - lastChapter.start) : '00:00:00';
+
+    await streamerClient.chapter.create({
+      data: {
+        vod_id: vodId,
+        game_id: String(category.id),
+        name: category.name,
+        image: bannerImage,
+        duration: duration,
+        start: lastChapter ? lastChapter.start : 0,
+      },
+    });
+
+    log.info({ vodId, categoryId: category.id, categoryName: category.name, startTime: lastChapter?.start || 0 }, 'Created new chapter');
+  } catch (error) {
+    log.error({ vodId, error: extractErrorDetails(error).message }, 'Failed to update chapter');
+  }
+}
+
+export async function finalizeKickChapters(vodId: string, finalDurationSeconds: number, streamerClient: PrismaClient): Promise<void> {
+  try {
+    const incompleteChapter = await streamerClient.chapter.findFirst({
+      where: {
+        vod_id: vodId,
+        end: null,
+      },
+      orderBy: { start: 'desc' },
+    });
+
+    if (incompleteChapter) {
+      const endDuration = finalDurationSeconds - incompleteChapter.start;
+
+      await streamerClient.chapter.update({
+        where: { id: incompleteChapter.id },
+        data: {
+          end: endDuration,
+          duration: toHHMMSS(endDuration),
+        },
+      });
+
+      log.info({ vodId, chapterId: incompleteChapter.id, finalDuration: endDuration }, 'Finalized last chapter');
+    } else {
+      log.debug({ vodId }, 'No incomplete chapters to finalize');
+    }
+  } catch (error) {
+    log.error({ vodId, error: extractErrorDetails(error).message }, 'Failed to finalize chapters');
+  }
+}
