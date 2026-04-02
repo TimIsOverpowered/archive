@@ -24,6 +24,11 @@ export interface KickStreamStatus {
   } | null;
 }
 
+interface KickApiResponse {
+  data?: Record<string, unknown>;
+  error?: string;
+}
+
 /**
  * Check if a Kick user is currently live via Puppeteer scraping with real-browser protection
  */
@@ -53,26 +58,76 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
     const content = await page.content();
 
     try {
-      const data = JSON.parse(content);
+      const response: KickApiResponse = JSON.parse(content);
 
-      if (!data || !data.id) {
+      if (!response) {
         logger.debug({ username }, `[Kick] Channel ${username} is offline (no livestream data)`);
         await page.close();
         return null;
       }
 
-      // Extract HLS playback URL from response (Kick uses playback_url field)
+      // Check for API error/blocked responses
+      if ('error' in response && typeof response.error === 'string') {
+        logger.warn({ username, error: response.error }, `[Kick] API request blocked or errored for ${username}: "${response.error}"`);
+        await page.close();
+        return null;
+      }
+
+      const data = response.data as Record<string, unknown> | undefined;
+
+      if (!data || typeof data !== 'object') {
+        logger.debug({ username }, `[Kick] Channel ${username} is offline (no livestream data object)`);
+        await page.close();
+        return null;
+      }
+
+      const streamId = String(data.id ?? '');
+
+      if (!streamId) {
+        logger.debug({ username }, `[Kick] Channel ${username} is offline (no livestream id in data)`);
+        await page.close();
+        return null;
+      }
+
+      // Safe extraction with type guards
+      const sessionTitle = typeof data.session_title === 'string' ? data.session_title : '';
+      const createdAt = typeof data.created_at === 'string' ? data.created_at : '';
+      const playbackUrl = typeof data.playback_url === 'string' && data.playback_url ? (data.playback_url as string) : undefined;
+      const viewers = typeof data.viewers === 'number' ? (data.viewers as number) : undefined;
+      const slug = typeof data.slug === 'string' && data.slug ? (data.slug as string) : undefined;
+      const language = typeof data.language === 'string' && data.language ? (data.language as string) : undefined;
+      const isMature = typeof data.is_mature === 'boolean' ? (data.is_mature as boolean) : undefined;
+
+      let category: KickStreamStatus['category'] = null;
+      if (typeof data.category === 'object' && data.category !== null) {
+        const cat = data.category as Record<string, unknown>;
+        if ('id' in cat && typeof cat.id === 'number') {
+          category = { id: Number(cat.id), name: typeof cat.name === 'string' ? (cat.name as string | null) : null };
+        }
+      }
+
+      let thumbnail: KickStreamStatus['thumbnail'] = null;
+      if (typeof data.thumbnail === 'object' && data.thumbnail !== null) {
+        const thumb = data.thumbnail as Record<string, unknown>;
+        if ('src' in thumb) {
+          thumbnail = { src: typeof thumb.src === 'string' ? (thumb.src as string | null) : '', srcset: undefined };
+          if ('srcset' in thumb && typeof thumb.srcset === 'string') {
+            thumbnail.srcset = thumb.srcset as string;
+          }
+        }
+      }
+
       const streamData: KickStreamStatus = {
-        id: String(data.id),
-        session_title: data.session_title ?? null,
-        created_at: data.created_at || '',
-        playback_url: data.playback_url || undefined,
-        viewers: data.viewers,
-        slug: data.slug,
-        language: data.language,
-        is_mature: data.is_mature,
-        category: data.category || null,
-        thumbnail: data.thumbnail || null,
+        id: streamId,
+        session_title: sessionTitle || null,
+        created_at: createdAt,
+        playback_url: playbackUrl,
+        viewers: viewers,
+        slug: slug,
+        language: language,
+        is_mature: isMature,
+        category: category,
+        thumbnail: thumbnail,
       };
 
       logger.debug({ username }, `[Kick] Live stream detected for ${username}: ID=${streamData.id}, Title="${streamData.session_title}"`);
