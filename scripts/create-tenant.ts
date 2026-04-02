@@ -310,8 +310,9 @@ async function main(): Promise<void> {
 
     if (enableTwitch) {
       console.log('\nTwitch Stream Info:');
-      const twitchId = await prompt('User ID (numeric): ');
+      const twitchId = String(await prompt('User ID (string): '));
       const twitchUsername = await prompt('Username: ');
+      const isMainPlatform = await confirm('Is this the main platform?');
 
       console.log('\nNote: OAuth credentials are NOT collected here.');
       console.log('      Run "npm run auth:twitch" after tenant creation to configure authentication.\n');
@@ -320,6 +321,7 @@ async function main(): Promise<void> {
         enabled: true,
         id: twitchId,
         username: twitchUsername,
+        mainPlatform: isMainPlatform,
       };
     }
 
@@ -328,18 +330,27 @@ async function main(): Promise<void> {
 
     if (enableKick) {
       console.log('\nKick Stream Info:');
-      const kickId = await prompt('User ID (numeric): ');
+      const kickId = String(await prompt('User ID (string): '));
       const kickUsername = await prompt('Username: ');
+      const isMainPlatform = await confirm('Is this the main platform?');
 
       kickData = {
         enabled: true,
         id: kickId || null,
         username: kickUsername,
+        mainPlatform: isMainPlatform,
       };
     }
 
     if (!twitchData && !kickData) {
       console.error('❌ At least one streaming platform must be enabled');
+      process.exit(1);
+    }
+
+    const twitchIsMain = twitchData?.mainPlatform === true;
+    const kickIsMain = kickData?.mainPlatform === true;
+    if (twitchIsMain && kickIsMain) {
+      console.error('❌ Only one platform can be marked as main. Please restart the script.');
       process.exit(1);
     }
 
@@ -427,12 +438,14 @@ async function main(): Promise<void> {
 
     console.log('\nStreaming Platforms:');
     if (twitchData) {
-      console.log(`  ✓ Twitch (${twitchData.id} / ${twitchData.username})`);
+      const mainBadge = twitchData.mainPlatform ? ' [MAIN]' : '';
+      console.log(`  ✓ Twitch (${twitchData.id} / ${twitchData.username})${mainBadge}`);
     } else {
       console.log(`  ✗ Twitch disabled`);
     }
     if (kickData) {
-      console.log(`  ✓ Kick (${kickData.id || 'N/A'} / ${kickData.username})`);
+      const mainBadge = kickData.mainPlatform ? ' [MAIN]' : '';
+      console.log(`  ✓ Kick (${kickData.id || 'N/A'} / ${kickData.username})${mainBadge}`);
     } else {
       console.log(`  ✗ Kick disabled`);
     }
@@ -495,6 +508,7 @@ async function main(): Promise<void> {
         enabled: true,
         id: twitchData.id,
         username: twitchData.username,
+        mainPlatform: twitchData.mainPlatform,
       };
     }
 
@@ -503,6 +517,7 @@ async function main(): Promise<void> {
         enabled: true,
         id: kickData.id || null,
         username: kickData.username,
+        mainPlatform: kickData.mainPlatform,
       };
     }
 
