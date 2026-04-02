@@ -146,7 +146,31 @@ export async function navigateToUrl<T = unknown>(url: string, options?: Navigate
         try {
           finalData = await response?.json();
         } catch (error) {
-          log.debug({ error: extractErrorDetails(error).message }, 'JSON.parse failed, falling back to page content');
+          // Direct parse failed - attempt DOM-based extraction
+
+          // First fallback: use already-extracted innerText from pageState.content
+          if (pageState.content.startsWith('{') || pageState.content.startsWith('[')) {
+            try {
+              finalData = JSON.parse(pageState.content);
+            } catch (parseError) {
+              log.debug({ error: extractErrorDetails(parseError).message }, 'Failed to parse innerText as JSON');
+            }
+          }
+
+          // Second fallback: specifically target <pre> tag content (Kick-style wrapping)
+          if (!finalData && pageState.content.length > 0) {
+            const preContent = await page.evaluate(() => document.querySelector('pre')?.textContent || '');
+
+            if (preContent.startsWith('{') || preContent.startsWith('[')) {
+              try {
+                finalData = JSON.parse(preContent);
+              } catch (parseError) {
+                log.debug({ error: extractErrorDetails(parseError).message }, 'Failed to parse <pre> content as JSON');
+              }
+            } else if (!finalData && pageState.content.length === 0) {
+              log.trace('No valid JSON found in response or DOM extraction failed');
+            }
+          }
         }
       }
 
