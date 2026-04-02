@@ -1,4 +1,5 @@
 import { extractErrorDetails } from './error.js';
+import { formatDuration } from './formatting.js';
 import { logger } from './logger.js';
 
 const globalDiscordAlertsEnabled = process.env.DISCORD_ALERTS_ENABLED !== 'false';
@@ -22,6 +23,15 @@ interface DiscordEmbed {
   fields: Array<{ name: string; value: string; inline: boolean }>;
   timestamp?: string;
   footer?: { text: string };
+}
+
+export interface StreamAlertData {
+  platform: 'twitch' | 'kick';
+  vodId: string;
+  alertType: 'in_progress' | 'failure' | 'success';
+  streamerName?: string;
+  durationSeconds?: number;
+  errorMessage?: string;
 }
 
 export function isAlertsEnabled(): boolean {
@@ -238,4 +248,71 @@ export function createProgressBar(percent: number, total?: number, current?: num
 export function formatProgressMessage(operation: string, streamerName: string, percent: number, current?: number, total?: number): string {
   const bar = createProgressBar(percent, total, current);
   return `[${operation}] ${streamerName} ${bar}`;
+}
+
+export async function sendStreamAlert(data: StreamAlertData): Promise<string | null> {
+  if (!isAlertsEnabled()) {
+    return null;
+  }
+
+  const webhookUrl = process.env.DISCORD_ALERT_WEBHOOK_URL;
+  if (!webhookUrl) {
+    return null;
+  }
+
+  const colorMap: Record<'in_progress' | 'failure' | 'success', number> = {
+    in_progress: 3447003,
+    failure: 15158332,
+    success: 3066992,
+  };
+
+  const emojiMap: Record<'in_progress' | 'failure' | 'success', string> = {
+    in_progress: '[IN_PROGRESS]',
+    failure: '[FAILED]',
+    success: '[SUCCESS]',
+  };
+
+  const titleMap: Record<'in_progress' | 'failure' | 'success', string> = {
+    in_progress: 'Stream Download Started',
+    failure: 'Download Failed',
+    success: 'Upload Completed Successfully',
+  };
+
+  const embedStatus: AlertStatus = data.alertType === 'success' ? 'success' : data.alertType === 'failure' ? 'error' : 'warning';
+
+  const fields: Array<{ name: string; value: string; inline?: boolean }> = [
+    { name: 'Platform', value: data.platform.toUpperCase(), inline: true },
+    { name: 'VOD ID', value: `\`${data.vodId}\``, inline: true },
+  ];
+
+  if (data.durationSeconds) {
+    fields.push({ name: 'Duration', value: formatDuration(data.durationSeconds), inline: true });
+  }
+
+  const embedData = {
+    title: `${emojiMap[data.alertType]} ${titleMap[data.alertType]}`,
+    description: data.errorMessage ? `**Error:**\n\`\`\`${data.errorMessage}\`\`\`` : undefined,
+    status: embedStatus,
+    fields,
+    timestamp: new Date().toISOString(),
+  };
+  const embed = constructEmbed(embedData);
+  (embed as any).footer = { text: 'Archive System' };
+
+  try {
+    const response = await fetch(`${webhookUrl}?wait=true`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ embeds: [embed] }),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!response.ok) throw new Error(`Webhook failed with status ${response.status}`);
+
+    const responseData = await response.json();
+    return responseData.id || null;
+  } catch (err) {
+    logger.error(extractErrorDetails(err), 'Failed to send stream alert');
+    return null;
+  }
 }
