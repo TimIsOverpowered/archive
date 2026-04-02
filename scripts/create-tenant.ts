@@ -545,9 +545,7 @@ async function main(): Promise<void> {
     tenantId = createdTenant.id;
 
     // Success message
-    console.log('\n' + '✅'.repeat(20));
-    console.log('TENANT CREATED SUCCESSFULLY!');
-    console.log('✅'.repeat(20));
+    console.log('✅ TENANT CREATED SUCCESSFULLY!');
     console.log(`\nStreamer ID: ${channelName}`);
     console.log(`Tenant ID in meta DB: ${createdTenant.id}`);
     console.log(`\n🗄️  Database: postgresql://${dbUser}:***@${dbHost}:${dbPort}/${dbName}`);
