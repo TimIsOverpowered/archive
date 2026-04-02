@@ -79,8 +79,8 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
         // Validate duration if available (optional, non-blocking)
         try {
-          const VideoValidatorModule = await import('../../../utils/video-validator');
-          const actualDuration: number | null = await VideoValidatorModule.validateVideoDuration(finalMp4Path);
+          const { getDuration } = await import('../../../utils/ffmpeg.js');
+          const actualDuration: number | null = await getDuration(finalMp4Path);
 
           if (!actualDuration) throw new Error('Could not determine video duration from MP4 file');
 

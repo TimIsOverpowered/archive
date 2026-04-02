@@ -8,10 +8,3 @@ declare namespace NodeJS {
     monitorIntervals?: Map<string, ReturnType<typeof setInterval>>;
   }
 }
-
-
-// Puppeteer plugin declaration (no types available)
-declare module 'puppeteer-extra-plugin-click-and-wait' {
-  function clickAndWaitPlugin(): any;
-  export default clickAndWaitPlugin;
-}
