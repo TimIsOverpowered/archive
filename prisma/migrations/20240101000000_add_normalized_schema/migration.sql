@@ -72,6 +72,17 @@ CREATE TABLE "chapters" (
     CONSTRAINT "chapters_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "chat_messages" (
+    "id" UUID NOT NULL,
+    "vod_id" TEXT NOT NULL,
+    "display_name" TEXT,
+    "content_offset_seconds" DECIMAL(65,30) NOT NULL,
+    "user_color" TEXT,
+    "created_at" TIMESTAMP(3),
+
+    CONSTRAINT "logs_pkey" PRIMARY KEY ("id")
+);
 
 
 -- CreateIndex
@@ -107,6 +118,9 @@ CREATE INDEX "games_game_name_idx" ON "games"("game_name");
 -- CreateIndex
 CREATE INDEX "chapters_vod_id_idx" ON "chapters"("vod_id");
 
+-- CreateIndex
+CREATE INDEX "idx_logs_vod_offset_id" ON "chat_messages"("vod_id", "content_offset_seconds", "id");
+
 
 
 -- AddForeignKey
@@ -120,6 +134,5 @@ ALTER TABLE "games" ADD CONSTRAINT "games_vod_id_fkey" FOREIGN KEY ("vod_id") RE
 
 -- AddForeignKey
 ALTER TABLE "chapters" ADD CONSTRAINT "chapters_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
 
 
