@@ -1,6 +1,7 @@
 import { logger } from '../utils/logger.js';
+import { Prisma } from '../../generated/streamer/client.js';
 
-export interface EmoteData {
+export interface EmoteData extends Prisma.JsonObject {
   id: string;
   code: string;
   flags?: string[];
@@ -121,14 +122,14 @@ export async function fetchAndSaveEmotes(streamerId: string, vodId: string, plat
       where: { vod_id: vodId },
       create: {
         vod_id: vodId,
-        ffz_emotes: emoteData.ffz_emotes as any,
-        bttv_emotes: emoteData.bttv_emotes as any,
-        seventv_emotes: emoteData.seventv_emotes as any,
+        ffz_emotes: emoteData.ffz_emotes as EmoteData[],
+        bttv_emotes: emoteData.bttv_emotes as EmoteData[],
+        seventv_emotes: emoteData.seventv_emotes as EmoteData[],
       },
       update: {
-        ffz_emotes: emoteData.ffz_emotes as any,
-        bttv_emotes: emoteData.bttv_emotes as any,
-        seventv_emotes: emoteData.seventv_emotes as any,
+        ffz_emotes: emoteData.ffz_emotes as EmoteData[],
+        bttv_emotes: emoteData.bttv_emotes as EmoteData[],
+        seventv_emotes: emoteData.seventv_emotes as EmoteData[],
       },
     });
   } catch {
