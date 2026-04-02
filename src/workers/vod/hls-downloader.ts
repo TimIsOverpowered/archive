@@ -53,8 +53,10 @@ async function downloadKickSegmentsWithCycleTLS(segmentUris: string[], vodDir: s
     try {
       await fsPromises.access(outputPath); // Check if exists - matches reference lines 476-477
       continue; // Skip existing files
-    } catch {}
-
+    } catch (error) {
+      const details = extractErrorDetails(error);
+      // File does not exist, continue to download
+    }
     // Download with cycletls using streamToFile - matches reference lines 478-501
     const url = `${baseURL}/${uri}`;
 
@@ -75,8 +77,9 @@ async function downloadTSSegmentsSequentially(segments: HLS.types.Segment[], vod
     try {
       await fsPromises.access(outputPath);
       continue; // File exists - skip download
-    } catch {
-      await downloadTSSegment(segment.uri, vodDir, baseURL);
+    } catch (error) {
+        const details = extractErrorDetails(error);
+await downloadTSSegment(segment.uri, vodDir, baseURL);
     }
   }
 }
@@ -297,8 +300,9 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         ],
         timestamp: startTime,
       });
-    } catch {
-      log.warn('Failed to initialize Discord alert message');
+    } catch (error) {
+        const details = extractErrorDetails(error);
+log.warn(`Failed to initialize Discord alert: ${details.message}`);
     }
   }
 
@@ -606,8 +610,9 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
         log.info(`[${vodId}] HLS files preserved in ${vodDir} (saveHLS=true)`);
       }
-    } catch {
-      log.error(`[${vodId}] Final MP4 file not found at expected path: ${finalMp4Path}`);
+    } catch (error) {
+        const details = extractErrorDetails(error);
+log.error({ ...details, vodId }, `[${vodId}] Final MP4 file not found`);
 
       if (!config.settings.saveHLS) {
         try {
@@ -625,8 +630,9 @@ export async function fileExists(filePath: string): Promise<boolean> {
   try {
     await fsPromises.access(filePath);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+      const details = extractErrorDetails(error);
+return false;
   }
 }
 

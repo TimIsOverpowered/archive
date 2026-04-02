@@ -8,7 +8,6 @@ import vodProcessor from './vod.worker.js';
 import chatProcessor from './chat.worker.js';
 import youtubeProcessor from './youtube.worker.js';
 import dmcaProcessor from './dmca.worker.js';
-import { releaseKickBrowser } from '../utils/puppeteer-manager.js';
 import { startTokenHealthCron } from '../cron/token-health.js';
 import { startMonitorService, stopMonitorService } from '../monitor/index.js';
 import { logger as baseLogger } from '../utils/logger.js';
@@ -320,14 +319,6 @@ async function bootstrap() {
       // Stop monitor polling loops first (also clears intervals)
       await stopMonitorService();
 
-      // Close Kick Puppeteer browser instance
-      try {
-        const kickModule = await import('../services/kick-live.js');
-        if (kickModule.closeKickBrowser) {
-          await kickModule.closeKickBrowser();
-        }
-      } catch (_err) {}
-
       // Clear YouTube OAuth clients cache
       try {
         const youtubeModule = await import('../services/youtube.js');
@@ -348,7 +339,6 @@ async function bootstrap() {
 
       const clientModule = await import('../db/client.js');
       await clientModule.closeAllClients();
-      await releaseKickBrowser();
       await closeQueues();
       clearConfigCache();
 

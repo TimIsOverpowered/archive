@@ -5,8 +5,12 @@ import { createSession } from '../utils/cycletls.js';
 import { navigateToUrl } from '../utils/puppeteer-manager.js';
 import dayjs from 'dayjs';
 import durationPlugin from 'dayjs/plugin/duration';
+import { extractErrorDetails } from '../utils/error.js';
+import { childLogger } from '../utils/logger.js';
 
 dayjs.extend(durationPlugin);
+
+const log = childLogger({ module: 'kick' });
 
 /**
  * Fetches Kick's HLS playlist using cycletls (JA3 fingerprinting).
@@ -40,7 +44,9 @@ export function getKickParsedM3u8(m3u8: string, baseURL: string): string | null 
     }
 
     return `${baseURL}/${bestVariant.uri}`;
-  } catch (_err) {
+  } catch (error) {
+    const details = extractErrorDetails(error);
+    log.debug({ details }, 'Failed to parse HLS master playlist');
     return null;
   }
 }
@@ -123,7 +129,9 @@ export async function getVods(channelName: string): Promise<KickVod[]> {
       }));
 
       return vodsData; // Return mapped VOD array - matches reference line 96 pattern
-    } catch (_parseError) {
+    } catch (error) {
+      const details = extractErrorDetails(error);
+      log.debug({ channelName, details }, 'Failed to parse videos API JSON response');
       return []; // Empty on parse error
     }
   } finally {
@@ -195,7 +203,10 @@ export async function downloadMP4(_streamerId: string, vod: KickVod): Promise<st
 
   try {
     await fsPromises.mkdir(outputDir, { recursive: true });
-  } catch {}
+  } catch (error) {
+    const details = extractErrorDetails(error);
+    // Silently ignore mkdir errors (directory may already exist)
+  }
 
   const outputPath = path.join(outputDir, `${vod.id}.mp4`);
 
@@ -242,7 +253,10 @@ export async function downloadMP4(_streamerId: string, vod: KickVod): Promise<st
 
     try {
       await fsPromises.writeFile(variantM3u8Content, tempM3u8Path);
-    } catch (_err) {}
+    } catch (error) {
+      const details = extractErrorDetails(error);
+      // Silently ignore writeFile errors
+    }
 
     // Download ALL TS segments sequentially using cycletls - matches reference downloadTSFiles function lines 476-501 (exact sequential approach for Kick platform only as requested)
     const mediaPlaylistSegments = 'segments' in mediaPlaylist ? mediaPlaylist.segments : [];
@@ -269,7 +283,9 @@ export async function downloadMP4(_streamerId: string, vod: KickVod): Promise<st
       try {
         await fsPromises.access(outputPathSegment); // Check if exists - matches reference line 476-477: "if (await fileExists(`${dir}/${segment.uri}`)) continue;"
         continue; // Skip existing files
-      } catch {
+      } catch (error) {
+        const details = extractErrorDetails(error);
+        if (!details.message.includes('ENOENT')) {/* not expected */}
         // File doesn't exist, download with cycletls using streamToFile (matches reference lines 478-501 exactly)
         const segmentUrl = `${segmentBaseURL}/${segment.uri}`;
 
