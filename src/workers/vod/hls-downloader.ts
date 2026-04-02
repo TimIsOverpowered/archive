@@ -10,6 +10,8 @@ import { getClient } from '../../db/client';
 import { sendRichAlert, updateDiscordEmbed, resetFailures, isAlertsEnabled } from '../../utils/alerts';
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch';
 import { loggerWithTenant } from '../../utils/logger.js';
+import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
+import { toHHMMSS } from '../../utils/formatting.js';
 import type { ReadableStream as NodeWebStream } from 'node:stream/web';
 
 export interface HlsDownloadOptions {
@@ -38,6 +40,31 @@ async function downloadTSSegment(segmentUri: string, vodDir: string, baseURL: st
     await pipeline(Readable.fromWeb(nodeWebStream), writer);
   } catch (error: unknown) {
     throw error;
+  }
+}
+
+/**
+ * Download TS segments sequentially using CycleTLS for Kick platform - matches reference downloadTSFiles pattern (lines 467-509)
+ */
+async function downloadKickSegmentsWithCycleTLS(segmentUris: string[], vodDir: string, baseURL: string, session: CycleTLSSession, log: ReturnType<typeof loggerWithTenant>): Promise<void> {
+  for (const uri of segmentUris) {
+    const outputPath = pathMod.join(vodDir, uri);
+
+    try {
+      await fsPromises.access(outputPath); // Check if exists - matches reference lines 476-477
+      continue; // Skip existing files
+    } catch {}
+
+    // Download with cycletls using streamToFile - matches reference lines 478-501
+    const url = `${baseURL}/${uri}`;
+
+    await session.streamToFile(url, outputPath);
+
+    log.debug({ uri }, `Downloaded ${uri}`); // matches line 493-496
+  }
+
+  if (segmentUris.length > 0) {
+    log.info(`Done downloading.. Last segment was ${segmentUris[segmentUris.length - 1]}`); // matches lines 507-512
   }
 }
 
@@ -155,7 +182,8 @@ async function fetchKickPlaylist(
   sourceUrl: string | undefined,
   log: ReturnType<typeof loggerWithTenant>,
   retryCount: number,
-  maxRetryBeforeEndDetection: number
+  maxRetryBeforeEndDetection: number,
+  session?: CycleTLSSession // Optional parameter for persistent sessions - matches reference pattern line 468-509
 ): Promise<{ variantM3u8String: string; baseURL: string } | null> {
   const fetchUrl = sourceUrl || '';
 
@@ -173,27 +201,32 @@ async function fetchKickPlaylist(
   }
 
   let baseURL: string = '';
-  let variantM3u8String: string = '';
 
   try {
+    const tempSession = session || createSession(); // Create if not provided (matches reference line 468)
+
     if (fetchUrl.includes('master.m3u8')) {
       const baseEndpoint = fetchUrl.substring(0, fetchUrl.lastIndexOf('/'));
-      baseURL = `${baseEndpoint}/1080p60`;
+      baseURL = `${baseEndpoint}/1080p60`; // matches reference lines 395-397
 
-      const response1 = await fetch(`${baseURL}/playlist.m3u8`);
-      if (!response1.ok) throw new Error(`Fetch failed with status ${response1.status}`);
+      const variantM3u8String = await tempSession.fetchText(`${baseURL}/playlist.m3u8`); // Uses cycletls - matches line 462 & getM3u8 pattern
 
-      variantM3u8String = await response1.text();
+      if (!session) {
+        await tempSession.close(); // Only close temporary sessions (matches reference line 509)
+      }
+
+      return { variantM3u8String, baseURL };
     } else {
-      const response2 = await fetch(fetchUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
-
-      if (!response2.ok) throw new Error(`Fetch failed with status ${response2.status}`);
+      const response = await tempSession.fetchText(fetchUrl); // Uses cycletls - matches reference getM3u8 pattern lines 177-204
 
       baseURL = fetchUrl.substring(0, fetchUrl.lastIndexOf('/'));
-      variantM3u8String = await response2.text();
-    }
 
-    return { variantM3u8String, baseURL };
+      if (!session) {
+        await tempSession.close();
+      }
+
+      return { variantM3u8String: response, baseURL };
+    }
   } catch (error: unknown) {
     const details = extractErrorDetails(error);
     log.error({ ...details, vodId }, `[${vodId}] Failed to fetch Kick HLS playlist`);
@@ -289,6 +322,14 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
   let baseURL: string = '';
   let totalSegmentsFound = 0;
 
+  // Create persistent CycleTLS session for Kick downloads - matches reference pattern lines 467-509
+  let kickSession: CycleTLSSession | null = null;
+
+  if (platform === 'kick') {
+    kickSession = createSession();
+    log.info(`[${vodId}] Created CycleTLS session for Kick HLS download`);
+  }
+
   log.info(`[${vodId}] Starting HLS polling loop...`);
 
   while (true) {
@@ -325,7 +366,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         variantM3u8String = result.variantM3u8String;
         fetchedBaseURL = result.baseURL;
       } else if (platform === 'kick') {
-        const result = await fetchKickPlaylist(vodId, sourceUrl, log, retryCount, maxRetryBeforeEndDetection);
+        const result = await fetchKickPlaylist(vodId, sourceUrl, log, retryCount, maxRetryBeforeEndDetection, kickSession ?? undefined); // Pass persistent session - matches reference pattern line 468-509
 
         if (!result) {
           // Special handling for Kick - may need to update DB on abort
@@ -390,7 +431,15 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         log.info(`[${vodId}] Found ${newSegments.length} new TS segments to download...`);
 
         try {
-          await downloadTSSegmentsSequentially(newSegments, vodDir, baseURL);
+          if (platform === 'kick' && kickSession) {
+            // Use cycletls for Kick - matches reference downloadTSFiles pattern lines 467-509
+            const segmentUris = newSegments.map((seg) => seg.uri);
+
+            await downloadKickSegmentsWithCycleTLS(segmentUris, vodDir, baseURL, kickSession!, log);
+          } else {
+            // Standard fetch for Twitch/other platforms - existing code unchanged
+            await downloadTSSegmentsSequentially(newSegments, vodDir, baseURL);
+          }
         } catch (error: unknown) {
           const details = extractErrorDetails(error);
           log.error({ ...details, vodId }, `[${vodId}] Error downloading segments`);
@@ -531,6 +580,12 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
     throw error;
   } finally {
+    // Close CycleTLS session for Kick downloads - matches reference line 509
+    if (kickSession) {
+      await kickSession.close();
+      log.info(`[${vodId}] Closed CycleTLS session`);
+    }
+
     const finalMp4Path = pathMod.join(config.settings.vodPath || '', String(streamerId), `${vodId}.mp4`);
 
     try {
@@ -574,6 +629,5 @@ export async function fileExists(filePath: string): Promise<boolean> {
     return false;
   }
 }
-import { toHHMMSS } from '../../utils/formatting.js';
 
 export default downloadLiveHls;
