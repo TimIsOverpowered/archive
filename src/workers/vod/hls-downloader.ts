@@ -509,11 +509,11 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
     const finalMp4Path = pathMod.join(config.settings.vodPath || '', String(streamerId), `${vodId}.mp4`);
 
     if (hasInitSegment && mp4Segments.length > 0) {
-      log.info(`[${vodId}] Detected fMP4 segments (${mp4Segments.length} files). Using specialized finalization...`);
+      log.info(`[${vodId}] Detected fMP4 segments (${mp4Segments.length} files).`);
 
-      const { finalizeFmp4Segments } = await import('../../utils/ffmpeg.js');
+      const { convertHlsToMp4 } = await import('../../utils/ffmpeg.js');
 
-      await finalizeFmp4Segments(vodDir, finalMp4Path);
+      await convertHlsToMp4(m3u8Path, finalMp4Path, { vodId, isFmp4: true });
 
       log.info(`[${vodId}] fMP4 merging complete. File saved to ${finalMp4Path}`);
     } else if (tsSegments.length > 0) {
@@ -523,7 +523,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
       const { convertHlsToMp4 } = await import('../../utils/ffmpeg.js');
 
-      await convertHlsToMp4(m3u8Path, vodId, finalMp4Path);
+      await convertHlsToMp4(m3u8Path, finalMp4Path, { vodId, isFmp4: false });
 
       log.info(`[${vodId}] MP4 conversion complete. File saved to ${finalMp4Path}`);
     } else {

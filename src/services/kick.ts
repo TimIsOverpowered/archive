@@ -1,12 +1,13 @@
 import HLS from 'hls-parser';
-import fsPromises from 'fs/promises';
-import path from 'path';
 import { createSession } from '../utils/cycletls.js';
 import { navigateToUrl } from '../utils/puppeteer-manager.js';
 import dayjs from 'dayjs';
 import durationPlugin from 'dayjs/plugin/duration';
 import { extractErrorDetails } from '../utils/error.js';
+import { sendRichAlert, updateDiscordEmbed, isAlertsEnabled } from '../utils/discord-alerts.js';
+import { convertHlsToMp4 } from '../utils/ffmpeg.js';
 import { childLogger } from '../utils/logger.js';
+import { getStreamerConfig } from '../config/loader.js';
 
 dayjs.extend(durationPlugin);
 
@@ -183,125 +184,134 @@ export async function getVod(channelName: string, vodId: string): Promise<KickVo
 }
 
 /**
- * Download VOD as MP4 using cycletls for segment downloads - matches reference downloadMP4 (lines 136-175) + getParsedM3u8 pattern
+ * Download Kick VOD directly to MP4 using ffmpeg HLS streaming (reference: kick.js line 136-205)
  */
-export async function downloadMP4(_streamerId: string, vod: KickVod): Promise<string> {
+export async function downloadMP4(streamerId: string, vod: KickVod): Promise<string | null> {
   if (!vod.source) {
     throw new Error('VOD source URL not available');
   }
 
-  const { getStreamerConfig } = await import('../config/loader.js');
-
-  const config = getStreamerConfig(_streamerId);
+  const config = getStreamerConfig(streamerId);
 
   if (!config?.settings.vodPath) {
-    throw new Error(`No vodPath configured for streamer ${_streamerId}`);
+    throw new Error(`No vodPath configured for streamer ${streamerId}`);
   }
 
-  // Use tenant's vodPath (matches hls-downloader.ts line 272 pattern: /{vodPath}/{tenantId}/tmp/)
-  const outputDir = path.join(config.settings.vodPath, _streamerId, 'tmp');
+  let messageId: string | null = null;
 
   try {
-    await fsPromises.mkdir(outputDir, { recursive: true });
+    // Fetch and parse HLS playlist to get direct media URL (reference kick.js line 175-205)
+    const m3u8Url = await getKickParsedM3u8ForFfmpeg(vod.source);
+
+    if (!m3u8Url) {
+      throw new Error('Failed to parse Kick HLS playlist');
+    }
+
+    const vodPath = `${config.settings.vodPath}/${vod.id}.mp4`;
+
+    // Send Discord "Download Started" alert
+    if (isAlertsEnabled()) {
+      try {
+        const streamerName = config.displayName || streamerId;
+
+        messageId = await sendRichAlert({
+          title: '📥 Kick VOD Download Started',
+          description: `${vod.id} download in progress for ${streamerName}`,
+          status: 'warning',
+          fields: [
+            { name: 'VOD ID', value: `\`${String(vod.id)}\``, inline: false },
+            { name: 'Streamer', value: `\`${streamerName}\`` },
+          ],
+          timestamp: new Date().toISOString(),
+        });
+      } catch {} // Silent fail for alerts
+    }
+
+    // Download directly to MP4 using ffmpeg HLS streaming (reference kick.js line 160-205, consolidated in ffmpeg.ts)
+    // Kick always uses .ts segments (per platform specification)
+    await convertHlsToMp4(m3u8Url, vodPath, { vodId: String(vod.id), isFmp4: false });
+
+    console.info(`Downloaded ${String(vod.id)}.mp4`); // Reference pattern kick.js line 160-205
+
+    // Success alert
+    if (isAlertsEnabled() && messageId) {
+      try {
+        const streamerName = config.displayName || streamerId;
+
+        await updateDiscordEmbed(messageId, {
+          title: '✅ Kick VOD Download Complete!',
+          description: `${vod.id} successfully downloaded and converted to MP4 for ${streamerName}`,
+          status: 'success',
+          fields: [
+            { name: 'VOD ID', value: `\`${String(vod.id)}\``, inline: false },
+            { name: 'Output Path', value: vodPath, inline: false },
+          ],
+          timestamp: new Date().toISOString(),
+          updatedTimestamp: new Date().toISOString(),
+        });
+      } catch {} // Silent fail for alerts
+    }
+
+    return vodPath;
   } catch (error) {
-    log.debug({ error: extractErrorDetails(error).message }, 'mkdir failed - directory may already exist');
+    const details = extractErrorDetails(error);
+    const errorMsg = details.message.substring(0, 500);
+
+    console.error(`\nffmpeg error occurred: ${errorMsg}`); // Reference pattern kick.js line 163-205
+
+    // Failure alert
+    if (isAlertsEnabled() && messageId) {
+      try {
+        await updateDiscordEmbed(messageId, {
+          title: '❌ Kick VOD Download Failed',
+          description: `${vod.id} download failed for ${streamerId}`,
+          status: 'error',
+          fields: [
+            { name: 'VOD ID', value: `\`${String(vod.id)}\``, inline: false },
+            { name: 'Error', value: errorMsg, inline: false },
+          ],
+          timestamp: new Date().toISOString(),
+          updatedTimestamp: new Date().toISOString(),
+        });
+      } catch {} // Silent fail for alerts
+    }
+
+    throw error;
   }
+}
 
-  const outputPath = path.join(outputDir, `${vod.id}.mp4`);
-
-  // Create session for entire download (matches reference pattern lines 170-205 + 468)
+/**
+ * Fetch Kick HLS playlist and return direct media URL suitable for ffmpeg streaming
+ */
+async function getKickParsedM3u8ForFfmpeg(sourceUrl: string): Promise<string | null> {
   const session = createSession();
 
   try {
-    // Fetch HLS master playlist using cycletls - matches reference line 139 & getM3u8 function lines 177-205
-    const m3u8Content = await session.fetchText(vod.source);
+    // Fetch master playlist using CycleTLS (reference kick.js line 175-205)
+    const m3u8Content = await session.fetchText(sourceUrl);
 
     if (!m3u8Content) {
       throw new Error('Empty HLS playlist response from Kick');
     }
 
-    // Parse master playlist and extract best variant URL using getParsedM3u8 helper - matches reference line 140 & lines 207-216
-    const baseURL = vod.source.replace('/master.m3u8', '');
+    let m3u8Url: string | null;
 
-    let variantUrl: string | null;
+    if (sourceUrl.includes('master.m3u8')) {
+      // Parse master playlist and get variant URL with 1080p60 preference (reference kick.js line 207-216)
+      const baseURL = sourceUrl.replace('/master.m3u8', '');
+      m3u8Url = getKickParsedM3u8(m3u8Content, baseURL);
 
-    if (vod.source.includes('master.m3u8')) {
-      // Use getParsedM3u8 for master playlists - matches reference line 140 & lines 207-216
-      variantUrl = getKickParsedM3u8(m3u8Content, baseURL);
-
-      if (!variantUrl) {
+      if (!m3u8Url) {
         throw new Error('No video variants found in HLS playlist');
       }
     } else {
-      // Direct media playlist URL - use as-is (matches reference downloadHLS line 462 pattern + getM3u8 usage lines 179-205)
-      variantUrl = vod.source;
+      // Direct media playlist - use as-is (reference kick.js line 179-205 pattern)
+      m3u8Url = sourceUrl;
     }
 
-    // Fetch media/variant playlist using cycletls - matches reference pattern line 462 & downloadTSFiles setup lines 467-509
-    const variantM3u8Content = await session.fetchText(variantUrl);
-
-    // Parse media playlist to get segments (matches reference downloadHLS line 464: m3u8 = HLS.parse(m3u8))
-    const mediaPlaylist: HLS.types.MediaPlaylist | null = HLS.parse(variantM3u8Content) as HLS.types.MediaPlaylist;
-
-    if (!mediaPlaylist || !('segments' in mediaPlaylist)) {
-      throw new Error('Failed to parse variant playlist');
-    }
-
-    // Write m3u8 file for ffmpeg (matches reference line 471-475: fs.writeFileSync(`${dir}/${vodId}.m3u8`, HLS.stringify(m3u8)))
-    const tempM3u8Path = path.join(outputDir, `${vod.id}.m3u8`);
-
-    try {
-      await fsPromises.writeFile(variantM3u8Content, tempM3u8Path);
-    } catch (error) {
-      log.debug({ error: extractErrorDetails(error).message }, 'writeFile failed');
-    }
-
-    // Download ALL TS segments sequentially using cycletls - matches reference downloadTSFiles function lines 476-501 (exact sequential approach for Kick platform only as requested)
-    const mediaPlaylistSegments = 'segments' in mediaPlaylist ? mediaPlaylist.segments : [];
-
-    if (!mediaPlaylistSegments || mediaPlaylistSegments.length === 0) {
-      throw new Error('No segments found in variant playlist');
-    }
-
-    // Determine correct baseURL for segment downloads - matches reference downloadHLS lines 395-462 & getM3u8 usage pattern
-    let segmentBaseURL: string;
-
-    if (vod.source.includes('master.m3u8')) {
-      // For master playlists, use the variant playlist's base URL (matches reference line 179-205 + downloadHLS lines 467-509 pattern)
-      segmentBaseURL = variantUrl.substring(0, variantUrl.lastIndexOf('/'));
-    } else {
-      // Direct media playlist - extract baseURL from source itself
-      segmentBaseURL = vod.source.substring(0, vod.source.lastIndexOf('/'));
-    }
-
-    // Download each TS file sequentially using cycletls session.streamToFile (matches reference downloadTSFiles lines 476-501 exactly)
-    for (const segment of mediaPlaylistSegments) {
-      const outputPathSegment = path.join(outputDir, segment.uri);
-
-      try {
-        await fsPromises.access(outputPathSegment); // Check if exists - matches reference line 476-477: "if (await fileExists(`${dir}/${segment.uri}`)) continue;"
-        continue; // Skip existing files
-      } catch (error) {
-        const details = extractErrorDetails(error);
-        if (!details.message.includes('ENOENT')) {
-          /* not expected */
-        }
-        // File doesn't exist, download with cycletls using streamToFile (matches reference lines 478-501 exactly)
-        const segmentUrl = `${segmentBaseURL}/${segment.uri}`;
-
-        await session.streamToFile(segmentUrl, outputPathSegment);
-      }
-    }
-
-    // Now use ffmpeg to concatenate m3u8 file into MP4 - matches reference downloadMP4 lines 169-205 pattern
-    const { convertHlsToMp4 } = await import('../utils/ffmpeg.js');
-
-    await convertHlsToMp4(tempM3u8Path, vod.id, outputPath);
-
-    return outputPath;
+    return m3u8Url;
   } finally {
-    // Clean exit - matches reference line 509: "await cycleTLS.exit();"
-    await session.close();
+    await session.close(); // Always clean up CycleTLS session (reference kick.js line 509 pattern)
   }
 }
 
