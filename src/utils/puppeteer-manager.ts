@@ -111,8 +111,7 @@ export async function navigateToUrl<T = unknown>(url: string, options?: Navigate
           { timeout: 10000 }
         );
       } catch (error) {
-        const details = extractErrorDetails(error);
-        // Silently fall through to manual check if waitForFunction times out
+        log.debug({ error: extractErrorDetails(error).message }, 'waitForFunction timed out');
       }
 
       // 3. FINAL STATE CHECK
@@ -147,8 +146,7 @@ export async function navigateToUrl<T = unknown>(url: string, options?: Navigate
         try {
           finalData = await response?.json();
         } catch (error) {
-          const details = extractErrorDetails(error);
-          finalData = JSON.parse(pageState.content) as T;
+          log.debug({ error: extractErrorDetails(error).message }, 'JSON.parse failed, falling back to page content');
         }
       }
 

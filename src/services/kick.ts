@@ -204,8 +204,7 @@ export async function downloadMP4(_streamerId: string, vod: KickVod): Promise<st
   try {
     await fsPromises.mkdir(outputDir, { recursive: true });
   } catch (error) {
-    const details = extractErrorDetails(error);
-    // Silently ignore mkdir errors (directory may already exist)
+    log.debug({ error: extractErrorDetails(error).message }, 'mkdir failed - directory may already exist');
   }
 
   const outputPath = path.join(outputDir, `${vod.id}.mp4`);
@@ -254,8 +253,7 @@ export async function downloadMP4(_streamerId: string, vod: KickVod): Promise<st
     try {
       await fsPromises.writeFile(variantM3u8Content, tempM3u8Path);
     } catch (error) {
-      const details = extractErrorDetails(error);
-      // Silently ignore writeFile errors
+      log.debug({ error: extractErrorDetails(error).message }, 'writeFile failed');
     }
 
     // Download ALL TS segments sequentially using cycletls - matches reference downloadTSFiles function lines 476-501 (exact sequential approach for Kick platform only as requested)
@@ -285,7 +283,9 @@ export async function downloadMP4(_streamerId: string, vod: KickVod): Promise<st
         continue; // Skip existing files
       } catch (error) {
         const details = extractErrorDetails(error);
-        if (!details.message.includes('ENOENT')) {/* not expected */}
+        if (!details.message.includes('ENOENT')) {
+          /* not expected */
+        }
         // File doesn't exist, download with cycletls using streamToFile (matches reference lines 478-501 exactly)
         const segmentUrl = `${segmentBaseURL}/${segment.uri}`;
 
