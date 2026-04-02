@@ -95,7 +95,9 @@ export interface KickVod {
 }
 
 export async function getVods(channelName: string): Promise<KickVod[]> {
-  const result = await navigateToUrl(`https://kick.com/api/v2/channels/${channelName}/videos`);
+  const result = await navigateToUrl(`https://kick.com/api/v2/channels/${channelName}/videos`, {
+    isJsonUrl: true,
+  });
 
   if (!result.success) {
     throw new Error('Failed to load Kick videos API after retries'); // Updated message - matches reference line 75-100 pattern
@@ -107,41 +109,54 @@ export async function getVods(channelName: string): Promise<KickVod[]> {
     // Wait briefly for response to be ready (replaces legacy code's 10s sleep with shorter wait) - matches reference line 85-96 pattern
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    const content = await page.content();
-
-    try {
-      const data = JSON.parse(content); // Parse API response directly (not Next.js script) - matches reference lines 75-100
-
-      if (!data || !Array.isArray(data)) {
+    // Use extracted data from navigator if available
+    let dataArray: unknown[] | undefined;
+    if ('data' in result && Array.isArray(result.data)) {
+      dataArray = result.data as unknown[];
+    } else {
+      const content = await page.content();
+      try {
+        dataArray = JSON.parse(content);
+      } catch (error) {
+        log.debug({ channelName, error: extractErrorDetails(error).message }, 'Failed to parse videos API response');
         return [];
       }
-
-      // Map raw video objects to KickVod interface - matches reference line 92-96 pattern
-      const vodsData = data.map((video: Record<string, unknown>) => ({
-        id: String(video.id),
-        slug: (video.slug as string) ?? null,
-        title: (video.title as string) ?? null,
-        session_title: (video.session_title as string) ?? null,
-        duration: video.duration ? Number(video.duration) : null,
-        views: video.views ? Number(video.views) : null,
-        published_at: (video.publishedAt as string) ?? null,
-        created_at: String(video.createdAt || ''),
-        source: (video.source as string) ?? null,
-      }));
-
-      return vodsData; // Return mapped VOD array - matches reference line 96 pattern
-    } catch (error) {
-      const details = extractErrorDetails(error);
-      log.debug({ channelName, details }, 'Failed to parse videos API JSON response');
-      return []; // Empty on parse error
     }
+
+    if (!dataArray || !Array.isArray(dataArray)) {
+      return [];
+    }
+
+    // Map raw video objects to KickVod interface - matches reference line 92-96 pattern
+    const vodsData = dataArray.map((video): KickVod => {
+      if (!video || typeof video !== 'object') {
+        throw new Error('Invalid video object in array');
+      }
+
+      return {
+        id: String((video as Record<string, unknown>).id),
+        slug: ((video as Record<string, unknown>).slug as string) ?? null,
+        title: ((video as Record<string, unknown>).title as string) ?? null,
+        session_title: ((video as Record<string, unknown>).session_title as string) ?? null,
+        duration: (video as Record<string, unknown>).duration ? Number((video as Record<string, unknown>).duration) : null,
+        views: (video as Record<string, unknown>).views ? Number((video as Record<string, unknown>).views) : null,
+        published_at: ((video as Record<string, unknown>).publishedAt as string) ?? null,
+        created_at: String((video as Record<string, unknown>).createdAt || ''),
+        source: ((video as Record<string, unknown>).source as string) ?? null,
+      };
+    });
+
+    return vodsData; // Return mapped VOD array - matches reference line 96 pattern
   } finally {
     await page.close();
   }
 }
 
 export async function getVod(channelName: string, vodId: string): Promise<KickVod> {
-  const result = await navigateToUrl(`https://kick.com/api/v2/channels/${channelName}/videos`); // Use API endpoint instead of Next.js page - matches reference line 103-134 pattern
+  const result = await navigateToUrl(`https://kick.com/api/v2/channels/${channelName}/videos`, {
+    // Use API endpoint instead of Next.js page - matches reference line 103-134 pattern
+    isJsonUrl: true,
+  });
 
   if (!result.success) {
     throw new Error('Failed to load Kick videos API after retries');
@@ -153,17 +168,32 @@ export async function getVod(channelName: string, vodId: string): Promise<KickVo
     // Wait briefly for response (replaces legacy code's sleep with shorter wait) - matches reference line 108-129 pattern
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    const content = await page.content();
-    const data: Record<string, unknown>[] = JSON.parse(content); // Parse API response directly (not Next.js script) - matches reference lines 75-100 pattern
+    // Use extracted data from navigator if available
+    let dataArray: unknown[] | undefined;
+    if ('data' in result && Array.isArray(result.data)) {
+      dataArray = result.data as unknown[];
+    } else {
+      const content = await page.content();
+      try {
+        dataArray = JSON.parse(content); // Parse API response directly (not Next.js script) - matches reference lines 75-100 pattern
+      } catch (error) {
+        log.error({ channelName, error: extractErrorDetails(error).message }, `Failed to parse videos API for VOD ${vodId}`);
+        throw new Error(`VOD ${vodId} not found`);
+      }
+    }
 
-    if (!Array.isArray(data)) {
+    if (!Array.isArray(dataArray)) {
       throw new Error(`VOD ${vodId} not found`);
     }
 
     // Find matching VOD by ID (matches reference line 128-134: jsonContent.find((livestream) => livestream.id.toString() === vodId))
-    const video = data.find((v) => v && String(v?.id) === vodId);
+    const video = dataArray.find((v): v is Record<string, unknown> & { id: string | number } => {
+      if (!v || typeof v !== 'object') return false;
+      // @ts-expect-error - checking for optional property on record type
+      return String(v.id ?? '') === vodId;
+    });
 
-    if (!video || typeof video !== 'object') {
+    if (!video) {
       throw new Error(`VOD ${vodId} not found`);
     }
 
