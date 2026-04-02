@@ -88,7 +88,7 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
           ...(kickConfig && {
             kick: {
               puppeteer: puppeteerHealth.status,
-              instanceMemoryMb: puppeteerHealth.instanceMemoryMb,
+              memoryStats: puppeteerHealth.stats,
             },
           }),
         },
