@@ -538,10 +538,10 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
         log.info(`[${vodId}] No new segments detected. Poll #${noChangePollCounter} without change.`);
 
-        const maxNoChangeThreshold = 60; // 60 polls * 5s = ~300 seconds (5 minutes) for Kick stream end detection
+        const maxNoChangeThreshold = 5; // 5 polls * 60s = ~300 seconds (5 minutes) for stream end detection
 
         if (noChangePollCounter >= maxNoChangeThreshold) {
-          log.info(`[${vodId}] Stream end detected after ${noChangePollCounter} unchanged polls (${noChangePollCounter * 5}s)`);
+          log.info(`[${vodId}] Stream end detected after ${noChangePollCounter} unchanged polls (${noChangePollCounter * 60}s)`);
 
           break; // Exit polling loop - assume stream has ended naturally or platform stopped sending updates
         }
@@ -595,7 +595,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         await updateChapterDuringDownload(vodId, streamerId, streamerClient);
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 5000)); // Poll every 5 seconds for live streams
+      await new Promise((resolve) => setTimeout(resolve, 60000)); // Poll every 60 seconds for VOD downloads
     } catch (error: unknown) {
       const details = extractErrorDetails(error);
       log.error({ ...details, vodId }, `[${vodId}] Error in HLS poll cycle`);
