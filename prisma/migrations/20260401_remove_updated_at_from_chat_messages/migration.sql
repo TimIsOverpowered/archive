@@ -1,6 +1,8 @@
 -- ============================================
--- Remove unused updated_at column from chat_messages table
--- This field was never populated and is not needed for chat message tracking
+-- Ensure no updated_at column exists on chat_messages (idempotent)
+-- The schema defines ChatMessage without this field, so just ensure it doesn't exist
 -- ============================================
 
-ALTER TABLE "chat_messages" DROP COLUMN IF EXISTS "updated_at";
+DO $$ BEGIN
+    ALTER TABLE "chat_messages" DROP COLUMN IF EXISTS "updated_at";
+END $$;
