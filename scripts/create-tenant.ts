@@ -474,18 +474,6 @@ async function main(): Promise<void> {
     console.log(`  Save HLS: ${saveHLS ? 'yes' : 'no'}`);
     console.log(`  Save MP4: ${saveMP4 ? 'yes' : 'no'}`);
 
-    console.log('\n' + '='.repeat(50));
-    console.log('ACTIONS TO BE TAKEN:');
-    console.log('='.repeat(50));
-    console.log('1. ✓ Database created/verified');
-    console.log('2. Register tenant in meta database (with encryption)');
-
-    const proceed = await confirm('\nProceed with tenant creation?');
-    if (!proceed) {
-      console.log('❌ Tenant creation cancelled');
-      process.exit(0);
-    }
-
     // Phase 7: Execution - Register tenant in meta database
 
     const tenantData: any = {
@@ -566,7 +554,6 @@ async function main(): Promise<void> {
     }
   } catch (error: unknown) {
     console.error('\n❌ Error during tenant creation:');
-    const message = typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : String(error);
 
     // Rollback if tenant was created
     if (tenantId !== null) {
