@@ -1,16 +1,17 @@
 import { extractErrorDetails } from './error.js';
 import { logger } from './logger';
+import { getFullMemoryStats, type MemoryStats } from './puppeteer-manager.js';
 
 interface PuppeteerHealthStatus {
   status: 'ok' | 'unavailable' | 'high_memory';
-  instanceMemoryMb?: number;
+  stats?: MemoryStats;
 }
 
 let cachedStatus: PuppeteerHealthStatus | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL_MS = 30000; // Cache for 30 seconds
 
-export async function checkPuppeteerHealth(): Promise<PuppeteerHealthStatus> {
+export async function checkPuppeteerHealth(browserInstance?: any): Promise<PuppeteerHealthStatus> {
   const now = Date.now();
 
   if (cachedStatus && now - cacheTimestamp < CACHE_TTL_MS) {
@@ -18,19 +19,22 @@ export async function checkPuppeteerHealth(): Promise<PuppeteerHealthStatus> {
   }
 
   try {
-    const memoryUsage = process.memoryUsage();
-    const memoryMb = Math.round(memoryUsage.heapUsed / 1024 / 1024);
+    const memStats: MemoryStats = await getFullMemoryStats(browserInstance);
+
+    // Use RSS for Docker OOM prevention (most honest total RAM metric)
     const limitMb = parseInt(process.env.KICK_PUPPETEER_MEMORY_LIMIT_MB || '512', 10);
 
-    if (memoryMb > limitMb) {
+    if (memStats.totalRssMb > limitMb) {
       cachedStatus = {
         status: 'high_memory',
-        instanceMemoryMb: memoryMb,
+        stats: memStats,
       };
+
+      logger.warn({ ...memStats, limitMb }, '[Puppeteer Health] Memory usage exceeds threshold');
     } else {
       cachedStatus = {
         status: 'ok',
-        instanceMemoryMb: memoryMb,
+        stats: memStats,
       };
     }
 
@@ -38,7 +42,8 @@ export async function checkPuppeteerHealth(): Promise<PuppeteerHealthStatus> {
     return cachedStatus;
   } catch (error) {
     const details = extractErrorDetails(error);
-    logger.warn(details, 'Failed to check Puppeteer health');
+    logger.warn(details, '[Puppeteer Health] Failed to check health');
+
     cachedStatus = { status: 'unavailable' };
     cacheTimestamp = now;
     return cachedStatus;
