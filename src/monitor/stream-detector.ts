@@ -3,7 +3,7 @@ import path from 'path';
 import { getStreamerConfig } from '../config/loader.js';
 import { logger } from '../utils/logger.js';
 import { createAutoLogger as loggerWithTenant } from '../utils/auto-tenant-logger.js';
-import { QUEUE_NAMES, type LiveHlsDownloadJob, getLiveHlsDownloadQueue } from '../jobs/queues.js';
+import { QUEUE_NAMES, type LiveHlsDownloadJob, getLiveHlsDownloadQueue, enqueueJobWithLogging } from '../jobs/queues.js';
 import { createClient, getClient } from '../db/client.js';
 import type { StreamerConfig } from '../config/types.js';
 import { getTwitchStreamStatus, getLatestTwitchVodObject } from '../services/twitch-live.js';
@@ -489,7 +489,8 @@ async function enqueueLiveHlsDownload(params: {
   try {
     log.info({ vodId: params.vodId, platform: params.platform, tenantId: params.tenantId }, `[Monitor] Attempting to enqueue Live HLS download job`);
 
-    const job = await queue.add(
+    const { jobId, isNew } = await enqueueJobWithLogging(
+      queue,
       'live_hls_download',
       {
         vodId: params.vodId,
@@ -505,10 +506,15 @@ async function enqueueLiveHlsDownload(params: {
         attempts: 10,
         backoff: { type: 'exponential' as const, delay: 5000 },
         deduplication: { id: `live_hls_${params.vodId}` },
-      }
+      },
+      { info: log.info.bind(log), debug: log.debug.bind(log) },
+      `[Monitor] Live HLS download job enqueued successfully`,
+      { vodId: params.vodId, platform: params.platform, queueName: QUEUE_NAMES.VOD_DOWNLOAD }
     );
 
-    log.info({ vodId: params.vodId, jobId: String(job.id), platform: params.platform, queueName: QUEUE_NAMES.VOD_DOWNLOAD }, `[Monitor] Live HLS download job enqueued successfully`);
+    if (isNew) {
+      log.debug({ vodId: params.vodId, jobId }, `[Monitor] Job was newly added to queue`);
+    }
   } catch (error) {
     const details = extractErrorDetails(error);
     log.error({ vodId: params.vodId, ...details }, `[Monitor] CRITICAL - Failed to enqueue Live HLS download job`);
