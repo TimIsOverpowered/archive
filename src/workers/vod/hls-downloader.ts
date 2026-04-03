@@ -211,31 +211,6 @@ export async function cleanupOrphanedTmpFiles(vodDir: string, log: ReturnType<ty
   }
 }
 
-/**
- * Check if partial download exists by scanning for segments on disk
- */
-export async function checkForPartialDownload(vodDir: string): Promise<boolean> {
-  try {
-    const files = await fsPromises.readdir(vodDir);
-
-    // Check for any .ts or .mp4 segments (excluding final merged output)
-    return files.some((f) => f.endsWith('.ts') || (f.endsWith('.mp4') && !f.includes('_final.mp4')));
-  } catch {
-    // Directory doesn't exist - no partial download
-    return false;
-  }
-}
-
-async function cleanupVodProgress(vodId: string): Promise<void> {
-  try {
-    const key = `vod_progress:${vodId}`;
-
-    await redis.del(key);
-  } catch (error) {
-    log.warn(createErrorContext(error, { vodId }), `Failed to cleanup VOD progress in Redis`);
-  }
-}
-
 function updateAlertProgress(messageId: string | null, platform: string, totalSegmentsFound: number, vodId: string, startedAt?: string): void {
   if (!messageId || !isAlertsEnabled()) return;
 
@@ -516,23 +491,9 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         const result = await fetchTwitchPlaylist(vodId, log, retryCount, maxRetryBeforeEndDetection);
 
         if (!result) {
-          // Check if we should break or continue based on error type
           if (retryCount > maxRetryBeforeEndDetection) {
-            // [OFFLINE AFTER CRASH] Check for crash recovery - partial segments exist?
-
-            const hasExistingSegments = await checkForPartialDownload(vodDir);
-
-            if (hasExistingSegments && totalSegmentsFound > 0) {
-              log.warn({ vodId, segmentCount: totalSegmentsFound }, `[${vodId}] Stream ended but ${totalSegmentsFound} segments already downloaded. Attempting finalization...`);
-
-              // Continue to MP4 conversion - don't throw error yet
-              break; // Exit loop, proceed with existing data
-            } else {
-              log.error({ vodId }, `[${vodId}] No segments found and stream is offline. Failing job.`);
-              await cleanupVodProgress(vodId);
-
-              throw new Error('Stream ended before any segments were downloaded');
-            }
+            log.error({ vodId }, `[${vodId}] No segments found and stream is offline. Failing job.`);
+            throw new Error('Stream ended before any segments were downloaded');
           }
 
           retryCount++;
@@ -543,27 +504,13 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         variantM3u8String = result.variantM3u8String;
         fetchedBaseURL = result.baseURL;
       } else if (platform === 'kick') {
-        const result = await fetchKickPlaylist(vodId, sourceUrl, log, retryCount, maxRetryBeforeEndDetection, kickSession ?? undefined); // Pass persistent session
+        const result = await fetchKickPlaylist(vodId, sourceUrl, log, retryCount, maxRetryBeforeEndDetection, kickSession ?? undefined);
 
         if (!result) {
-          // Special handling for Kick - may need to update DB on abort
-
-          // [OFFLINE AFTER CRASH] Check before giving up completely
           if (retryCount > maxRetryBeforeEndDetection * 2 && !sourceUrl) {
-            const hasExistingSegments = await checkForPartialDownload(vodDir);
-
-            if (hasExistingSegments && totalSegmentsFound > 0) {
-              log.warn({ vodId, segmentCount: totalSegmentsFound }, `[${vodId}] Stream ended but ${totalSegmentsFound} segments already downloaded. Attempting finalization...`);
-
-              await streamerClient.vod.update({ where: { id: vodId }, data: { is_live: false } });
-              break; // Exit loop, proceed with existing data
-            } else {
-              log.error({ vodId }, `[${vodId}] Kick HLS source URL not available and no segments downloaded`);
-
-              await streamerClient.vod.update({ where: { id: vodId }, data: { is_live: false } });
-
-              throw new Error('Kick HLS source URL not available');
-            }
+            log.error({ vodId }, `[${vodId}] Kick HLS source URL not available and no segments downloaded`);
+            await streamerClient.vod.update({ where: { id: vodId }, data: { is_live: false } });
+            throw new Error('Kick HLS source URL not available');
           }
 
           retryCount++;
@@ -793,9 +740,6 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
     try {
       await fsPromises.access(finalMp4Path);
 
-      // Download completed successfully
-      await cleanupVodProgress(vodId);
-
       if (!config.settings.saveHLS) {
         try {
           await fsPromises.rm(vodDir, { recursive: true });
@@ -814,9 +758,6 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
     } catch (error) {
       const details = extractErrorDetails(error);
       log.error({ ...details, vodId }, `[${vodId}] Final MP4 file not found`);
-
-      // Download failed - cleanup progress but keep dedup lock for retry
-      await cleanupVodProgress(vodId);
 
       if (!config.settings.saveHLS) {
         try {
