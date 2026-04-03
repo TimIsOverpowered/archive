@@ -1,29 +1,12 @@
 import { navigateToUrl } from '../utils/puppeteer-manager.js';
-import { extractErrorDetails } from '../utils/error.js';
+import { extractErrorDetails, createErrorContext } from '../utils/error.js';
 import { logger } from '../utils/logger.js';
+import { KickStreamStatus } from '../types/kick.js';
+import { sleep } from '../utils/delay.js';
 
-/**
- * Kick livestream data structure from /api/v2/channels/{username}/livestream endpoint
- */
-export interface KickStreamStatus {
-  id: string;
-  session_title: string | null;
-  created_at: string;
-  playback_url?: string; // HLS master playlist URL with auth token
-  viewers?: number;
-  slug?: string;
-  language?: string;
-  is_mature?: boolean;
-  category?: {
-    id: number;
-    name: string | null;
-    slug?: string | null;
-  } | null;
-  thumbnail?: {
-    src: string | null;
-    srcset?: string | null;
-  } | null;
-}
+// Kick Live API constants
+const KICK_LIVE_API_TIMEOUT_MS = 15000;
+const KICK_PAGE_DELAY_MS = 2000;
 
 interface KickApiResponse {
   data?: Record<string, unknown>;
@@ -41,7 +24,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
 
     // Navigate with Turnstile handling (even API calls may trigger bot protection)
     const result = await navigateToUrl(apiUrl, {
-      timeoutMs: 15000,
+      timeoutMs: KICK_LIVE_API_TIMEOUT_MS,
       dontSaveCookies: false,
       maxRetries: 2,
       isJsonUrl: true,
@@ -54,20 +37,18 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
 
     const page = result.page;
 
-    // Wait briefly for response to be ready (replaces legacy code's 10s sleep with shorter wait)
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await sleep(KICK_PAGE_DELAY_MS);
 
     // Use extracted data from navigator if available (preferred path for isJsonUrl: true)
     let response: KickApiResponse | undefined;
     if ('data' in result && result.data !== undefined) {
       response = result.data as KickApiResponse;
     } else {
-      // Fallback to manual parsing for backward compatibility or edge cases
       const content = await page.content();
       try {
         response = JSON.parse(content);
       } catch (error) {
-        logger.error({ username, error: extractErrorDetails(error).message }, `[Kick] Failed to parse API response`);
+        logger.error(createErrorContext(error, { username }), `[Kick] Failed to parse API response`);
         await page.close();
         return null;
       }
@@ -165,7 +146,7 @@ export async function getLatestKickVodObject(username: string, expectedStreamId:
 
     // Navigate with Turnstile handling
     const result = await navigateToUrl(videosUrl, {
-      timeoutMs: 15000,
+      timeoutMs: KICK_LIVE_API_TIMEOUT_MS,
       dontSaveCookies: false,
       maxRetries: 2,
       isJsonUrl: true,
@@ -178,8 +159,7 @@ export async function getLatestKickVodObject(username: string, expectedStreamId:
 
     const page = result.page;
 
-    // Wait briefly for response (replaces legacy code's sleep with shorter wait)
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await sleep(KICK_PAGE_DELAY_MS);
 
     // Use extracted data from navigator if available
     let dataArray: unknown[] | undefined;
@@ -190,7 +170,7 @@ export async function getLatestKickVodObject(username: string, expectedStreamId:
       try {
         dataArray = JSON.parse(content);
       } catch (error) {
-        logger.error({ username, error: extractErrorDetails(error).message }, `[Kick] Failed to parse videos API response`);
+        logger.error(createErrorContext(error, { username }), `[Kick] Failed to parse videos API response`);
         await page.close();
         return null;
       }

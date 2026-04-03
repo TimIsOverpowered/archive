@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { loadStreamerConfigs, getConfigById, clearConfigCache } from '../../config/loader';
+import { loadStreamerConfigs, getStreamerConfig, clearConfigCache } from '../../config/loader';
 import { StreamerConfig } from '../../config/types';
 import { logger } from '../../utils/logger';
 
@@ -13,7 +13,7 @@ const configPlugin: FastifyPluginAsync = async (fastify) => {
 
     // Decorate fastify with config helpers
     fastify.decorate('getStreamerConfig', (id: string): StreamerConfig | undefined => {
-      return getConfigById(id);
+      return getStreamerConfig(id);
     });
 
     fastify.decorate('getAllConfigs', async (): Promise<StreamerConfig[]> => {

@@ -126,7 +126,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
           const vodStreamTitle = vodRecord.title ? vodRecord.title.replace(/>|</gi, '') : '';
           const domainName = config.settings?.domainName || 'localhost';
-          const legacyDescription = `Chat Replay: https://${domainName}/youtube/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description || ''}`;
+          const youtubeDescription = `Chat Replay: https://${domainName}/youtube/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description || ''}`;
 
           let result;
           try {
@@ -192,7 +192,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
               }
             };
 
-            result = await uploadVideo(streamerId, channelName, parts[i], partTitle, legacyDescription, privacyStatus, onUploadProgress);
+            result = await uploadVideo(streamerId, channelName, parts[i], partTitle, youtubeDescription, privacyStatus, onUploadProgress);
 
             uploadedVideos.push({ id: result.videoId, part: i + 1 });
           } catch (error) {
@@ -222,7 +222,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
       } else {
         const vodStreamTitle = vodRecord.title ? vodRecord.title.replace(/>|</gi, '') : '';
         const domainName = config.settings?.domainName || 'localhost';
-        const legacyDescription = `Chat Replay: https://${domainName}/youtube/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description || ''}`;
+        const youtubeDescription = `Chat Replay: https://${domainName}/youtube/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description || ''}`;
 
         const vodTitle = `${channelName} ${platformName} VOD - ${dateFormatted}`;
 
@@ -246,7 +246,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
           channelName,
           filePath,
           vodTitle,
-          legacyDescription,
+          youtubeDescription,
           privacyStatus,
           // Progress callback for Discord milestone updates
           async (progress: UploadProgressCallbackData) => {
@@ -444,7 +444,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
             }
           }
 
-          const legacyDescription = `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description || ''}`;
+          const youtubeDescription = `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description || ''}`;
 
           // Create individual upload progress alert per game part
           let uploadAlertMessageId: string | null = null;
@@ -519,7 +519,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
               }
             };
 
-            result = await uploadVideo(streamerId, channelName, splitPaths[i], ytTitle, legacyDescription, 'public', onUploadProgress);
+            result = await uploadVideo(streamerId, channelName, splitPaths[i], ytTitle, youtubeDescription, 'public', onUploadProgress);
 
             const createdGameRecord = await db.game.create({
               data: {
@@ -589,7 +589,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
           }
         }
 
-        const legacyDescription = `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description || ''}`;
+        const youtubeDescription = `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description || ''}`;
 
         // Send initial upload alert for single game uploads (non-split)
         let uploadAlertMessageId: string | null = null;
@@ -611,7 +611,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
           channelName,
           trimmedPath,
           ytTitle,
-          legacyDescription,
+          youtubeDescription,
           'public',
           // Progress callback for Discord milestone updates
           async (progress: UploadProgressCallbackData) => {

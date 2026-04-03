@@ -4,6 +4,7 @@ import { getStreamerConfig, clearConfigCache } from '../config/loader.js';
 import { decryptObject, encryptObject } from '../utils/encryption.js';
 import { metaClient } from '../db/meta-client.js';
 import { extractErrorDetails } from '../utils/error.js';
+import { sleep } from '../utils/delay.js';
 import { loggerWithTenant, logger as baseLogger } from '../utils/logger.js';
 import { Prisma } from '../../prisma/generated/meta/client.js';
 
@@ -559,7 +560,7 @@ export async function uploadVideo(
     }
 
     // Wait for YouTube to generate thumbnails before fetching
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await sleep(3000);
 
     let thumbnailUrl = '';
     const meta = await youtube.videos.list({ part: ['snippet'], id: [videoId] });

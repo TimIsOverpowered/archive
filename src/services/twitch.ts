@@ -1,9 +1,13 @@
 import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
-import { extractErrorDetails, silentFail } from '../utils/error.js';
+import { extractErrorDetails, createErrorContext } from '../utils/error.js';
 import { getStreamerConfig as getConfig } from '../config/loader.js';
 import { toHHMMSS } from '../utils/formatting.js';
 import { PrismaClient } from '../../generated/streamer/client.js';
 import { childLogger } from '../utils/logger.js';
+
+// Twitch API constants
+// Other GQL Client-Id 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp';
+const TWITCH_GQL_CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 
 export interface VodData {
   id: string;
@@ -81,8 +85,7 @@ export async function getVodTokenSig(vodId: string): Promise<VodTokenSig> {
     method: 'POST',
     headers: {
       Accept: '*/*',
-      'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
-
+      'Client-Id': TWITCH_GQL_CLIENT_ID,
       'Content-Type': 'text/plain;charset=UTF-8',
     },
     body: JSON.stringify({
@@ -127,8 +130,7 @@ export async function fetchComments(vodId: string, offset = 0): Promise<Record<s
     method: 'POST',
     headers: {
       Accept: '*/*',
-      'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
-
+      'Client-Id': TWITCH_GQL_CLIENT_ID,
       'Content-Type': 'text/plain;charset=UTF-8',
     },
     body: JSON.stringify({
@@ -155,8 +157,7 @@ export async function fetchNextComments(vodId: string, cursor: string): Promise<
     method: 'POST',
     headers: {
       Accept: '*/*',
-      'Client-Id': 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
-
+      'Client-Id': TWITCH_GQL_CLIENT_ID,
       'Content-Type': 'text/plain;charset=UTF-8',
     },
     body: JSON.stringify({
@@ -183,8 +184,7 @@ export async function getChapters(vodId: string): Promise<Record<string, unknown
     method: 'POST',
     headers: {
       Accept: '*/*',
-      'Client-Id': 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
-
+      'Client-Id': TWITCH_GQL_CLIENT_ID,
       'Content-Type': 'text/plain;charset=UTF-8',
     },
     body: JSON.stringify({
@@ -210,8 +210,7 @@ export async function getChapter(vodId: string): Promise<Record<string, unknown>
     method: 'POST',
     headers: {
       Accept: '*/*',
-      'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
-
+      'Client-Id': TWITCH_GQL_CLIENT_ID,
       'Content-Type': 'text/plain;charset=UTF-8',
     },
     body: JSON.stringify({
@@ -363,11 +362,11 @@ export interface TwitchVideoCommentResponse {
   comments: TwitchCommentsConnection | null;
 }
 
-import { sendRichAlert, updateDiscordEmbed, isAlertsEnabled } from '../utils/discord-alerts.js';
+import { sendVodDownloadStarted, sendVodDownloadSuccess, sendVodDownloadFailed } from '../utils/discord-alerts.js';
 import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
 
 /**
- * Download Twitch VOD directly to MP4 using ffmpeg HLS streaming (reference: vod.js line 1209-1237)
+ * Download Twitch VOD directly to MP4 using ffmpeg HLS streaming
  */
 export async function downloadVodAsMp4(vodId: string, streamerId: string): Promise<string | null> {
   const config = getConfig(streamerId);
@@ -391,22 +390,8 @@ export async function downloadVodAsMp4(vodId: string, streamerId: string): Promi
 
     const vodPath = `${config.settings.vodPath}/${vodId}.mp4`;
 
-    // Send Discord "Download Started" alert
-    if (isAlertsEnabled()) {
-      silentFail(async () => {
-        const streamerName = config.displayName || streamerId;
-        messageId = await sendRichAlert({
-          title: '📥 Twitch VOD Download Started',
-          description: `${vodId} download in progress for ${streamerName}`,
-          status: 'warning',
-          fields: [
-            { name: 'VOD ID', value: `\`${vodId}\``, inline: false },
-            { name: 'Streamer', value: `\`${streamerName}\`` },
-          ],
-          timestamp: new Date().toISOString(),
-        });
-      });
-    }
+    const streamerName = config.displayName || streamerId;
+    messageId = await sendVodDownloadStarted('twitch', streamerId, vodId, streamerName);
 
     // Fetch m3u8 playlist and detect fMP4 format (Twitch can use both .ts or fMP4)
     const response = await fetch(m3u8Url);
@@ -418,53 +403,23 @@ export async function downloadVodAsMp4(vodId: string, streamerId: string): Promi
     const m3u8Content = await response.text();
     const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
 
-    // Download directly to MP4 using ffmpeg HLS streaming (reference line 1209-1237, consolidated in ffmpeg.ts)
+    // Download directly to MP4 using ffmpeg HLS streaming
     await convertHlsToMp4(m3u8Url, vodPath, { vodId, isFmp4 });
 
-    log.info(`Downloaded ${vodId}.mp4`); // Reference pattern line 1207-209
+    log.info(`Downloaded ${vodId}.mp4`);
 
     // Success alert
-    if (isAlertsEnabled() && messageId) {
-      silentFail(async () => {
-        const streamerName = config.displayName || streamerId;
-
-        await updateDiscordEmbed(messageId!, {
-          title: '✅ Twitch VOD Download Complete!',
-          description: `${vodId} successfully downloaded and converted to MP4 for ${streamerName}`,
-          status: 'success',
-          fields: [
-            { name: 'VOD ID', value: `\`${vodId}\``, inline: false },
-            { name: 'Output Path', value: vodPath, inline: false },
-          ],
-          timestamp: new Date().toISOString(),
-          updatedTimestamp: new Date().toISOString(),
-        });
-      });
-    }
+    await sendVodDownloadSuccess(messageId!, 'twitch', vodId, vodPath, streamerName);
 
     return vodPath;
   } catch (error) {
     const details = extractErrorDetails(error);
     const errorMsg = details.message.substring(0, 500);
 
-    log.error(`\nffmpeg error occurred: ${errorMsg}`); // Reference pattern line 1209-214
+    log.error(`ffmpeg error occurred: ${errorMsg}`);
 
     // Failure alert
-    if (isAlertsEnabled() && messageId) {
-      silentFail(async () => {
-        await updateDiscordEmbed(messageId!, {
-          title: '❌ Twitch VOD Download Failed',
-          description: `${vodId} download failed for ${streamerId}`,
-          status: 'error',
-          fields: [
-            { name: 'VOD ID', value: `\`${vodId}\``, inline: false },
-            { name: 'Error', value: errorMsg, inline: false },
-          ],
-          timestamp: new Date().toISOString(),
-          updatedTimestamp: new Date().toISOString(),
-        });
-      });
-    }
+    await sendVodDownloadFailed(messageId!, 'twitch', vodId, errorMsg, streamerId);
 
     throw error;
   }
@@ -540,6 +495,6 @@ export async function saveVodChapters(vodId: string, streamerId: string, finalDu
 
     log.info({ vodId, chapterCount: chaptersToCreate.length }, 'Saved all chapters');
   } catch (error) {
-    log.error({ vodId, error: extractErrorDetails(error).message }, 'Failed to save chapters');
+    log.error(createErrorContext(error, { vodId }), 'Failed to save chapters');
   }
 }

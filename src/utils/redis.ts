@@ -1,6 +1,7 @@
 import Redis from 'ioredis';
 import { logger } from './logger.js';
 import { extractErrorDetails } from './error.js';
+import { sleep } from './delay.js';
 
 export async function connectWithBackoff(url: string, maxAttempts = 6): Promise<Redis> {
   let attempt = 0;
@@ -19,7 +20,7 @@ export async function connectWithBackoff(url: string, maxAttempts = 6): Promise<
 
       const details = extractErrorDetails(error);
       logger.info({ ...details, attempt, maxAttempts, delay: delay / 1000 }, 'Redis connection failed');
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      await sleep(delay);
       delay *= 2;
     }
   }

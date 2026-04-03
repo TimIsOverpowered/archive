@@ -2,6 +2,7 @@ import { Processor, Job } from 'bullmq';
 import { getClient, createClient } from '../db/client.js';
 import { getStreamerConfig } from '../config/loader.js';
 import { extractErrorDetails } from '../utils/error.js';
+import { sleep } from '../utils/delay.js';
 import { fetchComments, fetchNextComments, type TwitchChatEdge } from '../services/twitch';
 import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/discord-alerts.js';
 import type { ChatDownloadJob, ChatDownloadResult } from '../jobs/queues.js';
@@ -255,7 +256,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
       lastCursor = pageCursor;
 
-      await new Promise((r) => setTimeout(r, RATE_LIMIT_MS));
+      await sleep(RATE_LIMIT_MS);
 
       rawPage = await fetchNextComments(vodId, pageCursor); // Only used for subsequent pages now!
     }
