@@ -489,8 +489,6 @@ async function enqueueLiveHlsDownload(params: {
   try {
     log.info({ vodId: params.vodId, platform: params.platform, tenantId: params.tenantId }, `[Monitor] Attempting to enqueue Live HLS download job`);
 
-    log.debug({ vodId: params.vodId, platform: params.platform }, `[Monitor] Adding job to BullMQ VOD download queue`);
-
     const job = await queue.add(
       'live_hls_download',
       {
@@ -503,8 +501,8 @@ async function enqueueLiveHlsDownload(params: {
         sourceUrl: params.sourceUrl,
       } satisfies LiveHlsDownloadJob,
       {
-        jobId: `live_hls_${params.vodId}`, // Native BullMQ deduplication - prevents duplicate jobs in queue
-        attempts: 10, // Increased for long-running live streams and crash recovery
+        jobId: `live_hls_${params.vodId}`,
+        attempts: 10,
         backoff: { type: 'exponential' as const, delay: 5000 },
       }
     );

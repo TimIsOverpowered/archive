@@ -1,11 +1,11 @@
 import type { YoutubeUploadJob } from './queues.js';
 import { getYoutubeUploadQueue } from './queues.js';
 
-export async function enqueueYoutubeUpload(job: Omit<YoutubeUploadJob, 'id'>): Promise<string | null> {
+export async function enqueueYoutubeUpload(job: Omit<YoutubeUploadJob, 'id'>, jobId: string): Promise<string | null> {
   const queue = getYoutubeUploadQueue();
 
   try {
-    const addedJob = await queue.add('youtube_upload', job);
+    const addedJob = await queue.add('youtube_upload', job, { jobId });
     return addedJob.id ?? null;
   } catch {
     return null;
@@ -41,7 +41,8 @@ export async function triggerYoutubeUpload(
     // For parts without chapters, no chapter field needed
   }
 
-  return enqueueYoutubeUpload(jobData);
+  const jobId = `youtube_${vodId}`;
+  return enqueueYoutubeUpload(jobData, jobId);
 }
 
 export async function triggerYoutubeUploadWithChapters(

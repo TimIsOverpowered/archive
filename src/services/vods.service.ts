@@ -135,7 +135,7 @@ export async function getVods(client: PrismaClient, streamerId: string, query: V
 
   if (!DISABLE_CACHE && redisClient) {
     try {
-      await redisClient.set(cacheKey, JSON.stringify(response), { EX: VODS_CACHE_TTL });
+      await redisClient.set(cacheKey, JSON.stringify(response), 'EX', VODS_CACHE_TTL);
     } catch {
       // Ignore cache errors
     }
@@ -186,7 +186,7 @@ export async function getVodById(client: PrismaClient, streamerId: string, vodId
 
     if (!DISABLE_CACHE && redisClient) {
       try {
-        await redisClient.set(cacheKey, JSON.stringify(response), { EX: VODS_CACHE_TTL });
+        await redisClient.set(cacheKey, JSON.stringify(response), 'EX', VODS_CACHE_TTL);
       } catch {
         // Ignore cache errors
       }

@@ -1,11 +1,11 @@
 import type { VODDownloadJob } from './queues.js';
 import { getVODDownloadQueue } from './queues.js';
 
-export async function enqueueVodDownload(job: Omit<VODDownloadJob, 'id'>): Promise<string | null> {
+export async function enqueueVodDownload(job: Omit<VODDownloadJob, 'id'>, jobId: string): Promise<string | null> {
   const queue = getVODDownloadQueue();
 
   try {
-    const addedJob = await queue.add('vod_download', job);
+    const addedJob = await queue.add('vod_download', job, { jobId });
     return addedJob.id ?? null;
   } catch {
     return null;
@@ -20,12 +20,16 @@ export async function triggerVodDownload(
   externalVodId: string,
   platformUsername?: string
 ): Promise<string | null> {
-  return enqueueVodDownload({
-    tenantId,
-    platformUserId,
-    platformUsername,
-    vodId,
-    platform,
-    externalVodId,
-  });
+  const jobId = `vod_${vodId}`;
+  return enqueueVodDownload(
+    {
+      tenantId,
+      platformUserId,
+      platformUsername,
+      vodId,
+      platform,
+      externalVodId,
+    },
+    jobId
+  );
 }

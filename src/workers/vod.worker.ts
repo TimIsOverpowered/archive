@@ -21,19 +21,13 @@ export interface LiveHlsDownloadResult {
 const VOD_PROCESS_TIMEOUT_MS = 60_000;
 
 const vodProcessor: Processor<LiveHlsDownloadJobData, LiveHlsDownloadResult, string> = async (job: Job<LiveHlsDownloadJobData, LiveHlsDownloadResult, string>) => {
-  console.error(`[vod.worker] Processor called with job.name: ${job.name}`);
-  console.error(`[vod.worker] Job data:`, JSON.stringify(job.data, null, 2));
-
+  const { vodId, platform, tenantId } = job.data;
+  
   if (job.name !== 'live_hls_download') {
-    console.error(`[vod.worker] Rejecting job - unsupported type: ${job.name}`);
     throw new Error(`Unsupported job type: ${job.name}`);
   }
 
-  console.error(`[vod.worker] Job type validated, proceeding...`);
-
-  const { vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl } = job.data;
-
-  console.error(`[vod.worker] Extracted data: vodId=${vodId}, platform=${platform}, tenantId=${tenantId}`);
+  const { platformUserId, platformUsername, startedAt, sourceUrl } = job.data;
 
   // 1. Progress Heartbeat (Type-Safe)
   let tickCount = 0;
@@ -51,6 +45,8 @@ const vodProcessor: Processor<LiveHlsDownloadJobData, LiveHlsDownloadResult, str
     const { getStreamerConfig } = await import('../config/loader.js');
 
     const log = loggerWithTenant(tenantId);
+    log.info({ jobId: job.id, vodId, platform, tenantId }, '[VOD Processor] Starting job processing');
+    
     const config = getStreamerConfig(tenantId);
 
     if (!config?.settings.vodPath) {

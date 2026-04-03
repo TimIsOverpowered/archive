@@ -1,4 +1,4 @@
-import { createClient, RedisClientType } from 'redis';
+import Redis from 'ioredis';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { logger } from '../../utils/logger';
 import { extractErrorDetails } from '../../utils/error.js';
@@ -8,7 +8,7 @@ interface RedisPluginOptions {
   url: string;
 }
 
-export let redisClient: RedisClientType | null = null;
+export let redisClient: Redis | null = null;
 export let publicRateLimiter: RateLimiterRedis | null = null;
 export let chatRateLimiter: RateLimiterRedis | null = null;
 export let adminRateLimiter: RateLimiterRedis | null = null;
@@ -26,15 +26,12 @@ const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, opti
   const readyTimeout = isProduction ? 30000 : 10000;
 
   try {
-    redisClient = createClient({
-      url,
-      socket: {
-        reconnectStrategy: (retries) => {
-          if (retries > 10) return new Error('Max Redis reconnection attempts reached');
-          const delay = Math.min(retries * 500, 5000);
-          logger.warn({ retries, delay }, 'Redis reconnection attempt');
-          return delay;
-        },
+    redisClient = new Redis(url, {
+      retryStrategy(times: number) {
+        if (times > 10) return null; // Max Redis reconnection attempts reached
+        const delay = Math.min(times * 500, 5000);
+        logger.warn({ times, delay }, 'Redis reconnection attempt');
+        return delay;
       },
     });
 
@@ -135,7 +132,7 @@ const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, opti
   } catch (error) {
     const isProduction = process.env.NODE_ENV === 'production';
     const details = extractErrorDetails(error);
-      const errorMessage = details.message;
+    const errorMessage = details.message;
 
     if (isProduction) {
       logger.fatal({ error: errorMessage }, 'Failed to connect to Redis - server cannot start in production without Redis');
@@ -152,7 +149,7 @@ const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, opti
       del: async () => 1,
       getBuffer: async () => null,
       setBuffer: async () => 'OK',
-    } as unknown as RedisClientType;
+    } as unknown as Redis;
 
     // Mock rate limiters (always allow in dev without Redis)
     const mockLimiter = {

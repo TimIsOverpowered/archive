@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { RedisClientType } from 'redis';
+import Redis from 'ioredis';
 import { loadStreamerConfigs } from '../../config/loader';
 import { getClient } from '../../db/client';
 import { checkPuppeteerHealth } from '../../utils/puppeteer-health';
@@ -11,7 +11,7 @@ interface HealthRouteOptions {
 
 declare module 'fastify' {
   interface FastifyInstance {
-    redis: RedisClientType;
+    redis: Redis;
     getAllConfigs: () => Promise<unknown[]>;
   }
 }
