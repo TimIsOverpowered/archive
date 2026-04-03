@@ -257,7 +257,7 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
     });
   } else if (existingVod && existingVod.is_live) {
     // Already tracked as live - queue download (BullMQ dedup will handle if already queued)
-    log.info(`[Monitor]: VOD ${String(existingVod.id)} is live - ensuring download is queued`);
+    log.debug(`[Monitor]: VOD ${String(existingVod.id)} is live - ensuring download is queued`);
 
     await enqueueLiveHlsDownload({
       vodId: String(existingVod.id),
@@ -487,7 +487,7 @@ async function enqueueLiveHlsDownload(params: {
   const queue = getLiveHlsDownloadQueue();
 
   try {
-    log.info({ vodId: params.vodId, platform: params.platform, tenantId: params.tenantId }, `[Monitor] Attempting to enqueue Live HLS download job`);
+    log.debug({ vodId: params.vodId, platform: params.platform, tenantId: params.tenantId }, `[Monitor] Attempting to enqueue Live HLS download job`);
 
     const { jobId, isNew } = await enqueueJobWithLogging(
       queue,

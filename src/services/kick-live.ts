@@ -197,7 +197,7 @@ export async function getLatestKickVodObject(username: string, expectedStreamId:
 
     const vod = vodObject as Record<string, unknown>;
 
-    logger.info({ username, expectedStreamId }, `[Kick] Video object ready! ID=${expectedStreamId}, Title="${vod.session_title || vod.title}"`);
+    logger.debug({ username, expectedStreamId }, `[Kick] Video object ready! ID=${expectedStreamId}, Title="${vod.session_title || vod.title}"`);
 
     await page.close();
 
