@@ -1,6 +1,6 @@
 import { Queue, QueueOptions } from 'bullmq';
-import Redis from 'ioredis';
 import type { DMCAClaim } from '../utils/dmca.js';
+import { redisInstance } from '../workers/redis.js';
 
 export type VodJobType = 'STANDARD_VOD_DOWNLOAD' | 'LIVE_HLS_DOWNLOAD';
 
@@ -117,10 +117,6 @@ export const youtubeJobOptions = {
   attempts: 5,
 };
 
-const redisConnection = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-  maxRetriesPerRequest: null, // Required by BullMQ workers
-});
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const queueCache = new Map<string, Queue<any, any, string>>();
 
@@ -132,7 +128,7 @@ export function getQueue<TData = unknown, TFinishedData = unknown>(name: string,
   }
 
   const queue = new Queue<TData, TFinishedData, string>(name, {
-    connection: redisConnection,
+    connection: redisInstance,
     defaultJobOptions: jobOptions || defaultJobOptions,
   });
 
@@ -165,5 +161,6 @@ export async function closeQueues(): Promise<void> {
     await queue.close();
   }
   queueCache.clear();
-  await redisConnection.quit();
+  // Don't quit redis here - it's managed by workers/redis.ts
+  // The redis instance is shared and should only be closed during worker shutdown
 }

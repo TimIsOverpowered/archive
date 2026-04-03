@@ -64,7 +64,7 @@ async function getVodBucketSize(streamerId: string, vodId: string): Promise<numb
 
   if (!DISABLE_CACHE && redisClient) {
     try {
-      await redisClient.set(key, bucketSize.toString(), { EX: BUCKET_SIZE_TTL });
+      await redisClient.set(key, bucketSize.toString(), 'EX', BUCKET_SIZE_TTL);
     } catch {
       // Ignore cache errors
     }
@@ -128,7 +128,7 @@ export async function getLogsByOffset(client: PrismaClient, streamerId: string, 
   if (!DISABLE_CACHE && redisClient) {
     try {
       const compressed = await compressChatData(response);
-      await (redisClient as unknown as { setBuffer: (key: string, value: Buffer, options?: { EX?: number }) => Promise<string> }).setBuffer(cacheKey, compressed, { EX: OFFSET_TTL });
+      await redisClient.set(cacheKey, compressed, 'EX', OFFSET_TTL);
       logger.debug({ vodId, bucket }, '[CACHE SET] bucket');
     } catch {
       // Ignore cache errors
@@ -209,7 +209,7 @@ export async function getLogsByCursor(client: PrismaClient, streamerId: string, 
   if (!DISABLE_CACHE && redisClient) {
     try {
       const compressed = await compressChatData(response);
-      await (redisClient as unknown as { setBuffer: (key: string, value: Buffer, options?: { EX?: number }) => Promise<string> }).setBuffer(cacheKey, compressed, { EX: CURSOR_TTL });
+      await redisClient.set(cacheKey, compressed, 'EX', CURSOR_TTL);
       logger.debug({ vodId }, '[CACHE SET] cursor');
     } catch {
       // Ignore cache errors

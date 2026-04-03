@@ -101,8 +101,8 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
 
           client = retrievedClient;
         } catch (error: unknown) {
-            const details = extractErrorDetails(error);
-            request.log.error({ ...details, streamerId }, `[${streamerId}] Database error`);
+          const details = extractErrorDetails(error);
+          request.log.error({ ...details, streamerId }, `[${streamerId}] Database error`);
           throw new Error('Database connection failed');
         }
 
@@ -172,7 +172,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const queue = YoutubeQueueModule.getYoutubeUploadQueue() as any;
-        const job = await queue.add(youtubeJobData, { name: 'youtube_upload', id: `youtube-live:${request.body.streamId}:${Date.now()}` });
+        const job = await queue.add(youtubeJobData, { name: 'youtube_upload', jobId: `youtube-live:${request.body.streamId}` });
 
         request.log.info(`[${streamerId}] Queued YouTube upload job ${job.id} for live recording at ${request.body.path}`);
 

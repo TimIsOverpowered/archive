@@ -1,9 +1,9 @@
 import 'dotenv/config';
 import { extractErrorDetails } from '../utils/error.js';
 import { Worker, Queue, BaseJobOptions } from 'bullmq';
-import Redis from 'ioredis';
 import { loadStreamerConfigs, clearConfigCache } from '../config/loader.js';
-import { QUEUE_NAMES, closeQueues, ChatDownloadJob, YoutubeUploadJob, DmcaProcessingJob, ChatDownloadResult, YoutubeUploadResult, DmcaProcessingResult } from '../jobs/queues.js';
+import { QUEUE_NAMES, getQueue, ChatDownloadJob, YoutubeUploadJob, DmcaProcessingJob, ChatDownloadResult, YoutubeUploadResult, DmcaProcessingResult } from '../jobs/queues.js';
+import { redisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
 import vodProcessor from './vod.worker.js';
 import chatProcessor from './chat.worker.js';
 import youtubeProcessor from './youtube.worker.js';
@@ -36,11 +36,26 @@ export interface WorkerHealthStatus {
 }
 
 const workers = new Map<WorkerName, Worker>();
-const queues = new Map<WorkerName, Queue>();
-let redisConnectionForWorkers: Redis | null = null;
+let redisConnectionForWorkers: unknown | null = null;
 
 export function registerWorker(name: WorkerName, worker: Worker) {
   workers.set(name, worker);
+}
+
+async function clearAllJobsOnStartup() {
+  const queues = [getQueue(QUEUE_NAMES.VOD_DOWNLOAD), getQueue(QUEUE_NAMES.CHAT_DOWNLOAD), getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD), getQueue(QUEUE_NAMES.DMCA_PROCESSING)];
+
+  for (const queue of queues) {
+    logger.warn({ queue: queue.name }, `Clearing all jobs from ${queue.name} queue`);
+
+    try {
+      await queue.obliterate({ force: true });
+      logger.info({ queue: queue.name }, `Cleared all jobs from ${queue.name} queue`);
+    } catch (error) {
+      const details = extractErrorDetails(error);
+      logger.error({ queue: queue.name, error: details.message }, `Failed to clear jobs from ${queue.name} queue`);
+    }
+  }
 }
 
 async function getLastFailedJob(queue: Queue): Promise<LastFailedJob | null> {
@@ -89,9 +104,10 @@ export async function getWorkersHealth(): Promise<Record<string, WorkerHealthSta
     return result;
   }
 
-  for (const [name, queue] of queues) {
+  for (const name of workers.keys()) {
+    const queue = getQueue(name);
     try {
-      if (!queue || !workers.get(name)) continue;
+      if (!workers.get(name)) continue;
 
       const counts = await queue.getJobCounts();
       const lastFailed = await getLastFailedJob(queue);
@@ -141,11 +157,13 @@ async function bootstrap() {
     await startMonitorService();
     logger.info('Stream detection monitoring started');
 
-    const redisConnection = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-      maxRetriesPerRequest: null, // Required by BullMQ workers
-    });
+    // Wait for Redis to be ready before creating workers
+    await waitForRedisReady(30000);
 
+    const redisConnection = redisInstance;
     redisConnectionForWorkers = redisConnection;
+
+    await clearAllJobsOnStartup();
 
     const vodWorker = new Worker<LiveHlsDownloadJobData, LiveHlsDownloadResult>(QUEUE_NAMES.VOD_DOWNLOAD as string, vodProcessor, {
       connection: redisConnection,
@@ -153,7 +171,7 @@ async function bootstrap() {
     });
 
     registerWorker('vod_download', vodWorker);
-    queues.set('vod_download', new Queue<LiveHlsDownloadJobData, unknown, string>(QUEUE_NAMES.VOD_DOWNLOAD as string, { connection: redisConnection }));
+    logger.info({ isRunning: vodWorker.isRunning }, '[Workers] VOD worker status');
 
     const chatWorker = new Worker<ChatDownloadJob, ChatDownloadResult>(QUEUE_NAMES.CHAT_DOWNLOAD as string, chatProcessor, {
       connection: redisConnection,
@@ -161,7 +179,7 @@ async function bootstrap() {
     });
 
     registerWorker('chat_download', chatWorker);
-    queues.set('chat_download', new Queue<ChatDownloadJob, unknown, string>(QUEUE_NAMES.CHAT_DOWNLOAD as string, { connection: redisConnection }));
+    logger.info('[Workers] Chat download worker created and registered');
 
     const youtubeWorker = new Worker<YoutubeUploadJob, YoutubeUploadResult>(QUEUE_NAMES.YOUTUBE_UPLOAD as string, youtubeProcessor, {
       connection: redisConnection,
@@ -169,7 +187,7 @@ async function bootstrap() {
     });
 
     registerWorker('youtube_upload', youtubeWorker);
-    queues.set('youtube_upload', new Queue<YoutubeUploadJob, unknown, string>(QUEUE_NAMES.YOUTUBE_UPLOAD as string, { connection: redisConnection }));
+    logger.info('[Workers] YouTube upload worker created and registered');
 
     const dmcaWorker = new Worker<DmcaProcessingJob, DmcaProcessingResult>(QUEUE_NAMES.DMCA_PROCESSING as string, dmcaProcessor, {
       connection: redisConnection,
@@ -177,7 +195,7 @@ async function bootstrap() {
     });
 
     registerWorker('dmca_processing', dmcaWorker);
-    queues.set('dmca_processing', new Queue<DmcaProcessingJob, unknown, string>(QUEUE_NAMES.DMCA_PROCESSING as string, { connection: redisConnection }));
+    logger.info('[Workers] DMCA processing worker created and registered');
 
     vodWorker.on('active', async (job) => {
       if (!job) return;
@@ -356,19 +374,19 @@ async function bootstrap() {
         }
       } catch {}
 
-      // Close workers and queues
+      // Close workers
       await vodWorker.close();
       await chatWorker.close();
       await youtubeWorker.close();
       await dmcaWorker.close();
 
-      for (const queue of queues.values()) {
-        await queue.close();
-      }
-
+      // Close DB clients
       const clientModule = await import('../db/client.js');
       await clientModule.closeAllClients();
-      await closeQueues();
+
+      // Close shared Redis connection (only once, from workers context)
+      await closeWorkersRedis();
+
       clearConfigCache();
 
       process.exit(0);

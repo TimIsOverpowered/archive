@@ -100,7 +100,8 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
     const DmcaQueueModule = await import('../../../jobs/queues');
 
     // Queue the DMCA processing job (handles both full and part processing in worker)
-    void DmcaQueueModule.getDmcaProcessingQueue().add('dmca_processing', dmcaJobData);
+    const jobId = body.partIndex !== undefined ? `dmca_${body.vodId}_p${body.partIndex}` : `dmca_${body.vodId}`;
+    void DmcaQueueModule.getDmcaProcessingQueue().add('dmca_processing', dmcaJobData, { jobId });
 
     return {
       data: {

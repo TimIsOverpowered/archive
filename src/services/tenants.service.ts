@@ -165,7 +165,7 @@ export async function getTenantStats(client: PrismaClient, streamerId: string): 
 
   if (!DISABLE_CACHE && redisClient) {
     try {
-      await redisClient.set(cacheKey, JSON.stringify(stats), { EX: STATS_CACHE_TTL });
+      await redisClient.set(cacheKey, JSON.stringify(stats), 'EX', STATS_CACHE_TTL);
     } catch {
       // Ignore cache errors
     }
