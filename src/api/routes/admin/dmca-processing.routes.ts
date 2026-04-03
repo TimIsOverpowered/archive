@@ -1,4 +1,5 @@
 import type { DmcaProcessingJob } from '../../../jobs/queues.js';
+import { enqueueJobWithLogging } from '../../../jobs/queues.js';
 import { extractErrorDetails } from '../../../utils/error.js';
 import { FastifyInstance } from 'fastify';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
@@ -101,10 +102,22 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
 
     // Queue the DMCA processing job (handles both full and part processing in worker)
     const jobId = body.partIndex !== undefined ? `dmca_${body.vodId}_p${body.partIndex}` : `dmca_${body.vodId}`;
-    void DmcaQueueModule.getDmcaProcessingQueue().add('dmca_processing', dmcaJobData, {
-      jobId,
-      deduplication: { id: jobId },
-    });
+    const { jobId: actualJobId, isNew } = await enqueueJobWithLogging(
+      DmcaQueueModule.getDmcaProcessingQueue(),
+      'dmca_processing',
+      dmcaJobData,
+      {
+        jobId,
+        deduplication: { id: jobId },
+      },
+      { info: requestLog.info.bind(requestLog), debug: requestLog.debug.bind(requestLog) },
+      `[${streamerId}] DMCA processing job queued`,
+      { vodId: body.vodId, part: body.partIndex !== undefined ? Number(body.partIndex) + 1 : undefined }
+    );
+
+    if (isNew) {
+      requestLog.debug({ vodId: body.vodId, jobId: actualJobId }, `[${streamerId}] Job was newly added to queue`);
+    }
 
     return {
       data: {

@@ -1,4 +1,4 @@
-import { Queue, QueueOptions } from 'bullmq';
+import { Queue, QueueOptions, JobsOptions } from 'bullmq';
 import type { DMCAClaim } from '../utils/dmca.js';
 import { redisInstance } from '../workers/redis.js';
 
@@ -154,6 +154,38 @@ export function getYoutubeUploadQueue(): Queue<YoutubeUploadJob, YoutubeUploadJo
 
 export function getDmcaProcessingQueue(): Queue<DmcaProcessingJob, DmcaProcessingJob, string> {
   return getQueue(QUEUE_NAMES.DMCA_PROCESSING);
+}
+
+export interface JobLogger {
+  info: (context: Record<string, unknown>, message: string) => void;
+  debug: (context: Record<string, unknown>, message: string) => void;
+}
+
+export interface JobEnqueueResult {
+  jobId: string;
+  isNew: boolean;
+}
+
+export async function enqueueJobWithLogging(
+  queue: Queue<unknown, unknown, string>,
+  name: string,
+  data: unknown,
+  options: JobsOptions,
+  logger: JobLogger,
+  successMessage: string,
+  extraContext?: Record<string, unknown>
+): Promise<JobEnqueueResult> {
+  const job = await queue.add(name, data, options);
+  const state = await job.getState();
+  const context = { jobId: String(job.id), state, ...extraContext };
+
+  if (state === 'active' || state === 'completed' || state === 'failed') {
+    logger.debug(context, `Job already exists in state ${state}, skipping`);
+    return { jobId: String(job.id), isNew: false };
+  } else {
+    logger.info(context, successMessage);
+    return { jobId: String(job.id), isNew: true };
+  }
 }
 
 export async function closeQueues(): Promise<void> {

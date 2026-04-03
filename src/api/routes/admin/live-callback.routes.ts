@@ -6,6 +6,7 @@ import { getStreamerConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import type { PrismaClient } from '../../../../generated/streamer/client';
 import type { VodRecordBase } from './types';
+import { enqueueJobWithLogging } from '../../../jobs/queues.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -172,19 +173,28 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const queue = YoutubeQueueModule.getYoutubeUploadQueue() as any;
-        const job = await queue.add(youtubeJobData, {
-          name: 'youtube_upload',
-          jobId: `youtube-live:${request.body.streamId}`,
-          deduplication: { id: `youtube-live:${request.body.streamId}` },
-        });
+        const { jobId, isNew } = await enqueueJobWithLogging(
+          queue,
+          'youtube_upload',
+          youtubeJobData,
+          {
+            jobId: `youtube-live:${request.body.streamId}`,
+            deduplication: { id: `youtube-live:${request.body.streamId}` },
+          },
+          { info: request.log.info.bind(request.log), debug: request.log.debug.bind(request.log) },
+          `[${streamerId}] Queued YouTube upload job for live recording`,
+          { vodId: request.body.streamId, path: request.body.path }
+        );
 
-        request.log.info(`[${streamerId}] Queued YouTube upload job ${job.id} for live recording at ${request.body.path}`);
+        if (isNew) {
+          request.log.debug({ vodId: request.body.streamId, jobId }, `[${streamerId}] Job was newly added to queue`);
+        }
 
         return <{ data: LiveCallbackResponseData }>{
           data: {
             message: 'YouTube upload queued successfully',
             vodId: request.body.streamId,
-            jobId: String(job.id),
+            jobId,
             path: request.body.path,
           },
         };

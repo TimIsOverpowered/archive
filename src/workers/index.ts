@@ -54,7 +54,7 @@ async function clearAllJobsOnStartup() {
     })
   );
 
-  logger.info({ total: queues.length }, `Cleared ${queues.length} queues`);
+  logger.info(`Cleared ${queues.length} queues`);
 }
 
 async function getLastFailedJob(queue: Queue): Promise<LastFailedJob | null> {
