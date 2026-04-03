@@ -59,7 +59,7 @@ export class CycleTLSSession {
 
     const client = await getCycleTLS();
 
-    logger.debug({ url }, `[CycleTLS Session] Fetching text from ${url}`);
+    logger.debug({ url }, `[CycleTLS] Fetching text from ${url}`);
 
     const response = await client.get(url, {
       ja3: LEGACY_FIREFOX_JA3,
@@ -80,7 +80,7 @@ export class CycleTLSSession {
 
     const client = await getCycleTLS();
 
-    logger.debug({ url }, `[CycleTLS Session] Streaming to file ${outputPath}`);
+    logger.debug({ url }, `[CycleTLS] Streaming to file ${outputPath}`);
 
     const response = await client.get(url, {
       ja3: LEGACY_FIREFOX_JA3,
@@ -108,7 +108,7 @@ export class CycleTLSSession {
     if (this.closed) return;
 
     this.closed = true;
-    logger.debug(`[CycleTLS Session] Closed`);
+    logger.debug(`[CycleTLS] Closed`);
   }
 }
 
