@@ -30,6 +30,8 @@ export async function loadStreamerConfigs(): Promise<StreamerConfig[]> {
         timezone: typeof settingsObj.timezone === 'string' ? settingsObj.timezone : '',
         vodDownload: typeof settingsObj.vodDownload === 'boolean' ? settingsObj.vodDownload : true,
         chatDownload: typeof settingsObj.chatDownload === 'boolean' ? settingsObj.chatDownload : true,
+        hlsDownloadConcurrency: typeof settingsObj.hlsDownloadConcurrency === 'number' ? settingsObj.hlsDownloadConcurrency : 10,
+        hlsDownloadRetryAttempts: typeof settingsObj.hlsDownloadRetryAttempts === 'number' ? settingsObj.hlsDownloadRetryAttempts : 3,
       },
     };
 

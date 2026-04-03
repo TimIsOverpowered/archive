@@ -26,5 +26,7 @@ export interface StreamerConfig {
     timezone: string;
     saveMP4: boolean;
     saveHLS: boolean;
+    hlsDownloadConcurrency?: number;
+    hlsDownloadRetryAttempts?: number;
   };
 }

@@ -27,10 +27,8 @@ const vodProcessor: Processor<LiveHlsDownloadJobData, LiveHlsDownloadResult, str
 
   const { platformUserId, platformUsername, startedAt, sourceUrl } = job.data;
 
-  let result: LiveHlsDownloadResult | undefined;
-
   // 2. Dynamic Imports for heavy modules
-  const { cleanupOrphanedTmpFiles, recoverPartialDownload, downloadLiveHls } = await import('./vod/hls-downloader.js');
+  const { cleanupOrphanedTmpFiles, downloadLiveHls } = await import('./vod/hls-downloader.js');
   const { createAutoLogger: loggerWithTenant } = await import('../utils/auto-tenant-logger.js');
   const { getStreamerConfig } = await import('../config/loader.js');
 
@@ -45,28 +43,22 @@ const vodProcessor: Processor<LiveHlsDownloadJobData, LiveHlsDownloadResult, str
 
   const vodDirPath = pathMod.join(config.settings.vodPath, tenantId, vodId);
 
-  // 3. Crash Recovery Logic
+  // 3. Crash Recovery: Clean up orphaned temp files if directory exists
   try {
     await fsPromises.access(vodDirPath);
-    log.info({ vodId, platform }, `[Recovery] Directory found - attempting resume`);
-
+    log.debug({ vodId, platform }, `[Recovery] Directory found - cleaning orphaned temp files`);
     await cleanupOrphanedTmpFiles(vodDirPath, log);
-    const recoveryInfo = await recoverPartialDownload(vodDirPath, log);
-
-    if (recoveryInfo.totalSegments > 0) {
-      log.info({ vodId, platform, count: recoveryInfo.totalSegments }, `[Recovery] Resuming from segment ${recoveryInfo.totalSegments}`);
-    }
   } catch (err) {
     const error = err as NodeJS.ErrnoException;
     if (error.code === 'ENOENT') {
-      log.debug({ vodId, platform }, `[Recovery] Fresh start - creating directory`);
+      log.debug({ vodId, platform }, `[Recovery] Fresh start - directory will be created`);
     } else {
       throw error;
     }
   }
 
   // 4. Execution
-  result = await downloadLiveHls({
+  const result: LiveHlsDownloadResult | undefined = await downloadLiveHls({
     vodId,
     platform,
     tenantId,

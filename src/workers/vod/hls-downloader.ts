@@ -18,6 +18,7 @@ import { toHHMMSS } from '../../utils/formatting.js';
 import { sleep, getRetryDelay } from '../../utils/delay.js';
 import Redis from 'ioredis';
 import type { ReadableStream as NodeWebStream } from 'node:stream/web';
+import pLimit from 'p-limit';
 import { updateChapterDuringDownload, finalizeKickChapters } from '../../services/kick.js';
 import { saveVodChapters as saveTwitchVodChapters } from '../../services/twitch.js';
 
@@ -33,111 +34,160 @@ export interface HlsDownloadOptions {
   sourceUrl?: string;
 }
 
-async function downloadTSSegment(segmentUri: string, vodDir: string, baseURL: string): Promise<void> {
+/**
+ * Download a single segment (universal - handles both .ts and .mp4)
+ * Uses standard fetch for Twitch
+ */
+async function downloadSegment(segmentUri: string, vodDir: string, baseURL: string, retryAttempts: number = 3): Promise<void> {
   const url = `${baseURL}/${segmentUri}`;
   const outputPath = pathMod.join(vodDir, segmentUri);
   const tempPath = outputPath + '.tmp';
 
   try {
-    const response = await fetch(url);
+    await fsPromises.access(outputPath);
+    return;
+  } catch {}
 
-    throwOnHttpError(response, `Download segment ${url}`);
+  let lastError: Error | null = null;
+  let lastResponse: Response | null = null;
 
-    const writer = fs.createWriteStream(tempPath);
-
-    const nodeWebStream = response.body as unknown as NodeWebStream<Uint8Array>;
-
-    await pipeline(Readable.fromWeb(nodeWebStream), writer);
-
-    await fsPromises.rename(tempPath, outputPath);
-  } catch (error: unknown) {
+  for (let attempt = 1; attempt <= retryAttempts; attempt++) {
     try {
-      await fsPromises.unlink(tempPath).catch(() => {});
-    } catch {}
-    throw error;
-  }
-}
+      const response = await fetch(url);
+      lastResponse = response;
 
-/**
- * Download TS segments sequentially using CycleTLS for Kick platform
- */
-async function downloadKickSegmentsWithCycleTLS(segmentUris: string[], vodDir: string, baseURL: string, session: CycleTLSSession, log: ReturnType<typeof loggerWithTenant>): Promise<void> {
-  for (const uri of segmentUris) {
-    const outputPath = pathMod.join(vodDir, uri);
-    const tempPath = outputPath + '.tmp';
+      throwOnHttpError(response, `Download segment ${url} (attempt ${attempt}/${retryAttempts})`);
 
-    try {
-      await fsPromises.access(outputPath); // Check if exists
-      continue; // Skip existing files
-    } catch {
-      // File does not exist, continue to download
-    }
+      const writer = fs.createWriteStream(tempPath);
+      const nodeWebStream = response.body as unknown as NodeWebStream<Uint8Array>;
 
-    const url = `${baseURL}/${uri}`;
+      await pipeline(Readable.fromWeb(nodeWebStream), writer);
 
-    await session.streamToFile(url, tempPath);
-
-    try {
       await fsPromises.rename(tempPath, outputPath);
-    } catch (error) {
-      await fsPromises.unlink(tempPath).catch(() => {});
-      throw error;
-    }
+      return;
+    } catch (error: unknown) {
+      lastError = error instanceof Error ? error : new Error(String(error));
 
-    log.debug({ uri }, `Downloaded ${uri}`);
-  }
+      try {
+        await fsPromises.unlink(tempPath).catch(() => {});
+      } catch {}
 
-  if (segmentUris.length > 0) {
-    log.info(`Done downloading.. Last segment was ${segmentUris[segmentUris.length - 1]}`);
-  }
-}
-
-async function downloadTSSegmentsSequentially(segments: HLS.types.Segment[], vodDir: string, baseURL: string): Promise<void> {
-  for (const segment of segments) {
-    const outputPath = pathMod.join(vodDir, segment.uri);
-
-    try {
-      await fsPromises.access(outputPath);
-      continue; // File exists - skip download
-    } catch {
-      await downloadTSSegment(segment.uri, vodDir, baseURL);
+      if (lastResponse && lastResponse.status >= 400 && lastResponse.status < 500) {
+        break;
+      }
     }
   }
+
+  throw lastError ?? new Error('Unknown error downloading segment');
 }
 
 /**
- * Scan directory for existing segments from crash recovery scenario
- * Returns count and highest segment filename found (for logging)
+ * Download segments in parallel using p-limit for concurrency control
+ * Universal function - works with both .ts and .mp4 (fMP4) segments
  */
-export async function recoverPartialDownload(vodDir: string, log: ReturnType<typeof loggerWithTenant>): Promise<{ lastCompleteSegment?: string; totalSegments: number }> {
-  try {
-    const files = await fsPromises.readdir(vodDir);
+async function downloadSegmentsParallel(
+  segments: HLS.types.Segment[],
+  vodDir: string,
+  baseURL: string,
+  concurrency: number,
+  retryAttempts: number,
+  log: ReturnType<typeof loggerWithTenant>
+): Promise<void> {
+  const limit = pLimit(concurrency);
+  let completedCount = 0;
+  const totalSegments = segments.length;
 
-    // Scan for .ts OR .mp4 segments ONLY (exclude final merged output file)
-    const tsSegments = files.filter((f) => f.endsWith('.ts'));
-    const mp4Segments = files.filter(
-      (f) => f.endsWith('.mp4') && !f.includes('_final.mp4') // Exclude merged output file if exists
-    );
+  log.info({ count: totalSegments, concurrency, retryAttempts }, `Starting parallel segment download`);
 
-    const totalSegments = Math.max(tsSegments.length, mp4Segments.length);
+  await Promise.all(
+    segments.map(async (segment) => {
+      let lastError: Error | null = null;
 
-    // Find highest-numbered segment for logging purposes (optional)
-    let lastCompleteSegment: string | undefined;
+      for (let attempt = 1; attempt <= retryAttempts; attempt++) {
+        try {
+          await limit(() => downloadSegment(segment.uri, vodDir, baseURL, 1));
 
-    if (tsSegments.length > 0 && tsSegments[0]) {
-      lastCompleteSegment = tsSegments[tsSegments.length - 1];
-    } else if (mp4Segments.length > 0 && mp4Segments[0]) {
-      lastCompleteSegment = mp4Segments[mp4Segments.length - 1];
-    }
+          completedCount++;
+          const progress = Math.round((completedCount / totalSegments) * 100);
 
-    return {
-      totalSegments,
-      lastCompleteSegment: lastCompleteSegment || undefined,
-    };
-  } catch (error) {
-    log.warn({ error: extractErrorDetails(error).message }, `Failed to scan directory for recovery`);
-    return { totalSegments: 0 };
-  }
+          if (progress % 10 === 0 || completedCount === totalSegments) {
+            log.debug({ current: completedCount, total: totalSegments, progress }, `Download progress: ${progress}%`);
+          }
+          return;
+        } catch (error: unknown) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          log.debug({ uri: segment.uri, attempt, error: lastError.message }, `Failed to download segment`);
+        }
+      }
+
+      throw lastError;
+    })
+  );
+
+  log.info({ total: totalSegments }, `All segments downloaded successfully`);
+}
+
+/**
+ * Download segments using CycleTLS for Kick platform
+ * Parallel version with concurrency control
+ */
+async function downloadKickSegmentsParallel(
+  segmentUris: string[],
+  vodDir: string,
+  baseURL: string,
+  session: CycleTLSSession,
+  concurrency: number,
+  retryAttempts: number,
+  log: ReturnType<typeof loggerWithTenant>
+): Promise<void> {
+  const limit = pLimit(concurrency);
+  let completedCount = 0;
+  const totalSegments = segmentUris.length;
+
+  log.info({ count: totalSegments, concurrency, retryAttempts }, `Starting parallel Kick segment download (CycleTLS)`);
+
+  await Promise.all(
+    segmentUris.map(async (uri) => {
+      const outputPath = pathMod.join(vodDir, uri);
+      const tempPath = outputPath + '.tmp';
+
+      try {
+        await fsPromises.access(outputPath);
+        completedCount++;
+        return;
+      } catch {}
+
+      let lastError: Error | null = null;
+
+      for (let attempt = 1; attempt <= retryAttempts; attempt++) {
+        try {
+          await limit(() => session.streamToFile(`${baseURL}/${uri}`, tempPath));
+
+          await fsPromises.rename(tempPath, outputPath);
+
+          completedCount++;
+          const progress = Math.round((completedCount / totalSegments) * 100);
+
+          if (progress % 10 === 0 || completedCount === totalSegments) {
+            log.debug({ current: completedCount, total: totalSegments, progress }, `Kick download progress: ${progress}%`);
+          }
+          return;
+        } catch (error: unknown) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+
+          try {
+            await fsPromises.unlink(tempPath).catch(() => {});
+          } catch {}
+
+          log.debug({ uri, attempt, error: lastError.message }, `Failed to download Kick segment`);
+        }
+      }
+
+      throw lastError;
+    })
+  );
+
+  log.info({ total: totalSegments }, `All Kick segments downloaded successfully`);
 }
 
 export async function cleanupOrphanedTmpFiles(vodDir: string, log: ReturnType<typeof loggerWithTenant>): Promise<void> {
@@ -568,15 +618,18 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
       const newSegments = segments.filter((seg) => !fs.existsSync(pathMod.join(vodDir, seg.uri)));
 
       if (newSegments.length > 0) {
-        log.info(`[${vodId}] Found ${newSegments.length} new TS segments to download...`);
+        log.info(`[${vodId}] Found ${newSegments.length} new segments to download...`);
+
+        const concurrency = 3;
+        const retryAttempts = 3;
 
         try {
           if (platform === 'kick' && kickSession) {
             const segmentUris = newSegments.map((seg) => seg.uri);
 
-            await downloadKickSegmentsWithCycleTLS(segmentUris, vodDir, baseURL, kickSession!, log);
+            await downloadKickSegmentsParallel(segmentUris, vodDir, baseURL, kickSession!, concurrency, retryAttempts, log);
           } else {
-            await downloadTSSegmentsSequentially(newSegments, vodDir, baseURL);
+            await downloadSegmentsParallel(newSegments, vodDir, baseURL, concurrency, retryAttempts, log);
           }
         } catch (error: unknown) {
           const details = extractErrorDetails(error);
@@ -585,12 +638,12 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
           retryCount++;
 
           if (retryCount > maxRetryBeforeEndDetection) {
-            throw new Error('Segment download failed after multiple retries'); // Will trigger worker retry logic
+            throw new Error('Segment download failed after multiple retries');
           }
 
           await sleep(getRetryDelay(retryCount));
 
-          continue; // Skip to next poll cycle without incrementing noChange counter (we still got playlist data)
+          continue;
         }
       } else {
         log.debug(`[${vodId}] No new segments. Last segment: ${currentLastSegment}`);
