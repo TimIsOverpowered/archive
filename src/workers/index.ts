@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { extractErrorDetails } from '../utils/error.js';
-import { Worker, Queue, BaseJobOptions, QueueEvents } from 'bullmq';
+import { Worker, Queue, BaseJobOptions } from 'bullmq';
 import { loadStreamerConfigs, clearConfigCache } from '../config/loader.js';
 import { QUEUE_NAMES, getQueue, ChatDownloadJob, YoutubeUploadJob, DmcaProcessingJob, ChatDownloadResult, YoutubeUploadResult, DmcaProcessingResult } from '../jobs/queues.js';
 import { redisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
@@ -164,18 +164,9 @@ async function bootstrap() {
 
     await clearAllJobsOnStartup();
 
-    // Set up deduplication logging for all queues
-    const queueEvents = [QUEUE_NAMES.VOD_DOWNLOAD, QUEUE_NAMES.CHAT_DOWNLOAD, QUEUE_NAMES.YOUTUBE_UPLOAD, QUEUE_NAMES.DMCA_PROCESSING].map((queueName) => {
-      const events = new QueueEvents(queueName, { connection: redisConnection });
-      events.on('deduplicated', ({ jobId }) => {
-        logger.debug({ jobId, queue: queueName }, '[Workers] Job deduplicated - already exists in queue');
-      });
-      return events;
-    });
-
     const vodWorker = new Worker<LiveHlsDownloadJobData, LiveHlsDownloadResult>(QUEUE_NAMES.VOD_DOWNLOAD as string, vodProcessor, {
       connection: redisConnection,
-      concurrency: 2,
+      concurrency: 10,
     });
 
     registerWorker('vod_download', vodWorker);
@@ -183,7 +174,7 @@ async function bootstrap() {
 
     const chatWorker = new Worker<ChatDownloadJob, ChatDownloadResult>(QUEUE_NAMES.CHAT_DOWNLOAD as string, chatProcessor, {
       connection: redisConnection,
-      concurrency: 1,
+      concurrency: 3,
     });
 
     registerWorker('chat_download', chatWorker);
@@ -191,7 +182,7 @@ async function bootstrap() {
 
     const youtubeWorker = new Worker<YoutubeUploadJob, YoutubeUploadResult>(QUEUE_NAMES.YOUTUBE_UPLOAD as string, youtubeProcessor, {
       connection: redisConnection,
-      concurrency: 1,
+      concurrency: 3,
     });
 
     registerWorker('youtube_upload', youtubeWorker);

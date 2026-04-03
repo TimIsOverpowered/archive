@@ -17,7 +17,6 @@ const redisInstance = new Redis(process.env.REDIS_URL || 'redis://localhost:6379
 // Wait for ready event with timeout (register BEFORE connect)
 const readyTimeout = 30000;
 let readyResolved = false;
-let readyPromise: Promise<void>;
 
 const readyHandler = () => {
   if (readyResolved) return;
@@ -32,7 +31,7 @@ const timeoutId = setTimeout(() => {
   logger.fatal({ timeoutMs: readyTimeout }, errorMsg);
 }, readyTimeout);
 
-readyPromise = new Promise<void>((resolve, reject) => {
+const readyPromise: Promise<void> = new Promise<void>((resolve, _) => {
   redisInstance.on('ready', readyHandler);
   resolve(); // Will be called by readyHandler
 });
