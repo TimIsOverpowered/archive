@@ -64,7 +64,6 @@ export interface KickVod {
   id: string;
   slug?: string | null;
   channel_id?: number | null;
-  title?: string | null;
   session_title?: string | null;
   duration?: number | null;
   views?: number | null;
@@ -123,11 +122,8 @@ export async function getVods(channelName: string): Promise<KickVod[]> {
       return {
         id: String((video as Record<string, unknown>).id),
         slug: ((video as Record<string, unknown>).slug as string) ?? null,
-        title: ((video as Record<string, unknown>).title as string) ?? null,
         session_title: ((video as Record<string, unknown>).session_title as string) ?? null,
-        duration: (video as Record<string, unknown>).duration ? Number((video as Record<string, unknown>).duration) : null,
-        views: (video as Record<string, unknown>).views ? Number((video as Record<string, unknown>).views) : null,
-        published_at: ((video as Record<string, unknown>).publishedAt as string) ?? null,
+        duration: (video as Record<string, unknown>).duration ? Number((video as Record<string, unknown>).duration) / 1000 : null,
         created_at: String((video as Record<string, unknown>).createdAt || ''),
         source: ((video as Record<string, unknown>).source as string) ?? null,
       };
@@ -183,11 +179,8 @@ export async function getVod(channelName: string, vodId: string): Promise<KickVo
     return {
       id: String(video.id),
       slug: (video.slug as string) ?? null,
-      title: (video.title as string) ?? null,
       session_title: (video.session_title as string) ?? null,
-      duration: video.duration ? Number(video.duration) : null,
-      views: video.views ? Number(video.views) : null,
-      published_at: (video.publishedAt as string) ?? null,
+      duration: video.duration ? Number(video.duration) / 1000 : null,
       created_at: String(video.createdAt || ''),
       source: (video.source as string) ?? null,
     };
