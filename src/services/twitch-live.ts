@@ -1,5 +1,5 @@
 import { getAppAccessToken, VodData } from '../services/twitch.js';
-import { extractErrorDetails } from '../utils/error.js';
+import { extractErrorDetails, throwOnHttpError } from '../utils/error.js';
 import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
 import { logger } from '../utils/logger.js';
 
@@ -44,7 +44,7 @@ export async function getTwitchStreamStatus(userId: string, tenantId: string): P
       signal: AbortSignal.timeout(10000),
     });
 
-    if (!response.ok) throw new Error(`Twitch API failed with status ${response.status}`);
+    throwOnHttpError(response, 'Twitch API');
 
     const data = await response.json();
 
@@ -103,7 +103,7 @@ export async function getLatestTwitchVodObject(userId: string, expectedStreamId:
       signal: AbortSignal.timeout(10000),
     });
 
-    if (!response.ok) throw new Error(`Twitch API failed with status ${response.status}`);
+    throwOnHttpError(response, 'Twitch API');
 
     const data = await response.json();
 

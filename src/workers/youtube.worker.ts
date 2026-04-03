@@ -8,11 +8,12 @@ import type { YoutubeUploadJob, YoutubeUploadResult } from '../jobs/queues.js';
 import { getStreamerConfig } from '../config/loader.js';
 import { getClient, createClient } from '../db/client.js';
 import { splitVideo, trimVideo, getDuration, deleteFile } from '../utils/ffmpeg.js';
-import { uploadVideo, linkParts, type UploadProgressCallbackData } from '../services/youtube.js';
+import { uploadVideo, linkParts } from '../services/youtube.js';
 import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/discord-alerts.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { toHHMMSS } from '../utils/formatting.js';
+import { createYoutubeUploadProgressHandler } from '../utils/youtube-upload-progress.js';
 
 type ExtendedYoutubeUploadJob = YoutubeUploadJob & { dmcaProcessed?: boolean };
 
@@ -130,67 +131,14 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
           let result;
           try {
-            // Progress callback for Discord milestone updates with part context
-            const onUploadProgress = async (progress: UploadProgressCallbackData) => {
-              if (!uploadAlertMessageId || !isAlertsEnabled()) return;
-
-              switch (progress.milestone) {
-                case 'starting':
-                  await updateDiscordEmbed(uploadAlertMessageId, {
-                    title: `📺 Uploading Part ${currentPartNum}/${totalParts}`,
-                    description: `${channelName} - Initializing upload stream...`,
-                    status: 'warning',
-                    fields: [
-                      { name: 'Video', value: partTitle.substring(0, 150), inline: false },
-                      { name: 'Part', value: `${currentPartNum}/${totalParts}`, inline: true },
-                    ],
-                    timestamp: new Date().toISOString(),
-                  });
-                  break;
-
-                case 'processing_metadata':
-                  await updateDiscordEmbed(uploadAlertMessageId, {
-                    title: `🔄 Processing Part ${currentPartNum}/${totalParts}`,
-                    description: `${channelName} - Fetching video metadata & thumbnails...`,
-                    status: 'warning',
-                    fields: [
-                      { name: 'Video ID', value: progress.videoId || '', inline: false },
-                      { name: 'Part', value: `${currentPartNum}/${totalParts}`, inline: true },
-                    ],
-                    timestamp: new Date().toISOString(),
-                  });
-                  break;
-
-                case 'success':
-                  await updateDiscordEmbed(uploadAlertMessageId, {
-                    title: `✅ Upload Complete (Part ${currentPartNum}/${totalParts})`,
-                    description: `${channelName} - Successfully uploaded to YouTube!`,
-                    status: 'success',
-                    fields: [
-                      { name: '', value: progress.thumbnailUrl || '' }, // Auto-expand thumbnail image in Discord
-                      { name: 'Video ID', value: (progress.videoId || '').substring(0, 12) + '...', inline: false },
-                      { name: 'Part', value: `${currentPartNum}/${totalParts}`, inline: true },
-                    ],
-                    timestamp: new Date().toISOString(),
-                  });
-                  break;
-
-                case 'error':
-                  if (progress.errorDetails) {
-                    const errorMsg = extractErrorDetails(progress.errorDetails).message;
-                    await updateDiscordEmbed(uploadAlertMessageId, {
-                      title: `❌ Upload Failed (Part ${currentPartNum}/${totalParts})`,
-                      description: `${channelName} - Video upload encountered an error`,
-                      status: 'error',
-                      fields: [
-                        { name: 'Error', value: errorMsg.substring(0, 500), inline: false },
-                        { name: 'Part', value: `${currentPartNum}/${totalParts}`, inline: true },
-                      ],
-                      timestamp: new Date().toISOString(),
-                    });
-                  }
-              }
-            };
+            const onUploadProgress = createYoutubeUploadProgressHandler({
+              messageId: uploadAlertMessageId,
+              type: 'vod',
+              channelName,
+              videoTitle: partTitle,
+              part: currentPartNum,
+              totalParts,
+            });
 
             result = await uploadVideo(streamerId, channelName, parts[i], partTitle, youtubeDescription, privacyStatus, onUploadProgress);
 
@@ -248,57 +196,12 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
           vodTitle,
           youtubeDescription,
           privacyStatus,
-          // Progress callback for Discord milestone updates
-          async (progress: UploadProgressCallbackData) => {
-            if (!uploadAlertMessageId || !isAlertsEnabled()) return;
-
-            switch (progress.milestone) {
-              case 'starting':
-                await updateDiscordEmbed(uploadAlertMessageId, {
-                  title: `📺 Uploading VOD`,
-                  description: `${channelName} - Initializing upload stream...`,
-                  status: 'warning',
-                  fields: [{ name: 'Video', value: vodTitle.substring(0, 150), inline: false }],
-                  timestamp: new Date().toISOString(),
-                });
-                break;
-
-              case 'processing_metadata':
-                await updateDiscordEmbed(uploadAlertMessageId, {
-                  title: `🔄 Processing VOD`,
-                  description: `${channelName} - Fetching video metadata & thumbnails...`,
-                  status: 'warning',
-                  fields: [{ name: 'Video ID', value: progress.videoId || '', inline: false }],
-                  timestamp: new Date().toISOString(),
-                });
-                break;
-
-              case 'success':
-                await updateDiscordEmbed(uploadAlertMessageId, {
-                  title: `✅ VOD Upload Complete`,
-                  description: `${channelName} - Successfully uploaded to YouTube!`,
-                  status: 'success',
-                  fields: [
-                    { name: '', value: progress.thumbnailUrl || '' }, // Auto-expand thumbnail image in Discord
-                    { name: 'Video ID', value: (progress.videoId || '').substring(0, 12) + '...', inline: false },
-                  ],
-                  timestamp: new Date().toISOString(),
-                });
-                break;
-
-              case 'error':
-                if (progress.errorDetails) {
-                  const errorMsg = extractErrorDetails(progress.errorDetails).message;
-                  await updateDiscordEmbed(uploadAlertMessageId, {
-                    title: `❌ VOD Upload Failed`,
-                    description: `${channelName} - Video upload encountered an error`,
-                    status: 'error',
-                    fields: [{ name: 'Error', value: errorMsg.substring(0, 500), inline: false }],
-                    timestamp: new Date().toISOString(),
-                  });
-                }
-            }
-          }
+          createYoutubeUploadProgressHandler({
+            messageId: uploadAlertMessageId,
+            type: 'vod',
+            channelName,
+            videoTitle: vodTitle,
+          })
         );
 
         uploadedVideos.push({ id: result.videoId, part: 1 });
@@ -464,60 +367,15 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
           let result;
           try {
-            // Progress callback for Discord milestone updates with game context
-            const onUploadProgress = async (progress: UploadProgressCallbackData) => {
-              if (!uploadAlertMessageId || !isAlertsEnabled()) return;
-
-              switch (progress.milestone) {
-                case 'starting':
-                  await updateDiscordEmbed(uploadAlertMessageId, {
-                    title: `🎮 Uploading Part ${currentPartNum}/${totalParts}`,
-                    description: `${channelName} - Initializing upload stream...`,
-                    status: 'warning',
-                    fields: [
-                      { name: 'Game', value: chapter.name.substring(0, 150), inline: true },
-                      { name: 'Video', value: ytTitle.substring(0, 100), inline: false },
-                    ],
-                    timestamp: new Date().toISOString(),
-                  });
-                  break;
-
-                case 'processing_metadata':
-                  await updateDiscordEmbed(uploadAlertMessageId, {
-                    title: `🔄 Processing Part ${currentPartNum}/${totalParts}`,
-                    description: `${channelName} - Fetching video metadata & thumbnails...`,
-                    status: 'warning',
-                    fields: [{ name: 'Video ID', value: progress.videoId || '', inline: false }],
-                    timestamp: new Date().toISOString(),
-                  });
-                  break;
-
-                case 'success':
-                  await updateDiscordEmbed(uploadAlertMessageId, {
-                    title: `✅ Game Upload Complete (Part ${currentPartNum}/${totalParts})`,
-                    description: `${channelName} - Successfully uploaded to YouTube!`,
-                    status: 'success',
-                    fields: [
-                      { name: '', value: progress.thumbnailUrl || '' }, // Auto-expand thumbnail image in Discord
-                      { name: 'Video ID', value: (progress.videoId || '').substring(0, 12) + '...', inline: false },
-                    ],
-                    timestamp: new Date().toISOString(),
-                  });
-                  break;
-
-                case 'error':
-                  if (progress.errorDetails) {
-                    const errorMsg = extractErrorDetails(progress.errorDetails).message;
-                    await updateDiscordEmbed(uploadAlertMessageId, {
-                      title: `❌ Game Upload Failed`,
-                      description: `${channelName} - Video upload encountered an error`,
-                      status: 'error',
-                      fields: [{ name: 'Error', value: errorMsg.substring(0, 500), inline: false }],
-                      timestamp: new Date().toISOString(),
-                    });
-                  }
-              }
-            };
+            const onUploadProgress = createYoutubeUploadProgressHandler({
+              messageId: uploadAlertMessageId,
+              type: 'game',
+              channelName,
+              videoTitle: ytTitle,
+              gameName: chapter.name,
+              part: currentPartNum,
+              totalParts,
+            });
 
             result = await uploadVideo(streamerId, channelName, splitPaths[i], ytTitle, youtubeDescription, 'public', onUploadProgress);
 
@@ -613,57 +471,12 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
           ytTitle,
           youtubeDescription,
           'public',
-          // Progress callback for Discord milestone updates
-          async (progress: UploadProgressCallbackData) => {
-            if (!uploadAlertMessageId || !isAlertsEnabled()) return;
-
-            switch (progress.milestone) {
-              case 'starting':
-                await updateDiscordEmbed(uploadAlertMessageId, {
-                  title: `🎮 Uploading Game Clip`,
-                  description: `${channelName} - Initializing upload stream...`,
-                  status: 'warning',
-                  fields: [{ name: 'Game', value: chapter.name.substring(0, 150), inline: true }],
-                  timestamp: new Date().toISOString(),
-                });
-                break;
-
-              case 'processing_metadata':
-                await updateDiscordEmbed(uploadAlertMessageId, {
-                  title: `🔄 Processing Game Clip`,
-                  description: `${channelName} - Fetching video metadata & thumbnails...`,
-                  status: 'warning',
-                  fields: [{ name: 'Video ID', value: progress.videoId || '', inline: false }],
-                  timestamp: new Date().toISOString(),
-                });
-                break;
-
-              case 'success':
-                await updateDiscordEmbed(uploadAlertMessageId, {
-                  title: `✅ Game Upload Complete`,
-                  description: `${channelName} - Successfully uploaded to YouTube!`,
-                  status: 'success',
-                  fields: [
-                    { name: '', value: progress.thumbnailUrl || '' }, // Auto-expand thumbnail image in Discord
-                    { name: 'Video ID', value: (progress.videoId || '').substring(0, 12) + '...', inline: false },
-                  ],
-                  timestamp: new Date().toISOString(),
-                });
-                break;
-
-              case 'error':
-                if (progress.errorDetails) {
-                  const errorMsg = extractErrorDetails(progress.errorDetails).message;
-                  await updateDiscordEmbed(uploadAlertMessageId, {
-                    title: `❌ Game Upload Failed`,
-                    description: `${channelName} - Video upload encountered an error`,
-                    status: 'error',
-                    fields: [{ name: 'Error', value: errorMsg.substring(0, 500), inline: false }],
-                    timestamp: new Date().toISOString(),
-                  });
-                }
-            }
-          }
+          createYoutubeUploadProgressHandler({
+            messageId: uploadAlertMessageId,
+            type: 'game',
+            channelName,
+            gameName: chapter.name,
+          })
         );
 
         const createdGameRecord = await db.game.create({

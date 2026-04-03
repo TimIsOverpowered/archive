@@ -16,6 +16,8 @@ export interface LiveHlsDownloadResult {
   durationSeconds?: number;
 }
 
+const VOD_PROCESS_TIMEOUT_MS = 60_000;
+
 const vodProcessor: Processor<LiveHlsDownloadJobData, LiveHlsDownloadResult, string> = async (job: Job<LiveHlsDownloadJobData, LiveHlsDownloadResult, string>) => {
   if (job.name !== 'live_hls_download') {
     throw new Error(`Unsupported job type: ${job.name}`);
@@ -29,8 +31,9 @@ const vodProcessor: Processor<LiveHlsDownloadJobData, LiveHlsDownloadResult, str
     tickCount++;
     // Use job.updateProgress() or job.log() instead of (job as any).progress
     await job.updateProgress(tickCount % 100);
-  }, 60_000);
+  }, VOD_PROCESS_TIMEOUT_MS);
 
+  let result: LiveHlsDownloadResult | undefined;
   try {
     // 2. Dynamic Imports for heavy modules
     const { cleanupOrphanedTmpFiles, recoverPartialDownload, downloadLiveHls } = await import('./vod/hls-downloader.js');
@@ -67,18 +70,17 @@ const vodProcessor: Processor<LiveHlsDownloadJobData, LiveHlsDownloadResult, str
     }
 
     // 4. Execution
-    return await downloadLiveHls({
+    result = await downloadLiveHls({
       vodId,
       platform,
       streamerId,
       startedAt,
       sourceUrl,
     });
-  } catch (error: unknown) {
-    throw error;
   } finally {
     clearInterval(heartbeatTimer);
   }
+  return result!;
 };
 
 export default vodProcessor;

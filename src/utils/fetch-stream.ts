@@ -2,6 +2,7 @@ import fs from 'fs';
 import { pipeline } from 'stream/promises';
 import { Readable } from 'stream';
 import type { ReadableStream as WebReadableStream } from 'stream/web';
+import { throwOnHttpError } from './error.js';
 
 const DEFAULT_JSON_TIMEOUT_MS = 20_000;
 const DEFAULT_FILE_TIMEOUT_MS = 120_000;
@@ -19,9 +20,7 @@ export async function fetchToFile(url: string, outputPath: string, options?: { h
       headers: options?.headers ? new Headers(options.headers) : undefined,
     });
 
-    if (!response.ok || !response.body) {
-      throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
-    }
+    throwOnHttpError(response, 'Fetch');
 
     const nodeWritable = fs.createWriteStream(outputPath);
 
@@ -55,9 +54,7 @@ export async function fetchText(url: string, options?: { headers?: Record<string
     headers: options?.headers ? new Headers(options.headers) : undefined,
   });
 
-  if (!response.ok) {
-    throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
-  }
+  throwOnHttpError(response, 'Fetch');
 
   return response.text();
 }
@@ -96,9 +93,7 @@ export async function fetchJson<T = unknown>(
 
   const response = await fetch(url, fetchOpts);
 
-  if (!response.ok) {
-    throw new Error(`Fetch JSON failed: ${response.status} ${response.statusText}`);
-  }
+  throwOnHttpError(response, 'Fetch JSON');
 
   // FIX: JSON parsing is inherently unknown, so we cast to our generic T
   const data = await response.json();

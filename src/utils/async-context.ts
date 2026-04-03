@@ -56,15 +56,5 @@ export function resolveCurrentDisplayName(): string | null {
   return null;
 }
 
-/**
- * Cleanup helper for testing or manual scope management. Clears current tenant context data.
- */
-export function clearCurrentContext(): void {
-  const store = getCurrentTenantContext();
-  if (!store) return;
-
-  Object.keys(store).forEach((key) => delete (store as Record<string, unknown>)[key]);
-}
-
 // Export singleton for direct access in middleware and other modules that need to set context manually
 export { tenantContextStore };

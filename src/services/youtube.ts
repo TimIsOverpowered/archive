@@ -56,10 +56,11 @@ export interface YoutubeJson extends Prisma.JsonObject {
 // Global redirect URI for Google OAuth flow (Google playground)
 const REDIRECT_URI = 'https://developers.google.com/oauthplayground';
 
+// Token refresh threshold: 120 seconds before expiry
+const REFRESH_THRESHOLD_MS = 120_000;
+
 // Per-tenant cached OAuth2 clients (long-lived across API calls, enables auto-refresh)
 const oauthClients = new Map<string, Auth.OAuth2Client>();
-
-// Note: authCache and decryptedAuthCache removed per requirement #3 - always read fresh from DB after persistence to ensure consistency
 
 /**
  * Fast local expiry check without network call.
@@ -81,7 +82,7 @@ function isTokenExpired(client: Auth.OAuth2Client): boolean {
  * Check if token is expiring soon based on configurable buffer.
  * Used for pre-emptive refresh before API calls to guarantee no mid-operation expiration.
  */
-function isTokenExpiringSoon(client: Auth.OAuth2Client, bufferMs = 120_000): boolean {
+function isTokenExpiringSoon(client: Auth.OAuth2Client, bufferMs = REFRESH_THRESHOLD_MS): boolean {
   const expiry = client.credentials.expiry_date as number | undefined;
 
   // No expiry means no valid token cached - assume needs refresh
@@ -121,7 +122,7 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
   const client = oauthClients.get(streamerId);
 
   // Determine if we need pre-emptive refresh (<120s remaining OR no valid token)
-  const shouldRefreshPreemptively = !client || isTokenExpiringSoon(client, 120_000);
+  const shouldRefreshPreemptively = !client || isTokenExpiringSoon(client, REFRESH_THRESHOLD_MS);
 
   if (shouldRefreshPreemptively && client?.credentials.refresh_token) {
     // Pre-emptive refresh: force fresh token before operation starts
@@ -226,13 +227,8 @@ async function getYoutubeOAuthClientWithValidToken(streamerId: string): Promise<
     // Clear all caches AFTER token event completes (requirement #3: ensure consistency)
     oauthClients.delete(streamerId);
 
-    if (clearConfigCache) {
-      clearConfigCache();
-
-      log.info(`[YouTube] All caches cleared for ${streamerId} - will read fresh data from DB`);
-    } else {
-      log.warn('[YouTube] Config cache clearing not available, may have stale config in memory');
-    }
+    clearConfigCache();
+    log.info(`[YouTube] All caches cleared for ${streamerId} - will read fresh data from DB`);
   });
 
   // Initialize OAuth2 client with credentials loaded fresh from DB (may include cached valid access_token)
@@ -471,23 +467,6 @@ export async function validateYoutubeToken(streamerId: string): Promise<boolean>
     // Don't clear cache - let next API call handle refresh naturally
     return false;
   }
-}
-
-/**
- * Backward-compatible wrapper that returns cached access token or forces refresh.
- */
-export async function getAccessToken(streamerId: string): Promise<string> {
-  // Use guaranteed-valid-token helper (pre-emptive refresh if <120s remaining)
-  const oauth2Client = await getYoutubeOAuthClientWithValidToken(streamerId);
-
-  const token = oauth2Client.credentials.access_token as string | undefined;
-
-  if (!token) {
-    throw new Error('Failed to get YouTube access token (no token in OAuth client credentials)');
-  }
-
-  // Token is guaranteed valid by getYoutubeOAuthClientWithValidToken - no race conditions!
-  return token;
 }
 
 /**

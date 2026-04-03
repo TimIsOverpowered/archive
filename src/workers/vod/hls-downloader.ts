@@ -1,5 +1,5 @@
 import fsPromises from 'fs/promises';
-import { extractErrorDetails, createErrorContext } from '../../utils/error.js';
+import { extractErrorDetails, createErrorContext, throwOnHttpError } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
 
 const log = childLogger({ module: 'hls-downloader' });
@@ -39,9 +39,7 @@ async function downloadTSSegment(segmentUri: string, vodDir: string, baseURL: st
   try {
     const response = await fetch(url);
 
-    if (!response.ok || !response.body) {
-      throw new Error(`Failed to download segment ${url}: status ${response.status}`);
-    }
+    throwOnHttpError(response, `Download segment ${url}`);
 
     const writer = fs.createWriteStream(tempPath);
 
