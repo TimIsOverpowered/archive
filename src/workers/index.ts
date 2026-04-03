@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { extractErrorDetails } from '../utils/error.js';
-import { Worker, Queue, BaseJobOptions } from 'bullmq';
+import { Worker, Queue, BaseJobOptions, QueueEvents } from 'bullmq';
 import { loadStreamerConfigs, clearConfigCache } from '../config/loader.js';
 import { QUEUE_NAMES, getQueue, ChatDownloadJob, YoutubeUploadJob, DmcaProcessingJob, ChatDownloadResult, YoutubeUploadResult, DmcaProcessingResult } from '../jobs/queues.js';
 import { redisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
@@ -163,6 +163,15 @@ async function bootstrap() {
     redisConnectionForWorkers = redisConnection;
 
     await clearAllJobsOnStartup();
+
+    // Set up deduplication logging for all queues
+    const queueEvents = [QUEUE_NAMES.VOD_DOWNLOAD, QUEUE_NAMES.CHAT_DOWNLOAD, QUEUE_NAMES.YOUTUBE_UPLOAD, QUEUE_NAMES.DMCA_PROCESSING].map((queueName) => {
+      const events = new QueueEvents(queueName, { connection: redisConnection });
+      events.on('deduplicated', ({ jobId }) => {
+        logger.debug({ jobId, queue: queueName }, '[Workers] Job deduplicated - already exists in queue');
+      });
+      return events;
+    });
 
     const vodWorker = new Worker<LiveHlsDownloadJobData, LiveHlsDownloadResult>(QUEUE_NAMES.VOD_DOWNLOAD as string, vodProcessor, {
       connection: redisConnection,

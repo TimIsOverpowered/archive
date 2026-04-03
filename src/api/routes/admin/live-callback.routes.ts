@@ -172,7 +172,11 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const queue = YoutubeQueueModule.getYoutubeUploadQueue() as any;
-        const job = await queue.add(youtubeJobData, { name: 'youtube_upload', jobId: `youtube-live:${request.body.streamId}` });
+        const job = await queue.add(youtubeJobData, {
+          name: 'youtube_upload',
+          jobId: `youtube-live:${request.body.streamId}`,
+          deduplication: { id: `youtube-live:${request.body.streamId}` },
+        });
 
         request.log.info(`[${streamerId}] Queued YouTube upload job ${job.id} for live recording at ${request.body.path}`);
 

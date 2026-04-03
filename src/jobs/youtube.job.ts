@@ -5,7 +5,10 @@ export async function enqueueYoutubeUpload(job: Omit<YoutubeUploadJob, 'id'>, jo
   const queue = getYoutubeUploadQueue();
 
   try {
-    const addedJob = await queue.add('youtube_upload', job, { jobId });
+    const addedJob = await queue.add('youtube_upload', job, {
+      jobId,
+      deduplication: { id: jobId },
+    });
     return addedJob.id ?? null;
   } catch {
     return null;
