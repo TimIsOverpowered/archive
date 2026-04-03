@@ -34,7 +34,7 @@ const vodProcessor: Processor<LiveHlsDownloadJobData, LiveHlsDownloadResult, str
   try {
     // 2. Dynamic Imports for heavy modules
     const { cleanupOrphanedTmpFiles, recoverPartialDownload, downloadLiveHls } = await import('./vod/hls-downloader.js');
-    const { loggerWithTenant } = await import('../utils/logger.js');
+    const { createAutoLogger: loggerWithTenant } = await import('../utils/auto-tenant-logger.js');
     const { getStreamerConfig } = await import('../config/loader.js');
 
     const log = loggerWithTenant(String(streamerId));

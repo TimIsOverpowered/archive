@@ -1,6 +1,6 @@
 import { getStreamerConfig } from '../config/loader.js';
 import { decryptObject } from './encryption.js';
-import { loggerWithTenant } from './logger.js';
+import { createAutoLogger as loggerWithTenant } from './auto-tenant-logger.js';
 
 interface TwitchAuth {
   client_id: string;

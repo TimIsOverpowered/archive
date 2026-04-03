@@ -33,6 +33,3 @@ export interface LogContext {
 export function childLogger(context: LogContext) {
   return logger.child(context);
 }
-
-// Re-export tenant-aware logger from auto-tenant-logger module for consistent usage
-export { createAutoLogger as loggerWithTenant } from './auto-tenant-logger.js';

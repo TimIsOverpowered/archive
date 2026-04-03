@@ -1,7 +1,8 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { getStreamerConfig } from '../config/loader.js';
-import { loggerWithTenant, logger } from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
+import { createAutoLogger as loggerWithTenant } from '../utils/auto-tenant-logger.js';
 import { QUEUE_NAMES, type LiveHlsDownloadJob, getLiveHlsDownloadQueue } from '../jobs/queues.js';
 import { createClient, getClient } from '../db/client.js';
 import type { StreamerConfig } from '../config/types.js';
