@@ -213,22 +213,17 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
 
     // Send Discord stream started alert
     await sendStreamLiveAlert(platform, vodResult.id, streamStatus.title || 'Live Stream', twitchUsername, config.displayName);
-    const hasActiveJob = await checkHasActiveDownload(tenantId, vodResult.id);
 
-    if (!hasActiveJob) {
-      log.info(`[Monitor]: Queuing HLS download for ${vodResult.id}`);
+    log.info(`[Monitor]: Queuing HLS download for ${vodResult.id}`);
 
-      await enqueueLiveHlsDownload({
-        vodId: vodResult.id,
-        platform,
-        tenantId: tenantId,
-        platformUserId: userIdCache,
-        platformUsername: twitchUsername,
-        startedAt: new Date(streamStatus.started_at),
-      });
-    } else {
-      log.debug(`[Monitor]: Download already queued/running for ${vodResult.id}, skipping.`);
-    }
+    await enqueueLiveHlsDownload({
+      vodId: vodResult.id,
+      platform,
+      tenantId: tenantId,
+      platformUserId: userIdCache,
+      platformUsername: twitchUsername,
+      startedAt: new Date(streamStatus.started_at),
+    });
   } else if (existingVod && !existingVod.is_live) {
     // Record exists but not marked live - update and queue download
 
@@ -247,53 +242,31 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
     const hasPartialSegments = await checkForCrashRecovery(tenantId, String(existingVod.id));
 
     if (hasPartialSegments) {
-      // Worker crashed mid-download - re-queue immediately to resume
       log.info({ vodId: existingVod.id }, `[Monitor]: Crash detected for ${existingVod.id} - resuming download`);
-
-      await enqueueLiveHlsDownload({
-        vodId: String(existingVod.id),
-        platform,
-        tenantId: tenantId,
-        platformUserId: userIdCache,
-        platformUsername: twitchUsername,
-        startedAt: new Date(streamStatus.started_at),
-      });
-    } else {
-      const hasDownloadJob = await checkHasActiveDownload(tenantId, String(existingVod.id));
-
-      if (!hasDownloadJob) {
-        log.info(`[Monitor]:  Queuing HLS download for resumed VOD ${String(existingVod.id)}`);
-
-        await enqueueLiveHlsDownload({
-          vodId: String(existingVod.id),
-          platform,
-          tenantId: tenantId,
-          platformUserId: userIdCache,
-          platformUsername: twitchUsername,
-          startedAt: new Date(streamStatus.started_at),
-        });
-      } else {
-        log.debug(`[Monitor]:  Download already in progress for VOD ${String(existingVod.id)}`);
-      }
     }
+
+    log.info(`[Monitor]:  Queuing HLS download for resumed VOD ${String(existingVod.id)}`);
+
+    await enqueueLiveHlsDownload({
+      vodId: String(existingVod.id),
+      platform,
+      tenantId: tenantId,
+      platformUserId: userIdCache,
+      platformUsername: twitchUsername,
+      startedAt: new Date(streamStatus.started_at),
+    });
   } else if (existingVod && existingVod.is_live) {
-    // Already tracked as live - check if download is actually running
-    const hasActiveJob = await checkHasActiveDownload(tenantId, String(existingVod.id));
+    // Already tracked as live - queue download (BullMQ dedup will handle if already queued)
+    log.info(`[Monitor]: VOD ${String(existingVod.id)} is live - ensuring download is queued`);
 
-    if (!hasActiveJob) {
-      log.info(`[Monitor]: VOD ${String(existingVod.id)} is live but no active download - re-queuing`);
-
-      await enqueueLiveHlsDownload({
-        vodId: String(existingVod.id),
-        platform,
-        tenantId: tenantId,
-        platformUserId: userIdCache,
-        platformUsername: twitchUsername,
-        startedAt: existingVod.started_at ?? new Date(),
-      });
-    } else {
-      log.debug(`[Monitor]:  Already tracking live VOD ${String(existingVod.id)} with active download.`);
-    }
+    await enqueueLiveHlsDownload({
+      vodId: String(existingVod.id),
+      platform,
+      tenantId: tenantId,
+      platformUserId: userIdCache,
+      platformUsername: twitchUsername,
+      startedAt: existingVod.started_at ?? new Date(),
+    });
   }
 }
 
@@ -384,23 +357,18 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
 
     // Send Discord stream started alert
     await sendStreamLiveAlert(platform, kickStreamIdStr, streamStatus.session_title || 'Live Stream', kickUsername, config.displayName);
-    const hasActiveJob = await checkHasActiveDownload(tenantId, kickStreamIdStr);
 
-    if (!hasActiveJob) {
-      log.info(`[Monitor]: Queuing HLS download for ${kickStreamIdStr}`);
+    log.info(`[Monitor]: Queuing HLS download for ${kickStreamIdStr}`);
 
-      await enqueueLiveHlsDownload({
-        vodId: kickStreamIdStr,
-        platform,
-        tenantId: tenantId,
-        platformUserId: kickUsername,
-        platformUsername: kickUsername,
-        startedAt: new Date(streamStatus.created_at),
-        sourceUrl: vodObject?.source ?? streamStatus.playback_url ?? undefined,
-      });
-    } else {
-      log.debug(`[Monitor]: Download already queued/running for ${kickStreamIdStr}, skipping.`);
-    }
+    await enqueueLiveHlsDownload({
+      vodId: kickStreamIdStr,
+      platform,
+      tenantId: tenantId,
+      platformUserId: kickUsername,
+      platformUsername: kickUsername,
+      startedAt: new Date(streamStatus.created_at),
+      sourceUrl: vodObject?.source ?? streamStatus.playback_url ?? undefined,
+    });
   } else if (existingVod && !existingVod.is_live) {
     // Record exists but not marked live - update and queue download
 
@@ -419,100 +387,37 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
     const hasPartialSegments = await checkForCrashRecovery(tenantId, kickStreamIdStr);
 
     if (hasPartialSegments) {
-      // Worker crashed mid-download - re-queue immediately to resume
       log.info({ vodId: kickStreamIdStr }, `[Monitor]: Crash detected for ${kickStreamIdStr} - resuming download`);
-
-      // Re-fetch vod object to get source URL
-      const vodObject = await getLatestKickVodObject(kickUsername, streamStatus.id);
-
-      await enqueueLiveHlsDownload({
-        vodId: kickStreamIdStr,
-        platform,
-        tenantId: tenantId,
-        platformUserId: kickUsername,
-        platformUsername: kickUsername,
-        startedAt: new Date(streamStatus.created_at),
-        sourceUrl: vodObject?.source ?? undefined,
-      });
-    } else {
-      const hasDownloadJob = await checkHasActiveDownload(tenantId, String(existingVod.id));
-
-      if (!hasDownloadJob) {
-        log.info(`[Monitor]:  Queuing HLS download for resumed VOD ${String(existingVod.id)}`);
-
-        const vodObject = await getLatestKickVodObject(kickUsername, existingVod.id);
-
-        await enqueueLiveHlsDownload({
-          vodId: String(existingVod.id),
-          platform,
-          tenantId: tenantId,
-          platformUserId: kickUsername,
-          platformUsername: kickUsername,
-          startedAt: new Date(existingVod.created_at),
-          sourceUrl: vodObject?.source ?? undefined,
-        });
-      } else {
-        log.debug(`[Monitor]:  Download already in progress for Kick VOD ${kickStreamIdStr}`);
-      }
     }
+
+    log.info(`[Monitor]:  Queuing HLS download for resumed VOD ${String(existingVod.id)}`);
+
+    const vodObject = await getLatestKickVodObject(kickUsername, existingVod.id);
+
+    await enqueueLiveHlsDownload({
+      vodId: String(existingVod.id),
+      platform,
+      tenantId: tenantId,
+      platformUserId: kickUsername,
+      platformUsername: kickUsername,
+      startedAt: new Date(existingVod.created_at),
+      sourceUrl: vodObject?.source ?? undefined,
+    });
   } else if (existingVod && existingVod.is_live) {
-    // Already tracked as live - check if download is actually running
-    const hasActiveJob = await checkHasActiveDownload(tenantId, kickStreamIdStr);
+    // Already tracked as live - queue download (BullMQ dedup will handle if already queued)
+    log.info(`[Monitor]: Kick VOD ${kickStreamIdStr} is live - ensuring download is queued`);
 
-    if (!hasActiveJob) {
-      log.info(`[Monitor]: Kick VOD ${kickStreamIdStr} is live but no active download - re-queuing`);
+    const vodObject = await getLatestKickVodObject(kickUsername, existingVod.id);
 
-      const vodObject = await getLatestKickVodObject(kickUsername, existingVod.id);
-
-      await enqueueLiveHlsDownload({
-        vodId: kickStreamIdStr,
-        platform,
-        tenantId: tenantId,
-        platformUserId: kickUsername,
-        platformUsername: kickUsername,
-        startedAt: existingVod.started_at ?? new Date(),
-        sourceUrl: vodObject?.source ?? undefined,
-      });
-    } else {
-      log.debug(`[Monitor]:  Already tracking live Kick VOD ${kickStreamIdStr} with active download.`);
-    }
-  }
-}
-
-/**
- * Check if a VOD already has an active download running (prevents duplicate jobs)
- */
-async function checkHasActiveDownload(tenantId: string, vodId: string): Promise<boolean> {
-  const log = loggerWithTenant(tenantId);
-  try {
-    // Get tenant's vodPath from config to construct correct path
-    const streamerConfig = getStreamerConfig(tenantId);
-
-    if (!streamerConfig?.settings.vodDownload) {
-      log.warn({ tenantId, vodId }, `[Monitor] No VOD download configured for tenant ${tenantId} - cannot check active download`);
-      return false;
-    }
-
-    const vodPath = streamerConfig.settings.vodPath;
-    if (!vodPath) {
-      log.warn({ tenantId, vodId }, `[Monitor] VOD path not configured for tenant ${tenantId}`);
-      return false;
-    }
-
-    const vodDir = path.join(vodPath, tenantId, vodId); // /mnt/live/{tenant.id}/{vodId}/ structure
-
-    try {
-      await fs.access(vodDir);
-      log.debug({ vodId, vodDir }, `[Monitor] Download directory exists - active download detected`);
-      return true;
-    } catch (accessError) {
-      log.trace(createErrorContext(accessError, { vodId, vodDir }), `[Monitor] No download directory found for VOD ${vodId}`);
-      return false;
-    }
-  } catch (error) {
-    const details = extractErrorDetails(error);
-    log.warn({ vodId, error: details.message }, `[Monitor] Failed to check active download status`);
-    return false;
+    await enqueueLiveHlsDownload({
+      vodId: kickStreamIdStr,
+      platform,
+      tenantId: tenantId,
+      platformUserId: kickUsername,
+      platformUsername: kickUsername,
+      startedAt: existingVod.started_at ?? new Date(),
+      sourceUrl: vodObject?.source ?? undefined,
+    });
   }
 }
 
@@ -683,6 +588,3 @@ export function startStreamDetectionLoop(tenantId: string, platform: PlatformTyp
 
   log.info(`[Platform]: ${platform}] Polling loop started with interval ID: ${intervalId}`);
 }
-
-// Export utility function if other modules need it
-export { checkHasActiveDownload };
