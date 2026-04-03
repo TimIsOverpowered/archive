@@ -5,6 +5,9 @@ import { StreamerConfig } from './types';
 
 const configCache = new Map<string, StreamerConfig>();
 
+// Default configuration constants
+const DEFAULT_YOUTUBE_SPLIT_DURATION = 10800; // 3 hours in seconds
+
 export async function loadStreamerConfigs(): Promise<StreamerConfig[]> {
   const tenants = await metaClient.tenant.findMany();
   if (tenants.length === 0) return [];
@@ -74,7 +77,7 @@ export async function loadStreamerConfigs(): Promise<StreamerConfig[]> {
         vodUpload: true,
         liveUpload: true,
         multiTrack: false,
-        splitDuration: 10800,
+        splitDuration: DEFAULT_YOUTUBE_SPLIT_DURATION,
         perGameUpload: false,
         restrictedGames: [],
         description: '',
@@ -94,7 +97,7 @@ export async function loadStreamerConfigs(): Promise<StreamerConfig[]> {
       const youtubeSettings: Record<string, unknown> = (settingsObj.youtube && typeof settingsObj.youtube === 'object' ? settingsObj.youtube : {}) as Record<string, unknown>;
 
       streamerConfig.youtube.public = (youtubeSettings.public ?? true) as boolean;
-      streamerConfig.youtube.splitDuration = (youtubeSettings.splitDuration ?? 10800) as number;
+      streamerConfig.youtube.splitDuration = (youtubeSettings.splitDuration ?? DEFAULT_YOUTUBE_SPLIT_DURATION) as number;
       streamerConfig.youtube.perGameUpload = (youtubeSettings.perGameUpload ?? false) as boolean;
       streamerConfig.youtube.restrictedGames = Array.isArray(youtubeSettings.restrictedGames) ? youtubeSettings.restrictedGames : [];
       streamerConfig.youtube.description = typeof youtubeSettings.description === 'string' ? youtubeSettings.description : '';
@@ -121,10 +124,6 @@ export async function loadStreamerConfigs(): Promise<StreamerConfig[]> {
 
 export function getStreamerConfig(streamerId: string): StreamerConfig | undefined {
   return configCache.get(streamerId);
-}
-
-export function getConfigById(streamerId: string): StreamerConfig | undefined {
-  return getStreamerConfig(streamerId);
 }
 
 export function clearConfigCache(): void {

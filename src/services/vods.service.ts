@@ -35,7 +35,7 @@ interface VodQuery {
   order?: 'asc' | 'desc';
 }
 
-const CACHE_TTL = 86400; // 24 hours
+const VODS_CACHE_TTL = 86400; // 24 hours
 const DISABLE_CACHE = process.env.DISABLE_REDIS_CACHE === 'true';
 
 export async function getVods(client: PrismaClient, streamerId: string, query: VodQuery): Promise<{ vods: VodResponse[]; total: number }> {
@@ -135,7 +135,7 @@ export async function getVods(client: PrismaClient, streamerId: string, query: V
 
   if (!DISABLE_CACHE && redisClient) {
     try {
-      await redisClient.set(cacheKey, JSON.stringify(response), { EX: CACHE_TTL });
+      await redisClient.set(cacheKey, JSON.stringify(response), { EX: VODS_CACHE_TTL });
     } catch {
       // Ignore cache errors
     }
@@ -186,7 +186,7 @@ export async function getVodById(client: PrismaClient, streamerId: string, vodId
 
     if (!DISABLE_CACHE && redisClient) {
       try {
-        await redisClient.set(cacheKey, JSON.stringify(response), { EX: CACHE_TTL });
+        await redisClient.set(cacheKey, JSON.stringify(response), { EX: VODS_CACHE_TTL });
       } catch {
         // Ignore cache errors
       }

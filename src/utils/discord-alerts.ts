@@ -1,6 +1,7 @@
 import { extractErrorDetails } from './error.js';
 import { formatDuration } from './formatting.js';
 import { logger } from './logger.js';
+import { getTenantDisplayName } from '../config/loader.js';
 
 const globalDiscordAlertsEnabled = process.env.DISCORD_ALERTS_ENABLED !== 'false';
 
@@ -309,4 +310,72 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
     logger.error(extractErrorDetails(err), 'Failed to send stream alert');
     return null;
   }
+}
+
+// ============================================================================
+// VOD Download Alert Functions
+// ============================================================================
+
+/**
+ * Send a VOD download started alert
+ */
+export async function sendVodDownloadStarted(platform: 'kick' | 'twitch', streamerId: string, vodId: string, streamerName?: string): Promise<string | null> {
+  if (!isAlertsEnabled()) return null;
+
+  const name = streamerName || getTenantDisplayName(streamerId);
+  const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
+
+  return sendRichAlert({
+    title: `📥 ${platformName} VOD Download Started`,
+    description: `${vodId} download in progress for ${name}`,
+    status: 'warning',
+    fields: [
+      { name: 'VOD ID', value: `\`${vodId}\``, inline: false },
+      { name: 'Streamer', value: `\`${name}\`` },
+    ],
+    timestamp: new Date().toISOString(),
+  });
+}
+
+/**
+ * Send a VOD download success alert
+ */
+export async function sendVodDownloadSuccess(messageId: string, platform: 'kick' | 'twitch', vodId: string, vodPath: string, _streamerName?: string): Promise<void> {
+  if (!isAlertsEnabled()) return;
+
+  const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
+
+  await updateDiscordEmbed(messageId, {
+    title: `✅ ${platformName} VOD Download Complete!`,
+    description: `${vodId} successfully downloaded and converted to MP4`,
+    status: 'success',
+    fields: [
+      { name: 'VOD ID', value: `\`${vodId}\``, inline: false },
+      { name: 'Output Path', value: vodPath, inline: false },
+    ],
+    timestamp: new Date().toISOString(),
+    updatedTimestamp: new Date().toISOString(),
+  });
+}
+
+/**
+ * Send a VOD download failed alert
+ */
+export async function sendVodDownloadFailed(messageId: string, platform: 'kick' | 'twitch', vodId: string, error: string, _streamerId?: string): Promise<void> {
+  if (!isAlertsEnabled()) return;
+
+  const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
+  const errorMsg = error.substring(0, 500);
+
+  await updateDiscordEmbed(messageId, {
+    title: `❌ ${platformName} VOD Download Failed`,
+    description: `${vodId} download failed`,
+    status: 'error',
+    fields: [
+      { name: 'VOD ID', value: `\`${vodId}\``, inline: false },
+      { name: 'Error', value: errorMsg, inline: false },
+    ],
+    timestamp: new Date().toISOString(),
+    updatedTimestamp: new Date().toISOString(),
+  });
 }

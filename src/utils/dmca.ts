@@ -1,6 +1,9 @@
 import ffmpeg from 'fluent-ffmpeg';
 import { extractErrorDetails } from './error.js';
 import { deleteFileIfExists } from './path.js';
+import { childLogger } from './logger.js';
+
+const log = childLogger({ module: 'dmca' });
 
 export interface DMCAClaim {
   type: 'CLAIM_TYPE_AUDIO' | 'CLAIM_TYPE_VISUAL' | 'CLAIM_TYPE_AUDIOVISUAL';
@@ -51,7 +54,7 @@ export async function muteAudioSections(videoPath: string, filters: string[], ou
       .toFormat('mp4')
       .on('end', () => resolve(outputPath))
       .on('error', (err) => {
-        console.error(`FFmpeg mute error: ${err.message}`);
+        log.error(`FFmpeg mute error: ${err.message}`);
         resolve(null);
       })
       .saveToFile(outputPath);
@@ -87,7 +90,7 @@ export async function blackoutVideoSections(videoPath: string, vodId: string, se
         .toFormat('mp4')
         .on('end', () => resolve(outputPath))
         .on('error', (err) => {
-          console.error(`FFmpeg blackout error: ${err.message}`);
+          log.error(`FFmpeg blackout error: ${err.message}`);
           resolve(null);
         })
         .saveToFile(outputPath);
@@ -119,7 +122,7 @@ export async function blackoutVideoSections(videoPath: string, vodId: string, se
       .toFormat('mp4')
       .on('end', () => resolve(outputPath))
       .on('error', (err) => {
-        console.error(`FFmpeg blackout error: ${err.message}`);
+        log.error(`FFmpeg blackout error: ${err.message}`);
         resolve(null);
       })
       .saveToFile(outputPath);
@@ -134,7 +137,7 @@ export async function cleanupTempFiles(files: string[]): Promise<void> {
       await deleteFileIfExists(file);
     } catch (err) {
       const details = extractErrorDetails(err);
-      console.warn('Failed to cleanup temp file:', file, details.message);
+      log.warn({ file, error: details.message }, 'Failed to cleanup temp file');
     }
   }
 }

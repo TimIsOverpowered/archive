@@ -1,6 +1,9 @@
 import path from 'path';
 import fsPromises from 'fs/promises';
 import { extractErrorDetails } from './error.js';
+import { childLogger } from './logger.js';
+
+const log = childLogger({ module: 'path' });
 
 /**
  * Normalizes a file path for cross-platform compatibility.
@@ -51,7 +54,7 @@ export async function deleteFileIfExists(filePath: string): Promise<void> {
   if (await fileExists(filePath)) {
     await fsPromises.unlink(filePath).catch((err) => {
       const details = extractErrorDetails(err);
-      console.warn(`Failed to delete file ${filePath}:`, details.message);
+      log.warn({ filePath, error: details.message }, 'Failed to delete file');
     });
   }
 }

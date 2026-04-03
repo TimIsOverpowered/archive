@@ -66,3 +66,17 @@ export function silentFail(fn: () => void | Promise<void>): void {
     // Silently ignore
   }
 }
+
+/**
+ * Creates a standardized error logging context object.
+ * Use this to ensure consistent error logging across the codebase.
+ *
+ * @param error - The error to extract details from
+ * @param additionalContext - Optional additional context to include in the log object
+ * @returns A log context object with the error message
+ */
+export function createErrorContext(error: unknown, additionalContext?: Record<string, unknown>): { error: string } & Record<string, unknown> {
+  const details = extractErrorDetails(error);
+  const context = { ...additionalContext, error: details.message };
+  return context as { error: string } & Record<string, unknown>;
+}

@@ -1,5 +1,8 @@
 import fsPromises from 'fs/promises';
-import { extractErrorDetails } from '../../utils/error.js';
+import { extractErrorDetails, createErrorContext } from '../../utils/error.js';
+import { childLogger } from '../../utils/logger.js';
+
+const log = childLogger({ module: 'hls-downloader' });
 import fs from 'fs';
 import pathMod from 'path';
 import HLS from 'hls-parser';
@@ -56,7 +59,7 @@ async function downloadTSSegment(segmentUri: string, vodDir: string, baseURL: st
 }
 
 /**
- * Download TS segments sequentially using CycleTLS for Kick platform - matches reference downloadTSFiles pattern (lines 467-509)
+ * Download TS segments sequentially using CycleTLS for Kick platform
  */
 async function downloadKickSegmentsWithCycleTLS(segmentUris: string[], vodDir: string, baseURL: string, session: CycleTLSSession, log: ReturnType<typeof loggerWithTenant>): Promise<void> {
   for (const uri of segmentUris) {
@@ -64,7 +67,7 @@ async function downloadKickSegmentsWithCycleTLS(segmentUris: string[], vodDir: s
     const tempPath = outputPath + '.tmp';
 
     try {
-      await fsPromises.access(outputPath); // Check if exists - matches reference lines 476-477
+      await fsPromises.access(outputPath); // Check if exists
       continue; // Skip existing files
     } catch {
       // File does not exist, continue to download
@@ -81,11 +84,11 @@ async function downloadKickSegmentsWithCycleTLS(segmentUris: string[], vodDir: s
       throw error;
     }
 
-    log.debug({ uri }, `Downloaded ${uri}`); // matches line 493-496
+    log.debug({ uri }, `Downloaded ${uri}`);
   }
 
   if (segmentUris.length > 0) {
-    log.info(`Done downloading.. Last segment was ${segmentUris[segmentUris.length - 1]}`); // matches lines 507-512
+    log.info(`Done downloading.. Last segment was ${segmentUris[segmentUris.length - 1]}`);
   }
 }
 
@@ -179,7 +182,7 @@ async function cleanupVodProgress(vodId: string): Promise<void> {
 
     await redis.del(key);
   } catch (error) {
-    console.warn(`Failed to cleanup VOD progress in Redis for ${vodId}:`, extractErrorDetails(error).message);
+    log.warn(createErrorContext(error, { vodId }), `Failed to cleanup VOD progress in Redis`);
   }
 }
 
@@ -228,7 +231,7 @@ async function fetchTwitchPlaylist(
         return null;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 5000 * Math.min(retryCount, 6)));
+      await sleep(5000 * Math.min(retryCount, 6));
       return null;
     }
 
@@ -237,7 +240,7 @@ async function fetchTwitchPlaylist(
     if (!parsedMaster) {
       log.error(`[${vodId}] Failed to parse Twitch master playlist`);
 
-      await new Promise((resolve) => setTimeout(resolve, 5000));
+      await sleep(5000);
       return null;
     }
 
@@ -266,15 +269,14 @@ async function fetchTwitchPlaylist(
 
     return { variantM3u8String, baseURL };
   } catch (error: unknown) {
-    const { message } = extractErrorDetails(error);
-    log.error({ error: message }, `[${vodId}] Failed to get Twitch HLS playlist`);
+    log.error(createErrorContext(error, { vodId }), `[${vodId}] Failed to get Twitch HLS playlist`);
 
     if (retryCount > maxRetryBeforeEndDetection) {
       log.warn(`[${vodId}] Too many consecutive failures. Assuming stream ended or platform issue.`);
       return null;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 5000 * Math.min(retryCount, 6)));
+    await sleep(5000 * Math.min(retryCount, 6));
     return null;
   }
 }
@@ -285,14 +287,14 @@ async function fetchKickPlaylist(
   log: ReturnType<typeof loggerWithTenant>,
   retryCount: number,
   maxRetryBeforeEndDetection: number,
-  session?: CycleTLSSession // Optional parameter for persistent sessions - matches reference pattern line 468-509
+  session?: CycleTLSSession // Optional parameter for persistent sessions
 ): Promise<{ variantM3u8String: string; baseURL: string } | null> {
   const fetchUrl = sourceUrl || '';
 
   if (!fetchUrl) {
     log.error(`[${vodId}] No Kick HLS source URL provided. Cannot continue download.`);
 
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await sleep(5000);
 
     if (retryCount > maxRetryBeforeEndDetection * 2) {
       log.error(`[${vodId}] Aborting download - no source URL available after multiple attempts`);
@@ -305,21 +307,21 @@ async function fetchKickPlaylist(
   let baseURL: string = '';
 
   try {
-    const tempSession = session || createSession(); // Create if not provided (matches reference line 468)
+    const tempSession = session || createSession(); // Create if not provided
 
     if (fetchUrl.includes('master.m3u8')) {
       const baseEndpoint = fetchUrl.substring(0, fetchUrl.lastIndexOf('/'));
-      baseURL = `${baseEndpoint}/1080p60`; // matches reference lines 395-397
+      baseURL = `${baseEndpoint}/1080p60`;
 
-      const variantM3u8String = await tempSession.fetchText(`${baseURL}/playlist.m3u8`); // Uses cycletls - matches line 462 & getM3u8 pattern
+      const variantM3u8String = await tempSession.fetchText(`${baseURL}/playlist.m3u8`);
 
       if (!session) {
-        await tempSession.close(); // Only close temporary sessions (matches reference line 509)
+        await tempSession.close(); // Only close temporary sessions
       }
 
       return { variantM3u8String, baseURL };
     } else {
-      const response = await tempSession.fetchText(fetchUrl); // Uses cycletls - matches reference getM3u8 pattern lines 177-204
+      const response = await tempSession.fetchText(fetchUrl);
 
       baseURL = fetchUrl.substring(0, fetchUrl.lastIndexOf('/'));
 
@@ -330,10 +332,9 @@ async function fetchKickPlaylist(
       return { variantM3u8String: response, baseURL };
     }
   } catch (error: unknown) {
-    const details = extractErrorDetails(error);
-    log.error({ ...details, vodId }, `[${vodId}] Failed to fetch Kick HLS playlist`);
+    log.error(createErrorContext(error, { vodId }), `[${vodId}] Failed to fetch Kick HLS playlist`);
 
-    await new Promise((resolve) => setTimeout(resolve, 5000 * Math.min(retryCount, 6)));
+    await sleep(5000 * Math.min(retryCount, 6));
 
     if (retryCount > maxRetryBeforeEndDetection) {
       log.warn(`[${vodId}] Too many consecutive failures. Assuming stream ended or platform issue.`);
@@ -425,7 +426,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
   let baseURL: string = '';
   let totalSegmentsFound = 0;
 
-  // Create persistent CycleTLS session for Kick downloads - matches reference pattern lines 467-509
+  // Create persistent CycleTLS session for Kick downloads
   let kickSession: CycleTLSSession | null = null;
 
   if (platform === 'kick') {
@@ -487,7 +488,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         variantM3u8String = result.variantM3u8String;
         fetchedBaseURL = result.baseURL;
       } else if (platform === 'kick') {
-        const result = await fetchKickPlaylist(vodId, sourceUrl, log, retryCount, maxRetryBeforeEndDetection, kickSession ?? undefined); // Pass persistent session - matches reference pattern line 468-509
+        const result = await fetchKickPlaylist(vodId, sourceUrl, log, retryCount, maxRetryBeforeEndDetection, kickSession ?? undefined); // Pass persistent session
 
         if (!result) {
           // Special handling for Kick - may need to update DB on abort
@@ -723,7 +724,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
     throw error;
   } finally {
-    // Close CycleTLS session for Kick downloads - matches reference line 509
+    // Close CycleTLS session for Kick downloads
     if (kickSession) {
       await kickSession.close();
       log.info(`[${vodId}] Closed CycleTLS session`);

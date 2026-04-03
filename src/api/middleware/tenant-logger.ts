@@ -2,7 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { getTenantDisplayName } from '../../config/loader.js';
 import { enterTenantContext, exitTenantContext, TenantContextData } from '../../utils/async-context.js';
 
-// Extend request type to include tenant context for backward compatibility
+// Extend request type to include tenant context for type safety
 declare module 'fastify' {
   interface FastifyRequest {
     tenantDisplayName?: string;

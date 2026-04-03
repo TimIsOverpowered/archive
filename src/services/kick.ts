@@ -3,8 +3,9 @@ import { createSession } from '../utils/cycletls.js';
 import { navigateToUrl } from '../utils/puppeteer-manager.js';
 import dayjs from 'dayjs';
 import durationPlugin from 'dayjs/plugin/duration';
-import { extractErrorDetails, silentFail } from '../utils/error.js';
-import { sendRichAlert, updateDiscordEmbed, isAlertsEnabled } from '../utils/discord-alerts.js';
+import { extractErrorDetails, createErrorContext } from '../utils/error.js';
+import { sleep } from '../utils/delay.js';
+import { sendVodDownloadStarted, sendVodDownloadSuccess, sendVodDownloadFailed } from '../utils/discord-alerts.js';
 import { convertHlsToMp4 } from '../utils/ffmpeg.js';
 import { childLogger } from '../utils/logger.js';
 import { getStreamerConfig } from '../config/loader.js';
@@ -13,6 +14,10 @@ import { PrismaClient } from '../../generated/streamer/client.js';
 import { getKickStreamStatus } from './kick-live.js';
 
 dayjs.extend(durationPlugin);
+
+// Kick API constants
+const KICK_API_TIMEOUT_MS = 10000;
+const KICK_PAGE_DELAY_MS = 2000;
 
 const log = childLogger({ module: 'kick' });
 
@@ -30,7 +35,7 @@ export async function getKickM3u8(sourceUrl: string): Promise<string> {
 }
 
 /**
- * Extract best variant URL from master playlist - matches reference getParsedM3u8 (lines 207-216)
+ * Fetch best variant URL from master playlist
  */
 export function getKickParsedM3u8(m3u8: string, baseURL: string): string | null {
   try {
@@ -40,7 +45,7 @@ export function getKickParsedM3u8(m3u8: string, baseURL: string): string | null 
       return null;
     }
 
-    // Select highest quality variant (first one in the list) - matches reference line 214-215
+    // Select highest quality variant (first one in the list)
     const bestVariant = parsed.variants[0];
 
     if (!bestVariant.uri) {
@@ -53,25 +58,6 @@ export function getKickParsedM3u8(m3u8: string, baseURL: string): string | null 
     log.debug({ details }, 'Failed to parse HLS master playlist');
     return null;
   }
-}
-
-/**
- * Live stream data structure - matches reference getStream (lines 48-73)
- */
-export interface KickStreamStatus {
-  id: string;
-  session_title?: string | null;
-  created_at: string;
-  playback_url?: string | null; // HLS master playlist URL with auth token
-  viewers?: number | null;
-  slug?: string | null;
-  language?: string | null;
-  is_mature?: boolean | null;
-  category?: {
-    id: number;
-    name?: string | null;
-    slug?: string | null;
-  } | null;
 }
 
 export interface KickVod {
@@ -103,14 +89,13 @@ export async function getVods(channelName: string): Promise<KickVod[]> {
   });
 
   if (!result.success) {
-    throw new Error('Failed to load Kick videos API after retries'); // Updated message - matches reference line 75-100 pattern
+    throw new Error('Failed to load Kick videos API after retries');
   }
 
   const page = result.page;
 
   try {
-    // Wait briefly for response to be ready (replaces legacy code's 10s sleep with shorter wait) - matches reference line 85-96 pattern
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await sleep(KICK_PAGE_DELAY_MS);
 
     // Use extracted data from navigator if available
     let dataArray: unknown[] | undefined;
@@ -121,7 +106,7 @@ export async function getVods(channelName: string): Promise<KickVod[]> {
       try {
         dataArray = JSON.parse(content);
       } catch (error) {
-        log.debug({ channelName, error: extractErrorDetails(error).message }, 'Failed to parse videos API response');
+        log.debug(createErrorContext(error, { channelName }), 'Failed to parse videos API response');
         return [];
       }
     }
@@ -130,7 +115,6 @@ export async function getVods(channelName: string): Promise<KickVod[]> {
       return [];
     }
 
-    // Map raw video objects to KickVod interface - matches reference line 92-96 pattern
     const vodsData = dataArray.map((video): KickVod => {
       if (!video || typeof video !== 'object') {
         throw new Error('Invalid video object in array');
@@ -149,7 +133,7 @@ export async function getVods(channelName: string): Promise<KickVod[]> {
       };
     });
 
-    return vodsData; // Return mapped VOD array - matches reference line 96 pattern
+    return vodsData;
   } finally {
     await page.close();
   }
@@ -157,7 +141,6 @@ export async function getVods(channelName: string): Promise<KickVod[]> {
 
 export async function getVod(channelName: string, vodId: string): Promise<KickVod> {
   const result = await navigateToUrl(`https://kick.com/api/v2/channels/${channelName}/videos`, {
-    // Use API endpoint instead of Next.js page - matches reference line 103-134 pattern
     isJsonUrl: true,
   });
 
@@ -168,8 +151,7 @@ export async function getVod(channelName: string, vodId: string): Promise<KickVo
   const page = result.page;
 
   try {
-    // Wait briefly for response (replaces legacy code's sleep with shorter wait) - matches reference line 108-129 pattern
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await sleep(KICK_PAGE_DELAY_MS);
 
     // Use extracted data from navigator if available
     let dataArray: unknown[] | undefined;
@@ -178,9 +160,9 @@ export async function getVod(channelName: string, vodId: string): Promise<KickVo
     } else {
       const content = await page.content();
       try {
-        dataArray = JSON.parse(content); // Parse API response directly (not Next.js script) - matches reference lines 75-100 pattern
+        dataArray = JSON.parse(content);
       } catch (error) {
-        log.error({ channelName, error: extractErrorDetails(error).message }, `Failed to parse videos API for VOD ${vodId}`);
+        log.error(createErrorContext(error, { channelName }), `Failed to parse videos API for VOD ${vodId}`);
         throw new Error(`VOD ${vodId} not found`);
       }
     }
@@ -189,11 +171,9 @@ export async function getVod(channelName: string, vodId: string): Promise<KickVo
       throw new Error(`VOD ${vodId} not found`);
     }
 
-    // Find matching VOD by ID (matches reference line 128-134: jsonContent.find((livestream) => livestream.id.toString() === vodId))
     const video = dataArray.find((v): v is Record<string, unknown> & { id: string | number } => {
       if (!v || typeof v !== 'object') return false;
-      // @ts-expect-error - checking for optional property on record type
-      return String(v.id ?? '') === vodId;
+      return String((v as { id?: string | number }).id ?? '') === vodId;
     });
 
     if (!video) {
@@ -217,7 +197,7 @@ export async function getVod(channelName: string, vodId: string): Promise<KickVo
 }
 
 /**
- * Download Kick VOD directly to MP4 using ffmpeg HLS streaming (reference: kick.js line 136-205)
+ * Download Kick VOD directly to MP4 using ffmpeg HLS streaming
  */
 export async function downloadMP4(streamerId: string, vod: KickVod): Promise<string | null> {
   if (!vod.source) {
@@ -233,7 +213,7 @@ export async function downloadMP4(streamerId: string, vod: KickVod): Promise<str
   let messageId: string | null = null;
 
   try {
-    // Fetch and parse HLS playlist to get direct media URL (reference kick.js line 175-205)
+    // Fetch and parse HLS playlist to get direct media URL
     const m3u8Url = await getKickParsedM3u8ForFfmpeg(vod.source);
 
     if (!m3u8Url) {
@@ -242,72 +222,26 @@ export async function downloadMP4(streamerId: string, vod: KickVod): Promise<str
 
     const vodPath = `${config.settings.vodPath}/${vod.id}.mp4`;
 
-    // Send Discord "Download Started" alert
-    if (isAlertsEnabled()) {
-      silentFail(async () => {
-        const streamerName = config.displayName || streamerId;
+    const streamerName = config.displayName || streamerId;
+    messageId = await sendVodDownloadStarted('kick', streamerId, String(vod.id), streamerName);
 
-        messageId = await sendRichAlert({
-          title: '📥 Kick VOD Download Started',
-          description: `${vod.id} download in progress for ${streamerName}`,
-          status: 'warning',
-          fields: [
-            { name: 'VOD ID', value: `\`${String(vod.id)}\``, inline: false },
-            { name: 'Streamer', value: `\`${streamerName}\`` },
-          ],
-          timestamp: new Date().toISOString(),
-        });
-      });
-    }
-
-    // Download directly to MP4 using ffmpeg HLS streaming (reference kick.js line 160-205, consolidated in ffmpeg.ts)
-    // Kick always uses .ts segments (per platform specification)
+    // Download directly to MP4 using ffmpeg HLS streaming
     await convertHlsToMp4(m3u8Url, vodPath, { vodId: String(vod.id), isFmp4: false });
 
-    console.info(`Downloaded ${String(vod.id)}.mp4`); // Reference pattern kick.js line 160-205
+    log.info(`Downloaded ${String(vod.id)}.mp4`);
 
     // Success alert
-    if (isAlertsEnabled() && messageId) {
-      silentFail(async () => {
-        const streamerName = config.displayName || streamerId;
-
-        await updateDiscordEmbed(messageId!, {
-          title: '✅ Kick VOD Download Complete!',
-          description: `${vod.id} successfully downloaded and converted to MP4 for ${streamerName}`,
-          status: 'success',
-          fields: [
-            { name: 'VOD ID', value: `\`${String(vod.id)}\``, inline: false },
-            { name: 'Output Path', value: vodPath, inline: false },
-          ],
-          timestamp: new Date().toISOString(),
-          updatedTimestamp: new Date().toISOString(),
-        });
-      });
-    }
+    await sendVodDownloadSuccess(messageId!, 'kick', String(vod.id), vodPath, streamerName);
 
     return vodPath;
   } catch (error) {
     const details = extractErrorDetails(error);
     const errorMsg = details.message.substring(0, 500);
 
-    console.error(`\nffmpeg error occurred: ${errorMsg}`); // Reference pattern kick.js line 163-205
+    log.error(`ffmpeg error occurred: ${errorMsg}`);
 
     // Failure alert
-    if (isAlertsEnabled() && messageId) {
-      silentFail(async () => {
-        await updateDiscordEmbed(messageId!, {
-          title: '❌ Kick VOD Download Failed',
-          description: `${vod.id} download failed for ${streamerId}`,
-          status: 'error',
-          fields: [
-            { name: 'VOD ID', value: `\`${String(vod.id)}\``, inline: false },
-            { name: 'Error', value: errorMsg, inline: false },
-          ],
-          timestamp: new Date().toISOString(),
-          updatedTimestamp: new Date().toISOString(),
-        });
-      });
-    }
+    await sendVodDownloadFailed(messageId!, 'kick', String(vod.id), errorMsg, streamerId);
 
     throw error;
   }
@@ -320,7 +254,6 @@ async function getKickParsedM3u8ForFfmpeg(sourceUrl: string): Promise<string | n
   const session = createSession();
 
   try {
-    // Fetch master playlist using CycleTLS (reference kick.js line 175-205)
     const m3u8Content = await session.fetchText(sourceUrl);
 
     if (!m3u8Content) {
@@ -330,7 +263,7 @@ async function getKickParsedM3u8ForFfmpeg(sourceUrl: string): Promise<string | n
     let m3u8Url: string | null;
 
     if (sourceUrl.includes('master.m3u8')) {
-      // Parse master playlist and get variant URL with 1080p60 preference (reference kick.js line 207-216)
+      // Parse master playlist and get variant URL with 1080p60 preference
       const baseURL = sourceUrl.replace('/master.m3u8', '');
       m3u8Url = getKickParsedM3u8(m3u8Content, baseURL);
 
@@ -338,13 +271,13 @@ async function getKickParsedM3u8ForFfmpeg(sourceUrl: string): Promise<string | n
         throw new Error('No video variants found in HLS playlist');
       }
     } else {
-      // Direct media playlist - use as-is (reference kick.js line 179-205 pattern)
+      // Direct media playlist - use as-is
       m3u8Url = sourceUrl;
     }
 
     return m3u8Url;
   } finally {
-    await session.close(); // Always clean up CycleTLS session (reference kick.js line 509 pattern)
+    await session.close(); // Always clean up CycleTLS session
   }
 }
 
@@ -354,13 +287,13 @@ export async function getKickCategoryInfo(slug: string): Promise<Record<string, 
   try {
     const result = await navigateToUrl(`https://kick.com/api/v1/subcategories/${slug}`, {
       isJsonUrl: true,
-      timeoutMs: 10000,
+      timeoutMs: KICK_API_TIMEOUT_MS,
     });
 
     if (!result.success) return null;
 
     const page = result.page;
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await sleep(KICK_PAGE_DELAY_MS);
 
     let response: Record<string, unknown> | undefined;
     if ('data' in result && result.data !== undefined) {
@@ -373,7 +306,7 @@ export async function getKickCategoryInfo(slug: string): Promise<Record<string, 
     await page.close();
     return response ?? null;
   } catch (error) {
-    log.warn({ slug, error: extractErrorDetails(error).message }, 'Failed to fetch category info');
+    log.warn(createErrorContext(error, { slug }), 'Failed to fetch category info');
     return null;
   }
 }
@@ -446,7 +379,7 @@ export async function updateChapterDuringDownload(vodId: string, streamerId: str
 
     log.info({ vodId, categoryId: category.id, categoryName: category.name, startTime: lastChapter?.start || 0 }, 'Created new chapter');
   } catch (error) {
-    log.error({ vodId, error: extractErrorDetails(error).message }, 'Failed to update chapter');
+    log.error(createErrorContext(error, { vodId }), 'Failed to update chapter');
   }
 }
 
@@ -476,6 +409,6 @@ export async function finalizeKickChapters(vodId: string, finalDurationSeconds: 
       log.debug({ vodId }, 'No incomplete chapters to finalize');
     }
   } catch (error) {
-    log.error({ vodId, error: extractErrorDetails(error).message }, 'Failed to finalize chapters');
+    log.error(createErrorContext(error, { vodId }), 'Failed to finalize chapters');
   }
 }

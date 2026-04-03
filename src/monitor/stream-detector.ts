@@ -9,7 +9,7 @@ import { getTwitchStreamStatus, getLatestTwitchVodObject } from '../services/twi
 import { getKickStreamStatus, getLatestKickVodObject } from '../services/kick-live.js';
 import { sendRichAlert } from '../utils/discord-alerts.js';
 import { formatDuration } from '../utils/formatting.js';
-import { extractErrorDetails } from '../utils/error.js';
+import { extractErrorDetails, createErrorContext } from '../utils/error.js';
 
 type PlatformType = 'twitch' | 'kick';
 type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
@@ -81,7 +81,7 @@ async function sendStreamLiveAlert(platform: PlatformType, vodId: string, title:
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.warn({ error: extractErrorDetails(error).message }, `Failed to send stream live alert for ${vodId}`);
+    logger.warn(createErrorContext(error), `Failed to send stream live alert for ${vodId}`);
   }
 }
 
@@ -108,7 +108,7 @@ async function sendStreamOfflineAlert(platform: PlatformType, vodId: string, sta
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.warn({ error: extractErrorDetails(error).message }, `Failed to send stream offline alert for ${vodId}`);
+    logger.warn(createErrorContext(error), `Failed to send stream offline alert for ${vodId}`);
   }
 }
 
@@ -448,7 +448,7 @@ async function checkHasActiveDownload(tenantId: string, vodId: string): Promise<
       log.debug({ vodId, vodDir }, `[Monitor] Download directory exists - active download detected`);
       return true;
     } catch (accessError) {
-      log.trace({ vodId, vodDir, error: extractErrorDetails(accessError).message }, `[Monitor] No download directory found for VOD ${vodId}`);
+      log.trace(createErrorContext(accessError, { vodId, vodDir }), `[Monitor] No download directory found for VOD ${vodId}`);
       return false;
     }
   } catch (error) {
@@ -572,7 +572,7 @@ async function checkForCrashRecovery(tenantId: string, vodId: string): Promise<b
       return false;
     }
   } catch (error) {
-    log.warn({ vodId, error: extractErrorDetails(error).message }, `Failed to check for crash recovery`);
+    log.warn(createErrorContext(error, { vodId }), `Failed to check for crash recovery`);
     return false;
   }
 }
