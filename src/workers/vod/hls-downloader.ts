@@ -12,7 +12,7 @@ import { getStreamerConfig } from '../../config/loader';
 import { getClient } from '../../db/client';
 import { sendRichAlert, updateDiscordEmbed, resetFailures, isAlertsEnabled } from '../../utils/discord-alerts.js';
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch';
-import { loggerWithTenant } from '../../utils/logger.js';
+import { createAutoLogger as loggerWithTenant } from '../../utils/auto-tenant-logger.js';
 import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 import { sleep, getRetryDelay } from '../../utils/delay.js';

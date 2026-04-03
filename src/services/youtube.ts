@@ -5,7 +5,8 @@ import { decryptObject, encryptObject } from '../utils/encryption.js';
 import { metaClient } from '../db/meta-client.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { sleep } from '../utils/delay.js';
-import { loggerWithTenant, logger as baseLogger } from '../utils/logger.js';
+import { logger as baseLogger } from '../utils/logger.js';
+import { createAutoLogger as loggerWithTenant } from '../utils/auto-tenant-logger.js';
 import { Prisma } from '../../prisma/generated/meta/client.js';
 
 export interface UploadProgressCallbackData {

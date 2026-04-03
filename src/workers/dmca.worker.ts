@@ -15,7 +15,7 @@ import type { DMCAClaim } from '../utils/dmca.js';
 import { isBlockingPolicy, buildMuteFilters, muteAudioSections, blackoutVideoSections, cleanupTempFiles, BlackoutSection } from '../utils/dmca.js';
 import { trimVideo as ffmpegTrim } from '../utils/ffmpeg.js';
 import { fileExists } from '../utils/path.js';
-import { loggerWithTenant } from '../utils/logger.js';
+import { createAutoLogger as loggerWithTenant } from '../utils/auto-tenant-logger.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
   const { streamerId, vodId, receivedClaims, type, platform, part } = job.data;
