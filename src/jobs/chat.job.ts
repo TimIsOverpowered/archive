@@ -12,9 +12,19 @@ export async function enqueueChatDownload(job: Omit<ChatDownloadJob, 'id'>): Pro
   }
 }
 
-export async function triggerChatDownload(streamerId: string, vodId: string, platform: 'twitch' | 'kick', duration: number, vodStartDate?: string): Promise<string | null> {
+export async function triggerChatDownload(
+  tenantId: string,
+  platformUserId: string,
+  vodId: string,
+  platform: 'twitch' | 'kick',
+  duration: number,
+  vodStartDate?: string,
+  platformUsername?: string
+): Promise<string | null> {
   return enqueueChatDownload({
-    streamerId,
+    tenantId,
+    platformUserId,
+    platformUsername,
     vodId,
     platform,
     duration,
@@ -27,14 +37,16 @@ export async function triggerChatAfterVod(vodJob: VODDownloadJob): Promise<strin
     return null;
   }
 
-  const streamerId = vodJob.streamerId || undefined;
+  const tenantId = vodJob.tenantId || undefined;
 
-  if (!streamerId) {
+  if (!tenantId) {
     return null;
   }
 
   return enqueueChatDownload({
-    streamerId: streamerId as string,
+    tenantId: tenantId,
+    platformUserId: vodJob.platformUserId,
+    platformUsername: vodJob.platformUsername,
     vodId: vodJob.vodId,
     platform: vodJob.platform,
     duration: 0,

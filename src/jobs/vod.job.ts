@@ -12,9 +12,18 @@ export async function enqueueVodDownload(job: Omit<VODDownloadJob, 'id'>): Promi
   }
 }
 
-export async function triggerVodDownload(streamerId: string, vodId: string, platform: 'twitch' | 'kick', externalVodId: string): Promise<string | null> {
+export async function triggerVodDownload(
+  tenantId: string,
+  platformUserId: string,
+  vodId: string,
+  platform: 'twitch' | 'kick',
+  externalVodId: string,
+  platformUsername?: string
+): Promise<string | null> {
   return enqueueVodDownload({
-    streamerId,
+    tenantId,
+    platformUserId,
+    platformUsername,
     vodId,
     platform,
     externalVodId,

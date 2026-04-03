@@ -26,7 +26,9 @@ const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 export interface HlsDownloadOptions {
   vodId: string;
   platform: 'twitch' | 'kick';
-  streamerId: string;
+  tenantId: string;
+  platformUserId: string;
+  platformUsername?: string;
   startedAt?: string;
   sourceUrl?: string;
 }
@@ -344,21 +346,21 @@ async function fetchKickPlaylist(
 }
 
 export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ success: true; finalPath: string; durationSeconds?: number }> {
-  const { vodId, platform, streamerId, startedAt, sourceUrl } = options;
+  const { vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl } = options;
 
-  const log = loggerWithTenant(String(streamerId));
+  const log = loggerWithTenant(tenantId);
 
   log.info(
     {
       vodId,
       platform,
-      streamerId: String(streamerId),
+      tenantId,
       startedAt,
       hasSourceUrl: !!sourceUrl,
     },
     `[HLS-Downloader] Starting Live HLS Download mode for ${platform} stream`
   );
-  const streamerClient = getClient(streamerId);
+  const streamerClient = getClient(tenantId);
   try {
     if (!streamerClient) throw new Error('Streamer database client not available');
 
@@ -371,14 +373,14 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
     throw error;
   }
 
-  const config = getStreamerConfig(String(streamerId)) || getStreamerConfig(vodId.split('-')[0]);
+  const config = getStreamerConfig(tenantId);
 
   if (!config) {
-    log.error({ vodId, streamerId: String(streamerId), platform }, `[HLS-Downloader] CRITICAL - Stream config not found. Cannot proceed with download.`);
-    throw new Error(`Stream config not found for VOD ${vodId} (streamerId: ${String(streamerId)})`);
+    log.error({ vodId, tenantId, platform }, `[HLS-Downloader] CRITICAL - Stream config not found. Cannot proceed with download.`);
+    throw new Error(`Stream config not found for VOD ${vodId} (tenantId: ${tenantId})`);
   }
 
-  log.debug({ vodId, streamerId: String(streamerId), vodPath: config.settings.vodPath }, `[HLS-Downloader] Configuration loaded successfully`);
+  log.debug({ vodId, tenantId, vodPath: config.settings.vodPath }, `[HLS-Downloader] Configuration loaded successfully`);
 
   // Initialize alert state
   let messageId: string | null = null;
@@ -393,7 +395,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         status: 'warning',
         fields: [
           { name: 'Platform', value: platform, inline: true },
-          { name: 'Streamer ID', value: String(streamerId), inline: true },
+          { name: 'Tenant ID', value: tenantId, inline: true },
           { name: 'Started At', value: startedAt || startTime, inline: false },
         ],
         timestamp: startTime,
@@ -404,7 +406,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
     }
   }
 
-  const vodDir = pathMod.join(config.settings.vodPath || '', String(streamerId), vodId);
+  const vodDir = pathMod.join(config.settings.vodPath || '', tenantId, vodId);
 
   try {
     await fsPromises.mkdir(vodDir, { recursive: true });
@@ -592,7 +594,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
       retryCount = 0;
 
       if (platform === 'kick' && streamerClient) {
-        await updateChapterDuringDownload(vodId, streamerId, streamerClient);
+        await updateChapterDuringDownload(vodId, tenantId, streamerClient);
       }
 
       await sleep(60000); // Poll every 60 seconds for VOD downloads
@@ -639,7 +641,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
     const mp4Segments = filesInDir.filter((f) => f.endsWith('.mp4'));
     const tsSegments = filesInDir.filter((f) => f.endsWith('.ts'));
 
-    const finalMp4Path = pathMod.join(config.settings.vodPath || '', String(streamerId), `${vodId}.mp4`);
+    const finalMp4Path = pathMod.join(config.settings.vodPath || '', tenantId, `${vodId}.mp4`);
 
     if (hasInitSegment && mp4Segments.length > 0) {
       log.info(`[${vodId}] Detected fMP4 segments (${mp4Segments.length} files).`);
@@ -674,7 +676,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
       if (platform === 'kick') {
         await finalizeKickChapters(vodId, durationSeconds, streamerClient);
       } else if (platform === 'twitch') {
-        await saveTwitchVodChapters(vodId, streamerId, durationSeconds, streamerClient);
+        await saveTwitchVodChapters(vodId, tenantId, durationSeconds, streamerClient);
       }
 
       await streamerClient.vod.update({ where: { id: vodId }, data: { duration: durationSeconds, is_live: false } });
@@ -728,7 +730,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
       log.info(`[${vodId}] Closed CycleTLS session`);
     }
 
-    const finalMp4Path = pathMod.join(config.settings.vodPath || '', String(streamerId), `${vodId}.mp4`);
+    const finalMp4Path = pathMod.join(config.settings.vodPath || '', tenantId, `${vodId}.mp4`);
 
     try {
       await fsPromises.access(finalMp4Path);
@@ -739,7 +741,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
       if (!config.settings.saveHLS) {
         try {
           await fsPromises.rm(vodDir, { recursive: true });
-          resetFailures(String(streamerId));
+          resetFailures(tenantId);
 
           log.info(`[${vodId}] Cleaned up temporary directory ${vodDir}`);
         } catch (error: unknown) {
@@ -747,7 +749,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
           log.warn({ ...details, vodId }, `[${vodId}] Failed to clean up temporary directory`);
         }
       } else {
-        resetFailures(String(streamerId));
+        resetFailures(tenantId);
 
         log.info(`[${vodId}] HLS files preserved in ${vodDir} (saveHLS=true)`);
       }

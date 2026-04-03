@@ -5,7 +5,9 @@ import type { DMCAClaim } from '../utils/dmca.js';
 export type VodJobType = 'STANDARD_VOD_DOWNLOAD' | 'LIVE_HLS_DOWNLOAD';
 
 export interface VODDownloadJob {
-  streamerId: string;
+  tenantId: string;
+  platformUserId: string;
+  platformUsername?: string;
   vodId: string;
   platform: 'twitch' | 'kick';
   externalVodId?: string;
@@ -14,14 +16,18 @@ export interface VODDownloadJob {
 export interface LiveHlsDownloadJob {
   vodId: string;
   platform: 'twitch' | 'kick';
-  streamerId: string;
+  tenantId: string;
+  platformUserId: string;
+  platformUsername?: string;
   startedAt?: string; // ISO timestamp when live stream was detected
   sourceUrl?: string; // Kick HLS URL (passed from monitor)
   isFallback?: boolean; // Flag for Twitch fallback mode (no VOD object found)
 }
 
 export interface ChatDownloadJob {
-  streamerId: string;
+  tenantId: string;
+  platformUserId: string;
+  platformUsername?: string;
   vodId: string;
   platform: 'twitch' | 'kick';
   duration: number;

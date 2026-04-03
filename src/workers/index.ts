@@ -188,7 +188,8 @@ async function bootstrap() {
           jobId: String(job.id),
           vodId: data?.vodId,
           platform: data?.platform,
-          streamerId: data?.streamerId,
+          tenantId: data?.tenantId,
+          platformUserId: data?.platformUserId,
         },
         `VOD download completed successfully`
       );
@@ -203,7 +204,8 @@ async function bootstrap() {
           jobId: String(job.id),
           vodId: jobData?.vodId,
           platform: jobData?.platform,
-          streamerId: jobData?.streamerId,
+          tenantId: jobData?.tenantId,
+          platformUserId: jobData?.platformUserId,
           attemptsMade: job.attemptsMade,
           maxAttempts: (job.opts as Partial<BaseJobOptions>).attempts ?? 3,
           errorMessage: err.message || String(err),
