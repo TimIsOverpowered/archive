@@ -110,9 +110,9 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
           type: 'vod' as const,
         };
 
-        await YouTubeQueueModule.getYoutubeUploadQueue().add('youtube_upload', youtubeJob, { jobId: `youtube-reupload:${vodId}:${Date.now()}` });
+        await YouTubeQueueModule.getYoutubeUploadQueue().add('youtube_upload', youtubeJob, { jobId: `youtube-reupload_${vodId}` });
 
-        return { data: { message: 'YouTube re-upload job queued', vodId, jobId: `youtube-reupload:${vodId}:${Date.now()}`, durationValidation: null } };
+        return { data: { message: 'YouTube re-upload job queued', vodId, jobId: `youtube-reupload_${vodId}`, durationValidation: null } };
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
@@ -161,15 +161,15 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
         const YouTubeQueueModule = await import('../../../jobs/queues');
 
         const downloadJob = {
-          streamerId,
+          tenantId: streamerId,
+          platformUserId: streamerId,
           vodId,
           platform: vodRecord.platform as 'twitch' | 'kick',
-          userId: streamerId,
         };
 
-        void YouTubeQueueModule.getVODDownloadQueue().add('vod_download', downloadJob, { jobId: `download:${vodId}:${Date.now()}` });
+        void YouTubeQueueModule.getVODDownloadQueue().add('vod_download', downloadJob, { jobId: `download_${vodId}` });
 
-        return { data: { message: 'Re-download job queued', vodId, jobId: `download:${vodId}:${Date.now()}` } };
+        return { data: { message: 'Re-download job queued', vodId, jobId: `download_${vodId}` } };
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;

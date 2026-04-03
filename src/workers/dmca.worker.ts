@@ -159,7 +159,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       dmcaProcessed: true,
     };
 
-    const uploadJob = await getYoutubeUploadQueue().add('youtube_upload', youtubeJobData, { jobId: `youtube-dmca:${vodId}:${Date.now()}` });
+    const uploadJob = await getYoutubeUploadQueue().add('youtube_upload', youtubeJobData, { jobId: `youtube-dmca_${vodId}` });
 
     log.info(`YouTube upload job queued with ID ${uploadJob.id!}`);
 

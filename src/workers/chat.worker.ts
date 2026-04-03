@@ -84,18 +84,18 @@ function extractEdges(commentsObj: Record<string, unknown>): TwitchChatEdge[] {
 }
 
 const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job: Job<ChatDownloadJob>): Promise<ChatDownloadResult> => {
-  const { streamerId, vodId, platform, duration, startOffset } = job.data;
-  const log = createAutoLogger(String(streamerId));
+  const { tenantId, platformUserId, platformUsername, vodId, platform, duration, startOffset } = job.data;
+  const log = createAutoLogger(tenantId);
 
   if (platform !== 'twitch') {
     log.info(`Chat download for ${platform} is deferred`);
     return { success: true, skipped: true };
   }
 
-  const config = getStreamerConfig(streamerId);
-  if (!config) throw new Error(`Stream config not found for ${streamerId}`);
+  const config = getStreamerConfig(tenantId);
+  if (!config) throw new Error(`Stream config not found for ${tenantId}`);
 
-  let db = getClient(streamerId);
+  let db = getClient(tenantId);
   if (!db) db = await createClient(config);
 
   // Smart resume - check for existing data if no manual override provided
@@ -117,7 +117,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
   const messageId = isAlertsEnabled()
     ? await sendRichAlert({
         title: lastSavedRecord?.content_offset_seconds && !startOffset ? `💬 Chat Download Resumed` : `💬 Chat Download Started`,
-        description: `${streamerId} - ${lastSavedRecord?.content_offset_seconds && !startOffset ? 'Continuing from offset ' + effectiveOffset.toFixed(2) + 's' : 'Fetching chat messages'} for ${vodId}`,
+        description: `${tenantId} - ${lastSavedRecord?.content_offset_seconds && !startOffset ? 'Continuing from offset ' + effectiveOffset.toFixed(2) + 's' : 'Fetching chat messages'} for ${vodId}`,
         status: 'warning',
         fields: [
           { name: 'Platform', value: platform, inline: true },
@@ -168,12 +168,12 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
       if (!edges || edges.length === 0) {
         log.warn('[' + vodId + '] No chat messages found for this VOD (or at current offset ' + effectiveOffset.toFixed(2) + 's). This may be due to disabled chat history or indexing delay.');
 
-        resetFailures(streamerId);
+        resetFailures(tenantId);
 
         if (messageId && isAlertsEnabled()) {
           updateDiscordEmbed(messageId, {
             title: '[Chat] Download Complete',
-            description: streamerId + ' - No chat messages found for VOD ' + vodId,
+            description: tenantId + ' - No chat messages found for VOD ' + vodId,
             status: 'warning', // Use warning instead of success to alert admins
             fields: [
               { name: 'Platform', value: platform, inline: true },
@@ -230,13 +230,13 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
         updateDiscordEmbed(messageId, {
           title: '💬 Downloading Chat',
-          description: streamerId + (startOffset || lastSavedRecord?.content_offset_seconds ? ' - Resuming' : '') + ' chat download for ' + vodId,
+          description: tenantId + (startOffset || lastSavedRecord?.content_offset_seconds ? ' - Resuming' : '') + ' chat download for ' + vodId,
           status: 'warning',
           fields: [
             { name: 'Current Time Offset', value: lastOffset.toFixed(2) + 's (' + formatTime(lastOffset) + ')', inline: true },
             {
               name: 'Progress',
-              value: formatProgressMessage('Chat Download' + (startOffset || lastSavedRecord?.content_offset_seconds ? ' (Resumed)' : ''), streamerId, percent, totalMessages),
+              value: formatProgressMessage('Chat Download' + (startOffset || lastSavedRecord?.content_offset_seconds ? ' (Resumed)' : ''), tenantId, percent, totalMessages),
               inline: false,
             },
           ],
@@ -262,14 +262,14 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
       rawPage = await fetchNextComments(vodId, pageCursor); // Only used for subsequent pages now!
     }
 
-    resetFailures(streamerId);
+    resetFailures(tenantId);
 
     if (messageId && isAlertsEnabled()) {
       const resumeIndicator = startOffset || lastSavedRecord?.content_offset_seconds ? ' [Resumed]' : '';
 
       updateDiscordEmbed(messageId, {
         title: '[Chat] Download Complete' + resumeIndicator,
-        description: streamerId + ' - Successfully fetched ' + totalMessages.toLocaleString() + ' chat messages for VOD ' + vodId,
+        description: tenantId + ' - Successfully fetched ' + totalMessages.toLocaleString() + ' chat messages for VOD ' + vodId,
         status: totalMessages > 0 ? 'success' : 'warning', // Warning if zero messages found
         fields: [
           { name: 'Platform', value: platform, inline: true },
@@ -301,7 +301,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
     if (messageId && isAlertsEnabled()) {
       updateDiscordEmbed(messageId, {
         title: '[Chat] Download Failed',
-        description: streamerId + ' - Error fetching chat messages for VOD ' + vodId,
+        description: tenantId + ' - Error fetching chat messages for VOD ' + vodId,
         status: 'error',
         fields: [
           { name: 'Platform', value: platform, inline: true },

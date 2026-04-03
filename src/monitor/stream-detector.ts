@@ -221,7 +221,9 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
       await enqueueLiveHlsDownload({
         vodId: vodResult.id,
         platform,
-        streamerId: userIdCache,
+        tenantId: tenantId,
+        platformUserId: userIdCache,
+        platformUsername: twitchUsername,
         startedAt: new Date(streamStatus.started_at),
       });
     } else {
@@ -251,7 +253,9 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
       await enqueueLiveHlsDownload({
         vodId: String(existingVod.id),
         platform,
-        streamerId: userIdCache,
+        tenantId: tenantId,
+        platformUserId: userIdCache,
+        platformUsername: twitchUsername,
         startedAt: new Date(streamStatus.started_at),
       });
     } else {
@@ -263,7 +267,9 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
         await enqueueLiveHlsDownload({
           vodId: String(existingVod.id),
           platform,
-          streamerId: userIdCache,
+          tenantId: tenantId,
+          platformUserId: userIdCache,
+          platformUsername: twitchUsername,
           startedAt: new Date(streamStatus.started_at),
         });
       } else {
@@ -271,10 +277,23 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
       }
     }
   } else if (existingVod && existingVod.is_live) {
-    // Already tracked as live with correct fields - no action needed
+    // Already tracked as live - check if download is actually running
+    const hasActiveJob = await checkHasActiveDownload(tenantId, String(existingVod.id));
 
-    log.debug(`[Monitor]:  Already tracking live VOD ${String(existingVod.id)}. No action needed.`);
-    return;
+    if (!hasActiveJob) {
+      log.info(`[Monitor]: VOD ${String(existingVod.id)} is live but no active download - re-queuing`);
+
+      await enqueueLiveHlsDownload({
+        vodId: String(existingVod.id),
+        platform,
+        tenantId: tenantId,
+        platformUserId: userIdCache,
+        platformUsername: twitchUsername,
+        startedAt: existingVod.started_at ?? new Date(),
+      });
+    } else {
+      log.debug(`[Monitor]:  Already tracking live VOD ${String(existingVod.id)} with active download.`);
+    }
   }
 }
 
@@ -373,7 +392,9 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
       await enqueueLiveHlsDownload({
         vodId: kickStreamIdStr,
         platform,
-        streamerId: kickUsername,
+        tenantId: tenantId,
+        platformUserId: kickUsername,
+        platformUsername: kickUsername,
         startedAt: new Date(streamStatus.created_at),
         sourceUrl: vodObject?.source ?? streamStatus.playback_url ?? undefined,
       });
@@ -407,18 +428,54 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
       await enqueueLiveHlsDownload({
         vodId: kickStreamIdStr,
         platform,
-        streamerId: kickUsername,
+        tenantId: tenantId,
+        platformUserId: kickUsername,
+        platformUsername: kickUsername,
         startedAt: new Date(streamStatus.created_at),
-        sourceUrl: vodObject?.source ?? streamStatus.playback_url ?? undefined,
+        sourceUrl: vodObject?.source ?? undefined,
       });
     } else {
-      log.debug(`[Monitor]:  Download already in progress for Kick VOD ${kickStreamIdStr}`);
+      const hasDownloadJob = await checkHasActiveDownload(tenantId, String(existingVod.id));
+
+      if (!hasDownloadJob) {
+        log.info(`[Monitor]:  Queuing HLS download for resumed VOD ${String(existingVod.id)}`);
+
+        const vodObject = await getLatestKickVodObject(kickUsername, existingVod.id);
+
+        await enqueueLiveHlsDownload({
+          vodId: String(existingVod.id),
+          platform,
+          tenantId: tenantId,
+          platformUserId: kickUsername,
+          platformUsername: kickUsername,
+          startedAt: new Date(existingVod.created_at),
+          sourceUrl: vodObject?.source ?? undefined,
+        });
+      } else {
+        log.debug(`[Monitor]:  Download already in progress for Kick VOD ${kickStreamIdStr}`);
+      }
     }
   } else if (existingVod && existingVod.is_live) {
-    // Already tracked as live with correct fields - no action needed
+    // Already tracked as live - check if download is actually running
+    const hasActiveJob = await checkHasActiveDownload(tenantId, kickStreamIdStr);
 
-    log.debug(`[Monitor]:  Already tracking live Kick VOD ${kickStreamIdStr}. No action needed.`);
-    return;
+    if (!hasActiveJob) {
+      log.info(`[Monitor]: Kick VOD ${kickStreamIdStr} is live but no active download - re-queuing`);
+
+      const vodObject = await getLatestKickVodObject(kickUsername, existingVod.id);
+
+      await enqueueLiveHlsDownload({
+        vodId: kickStreamIdStr,
+        platform,
+        tenantId: tenantId,
+        platformUserId: kickUsername,
+        platformUsername: kickUsername,
+        startedAt: existingVod.started_at ?? new Date(),
+        sourceUrl: vodObject?.source ?? undefined,
+      });
+    } else {
+      log.debug(`[Monitor]:  Already tracking live Kick VOD ${kickStreamIdStr} with active download.`);
+    }
   }
 }
 
@@ -504,11 +561,19 @@ async function validateVodPath(tenantId: string): Promise<{ valid: boolean }> {
 /**
  * Enqueue Live HLS Download job
  */
-async function enqueueLiveHlsDownload(params: { vodId: string; platform: PlatformType; streamerId: string; startedAt: Date; sourceUrl?: string }): Promise<void> {
-  const log = loggerWithTenant(params.streamerId);
+async function enqueueLiveHlsDownload(params: {
+  vodId: string;
+  platform: PlatformType;
+  tenantId: string;
+  platformUserId: string;
+  platformUsername?: string;
+  startedAt: Date;
+  sourceUrl?: string;
+}): Promise<void> {
+  const log = loggerWithTenant(params.tenantId);
 
   // Validate VOD path before attempting to queue job
-  const validationResult = await validateVodPath(params.streamerId);
+  const validationResult = await validateVodPath(params.tenantId);
   if (!validationResult.valid) {
     log.error({ vodId: params.vodId, platform: params.platform }, `[Monitor] Aborting download queue - VOD path validation failed`);
     return; // Don't attempt to queue job if path is invalid
@@ -517,7 +582,7 @@ async function enqueueLiveHlsDownload(params: { vodId: string; platform: Platfor
   const queue = getLiveHlsDownloadQueue();
 
   try {
-    log.info({ vodId: params.vodId, platform: params.platform, streamerId: params.streamerId }, `[Monitor] Attempting to enqueue Live HLS download job`);
+    log.info({ vodId: params.vodId, platform: params.platform, tenantId: params.tenantId }, `[Monitor] Attempting to enqueue Live HLS download job`);
 
     log.debug({ vodId: params.vodId, platform: params.platform }, `[Monitor] Adding job to BullMQ VOD download queue`);
 
@@ -526,12 +591,14 @@ async function enqueueLiveHlsDownload(params: { vodId: string; platform: Platfor
       {
         vodId: params.vodId,
         platform: params.platform,
-        streamerId: params.streamerId,
+        tenantId: params.tenantId,
+        platformUserId: params.platformUserId,
+        platformUsername: params.platformUsername,
         startedAt: params.startedAt.toISOString(),
         sourceUrl: params.sourceUrl,
       } satisfies LiveHlsDownloadJob,
       {
-        jobId: `live_hls:${params.vodId}`, // Native BullMQ deduplication - prevents duplicate jobs in queue
+        jobId: `live_hls_${params.vodId}`, // Native BullMQ deduplication - prevents duplicate jobs in queue
         attempts: 10, // Increased for long-running live streams and crash recovery
         backoff: { type: 'exponential' as const, delay: 5000 },
       }

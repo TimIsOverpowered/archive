@@ -5,7 +5,9 @@ import pathMod from 'path'; // Standard import is fine here
 export interface LiveHlsDownloadJobData {
   vodId: string;
   platform: 'twitch' | 'kick';
-  streamerId: string;
+  tenantId: string;
+  platformUserId: string;
+  platformUsername?: string;
   startedAt?: string;
   sourceUrl?: string;
 }
@@ -23,7 +25,7 @@ const vodProcessor: Processor<LiveHlsDownloadJobData, LiveHlsDownloadResult, str
     throw new Error(`Unsupported job type: ${job.name}`);
   }
 
-  const { vodId, platform, streamerId, startedAt, sourceUrl } = job.data;
+  const { vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl } = job.data;
 
   // 1. Progress Heartbeat (Type-Safe)
   let tickCount = 0;
@@ -40,14 +42,14 @@ const vodProcessor: Processor<LiveHlsDownloadJobData, LiveHlsDownloadResult, str
     const { createAutoLogger: loggerWithTenant } = await import('../utils/auto-tenant-logger.js');
     const { getStreamerConfig } = await import('../config/loader.js');
 
-    const log = loggerWithTenant(String(streamerId));
-    const config = getStreamerConfig(String(streamerId));
+    const log = loggerWithTenant(tenantId);
+    const config = getStreamerConfig(tenantId);
 
     if (!config?.settings.vodPath) {
-      throw new Error(`No VOD path configured for streamer ${streamerId}`);
+      throw new Error(`No VOD path configured for streamer ${tenantId}`);
     }
 
-    const vodDirPath = pathMod.join(config.settings.vodPath, String(streamerId), vodId);
+    const vodDirPath = pathMod.join(config.settings.vodPath, tenantId, vodId);
 
     // 3. Crash Recovery Logic
     try {
@@ -73,7 +75,9 @@ const vodProcessor: Processor<LiveHlsDownloadJobData, LiveHlsDownloadResult, str
     result = await downloadLiveHls({
       vodId,
       platform,
-      streamerId,
+      tenantId,
+      platformUserId,
+      platformUsername,
       startedAt,
       sourceUrl,
     });

@@ -209,24 +209,24 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
           const VodQueueModule = await import('../../../jobs/queues');
 
-          const vodDownloadJob = { streamerId, vodId: request.body.vodId, platform };
+          const vodDownloadJob = { tenantId: streamerId, platformUserId: streamerId, vodId: request.body.vodId, platform };
 
           void VodQueueModule.getVODDownloadQueue().add('vod_download', vodDownloadJob, {
-            jobId: `download:${request.body.vodId}:${Date.now()}`,
+            jobId: `download_${request.body.vodId}`,
           });
 
-          const vodJobId = `download:${request.body.vodId}:${Date.now()}`;
+          const vodJobId = `download_${request.body.vodId}`;
 
           // Calculate duration for chat download job
           const durationSeconds = parseDurationToSeconds(vodRecord.duration, request.body.platform as 'twitch' | 'kick');
 
           void VodQueueModule.getChatDownloadQueue().add(
             'chat_download',
-            { streamerId, vodId: request.body.vodId, platform: request.body.platform as 'twitch' | 'kick', duration: durationSeconds },
-            { jobId: `chat:${request.body.vodId}:${Date.now()}` }
+            { tenantId: streamerId, platformUserId: streamerId, vodId: request.body.vodId, platform: request.body.platform as 'twitch' | 'kick', duration: durationSeconds },
+            { jobId: `chat_${request.body.vodId}` }
           );
 
-          const chatJobId = `chat:${request.body.vodId}:${Date.now()}`;
+          const chatJobId = `chat_${request.body.vodId}`;
 
           request.log.info(`[${streamerId}] Queued live HLS download jobs for ${request.body.vodId}: vod=${vodJobId}, chat=${chatJobId}`);
 
@@ -341,12 +341,12 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         }
 
         // Queue VOD download job
-        const vodDownloadJob = { streamerId, vodId: request.body.vodId, platform: platform };
+        const vodDownloadJob = { tenantId: streamerId, platformUserId: streamerId, vodId: request.body.vodId, platform: platform };
 
         const VodQueueModule = await import('../../../jobs/queues');
 
         void VodQueueModule.getVODDownloadQueue().add('vod_download', vodDownloadJob, {
-          jobId: `hls:${request.body.vodId}:${Date.now()}`,
+          jobId: `hls_${request.body.vodId}`,
         });
 
         // Queue chat download job
@@ -354,15 +354,15 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
         void VodQueueModule.getChatDownloadQueue().add(
           'chat_download',
-          { streamerId, vodId: request.body.vodId, platform: platform, duration: durationSeconds },
+          { tenantId: streamerId, platformUserId: streamerId, vodId: request.body.vodId, platform: platform, duration: durationSeconds },
           {
-            jobId: `hls-chat:${request.body.vodId}:${Date.now()}`,
+            jobId: `hls-chat_${request.body.vodId}`,
           }
         );
 
         request.log.info(`[${streamerId}] Queued HLS download jobs for ${request.body.vodId} (platform=${platform})`);
 
-        return { data: { message: 'HLS download jobs queued', vodId: request.body.vodId, platform, jobId: `hls:${request.body.vodId}:${Date.now()}` } };
+        return { data: { message: 'HLS download jobs queued', vodId: request.body.vodId, platform, jobId: `hls_${request.body.vodId}` } };
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
