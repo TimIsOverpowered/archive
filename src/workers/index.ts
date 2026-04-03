@@ -179,6 +179,23 @@ async function bootstrap() {
     registerWorker('dmca_processing', dmcaWorker);
     queues.set('dmca_processing', new Queue<DmcaProcessingJob, unknown, string>(QUEUE_NAMES.DMCA_PROCESSING as string, { connection: redisConnection }));
 
+    vodWorker.on('active', async (job) => {
+      if (!job) return;
+
+      const data = job.data;
+      logger.info(
+        {
+          jobId: String(job.id),
+          vodId: data?.vodId,
+          platform: data?.platform,
+          tenantId: data?.tenantId,
+          platformUserId: data?.platformUserId,
+          attemptsMade: job.attemptsMade,
+        },
+        `VOD download job started processing`
+      );
+    });
+
     vodWorker.on('completed', async (job) => {
       if (!job) return;
 
@@ -220,6 +237,16 @@ async function bootstrap() {
 
       const data = job.data;
       logger.debug({ jobId: String(job.id), vodId: data?.vodId, progress }, `VOD download progress update`);
+    });
+
+    vodWorker.on('error', (err) => {
+      logger.error(
+        {
+          errorMessage: err.message || String(err),
+          errorStack: 'stack' in err ? String((err as Error & { stack?: string }).stack) : 'No stack trace available',
+        },
+        `VOD worker error (not job-specific)`
+      );
     });
 
     chatWorker.on('completed', async (job) => {
