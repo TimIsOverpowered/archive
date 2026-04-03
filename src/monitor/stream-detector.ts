@@ -504,6 +504,7 @@ async function enqueueLiveHlsDownload(params: {
         jobId: `live_hls_${params.vodId}`,
         attempts: 10,
         backoff: { type: 'exponential' as const, delay: 5000 },
+        deduplication: { id: `live_hls_${params.vodId}` },
       }
     );
 

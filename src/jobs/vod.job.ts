@@ -5,7 +5,10 @@ export async function enqueueVodDownload(job: Omit<VODDownloadJob, 'id'>, jobId:
   const queue = getVODDownloadQueue();
 
   try {
-    const addedJob = await queue.add('vod_download', job, { jobId });
+    const addedJob = await queue.add('vod_download', job, {
+      jobId,
+      deduplication: { id: jobId },
+    });
     return addedJob.id ?? null;
   } catch {
     return null;

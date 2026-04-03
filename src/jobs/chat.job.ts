@@ -5,7 +5,10 @@ export async function enqueueChatDownload(job: Omit<ChatDownloadJob, 'id'>, jobI
   const queue = getChatDownloadQueue();
 
   try {
-    const addedJob = await queue.add('chat_download', job, { jobId });
+    const addedJob = await queue.add('chat_download', job, {
+      jobId,
+      deduplication: { id: jobId },
+    });
     return addedJob.id ?? null;
   } catch {
     return null;
