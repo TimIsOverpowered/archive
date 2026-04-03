@@ -491,11 +491,6 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         const result = await fetchTwitchPlaylist(vodId, log, retryCount, maxRetryBeforeEndDetection);
 
         if (!result) {
-          if (retryCount > maxRetryBeforeEndDetection) {
-            log.error({ vodId }, `[${vodId}] No segments found and stream is offline. Failing job.`);
-            throw new Error('Stream ended before any segments were downloaded');
-          }
-
           retryCount++;
           await sleep(getRetryDelay(retryCount));
           continue;
@@ -507,12 +502,6 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         const result = await fetchKickPlaylist(vodId, sourceUrl, log, retryCount, maxRetryBeforeEndDetection, kickSession ?? undefined);
 
         if (!result) {
-          if (retryCount > maxRetryBeforeEndDetection * 2 && !sourceUrl) {
-            log.error({ vodId }, `[${vodId}] Kick HLS source URL not available and no segments downloaded`);
-            await streamerClient.vod.update({ where: { id: vodId }, data: { is_live: false } });
-            throw new Error('Kick HLS source URL not available');
-          }
-
           retryCount++;
           await sleep(getRetryDelay(retryCount));
           continue;
@@ -529,7 +518,6 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
         retryCount++;
         await sleep(60000);
-
         continue;
       }
 
@@ -611,7 +599,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
 
       await sleep(getRetryDelay(retryCount));
 
-      if (retryCount > maxRetryBeforeEndDetection + 12) {
+      if (retryCount > maxRetryBeforeEndDetection) {
         // Higher threshold for complete failures vs just no segments
         log.error(`[${vodId}] Aborting live HLS download after ${retryCount} consecutive errors`);
 
