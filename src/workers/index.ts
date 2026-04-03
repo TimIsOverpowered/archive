@@ -45,17 +45,16 @@ export function registerWorker(name: WorkerName, worker: Worker) {
 async function clearAllJobsOnStartup() {
   const queues = [getQueue(QUEUE_NAMES.VOD_DOWNLOAD), getQueue(QUEUE_NAMES.CHAT_DOWNLOAD), getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD), getQueue(QUEUE_NAMES.DMCA_PROCESSING)];
 
-  for (const queue of queues) {
-    logger.warn({ queue: queue.name }, `Clearing all jobs from ${queue.name} queue`);
+  logger.info('Clearing all jobs from all queues on startup');
 
-    try {
+  await Promise.allSettled(
+    queues.map(async (queue) => {
       await queue.obliterate({ force: true });
-      logger.info({ queue: queue.name }, `Cleared all jobs from ${queue.name} queue`);
-    } catch (error) {
-      const details = extractErrorDetails(error);
-      logger.error({ queue: queue.name, error: details.message }, `Failed to clear jobs from ${queue.name} queue`);
-    }
-  }
+      return queue.name;
+    })
+  );
+
+  logger.info({ total: queues.length }, `Cleared ${queues.length} queues`);
 }
 
 async function getLastFailedJob(queue: Queue): Promise<LastFailedJob | null> {
@@ -158,7 +157,7 @@ async function bootstrap() {
     logger.info('Stream detection monitoring started');
 
     // Wait for Redis to be ready before creating workers
-    await waitForRedisReady(30000);
+    await waitForRedisReady;
 
     const redisConnection = redisInstance;
     redisConnectionForWorkers = redisConnection;

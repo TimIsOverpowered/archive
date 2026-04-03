@@ -14,6 +14,29 @@ const redisOptions: RedisOptions = {
 
 const redisInstance = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', redisOptions);
 
+// Wait for ready event with timeout (register BEFORE connect)
+const readyTimeout = 30000;
+let readyResolved = false;
+let readyPromise: Promise<void>;
+
+const readyHandler = () => {
+  if (readyResolved) return;
+  readyResolved = true;
+  clearTimeout(timeoutId);
+  logger.info('[Workers Redis] Connection ready - BullMQ can now process jobs');
+};
+
+const timeoutId = setTimeout(() => {
+  redisInstance.off('ready', readyHandler);
+  const errorMsg = `Redis did not become ready after ${readyTimeout}ms`;
+  logger.fatal({ timeoutMs: readyTimeout }, errorMsg);
+}, readyTimeout);
+
+readyPromise = new Promise<void>((resolve, reject) => {
+  redisInstance.on('ready', readyHandler);
+  resolve(); // Will be called by readyHandler
+});
+
 // Connection event handlers using project logger
 redisInstance.on('error', (err) => {
   logger.error({ err: err.message }, '[Workers Redis] Connection error');
@@ -21,10 +44,6 @@ redisInstance.on('error', (err) => {
 
 redisInstance.on('connect', () => {
   logger.info('[Workers Redis] Connected to Redis server');
-});
-
-redisInstance.on('ready', () => {
-  logger.info('[Workers Redis] Connection ready - BullMQ can now process jobs');
 });
 
 redisInstance.on('close', () => {
@@ -48,22 +67,5 @@ export function isRedisReady(): boolean {
   return redisInstance.status === 'ready';
 }
 
-// Wait for Redis to be ready with timeout
-export async function waitForRedisReady(timeoutMs: number = 30000): Promise<void> {
-  const startTime = Date.now();
-
-  logger.info('[Workers] Waiting for Redis connection to be ready...');
-
-  while (!isRedisReady()) {
-    const elapsed = Date.now() - startTime;
-
-    if (elapsed >= timeoutMs) {
-      logger.fatal({ timeoutMs, elapsed, status: redisInstance.status }, '[Workers] Redis connection timeout - workers cannot start without Redis');
-      throw new Error(`Redis did not become ready within ${timeoutMs}ms`);
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-
-  logger.info('[Workers] Redis connection is ready');
-}
+// Export readyPromise for bootstrap to await
+export { readyPromise as waitForRedisReady };

@@ -79,12 +79,6 @@ const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, opti
       redisClient?.on('ready', readyHandler);
     });
 
-    // Add timeout to connection attempt
-    logger.info('Attempting Redis connection...');
-
-    const connectPromise = redisClient.connect();
-    await connectPromise;
-
     if (!redisClient) {
       logger.error('Redis client became null after connection');
       throw new Error('Redis client lost during connection');
