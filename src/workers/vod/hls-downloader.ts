@@ -1,8 +1,5 @@
 import fsPromises from 'fs/promises';
 import { extractErrorDetails, createErrorContext, throwOnHttpError } from '../../utils/error.js';
-import { childLogger } from '../../utils/logger.js';
-
-const log = childLogger({ module: 'hls-downloader' });
 import fs from 'fs';
 import pathMod from 'path';
 import HLS from 'hls-parser';
@@ -16,13 +13,10 @@ import { createAutoLogger as loggerWithTenant } from '../../utils/auto-tenant-lo
 import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 import { sleep, getRetryDelay } from '../../utils/delay.js';
-import Redis from 'ioredis';
 import type { ReadableStream as NodeWebStream } from 'node:stream/web';
 import pLimit from 'p-limit';
 import { updateChapterDuringDownload, finalizeKickChapters } from '../../services/kick.js';
 import { saveVodChapters as saveTwitchVodChapters } from '../../services/twitch.js';
-
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 export interface HlsDownloadOptions {
   vodId: string;
