@@ -84,7 +84,7 @@ function extractEdges(commentsObj: Record<string, unknown>): TwitchChatEdge[] {
 }
 
 const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job: Job<ChatDownloadJob>): Promise<ChatDownloadResult> => {
-  const { tenantId, platformUserId, platformUsername, vodId, platform, duration, startOffset } = job.data;
+  const { tenantId, vodId, platform, duration, startOffset } = job.data;
   const log = createAutoLogger(tenantId);
 
   if (platform !== 'twitch') {

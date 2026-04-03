@@ -355,6 +355,8 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
       vodId,
       platform,
       tenantId,
+      platformUserId,
+      platformUsername,
       startedAt,
       hasSourceUrl: !!sourceUrl,
     },
