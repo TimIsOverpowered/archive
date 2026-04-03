@@ -7,6 +7,7 @@ import { fetchComments, fetchNextComments, type TwitchChatEdge } from '../servic
 import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/discord-alerts.js';
 import type { ChatDownloadJob, ChatDownloadResult } from '../jobs/queues.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
+import { parseDuration } from '../utils/formatting.js';
 
 // Custom JSON value type compatible with Prisma's InputJsonValue without importing internal types
 type JsonValue = string | number | boolean | { [key: string]: JsonValue } | JsonValue[];
@@ -26,7 +27,7 @@ const BATCH_SIZE = 2500;
 const RATE_LIMIT_MS = 150;
 
 function formatTime(seconds: number): string {
-  const { hrs, mins, secs } = { hrs: Math.floor(seconds / 3600), mins: Math.floor((seconds % 3600) / 60), secs: seconds % 60 };
+  const { hrs, mins, secs } = parseDuration(seconds);
   return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toFixed(1).toString()}`;
 }
 

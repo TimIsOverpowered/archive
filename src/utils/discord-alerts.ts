@@ -1,4 +1,4 @@
-import { extractErrorDetails } from './error.js';
+import { extractErrorDetails, throwOnHttpError } from './error.js';
 import { formatDuration } from './formatting.js';
 import { logger } from './logger.js';
 import { getTenantDisplayName } from '../config/loader.js';
@@ -105,7 +105,7 @@ export async function sendDiscordAlert(message: string): Promise<string | null> 
       signal: AbortSignal.timeout(10000),
     });
 
-    if (!response.ok) throw new Error(`Webhook failed with status ${response.status}`);
+    throwOnHttpError(response, 'Webhook');
 
     const data = await response.json();
 
@@ -141,7 +141,7 @@ export async function updateDiscordMessage(messageId: string, message: string): 
       signal: AbortSignal.timeout(10000),
     });
 
-    if (!response.ok) throw new Error(`Webhook failed with status ${response.status}`);
+    throwOnHttpError(response, 'Webhook');
   } catch (err) {
     logger.error(extractErrorDetails(err), 'Failed to update Discord message');
   }
@@ -179,7 +179,7 @@ export async function sendRichAlert(data: RichEmbedData): Promise<string | null>
       signal: AbortSignal.timeout(10000),
     });
 
-    if (!response.ok) throw new Error(`Webhook failed with status ${response.status}`);
+    throwOnHttpError(response, 'Webhook');
 
     const responseData = await response.json();
 
@@ -302,7 +302,7 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
       signal: AbortSignal.timeout(10000),
     });
 
-    if (!response.ok) throw new Error(`Webhook failed with status ${response.status}`);
+    throwOnHttpError(response, 'Webhook');
 
     const responseData = await response.json();
     return responseData.id || null;

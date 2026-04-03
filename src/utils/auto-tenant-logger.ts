@@ -8,7 +8,7 @@ type AppLogger = typeof baseLogger;
 type InternalLogCall = (arg1: unknown, ...args: unknown[]) => void;
 
 export function createAutoLogger(tenantId?: string | null): AppLogger {
-  if (!tenantId || tenantId === 'null') {
+  if (!tenantId) {
     return baseLogger;
   }
 

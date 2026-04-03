@@ -1,5 +1,5 @@
 import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
-import { extractErrorDetails, createErrorContext } from '../utils/error.js';
+import { extractErrorDetails, createErrorContext, throwOnHttpError } from '../utils/error.js';
 import { getStreamerConfig as getConfig } from '../config/loader.js';
 import { toHHMMSS } from '../utils/formatting.js';
 import { PrismaClient } from '../../generated/streamer/client.js';
@@ -52,7 +52,7 @@ export async function getAppAccessToken(streamerId: string): Promise<string> {
     method: 'POST',
     signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) throw new Error(`Twitch token failed with status ${response.status}`);
+  throwOnHttpError(response, 'Twitch token');
   const data = await response.json();
   const { access_token, expires_in } = data;
   tokenCache.set(streamerId, {
@@ -73,7 +73,7 @@ export async function getVodData(vodId: string, streamerId: string): Promise<Vod
     },
     signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) throw new Error(`Twitch API failed with status ${response.status}`);
+  throwOnHttpError(response, 'Twitch API');
   const data = await response.json();
   if (!data.data || data.data.length === 0) {
     throw new Error(`VOD ${vodId} not found`);
@@ -108,7 +108,7 @@ export async function getVodTokenSig(vodId: string): Promise<VodTokenSig> {
     }),
     signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) throw new Error(`Twitch token sig failed with status ${response.status}`);
+  throwOnHttpError(response, 'Twitch token sig');
   const data = await response.json();
   const token = data.data.videoPlaybackAccessToken;
   if (!token) {
@@ -122,7 +122,7 @@ export async function getVodTokenSig(vodId: string): Promise<VodTokenSig> {
 export async function getM3u8(vodId: string, token: string, sig: string): Promise<string> {
   const url = `https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h265,h264&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`;
   const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
-  if (!response.ok) throw new Error(`Twitch M3U8 failed with status ${response.status}`);
+  throwOnHttpError(response, 'Twitch M3U8');
   return response.text();
 }
 export async function fetchComments(vodId: string, offset = 0): Promise<Record<string, unknown> | null> {
@@ -148,7 +148,7 @@ export async function fetchComments(vodId: string, offset = 0): Promise<Record<s
     }),
     signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) throw new Error(`Twitch comments failed with status ${response.status}`);
+  throwOnHttpError(response, 'Twitch comments');
   const data = await response.json();
   return data.data?.video || null;
 }
@@ -175,7 +175,7 @@ export async function fetchNextComments(vodId: string, cursor: string): Promise<
     }),
     signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) throw new Error(`Twitch next comments failed with status ${response.status}`);
+  throwOnHttpError(response, 'Twitch next comments');
   const data = await response.json();
   return data.data?.video || null;
 }
@@ -201,7 +201,7 @@ export async function getChapters(vodId: string): Promise<Record<string, unknown
     }),
     signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) throw new Error(`Twitch chapters failed with status ${response.status}`);
+  throwOnHttpError(response, 'Twitch chapters');
   const data = await response.json();
   return data?.data || null;
 }
@@ -232,7 +232,7 @@ export async function getChapter(vodId: string): Promise<Record<string, unknown>
     }),
     signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) throw new Error(`Twitch chapter failed with status ${response.status}`);
+  throwOnHttpError(response, 'Twitch chapter');
   const data = await response.json();
   return data.data?.video || null;
 }
@@ -248,7 +248,7 @@ export async function getGameData(gameId: string, streamerId: string): Promise<R
     },
     signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) throw new Error(`Twitch game data failed with status ${response.status}`);
+  throwOnHttpError(response, 'Twitch game data');
   const data = await response.json();
   if (!data.data || data.data.length === 0) {
     return null;
@@ -274,7 +274,7 @@ export async function getChannelBadges(streamerId: string): Promise<Record<strin
       },
       signal: AbortSignal.timeout(10000),
     });
-    if (!response.ok) throw new Error(`Twitch badges failed with status ${response.status}`);
+    throwOnHttpError(response, 'Twitch badges');
     const data = await response.json();
     const badgesData = data?.data || null;
     if (!badgesData) {
@@ -298,7 +298,7 @@ export async function getGlobalBadges(streamerId: string): Promise<Record<string
       headers: { Authorization: `Bearer ${accessToken}`, 'Client-Id': creds.clientId },
       signal: AbortSignal.timeout(10000),
     });
-    if (!response.ok) throw new Error(`Twitch global badges failed with status ${response.status}`);
+    throwOnHttpError(response, 'Twitch global badges');
     const data = await response.json();
     return (data?.data || null) as Record<string, unknown>;
   } catch (error: unknown) {
@@ -396,9 +396,7 @@ export async function downloadVodAsMp4(vodId: string, streamerId: string): Promi
     // Fetch m3u8 playlist and detect fMP4 format (Twitch can use both .ts or fMP4)
     const response = await fetch(m3u8Url);
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch Twitch HLS playlist: ${response.status} ${response.statusText}`);
-    }
+    throwOnHttpError(response, 'Twitch HLS playlist');
 
     const m3u8Content = await response.text();
     const isFmp4 = detectFmp4FromPlaylist(m3u8Content);

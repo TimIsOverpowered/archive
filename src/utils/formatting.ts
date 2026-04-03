@@ -1,7 +1,7 @@
 /**
  * Converts seconds to hours, minutes, and seconds components.
  */
-function parseDuration(seconds: number): { hrs: number; mins: number; secs: number } {
+export function parseDuration(seconds: number): { hrs: number; mins: number; secs: number } {
   const hrs = Math.floor(seconds / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;

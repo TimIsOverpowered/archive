@@ -80,3 +80,13 @@ export function createErrorContext(error: unknown, additionalContext?: Record<st
   const context = { ...additionalContext, error: details.message };
   return context as { error: string } & Record<string, unknown>;
 }
+
+/**
+ * Throws an error if the HTTP response is not ok.
+ * Standardizes HTTP error handling across the codebase.
+ */
+export function throwOnHttpError(response: Response, context: string = 'HTTP request'): asserts response is Response {
+  if (!response.ok) {
+    throw new Error(`${context} failed with status ${response.status} ${response.statusText}`);
+  }
+}
