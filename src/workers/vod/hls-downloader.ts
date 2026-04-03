@@ -189,25 +189,28 @@ async function cleanupVodProgress(vodId: string): Promise<void> {
 function updateAlertProgress(messageId: string | null, platform: string, totalSegmentsFound: number, vodId: string, startedAt?: string): void {
   if (!messageId || !isAlertsEnabled()) return;
 
+  // Calculate elapsed time
+  const startTime = startedAt ? new Date(startedAt) : new Date();
+  const elapsedSeconds = Math.floor((Date.now() - startTime.getTime()) / 1000);
+
+  // Format as HH:MM:SS
+  const hours = Math.floor(elapsedSeconds / 3600);
+  const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+  const seconds = elapsedSeconds % 60;
+  const elapsedFormatted = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
   const fields = [
     { name: 'Platform', value: platform, inline: true },
-    { name: 'Segments', value: String(totalSegmentsFound), inline: false },
+    { name: 'Segments', value: String(totalSegmentsFound), inline: true },
+    { name: 'Elapsed Time', value: elapsedFormatted, inline: false },
   ];
-
-  if (totalSegmentsFound > 20 && totalSegmentsFound < 40) {
-    fields.push({ name: 'Progress', value: '~30%', inline: false });
-  } else if (totalSegmentsFound > 45 && totalSegmentsFound < 80) {
-    fields.push({ name: 'Progress', value: '~60%', inline: false });
-  } else if (totalSegmentsFound > 150) {
-    fields.push({ name: 'Progress', value: '~90%', inline: false });
-  }
 
   updateDiscordEmbed(messageId, {
     title: `📥 Downloading ${vodId}`,
     description: `${platform.toUpperCase()} live HLS download in progress`,
     status: 'warning',
     fields,
-    timestamp: startedAt || new Date().toISOString(),
+    timestamp: startTime.toISOString(),
     updatedTimestamp: new Date().toISOString(),
   });
 }
