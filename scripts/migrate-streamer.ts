@@ -322,6 +322,7 @@ const main = async () => {
         try {
           await client.query('ALTER TABLE logs RENAME TO chat_messages');
           await client.query('ALTER TABLE "chat_messages" RENAME COLUMN "createdAt" TO "created_at"');
+          await client.query('ALTER TABLE "chat_messages" RENAME COLUMN "updatedAt" TO "updated_at"');
           console.log('✅ Renamed logs table to chat_messages\n');
         } catch (renameError) {
           errors.push(`Failed to rename logs table: ${String(renameError)}`);
