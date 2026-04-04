@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
-import { extractErrorDetails } from '../../../utils/error.js';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
+import path from 'path';
 import type { VodData as TwitchVodData } from '../../../services/twitch.js';
 import { getStreamerConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
@@ -8,6 +8,7 @@ import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { validateTenantPlatform, findVodRecord, parseDurationToSeconds, queueEmoteFetch } from './utils/vod-helpers';
 import type { KickVod } from '../../../services/kick.js';
 import { getClient } from '../../../db/client.js';
+import { fileExists } from '../../../utils/path.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -25,6 +26,40 @@ type VodRecord = {
   stream_id: string | null;
   platform: string;
 };
+
+interface Logger {
+  info: (context: Record<string, unknown>, message: string) => void;
+  debug: (context: Record<string, unknown>, message: string) => void;
+  warn: (context: Record<string, unknown>, message: string) => void;
+  error: (context: Record<string, unknown>, message: string) => void;
+}
+
+async function validateVodFile(streamerId: string, vodId: string, expectedDuration: number, filePath: string, log: Logger): Promise<{ valid: boolean; filePath: string }> {
+  const exists = await fileExists(filePath);
+
+  if (!exists) {
+    log.debug({ streamerId, vodId, filePath }, `File does not exist`);
+    return { valid: false, filePath };
+  }
+
+  const ffmpegModule = await import('../../../utils/ffmpeg.js');
+  const actualDuration = await ffmpegModule.getDuration(filePath);
+
+  if (actualDuration === null) {
+    log.warn({ streamerId, vodId, filePath }, `Could not determine file duration`);
+    return { valid: false, filePath };
+  }
+
+  const durationDiff = Math.abs(actualDuration - expectedDuration);
+
+  if (durationDiff <= 1) {
+    log.info({ streamerId, vodId, expectedDuration, actualDuration, filePath }, `File exists and duration is valid`);
+    return { valid: true, filePath };
+  }
+
+  log.warn({ streamerId, vodId, expectedDuration, actualDuration, diff: durationDiff, filePath }, `File duration mismatch exceeds tolerance`);
+  return { valid: false, filePath };
+}
 
 export default async function downloadJobsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
@@ -118,7 +153,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         vodRecord = (await client.vod.create({
           data: {
             id: String(vodId),
-            title: vodMetadata.title || null,
+            title: vodMetadata.session_title || null,
             created_at: new Date(vodMetadata.created_at),
             duration: Math.floor(Number(vodMetadata.duration) / 1000), // Convert ms to seconds
             stream_id: `${vodMetadata.id}`,
@@ -141,12 +176,12 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
     }
   }
 
-  // Main download endpoint - creates VOD record if missing, then queues download + emote + chat jobs (Twitch/Kick)
+  // Main download endpoint - creates VOD record if missing, then queues download + emote + chat jobs + upload (Twitch/Kick)
   fastify.post<{
-    Body: { vodId: string; type?: 'live' | 'vod'; platform: 'twitch' | 'kick'; path?: string };
+    Body: { vodId: string; type?: 'live' | 'vod'; platform: 'twitch' | 'kick'; path?: string; uploadMode?: 'vod' | 'all'; mode?: 'hls' | 'mp4' };
     Params: { id: string };
   }>(
-    '/:id/download',
+    '/:id/upload',
     {
       schema: {
         tags: ['Admin', 'Tenants'],
@@ -156,11 +191,12 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           type: 'object',
           properties: {
             vodId: { type: 'string' },
-            type: { type: 'string', enum: ['live', 'vod'] },
+            type: { type: 'string', enum: ['live', 'vod'], default: 'vod' },
             platform: { type: 'string', enum: ['twitch', 'kick'] },
-            path: { type: 'string' },
+            mode: { type: 'string', enum: ['hls', 'mp4'], default: 'hls' },
+            uploadMode: { type: 'string', enum: ['vod', 'all'], default: 'all' },
           },
-          required: ['vodId', 'type', 'platform'],
+          required: ['vodId', 'platform'],
         },
         security: [{ apiKey: [] }],
       },
@@ -170,14 +206,14 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       const streamerId = request.params.id;
 
       try {
-        // Get config for reference to username fields if needed
-        const config = getStreamerConfig(streamerId);
-
         // Validate tenant and platform enablement
         const platform = request.body.platform;
         const validation = validateTenantPlatform(streamerId, platform);
 
         if (validation.error) throw validation.error;
+
+        // Get config for reference to username fields if needed
+        const config = validation.config;
 
         // Ensure VOD record exists or create it from platform API metadata
         const vodRecord: VodRecord | null = await ensureVodRecord(streamerId, request.body.vodId, request.body.platform as 'twitch' | 'kick', request.log);
@@ -187,29 +223,72 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         }
 
         // Queue emote save job (fire-and-forget within request context)
-        const channelId = vodRecord.stream_id ? String(vodRecord.stream_id) : undefined;
+        const platformId = config?.[platform]?.id;
 
-        if (channelId) {
+        if (platformId) {
           await queueEmoteFetch({
             streamerId,
-            vodId: request.body.vodId,
+            vodId: vodRecord.id,
             platform: request.body.platform as 'twitch' | 'kick',
-            channelId,
+            platformId,
             log: request.log,
           });
         } else {
-          request.log.warn(`[${streamerId}] No channel ID available for emote fetching on VOD ${request.body.vodId}`);
+          request.log.warn(`[${streamerId}] No platform ID available for emote fetching on VOD ${request.body.vodId}`);
+        }
+
+        // Determine file path based on type
+        const type = request.body.type;
+        const streamerConfig = getStreamerConfig(streamerId);
+        const filePath =
+          type === 'live'
+            ? streamerConfig?.settings.livePath
+              ? path.join(streamerConfig.settings.livePath, streamerId, `${vodRecord.id}.mp4`)
+              : ''
+            : streamerConfig?.settings.vodPath
+              ? path.join(streamerConfig.settings.vodPath, streamerId, `${vodRecord.id}.mp4`)
+              : '';
+
+        // File validation before download
+        let skipDownload = false;
+
+        if (filePath) {
+          const validation = await validateVodFile(streamerId, vodRecord.id, vodRecord.duration, filePath, request.log);
+
+          if (validation.valid) {
+            skipDownload = true;
+          }
         }
 
         // Queue VOD download job
-
-        // Handle download based on type (vod = archived, live = streaming)
-        if (request.body.type === 'live') {
+        if (request.body.mode === 'hls') {
           // Live stream HLS download - queue job for hls-downloader.ts handler
+
+          if (skipDownload) {
+            const { queueYoutubeUpload } = await import('../../../utils/upload-queue.js');
+
+            await queueYoutubeUpload(streamerId, vodRecord.id, filePath, request.body.uploadMode || 'all', request.body.platform, request.log);
+
+            return {
+              data: {
+                message: 'Live file already exists and validated, upload queued',
+                vodId: vodRecord.id,
+                path: filePath,
+                platform: request.body.platform,
+              },
+            };
+          }
 
           const VodQueueModule = await import('../../../jobs/queues');
 
-          const vodDownloadJob = { tenantId: streamerId, platformUserId: streamerId, vodId: request.body.vodId, platform };
+          const vodDownloadJob = {
+            tenantId: streamerId,
+            platformUserId: streamerId,
+            vodId: request.body.vodId,
+            platform,
+            uploadAfterDownload: true,
+            uploadMode: request.body.uploadMode || 'all',
+          };
 
           void VodQueueModule.getVODDownloadQueue().add('vod_download', vodDownloadJob, {
             jobId: `download_${request.body.vodId}`,
@@ -231,49 +310,56 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           request.log.info(`[${streamerId}] Queued live HLS download jobs for ${request.body.vodId}: vod=${vodJobId}, chat=${chatJobId}`);
 
           return { data: { message: 'Live HLS download queued', vodId: request.body.vodId, jobId: vodJobId, chatJobId } };
-        } else if (request.body.type === 'vod' || !request.body.type) {
-          // Standard archived VOD re-download - use platform-specific MP4 functions directly with Discord alerts
+        } else if (request.body.mode === 'mp4') {
+          // Standard archived VOD re-download - queue job for standard-vod-downloader.ts handler
 
-          if (platform === 'kick') {
-            const kickModule = await import('../../../services/kick.js');
+          if (skipDownload && filePath) {
+            const { queueYoutubeUpload } = await import('../../../utils/upload-queue.js');
 
-            // Fetch VOD metadata to get source URL
-            const username = config?.kick?.username;
+            await queueYoutubeUpload(streamerId, vodRecord.id, filePath, request.body.uploadMode || 'all', request.body.platform, request.log);
 
-            if (!username) {
-              throw new Error('Kick username not configured for streamer');
-            }
-
-            const vodMetadata: KickVod = await kickModule.getVod(username, request.body.vodId);
-
-            if (!vodMetadata) {
-              throw new Error(`Kick VOD ${request.body.vodId} not found`);
-            }
-
-            // Call MP4 download with Discord alerts built-in
-            const outputPath = await kickModule.downloadMP4(streamerId, vodMetadata);
-
-            if (!outputPath) {
-              throw new Error(`Failed to download Kick VOD ${request.body.vodId}`);
-            }
-
-            return { data: { message: 'Kick VOD downloaded successfully', vodId: request.body.vodId, path: outputPath, platform: 'kick' } };
-          } else if (platform === 'twitch') {
-            const twitchModule = await import('../../../services/twitch.js');
-
-            // Call MP4 download with Discord alerts built-in
-            const outputPath = await twitchModule.downloadVodAsMp4(request.body.vodId, streamerId);
-
-            if (!outputPath) {
-              throw new Error(`Failed to download Twitch VOD ${request.body.vodId}`);
-            }
-
-            return { data: { message: 'Twitch VOD downloaded successfully', vodId: request.body.vodId, path: outputPath, platform: 'twitch' } };
-          } else {
-            throw new Error(`Unsupported platform for MP4 download: ${platform}`);
+            return {
+              data: {
+                message: 'File already exists and validated, upload queued',
+                vodId: vodRecord.id,
+                path: filePath,
+                platform: request.body.platform,
+              },
+            };
           }
+
+          const VodQueueModule = await import('../../../jobs/queues');
+
+          const vodDownloadJob = {
+            tenantId: streamerId,
+            platformUserId: streamerId,
+            vodId: request.body.vodId,
+            platform,
+            uploadMode: request.body.uploadMode || 'all',
+          };
+
+          void VodQueueModule.getVODDownloadQueue().add('standard_vod_download', vodDownloadJob, {
+            jobId: `download_${request.body.vodId}`,
+          });
+
+          const vodJobId = `download_${request.body.vodId}`;
+
+          // Calculate duration for chat download job
+          const durationSeconds = parseDurationToSeconds(vodRecord.duration, request.body.platform as 'twitch' | 'kick');
+
+          void VodQueueModule.getChatDownloadQueue().add(
+            'chat_download',
+            { tenantId: streamerId, platformUserId: streamerId, vodId: request.body.vodId, platform, duration: durationSeconds },
+            { jobId: `chat_${request.body.vodId}` }
+          );
+
+          const chatJobId = `chat_${request.body.vodId}`;
+
+          request.log.info(`[${streamerId}] Queued standard VOD download jobs for ${request.body.vodId}: vod=${vodJobId}, chat=${chatJobId}`);
+
+          return { data: { message: 'VOD download queued', vodId: request.body.vodId, jobId: vodJobId, chatJobId } };
         } else {
-          throw new Error('VOD type must be "vod" (archived) or "live"');
+          throw new Error('Download mode must be "hls" or "mp4"');
         }
       } catch (error) {
         request.log.error({ err: error }, `[${streamerId}] Download failed`);
@@ -281,97 +367,5 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       }
     }
   );
-
-  // Convenience endpoint - trigger VOD + chat download together (Twitch/Kick with optional platform param)
-  fastify.post<{
-    Body: { vodId: string; platform?: 'twitch' | 'kick'; skipEmotes?: boolean };
-    Params: { id: string };
-  }>(
-    '/:id/hlsDownload',
-    {
-      schema: {
-        tags: ['Admin', 'Tenants'],
-        description: 'Convenience endpoint - trigger VOD + chat download together (Twitch/Kick with optional platform param)',
-        params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
-        body: {
-          type: 'object',
-          properties: {
-            vodId: { type: 'string' },
-            platform: { type: 'string', enum: ['twitch', 'kick'] },
-            skipEmotes: { type: 'boolean' },
-          },
-          required: ['vodId'],
-        },
-        security: [{ apiKey: [] }],
-      },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
-    },
-    async (request) => {
-      const streamerId = request.params.id;
-
-      try {
-        // Default to Twitch for backward compatibility if platform not specified
-        const platform = (request.body.platform as 'twitch' | 'kick') || 'twitch';
-
-        // Validate tenant and platform enablement
-        const validation = validateTenantPlatform(streamerId, platform);
-
-        if (validation.error) throw validation.error;
-
-        // Ensure VOD record exists or create it from platform API metadata
-        const vodRecord: VodRecord = await ensureVodRecord(streamerId, request.body.vodId, platform, request.log);
-
-        if (!vodRecord) {
-          throw new Error('Failed to create VOD record');
-        }
-
-        // Queue emote save (fire-and-forget)
-        const channelId = vodRecord.stream_id ? String(vodRecord.stream_id) : undefined;
-
-        if (channelId && !request.body.skipEmotes) {
-          await queueEmoteFetch({
-            streamerId,
-            vodId: request.body.vodId,
-            platform: platform,
-            channelId,
-            log: request.log,
-          });
-
-          request.log.info(`[${streamerId}] Queued async emote fetch for hlsDownload VOD ${request.body.vodId} (channel=${channelId})`);
-        }
-
-        // Queue VOD download job
-        const vodDownloadJob = { tenantId: streamerId, platformUserId: streamerId, vodId: request.body.vodId, platform: platform };
-
-        const VodQueueModule = await import('../../../jobs/queues');
-
-        void VodQueueModule.getVODDownloadQueue().add('vod_download', vodDownloadJob, {
-          jobId: `hls_${request.body.vodId}`,
-        });
-
-        // Queue chat download job
-        const durationSeconds = parseDurationToSeconds(vodRecord.duration, platform);
-
-        void VodQueueModule.getChatDownloadQueue().add(
-          'chat_download',
-          { tenantId: streamerId, platformUserId: streamerId, vodId: request.body.vodId, platform: platform, duration: durationSeconds },
-          {
-            jobId: `hls-chat_${request.body.vodId}`,
-          }
-        );
-
-        request.log.info(`[${streamerId}] Queued HLS download jobs for ${request.body.vodId} (platform=${platform})`);
-
-        return { data: { message: 'HLS download jobs queued', vodId: request.body.vodId, platform, jobId: `hls_${request.body.vodId}` } };
-      } catch (error) {
-        const details = extractErrorDetails(error);
-        const errorMsg = details.message;
-        request.log.error(`[${streamerId}] HLS download failed for ${request.body.vodId}: ${errorMsg}`);
-
-        throw new Error('Failed to queue HLS download jobs');
-      }
-    }
-  );
-
   return fastify;
 }

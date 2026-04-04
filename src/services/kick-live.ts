@@ -203,7 +203,7 @@ export async function getLatestKickVodObject(username: string, expectedStreamId:
 
     return {
       id: String(expectedStreamId),
-      title: (vod.session_title as string) || (vod.title as string),
+      title: vod.session_title as string,
       source: (vod.source as string) || undefined,
     };
   } catch (error) {

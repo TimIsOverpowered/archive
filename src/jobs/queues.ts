@@ -19,9 +19,11 @@ export interface LiveHlsDownloadJob {
   tenantId: string;
   platformUserId: string;
   platformUsername?: string;
-  startedAt?: string; // ISO timestamp when live stream was detected
-  sourceUrl?: string; // Kick HLS URL (passed from monitor)
-  isFallback?: boolean; // Flag for Twitch fallback mode (no VOD object found)
+  startedAt?: string;
+  sourceUrl?: string;
+  isFallback?: boolean;
+  uploadAfterDownload?: boolean;
+  uploadMode?: 'vod' | 'all';
 }
 
 export interface ChatDownloadJob {
