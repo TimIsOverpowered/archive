@@ -10,7 +10,7 @@ import { getClient } from '../../../db/client.js';
 import { fileExists } from '../../../utils/path.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { notFound, serviceUnavailable, badRequest, internalServerError } from '../../../utils/http-error';
+import { notFound, serviceUnavailable, badRequest } from '../../../utils/http-error';
 
 type StreamerDbClient = ReturnType<typeof getClient>;
 

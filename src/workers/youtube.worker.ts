@@ -382,8 +382,8 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
             const createdGameRecord = await db.game.create({
               data: {
                 vod_id: vodId,
-                start_time: (startTime + chapter.start).toString(),
-                end_time: (endTime + chapter.start).toString(),
+                start_time: startTime + chapter.start,
+                end_time: endTime + chapter.start,
                 video_provider: 'youtube',
                 video_id: result.videoId,
                 thumbnail_url: result.thumbnailUrl || null,
@@ -482,8 +482,8 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
         const createdGameRecord = await db.game.create({
           data: {
             vod_id: vodId,
-            start_time: chapter.start.toString(),
-            end_time: chapter.end.toString(),
+            start_time: chapter.start,
+            end_time: chapter.end,
             video_provider: 'youtube',
             video_id: result.videoId,
             thumbnail_url: result.thumbnailUrl || null,
