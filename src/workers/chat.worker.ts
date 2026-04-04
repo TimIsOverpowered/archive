@@ -17,7 +17,7 @@ interface ChatMessageCreateInput {
   vod_id: string;
   display_name: string | null;
   content_offset_seconds: string; // String for Decimal precision preservation
-  created_at: Date | null;
+  createdAt: Date;
   message?: JsonValue;
   user_badges?: JsonValue;
   user_color: string | null;
@@ -205,7 +205,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
           vod_id: vodId,
           display_name: ('commenter' in node && node.commenter?.displayName) || null,
           content_offset_seconds: String(offsetSeconds), // Preserve Decimal precision
-          created_at: 'createdAt' in node && node.createdAt ? new Date(node.createdAt as string) : null,
+          createdAt: 'createdAt' in node && node.createdAt ? new Date(node.createdAt as string) : new Date(),
           message,
           user_badges: userBadges ?? undefined,
           user_color: ('message' in node && node.message?.userColor) || '#FFFFFF',

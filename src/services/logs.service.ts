@@ -96,7 +96,7 @@ export async function getLogsByOffset(client: PrismaClient, tenantId: string, vo
       vod_id: vodId,
       content_offset_seconds: { gte: bucket },
     },
-    orderBy: [{ content_offset_seconds: 'asc' }, { id: 'asc' }],
+    orderBy: [{ content_offset_seconds: 'asc' }, { createdAt: 'asc' }],
     take: PAGE_SIZE + 1,
   });
 
@@ -177,7 +177,7 @@ export async function getLogsByCursor(client: PrismaClient, tenantId: string, vo
         },
       ],
     },
-    orderBy: [{ content_offset_seconds: 'asc' }, { id: 'asc' }],
+    orderBy: [{ content_offset_seconds: 'asc' }, { createdAt: 'asc' }],
     take: PAGE_SIZE + 1,
   });
 

@@ -99,11 +99,11 @@ model ChatMessage {
   display_name           String?
   content_offset_seconds Decimal   @db.Decimal
   user_color             String?
-  createdAt              DateTime? @map("created_at") @db.Timestamptz(6)
+  createdAt              DateTime @map("created_at") @db.Timestamptz(6)
   message                Json?
   user_badges            Json?
 
-  @@index([vod_id, content_offset_seconds, id], map: "idx_chat_messages_vod_offset_id")
+  @@index([vod_id, content_offset_seconds, createdAt], map: "idx_chat_messages_vod_offset_created")
   @@map("chat_messages")
 }
 
