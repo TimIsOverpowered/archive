@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-import { RateLimiterRedis } from 'rate-limiter-flexible';
 import path from 'path';
 import type { VodData as TwitchVodData } from '../../../services/twitch.js';
 import { getTenantConfig } from '../../../config/loader';
@@ -9,12 +8,7 @@ import { validateTenantPlatform, findVodRecord, parseDurationToSeconds, queueEmo
 import type { KickVod } from '../../../services/kick.js';
 import { getClient } from '../../../db/client.js';
 import { fileExists } from '../../../utils/path.js';
-
-declare module 'fastify' {
-  interface FastifyInstance {
-    adminRateLimiter: RateLimiterRedis;
-  }
-}
+import { adminRateLimiter } from '../../plugins/redis.plugin';
 
 type StreamerDbClient = ReturnType<typeof getClient>;
 
@@ -62,7 +56,11 @@ async function validateVodFile(tenantId: string, vodId: string, expectedDuration
 }
 
 export default async function downloadJobsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
+  if (!adminRateLimiter) {
+    throw new Error('Rate limiter not initialized');
+  }
+
+  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
 
   /**
    * Shared VOD creation logic for both /download and /hlsDownload endpoints

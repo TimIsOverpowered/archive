@@ -13,6 +13,16 @@ export let publicRateLimiter: RateLimiterRedis | null = null;
 export let chatRateLimiter: RateLimiterRedis | null = null;
 export let adminRateLimiter: RateLimiterRedis | null = null;
 
+export function getRedisStatus(): { status: string; connected: boolean } {
+  if (!redisClient) {
+    return { status: 'not-initialized', connected: false };
+  }
+  return {
+    status: redisClient.status,
+    connected: redisClient.status === 'ready',
+  };
+}
+
 const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, options) => {
   const { url } = options;
 
@@ -134,28 +144,6 @@ const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, opti
     }
 
     logger.warn({ error: errorMessage }, 'Redis connection failed - running without Redis (rate limiting and caching disabled)');
-
-    // Create mock/no-op implementations for development
-    const mockRedis = {
-      ping: async () => 'PONG',
-      get: async () => null,
-      set: async () => 'OK',
-      del: async () => 1,
-      getBuffer: async () => null,
-      setBuffer: async () => 'OK',
-    } as unknown as Redis;
-
-    // Mock rate limiters (always allow in dev without Redis)
-    const mockLimiter = {
-      consume: async () => ({ remainingPoints: 100 }),
-      points: 100,
-      duration: 60,
-    } as unknown as RateLimiterRedis;
-
-    fastify.decorate('redis', mockRedis);
-    fastify.decorate('publicRateLimiter', mockLimiter);
-    fastify.decorate('chatRateLimiter', mockLimiter);
-    fastify.decorate('adminRateLimiter', mockLimiter);
   }
 };
 

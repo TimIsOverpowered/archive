@@ -1,7 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { extractErrorDetails } from '../../../utils/error.js';
 import fs from 'fs/promises';
-import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { getTenantConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
@@ -9,12 +8,7 @@ import type { PrismaClient } from '../../../../generated/streamer/client';
 import type { VodRecordBase } from './types';
 import { enqueueJobWithLogging } from '../../../jobs/utils.js';
 import { fileExists } from '../../../utils/path.js';
-
-declare module 'fastify' {
-  interface FastifyInstance {
-    adminRateLimiter: RateLimiterRedis;
-  }
-}
+import { adminRateLimiter } from '../../plugins/redis.plugin';
 
 interface LiveCallbackBody {
   streamId: string;
@@ -33,7 +27,11 @@ interface LiveCallbackResponseData {
 }
 
 export default async function liveCallbackRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
+  if (!adminRateLimiter) {
+    throw new Error('Rate limiter not initialized');
+  }
+
+  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
 
   // Callback endpoint for twitch-recorder-go when live stream recording completes
   fastify.route<{ Params: LiveCallbackParams; Body: LiveCallbackBody }>({

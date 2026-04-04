@@ -2,17 +2,11 @@ import type { DmcaProcessingJob } from '../../../types/queues.js';
 import { enqueueJobWithLogging } from '../../../jobs/utils.js';
 import { extractErrorDetails } from '../../../utils/error.js';
 import { FastifyInstance } from 'fastify';
-import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { getTenantConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { getClient } from '../../../db/client.js';
-
-declare module 'fastify' {
-  interface FastifyInstance {
-    adminRateLimiter: RateLimiterRedis;
-  }
-}
+import { adminRateLimiter } from '../../plugins/redis.plugin';
 
 type VodRecord = { id: string; platform: 'twitch' | 'kick' };
 
@@ -25,7 +19,6 @@ interface DmcaClaim {
   [key: string]: unknown;
 }
 
-// Cast to match the strict queue definition - incoming API data is loose but we cast at boundary
 type StrictDmcaClaims = Array<{
   type: 'CLAIM_TYPE_AUDIO' | 'CLAIM_TYPE_VISUAL' | 'CLAIM_TYPE_AUDIOVISUAL';
   claimPolicy: { primaryPolicy: { policyType: string } };
@@ -37,7 +30,7 @@ interface DmcaRequestBody {
   claims: DmcaClaim[] | string;
   platform?: 'twitch' | 'kick';
   type?: 'vod' | 'live';
-  partIndex?: number; // Optional - if provided, processes only that part (0-indexed from API)
+  partIndex?: number;
 }
 
 interface ProcessDmcaResponse {
@@ -45,7 +38,11 @@ interface ProcessDmcaResponse {
 }
 
 export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
+  if (!adminRateLimiter) {
+    throw new Error('Rate limiter not initialized');
+  }
+
+  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
 
   /**
    * Shared DMCA processing logic - handles both full VOD and specific part processing

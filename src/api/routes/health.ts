@@ -5,6 +5,7 @@ import { getClient } from '../../db/client';
 import { checkPuppeteerHealth } from '../../utils/puppeteer-health';
 import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator';
 import healthCheckMiddleware from '../middleware/health-check';
+import { getRedisStatus } from '../plugins/redis.plugin';
 
 interface HealthRouteOptions {
   prefix: string;
@@ -37,10 +38,14 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
     async () => {
       const redis = fastify.redis;
       const streamerConfigs = await loadTenantConfigs();
+      const redisStatusInfo = getRedisStatus();
 
       let redisStatus = 'ok';
       try {
         await redis.ping();
+        if (redisStatusInfo.status !== 'ready') {
+          redisStatus = 'unstable';
+        }
       } catch {
         redisStatus = 'error';
       }
@@ -91,7 +96,11 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
       const response = {
         data: {
           status: 'ok',
-          redis: redisStatus,
+          redis: {
+            status: redisStatus,
+            connection: redisStatusInfo.status,
+            connected: redisStatusInfo.connected,
+          },
           streamers,
           workers: workersStatus,
           cloudflareIpCache: cloudflareCache,

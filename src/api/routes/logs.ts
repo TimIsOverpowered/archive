@@ -1,23 +1,21 @@
 import { FastifyInstance } from 'fastify';
-import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { getLogsByOffset, getLogsByCursor } from '../../services/logs.service';
 import { getClient } from '../../db/client';
 import { getTenantConfig } from '../../config/loader';
 import createRateLimitMiddleware from '../middleware/rate-limit';
+import { chatRateLimiter } from '../plugins/redis.plugin';
 
 interface LogsRoutesOptions {
   prefix: string;
 }
 
-declare module 'fastify' {
-  interface FastifyInstance {
-    chatRateLimiter: RateLimiterRedis;
-  }
-}
-
 export default async function logsRoutes(fastify: FastifyInstance, _options: LogsRoutesOptions) {
+  if (!chatRateLimiter) {
+    throw new Error('Rate limiter not initialized');
+  }
+
   const rateLimitMiddleware = createRateLimitMiddleware({
-    limiter: fastify.chatRateLimiter,
+    limiter: chatRateLimiter,
   });
 
   fastify.get(
