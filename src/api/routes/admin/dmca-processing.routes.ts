@@ -1,5 +1,5 @@
-import type { DmcaProcessingJob } from '../../../jobs/queues.js';
-import { enqueueJobWithLogging } from '../../../jobs/queues.js';
+import type { DmcaProcessingJob } from '../../../types/queues.js';
+import { enqueueJobWithLogging } from '../../../jobs/utils.js';
 import { extractErrorDetails } from '../../../utils/error.js';
 import { FastifyInstance } from 'fastify';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
