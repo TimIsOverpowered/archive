@@ -89,13 +89,20 @@ const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, opti
 
     fastify.decorate('redis', redisClient);
 
-    // Pre-fetch Cloudflare IP ranges on startup
+    // Pre-fetch Cloudflare IP ranges on startup (only if missing or expiring soon)
     try {
       const cfValidator = await import('../../utils/cloudflare-ip-validator');
-      await cfValidator.getCloudflareIpRanges();
-      logger.info('Cloudflare IP ranges pre-fetched');
+      const cacheInfo = await cfValidator.getCachedRangeInfo();
+
+      if (!cacheInfo || cacheInfo.status === 'missing' || (cacheInfo.ttlRemaining ?? 0) < 3600) {
+        // Only fetch if missing or less than 1 hour remaining
+        await cfValidator.getCloudflareIpRanges();
+        logger.info('Cloudflare IP ranges pre-fetched (cache was missing/expired)');
+      } else {
+        logger.debug({ ttlRemaining: cacheInfo.ttlRemaining }, 'Cloudflare IP ranges cache is fresh');
+      }
     } catch (err) {
-      logger.warn({ err: err instanceof Error ? err.message : err }, 'Failed to pre-fetch Cloudflare IP ranges');
+      logger.warn({ err: err instanceof Error ? err.message : err }, 'Failed to check Cloudflare IP ranges cache');
     }
 
     // Initialize rate limiters from env vars
