@@ -39,7 +39,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
     method: 'POST',
     url: '/:id/live',
     schema: {
-      tags: ['Admin', 'Live Recording'],
+      tags: ['Admin'],
       description: 'Callback from external recorder when live HLS download/merge completes. Queues YouTube upload.',
       params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
       body: {
@@ -52,6 +52,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         },
         required: ['streamId', 'path', 'platform'],
       },
+      security: [{ apiKey: [] }],
     },
     onRequest: rateLimitMiddleware,
     handler: async (request) => {

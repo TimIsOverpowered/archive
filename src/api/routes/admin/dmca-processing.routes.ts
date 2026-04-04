@@ -133,7 +133,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
     '/:id/dmca',
     {
       schema: {
-        tags: ['Admin', 'Tenants'],
+        tags: ['Admin'],
         description: 'Process DMCA claims for a VOD (or specific part if provided) - mutes audio or applies blackout, then queues YouTube upload',
         params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
         body: {
