@@ -187,15 +187,19 @@ const main = async () => {
             .replace(/ALTER TABLE "emotes"/g, 'ALTER TABLE "emotes_new"')
             .replace(/ALTER TABLE "games"/g, 'ALTER TABLE "games_new"');
 
+          // Remove the entire chat_messages table block first
+          migrationSql = migrationSql.replace(/-- CreateTable\s+CREATE TABLE "chat_messages" \([\s\S]*?\n\);/g, '');
+
+          // Also remove chat_messages index creation
           migrationSql = migrationSql
             .split('\n')
             .filter((line) => {
-              return !line.includes('CREATE TABLE "chat_messages"') && !line.includes('chat_messages_pkey') && !line.includes('idx_chat_messages') && !line.includes('chat_messages_vod_id_fkey');
+              return !line.includes('idx_chat_messages') && !line.includes('chat_messages_vod_id_fkey');
             })
             .join('\n');
 
-          // Remove the entire chat_messages table block (orphaned column definitions)
-          migrationSql = migrationSql.replace(/CREATE TABLE "chat_messages" \([\s\S]*?\n\);/g, '');
+          console.log('Debug: SQL length after processing:', migrationSql.length);
+          console.log('Debug: Contains CREATE TABLE "chat_messages":', migrationSql.includes('CREATE TABLE "chat_messages"'));
 
           await client.query(migrationSql);
           console.log('✅ New schema created successfully\n');
