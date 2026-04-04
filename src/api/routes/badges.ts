@@ -3,6 +3,7 @@ import Redis from 'ioredis';
 import { getTenantConfig } from '../../config/loader';
 import { extractErrorDetails } from '../../utils/error.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
+import { notFound, internalServerError } from '../../utils/http-error';
 
 interface BadgesRoutesOptions {
   prefix: string;
@@ -26,7 +27,7 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
       try {
         const config = getTenantConfig(tenantId);
 
-        if (!config?.twitch?.id) throw new Error('Twitch not configured for this tenant');
+        if (!config?.twitch?.id) notFound('Twitch not configured for this tenant');
 
         // Check Redis cache first (60-minute TTL)
         const redisInstance = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
@@ -71,7 +72,7 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
         const details = extractErrorDetails(error);
         log.error({ ...details, tenantId }, 'Failed to fetch Twitch badges');
 
-        throw new Error('Something went wrong trying to retrieve channel badges..');
+        internalServerError('Something went wrong trying to retrieve channel badges');
       }
     }
   );

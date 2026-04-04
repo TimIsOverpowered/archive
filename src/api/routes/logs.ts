@@ -4,6 +4,7 @@ import { getClient } from '../../db/client';
 import { getTenantConfig } from '../../config/loader';
 import createRateLimitMiddleware from '../middleware/rate-limit';
 import { chatRateLimiter } from '../plugins/redis.plugin';
+import { badRequest, notFound, serviceUnavailable } from '../../utils/http-error';
 
 interface LogsRoutesOptions {
   prefix: string;
@@ -19,7 +20,7 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
   });
 
   fastify.get(
-    '/:/vods/:vodId/logs',
+    '/:tenantId/vods/:vodId/logs',
     {
       schema: {
         tags: ['Chat Logs'],
@@ -53,17 +54,17 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
       const { content_offset_seconds, cursor } = request.query as { content_offset_seconds?: number; cursor?: string };
 
       if (!content_offset_seconds && !cursor) {
-        throw new Error('Missing required query parameter: content_offset_seconds or cursor');
+        badRequest('Missing required query parameter: content_offset_seconds or cursor');
       }
 
       const config = getTenantConfig(tenantId);
       if (!config) {
-        throw new Error('Streamer not found');
+        notFound('Streamer not found');
       }
 
       const client = getClient(tenantId);
       if (!client) {
-        throw new Error('Database not available');
+        serviceUnavailable('Database not available');
       }
 
       let result;
@@ -73,7 +74,7 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
       } else if (content_offset_seconds !== undefined && !isNaN(content_offset_seconds)) {
         result = await getLogsByOffset(client, tenantId, vodId, content_offset_seconds);
       } else {
-        throw new Error('Invalid content_offset_seconds value');
+        badRequest('Invalid content_offset_seconds value');
       }
 
       return { data: result };

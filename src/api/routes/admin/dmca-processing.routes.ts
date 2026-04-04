@@ -8,6 +8,7 @@ import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { getClient } from '../../../db/client.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
+import { notFound, serviceUnavailable, internalServerError } from '../../../utils/http-error';
 
 type VodRecord = { id: string; platform: 'twitch' | 'kick' };
 
@@ -51,7 +52,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
   async function processDmcaRequest(tenantId: string, body: DmcaRequestBody, log: ReturnType<typeof createAutoLogger>): Promise<ProcessDmcaResponse> {
     const config = getTenantConfig(tenantId);
 
-    if (!config) throw new Error('Tenant not found');
+    if (!config) notFound('Tenant not found');
 
     let client: StreamerDbClient | null = null;
 
@@ -59,7 +60,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
 
     if (!client) {
       log.error('Database error in DMCA processing');
-      throw new Error('Database not available');
+      serviceUnavailable('Database not available');
     }
 
     let vodRecord: VodRecord | null = null;
@@ -73,7 +74,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
       // VOD not found or error looking up
     }
 
-    if (!vodRecord) throw new Error('VOD not found');
+    if (!vodRecord) notFound('VOD not found');
 
     // Parse claims from various formats (array or JSON string)
     const claimsArray: DmcaClaim[] = Array.isArray(body.claims) ? body.claims : JSON.parse(typeof body.claims === 'string' ? body.claims : JSON.stringify(body.claims));
@@ -160,7 +161,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
         const errorMsg = details.message;
         log.error(`DMCA processing failed: ${errorMsg}`);
 
-        throw new Error('Failed to queue DMCA processing job');
+        internalServerError('Failed to queue DMCA processing job');
       }
     }
   );
