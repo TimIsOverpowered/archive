@@ -112,13 +112,13 @@ export async function buildServer() {
   fastify.setErrorHandler((error, request, reply) => {
     const details = extractErrorDetails(error);
     const statusCode = (error as { statusCode?: number }).statusCode || 500;
-    const code = (error as { code?: string }).code || 'INTERNAL_ERROR';
+
+    // For 5xx errors, use generic code to avoid leaking internal error codes
+    const isClientError = statusCode >= 400 && statusCode < 500;
+    const code = isClientError ? (error as { code?: string }).code || 'BAD_REQUEST' : 'INTERNAL_ERROR';
+    const errorMessage = isClientError ? details.message : 'Internal server error';
 
     logger.error({ err: details.message, stack: details.stack }, 'Request error');
-
-    // Show actual error message for 4xx errors, generic message for 5xx errors
-    const isClientError = statusCode >= 400 && statusCode < 500;
-    const errorMessage = isClientError ? details.message : 'Internal server error';
 
     return reply.status(statusCode).send({
       error: {
