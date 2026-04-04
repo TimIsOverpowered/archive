@@ -194,6 +194,9 @@ const main = async () => {
             })
             .join('\n');
 
+          // Remove the entire chat_messages table block (orphaned column definitions)
+          migrationSql = migrationSql.replace(/CREATE TABLE "chat_messages" \([\s\S]*?\n\);/g, '');
+
           await client.query(migrationSql);
           console.log('✅ New schema created successfully\n');
         } catch (schemaError) {
