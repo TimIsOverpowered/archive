@@ -80,19 +80,6 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
         cloudflareCache = { status: 'error' };
       }
 
-      let workersStatus;
-      try {
-        const workersModule = await import('../../workers/index');
-
-        if (typeof workersModule.getWorkersHealth === 'function') {
-          workersStatus = await workersModule.getWorkersHealth();
-        } else {
-          workersStatus = {};
-        }
-      } catch {
-        workersStatus = {};
-      }
-
       const response = {
         data: {
           status: 'ok',
@@ -102,7 +89,6 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
             connected: redisStatusInfo.connected,
           },
           streamers,
-          workers: workersStatus,
           cloudflareIpCache: cloudflareCache,
           ...(kickConfig && {
             kick: {
