@@ -7,7 +7,7 @@ import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import type { PrismaClient } from '../../../../generated/streamer/client';
 import type { VodRecordBase } from './types';
-import { enqueueJobWithLogging } from '../../../jobs/queues.js';
+import { enqueueJobWithLogging } from '../../../jobs/utils.js';
 import { fileExists } from '../../../utils/path.js';
 
 declare module 'fastify' {
