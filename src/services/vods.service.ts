@@ -56,7 +56,7 @@ export async function getVods(client: PrismaClient, tenantId: string, query: Vod
     }
   }
 
-  const where: Record<string, unknown> = { vod_id: { startsWith: tenantId } };
+  const where: Record<string, unknown> = { platform: { startsWith: tenantId } };
 
   if (query.platform) {
     where.platform = query.platform;
@@ -85,10 +85,10 @@ export async function getVods(client: PrismaClient, tenantId: string, query: Vod
           mode: 'insensitive',
         },
       },
-      select: { vod_id: true },
+      select: { id: true },
     });
 
-    const gameVodIds = games.map((g) => g.vod_id);
+    const gameVodIds = games.map((g) => g.id);
     if (gameVodIds.length > 0) {
       where.id = { in: gameVodIds };
     } else {
@@ -105,21 +105,9 @@ export async function getVods(client: PrismaClient, tenantId: string, query: Vod
         [query.sort || 'created_at']: query.order || 'desc',
       },
       include: {
-        vod_uploads: {
-          select: {
-            upload_id: true,
-            platform: true,
-            status: true,
-            thumbnail_url: true,
-          },
-        },
-        chapters: {
-          select: {
-            name: true,
-            duration: true,
-            start: true,
-          },
-        },
+        vod_uploads: {},
+        chapters: {},
+        games: {},
       },
     }),
     client.vod.count({ where }),
@@ -161,23 +149,11 @@ export async function getVodById(client: PrismaClient, tenantId: string, vodId: 
   const vod = await client.vod.findFirst({
     where: {
       id: vodId,
-      platform: { startsWith: tenantId },
     },
     include: {
-      vod_uploads: {
-        select: {
-          upload_id: true,
-          platform: true,
-          status: true,
-        },
-      },
-      chapters: {
-        select: {
-          name: true,
-          duration: true,
-          start: true,
-        },
-      },
+      vod_uploads: {},
+      chapters: {},
+      games: {},
     },
   });
 

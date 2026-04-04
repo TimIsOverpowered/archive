@@ -5,6 +5,7 @@ import compress from '@fastify/compress';
 import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
 import redisPlugin from './plugins/redis.plugin';
+import configPlugin from './plugins/config.plugin';
 import createTenantLoggerMiddleware from './middleware/tenant-logger';
 import { extractErrorDetails } from '../utils/error.js';
 import { logger } from '../utils/logger.js';
@@ -32,6 +33,9 @@ export async function buildServer() {
   await fastify.register(compress, {
     threshold: 10240,
   });
+
+  // Load streamer configs and initialize database clients
+  await fastify.register(configPlugin);
 
   // Redis connection + rate limiters
   await fastify.register(redisPlugin, {
@@ -107,15 +111,14 @@ export async function buildServer() {
   // Error handler
   fastify.setErrorHandler((error, request, reply) => {
     const details = extractErrorDetails(error);
-    const errorMessage = details.message;
     const statusCode = (error as { statusCode?: number }).statusCode || 500;
     const code = (error as { code?: string }).code || 'INTERNAL_ERROR';
 
-    logger.error({ err: errorMessage }, 'Request error');
+    logger.error({ err: details.message, stack: details.stack }, 'Request error');
 
     return reply.status(statusCode).send({
       error: {
-        message: errorMessage || 'Internal server error',
+        message: 'Internal server error',
         code,
         statusCode,
       },
