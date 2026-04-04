@@ -10,6 +10,7 @@ import { getClient } from '../../../db/client.js';
 import { fileExists } from '../../../utils/path.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
+import { notFound, serviceUnavailable, badRequest, internalServerError } from '../../../utils/http-error';
 
 type StreamerDbClient = ReturnType<typeof getClient>;
 
@@ -64,7 +65,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
   async function ensureVodRecord(tenantId: string, vodId: string, platform: 'twitch' | 'kick', logInstance: Logger): Promise<VodRecord> {
     const config = getTenantConfig(tenantId);
 
-    if (!config) throw new Error('Tenant not found');
+    if (!config) notFound('Tenant not found');
 
     let client: StreamerDbClient | null = null;
 
@@ -72,7 +73,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       // Try to get tenant-specific client first, fall back to meta for VOD lookup
       client = getClient(tenantId);
 
-      if (!client) throw new Error('Database not available');
+      if (!client) serviceUnavailable('Database not available');
 
       let vodRecord: VodRecord | null = null;
       try {
@@ -105,7 +106,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
         // Validate ownership
         if (!config.twitch?.id || vodMetadata.user_id !== config.twitch.id) {
-          throw new Error('This VOD belongs to another Twitch channel');
+          badRequest('This VOD belongs to another Twitch channel');
         }
 
         const durationStr = String(vodMetadata.duration);
@@ -132,7 +133,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         const kick = await import('../../../services/kick');
 
         if (!config.kick?.username) {
-          throw new Error('Kick username not configured for this tenant');
+          badRequest('Kick username not configured for this tenant');
         }
 
         const vodMetadata: KickVod = await kick.getVod(config.kick.username, vodId);
@@ -152,7 +153,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
         logInstance.info(`Created Kick VOD ${vodId} with duration=${Number(vodMetadata.duration)}ms`);
       } else {
-        throw new Error('Unsupported platform');
+        badRequest('Unsupported platform');
       }
 
       return vodRecord;
@@ -349,7 +350,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
           return { data: { message: 'VOD download queued', vodId: request.body.vodId, jobId: vodJobId, chatJobId } };
         } else {
-          throw new Error('Download mode must be "hls" or "mp4"');
+          badRequest('Download mode must be "hls" or "mp4"');
         }
       } catch (error) {
         log.error({ err: error }, 'Download failed');

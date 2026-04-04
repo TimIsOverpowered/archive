@@ -10,6 +10,7 @@ import { enqueueJobWithLogging } from '../../../jobs/utils.js';
 import { fileExists } from '../../../utils/path.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
+import { notFound, badRequest, serviceUnavailable, internalServerError } from '../../../utils/http-error';
 
 interface LiveCallbackBody {
   streamId: string;
@@ -64,16 +65,16 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         const config = getTenantConfig(tenantId);
 
         if (!config) {
-          throw new Error('Tenant not found');
+          notFound('Tenant not found');
         }
 
         // Validate platform is enabled for this tenant
         if (request.body.platform === 'twitch' && !config.twitch?.enabled) {
-          throw new Error('Twitch is not enabled for this tenant');
+          badRequest('Twitch is not enabled for this tenant');
         }
 
         if (request.body.platform === 'kick' && !config.kick?.enabled) {
-          throw new Error('Kick is not enabled for this tenant');
+          badRequest('Kick is not enabled for this tenant');
         }
 
         // Validate file path exists and is accessible
@@ -81,12 +82,12 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
           const exists = await fileExists(request.body.path);
 
           if (!exists) {
-            throw new Error(`File at ${request.body.path} does not exist`);
+            notFound(`File at ${request.body.path} does not exist`);
           }
 
           const stats = await fs.stat(request.body.path);
           if (!stats.isFile() || stats.size === 0) {
-            throw new Error(`File at ${request.body.path} is invalid (not a regular file or empty)`);
+            badRequest(`File at ${request.body.path} is invalid (not a regular file or empty)`);
           }
 
           log.info(`Validated recording file: ${request.body.path} (${(stats.size / (1024 * 1024)).toFixed(2)} MB)`);
@@ -94,7 +95,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
           const errorMessage = accessError instanceof Error ? accessError.message : String(accessError);
           log.error(`File validation failed for ${request.body.path}: ${errorMessage}`);
 
-          throw new Error('Recording file not found or inaccessible');
+          notFound('Recording file not found or inaccessible');
         }
 
         // Get database client
@@ -104,14 +105,14 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
           const retrievedClient = ClientModule.getClient(tenantId);
 
           if (!retrievedClient) {
-            throw new Error('Database not available for tenant');
+            serviceUnavailable('Database not available for tenant');
           }
 
           client = retrievedClient;
         } catch (error: unknown) {
           const details = extractErrorDetails(error);
           log.error({ ...details, tenantId }, 'Database error');
-          throw new Error('Database connection failed');
+          serviceUnavailable('Database connection failed');
         }
 
         // Look up VOD record by stream_id or id
@@ -212,7 +213,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         // Only throw if not already a proper HTTP error response scenario
         log.error(`Live callback failed for ${request.body.streamId}: ${errorMsg}`);
 
-        throw new Error('Failed to process live recording callback');
+        internalServerError('Failed to process live recording callback');
       }
     },
   });

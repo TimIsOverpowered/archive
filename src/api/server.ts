@@ -116,9 +116,13 @@ export async function buildServer() {
 
     logger.error({ err: details.message, stack: details.stack }, 'Request error');
 
+    // Show actual error message for 4xx errors, generic message for 5xx errors
+    const isClientError = statusCode >= 400 && statusCode < 500;
+    const errorMessage = isClientError ? details.message : 'Internal server error';
+
     return reply.status(statusCode).send({
       error: {
-        message: 'Internal server error',
+        message: errorMessage,
         code,
         statusCode,
       },

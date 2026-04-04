@@ -4,6 +4,7 @@ import { getClient } from '../../db/client';
 import { getTenantConfig } from '../../config/loader';
 import createRateLimitMiddleware from '../middleware/rate-limit';
 import { publicRateLimiter } from '../plugins/redis.plugin';
+import { notFound, serviceUnavailable } from '../../utils/http-error';
 
 interface VodRoutesOptions {
   prefix: string;
@@ -54,12 +55,12 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
 
       const config = getTenantConfig(tenantId);
       if (!config) {
-        throw new Error('Streamer not found');
+        notFound('Streamer not found');
       }
 
       const client = getClient(tenantId);
       if (!client) {
-        throw new Error('Database not available');
+        serviceUnavailable('Database not available');
       }
 
       const { vods, total } = await getVods(client, tenantId, query as never);
@@ -99,18 +100,18 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
 
       const config = getTenantConfig(tenantId);
       if (!config) {
-        throw new Error('Streamer not found');
+        notFound('Streamer not found');
       }
 
       const client = getClient(tenantId);
       if (!client) {
-        throw new Error('Database not available');
+        serviceUnavailable('Database not available');
       }
 
       const vod = await getVodById(client, tenantId, vodId);
 
       if (!vod) {
-        throw new Error('VOD not found');
+        notFound('VOD not found');
       }
 
       return { data: vod };

@@ -9,6 +9,7 @@ import { getClient } from '../../../db/client.js';
 import type { VodData as TwitchVodData } from '../../../services/twitch.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
+import { notFound, serviceUnavailable, internalServerError } from '../../../utils/http-error';
 
 dayjs.extend(durationPlugin);
 
@@ -62,18 +63,18 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       try {
         const config = getTenantConfig(tenantId);
 
-        if (!config) throw new Error('Tenant not found');
+        if (!config) notFound('Tenant not found');
 
         const client: StreamerDbClient | undefined = getClient(tenantId);
 
         if (!client) {
           log.error('Database error: Database not available');
-          throw new Error('Database not available');
+          serviceUnavailable('Database not available');
         }
 
         const vodRecord: VodRecord | null = (await client.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
 
-        if (!vodRecord) throw new Error(`VOD ${vodId} not found`);
+        if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
         // Chapters only supported for Twitch VODs
         if (vodRecord.platform !== 'twitch') {
@@ -200,7 +201,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
         const errorMsg = details.message;
         log.error(`Chapter save failed: ${errorMsg}`);
 
-        throw new Error('Failed to fetch and save chapters');
+        internalServerError('Failed to fetch and save chapters');
       }
     }
   );
@@ -225,18 +226,18 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       try {
         const config = getTenantConfig(tenantId);
 
-        if (!config) throw new Error('Tenant not found');
+        if (!config) notFound('Tenant not found');
 
         const client: StreamerDbClient | undefined = getClient(tenantId);
 
         if (!client) {
           log.error('Database error: Database not available');
-          throw new Error('Database not available');
+          serviceUnavailable('Database not available');
         }
 
         const vodRecord: VodRecord | null = (await client.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
 
-        if (!vodRecord) throw new Error(`VOD ${vodId} not found`);
+        if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
         let channelId: string | undefined;
 
@@ -267,7 +268,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
         const errorMsg = details.message;
         log.error(`Emote save failed: ${errorMsg}`);
 
-        throw new Error('Failed to queue emote saving job');
+        internalServerError('Failed to queue emote saving job');
       }
     }
   );

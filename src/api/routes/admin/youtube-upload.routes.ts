@@ -7,6 +7,7 @@ import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { fileExists } from '../../../utils/path.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
+import { notFound, serviceUnavailable, badRequest, internalServerError } from '../../../utils/http-error';
 
 type VodRecord = { id: string; title?: string | null; duration: number | string; platform: 'twitch' | 'kick' };
 
@@ -47,9 +48,9 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       try {
         const config = getTenantConfig(tenantId);
 
-        if (!config) throw new Error('Tenant not found');
+        if (!config) notFound('Tenant not found');
 
-        if (!config.youtube) throw new Error('YouTube integration not configured for this tenant');
+        if (!config.youtube) badRequest('YouTube integration not configured for this tenant');
 
         const { getClient } = await import('../../../db/client.js');
 
@@ -57,19 +58,19 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
         if (!dbClient) {
           log.error('Database not available');
-          throw new Error('Database not available');
+          serviceUnavailable('Database not available');
         }
 
         const vodRecord = (await dbClient.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
 
-        if (!vodRecord) throw new Error(`VOD ${vodId} not found`);
+        if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
         const finalMp4Path = path.join(config.settings.vodPath!, tenantId, `${vodId}.mp4`);
 
         const exists = await fileExists(finalMp4Path);
 
         if (!exists) {
-          throw new Error('MP4 file not found. VOD may not have been processed yet.');
+          notFound('MP4 file not found. VOD may not have been processed yet.');
         }
 
         const YouTubeQueueModule = await import('../../../jobs/queues');
@@ -118,7 +119,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
         const errorMsg = details.message;
         log.error(`Re-upload failed for ${vodId}: ${errorMsg}`);
 
-        throw new Error('Failed to queue re-upload job');
+        internalServerError('Failed to queue re-upload job');
       }
     }
   );
@@ -143,7 +144,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       try {
         const config = getTenantConfig(tenantId);
 
-        if (!config) throw new Error('Tenant not found');
+        if (!config) notFound('Tenant not found');
 
         const { getClient } = await import('../../../db/client.js');
 
@@ -151,12 +152,12 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
         if (!dbClient) {
           log.error('Database not available');
-          throw new Error('Database not available');
+          serviceUnavailable('Database not available');
         }
 
         const vodRecord = (await dbClient.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
 
-        if (!vodRecord) throw new Error(`VOD ${vodId} not found`);
+        if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
         // Queue download job
         const YouTubeQueueModule = await import('../../../jobs/queues');
@@ -176,7 +177,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
         const errorMsg = details.message;
         log.error(`Re-download failed for ${vodId}: ${errorMsg}`);
 
-        throw new Error('Failed to queue re-download job');
+        internalServerError('Failed to queue re-download job');
       }
     }
   );

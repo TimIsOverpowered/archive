@@ -6,6 +6,7 @@ import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
+import { serviceUnavailable, badRequest, internalServerError } from '../../../utils/http-error';
 
 interface CreateVodParams {
   id: string;
@@ -70,7 +71,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       const client = getClient(tenantId);
 
       if (!client) {
-        throw new Error('Database not available');
+        serviceUnavailable('Database not available');
       }
 
       const stats = await getTenantStats(client, tenantId);
@@ -108,11 +109,11 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       try {
         const client = getClient(tenantId);
 
-        if (!client) throw new Error('Database not available');
+        if (!client) serviceUnavailable('Database not available');
 
         // Validate vodId is provided
         if (!body.vodId) {
-          throw new Error('vodId is required');
+          badRequest('vodId is required');
         }
 
         const existing = await client.vod.findUnique({ where: { id: body.vodId } });
@@ -139,7 +140,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
         const errorMsg = details.message;
         log.error(`VOD creation failed: ${errorMsg}`);
 
-        throw new Error('Failed to create VOD record');
+        internalServerError('Failed to create VOD record');
       }
     }
   );
@@ -168,7 +169,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       try {
         const client = getClient(tenantId);
 
-        if (!client) throw new Error('Database not available');
+        if (!client) serviceUnavailable('Database not available');
 
         await client.vod.delete({ where: { id: vodId } });
 
@@ -180,7 +181,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
         const errorMsg = details.message;
         log.error(`VOD deletion failed: ${errorMsg}`);
 
-        throw new Error('Failed to delete VOD record');
+        internalServerError('Failed to delete VOD record');
       }
     }
   );
