@@ -2,6 +2,7 @@ import { PrismaClient } from '../../generated/streamer/client';
 import { redisClient } from '../api/plugins/redis.plugin';
 import { compressChatData, decompressChatData } from '../utils/compression';
 import { logger } from '../utils/logger.js';
+import { badRequest } from '../utils/http-error';
 
 const PAGE_SIZE = 200;
 const DEFAULT_BUCKET_SIZE = 120;
@@ -26,6 +27,7 @@ interface ChatMessage {
 
 interface CursorData {
   offset: number;
+  createdAt: string;
   id: string;
 }
 
@@ -34,22 +36,22 @@ function computeBucketSize(commentsPer100s: number): number {
   return BOUNDARIES.reduce((prev, curr) => (Math.abs(curr - raw) < Math.abs(prev - raw) ? curr : prev));
 }
 
-async function getVodBucketSize(tenantId: string, vodId: string): Promise<number> {
-  if (DISABLE_CACHE || !redisClient) return DEFAULT_BUCKET_SIZE;
-
+async function getVodBucketSize(client: PrismaClient, tenantId: string, vodId: string): Promise<number> {
   const key = `${tenantId}:${vodId}:bucketSize`;
 
-  try {
-    const cached = await redisClient.get(key);
-    if (cached) {
-      logger.debug({ vodId }, '[CACHE HIT] bucketSize');
-      return parseInt(cached, 10);
+  if (!DISABLE_CACHE && redisClient) {
+    try {
+      const cached = await redisClient.get(key);
+      if (cached) {
+        logger.debug({ vodId }, '[CACHE HIT] bucketSize');
+        return parseInt(cached, 10);
+      }
+    } catch {
+      // fall through to DB query
     }
-  } catch {
-    // Ignore cache errors
   }
 
-  const rawResult = await (PrismaClient as unknown as { queryRawUnsafe: (query: string, ...params: unknown[]) => Promise<unknown[]> }).queryRawUnsafe(
+  const rawResult = await client.$queryRawUnsafe(
     `
     SELECT 
       COUNT(*) / NULLIF((MAX(content_offset_seconds) - MIN(content_offset_seconds)), 0) * 100 AS comments_per_100s
@@ -59,8 +61,9 @@ async function getVodBucketSize(tenantId: string, vodId: string): Promise<number
     vodId
   );
 
-  const commentsPer100s = (rawResult?.[0] as { comments_per_100s?: unknown } | undefined)?.comments_per_100s;
-  const bucketSize = commentsPer100s ? computeBucketSize(parseFloat(String(commentsPer100s))) : DEFAULT_BUCKET_SIZE;
+  const row = (rawResult as unknown[])[0] as { comments_per_100s?: unknown };
+  const commentsPer100sValue = parseFloat(String(row?.comments_per_100s ?? ''));
+  const bucketSize = isFinite(commentsPer100sValue) ? computeBucketSize(commentsPer100sValue) : DEFAULT_BUCKET_SIZE;
 
   if (!DISABLE_CACHE && redisClient) {
     try {
@@ -74,7 +77,7 @@ async function getVodBucketSize(tenantId: string, vodId: string): Promise<number
 }
 
 export async function getLogsByOffset(client: PrismaClient, tenantId: string, vodId: string, offsetSeconds: number): Promise<{ comments: ChatMessage[]; cursor?: string }> {
-  const bucketSize = await getVodBucketSize(tenantId, vodId);
+  const bucketSize = await getVodBucketSize(client, tenantId, vodId);
   const bucket = Math.floor(offsetSeconds / bucketSize) * bucketSize;
   const cacheKey = `${tenantId}:${vodId}:bucket:${bucket}`;
 
@@ -86,8 +89,8 @@ export async function getLogsByOffset(client: PrismaClient, tenantId: string, vo
         const data = (await decompressChatData(cached)) as { comments: ChatMessage[]; cursor?: string };
         return data;
       }
-    } catch {
-      // Ignore cache errors
+    } catch (error) {
+      logger.warn({ vodId, bucket, error: String(error) }, '[CACHE MISS] bucket read failed');
     }
   }
 
@@ -116,9 +119,14 @@ export async function getLogsByOffset(client: PrismaClient, tenantId: string, vo
 
   let cursor: string | undefined;
   if (data.length === PAGE_SIZE + 1) {
+    const lastMsg = data[PAGE_SIZE];
+    if (!lastMsg.createdAt) {
+      throw new Error(`Missing createdAt on message ${lastMsg.id}`);
+    }
     const cursorData: CursorData = {
-      offset: Number(data[PAGE_SIZE].content_offset_seconds),
-      id: data[PAGE_SIZE].id,
+      offset: Number(lastMsg.content_offset_seconds),
+      createdAt: lastMsg.createdAt.toISOString(),
+      id: lastMsg.id,
     };
     cursor = Buffer.from(JSON.stringify(cursorData)).toString('base64');
   }
@@ -128,7 +136,7 @@ export async function getLogsByOffset(client: PrismaClient, tenantId: string, vo
   if (!DISABLE_CACHE && redisClient) {
     try {
       const compressed = await compressChatData(response);
-      await redisClient.set(cacheKey, compressed, 'EX', OFFSET_TTL);
+      await redisClient.set(cacheKey, compressed as Buffer, 'EX', OFFSET_TTL);
       logger.debug({ vodId, bucket }, '[CACHE SET] bucket');
     } catch {
       // Ignore cache errors
@@ -150,8 +158,8 @@ export async function getLogsByCursor(client: PrismaClient, tenantId: string, vo
         const data = (await decompressChatData(cached)) as { comments: ChatMessage[]; cursor?: string };
         return data;
       }
-    } catch {
-      // Ignore cache errors
+    } catch (error) {
+      logger.warn({ vodId, error: String(error) }, '[CACHE MISS] cursor read failed');
     }
   }
 
@@ -159,11 +167,16 @@ export async function getLogsByCursor(client: PrismaClient, tenantId: string, vo
   try {
     cursorJson = JSON.parse(Buffer.from(cursor, 'base64').toString());
   } catch {
-    return { comments: [], cursor: undefined };
+    badRequest('Invalid cursor format');
   }
 
-  if (!cursorJson?.offset || !cursorJson?.id) {
-    return { comments: [], cursor: undefined };
+  if (cursorJson?.offset == null || cursorJson?.createdAt == null || cursorJson?.id == null) {
+    badRequest('Invalid cursor: missing required fields');
+  }
+
+  const cursorDate = new Date(cursorJson.createdAt);
+  if (isNaN(cursorDate.getTime())) {
+    badRequest('Invalid cursor: invalid date');
   }
 
   const data = await client.chatMessage.findMany({
@@ -173,7 +186,7 @@ export async function getLogsByCursor(client: PrismaClient, tenantId: string, vo
         { content_offset_seconds: { gt: cursorJson.offset } },
         {
           content_offset_seconds: cursorJson.offset,
-          id: { gte: cursorJson.id },
+          OR: [{ createdAt: { gt: cursorDate } }, { createdAt: cursorDate, id: { gt: cursorJson.id } }],
         },
       ],
     },
@@ -197,9 +210,14 @@ export async function getLogsByCursor(client: PrismaClient, tenantId: string, vo
 
   let nextCursor: string | undefined;
   if (data.length === PAGE_SIZE + 1) {
+    const lastMsg = data[PAGE_SIZE];
+    if (!lastMsg.createdAt) {
+      throw new Error(`Missing createdAt on message ${lastMsg.id}`);
+    }
     const cursorData: CursorData = {
-      offset: Number(data[PAGE_SIZE].content_offset_seconds),
-      id: data[PAGE_SIZE].id,
+      offset: Number(lastMsg.content_offset_seconds),
+      createdAt: lastMsg.createdAt.toISOString(),
+      id: lastMsg.id,
     };
     nextCursor = Buffer.from(JSON.stringify(cursorData)).toString('base64');
   }
@@ -209,7 +227,7 @@ export async function getLogsByCursor(client: PrismaClient, tenantId: string, vo
   if (!DISABLE_CACHE && redisClient) {
     try {
       const compressed = await compressChatData(response);
-      await redisClient.set(cacheKey, compressed, 'EX', CURSOR_TTL);
+      await redisClient.set(cacheKey, compressed as Buffer, 'EX', CURSOR_TTL);
       logger.debug({ vodId }, '[CACHE SET] cursor');
     } catch {
       // Ignore cache errors
