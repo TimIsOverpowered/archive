@@ -67,14 +67,14 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
     async (request) => {
-      const streamerId = request.params.id;
-      const client = getClient(streamerId);
+      const tenantId = request.params.id;
+      const client = getClient(tenantId);
 
       if (!client) {
         throw new Error('Database not available');
       }
 
-      const stats = await getTenantStats(client, streamerId);
+      const stats = await getTenantStats(client, tenantId);
       return { data: stats };
     }
   );
@@ -102,11 +102,11 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
     async (request) => {
-      const streamerId = request.params.id;
+      const tenantId = request.params.id;
       const body = request.body;
 
       try {
-        const client = getClient(streamerId);
+        const client = getClient(tenantId);
 
         if (!client) throw new Error('Database not available');
 
@@ -131,13 +131,13 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
           },
         });
 
-        request.log.info(`[${streamerId}] Created VOD ${body.vodId}`);
+        request.log.info(`[${tenantId}] Created VOD ${body.vodId}`);
 
         return { data: { message: `${newVod.id} created!`, vodId: newVod.id } };
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
-        request.log.error(`[${streamerId}] VOD creation failed: ${errorMsg}`);
+        request.log.error(`[${tenantId}] VOD creation failed: ${errorMsg}`);
 
         throw new Error('Failed to create VOD record');
       }
@@ -161,23 +161,23 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
     async (request) => {
-      const streamerId = request.params.id;
+      const tenantId = request.params.id;
       const vodId = request.params.vodId;
 
       try {
-        const client = getClient(streamerId);
+        const client = getClient(tenantId);
 
         if (!client) throw new Error('Database not available');
 
         await client.vod.delete({ where: { id: vodId } });
 
-        request.log.info(`[${streamerId}] Deleted VOD ${vodId} and all related data (cascade)`);
+        request.log.info(`[${tenantId}] Deleted VOD ${vodId} and all related data (cascade)`);
 
         return { data: { message: `Deleted VOD ${vodId} and all related data`, vodId } };
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
-        request.log.error(`[${streamerId}] VOD deletion failed: ${errorMsg}`);
+        request.log.error(`[${tenantId}] VOD deletion failed: ${errorMsg}`);
 
         throw new Error('Failed to delete VOD record');
       }

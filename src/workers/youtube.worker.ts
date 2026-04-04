@@ -5,7 +5,7 @@ import timezone from 'dayjs/plugin/timezone';
 dayjs.extend(timezone);
 
 import type { YoutubeUploadJob, YoutubeUploadResult } from '../jobs/queues.js';
-import { getStreamerConfig } from '../config/loader.js';
+import { getTenantConfig } from '../config/loader.js';
 import { getClient, createClient } from '../db/client.js';
 import { splitVideo, trimVideo, getDuration, deleteFile } from '../utils/ffmpeg.js';
 import { uploadVideo, linkParts } from '../services/youtube.js';
@@ -20,17 +20,17 @@ type ExtendedYoutubeUploadJob = YoutubeUploadJob & { dmcaProcessed?: boolean };
 const YOUTUBE_MAX_DURATION = 43199; // YouTube hard limit: 12 hours - 1 second (720 minutes)
 
 const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async (job: Job<YoutubeUploadJob>) => {
-  const { streamerId, vodId, filePath, type, part, chapter } = job.data;
+  const { tenantId, vodId, filePath, type, part, chapter } = job.data;
 
-  const log = createAutoLogger(String(streamerId));
+  const log = createAutoLogger(String(tenantId));
 
-  const config = getStreamerConfig(streamerId);
+  const config = getTenantConfig(tenantId);
 
   if (!config?.youtube) {
     throw new Error('YouTube not configured for streamer');
   }
 
-  let db = getClient(streamerId);
+  let db = getClient(tenantId);
   if (!db) {
     db = await createClient(config);
   }
@@ -45,7 +45,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
       if (!vodRecord) throw new Error(`VOD record not found for ${vodId}`);
 
       const platformName = vodRecord.platform.charAt(0).toUpperCase() + vodRecord.platform.slice(1);
-      const channelName = config.displayName || streamerId;
+      const channelName = config.displayName || tenantId;
       const dateFormatted = dayjs(vodRecord.created_at)
         .tz(config.settings?.timezone || 'UTC')
         .format('MMMM DD YYYY')
@@ -80,7 +80,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
         if (isAlertsEnabled()) {
           splitAlertMessageId = await sendRichAlert({
             title: `📺 VOD Splitting in Progress`,
-            description: `${streamerId} - Preparing ${totalParts} parts...`,
+            description: `${tenantId} - Preparing ${totalParts} parts...`,
             status: 'warning',
             fields: [
               { name: 'VOD ID', value: vodId, inline: true },
@@ -95,9 +95,9 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
           if (splitAlertMessageId && isAlertsEnabled()) {
             updateDiscordEmbed(splitAlertMessageId, {
               title: `📺 Splitting VOD`,
-              description: `${streamerId} - Preparing video parts for upload`,
+              description: `${tenantId} - Preparing video parts for upload`,
               status: 'warning',
-              fields: [{ name: 'Progress', value: formatProgressMessage('VOD Splitting', streamerId, percent), inline: false }],
+              fields: [{ name: 'Progress', value: formatProgressMessage('VOD Splitting', tenantId, percent), inline: false }],
               timestamp: new Date().toISOString(),
               updatedTimestamp: new Date().toISOString(),
             });
@@ -112,7 +112,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
           if (isAlertsEnabled()) {
             uploadAlertMessageId = await sendRichAlert({
               title: `📺 YouTube Upload (Part ${currentPartNum}/${totalParts})`,
-              description: `${streamerId} - Uploading video part to YouTube...`,
+              description: `${tenantId} - Uploading video part to YouTube...`,
               status: 'warning',
               fields: [
                 { name: 'VOD ID', value: vodId, inline: true },
@@ -140,7 +140,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
               totalParts,
             });
 
-            result = await uploadVideo(streamerId, channelName, parts[i], partTitle, youtubeDescription, privacyStatus, onUploadProgress);
+            result = await uploadVideo(tenantId, channelName, parts[i], partTitle, youtubeDescription, privacyStatus, onUploadProgress);
 
             uploadedVideos.push({ id: result.videoId, part: i + 1 });
           } catch (error) {
@@ -157,7 +157,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
         if (splitAlertMessageId && isAlertsEnabled()) {
           updateDiscordEmbed(splitAlertMessageId, {
             title: `✅ VOD Splitting Complete`,
-            description: `${streamerId} - Successfully split into ${totalParts} parts`,
+            description: `${tenantId} - Successfully split into ${totalParts} parts`,
             status: 'success',
             fields: [
               { name: 'Total Duration', value: toHHMMSS(duration), inline: true },
@@ -179,7 +179,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
         if (isAlertsEnabled()) {
           uploadAlertMessageId = await sendRichAlert({
             title: `📺 YouTube Upload Started`,
-            description: `${streamerId} - Uploading VOD to YouTube...`,
+            description: `${tenantId} - Uploading VOD to YouTube...`,
             status: 'warning',
             fields: [
               { name: 'VOD ID', value: vodId, inline: true },
@@ -190,7 +190,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
         }
 
         const result = await uploadVideo(
-          streamerId,
+          tenantId,
           channelName,
           filePath,
           vodTitle,
@@ -226,11 +226,11 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
       if (uploadedVideos.length > 1) {
         setTimeout(() => {
-          void linkParts(streamerId, uploadedVideos);
+          void linkParts(tenantId, uploadedVideos);
         }, 60000);
       }
 
-      resetFailures(streamerId);
+      resetFailures(tenantId);
 
       return { success: true, videos: uploadedVideos };
     } else {
@@ -248,7 +248,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
             data: { video_provider: null, video_id: null, thumbnail_url: null },
           });
 
-          resetFailures(streamerId);
+          resetFailures(tenantId);
 
           return { success: true, skipped: true };
         }
@@ -259,7 +259,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
       if (!vodRecord) throw new Error(`VOD record not found for ${vodId}`);
 
-      const channelName = config.displayName || streamerId;
+      const channelName = config.displayName || tenantId;
       const dateFormatted = dayjs(vodRecord.created_at)
         .tz(config.settings?.timezone || 'UTC')
         .format('MMMM DD YYYY')
@@ -298,7 +298,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
         if (isAlertsEnabled()) {
           splitAlertMessageId = await sendRichAlert({
             title: `✂️ Game Clip Splitting in Progress`,
-            description: `${streamerId} - Preparing ${totalParts} parts...`,
+            description: `${tenantId} - Preparing ${totalParts} parts...`,
             status: 'warning',
             fields: [
               { name: 'Game Name', value: chapter.name, inline: true },
@@ -313,16 +313,16 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
           if (splitAlertMessageId && isAlertsEnabled()) {
             updateDiscordEmbed(splitAlertMessageId, {
               title: `✂️ Splitting Game Clip`,
-              description: `${streamerId} - Game clip exceeds YouTube max duration`,
+              description: `${tenantId} - Game clip exceeds YouTube max duration`,
               status: 'warning',
-              fields: [{ name: 'Progress', value: formatProgressMessage('Game Splitting', streamerId, percent), inline: false }],
+              fields: [{ name: 'Progress', value: formatProgressMessage('Game Splitting', tenantId, percent), inline: false }],
               timestamp: new Date().toISOString(),
               updatedTimestamp: new Date().toISOString(),
             });
           }
         });
 
-        const uploadedGameVideos: Array<{ id: string; part: number; startTime: number; endTime: number; gameId?: number }> = [];
+        const uploadedGameVideos: Array<{ id: string; part: number; startTime: number; endTime: number; gameId?: string }> = [];
 
         for (let i = 0; i < totalParts; i++) {
           const currentPartNum = i + 1;
@@ -354,7 +354,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
           if (isAlertsEnabled()) {
             uploadAlertMessageId = await sendRichAlert({
               title: `🎮 Game Upload (Part ${currentPartNum}/${totalParts})`,
-              description: `${streamerId} - Uploading game clip part to YouTube...`,
+              description: `${tenantId} - Uploading game clip part to YouTube...`,
               status: 'warning',
               fields: [
                 { name: 'Game Name', value: chapter.name, inline: true },
@@ -377,7 +377,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
               totalParts,
             });
 
-            result = await uploadVideo(streamerId, channelName, splitPaths[i], ytTitle, youtubeDescription, 'public', onUploadProgress);
+            result = await uploadVideo(tenantId, channelName, splitPaths[i], ytTitle, youtubeDescription, 'public', onUploadProgress);
 
             const createdGameRecord = await db.game.create({
               data: {
@@ -398,7 +398,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
               part: currentPartNum,
               startTime,
               endTime,
-              gameId: createdGameRecord.id,
+              gameId: String(createdGameRecord.id),
             });
           } catch (error) {
             // Error already handled in progress callback above - just re-throw for retry mechanism
@@ -414,7 +414,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
         if (splitAlertMessageId && isAlertsEnabled()) {
           updateDiscordEmbed(splitAlertMessageId, {
             title: `✅ Game Clip Splitting Complete`,
-            description: `${streamerId} - Successfully split into ${totalParts} parts`,
+            description: `${tenantId} - Successfully split into ${totalParts} parts`,
             status: 'success',
             fields: [
               { name: 'Total Duration', value: toHHMMSS(trimmedDuration), inline: true },
@@ -425,7 +425,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
           });
         }
 
-        resetFailures(streamerId);
+        resetFailures(tenantId);
 
         return { success: true, videos: uploadedGameVideos };
       } else {
@@ -454,7 +454,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
         if (isAlertsEnabled()) {
           uploadAlertMessageId = await sendRichAlert({
             title: `🎮 Game Upload Started`,
-            description: `${streamerId} - Uploading game clip to YouTube...`,
+            description: `${tenantId} - Uploading game clip to YouTube...`,
             status: 'warning',
             fields: [
               { name: 'Game Name', value: chapter.name, inline: true },
@@ -465,7 +465,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
         }
 
         const result = await uploadVideo(
-          streamerId,
+          tenantId,
           channelName,
           trimmedPath,
           ytTitle,
@@ -495,9 +495,9 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
         await deleteFile(trimmedPath);
 
-        resetFailures(streamerId);
+        resetFailures(tenantId);
 
-        return { success: true, videoId: result.videoId, gameId: createdGameRecord.id };
+        return { success: true, videoId: result.videoId, gameId: String(createdGameRecord.id) };
       }
     }
   } catch (error) {
@@ -507,7 +507,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
       {
         ...details,
         vodId,
-        streamerId,
+        tenantId,
       },
       `YouTube upload failed for ${vodId}`
     );

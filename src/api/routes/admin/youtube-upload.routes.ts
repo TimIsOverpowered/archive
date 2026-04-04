@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { extractErrorDetails } from '../../../utils/error.js';
 import path from 'path';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
-import { getStreamerConfig } from '../../../config/loader';
+import { getTenantConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { fileExists } from '../../../utils/path.js';
@@ -41,11 +41,11 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
     async (request) => {
-      const streamerId = request.params.id;
+      const tenantId = request.params.id;
       const vodId = request.params.vodId;
 
       try {
-        const config = getStreamerConfig(streamerId);
+        const config = getTenantConfig(tenantId);
 
         if (!config) throw new Error('Tenant not found');
 
@@ -53,10 +53,10 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
         const { getClient } = await import('../../../db/client.js');
 
-        const dbClient = getClient(streamerId);
+        const dbClient = getClient(tenantId);
 
         if (!dbClient) {
-          request.log.error(`[${streamerId}] Database not available`);
+          request.log.error(`[${tenantId}] Database not available`);
           throw new Error('Database not available');
         }
 
@@ -64,7 +64,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
         if (!vodRecord) throw new Error(`VOD ${vodId} not found`);
 
-        const finalMp4Path = path.join(config.settings.vodPath!, streamerId, `${vodId}.mp4`);
+        const finalMp4Path = path.join(config.settings.vodPath!, tenantId, `${vodId}.mp4`);
 
         const exists = await fileExists(finalMp4Path);
 
@@ -102,7 +102,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
         }
 
         const youtubeJob = {
-          streamerId,
+          tenantId,
           vodId,
           filePath: finalMp4Path,
           title: `Re-upload: ${vodRecord.title || vodId}`,
@@ -116,7 +116,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
-        request.log.error(`[${streamerId}] Re-upload failed for ${vodId}: ${errorMsg}`);
+        request.log.error(`[${tenantId}] Re-upload failed for ${vodId}: ${errorMsg}`);
 
         throw new Error('Failed to queue re-upload job');
       }
@@ -136,20 +136,20 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
     async (request) => {
-      const streamerId = request.params.id;
+      const tenantId = request.params.id;
       const vodId = request.params.vodId;
 
       try {
-        const config = getStreamerConfig(streamerId);
+        const config = getTenantConfig(tenantId);
 
         if (!config) throw new Error('Tenant not found');
 
         const { getClient } = await import('../../../db/client.js');
 
-        const dbClient = getClient(streamerId);
+        const dbClient = getClient(tenantId);
 
         if (!dbClient) {
-          request.log.error(`[${streamerId}] Database not available`);
+          request.log.error(`[${tenantId}] Database not available`);
           throw new Error('Database not available');
         }
 
@@ -161,8 +161,8 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
         const YouTubeQueueModule = await import('../../../jobs/queues');
 
         const downloadJob = {
-          tenantId: streamerId,
-          platformUserId: streamerId,
+          tenantId: tenantId,
+          platformUserId: tenantId,
           vodId,
           platform: vodRecord.platform as 'twitch' | 'kick',
         };
@@ -173,7 +173,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
-        request.log.error(`[${streamerId}] Re-download failed for ${vodId}: ${errorMsg}`);
+        request.log.error(`[${tenantId}] Re-download failed for ${vodId}: ${errorMsg}`);
 
         throw new Error('Failed to queue re-download job');
       }

@@ -39,8 +39,8 @@ interface TenantStats {
   };
 }
 
-export async function getTenantStats(client: PrismaClient, streamerId: string): Promise<TenantStats> {
-  const cacheKey = `stats:${streamerId}`;
+export async function getTenantStats(client: PrismaClient, tenantId: string): Promise<TenantStats> {
+  const cacheKey = `stats:${tenantId}`;
 
   if (!DISABLE_CACHE && redisClient) {
     try {
@@ -54,7 +54,7 @@ export async function getTenantStats(client: PrismaClient, streamerId: string): 
   }
 
   const tenant = await metaClient.tenant.findFirst({
-    where: { id: streamerId },
+    where: { id: tenantId },
   });
 
   if (!tenant) {
@@ -78,17 +78,17 @@ export async function getTenantStats(client: PrismaClient, streamerId: string): 
   if (kick?.username) platforms.push('kick');
 
   const [vods, vodUploads, chatMessages, chapters] = await Promise.all([
-    client.vod.findMany({ where: { platform: { startsWith: streamerId } } }),
+    client.vod.findMany({ where: { platform: { startsWith: tenantId } } }),
     client.vodUpload.findMany({
       where: {
-        vod: { platform: { startsWith: streamerId } },
+        vod: { platform: { startsWith: tenantId } },
       },
     }),
     client.chatMessage.count({
-      where: { vod_id: { startsWith: streamerId } },
+      where: { vod_id: { startsWith: tenantId } },
     }),
     client.chapter.findMany({
-      where: { vod: { platform: { startsWith: streamerId } } },
+      where: { vod: { platform: { startsWith: tenantId } } },
     }),
   ]);
 
@@ -124,14 +124,14 @@ export async function getTenantStats(client: PrismaClient, streamerId: string): 
 
   const messagesThisMonth = await client.chatMessage.count({
     where: {
-      vod_id: { startsWith: streamerId },
+      vod_id: { startsWith: tenantId },
       createdAt: { gte: thisMonthChatStart },
     },
   });
 
   const stats: TenantStats = {
     tenant: {
-      id: streamerId,
+      id: tenantId,
       display_name: tenant.displayName,
       platforms,
       created_at: tenant.createdAt,

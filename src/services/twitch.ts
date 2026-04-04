@@ -1,6 +1,6 @@
 import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
 import { extractErrorDetails, createErrorContext, throwOnHttpError } from '../utils/error.js';
-import { getStreamerConfig as getConfig } from '../config/loader.js';
+import { getTenantConfig as getConfig } from '../config/loader.js';
 import { toHHMMSS } from '../utils/formatting.js';
 import { PrismaClient } from '../../generated/streamer/client.js';
 import { childLogger } from '../utils/logger.js';
@@ -35,12 +35,12 @@ interface VodTokenSig {
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();
 const log = childLogger({ module: 'twitch' });
 
-export async function getAppAccessToken(streamerId: string): Promise<string> {
-  const creds = getCreds(streamerId);
+export async function getAppAccessToken(tenantId: string): Promise<string> {
+  const creds = getCreds(tenantId);
   if (!creds) {
     throw new Error('Twitch credentials not configured');
   }
-  const cached = tokenCache.get(streamerId);
+  const cached = tokenCache.get(tenantId);
   if (cached && cached.expiresAt > Date.now() + 24 * 60 * 60 * 1000) {
     return cached.token;
   }
@@ -55,15 +55,15 @@ export async function getAppAccessToken(streamerId: string): Promise<string> {
   throwOnHttpError(response, 'Twitch token');
   const data = await response.json();
   const { access_token, expires_in } = data;
-  tokenCache.set(streamerId, {
+  tokenCache.set(tenantId, {
     token: access_token,
     expiresAt: Date.now() + expires_in * 1000,
   });
   return access_token;
 }
-export async function getVodData(vodId: string, streamerId: string): Promise<VodData> {
-  const accessToken = await getAppAccessToken(streamerId);
-  const creds = getCreds(streamerId)!;
+export async function getVodData(vodId: string, tenantId: string): Promise<VodData> {
+  const accessToken = await getAppAccessToken(tenantId);
+  const creds = getCreds(tenantId)!;
   const url = new URL('https://api.twitch.tv/helix/videos');
   url.searchParams.append('id', vodId);
   const response = await fetch(url.toString(), {
@@ -236,9 +236,9 @@ export async function getChapter(vodId: string): Promise<Record<string, unknown>
   const data = await response.json();
   return data.data?.video || null;
 }
-export async function getGameData(gameId: string, streamerId: string): Promise<Record<string, unknown> | null> {
-  const accessToken = await getAppAccessToken(streamerId);
-  const creds = getCreds(streamerId)!;
+export async function getGameData(gameId: string, tenantId: string): Promise<Record<string, unknown> | null> {
+  const accessToken = await getAppAccessToken(tenantId);
+  const creds = getCreds(tenantId)!;
   const url = new URL('https://api.twitch.tv/helix/games');
   url.searchParams.append('id', gameId);
   const response = await fetch(url.toString(), {
@@ -255,15 +255,15 @@ export async function getGameData(gameId: string, streamerId: string): Promise<R
   }
   return data.data[0];
 }
-export async function getChannelBadges(streamerId: string): Promise<Record<string, unknown> | null> {
-  const creds = getCreds(streamerId);
-  const config = getConfig(streamerId);
+export async function getChannelBadges(tenantId: string): Promise<Record<string, unknown> | null> {
+  const creds = getCreds(tenantId);
+  const config = getConfig(tenantId);
   if (!creds?.clientId || !config?.twitch?.id) {
-    log.warn(`Twitch credentials not configured for streamer ${streamerId}`);
+    log.warn(`Twitch credentials not configured for streamer ${tenantId}`);
     return null;
   }
   try {
-    const accessToken = await getAppAccessToken(streamerId);
+    const accessToken = await getAppAccessToken(tenantId);
     if (!accessToken) throw new Error('Twitch OAuth access token unavailable');
     const url = new URL(`https://api.twitch.tv/helix/chat/badges`);
     url.searchParams.append('broadcaster_id', config.twitch.id.toString());
@@ -283,16 +283,16 @@ export async function getChannelBadges(streamerId: string): Promise<Record<strin
     return badgesData as Record<string, unknown>;
   } catch (error: unknown) {
     const { message } = extractErrorDetails(error);
-    log.error(`Failed to fetch channel badges for ${streamerId}: ${message}`);
+    log.error(`Failed to fetch channel badges for ${tenantId}: ${message}`);
     return null;
   }
 }
 
-export async function getGlobalBadges(streamerId: string): Promise<Record<string, unknown> | null> {
-  const creds = getCreds(streamerId);
+export async function getGlobalBadges(tenantId: string): Promise<Record<string, unknown> | null> {
+  const creds = getCreds(tenantId);
   if (!creds?.clientId) return null;
   try {
-    const accessToken = await getAppAccessToken(streamerId);
+    const accessToken = await getAppAccessToken(tenantId);
     if (!accessToken) throw new Error('Twitch OAuth access token unavailable');
     const response = await fetch('https://api.twitch.tv/helix/chat/badges/global', {
       headers: { Authorization: `Bearer ${accessToken}`, 'Client-Id': creds.clientId },
@@ -303,7 +303,7 @@ export async function getGlobalBadges(streamerId: string): Promise<Record<string
     return (data?.data || null) as Record<string, unknown>;
   } catch (error: unknown) {
     const { message } = extractErrorDetails(error);
-    log.error(`Failed to fetch global badges for ${streamerId}: ${message}`);
+    log.error(`Failed to fetch global badges for ${tenantId}: ${message}`);
     return null;
   }
 }
@@ -368,11 +368,11 @@ import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
 /**
  * Download Twitch VOD directly to MP4 using ffmpeg HLS streaming
  */
-export async function downloadVodAsMp4(vodId: string, streamerId: string): Promise<string | null> {
-  const config = getConfig(streamerId);
+export async function downloadVodAsMp4(vodId: string, tenantId: string): Promise<string | null> {
+  const config = getConfig(tenantId);
 
   if (!config?.settings.vodPath) {
-    throw new Error(`No vodPath configured for streamer ${streamerId}`);
+    throw new Error(`No vodPath configured for streamer ${tenantId}`);
   }
 
   let messageId: string | null = null;
@@ -390,8 +390,8 @@ export async function downloadVodAsMp4(vodId: string, streamerId: string): Promi
 
     const vodPath = `${config.settings.vodPath}/${vodId}.mp4`;
 
-    const streamerName = config.displayName || streamerId;
-    messageId = await sendVodDownloadStarted('twitch', streamerId, vodId, streamerName);
+    const streamerName = config.displayName || tenantId;
+    messageId = await sendVodDownloadStarted('twitch', tenantId, vodId, streamerName);
 
     // Fetch m3u8 playlist and detect fMP4 format (Twitch can use both .ts or fMP4)
     const response = await fetch(m3u8Url);
@@ -417,13 +417,13 @@ export async function downloadVodAsMp4(vodId: string, streamerId: string): Promi
     log.error(`ffmpeg error occurred: ${errorMsg}`);
 
     // Failure alert
-    await sendVodDownloadFailed(messageId!, 'twitch', vodId, errorMsg, streamerId);
+    await sendVodDownloadFailed(messageId!, 'twitch', vodId, errorMsg, tenantId);
 
     throw error;
   }
 }
 
-export async function saveVodChapters(vodId: string, streamerId: string, finalDurationSeconds: number, client: PrismaClient): Promise<void> {
+export async function saveVodChapters(vodId: string, tenantId: string, finalDurationSeconds: number, client: PrismaClient): Promise<void> {
   try {
     await client.chapter.deleteMany({
       where: { vod_id: vodId },
@@ -446,7 +446,7 @@ export async function saveVodChapters(vodId: string, streamerId: string, finalDu
 
       const game = chapter.game as Record<string, unknown>;
       const gameId = typeof game.id === 'string' ? game.id : null;
-      const gameData = gameId ? await getGameData(gameId, streamerId) : null;
+      const gameData = gameId ? await getGameData(gameId, tenantId) : null;
 
       await client.chapter.create({
         data: {

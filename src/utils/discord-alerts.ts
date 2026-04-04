@@ -222,14 +222,14 @@ export async function updateDiscordEmbed(messageId: string, data: RichEmbedData)
 
 const failureCounts = new Map<string, number>();
 
-export function trackFailure(streamerId: string, maxBeforeAlert: number = 3): boolean {
-  const currentCount = (failureCounts.get(streamerId) || 0) + 1;
-  failureCounts.set(streamerId, currentCount);
+export function trackFailure(tenantId: string, maxBeforeAlert: number = 3): boolean {
+  const currentCount = (failureCounts.get(tenantId) || 0) + 1;
+  failureCounts.set(tenantId, currentCount);
   return currentCount >= maxBeforeAlert;
 }
 
-export function resetFailures(streamerId: string): void {
-  failureCounts.delete(streamerId);
+export function resetFailures(tenantId: string): void {
+  failureCounts.delete(tenantId);
 }
 
 export function createProgressBar(percent: number, total?: number, current?: number): string {
@@ -319,10 +319,10 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
 /**
  * Send a VOD download started alert
  */
-export async function sendVodDownloadStarted(platform: 'kick' | 'twitch', streamerId: string, vodId: string, streamerName?: string): Promise<string | null> {
+export async function sendVodDownloadStarted(platform: 'kick' | 'twitch', tenantId: string, vodId: string, streamerName?: string): Promise<string | null> {
   if (!isAlertsEnabled()) return null;
 
-  const name = streamerName || getTenantDisplayName(streamerId);
+  const name = streamerName || getTenantDisplayName(tenantId);
   const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
 
   return sendRichAlert({
@@ -361,7 +361,7 @@ export async function sendVodDownloadSuccess(messageId: string, platform: 'kick'
 /**
  * Send a VOD download failed alert
  */
-export async function sendVodDownloadFailed(messageId: string, platform: 'kick' | 'twitch', vodId: string, error: string, _streamerId?: string): Promise<void> {
+export async function sendVodDownloadFailed(messageId: string, platform: 'kick' | 'twitch', vodId: string, error: string, _tenantId?: string): Promise<void> {
   if (!isAlertsEnabled()) return;
 
   const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);

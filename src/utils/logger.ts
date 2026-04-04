@@ -23,7 +23,7 @@ export type LogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' |
 
 export interface LogContext {
   reqId?: string;
-  streamerId?: string;
+  tenantId?: string;
   vodId?: string;
   userId?: string;
   [key: string]: unknown;

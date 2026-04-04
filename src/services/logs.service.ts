@@ -34,10 +34,10 @@ function computeBucketSize(commentsPer100s: number): number {
   return BOUNDARIES.reduce((prev, curr) => (Math.abs(curr - raw) < Math.abs(prev - raw) ? curr : prev));
 }
 
-async function getVodBucketSize(streamerId: string, vodId: string): Promise<number> {
+async function getVodBucketSize(tenantId: string, vodId: string): Promise<number> {
   if (DISABLE_CACHE || !redisClient) return DEFAULT_BUCKET_SIZE;
 
-  const key = `${streamerId}:${vodId}:bucketSize`;
+  const key = `${tenantId}:${vodId}:bucketSize`;
 
   try {
     const cached = await redisClient.get(key);
@@ -73,10 +73,10 @@ async function getVodBucketSize(streamerId: string, vodId: string): Promise<numb
   return bucketSize;
 }
 
-export async function getLogsByOffset(client: PrismaClient, streamerId: string, vodId: string, offsetSeconds: number): Promise<{ comments: ChatMessage[]; cursor?: string }> {
-  const bucketSize = await getVodBucketSize(streamerId, vodId);
+export async function getLogsByOffset(client: PrismaClient, tenantId: string, vodId: string, offsetSeconds: number): Promise<{ comments: ChatMessage[]; cursor?: string }> {
+  const bucketSize = await getVodBucketSize(tenantId, vodId);
   const bucket = Math.floor(offsetSeconds / bucketSize) * bucketSize;
-  const cacheKey = `${streamerId}:${vodId}:bucket:${bucket}`;
+  const cacheKey = `${tenantId}:${vodId}:bucket:${bucket}`;
 
   if (!DISABLE_CACHE && redisClient) {
     try {
@@ -138,8 +138,8 @@ export async function getLogsByOffset(client: PrismaClient, streamerId: string, 
   return response;
 }
 
-export async function getLogsByCursor(client: PrismaClient, streamerId: string, vodId: string, cursor: string): Promise<{ comments: ChatMessage[]; cursor?: string }> {
-  const cacheKey = `${streamerId}:${vodId}:cursor:${cursor}`;
+export async function getLogsByCursor(client: PrismaClient, tenantId: string, vodId: string, cursor: string): Promise<{ comments: ChatMessage[]; cursor?: string }> {
+  const cacheKey = `${tenantId}:${vodId}:cursor:${cursor}`;
 
   if (!DISABLE_CACHE && redisClient) {
     try {

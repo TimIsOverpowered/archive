@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { extractErrorDetails } from '../../../utils/error.js';
 import fs from 'fs/promises';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
-import { getStreamerConfig } from '../../../config/loader';
+import { getTenantConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import type { PrismaClient } from '../../../../generated/streamer/client';
@@ -57,11 +57,11 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
     },
     onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     handler: async (request) => {
-      const streamerId = request.params.id;
+      const tenantId = request.params.id;
 
       try {
         // Validate tenant exists
-        const config = getStreamerConfig(streamerId);
+        const config = getTenantConfig(tenantId);
 
         if (!config) {
           throw new Error('Tenant not found');
@@ -89,10 +89,10 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
             throw new Error(`File at ${request.body.path} is invalid (not a regular file or empty)`);
           }
 
-          request.log.info(`[${streamerId}] Validated recording file: ${request.body.path} (${(stats.size / (1024 * 1024)).toFixed(2)} MB)`);
+          request.log.info(`[${tenantId}] Validated recording file: ${request.body.path} (${(stats.size / (1024 * 1024)).toFixed(2)} MB)`);
         } catch (accessError) {
           const errorMessage = accessError instanceof Error ? accessError.message : String(accessError);
-          request.log.error(`[${streamerId}] File validation failed for ${request.body.path}: ${errorMessage}`);
+          request.log.error(`[${tenantId}] File validation failed for ${request.body.path}: ${errorMessage}`);
 
           throw new Error('Recording file not found or inaccessible');
         }
@@ -101,7 +101,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         let client: PrismaClient;
         try {
           const ClientModule = await import('../../../db/client');
-          const retrievedClient = ClientModule.getClient(streamerId);
+          const retrievedClient = ClientModule.getClient(tenantId);
 
           if (!retrievedClient) {
             throw new Error('Database not available for tenant');
@@ -110,7 +110,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
           client = retrievedClient;
         } catch (error: unknown) {
           const details = extractErrorDetails(error);
-          request.log.error({ ...details, streamerId }, `[${streamerId}] Database error`);
+          request.log.error({ ...details, tenantId }, `[${tenantId}] Database error`);
           throw new Error('Database connection failed');
         }
 
@@ -123,7 +123,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
 
         if (!vodRecord) {
           // VOD doesn't exist - create placeholder for live recording callback
-          request.log.warn(`[${streamerId}] No VOD record found for ${request.body.streamId}. Creating placeholder...`);
+          request.log.warn(`[${tenantId}] No VOD record found for ${request.body.streamId}. Creating placeholder...`);
 
           vodRecord = await client.vod.create({
             data: {
@@ -135,9 +135,9 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
             },
           });
 
-          request.log.info(`[${streamerId}] Created placeholder VOD ${request.body.streamId}`);
+          request.log.info(`[${tenantId}] Created placeholder VOD ${request.body.streamId}`);
         } else if (vodRecord.platform !== request.body.platform) {
-          request.log.warn(`[${streamerId}] Platform mismatch for VOD ${request.body.streamId}: expected=${request.body.platform}, actual=${vodRecord.platform}`);
+          request.log.warn(`[${tenantId}] Platform mismatch for VOD ${request.body.streamId}: expected=${request.body.platform}, actual=${vodRecord.platform}`);
         }
 
         // Update duration if provided and different from current value
@@ -147,17 +147,17 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
             data: { duration: request.body.durationSecs },
           });
 
-          request.log.info(`[${streamerId}] Updated VOD ${vodRecord.id} duration to ${request.body.durationSecs}s`);
+          request.log.info(`[${tenantId}] Updated VOD ${vodRecord.id} duration to ${request.body.durationSecs}s`);
         } else if (!request.body.durationSecs && vodRecord.duration === 0) {
           // Duration not provided and current is 0 - try to get from file metadata or skip update
-          request.log.debug(`[${streamerId}] No duration update needed for VOD ${vodRecord.id}`);
+          request.log.debug(`[${tenantId}] No duration update needed for VOD ${vodRecord.id}`);
         }
 
         // Queue YouTube upload job for the pre-recorded MP4 file at `path`
         const YoutubeQueueModule = await import('../../../jobs/queues');
 
         if (!config.youtube?.liveUpload) {
-          request.log.warn(`[${streamerId}] YouTube live upload not enabled, skipping queue for ${request.body.streamId}`);
+          request.log.warn(`[${tenantId}] YouTube live upload not enabled, skipping queue for ${request.body.streamId}`);
 
           return <{ data: LiveCallbackResponseData }>{
             data: {
@@ -169,7 +169,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         }
 
         const youtubeJobData = {
-          streamerId,
+          tenantId,
           vodId: request.body.streamId,
           filePath: request.body.path, // Pre-recorded MP4 path from recorder
           title: vodRecord.title || `${request.body.platform.toUpperCase()} VOD`,
@@ -189,12 +189,12 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
             deduplication: { id: `youtube-live:${request.body.streamId}` },
           },
           { info: request.log.info.bind(request.log), debug: request.log.debug.bind(request.log) },
-          `[${streamerId}] Queued YouTube upload job for live recording`,
+          `[${tenantId}] Queued YouTube upload job for live recording`,
           { vodId: request.body.streamId, path: request.body.path }
         );
 
         if (isNew) {
-          request.log.debug({ vodId: request.body.streamId, jobId }, `[${streamerId}] Job was newly added to queue`);
+          request.log.debug({ vodId: request.body.streamId, jobId }, `[${tenantId}] Job was newly added to queue`);
         }
 
         return <{ data: LiveCallbackResponseData }>{
@@ -210,7 +210,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         const errorMsg = details.message;
 
         // Only throw if not already a proper HTTP error response scenario
-        request.log.error(`[${streamerId}] Live callback failed for ${request.body.streamId}: ${errorMsg}`);
+        request.log.error(`[${tenantId}] Live callback failed for ${request.body.streamId}: ${errorMsg}`);
 
         throw new Error('Failed to process live recording callback');
       }

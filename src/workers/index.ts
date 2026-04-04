@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { extractErrorDetails } from '../utils/error.js';
 import { Worker, Queue, BaseJobOptions } from 'bullmq';
-import { loadStreamerConfigs, clearConfigCache } from '../config/loader.js';
+import { loadTenantConfigs, clearConfigCache } from '../config/loader.js';
 import { QUEUE_NAMES, getQueue, ChatDownloadJob, YoutubeUploadJob, DmcaProcessingJob, ChatDownloadResult, YoutubeUploadResult, DmcaProcessingResult } from '../jobs/queues.js';
 import { redisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
 import vodProcessor from './vod.worker.js';
@@ -142,7 +142,7 @@ async function bootstrap() {
   logger.info(`NODE_ENV: ${process.env.NODE_ENV}`);
 
   try {
-    await loadStreamerConfigs();
+    await loadTenantConfigs();
     logger.info('Loaded streamer configurations');
 
     // Start monitor service (stream detection polling)

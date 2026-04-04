@@ -1,4 +1,4 @@
-import { getStreamerConfig } from '../config/loader.js';
+import { getTenantConfig } from '../config/loader.js';
 import { decryptObject } from './encryption.js';
 import { createAutoLogger as loggerWithTenant } from './auto-tenant-logger.js';
 
@@ -19,7 +19,7 @@ export interface TwitchCredentials {
  */
 export function getTwitchCredentials(tenantId: string): TwitchCredentials | null {
   const log = loggerWithTenant(tenantId);
-  const config = getStreamerConfig(tenantId);
+  const config = getTenantConfig(tenantId);
 
   if (!config?.twitch?.auth) {
     log.warn(`[Twitch] No auth configured for tenant`);

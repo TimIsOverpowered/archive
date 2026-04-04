@@ -90,7 +90,7 @@ export async function buildServer() {
         await vodInstance.register(vodsRoutes.default, { prefix: '' });
         await vodInstance.register(logsRoutes.default, { prefix: '' });
       },
-      { prefix: '/api/v1/vods' }
+      { prefix: '/api/v1/' }
     );
 
     // Register badges route under /api/v1/:id/badges/twitch

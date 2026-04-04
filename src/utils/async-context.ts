@@ -3,7 +3,7 @@ import { getTenantDisplayName } from '../config/loader.js';
 
 export interface TenantContextData {
   displayName?: string;
-  streamerId?: string | null;
+  tenantId?: string | null;
 }
 
 // Singleton async-local storage instance for propagating context across async boundaries
@@ -48,9 +48,9 @@ export function resolveCurrentDisplayName(): string | null {
 
   if (context.displayName) return context.displayName;
 
-  if (context.streamerId && context.streamerId !== 'null') {
-    const displayName = getTenantDisplayName(String(context.streamerId));
-    if (displayName) return displayName || String(context.streamerId);
+  if (context.tenantId && context.tenantId !== 'null') {
+    const displayName = getTenantDisplayName(String(context.tenantId));
+    if (displayName) return displayName || String(context.tenantId);
   }
 
   return null;

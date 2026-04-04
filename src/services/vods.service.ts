@@ -38,12 +38,12 @@ interface VodQuery {
 const VODS_CACHE_TTL = 86400; // 24 hours
 const DISABLE_CACHE = process.env.DISABLE_REDIS_CACHE === 'true';
 
-export async function getVods(client: PrismaClient, streamerId: string, query: VodQuery): Promise<{ vods: VodResponse[]; total: number }> {
+export async function getVods(client: PrismaClient, tenantId: string, query: VodQuery): Promise<{ vods: VodResponse[]; total: number }> {
   const page = Math.max(1, query.page || 1);
   const limit = Math.min(100, Math.max(1, query.limit || 20));
   const offset = (page - 1) * limit;
 
-  const cacheKey = `vods:${streamerId}:${JSON.stringify({ ...query, page, limit })}`;
+  const cacheKey = `vods:${tenantId}:${JSON.stringify({ ...query, page, limit })}`;
 
   if (!DISABLE_CACHE && redisClient) {
     try {
@@ -56,7 +56,7 @@ export async function getVods(client: PrismaClient, streamerId: string, query: V
     }
   }
 
-  const where: Record<string, unknown> = { vod_id: { startsWith: streamerId } };
+  const where: Record<string, unknown> = { vod_id: { startsWith: tenantId } };
 
   if (query.platform) {
     where.platform = query.platform;
@@ -144,8 +144,8 @@ export async function getVods(client: PrismaClient, streamerId: string, query: V
   return response;
 }
 
-export async function getVodById(client: PrismaClient, streamerId: string, vodId: string): Promise<VodResponse | null> {
-  const cacheKey = `vod:${streamerId}:${vodId}`;
+export async function getVodById(client: PrismaClient, tenantId: string, vodId: string): Promise<VodResponse | null> {
+  const cacheKey = `vod:${tenantId}:${vodId}`;
 
   if (!DISABLE_CACHE && redisClient) {
     try {
@@ -161,7 +161,7 @@ export async function getVodById(client: PrismaClient, streamerId: string, vodId
   const vod = await client.vod.findFirst({
     where: {
       id: vodId,
-      platform: { startsWith: streamerId },
+      platform: { startsWith: tenantId },
     },
     include: {
       vod_uploads: {

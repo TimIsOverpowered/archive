@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { getVods, getVodById } from '../../services/vods.service';
 import { getClient } from '../../db/client';
-import { getStreamerConfig } from '../../config/loader';
+import { getTenantConfig } from '../../config/loader';
 import createRateLimitMiddleware from '../middleware/rate-limit';
 
 interface VodRoutesOptions {
@@ -21,7 +21,7 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
   });
 
   fastify.get(
-    '/:streamerId/vods',
+    '/:tenantId/vods',
     {
       schema: {
         tags: ['VODs'],
@@ -29,9 +29,9 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
         params: {
           type: 'object',
           properties: {
-            streamerId: { type: 'string', description: 'Streamer ID' },
+            tenantId: { type: 'string', description: 'Tenant ID' },
           },
-          required: ['streamerId'],
+          required: ['tenantId'],
         },
         query: {
           type: 'object',
@@ -51,20 +51,20 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
       onRequest: rateLimitMiddleware,
     },
     async (request) => {
-      const { streamerId } = request.params as { streamerId: string };
+      const { tenantId } = request.params as { tenantId: string };
       const query = request.query as Record<string, unknown>;
 
-      const config = getStreamerConfig(streamerId);
+      const config = getTenantConfig(tenantId);
       if (!config) {
         throw new Error('Streamer not found');
       }
 
-      const client = getClient(streamerId);
+      const client = getClient(tenantId);
       if (!client) {
         throw new Error('Database not available');
       }
 
-      const { vods, total } = await getVods(client, streamerId, query as never);
+      const { vods, total } = await getVods(client, tenantId, query as never);
       const page = Math.max(1, (query.page as number) || 1);
       const limit = Math.min(100, Math.max(1, (query.limit as number) || 20));
 
@@ -80,7 +80,7 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
   );
 
   fastify.get(
-    '/:streamerId/vods/:vodId',
+    '/:tenantId/vods/:vodId',
     {
       schema: {
         tags: ['VODs'],
@@ -88,28 +88,28 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
         params: {
           type: 'object',
           properties: {
-            streamerId: { type: 'string', description: 'Streamer ID' },
+            tenantId: { type: 'string', description: 'Tenant ID' },
             vodId: { type: 'string', description: 'VOD ID' },
           },
-          required: ['streamerId', 'vodId'],
+          required: ['tenantId', 'vodId'],
         },
       },
       onRequest: rateLimitMiddleware,
     },
     async (request) => {
-      const { streamerId, vodId } = request.params as { streamerId: string; vodId: string };
+      const { tenantId, vodId } = request.params as { tenantId: string; vodId: string };
 
-      const config = getStreamerConfig(streamerId);
+      const config = getTenantConfig(tenantId);
       if (!config) {
         throw new Error('Streamer not found');
       }
 
-      const client = getClient(streamerId);
+      const client = getClient(tenantId);
       if (!client) {
         throw new Error('Database not available');
       }
 
-      const vod = await getVodById(client, streamerId, vodId);
+      const vod = await getVodById(client, tenantId, vodId);
 
       if (!vod) {
         throw new Error('VOD not found');

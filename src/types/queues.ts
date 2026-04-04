@@ -36,7 +36,7 @@ export interface ChatDownloadJob {
 }
 
 export interface YoutubeUploadJob {
-  streamerId: string;
+  tenantId: string;
   vodId: string;
   filePath: string;
   title: string;
@@ -54,7 +54,7 @@ export interface YoutubeUploadJob {
 }
 
 export interface DmcaProcessingJob {
-  streamerId: string;
+  tenantId: string;
   vodId: string;
   receivedClaims: DMCAClaim[];
   type: 'vod' | 'live';

@@ -1,4 +1,4 @@
-import { loadStreamerConfigs } from '../config/loader.js';
+import { loadTenantConfigs } from '../config/loader.js';
 import { startStreamDetectionLoop } from './stream-detector.js';
 import { logger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
@@ -10,7 +10,7 @@ export async function startMonitorService(): Promise<void> {
   logger.info('[Monitor] Starting Archive Monitor Service...');
 
   try {
-    const allConfigs = await loadStreamerConfigs();
+    const allConfigs = await loadTenantConfigs();
 
     if (allConfigs.length === 0) {
       logger.warn('[Monitor] No tenant configs loaded. Check META_DATABASE_URL and Tenant table.');
