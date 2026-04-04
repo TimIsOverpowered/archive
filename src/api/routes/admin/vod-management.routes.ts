@@ -169,12 +169,11 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
 
         if (!client) throw new Error('Database not available');
 
-        await client.chatMessage.deleteMany({ where: { vod_id: vodId } });
-        await client.vod.deleteMany({ where: { id: vodId } });
+        await client.vod.delete({ where: { id: vodId } });
 
-        request.log.info(`[${streamerId}] Deleted VOD ${vodId} and related data`);
+        request.log.info(`[${streamerId}] Deleted VOD ${vodId} and all related data (cascade)`);
 
-        return { data: { message: `Deleted VOD ${vodId}`, vodId } };
+        return { data: { message: `Deleted VOD ${vodId} and all related data`, vodId } };
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
