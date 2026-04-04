@@ -20,7 +20,6 @@ async function start() {
 
     logger.info({ url: `http://${HOST}:${PORT}` }, 'Server started successfully');
     logger.info({ docs: `http://${HOST}:${PORT}/docs` }, 'Swagger documentation available');
-    logger.info({ metrics: `http://${HOST}:${PORT}/metrics` }, 'Prometheus metrics available');
   } catch (error) {
     const details = extractErrorDetails(error);
     logger.fatal({ ...details }, 'Failed to start server');
