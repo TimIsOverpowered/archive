@@ -15,7 +15,7 @@ export interface StreamerConfig {
     restrictedGames: string[];
     description: string;
   };
-  kick?: { enabled: boolean; username?: string; mainPlatform?: boolean };
+  kick?: { id?: string; enabled: boolean; username?: string; mainPlatform?: boolean };
   database: { url: string; connectionLimit?: number };
   settings: {
     vodPath?: string;

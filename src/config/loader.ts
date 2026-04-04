@@ -110,6 +110,10 @@ export async function loadStreamerConfigs(): Promise<StreamerConfig[]> {
 
       streamerConfig.kick = { enabled: false };
 
+      if ('id' in kick && kick.id) {
+        streamerConfig.kick.id = kick.id as string;
+      }
+
       if ('username' in kick && kick.username) {
         streamerConfig.kick.username = kick.username as string;
       }

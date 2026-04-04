@@ -17,6 +17,7 @@ import type { ReadableStream as NodeWebStream } from 'node:stream/web';
 import pLimit from 'p-limit';
 import { updateChapterDuringDownload, finalizeKickChapters } from '../../services/kick.js';
 import { saveVodChapters as saveTwitchVodChapters } from '../../services/twitch.js';
+import { fileExists } from '../../utils/path.js';
 
 export interface HlsDownloadOptions {
   vodId: string;
@@ -26,6 +27,8 @@ export interface HlsDownloadOptions {
   platformUsername?: string;
   startedAt?: string;
   sourceUrl?: string;
+  uploadAfterDownload?: boolean;
+  uploadMode?: 'vod' | 'all';
 }
 
 /**
@@ -37,10 +40,11 @@ async function downloadSegment(segmentUri: string, vodDir: string, baseURL: stri
   const outputPath = pathMod.join(vodDir, segmentUri);
   const tempPath = outputPath + '.tmp';
 
-  try {
-    await fsPromises.access(outputPath);
+  const exists = await fileExists(outputPath);
+
+  if (exists) {
     return;
-  } catch {}
+  }
 
   let lastError: Error | null = null;
   let lastResponse: Response | null = null;
@@ -145,11 +149,12 @@ async function downloadKickSegmentsParallel(
       const outputPath = pathMod.join(vodDir, uri);
       const tempPath = outputPath + '.tmp';
 
-      try {
-        await fsPromises.access(outputPath);
+      const exists = await fileExists(outputPath);
+
+      if (exists) {
         completedCount++;
         return;
-      } catch {}
+      }
 
       let lastError: Error | null = null;
 
@@ -430,7 +435,8 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
     }
   }
 
-  const vodDir = pathMod.join(config.settings.vodPath || '', tenantId, vodId);
+  const basePath = config.settings.livePath || config.settings.vodPath || '';
+  const vodDir = pathMod.join(basePath, tenantId, vodId);
 
   try {
     await fsPromises.mkdir(vodDir, { recursive: true });
@@ -628,7 +634,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
     const mp4Segments = filesInDir.filter((f) => f.endsWith('.mp4'));
     const tsSegments = filesInDir.filter((f) => f.endsWith('.ts'));
 
-    const finalMp4Path = pathMod.join(config.settings.vodPath || '', tenantId, `${vodId}.mp4`);
+    const finalMp4Path = pathMod.join(basePath, tenantId, `${vodId}.mp4`);
 
     if (hasInitSegment && mp4Segments.length > 0) {
       log.info(`[${vodId}] Detected fMP4 segments (${mp4Segments.length} files).`);
@@ -684,6 +690,19 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         });
       }
 
+      if (options.uploadAfterDownload) {
+        try {
+          const { queueYoutubeUpload } = await import('../../utils/upload-queue.js');
+
+          await queueYoutubeUpload(options.tenantId, options.vodId, finalMp4Path, options.uploadMode || 'all', options.platform, log);
+
+          log.info({ vodId }, `Upload job(s) queued after HLS download completion`);
+        } catch (error) {
+          const details = extractErrorDetails(error);
+          log.warn({ ...details, vodId }, `Failed to queue upload job after HLS download`);
+        }
+      }
+
       return { success: true as const, finalPath: finalMp4Path, durationSeconds: actualDuration };
     } else {
       log.warn(`[${vodId}] Could not determine video duration from MP4 file`);
@@ -717,36 +736,36 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
       log.info(`[${vodId}] Closed CycleTLS session`);
     }
 
-    const finalMp4Path = pathMod.join(config.settings.vodPath || '', tenantId, `${vodId}.mp4`);
+    const finalMp4Path = pathMod.join(basePath, tenantId, `${vodId}.mp4`);
 
-    try {
-      await fsPromises.access(finalMp4Path);
+    const exists = await fileExists(finalMp4Path);
 
+    if (exists) {
       if (!config.settings.saveHLS) {
         try {
           await fsPromises.rm(vodDir, { recursive: true });
           resetFailures(tenantId);
 
-          log.info(`[${vodId}] Cleaned up temporary directory ${vodDir}`);
+          log.info({ vodId }, `Cleaned up temporary directory ${vodDir}`);
         } catch (error: unknown) {
           const details = extractErrorDetails(error);
-          log.warn({ ...details, vodId }, `[${vodId}] Failed to clean up temporary directory`);
+          log.warn({ ...details, vodId }, `Failed to clean up temporary directory`);
         }
       } else {
         resetFailures(tenantId);
 
-        log.info(`[${vodId}] HLS files preserved in ${vodDir} (saveHLS=true)`);
+        log.info({ vodId }, `HLS files preserved in ${vodDir} (saveHLS=true)`);
       }
-    } catch (error) {
-      const details = extractErrorDetails(error);
-      log.error({ ...details, vodId }, `[${vodId}] Final MP4 file not found`);
+    } else {
+      const details = extractErrorDetails(new Error('Final MP4 file not found'));
+      log.error({ ...details, vodId }, `Final MP4 file not found`);
 
       if (!config.settings.saveHLS) {
         try {
           await fsPromises.rm(vodDir, { recursive: true });
         } catch (error: unknown) {
           const details = extractErrorDetails(error);
-          log.warn({ ...details, vodId }, `[${vodId}] Cleanup failed`);
+          log.warn({ ...details, vodId }, `Cleanup failed`);
         }
       }
     }

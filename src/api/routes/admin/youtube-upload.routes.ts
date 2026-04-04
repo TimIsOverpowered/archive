@@ -1,11 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import { extractErrorDetails } from '../../../utils/error.js';
-import fsPromises from 'fs/promises';
 import path from 'path';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { getStreamerConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
+import { fileExists } from '../../../utils/path.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -66,9 +66,9 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
         const finalMp4Path = path.join(config.settings.vodPath!, streamerId, `${vodId}.mp4`);
 
-        try {
-          await fsPromises.access(finalMp4Path);
-        } catch {
+        const exists = await fileExists(finalMp4Path);
+
+        if (!exists) {
           throw new Error('MP4 file not found. VOD may not have been processed yet.');
         }
 

@@ -123,7 +123,7 @@ export async function getVods(channelName: string): Promise<KickVod[]> {
         id: String((video as Record<string, unknown>).id),
         slug: ((video as Record<string, unknown>).slug as string) ?? null,
         session_title: ((video as Record<string, unknown>).session_title as string) ?? null,
-        duration: (video as Record<string, unknown>).duration ? Number((video as Record<string, unknown>).duration) / 1000 : null,
+        duration: (video as Record<string, unknown>).duration ? Number((video as Record<string, unknown>).duration) : null,
         created_at: String((video as Record<string, unknown>).createdAt || ''),
         source: ((video as Record<string, unknown>).source as string) ?? null,
       };
@@ -180,7 +180,7 @@ export async function getVod(channelName: string, vodId: string): Promise<KickVo
       id: String(video.id),
       slug: (video.slug as string) ?? null,
       session_title: (video.session_title as string) ?? null,
-      duration: video.duration ? Number(video.duration) / 1000 : null,
+      duration: video.duration ? Number(video.duration) : null,
       created_at: String(video.createdAt || ''),
       source: (video.source as string) ?? null,
     };
@@ -243,7 +243,7 @@ export async function downloadMP4(streamerId: string, vod: KickVod): Promise<str
 /**
  * Fetch Kick HLS playlist and return direct media URL suitable for ffmpeg streaming
  */
-async function getKickParsedM3u8ForFfmpeg(sourceUrl: string): Promise<string | null> {
+export async function getKickParsedM3u8ForFfmpeg(sourceUrl: string): Promise<string | null> {
   const session = createSession();
 
   try {

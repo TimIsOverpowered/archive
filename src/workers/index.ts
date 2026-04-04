@@ -11,7 +11,7 @@ import dmcaProcessor from './dmca.worker.js';
 import { startTokenHealthCron } from '../cron/token-health.js';
 import { startMonitorService, stopMonitorService } from '../monitor/index.js';
 import { logger as baseLogger } from '../utils/logger.js';
-import type { LiveHlsDownloadJobData, LiveHlsDownloadResult } from './vod.worker.js';
+import type { LiveHlsDownloadJobData, StandardVodDownloadJobData, VODDownloadResult } from './vod.worker.js';
 
 const logger = baseLogger;
 
@@ -164,7 +164,7 @@ async function bootstrap() {
 
     await clearAllJobsOnStartup();
 
-    const vodWorker = new Worker<LiveHlsDownloadJobData, LiveHlsDownloadResult>(QUEUE_NAMES.VOD_DOWNLOAD as string, vodProcessor, {
+    const vodWorker = new Worker<LiveHlsDownloadJobData | StandardVodDownloadJobData, VODDownloadResult>(QUEUE_NAMES.VOD_DOWNLOAD as string, vodProcessor, {
       connection: redisConnection,
       concurrency: 10,
     });

@@ -1,6 +1,6 @@
 import { Processor, Job } from 'bullmq';
-import fsPromises from 'fs/promises';
-import pathMod from 'path'; // Standard import is fine here
+import pathMod from 'path';
+import { fileExists } from '../utils/path.js';
 
 export interface LiveHlsDownloadJobData {
   vodId: string;
@@ -10,65 +10,91 @@ export interface LiveHlsDownloadJobData {
   platformUsername?: string;
   startedAt?: string;
   sourceUrl?: string;
+  uploadAfterDownload?: boolean;
+  uploadMode?: 'vod' | 'all';
 }
 
-export interface LiveHlsDownloadResult {
-  success: true;
-  finalPath: string;
-  durationSeconds?: number;
+export interface StandardVodDownloadJobData {
+  vodId: string;
+  platform: 'twitch' | 'kick';
+  tenantId: string;
+  platformUserId: string;
+  uploadMode?: 'vod' | 'all';
 }
 
-const vodProcessor: Processor<LiveHlsDownloadJobData, LiveHlsDownloadResult, string> = async (job: Job<LiveHlsDownloadJobData, LiveHlsDownloadResult, string>) => {
+export type VODDownloadResult =
+  | {
+      success: true;
+      finalPath: string;
+      durationSeconds?: number;
+    }
+  | {
+      success: true;
+      finalPath: string;
+      durationSeconds?: number;
+    };
+
+const vodProcessor: Processor<LiveHlsDownloadJobData | StandardVodDownloadJobData, VODDownloadResult, string> = async (
+  job: Job<LiveHlsDownloadJobData | StandardVodDownloadJobData, VODDownloadResult, string>
+) => {
   const { vodId, platform, tenantId } = job.data;
 
-  if (job.name !== 'live_hls_download') {
-    throw new Error(`Unsupported job type: ${job.name}`);
-  }
-
-  const { platformUserId, platformUsername, startedAt, sourceUrl } = job.data;
-
-  // 2. Dynamic Imports for heavy modules
-  const { cleanupOrphanedTmpFiles, downloadLiveHls } = await import('./vod/hls-downloader.js');
   const { createAutoLogger: loggerWithTenant } = await import('../utils/auto-tenant-logger.js');
-  const { getStreamerConfig } = await import('../config/loader.js');
 
   const log = loggerWithTenant(tenantId);
   log.info({ jobId: job.id, vodId, platform, tenantId }, '[VOD Processor] Starting job processing');
 
-  const config = getStreamerConfig(tenantId);
+  if (job.name === 'live_hls_download') {
+    const { cleanupOrphanedTmpFiles, downloadLiveHls } = await import('./vod/hls-downloader.js');
+    const { getStreamerConfig } = await import('../config/loader.js');
 
-  if (!config?.settings.vodPath) {
-    throw new Error(`VOD path not configured for streamer ${tenantId}`);
-  }
+    const config = getStreamerConfig(tenantId);
 
-  const vodDirPath = pathMod.join(config.settings.vodPath, tenantId, vodId);
-
-  // 3. Crash Recovery: Clean up orphaned temp files if directory exists
-  try {
-    await fsPromises.access(vodDirPath);
-    log.debug({ vodId, platform }, `[Recovery] Directory found - cleaning orphaned temp files`);
-    await cleanupOrphanedTmpFiles(vodDirPath, log);
-  } catch (err) {
-    const error = err as NodeJS.ErrnoException;
-    if (error.code === 'ENOENT') {
-      log.debug({ vodId, platform }, `[Recovery] Fresh start - directory will be created`);
-    } else {
-      throw error;
+    if (!config?.settings.vodPath) {
+      throw new Error(`VOD path not configured for streamer ${tenantId}`);
     }
+
+    const vodDirPath = pathMod.join(config.settings.livePath || config.settings.vodPath, tenantId, vodId);
+
+    const exists = await fileExists(vodDirPath);
+
+    if (exists) {
+      log.debug({ vodId, platform }, `[Recovery] Directory found - cleaning orphaned temp files`);
+      await cleanupOrphanedTmpFiles(vodDirPath, log);
+    } else {
+      log.debug({ vodId, platform }, `[Recovery] Fresh start - directory will be created`);
+    }
+
+    const liveData = job.data as LiveHlsDownloadJobData;
+    const result = await downloadLiveHls({
+      vodId,
+      platform,
+      tenantId,
+      platformUserId: liveData.platformUserId,
+      platformUsername: liveData.platformUsername,
+      startedAt: liveData.startedAt,
+      sourceUrl: liveData.sourceUrl,
+      uploadAfterDownload: liveData.uploadAfterDownload,
+      uploadMode: liveData.uploadMode,
+    });
+
+    return result!;
+  } else if (job.name === 'standard_vod_download') {
+    const { downloadStandardVod } = await import('./vod/standard-vod-downloader.js');
+
+    const standardData = job.data as StandardVodDownloadJobData;
+    const result = await downloadStandardVod({
+      vodId,
+      platform,
+      tenantId,
+      platformUserId: standardData.platformUserId,
+      uploadMode: standardData.uploadMode,
+    });
+
+    return result;
+  } else {
+    throw new Error(`Unsupported job type: ${job.name}`);
   }
-
-  // 4. Execution
-  const result: LiveHlsDownloadResult | undefined = await downloadLiveHls({
-    vodId,
-    platform,
-    tenantId,
-    platformUserId,
-    platformUsername,
-    startedAt,
-    sourceUrl,
-  });
-
-  return result!;
 };
 
 export default vodProcessor;

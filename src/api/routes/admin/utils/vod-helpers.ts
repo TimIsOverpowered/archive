@@ -18,7 +18,7 @@ export interface QueueEmoteOptions {
   streamerId: string;
   vodId: string;
   platform: 'twitch' | 'kick';
-  channelId: string;
+  platformId: string;
   log: FastifyRequest['log'];
 }
 
@@ -111,11 +111,11 @@ export function parseDurationToSeconds(duration: number | string, platform?: 'tw
  * Queues emote fetch job with proper error handling
  */
 export async function queueEmoteFetch(options: QueueEmoteOptions): Promise<void> {
-  const { streamerId, vodId, platform, channelId, log } = options;
+  const { streamerId, vodId, platform, platformId, log } = options;
 
   void import('../../../../services/emotes')
     .then(({ fetchAndSaveEmotes }) =>
-      fetchAndSaveEmotes(streamerId, vodId, platform, channelId).catch((err: unknown) => {
+      fetchAndSaveEmotes(streamerId, vodId, platform, platformId).catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
         log.error(`[${vodId}] Emote save failed: ${msg}`);
       })
@@ -125,5 +125,5 @@ export async function queueEmoteFetch(options: QueueEmoteOptions): Promise<void>
       log.error(`[${vodId}] Emote save failed: ${msg}`);
     });
 
-  log.info(`[${streamerId}] Queued async emote fetch for ${vodId} (channel=${channelId})`);
+  log.info(`[${streamerId}] Queued async emote fetch for ${vodId} (platform=${platform}) (platformId=${platformId})`);
 }

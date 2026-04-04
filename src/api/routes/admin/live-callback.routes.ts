@@ -7,6 +7,7 @@ import createRateLimitMiddleware from '../../middleware/rate-limit';
 import type { PrismaClient } from '../../../../generated/streamer/client';
 import type { VodRecordBase } from './types';
 import { enqueueJobWithLogging } from '../../../jobs/queues.js';
+import { fileExists } from '../../../utils/path.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -75,7 +76,11 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
 
         // Validate file path exists and is accessible
         try {
-          await fs.access(request.body.path);
+          const exists = await fileExists(request.body.path);
+
+          if (!exists) {
+            throw new Error(`File at ${request.body.path} does not exist`);
+          }
 
           const stats = await fs.stat(request.body.path);
           if (!stats.isFile() || stats.size === 0) {

@@ -238,14 +238,7 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
       },
     });
 
-    // [CRASH RECOVERY] Check for crash recovery scenario - partial segments exist from previous run?
-    const hasPartialSegments = await checkForCrashRecovery(tenantId, String(existingVod.id));
-
-    if (hasPartialSegments) {
-      log.info({ vodId: existingVod.id }, `[Monitor]: Crash detected for ${existingVod.id} - resuming download`);
-    }
-
-    log.info(`[Monitor]:  Queuing HLS download for resumed VOD ${String(existingVod.id)}`);
+    log.info(`[Monitor]: Queuing HLS download for VOD ${String(existingVod.id)}`);
 
     await enqueueLiveHlsDownload({
       vodId: String(existingVod.id),
@@ -383,14 +376,7 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
       },
     });
 
-    // [CRASH RECOVERY] Check for crash recovery scenario - partial segments exist from previous run?
-    const hasPartialSegments = await checkForCrashRecovery(tenantId, kickStreamIdStr);
-
-    if (hasPartialSegments) {
-      log.info({ vodId: kickStreamIdStr }, `[Monitor]: Crash detected for ${kickStreamIdStr} - resuming download`);
-    }
-
-    log.info(`[Monitor]:  Queuing HLS download for resumed VOD ${String(existingVod.id)}`);
+    log.info(`[Monitor]: Queuing HLS download for VOD ${String(existingVod.id)}`);
 
     const vodObject = await getLatestKickVodObject(kickUsername, existingVod.id);
 
@@ -518,40 +504,6 @@ async function enqueueLiveHlsDownload(params: {
   } catch (error) {
     const details = extractErrorDetails(error);
     log.error({ vodId: params.vodId, ...details }, `[Monitor] CRITICAL - Failed to enqueue Live HLS download job`);
-  }
-}
-
-/**
- * Check if a crash occurred mid-download by scanning for partial segments on disk
- */
-async function checkForCrashRecovery(tenantId: string, vodId: string): Promise<boolean> {
-  const log = loggerWithTenant(tenantId);
-
-  try {
-    const streamerConfig = getStreamerConfig(tenantId);
-
-    if (!streamerConfig?.settings.vodPath) {
-      return false;
-    }
-
-    const vodDir = path.join(streamerConfig.settings.vodPath, tenantId, vodId);
-
-    // Check if directory exists (indicates download was in progress when crash occurred)
-    try {
-      await fs.access(vodDir);
-
-      // Scan for segments - if any exist but no final MP4, this is a crash recovery scenario
-      const files = await fs.readdir(vodDir);
-      const hasSegments = files.some((f) => f.endsWith('.ts') || (f.endsWith('.mp4') && !f.includes('_final.mp4')));
-
-      return hasSegments;
-    } catch {
-      // Directory doesn't exist - no crash to recover from
-      return false;
-    }
-  } catch (error) {
-    log.warn(createErrorContext(error, { vodId }), `Failed to check for crash recovery`);
-    return false;
   }
 }
 
