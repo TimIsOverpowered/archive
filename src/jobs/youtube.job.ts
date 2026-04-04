@@ -16,7 +16,7 @@ export async function enqueueYoutubeUpload(job: Omit<YoutubeUploadJob, 'id'>, jo
 }
 
 export async function triggerYoutubeUpload(
-  streamerId: string,
+  tenantId: string,
   vodId: string,
   filePath: string,
   title: string,
@@ -28,7 +28,7 @@ export async function triggerYoutubeUpload(
   gameId?: string
 ): Promise<string | null> {
   const jobData: Omit<YoutubeUploadJob, 'id'> = {
-    streamerId,
+    tenantId,
     vodId,
     filePath,
     title,
@@ -49,7 +49,7 @@ export async function triggerYoutubeUpload(
 }
 
 export async function triggerYoutubeUploadWithChapters(
-  streamerId: string,
+  tenantId: string,
   vodId: string,
   filePath: string,
   title: string,
@@ -60,7 +60,7 @@ export async function triggerYoutubeUploadWithChapters(
   chapters?: { name: string; start: number; end: number; gameId?: string }[]
 ): Promise<string[]> {
   if (!chapters || chapters.length === 0) {
-    const jobId = await triggerYoutubeUpload(streamerId, vodId, filePath, title, description, type, platform, part);
+    const jobId = await triggerYoutubeUpload(tenantId, vodId, filePath, title, description, type, platform, part);
     return jobId ? [jobId] : [];
   }
 
@@ -68,7 +68,7 @@ export async function triggerYoutubeUploadWithChapters(
   const jobIds: string[] = [];
 
   for (const chapter of chapters) {
-    const jobId = await triggerYoutubeUpload(streamerId, vodId, filePath, title, description, type, platform, part && chapters.length > 1 ? part : undefined, chapter.name, chapter.gameId);
+    const jobId = await triggerYoutubeUpload(tenantId, vodId, filePath, title, description, type, platform, part && chapters.length > 1 ? part : undefined, chapter.name, chapter.gameId);
 
     if (jobId) {
       jobIds.push(jobId);

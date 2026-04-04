@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { getLogsByOffset, getLogsByCursor } from '../../services/logs.service';
 import { getClient } from '../../db/client';
-import { getStreamerConfig } from '../../config/loader';
+import { getTenantConfig } from '../../config/loader';
 import createRateLimitMiddleware from '../middleware/rate-limit';
 
 interface LogsRoutesOptions {
@@ -21,7 +21,7 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
   });
 
   fastify.get(
-    '/:streamerId/vods/:vodId/logs',
+    '/:/vods/:vodId/logs',
     {
       schema: {
         tags: ['Chat Logs'],
@@ -29,10 +29,10 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
         params: {
           type: 'object',
           properties: {
-            streamerId: { type: 'string', description: 'Streamer ID' },
+            tenantId: { type: 'string', description: 'Tenant ID' },
             vodId: { type: 'string', description: 'VOD ID' },
           },
-          required: ['streamerId', 'vodId'],
+          required: ['tenantId', 'vodId'],
         },
         query: {
           type: 'object',
@@ -51,19 +51,19 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
       onRequest: rateLimitMiddleware,
     },
     async (request) => {
-      const { streamerId, vodId } = request.params as { streamerId: string; vodId: string };
+      const { tenantId, vodId } = request.params as { tenantId: string; vodId: string };
       const { content_offset_seconds, cursor } = request.query as { content_offset_seconds?: number; cursor?: string };
 
       if (!content_offset_seconds && !cursor) {
         throw new Error('Missing required query parameter: content_offset_seconds or cursor');
       }
 
-      const config = getStreamerConfig(streamerId);
+      const config = getTenantConfig(tenantId);
       if (!config) {
         throw new Error('Streamer not found');
       }
 
-      const client = getClient(streamerId);
+      const client = getClient(tenantId);
       if (!client) {
         throw new Error('Database not available');
       }
@@ -71,9 +71,9 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
       let result;
 
       if (cursor) {
-        result = await getLogsByCursor(client, streamerId, vodId, cursor);
+        result = await getLogsByCursor(client, tenantId, vodId, cursor);
       } else if (content_offset_seconds !== undefined && !isNaN(content_offset_seconds)) {
-        result = await getLogsByOffset(client, streamerId, vodId, content_offset_seconds);
+        result = await getLogsByOffset(client, tenantId, vodId, content_offset_seconds);
       } else {
         throw new Error('Invalid content_offset_seconds value');
       }

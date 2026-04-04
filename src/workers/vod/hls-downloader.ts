@@ -5,7 +5,7 @@ import pathMod from 'path';
 import HLS from 'hls-parser';
 import { pipeline } from 'stream/promises';
 import { Readable } from 'stream';
-import { getStreamerConfig } from '../../config/loader';
+import { getTenantConfig } from '../../config/loader';
 import { getClient } from '../../db/client';
 import { sendRichAlert, updateDiscordEmbed, resetFailures, isAlertsEnabled } from '../../utils/discord-alerts.js';
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch';
@@ -402,7 +402,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
     throw error;
   }
 
-  const config = getStreamerConfig(tenantId);
+  const config = getTenantConfig(tenantId);
 
   if (!config) {
     log.error({ vodId, tenantId, platform }, `[HLS-Downloader] CRITICAL - Stream config not found. Cannot proceed with download.`);

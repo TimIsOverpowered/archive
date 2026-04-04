@@ -3,7 +3,7 @@ import { extractErrorDetails } from '../../../utils/error.js';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import dayjs from 'dayjs';
 import durationPlugin from 'dayjs/plugin/duration';
-import { getStreamerConfig } from '../../../config/loader';
+import { getTenantConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { getClient } from '../../../db/client.js';
@@ -56,18 +56,18 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
     async (request) => {
-      const streamerId = request.params.id;
+      const tenantId = request.params.id;
       const vodId = request.params.vodId;
 
       try {
-        const config = getStreamerConfig(streamerId);
+        const config = getTenantConfig(tenantId);
 
         if (!config) throw new Error('Tenant not found');
 
-        const client: StreamerDbClient | undefined = getClient(streamerId);
+        const client: StreamerDbClient | undefined = getClient(tenantId);
 
         if (!client) {
-          request.log.error(`[${streamerId}] Database error: Database not available`);
+          request.log.error(`[${tenantId}] Database error: Database not available`);
           throw new Error('Database not available');
         }
 
@@ -107,7 +107,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
               try {
                 const twitch = await import('../../../services/twitch');
                 if (gameNode.id) {
-                  const gameData = await twitch.getGameData(gameNode.id, streamerId);
+                  const gameData = await twitch.getGameData(gameNode.id, tenantId);
                   if (gameData && 'box_art_url' in gameData) {
                     image = String(gameData.box_art_url).replace('{width}x{height}', '40x53');
                   }
@@ -163,7 +163,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
             try {
               const twitch = await import('../../../services/twitch');
               if (gameNode.id) {
-                const gameData = await twitch.getGameData(gameNode.id, streamerId);
+                const gameData = await twitch.getGameData(gameNode.id, tenantId);
                 if (gameData && 'box_art_url' in gameData) {
                   image = String(gameData.box_art_url).replace('{width}x{height}', '40x53');
                 }
@@ -198,7 +198,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
-        request.log.error(`[${streamerId}] Chapter save failed: ${errorMsg}`);
+        request.log.error(`[${tenantId}] Chapter save failed: ${errorMsg}`);
 
         throw new Error('Failed to fetch and save chapters');
       }
@@ -218,18 +218,18 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
     async (request) => {
-      const streamerId = request.params.id;
+      const tenantId = request.params.id;
       const vodId = request.params.vodId;
 
       try {
-        const config = getStreamerConfig(streamerId);
+        const config = getTenantConfig(tenantId);
 
         if (!config) throw new Error('Tenant not found');
 
-        const client: StreamerDbClient | undefined = getClient(streamerId);
+        const client: StreamerDbClient | undefined = getClient(tenantId);
 
         if (!client) {
-          request.log.error(`[${streamerId}] Database error: Database not available`);
+          request.log.error(`[${tenantId}] Database error: Database not available`);
           throw new Error('Database not available');
         }
 
@@ -242,7 +242,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
         // Only supported for Twitch with stream_id available
         if (vodRecord.platform === 'twitch' && vodRecord.stream_id) {
           const twitch = await import('../../../services/twitch');
-          const vodData: TwitchVodData = await twitch.getVodData(vodId, streamerId);
+          const vodData: TwitchVodData = await twitch.getVodData(vodId, tenantId);
 
           channelId = vodData.user_id;
 
@@ -250,11 +250,11 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
             request.log.info(`[${vodId}] Fetching emotes for channel ${channelId}`);
 
             const EmoteModule = await import('../../../services/emotes');
-            await EmoteModule.fetchAndSaveEmotes(streamerId, vodId, vodRecord.platform, channelId);
+            await EmoteModule.fetchAndSaveEmotes(tenantId, vodId, vodRecord.platform, channelId);
 
             request.log.info(`[${vodId}] Successfully fetched and saved emotes`);
           } else {
-            request.log.warn(`[${streamerId}] No channel ID available for Twitch VOD ${vodId}`);
+            request.log.warn(`[${tenantId}] No channel ID available for Twitch VOD ${vodId}`);
           }
         } else if (vodRecord.platform !== 'twitch') {
           request.log.info(`[${vodId}] Emote fetching only supported for Twitch platform`);
@@ -264,7 +264,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
-        request.log.error(`[${streamerId}] Emote save failed: ${errorMsg}`);
+        request.log.error(`[${tenantId}] Emote save failed: ${errorMsg}`);
 
         throw new Error('Failed to queue emote saving job');
       }

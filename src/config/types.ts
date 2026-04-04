@@ -1,4 +1,4 @@
-export interface StreamerConfig {
+export interface TenantConfig {
   id: string;
   displayName?: string;
   twitch?: { enabled: boolean; auth?: string; username?: string; mainPlatform?: boolean; id?: string };

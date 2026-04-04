@@ -1,4 +1,4 @@
-import { getStreamerConfig } from '../../config/loader.js';
+import { getTenantConfig } from '../../config/loader.js';
 import { getClient } from '../../db/client.js';
 import { convertHlsToMp4, getDuration } from '../../utils/ffmpeg.js';
 import { getKickParsedM3u8ForFfmpeg } from '../../services/kick.js';
@@ -27,7 +27,7 @@ export async function downloadStandardVod(options: StandardVodDownloadOptions): 
   const { vodId, platform, tenantId, uploadMode } = options;
   const log = loggerWithTenant(tenantId);
 
-  const config = getStreamerConfig(tenantId);
+  const config = getTenantConfig(tenantId);
 
   if (!config?.settings.vodPath) {
     throw new Error(`No vodPath configured for streamer ${tenantId}`);

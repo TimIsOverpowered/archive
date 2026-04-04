@@ -1,23 +1,23 @@
 import { FastifyPluginAsync } from 'fastify';
-import { loadStreamerConfigs, getStreamerConfig, clearConfigCache } from '../../config/loader';
-import { StreamerConfig } from '../../config/types';
+import { loadTenantConfigs, getTenantConfig, clearConfigCache } from '../../config/loader';
+import { TenantConfig } from '../../config/types';
 import { logger } from '../../utils/logger';
 
 const configPlugin: FastifyPluginAsync = async (fastify) => {
   try {
     logger.info('Loading streamer configurations from meta database');
 
-    const configs = await loadStreamerConfigs();
+    const configs = await loadTenantConfigs();
 
     logger.info({ count: configs.length, streamers: configs.map((c) => c.id) }, 'Streamer configs loaded');
 
     // Decorate fastify with config helpers
-    fastify.decorate('getStreamerConfig', (id: string): StreamerConfig | undefined => {
-      return getStreamerConfig(id);
+    fastify.decorate('getTenantConfig', (id: string): TenantConfig | undefined => {
+      return getTenantConfig(id);
     });
 
-    fastify.decorate('getAllConfigs', async (): Promise<StreamerConfig[]> => {
-      return loadStreamerConfigs();
+    fastify.decorate('getAllConfigs', async (): Promise<TenantConfig[]> => {
+      return loadTenantConfigs();
     });
 
     fastify.decorate('clearConfigCache', (): void => {

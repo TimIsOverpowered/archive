@@ -8,7 +8,7 @@ dayjs.extend(utcPlugin);
 dayjs.extend(timezone);
 
 import type { DmcaProcessingJob, DmcaProcessingResult, YoutubeUploadJob } from '../jobs/queues.js';
-import { getStreamerConfig } from '../config/loader.js';
+import { getTenantConfig } from '../config/loader.js';
 import { getClient, createClient } from '../db/client.js';
 import { getYoutubeUploadQueue } from '../jobs/queues.js';
 import type { DMCAClaim } from '../utils/dmca.js';
@@ -18,8 +18,8 @@ import { fileExists } from '../utils/path.js';
 import { createAutoLogger as loggerWithTenant } from '../utils/auto-tenant-logger.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
-  const { streamerId, vodId, receivedClaims, type, platform, part } = job.data;
-  const log = loggerWithTenant(String(streamerId));
+  const { tenantId, vodId, receivedClaims, type, platform, part } = job.data;
+  const log = loggerWithTenant(String(tenantId));
 
   if (!receivedClaims || receivedClaims.length === 0) {
     log.warn(`No claims to process for VOD ${vodId}`);
@@ -27,13 +27,13 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     return { success: true, message: 'No blocking claims found' };
   }
 
-  const config = getStreamerConfig(streamerId);
+  const config = getTenantConfig(tenantId);
 
   if (!config?.youtube) {
     throw new Error('YouTube not configured for streamer');
   }
 
-  let db = getClient(streamerId);
+  let db = getClient(tenantId);
   if (!db) {
     db = await createClient(config);
   }
@@ -41,7 +41,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
   const vodRecord = await db.vod.findUnique({ where: { id: vodId } });
 
   if (!vodRecord) {
-    throw new Error(`VOD not found in database for streamer ${streamerId}`);
+    throw new Error(`VOD not found in database for streamer ${tenantId}`);
   }
 
   let videoPath: string;
@@ -51,7 +51,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     const liveDir = path.join(config.settings.livePath!, username, vodRecord.stream_id || vodId);
     videoPath = path.join(liveDir, `${vodRecord.stream_id}.mp4`);
   } else {
-    videoPath = path.join(config.settings.vodPath!, streamerId, `${vodId}.mp4`);
+    videoPath = path.join(config.settings.vodPath!, tenantId, `${vodId}.mp4`);
   }
 
   if (!(await fileExists(videoPath))) {
@@ -148,7 +148,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     log.info(`Queuing YouTube upload for ${finalTitle}`);
 
     const youtubeJobData: YoutubeUploadJob = {
-      streamerId,
+      tenantId,
       vodId: String(vodId),
       filePath: processedPath,
       title: finalTitle,

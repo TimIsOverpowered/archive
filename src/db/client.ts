@@ -1,14 +1,14 @@
 import { PrismaClient } from '../../generated/streamer/client';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { StreamerConfig } from '../config/types';
+import { TenantConfig } from '../config/types';
 
 const clients = new Map<string, PrismaClient>();
 
-export function getClient(streamerId: string): PrismaClient | undefined {
-  return clients.get(streamerId);
+export function getClient(tenantId: string): PrismaClient | undefined {
+  return clients.get(tenantId);
 }
 
-export async function createClient(config: StreamerConfig): Promise<PrismaClient> {
+export async function createClient(config: TenantConfig): Promise<PrismaClient> {
   if (clients.has(config.id)) return clients.get(config.id)!;
 
   const connectionLimit = config.database.connectionLimit || 5;
@@ -23,21 +23,21 @@ export async function createClient(config: StreamerConfig): Promise<PrismaClient
   return client;
 }
 
-export async function closeClient(streamerId: string): Promise<void> {
-  const client = clients.get(streamerId);
+export async function closeClient(tenantId: string): Promise<void> {
+  const client = clients.get(tenantId);
   if (client) {
     try {
       await client.$disconnect();
     } catch {}
-    clients.delete(streamerId);
+    clients.delete(tenantId);
   }
 }
 
 export async function closeAllClients(): Promise<void> {
-  for (const [streamerId, client] of clients.entries()) {
+  for (const [tenantId, client] of clients.entries()) {
     try {
       await client.$disconnect();
     } catch {}
-    clients.delete(streamerId);
+    clients.delete(tenantId);
   }
 }

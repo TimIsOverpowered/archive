@@ -1,6 +1,6 @@
 import { Processor, Job } from 'bullmq';
 import { getClient, createClient } from '../db/client.js';
-import { getStreamerConfig } from '../config/loader.js';
+import { getTenantConfig } from '../config/loader.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { sleep } from '../utils/delay.js';
 import { fetchComments, fetchNextComments, type TwitchChatEdge } from '../services/twitch';
@@ -92,7 +92,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
     return { success: true, skipped: true };
   }
 
-  const config = getStreamerConfig(tenantId);
+  const config = getTenantConfig(tenantId);
   if (!config) throw new Error(`Stream config not found for ${tenantId}`);
 
   let db = getClient(tenantId);

@@ -1,11 +1,11 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { getStreamerConfig } from '../config/loader.js';
+import { getTenantConfig } from '../config/loader.js';
 import { logger } from '../utils/logger.js';
 import { createAutoLogger as loggerWithTenant } from '../utils/auto-tenant-logger.js';
 import { QUEUE_NAMES, type LiveHlsDownloadJob, getLiveHlsDownloadQueue, enqueueJobWithLogging } from '../jobs/queues.js';
 import { createClient, getClient } from '../db/client.js';
-import type { StreamerConfig } from '../config/types.js';
+import type { TenantConfig } from '../config/types.js';
 import { getTwitchStreamStatus, getLatestTwitchVodObject } from '../services/twitch-live.js';
 import { getKickStreamStatus, getLatestKickVodObject } from '../services/kick-live.js';
 import { sendRichAlert } from '../utils/discord-alerts.js';
@@ -18,7 +18,7 @@ type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
 /**
  * Main polling function - called every 30 seconds per tenant/platform pair
  */
-export async function checkPlatformStatus(tenantId: string, platform: PlatformType, config: StreamerConfig): Promise<void> {
+export async function checkPlatformStatus(tenantId: string, platform: PlatformType, config: TenantConfig): Promise<void> {
   const log = loggerWithTenant(tenantId);
 
   log.debug(`[Monitor]: Polling ${platform} status for streamer...`);
@@ -113,7 +113,7 @@ async function sendStreamOfflineAlert(platform: PlatformType, vodId: string, sta
   }
 }
 
-async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string, platform: PlatformType, config: StreamerConfig): Promise<void> {
+async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string, platform: PlatformType, config: TenantConfig): Promise<void> {
   const log = loggerWithTenant(tenantId);
   const twitchUsername = config.twitch?.username;
 
@@ -266,7 +266,7 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
 /**
  * Handle Kick-specific live detection logic - NO FALLBACK, only downloads after video object confirmed available
  */
-async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, platform: PlatformType, config: StreamerConfig): Promise<void> {
+async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, platform: PlatformType, config: TenantConfig): Promise<void> {
   const log = loggerWithTenant(tenantId);
   const kickUsername = config.kick?.username;
 
@@ -414,7 +414,7 @@ async function validateVodPath(tenantId: string): Promise<{ valid: boolean }> {
   const log = loggerWithTenant(tenantId);
 
   try {
-    const streamerConfig = getStreamerConfig(tenantId);
+    const streamerConfig = getTenantConfig(tenantId);
 
     if (!streamerConfig?.settings.vodPath) {
       log.error({ tenantId }, `[Monitor] VOD path not configured for tenant - cannot queue downloads`);
@@ -510,7 +510,7 @@ async function enqueueLiveHlsDownload(params: {
 /**
  * Start independent polling loop per tenant/platform pair (concurrent async execution)
  */
-export function startStreamDetectionLoop(tenantId: string, platform: PlatformType, config: StreamerConfig): void {
+export function startStreamDetectionLoop(tenantId: string, platform: PlatformType, config: TenantConfig): void {
   const log = loggerWithTenant(tenantId);
   log.info(`[Platform]: ${platform}] Starting stream detection polling every 30 seconds...`);
 

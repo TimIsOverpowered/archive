@@ -8,7 +8,7 @@ import { sleep } from '../utils/delay.js';
 import { sendVodDownloadStarted, sendVodDownloadSuccess, sendVodDownloadFailed } from '../utils/discord-alerts.js';
 import { convertHlsToMp4 } from '../utils/ffmpeg.js';
 import { childLogger } from '../utils/logger.js';
-import { getStreamerConfig } from '../config/loader.js';
+import { getTenantConfig } from '../config/loader.js';
 import { toHHMMSS } from '../utils/formatting.js';
 import { PrismaClient } from '../../generated/streamer/client.js';
 import { getKickStreamStatus } from './kick-live.js';
@@ -192,15 +192,15 @@ export async function getVod(channelName: string, vodId: string): Promise<KickVo
 /**
  * Download Kick VOD directly to MP4 using ffmpeg HLS streaming
  */
-export async function downloadMP4(streamerId: string, vod: KickVod): Promise<string | null> {
+export async function downloadMP4(tenantId: string, vod: KickVod): Promise<string | null> {
   if (!vod.source) {
     throw new Error('VOD source URL not available');
   }
 
-  const config = getStreamerConfig(streamerId);
+  const config = getTenantConfig(tenantId);
 
   if (!config?.settings.vodPath) {
-    throw new Error(`No vodPath configured for streamer ${streamerId}`);
+    throw new Error(`No vodPath configured for streamer ${tenantId}`);
   }
 
   let messageId: string | null = null;
@@ -215,8 +215,8 @@ export async function downloadMP4(streamerId: string, vod: KickVod): Promise<str
 
     const vodPath = `${config.settings.vodPath}/${vod.id}.mp4`;
 
-    const streamerName = config.displayName || streamerId;
-    messageId = await sendVodDownloadStarted('kick', streamerId, String(vod.id), streamerName);
+    const streamerName = config.displayName || tenantId;
+    messageId = await sendVodDownloadStarted('kick', tenantId, String(vod.id), streamerName);
 
     // Download directly to MP4 using ffmpeg HLS streaming
     await convertHlsToMp4(m3u8Url, vodPath, { vodId: String(vod.id), isFmp4: false });
@@ -234,7 +234,7 @@ export async function downloadMP4(streamerId: string, vod: KickVod): Promise<str
     log.error(`ffmpeg error occurred: ${errorMsg}`);
 
     // Failure alert
-    await sendVodDownloadFailed(messageId!, 'kick', String(vod.id), errorMsg, streamerId);
+    await sendVodDownloadFailed(messageId!, 'kick', String(vod.id), errorMsg, tenantId);
 
     throw error;
   }
@@ -304,9 +304,9 @@ export async function getKickCategoryInfo(slug: string): Promise<Record<string, 
   }
 }
 
-export async function updateChapterDuringDownload(vodId: string, streamerId: string, streamerClient: PrismaClient): Promise<void> {
+export async function updateChapterDuringDownload(vodId: string, tenantId: string, streamerClient: PrismaClient): Promise<void> {
   try {
-    const config = getStreamerConfig(streamerId);
+    const config = getTenantConfig(tenantId);
     const username = config?.kick?.username;
     if (!username) {
       log.warn({ vodId }, 'Kick username not configured');

@@ -46,9 +46,9 @@ const vodProcessor: Processor<LiveHlsDownloadJobData | StandardVodDownloadJobDat
 
   if (job.name === 'live_hls_download') {
     const { cleanupOrphanedTmpFiles, downloadLiveHls } = await import('./vod/hls-downloader.js');
-    const { getStreamerConfig } = await import('../config/loader.js');
+    const { getTenantConfig } = await import('../config/loader.js');
 
-    const config = getStreamerConfig(tenantId);
+    const config = getTenantConfig(tenantId);
 
     if (!config?.settings.vodPath) {
       throw new Error(`VOD path not configured for streamer ${tenantId}`);

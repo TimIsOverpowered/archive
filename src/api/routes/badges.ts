@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import Redis from 'ioredis';
-import { getStreamerConfig } from '../../config/loader';
+import { getTenantConfig } from '../../config/loader';
 import { extractErrorDetails } from '../../utils/error.js';
 
 interface BadgesRoutesOptions {
@@ -19,10 +19,10 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
       },
     },
     async (request: FastifyRequest<{ Params: { id: string }; Body?: unknown }>): Promise<unknown> => {
-      const streamerId = request.params.id;
+      const tenantId = request.params.id;
 
       try {
-        const config = getStreamerConfig(streamerId);
+        const config = getTenantConfig(tenantId);
 
         if (!config?.twitch?.id) throw new Error('Twitch not configured for this tenant');
 
@@ -30,10 +30,10 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
         const redisInstance = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
         try {
-          const cachedBadges = await redisInstance.get(`twitch_badges:${streamerId}`);
+          const cachedBadges = await redisInstance.get(`twitch_badges:${tenantId}`);
 
           if (cachedBadges) {
-            request.log.info(`[${streamerId}] Returning cached Twitch badges`);
+            request.log.info(`[${tenantId}] Returning cached Twitch badges`);
 
             return { data: JSON.parse(cachedBadges) };
           }
@@ -45,20 +45,20 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
         const twitch = await import('../../services/twitch');
 
         try {
-          const [channelBadges, globalBadges] = await Promise.all([twitch.getChannelBadges(streamerId).catch(() => null), twitch.getGlobalBadges(streamerId).catch(() => null)]);
+          const [channelBadges, globalBadges] = await Promise.all([twitch.getChannelBadges(tenantId).catch(() => null), twitch.getGlobalBadges(tenantId).catch(() => null)]);
 
           const badgesData = { channel: channelBadges || null, global: globalBadges || null };
 
           // Cache in Redis with 60-minute TTL (3600 seconds) if fetch succeeded
           try {
-            await redisInstance.set(`twitch_badges:${streamerId}`, JSON.stringify(badgesData), 'EX', 3600);
+            await redisInstance.set(`twitch_badges:${tenantId}`, JSON.stringify(badgesData), 'EX', 3600);
 
-            request.log.info(`[${streamerId}] Fetched and cached Twitch badges`);
+            request.log.info(`[${tenantId}] Fetched and cached Twitch badges`);
 
             return { data: badgesData };
           } catch {
             // Cache write failure - still return the fetched data even if caching fails
-            request.log.warn(`Failed to cache Twitch badges in Redis, returning uncached result for ${streamerId}`);
+            request.log.warn(`Failed to cache Twitch badges in Redis, returning uncached result for ${tenantId}`);
 
             return { data: badgesData };
           }
@@ -67,7 +67,7 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
         }
       } catch (error) {
         const details = extractErrorDetails(error);
-        request.log.error({ ...details, streamerId }, 'Failed to fetch Twitch badges');
+        request.log.error({ ...details, tenantId }, 'Failed to fetch Twitch badges');
 
         throw new Error('Something went wrong trying to retrieve channel badges..');
       }

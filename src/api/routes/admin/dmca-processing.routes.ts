@@ -3,7 +3,7 @@ import { enqueueJobWithLogging } from '../../../jobs/utils.js';
 import { extractErrorDetails } from '../../../utils/error.js';
 import { FastifyInstance } from 'fastify';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
-import { getStreamerConfig } from '../../../config/loader';
+import { getTenantConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { getClient } from '../../../db/client.js';
@@ -50,17 +50,17 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
   /**
    * Shared DMCA processing logic - handles both full VOD and specific part processing
    */
-  async function processDmcaRequest(streamerId: string, body: DmcaRequestBody, requestLog: FastifyInstance['log']): Promise<ProcessDmcaResponse> {
-    const config = getStreamerConfig(streamerId);
+  async function processDmcaRequest(tenantId: string, body: DmcaRequestBody, requestLog: FastifyInstance['log']): Promise<ProcessDmcaResponse> {
+    const config = getTenantConfig(tenantId);
 
     if (!config) throw new Error('Tenant not found');
 
     let client: StreamerDbClient | null = null;
 
-    client = getClient(streamerId);
+    client = getClient(tenantId);
 
     if (!client) {
-      requestLog.error(`[${streamerId}] Database error in DMCA processing`);
+      requestLog.error(`[${tenantId}] Database error in DMCA processing`);
       throw new Error('Database not available');
     }
 
@@ -82,7 +82,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
 
     // Cast at boundary to match strict queue type definition
     const dmcaJobData: Omit<DmcaProcessingJob, 'receivedClaims'> & { receivedClaims: StrictDmcaClaims } = {
-      streamerId,
+      tenantId,
       vodId: String(vodRecord.id),
       receivedClaims: claimsArray as StrictDmcaClaims,
       type: body.type || 'vod',
@@ -93,9 +93,9 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
     if (body.partIndex !== undefined && body.partIndex !== null) {
       dmcaJobData.part = Number(body.partIndex) + 1; // Convert to 1-indexed for worker
 
-      requestLog.info(`[${streamerId}] DMCA processing job queued for ${body.vodId} Part ${Number(body.partIndex) + 1}`);
+      requestLog.info(`[${tenantId}] DMCA processing job queued for ${body.vodId} Part ${Number(body.partIndex) + 1}`);
     } else {
-      requestLog.info(`[${streamerId}] DMCA processing job queued for full VOD ${body.vodId}`);
+      requestLog.info(`[${tenantId}] DMCA processing job queued for full VOD ${body.vodId}`);
     }
 
     const DmcaQueueModule = await import('../../../jobs/queues');
@@ -111,12 +111,12 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
         deduplication: { id: jobId },
       },
       { info: requestLog.info.bind(requestLog), debug: requestLog.debug.bind(requestLog) },
-      `[${streamerId}] DMCA processing job queued`,
+      `[${tenantId}] DMCA processing job queued`,
       { vodId: body.vodId, part: body.partIndex !== undefined ? Number(body.partIndex) + 1 : undefined }
     );
 
     if (isNew) {
-      requestLog.debug({ vodId: body.vodId, jobId: actualJobId }, `[${streamerId}] Job was newly added to queue`);
+      requestLog.debug({ vodId: body.vodId, jobId: actualJobId }, `[${tenantId}] Job was newly added to queue`);
     }
 
     return {
@@ -152,14 +152,14 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
     async (request) => {
-      const streamerId = request.params.id;
+      const tenantId = request.params.id;
 
       try {
-        return await processDmcaRequest(streamerId, request.body, request.log);
+        return await processDmcaRequest(tenantId, request.body, request.log);
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
-        request.log.error(`[${streamerId}] DMCA processing failed: ${errorMsg}`);
+        request.log.error(`[${tenantId}] DMCA processing failed: ${errorMsg}`);
 
         throw new Error('Failed to queue DMCA processing job');
       }

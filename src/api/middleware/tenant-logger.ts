@@ -16,26 +16,26 @@ declare module 'fastify' {
  */
 export default function createTenantLoggerMiddleware() {
   return async function tenantLoggerMiddleware(request: FastifyRequest, _reply: FastifyReply) {
-    // Extract streamerId from params (routes like /api/v1/:streamerId/vods/* or /api/v1/admin/:id/...)
+    // Extract tenantId from params (routes like /api/v1/:tenantId/vods/* or /api/v1/admin/:id/...)
     const params = request.params as Record<string, string>;
 
-    let streamerId: string | undefined;
+    let tenantId: string | undefined;
 
-    if ('streamerId' in params) {
-      // Standard VOD routes use 'streamerId' parameter
-      streamerId = String(params.streamerId);
+    if ('tenantId' in params) {
+      // Standard VOD routes use 'tenantId' parameter
+      tenantId = String(params.tenantId);
     } else if ('id' in params && (request.url?.includes('/admin/') || request.url?.includes('tenant'))) {
-      // Admin routes use 'id' instead of 'streamerId' for tenant identification
-      streamerId = String(params.id);
+      // Admin routes use 'id' instead of 'tenantId' for tenant identification
+      tenantId = String(params.id);
     }
 
-    if (!streamerId) return; // No tenant context available for this route (e.g., health check, root paths)
+    if (!tenantId) return; // No tenant context available for this route (e.g., health check, root paths)
 
-    const displayName = getTenantDisplayName(streamerId);
+    const displayName = getTenantDisplayName(tenantId);
     request.tenantDisplayName = displayName;
 
     // Set tenant in async-local storage so pino mixin can read it automatically during handler execution
-    const context: TenantContextData = { displayName, streamerId };
+    const context: TenantContextData = { displayName, tenantId };
 
     enterTenantContext(context);
   };

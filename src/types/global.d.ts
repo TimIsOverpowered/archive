@@ -4,7 +4,7 @@
 
 declare namespace NodeJS {
   interface Global {
-    /** Map of streamerId:platform -> setInterval ID for cleanup during shutdown */
+    /** Map of tenantId:platform -> setInterval ID for cleanup during shutdown */
     monitorIntervals?: Map<string, ReturnType<typeof setInterval>>;
   }
 }

@@ -48,7 +48,7 @@ interface SevenTVUserResponse {
   }>;
 }
 
-export async function fetchAndSaveEmotes(streamerId: string, vodId: string, platform: 'twitch' | 'kick', platformId?: string): Promise<void> {
+export async function fetchAndSaveEmotes(tenantId: string, vodId: string, platform: 'twitch' | 'kick', platformId?: string): Promise<void> {
   let ffzEmotes: EmoteData[] = [];
   let bttvEmotes: EmoteData[] = [];
   let sevenTvEmotes: EmoteData[] = [];
@@ -111,10 +111,10 @@ export async function fetchAndSaveEmotes(streamerId: string, vodId: string, plat
 
   try {
     const { getClient } = await import('../db/client');
-    const db = getClient(streamerId);
+    const db = getClient(tenantId);
 
     if (!db) {
-      logger.error({ streamerId }, 'Database client not available for streamer');
+      logger.error({ tenantId }, 'Database client not available for streamer');
       return;
     }
 
