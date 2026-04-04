@@ -53,7 +53,7 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
       const { tenantId, vodId } = request.params as { tenantId: string; vodId: string };
       const { content_offset_seconds, cursor } = request.query as { content_offset_seconds?: number; cursor?: string };
 
-      if (!content_offset_seconds && !cursor) {
+      if (content_offset_seconds === undefined && !cursor) {
         badRequest('Missing required query parameter: content_offset_seconds or cursor');
       }
 
