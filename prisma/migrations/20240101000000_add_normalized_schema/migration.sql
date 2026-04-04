@@ -81,7 +81,7 @@ CREATE TABLE "chat_messages" (
     "user_color" TEXT,
     "created_at" TIMESTAMP(3),
 
-    CONSTRAINT "logs_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "chat_messages_pkey" PRIMARY KEY ("id")
 );
 
 
@@ -119,7 +119,7 @@ CREATE INDEX "games_game_name_idx" ON "games"("game_name");
 CREATE INDEX "chapters_vod_id_idx" ON "chapters"("vod_id");
 
 -- CreateIndex
-CREATE INDEX "idx_logs_vod_offset_id" ON "chat_messages"("vod_id", "content_offset_seconds", "id");
+CREATE INDEX "idx_chat_messages_vod_offset_id" ON "chat_messages"("vod_id", "content_offset_seconds", "id");
 
 
 

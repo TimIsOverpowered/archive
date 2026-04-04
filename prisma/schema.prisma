@@ -94,7 +94,7 @@ model Chapter {
 }
 
 model ChatMessage {
-  id                     String    @id(map: "logs_pkey") @db.Uuid
+  id                     String    @id(map: "chat_messages_pkey") @db.Uuid
   vod_id                 String
   display_name           String?
   content_offset_seconds Decimal   @db.Decimal
@@ -103,7 +103,7 @@ model ChatMessage {
   message                Json?
   user_badges            Json?
 
-  @@index([vod_id, content_offset_seconds, id], map: "idx_logs_vod_offset_id")
+  @@index([vod_id, content_offset_seconds, id], map: "idx_chat_messages_vod_offset_id")
   @@map("chat_messages")
 }
 
