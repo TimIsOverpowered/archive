@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify';
 import { extractErrorDetails } from '../../../utils/error.js';
-import { RateLimiterRedis } from 'rate-limiter-flexible';
 import dayjs from 'dayjs';
 import durationPlugin from 'dayjs/plugin/duration';
 import { getTenantConfig } from '../../../config/loader';
@@ -8,14 +7,9 @@ import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { getClient } from '../../../db/client.js';
 import type { VodData as TwitchVodData } from '../../../services/twitch.js';
+import { adminRateLimiter } from '../../plugins/redis.plugin';
 
 dayjs.extend(durationPlugin);
-
-declare module 'fastify' {
-  interface FastifyInstance {
-    adminRateLimiter: RateLimiterRedis;
-  }
-}
 
 type RouteParams = { id: string; vodId: string };
 
@@ -41,7 +35,11 @@ type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
 type VodRecord = { id: string; platform: 'twitch' | 'kick'; duration: number | string; stream_id?: string | null };
 
 export default async function metadataFetchingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
+  if (!adminRateLimiter) {
+    throw new Error('Rate limiter not initialized');
+  }
+
+  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
 
   // Fetch and save game chapters from Twitch API (Twitch only)
   fastify.post<{ Params: RouteParams }>(

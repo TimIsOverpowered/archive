@@ -1,23 +1,21 @@
 import { FastifyInstance } from 'fastify';
-import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { getVods, getVodById } from '../../services/vods.service';
 import { getClient } from '../../db/client';
 import { getTenantConfig } from '../../config/loader';
 import createRateLimitMiddleware from '../middleware/rate-limit';
+import { publicRateLimiter } from '../plugins/redis.plugin';
 
 interface VodRoutesOptions {
   prefix: string;
 }
 
-declare module 'fastify' {
-  interface FastifyInstance {
-    publicRateLimiter: RateLimiterRedis;
-  }
-}
-
 export default async function vodsRoutes(fastify: FastifyInstance, _options: VodRoutesOptions) {
+  if (!publicRateLimiter) {
+    throw new Error('Rate limiter not initialized');
+  }
+
   const rateLimitMiddleware = createRateLimitMiddleware({
-    limiter: fastify.publicRateLimiter,
+    limiter: publicRateLimiter,
   });
 
   fastify.get(

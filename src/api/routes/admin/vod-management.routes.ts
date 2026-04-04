@@ -1,16 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import { extractErrorDetails } from '../../../utils/error.js';
-import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { getTenantStats, getAllTenants } from '../../../services/tenants.service';
 import { getClient } from '../../../db/client.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
-
-declare module 'fastify' {
-  interface FastifyInstance {
-    adminRateLimiter: RateLimiterRedis;
-  }
-}
+import { adminRateLimiter } from '../../plugins/redis.plugin';
 
 interface CreateVodParams {
   id: string;
@@ -31,7 +25,11 @@ interface CreateVodBody {
 }
 
 export default async function vodManagementRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
+  if (!adminRateLimiter) {
+    throw new Error('Rate limiter not initialized');
+  }
+
+  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
 
   // List all tenants (streamers)
   fastify.get(

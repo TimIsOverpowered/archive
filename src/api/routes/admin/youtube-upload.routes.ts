@@ -1,17 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import { extractErrorDetails } from '../../../utils/error.js';
 import path from 'path';
-import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { getTenantConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { fileExists } from '../../../utils/path.js';
-
-declare module 'fastify' {
-  interface FastifyInstance {
-    adminRateLimiter: RateLimiterRedis;
-  }
-}
+import { adminRateLimiter } from '../../plugins/redis.plugin';
 
 type VodRecord = { id: string; title?: string | null; duration: number | string; platform: 'twitch' | 'kick' };
 
@@ -26,7 +20,11 @@ interface ReDownloadVodParams {
 }
 
 export default async function youtubeUploadRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
+  if (!adminRateLimiter) {
+    throw new Error('Rate limiter not initialized');
+  }
+
+  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
 
   // Manually trigger YouTube re-upload for a VOD with duration validation
   fastify.post<{ Params: ReUploadYoutubeParams }>(

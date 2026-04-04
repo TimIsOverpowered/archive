@@ -53,7 +53,7 @@ async function shutdown(signal: string) {
   const shutdownTimeout = setTimeout(() => {
     logger.error('Forced shutdown after 30 second timeout');
     process.exit(1);
-  }, 30000);
+  }, 5000);
 
   if (!server) {
     clearTimeout(shutdownTimeout);

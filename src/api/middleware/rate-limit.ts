@@ -17,7 +17,6 @@ export default function createRateLimitMiddleware(options: RateLimitOptions) {
     const method = request.method;
     const activeLimiter = method === 'GET' ? limiter : writeLimiter || limiter;
 
-    // Validate Cloudflare headers in production
     const isValidCfRequest = await validateCloudflareRequest(request);
     if (!isValidCfRequest) {
       return reply.status(403).send({
@@ -37,15 +36,26 @@ export default function createRateLimitMiddleware(options: RateLimitOptions) {
       reply.header('X-RateLimit-Limit', activeLimiter.points);
       reply.header('X-RateLimit-Remaining', activeLimiter.points);
     } catch (rateLimitError) {
-      const error = rateLimitError as { msBeforeNext?: number };
-      const retryAfter = error.msBeforeNext ? Math.ceil(error.msBeforeNext / 1000) : 60;
+      const error = rateLimitError as Error & { msBeforeNext?: number; code?: string };
 
-      return reply.status(429).send({
+      if ('msBeforeNext' in error && error.msBeforeNext != null) {
+        const retryAfter = Math.ceil(error.msBeforeNext / 1000);
+
+        return reply.status(429).send({
+          error: {
+            message: 'Too Many Requests',
+            code: 'RATE_LIMITED',
+            statusCode: 429,
+            retryAfter,
+          },
+        });
+      }
+
+      return reply.status(500).send({
         error: {
-          message: 'Too Many Requests',
-          code: 'RATE_LIMITED',
-          statusCode: 429,
-          retryAfter,
+          message: 'Internal server error',
+          code: 'INTERNAL_ERROR',
+          statusCode: 500,
         },
       });
     }
