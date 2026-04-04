@@ -5,7 +5,6 @@ import helmet from '@fastify/helmet';
 import compress from '@fastify/compress';
 import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
-import metrics from 'fastify-metrics';
 import redisPlugin from './plugins/redis.plugin';
 import createTenantLoggerMiddleware from './middleware/tenant-logger';
 import { resolveCurrentDisplayName } from '../utils/async-context.js';
@@ -53,11 +52,6 @@ export async function buildServer() {
   // Redis connection + rate limiters
   await fastify.register(redisPlugin, {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
-  });
-
-  // Prometheus metrics (fastify-metrics v12+ API)
-  await fastify.register(metrics, {
-    endpoint: '/metrics',
   });
 
   // Swagger/OpenAPI documentation

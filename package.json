@@ -66,7 +66,6 @@
     "cycletls": "^2.0.5",
     "dayjs": "^1.11.20",
     "fastify": "^5.8.4",
-    "fastify-metrics": "^13.1.0",
     "fluent-ffmpeg": "^2.1.3",
     "googleapis": "^171.4.0",
     "hls-parser": "^0.16.1",
