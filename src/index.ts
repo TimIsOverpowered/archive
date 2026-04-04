@@ -5,6 +5,7 @@ import { logger } from './utils/logger';
 import { closeRedisClient } from './api/plugins/redis.plugin';
 import { extractErrorDetails } from './utils/error.js';
 import { startCloudflareIpRangesCron } from './cron/cloudflare-ip-ranges.js';
+import { getCachedRangeInfo, getCloudflareIpRanges } from './utils/cloudflare-ip-validator.js';
 
 const PORT = process.env.PORT || 3030;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -21,6 +22,19 @@ async function start() {
 
     logger.info({ url: `http://${HOST}:${PORT}` }, 'Server started successfully');
     logger.info({ docs: `http://${HOST}:${PORT}/docs` }, 'Swagger documentation available');
+
+    // Pre-fetch Cloudflare IP ranges (only if missing or expiring soon)
+    try {
+      const cacheInfo = await getCachedRangeInfo();
+      if (!cacheInfo || cacheInfo.status === 'missing' || (cacheInfo.ttlRemaining ?? 0) < 3600) {
+        await getCloudflareIpRanges();
+        logger.info('Cloudflare IP ranges pre-fetched (cache was missing/expired)');
+      } else {
+        logger.debug({ ttlRemaining: cacheInfo.ttlRemaining }, 'Cloudflare IP ranges cache is fresh');
+      }
+    } catch (err) {
+      logger.warn({ err: err instanceof Error ? err.message : err }, 'Failed to check Cloudflare IP ranges cache');
+    }
 
     // Start Cloudflare IP ranges refresh cron
     startCloudflareIpRangesCron();
