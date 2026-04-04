@@ -51,7 +51,7 @@ async function shutdown(signal: string) {
 
   // Force exit after 30 seconds if graceful shutdown hangs
   const shutdownTimeout = setTimeout(() => {
-    logger.error('Forced shutdown after 30 second timeout');
+    logger.error('Forced shutdown after 5 second timeout');
     process.exit(1);
   }, 5000);
 
