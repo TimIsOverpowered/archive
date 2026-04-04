@@ -8,6 +8,7 @@ import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { getClient } from '../../../db/client.js';
 import type { VodData as TwitchVodData } from '../../../services/twitch.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
+import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 
 dayjs.extend(durationPlugin);
 
@@ -56,6 +57,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
     async (request) => {
       const tenantId = request.params.id;
       const vodId = request.params.vodId;
+      const log = createAutoLogger(tenantId);
 
       try {
         const config = getTenantConfig(tenantId);
@@ -65,7 +67,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
         const client: StreamerDbClient | undefined = getClient(tenantId);
 
         if (!client) {
-          request.log.error(`[${tenantId}] Database error: Database not available`);
+          log.error('Database error: Database not available');
           throw new Error('Database not available');
         }
 
@@ -88,7 +90,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
           const rawChapters = (await twitch.getChapters(vodId)) as ChapterEdge[] | null;
           chapterEdges = rawChapters || [];
         } catch {
-          request.log.warn(`[${vodId}] Failed to fetch chapter data from Twitch API`);
+          log.warn(`Failed to fetch chapter data from Twitch API`);
         }
 
         if (chapterEdges && chapterEdges.length > 0) {
@@ -111,7 +113,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
                   }
                 }
               } catch {
-                request.log.warn(`[${vodId}] Failed to fetch game data`);
+                log.warn(`Failed to fetch game data`);
               }
 
               const startSeconds = node.positionMilliseconds / 1000;
@@ -140,7 +142,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
               savedCount++;
             } catch {
-              request.log.warn(`[${vodId}] Failed to save chapter`);
+              log.warn(`Failed to save chapter`);
             }
           }
         } else {
@@ -151,7 +153,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
             const twitch = await import('../../../services/twitch');
             chapterData = await twitch.getChapter(vodId);
           } catch {
-            request.log.warn(`[${vodId}] Failed to fetch single chapter data from Twitch API`);
+            log.warn(`Failed to fetch single chapter data from Twitch API`);
           }
 
           if (chapterData && 'game' in chapterData) {
@@ -167,7 +169,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
                 }
               }
             } catch {
-              request.log.warn(`[${vodId}] Failed to fetch game data`);
+              log.warn(`Failed to fetch game data`);
             }
 
             await client.chapter.create({
@@ -196,7 +198,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
-        request.log.error(`[${tenantId}] Chapter save failed: ${errorMsg}`);
+        log.error(`Chapter save failed: ${errorMsg}`);
 
         throw new Error('Failed to fetch and save chapters');
       }
@@ -218,6 +220,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
     async (request) => {
       const tenantId = request.params.id;
       const vodId = request.params.vodId;
+      const log = createAutoLogger(tenantId);
 
       try {
         const config = getTenantConfig(tenantId);
@@ -227,7 +230,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
         const client: StreamerDbClient | undefined = getClient(tenantId);
 
         if (!client) {
-          request.log.error(`[${tenantId}] Database error: Database not available`);
+          log.error('Database error: Database not available');
           throw new Error('Database not available');
         }
 
@@ -245,24 +248,24 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
           channelId = vodData.user_id;
 
           if (channelId) {
-            request.log.info(`[${vodId}] Fetching emotes for channel ${channelId}`);
+            log.info(`Fetching emotes for channel ${channelId}`);
 
             const EmoteModule = await import('../../../services/emotes');
             await EmoteModule.fetchAndSaveEmotes(tenantId, vodId, vodRecord.platform, channelId);
 
-            request.log.info(`[${vodId}] Successfully fetched and saved emotes`);
+            log.info(`Successfully fetched and saved emotes`);
           } else {
-            request.log.warn(`[${tenantId}] No channel ID available for Twitch VOD ${vodId}`);
+            log.warn(`No channel ID available for Twitch VOD ${vodId}`);
           }
         } else if (vodRecord.platform !== 'twitch') {
-          request.log.info(`[${vodId}] Emote fetching only supported for Twitch platform`);
+          log.info(`Emote fetching only supported for Twitch platform`);
         }
 
         return { data: { message: `Emote saving completed for ${vodId}`, vodId, platform: vodRecord.platform } };
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
-        request.log.error(`[${tenantId}] Emote save failed: ${errorMsg}`);
+        log.error(`Emote save failed: ${errorMsg}`);
 
         throw new Error('Failed to queue emote saving job');
       }

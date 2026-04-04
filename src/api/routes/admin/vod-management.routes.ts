@@ -5,6 +5,7 @@ import { getClient } from '../../../db/client.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
+import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 
 interface CreateVodParams {
   id: string;
@@ -102,6 +103,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
     async (request) => {
       const tenantId = request.params.id;
       const body = request.body;
+      const log = createAutoLogger(tenantId);
 
       try {
         const client = getClient(tenantId);
@@ -129,13 +131,13 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
           },
         });
 
-        request.log.info(`[${tenantId}] Created VOD ${body.vodId}`);
+        log.info(`Created VOD ${body.vodId}`);
 
         return { data: { message: `${newVod.id} created!`, vodId: newVod.id } };
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
-        request.log.error(`[${tenantId}] VOD creation failed: ${errorMsg}`);
+        log.error(`VOD creation failed: ${errorMsg}`);
 
         throw new Error('Failed to create VOD record');
       }
@@ -161,6 +163,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
     async (request) => {
       const tenantId = request.params.id;
       const vodId = request.params.vodId;
+      const log = createAutoLogger(tenantId);
 
       try {
         const client = getClient(tenantId);
@@ -169,13 +172,13 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
 
         await client.vod.delete({ where: { id: vodId } });
 
-        request.log.info(`[${tenantId}] Deleted VOD ${vodId} and all related data (cascade)`);
+        log.info(`Deleted VOD ${vodId} and all related data (cascade)`);
 
         return { data: { message: `Deleted VOD ${vodId} and all related data`, vodId } };
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
-        request.log.error(`[${tenantId}] VOD deletion failed: ${errorMsg}`);
+        log.error(`VOD deletion failed: ${errorMsg}`);
 
         throw new Error('Failed to delete VOD record');
       }
