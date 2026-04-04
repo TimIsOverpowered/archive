@@ -18,6 +18,39 @@ export async function buildServer() {
     trustProxy: true,
   });
 
+  // Set error handler immediately after creating instance (before any plugins/routes)
+  // This ensures it's properly inherited by all child instances
+  fastify.setErrorHandler((error, request, reply) => {
+    const details = extractErrorDetails(error);
+    const statusCode = (error as { statusCode?: number }).statusCode || 500;
+
+    // For 5xx errors, use generic code to avoid leaking internal error codes
+    const isClientError = statusCode >= 400 && statusCode < 500;
+    const code = isClientError ? (error as { code?: string }).code || 'BAD_REQUEST' : 'INTERNAL_ERROR';
+    const errorMessage = isClientError ? details.message : 'Internal server error';
+
+    logger.error({ err: details.message, stack: details.stack }, 'Request error');
+
+    return reply.status(statusCode).send({
+      error: {
+        message: errorMessage,
+        code,
+        statusCode,
+      },
+    });
+  });
+
+  // Set 404 handler immediately after error handler
+  fastify.setNotFoundHandler((request, reply) => {
+    return reply.status(404).send({
+      error: {
+        message: 'Route not found',
+        code: 'NOT_FOUND',
+        statusCode: 404,
+      },
+    });
+  });
+
   // Add tenant display name to logger for routes with streamer ID
   const tenantLoggerMiddleware = createTenantLoggerMiddleware();
   fastify.addHook('preHandler', tenantLoggerMiddleware);
@@ -106,38 +139,6 @@ export async function buildServer() {
   await fastify.register(async (instance) => {
     const adminRoutes = await import('./routes/admin');
     await instance.register(adminRoutes.default, { prefix: '/api/v1/admin' });
-  });
-
-  // Error handler
-  fastify.setErrorHandler((error, request, reply) => {
-    const details = extractErrorDetails(error);
-    const statusCode = (error as { statusCode?: number }).statusCode || 500;
-
-    // For 5xx errors, use generic code to avoid leaking internal error codes
-    const isClientError = statusCode >= 400 && statusCode < 500;
-    const code = isClientError ? (error as { code?: string }).code || 'BAD_REQUEST' : 'INTERNAL_ERROR';
-    const errorMessage = isClientError ? details.message : 'Internal server error';
-
-    logger.error({ err: details.message, stack: details.stack }, 'Request error');
-
-    return reply.status(statusCode).send({
-      error: {
-        message: errorMessage,
-        code,
-        statusCode,
-      },
-    });
-  });
-
-  // 404 handler
-  fastify.setNotFoundHandler((request, reply) => {
-    return reply.status(404).send({
-      error: {
-        message: 'Route not found',
-        code: 'NOT_FOUND',
-        statusCode: 404,
-      },
-    });
   });
 
   return fastify;
