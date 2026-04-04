@@ -45,12 +45,7 @@ export function registerWorker(name: WorkerName, worker: Worker) {
 async function clearAllJobsOnStartup() {
   const queues = [getQueue(QUEUE_NAMES.VOD_DOWNLOAD), getQueue(QUEUE_NAMES.CHAT_DOWNLOAD), getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD), getQueue(QUEUE_NAMES.DMCA_PROCESSING)];
 
-  await Promise.allSettled(
-    queues.map(async (queue) => {
-      await queue.obliterate({ force: true });
-      return queue.name;
-    })
-  );
+  await Promise.allSettled(queues.map((queue) => queue.obliterate({ force: true })));
 
   logger.info(`[Queues] Cleared all queues`);
 }
