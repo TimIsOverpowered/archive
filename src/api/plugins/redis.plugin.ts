@@ -89,6 +89,15 @@ const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, opti
 
     fastify.decorate('redis', redisClient);
 
+    // Pre-fetch Cloudflare IP ranges on startup
+    try {
+      const cfValidator = await import('../../utils/cloudflare-ip-validator');
+      await cfValidator.getCloudflareIpRanges();
+      logger.info('Cloudflare IP ranges pre-fetched');
+    } catch (err) {
+      logger.warn({ err: err instanceof Error ? err.message : err }, 'Failed to pre-fetch Cloudflare IP ranges');
+    }
+
     // Initialize rate limiters from env vars
     const vodLimit = parseInt(process.env.RATE_LIMIT_VODS || '60', 10);
     const chatLimit = parseInt(process.env.RATE_LIMIT_CHAT || '30', 10);

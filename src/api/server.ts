@@ -14,23 +14,8 @@ export async function buildServer() {
   const fastify = Fastify({
     bodyLimit: 25 * 1024 * 1024, // 25MB for large payloads
     exposeHeadRoutes: true,
-    loggerInstance: pino({
-      level: process.env.LOG_LEVEL || 'info',
-      customLevels: { metric: 35 },
-      mixin: () => ({
-        service: 'archive-api',
-        env: process.env.NODE_ENV || 'development',
-        tenant: resolveCurrentDisplayName() || undefined, // Auto-inject from async context
-      }),
-    }) as unknown as pino.Logger,
-  });
-
-  // Setup logger with request ID tracking
-  fastify.addHook('onRequest', async (request, reply) => {
-    const xRequestId = request.headers['x-request-id'];
-    const requestId = Array.isArray(xRequestId) ? xRequestId[0] : (xRequestId ?? crypto.randomUUID());
-    (request.log as unknown as { reqId: string }).reqId = requestId;
-    reply.header('X-Request-ID', requestId);
+    logger: false,
+    trustProxy: true,
   });
 
   // Add tenant display name to logger for routes with streamer ID
