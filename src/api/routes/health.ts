@@ -3,6 +3,7 @@ import Redis from 'ioredis';
 import { loadStreamerConfigs } from '../../config/loader';
 import { getClient } from '../../db/client';
 import { checkPuppeteerHealth } from '../../utils/puppeteer-health';
+import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator';
 import healthCheckMiddleware from '../middleware/health-check';
 
 interface HealthRouteOptions {
@@ -66,6 +67,14 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
       const kickConfig = streamerConfigs.find((c) => c.kick?.enabled);
       const puppeteerHealth = await checkPuppeteerHealth();
 
+      let cloudflareCache = { status: 'unknown' };
+      try {
+        const cfInfo = await getCachedRangeInfo();
+        cloudflareCache = cfInfo || { status: 'missing' };
+      } catch {
+        cloudflareCache = { status: 'error' };
+      }
+
       let workersStatus;
       try {
         const workersModule = await import('../../workers/index');
@@ -85,6 +94,7 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
           redis: redisStatus,
           streamers,
           workers: workersStatus,
+          cloudflareIpCache: cloudflareCache,
           ...(kickConfig && {
             kick: {
               puppeteer: puppeteerHealth.status,

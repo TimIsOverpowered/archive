@@ -4,6 +4,7 @@ import { closeAllClients } from './db/client';
 import { logger } from './utils/logger';
 import { closeRedisClient } from './api/plugins/redis.plugin';
 import { extractErrorDetails } from './utils/error.js';
+import { startCloudflareIpRangesCron } from './cron/cloudflare-ip-ranges.js';
 
 const PORT = process.env.PORT || 3030;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -20,6 +21,10 @@ async function start() {
 
     logger.info({ url: `http://${HOST}:${PORT}` }, 'Server started successfully');
     logger.info({ docs: `http://${HOST}:${PORT}/docs` }, 'Swagger documentation available');
+
+    // Start Cloudflare IP ranges refresh cron
+    startCloudflareIpRangesCron();
+    logger.info('Cloudflare IP ranges refresh cron started');
   } catch (error) {
     const details = extractErrorDetails(error);
     logger.fatal({ ...details }, 'Failed to start server');
