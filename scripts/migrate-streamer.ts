@@ -113,7 +113,7 @@ const main = async () => {
 
       if (isAlreadyMigrated) {
         console.log('⚠️  Migration appears to already be completed or partially done');
-        console.log('   Check tables: vods, emotes, games, chapters, chat_messages\n');
+        console.log('   Check tables: vods, emotes, games, chapters\n');
         poolEnded = true;
         await oldPool.end();
         return;
@@ -122,20 +122,17 @@ const main = async () => {
       const oldVodsCount = await oldPool.query('SELECT COUNT(*) FROM vods');
       const oldEmotesCount = await oldPool.query('SELECT COUNT(*) FROM emotes');
       const oldGamesCount = await oldPool.query('SELECT COUNT(*) FROM games');
-      const oldLogsCount = await oldPool.query('SELECT COUNT(*) FROM logs');
 
       console.log('📊 Legacy database row counts:');
       console.log(`   vods: ${oldVodsCount.rows[0].count}`);
       console.log(`   emotes: ${oldEmotesCount.rows[0].count}`);
-      console.log(`   games: ${oldGamesCount.rows[0].count}`);
-      console.log(`   logs: ${oldLogsCount.rows[0].count}\n`);
+      console.log(`   games: ${oldGamesCount.rows[0].count}\n`);
 
       if (dryRunMode) {
         console.log('✅ Dry run validation complete');
         console.log(`   Would migrate: ${oldVodsCount.rows[0].count} VODs`);
         console.log(`   Would migrate: ${oldEmotesCount.rows[0].count} emote records`);
-        console.log(`   Would migrate: ${oldGamesCount.rows[0].count} game records`);
-        console.log(`   Would migrate: ${oldLogsCount.rows[0].count} chat messages\n`);
+        console.log(`   Would migrate: ${oldGamesCount.rows[0].count} game records\n`);
         poolEnded = true;
         await oldPool.end();
         return;
@@ -337,15 +334,13 @@ const main = async () => {
         const newEmotesCount = await oldPool.query('SELECT COUNT(*) FROM "emotes_new"');
         const newGamesCount = await oldPool.query('SELECT COUNT(*) FROM "games_new"');
         const newChaptersCount = await oldPool.query('SELECT COUNT(*) FROM "chapters"');
-        const newChatMessagesCount = await oldPool.query('SELECT COUNT(*) FROM "chat_messages"');
 
         console.log('📊 New database row counts:');
         console.log(`   vods_new: ${newVodsCount.rows[0].count}`);
         console.log(`   vod_uploads: ${newUploadsCount.rows[0].count}`);
         console.log(`   emotes_new: ${newEmotesCount.rows[0].count}`);
         console.log(`   games_new: ${newGamesCount.rows[0].count}`);
-        console.log(`   chapters: ${newChaptersCount.rows[0].count}`);
-        console.log(`   chat_messages: ${newChatMessagesCount.rows[0].count}\n`);
+        console.log(`   chapters: ${newChaptersCount.rows[0].count}\n`);
 
         const renameLegacy = await confirm('Rename legacy tables and finalize migration?');
         if (renameLegacy) {
@@ -365,43 +360,45 @@ const main = async () => {
 
             console.log('✅ Legacy tables renamed and migration finalized\n');
 
-            const resolveMigrations = await confirm('Mark Prisma migrations as applied? This enables future prisma migrate deploy commands');
-            if (resolveMigrations) {
-              try {
-                const { execSync } = await import('child_process');
-                console.log('\n📝 Resolving migration state with Prisma...');
+            const originalDbUrl = process.env.DATABASE_URL;
+            process.env.DATABASE_URL = dbUrl;
 
-                execSync('npx prisma migrate resolve --applied 20240101000000_add_normalized_schema', {
-                  stdio: 'inherit',
-                  cwd: process.cwd(),
-                });
+            try {
+              const { execSync } = await import('child_process');
+              console.log('\n📝 Resolving migration state with Prisma...');
 
-                console.log('✅ Migration state resolved successfully\n');
-              } catch (resolveError) {
-                errors.push(`Failed to resolve Prisma migration state: ${String(resolveError)}`);
-                console.warn('\n⚠️  Failed to resolve migration state. Run manually:');
-                console.warn('   npx prisma migrate resolve --applied 20240101000000_add_normalized_schema\n');
-              }
+              execSync('npx prisma migrate resolve --applied 20240101000000_add_normalized_schema', {
+                stdio: 'inherit',
+                cwd: process.cwd(),
+              });
 
-              try {
-                const { execSync } = await import('child_process');
-                console.log('📝 Applying remaining Prisma migrations...');
+              console.log('✅ Migration state resolved successfully\n');
+            } catch (resolveError) {
+              errors.push(`Failed to resolve Prisma migration state: ${String(resolveError)}`);
+              console.warn('\n⚠️  Failed to resolve migration state. Run manually:');
+              console.warn('   npx prisma migrate resolve --applied 20240101000000_add_normalized_schema\n');
+            }
 
-                execSync('npx prisma migrate deploy', {
-                  stdio: 'inherit',
-                  cwd: process.cwd(),
-                });
+            try {
+              const { execSync } = await import('child_process');
+              console.log('📝 Applying remaining Prisma migrations...');
 
-                console.log('✅ All Prisma migrations applied successfully\n');
-              } catch (deployError) {
-                errors.push(`Failed to apply remaining Prisma migrations: ${String(deployError)}`);
-                console.warn('\n⚠️  Failed to apply remaining migrations. Run manually:');
-                console.warn('   npx prisma migrate deploy\n');
-              }
+              execSync('npx prisma migrate deploy', {
+                stdio: 'inherit',
+                cwd: process.cwd(),
+              });
+
+              console.log('✅ All Prisma migrations applied successfully\n');
+            } catch (deployError) {
+              errors.push(`Failed to apply remaining Prisma migrations: ${String(deployError)}`);
+              console.warn('\n⚠️  Failed to apply remaining migrations. Run manually:');
+              console.warn('   npx prisma migrate deploy\n');
+            }
+
+            if (originalDbUrl) {
+              process.env.DATABASE_URL = originalDbUrl;
             } else {
-              console.log('\nℹ️  To enable future Prisma migrations, run:');
-              console.log('   npx prisma migrate resolve --applied 20240101000000_add_normalized_schema');
-              console.log('   npx prisma migrate deploy\n');
+              delete process.env.DATABASE_URL;
             }
           } catch (renameError) {
             errors.push(`Failed to rename legacy tables: ${String(renameError)}`);
