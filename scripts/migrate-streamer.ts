@@ -198,9 +198,6 @@ const main = async () => {
             })
             .join('\n');
 
-          console.log('Debug: SQL length after processing:', migrationSql.length);
-          console.log('Debug: Contains CREATE TABLE "chat_messages":', migrationSql.includes('CREATE TABLE "chat_messages"'));
-
           await client.query(migrationSql);
           console.log('✅ New schema created successfully\n');
         } catch (schemaError) {
