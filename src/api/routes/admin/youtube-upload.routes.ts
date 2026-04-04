@@ -6,6 +6,7 @@ import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { fileExists } from '../../../utils/path.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
+import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 
 type VodRecord = { id: string; title?: string | null; duration: number | string; platform: 'twitch' | 'kick' };
 
@@ -41,6 +42,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
     async (request) => {
       const tenantId = request.params.id;
       const vodId = request.params.vodId;
+      const log = createAutoLogger(tenantId);
 
       try {
         const config = getTenantConfig(tenantId);
@@ -54,7 +56,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
         const dbClient = getClient(tenantId);
 
         if (!dbClient) {
-          request.log.error(`[${tenantId}] Database not available`);
+          log.error('Database not available');
           throw new Error('Database not available');
         }
 
@@ -89,14 +91,14 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
             expectedSeconds = hrs * 3600 + mins * 60 + secs;
 
             if (expectedSeconds > 0) {
-              fastify.log.info(`[${vodId}] Duration validation: actual=${actualDuration}s vs expected=${expectedSeconds}s`);
+              log.info(`Duration validation: actual=${actualDuration}s vs expected=${expectedSeconds}s`);
             } else {
-              fastify.log.info(`[${vodId}] Duration validation: actual=${actualDuration}s (no expected duration to compare)`);
+              log.info(`Duration validation: actual=${actualDuration}s (no expected duration to compare)`);
             }
           }
         } catch (validationError) {
           // Non-critical - just log and continue with upload anyway
-          request.log.warn(validationError instanceof Error ? `Duration check failed: ${validationError.message}` : 'Duration validation skipped');
+          log.warn(validationError instanceof Error ? `Duration check failed: ${validationError.message}` : 'Duration validation skipped');
         }
 
         const youtubeJob = {
@@ -114,7 +116,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
-        request.log.error(`[${tenantId}] Re-upload failed for ${vodId}: ${errorMsg}`);
+        log.error(`Re-upload failed for ${vodId}: ${errorMsg}`);
 
         throw new Error('Failed to queue re-upload job');
       }
@@ -136,6 +138,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
     async (request) => {
       const tenantId = request.params.id;
       const vodId = request.params.vodId;
+      const log = createAutoLogger(tenantId);
 
       try {
         const config = getTenantConfig(tenantId);
@@ -147,7 +150,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
         const dbClient = getClient(tenantId);
 
         if (!dbClient) {
-          request.log.error(`[${tenantId}] Database not available`);
+          log.error('Database not available');
           throw new Error('Database not available');
         }
 
@@ -171,7 +174,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
-        request.log.error(`[${tenantId}] Re-download failed for ${vodId}: ${errorMsg}`);
+        log.error(`Re-download failed for ${vodId}: ${errorMsg}`);
 
         throw new Error('Failed to queue re-download job');
       }

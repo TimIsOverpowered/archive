@@ -9,6 +9,7 @@ import type { KickVod } from '../../../services/kick.js';
 import { getClient } from '../../../db/client.js';
 import { fileExists } from '../../../utils/path.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
+import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 
 type StreamerDbClient = ReturnType<typeof getClient>;
 
@@ -21,12 +22,7 @@ type VodRecord = {
   platform: string;
 };
 
-interface Logger {
-  info: (context: Record<string, unknown>, message: string) => void;
-  debug: (context: Record<string, unknown>, message: string) => void;
-  warn: (context: Record<string, unknown>, message: string) => void;
-  error: (context: Record<string, unknown>, message: string) => void;
-}
+type Logger = ReturnType<typeof createAutoLogger>;
 
 async function validateVodFile(tenantId: string, vodId: string, expectedDuration: number, filePath: string, log: Logger): Promise<{ valid: boolean; filePath: string }> {
   const exists = await fileExists(filePath);
@@ -65,12 +61,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
   /**
    * Shared VOD creation logic for both /download and /hlsDownload endpoints
    */
-  async function ensureVodRecord(
-    tenantId: string,
-    vodId: string,
-    platform: 'twitch' | 'kick',
-    logInstance: { info: (msg: string) => void; warn: (msg: string) => void; error: (msg: string) => void }
-  ): Promise<VodRecord> {
+  async function ensureVodRecord(tenantId: string, vodId: string, platform: 'twitch' | 'kick', logInstance: Logger): Promise<VodRecord> {
     const config = getTenantConfig(tenantId);
 
     if (!config) throw new Error('Tenant not found');
@@ -97,16 +88,16 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       if (vodRecord) {
         const typedRecord: Record<string, unknown> = vodRecord as Record<string, unknown>;
         if ((typedRecord.platform as string | undefined) !== platform) {
-          logInstance.warn(`[${tenantId}] VOD ${vodId} exists but has different platform: expected=${platform}, actual=${typedRecord.platform}`);
+          logInstance.warn(`VOD ${vodId} exists but has different platform: expected=${platform}, actual=${typedRecord.platform}`);
         }
 
-        logInstance.info(`[${tenantId}] Using existing VOD record for ${vodId}`);
+        logInstance.info(`Using existing VOD record for ${vodId}`);
 
         return vodRecord;
       }
 
       // Create new VOD record by fetching metadata from platform API
-      logInstance.info(`[${tenantId}] Creating new VOD ${vodId} for platform ${platform}`);
+      logInstance.info(`Creating new VOD ${vodId} for platform ${platform}`);
 
       if (platform === 'twitch') {
         const twitch = await import('../../../services/twitch');
@@ -136,7 +127,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           },
         })) as VodRecord;
 
-        logInstance.info(`[${tenantId}] Created Twitch VOD ${vodId} with user_id=${vodMetadata.user_id}`);
+        logInstance.info(`Created Twitch VOD ${vodId} with user_id=${vodMetadata.user_id}`);
       } else if (platform === 'kick') {
         const kick = await import('../../../services/kick');
 
@@ -146,7 +137,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
         const vodMetadata: KickVod = await kick.getVod(config.kick.username, vodId);
 
-        logInstance.info(`[${tenantId}] Fetched Kick VOD ${vodId} from channel ${config.kick.username}`);
+        logInstance.info(`Fetched Kick VOD ${vodId} from channel ${config.kick.username}`);
 
         vodRecord = (await client.vod.create({
           data: {
@@ -159,7 +150,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           },
         })) as VodRecord;
 
-        logInstance.info(`[${tenantId}] Created Kick VOD ${vodId} with duration=${Number(vodMetadata.duration)}ms`);
+        logInstance.info(`Created Kick VOD ${vodId} with duration=${Number(vodMetadata.duration)}ms`);
       } else {
         throw new Error('Unsupported platform');
       }
@@ -167,7 +158,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       return vodRecord;
     } catch (error: unknown) {
       if (!client) {
-        logInstance.error(`[${tenantId}] Database not available for VOD creation`);
+        logInstance.error('Database not available for VOD creation');
       }
 
       throw error;
@@ -202,6 +193,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
     },
     async (request) => {
       const tenantId = request.params.id;
+      const log = createAutoLogger(tenantId);
 
       try {
         // Validate tenant and platform enablement
@@ -214,7 +206,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         const config = validation.config;
 
         // Ensure VOD record exists or create it from platform API metadata
-        const vodRecord: VodRecord | null = await ensureVodRecord(tenantId, request.body.vodId, request.body.platform as 'twitch' | 'kick', request.log);
+        const vodRecord: VodRecord | null = await ensureVodRecord(tenantId, request.body.vodId, request.body.platform as 'twitch' | 'kick', log);
 
         if (!vodRecord) {
           throw new Error('Failed to create VOD record');
@@ -229,10 +221,10 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
             vodId: vodRecord.id,
             platform: request.body.platform as 'twitch' | 'kick',
             platformId,
-            log: request.log,
+            log,
           });
         } else {
-          request.log.warn(`[${tenantId}] No platform ID available for emote fetching on VOD ${request.body.vodId}`);
+          log.warn(`No platform ID available for emote fetching on VOD ${request.body.vodId}`);
         }
 
         // Determine file path based on type
@@ -251,7 +243,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         let skipDownload = false;
 
         if (filePath) {
-          const validation = await validateVodFile(tenantId, vodRecord.id, vodRecord.duration, filePath, request.log);
+          const validation = await validateVodFile(tenantId, vodRecord.id, vodRecord.duration, filePath, log);
 
           if (validation.valid) {
             skipDownload = true;
@@ -265,7 +257,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           if (skipDownload) {
             const { queueYoutubeUpload } = await import('../../../utils/upload-queue.js');
 
-            await queueYoutubeUpload(tenantId, vodRecord.id, filePath, request.body.uploadMode || 'all', request.body.platform, request.log);
+            await queueYoutubeUpload(tenantId, vodRecord.id, filePath, request.body.uploadMode || 'all', request.body.platform, log);
 
             return {
               data: {
@@ -305,7 +297,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
           const chatJobId = `chat_${request.body.vodId}`;
 
-          request.log.info(`[${tenantId}] Queued live HLS download jobs for ${request.body.vodId}: vod=${vodJobId}, chat=${chatJobId}`);
+          log.info(`Queued live HLS download jobs for ${request.body.vodId}: vod=${vodJobId}, chat=${chatJobId}`);
 
           return { data: { message: 'Live HLS download queued', vodId: request.body.vodId, jobId: vodJobId, chatJobId } };
         } else if (request.body.mode === 'mp4') {
@@ -314,7 +306,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           if (skipDownload && filePath) {
             const { queueYoutubeUpload } = await import('../../../utils/upload-queue.js');
 
-            await queueYoutubeUpload(tenantId, vodRecord.id, filePath, request.body.uploadMode || 'all', request.body.platform, request.log);
+            await queueYoutubeUpload(tenantId, vodRecord.id, filePath, request.body.uploadMode || 'all', request.body.platform, log);
 
             return {
               data: {
@@ -353,14 +345,14 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
           const chatJobId = `chat_${request.body.vodId}`;
 
-          request.log.info(`[${tenantId}] Queued standard VOD download jobs for ${request.body.vodId}: vod=${vodJobId}, chat=${chatJobId}`);
+          log.info(`Queued standard VOD download jobs for ${request.body.vodId}: vod=${vodJobId}, chat=${chatJobId}`);
 
           return { data: { message: 'VOD download queued', vodId: request.body.vodId, jobId: vodJobId, chatJobId } };
         } else {
           throw new Error('Download mode must be "hls" or "mp4"');
         }
       } catch (error) {
-        request.log.error({ err: error }, `[${tenantId}] Download failed`);
+        log.error({ err: error }, 'Download failed');
         throw error;
       }
     }

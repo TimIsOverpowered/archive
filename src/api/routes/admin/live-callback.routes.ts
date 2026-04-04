@@ -9,6 +9,7 @@ import type { VodRecordBase } from './types';
 import { enqueueJobWithLogging } from '../../../jobs/utils.js';
 import { fileExists } from '../../../utils/path.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
+import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 
 interface LiveCallbackBody {
   streamId: string;
@@ -56,6 +57,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
     onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     handler: async (request) => {
       const tenantId = request.params.id;
+      const log = createAutoLogger(tenantId);
 
       try {
         // Validate tenant exists
@@ -87,10 +89,10 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
             throw new Error(`File at ${request.body.path} is invalid (not a regular file or empty)`);
           }
 
-          request.log.info(`[${tenantId}] Validated recording file: ${request.body.path} (${(stats.size / (1024 * 1024)).toFixed(2)} MB)`);
+          log.info(`Validated recording file: ${request.body.path} (${(stats.size / (1024 * 1024)).toFixed(2)} MB)`);
         } catch (accessError) {
           const errorMessage = accessError instanceof Error ? accessError.message : String(accessError);
-          request.log.error(`[${tenantId}] File validation failed for ${request.body.path}: ${errorMessage}`);
+          log.error(`File validation failed for ${request.body.path}: ${errorMessage}`);
 
           throw new Error('Recording file not found or inaccessible');
         }
@@ -108,7 +110,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
           client = retrievedClient;
         } catch (error: unknown) {
           const details = extractErrorDetails(error);
-          request.log.error({ ...details, tenantId }, `[${tenantId}] Database error`);
+          log.error({ ...details, tenantId }, 'Database error');
           throw new Error('Database connection failed');
         }
 
@@ -121,7 +123,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
 
         if (!vodRecord) {
           // VOD doesn't exist - create placeholder for live recording callback
-          request.log.warn(`[${tenantId}] No VOD record found for ${request.body.streamId}. Creating placeholder...`);
+          log.warn(`No VOD record found for ${request.body.streamId}. Creating placeholder...`);
 
           vodRecord = await client.vod.create({
             data: {
@@ -133,9 +135,9 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
             },
           });
 
-          request.log.info(`[${tenantId}] Created placeholder VOD ${request.body.streamId}`);
+          log.info(`Created placeholder VOD ${request.body.streamId}`);
         } else if (vodRecord.platform !== request.body.platform) {
-          request.log.warn(`[${tenantId}] Platform mismatch for VOD ${request.body.streamId}: expected=${request.body.platform}, actual=${vodRecord.platform}`);
+          log.warn(`Platform mismatch for VOD ${request.body.streamId}: expected=${request.body.platform}, actual=${vodRecord.platform}`);
         }
 
         // Update duration if provided and different from current value
@@ -145,17 +147,17 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
             data: { duration: request.body.durationSecs },
           });
 
-          request.log.info(`[${tenantId}] Updated VOD ${vodRecord.id} duration to ${request.body.durationSecs}s`);
+          log.info(`Updated VOD ${vodRecord.id} duration to ${request.body.durationSecs}s`);
         } else if (!request.body.durationSecs && vodRecord.duration === 0) {
           // Duration not provided and current is 0 - try to get from file metadata or skip update
-          request.log.debug(`[${tenantId}] No duration update needed for VOD ${vodRecord.id}`);
+          log.debug(`No duration update needed for VOD ${vodRecord.id}`);
         }
 
         // Queue YouTube upload job for the pre-recorded MP4 file at `path`
         const YoutubeQueueModule = await import('../../../jobs/queues');
 
         if (!config.youtube?.liveUpload) {
-          request.log.warn(`[${tenantId}] YouTube live upload not enabled, skipping queue for ${request.body.streamId}`);
+          log.warn(`YouTube live upload not enabled, skipping queue for ${request.body.streamId}`);
 
           return <{ data: LiveCallbackResponseData }>{
             data: {
@@ -186,13 +188,13 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
             jobId: `youtube-live:${request.body.streamId}`,
             deduplication: { id: `youtube-live:${request.body.streamId}` },
           },
-          { info: request.log.info.bind(request.log), debug: request.log.debug.bind(request.log) },
-          `[${tenantId}] Queued YouTube upload job for live recording`,
+          { info: log.info.bind(log), debug: log.debug.bind(log) },
+          'Queued YouTube upload job for live recording',
           { vodId: request.body.streamId, path: request.body.path }
         );
 
         if (isNew) {
-          request.log.debug({ vodId: request.body.streamId, jobId }, `[${tenantId}] Job was newly added to queue`);
+          log.debug({ vodId: request.body.streamId, jobId }, 'Job was newly added to queue');
         }
 
         return <{ data: LiveCallbackResponseData }>{
@@ -208,7 +210,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         const errorMsg = details.message;
 
         // Only throw if not already a proper HTTP error response scenario
-        request.log.error(`[${tenantId}] Live callback failed for ${request.body.streamId}: ${errorMsg}`);
+        log.error(`Live callback failed for ${request.body.streamId}: ${errorMsg}`);
 
         throw new Error('Failed to process live recording callback');
       }

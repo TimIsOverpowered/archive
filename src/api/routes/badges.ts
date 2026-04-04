@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import Redis from 'ioredis';
 import { getTenantConfig } from '../../config/loader';
 import { extractErrorDetails } from '../../utils/error.js';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 
 interface BadgesRoutesOptions {
   prefix: string;
@@ -20,6 +21,7 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
     },
     async (request: FastifyRequest<{ Params: { id: string }; Body?: unknown }>): Promise<unknown> => {
       const tenantId = request.params.id;
+      const log = createAutoLogger(tenantId);
 
       try {
         const config = getTenantConfig(tenantId);
@@ -33,7 +35,7 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
           const cachedBadges = await redisInstance.get(`twitch_badges:${tenantId}`);
 
           if (cachedBadges) {
-            request.log.info(`[${tenantId}] Returning cached Twitch badges`);
+            log.info('Returning cached Twitch badges');
 
             return { data: JSON.parse(cachedBadges) };
           }
@@ -53,12 +55,12 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
           try {
             await redisInstance.set(`twitch_badges:${tenantId}`, JSON.stringify(badgesData), 'EX', 3600);
 
-            request.log.info(`[${tenantId}] Fetched and cached Twitch badges`);
+            log.info('Fetched and cached Twitch badges');
 
             return { data: badgesData };
           } catch {
             // Cache write failure - still return the fetched data even if caching fails
-            request.log.warn(`Failed to cache Twitch badges in Redis, returning uncached result for ${tenantId}`);
+            log.warn('Failed to cache Twitch badges in Redis, returning uncached result');
 
             return { data: badgesData };
           }
@@ -67,7 +69,7 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
         }
       } catch (error) {
         const details = extractErrorDetails(error);
-        request.log.error({ ...details, tenantId }, 'Failed to fetch Twitch badges');
+        log.error({ ...details, tenantId }, 'Failed to fetch Twitch badges');
 
         throw new Error('Something went wrong trying to retrieve channel badges..');
       }

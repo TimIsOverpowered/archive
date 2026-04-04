@@ -7,6 +7,7 @@ import swaggerUI from '@fastify/swagger-ui';
 import redisPlugin from './plugins/redis.plugin';
 import createTenantLoggerMiddleware from './middleware/tenant-logger';
 import { extractErrorDetails } from '../utils/error.js';
+import { logger } from '../utils/logger.js';
 
 export async function buildServer() {
   const fastify = Fastify({
@@ -110,7 +111,7 @@ export async function buildServer() {
     const statusCode = (error as { statusCode?: number }).statusCode || 500;
     const code = (error as { code?: string }).code || 'INTERNAL_ERROR';
 
-    request.log.error({ err: errorMessage }, 'Request error');
+    logger.error({ err: errorMessage }, 'Request error');
 
     return reply.status(statusCode).send({
       error: {
