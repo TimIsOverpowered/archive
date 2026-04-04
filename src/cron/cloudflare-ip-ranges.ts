@@ -18,10 +18,7 @@ export async function refreshCloudflareIpRanges(): Promise<void> {
  * Returns interval ID for cleanup if needed
  */
 export function startCloudflareIpRangesCron(): NodeJS.Timeout {
-  // Initial run
-  refreshCloudflareIpRanges();
-
-  // Run every 24 hours
+  // Run every 24 hours (no initial run - pre-fetch handles startup)
   return setInterval(
     () => {
       refreshCloudflareIpRanges().catch((err) => {
