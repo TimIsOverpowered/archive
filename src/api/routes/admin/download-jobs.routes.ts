@@ -184,7 +184,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
     '/:id/upload',
     {
       schema: {
-        tags: ['Admin', 'Tenants'],
+        tags: ['Admin'],
         description: 'Create VOD record if missing, then queue download + emote + chat jobs (Twitch/Kick)',
         params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
         body: {

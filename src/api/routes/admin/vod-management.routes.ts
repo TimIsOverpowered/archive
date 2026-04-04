@@ -35,10 +35,10 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
 
   // List all tenants (streamers)
   fastify.get(
-    '/',
+    '/tenants',
     {
       schema: {
-        tags: ['Admin', 'Tenants'],
+        tags: ['Admin'],
         description: 'List all tenants (streamers)',
         security: [{ apiKey: [] }],
         headers: {
@@ -62,7 +62,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
     '/:id/stats',
     {
       schema: {
-        tags: ['Admin', 'Tenants'],
+        tags: ['Admin'],
         description: 'Get detailed stats for a tenant',
         params: {
           type: 'object',
@@ -91,7 +91,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
     '/:id/vods/create',
     {
       schema: {
-        tags: ['Admin', 'Tenants'],
+        tags: ['Admin'],
         description: 'Create a VOD record manually (without drive field)',
         params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
         body: {
@@ -156,7 +156,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
     '/:id/vods/:vodId/delete',
     {
       schema: {
-        tags: ['Admin', 'Tenants'],
+        tags: ['Admin'],
         description: 'Delete a VOD and all related data (chapters, games, uploads)',
         params: {
           type: 'object',

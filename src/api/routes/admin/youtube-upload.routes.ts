@@ -33,7 +33,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
     '/:id/vods/:vodId/re-upload-youtube',
     {
       schema: {
-        tags: ['Admin', 'Tenants'],
+        tags: ['Admin'],
         description: 'Manually trigger YouTube re-upload for a VOD with duration validation',
         params: { type: 'object', properties: { id: { type: 'string' }, vodId: { type: 'string' } }, required: ['id', 'vodId'] },
         security: [{ apiKey: [] }],
@@ -128,7 +128,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
     '/:id/vods/:vodId/re-download',
     {
       schema: {
-        tags: ['Admin', 'Tenants'],
+        tags: ['Admin'],
         description: 'Manually trigger VOD download (clears Redis dedup key first)',
         params: { type: 'object', properties: { id: { type: 'string' }, vodId: { type: 'string' } }, required: ['id', 'vodId'] },
         security: [{ apiKey: [] }],
