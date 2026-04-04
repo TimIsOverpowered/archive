@@ -41,13 +41,6 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
         tags: ['Admin'],
         description: 'List all tenants (streamers)',
         security: [{ apiKey: [] }],
-        headers: {
-          type: 'object',
-          properties: {
-            Authorization: { type: 'string', description: 'Bearer token with API key' },
-            'X-API-Key': { type: 'string', description: 'Direct API key header as alternative to Bearer auth' },
-          },
-        },
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },

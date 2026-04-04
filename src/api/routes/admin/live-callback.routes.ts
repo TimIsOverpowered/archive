@@ -4,6 +4,7 @@ import fs from 'fs/promises';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import { getStreamerConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import type { PrismaClient } from '../../../../generated/streamer/client';
 import type { VodRecordBase } from './types';
 import { enqueueJobWithLogging } from '../../../jobs/queues.js';
@@ -54,7 +55,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
       },
       security: [{ apiKey: [] }],
     },
-    onRequest: rateLimitMiddleware,
+    onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     handler: async (request) => {
       const streamerId = request.params.id;
 
