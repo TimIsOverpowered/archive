@@ -13,13 +13,30 @@ interface VodResponse {
   vod_uploads?: Array<{
     upload_id: string;
     platform: string;
+    type: string | null;
+    duration: number;
+    part: number;
     status: UploadStatus;
     thumbnail_url: string | null;
+    created_at: Date;
   }>;
   chapters?: Array<{
     name: string | null;
+    image: string | null;
     duration: string | null;
     start: number;
+    end: number | null;
+  }>;
+  games?: Array<{
+    start_time: number | null;
+    end_time: number | null;
+    video_provider: string | null;
+    video_id: string | null;
+    thumbnail_url: string | null;
+    game_id: string | null;
+    game_name: string | null;
+    title: string | null;
+    chapter_image: string | null;
   }>;
 }
 
@@ -56,7 +73,7 @@ export async function getVods(client: PrismaClient, tenantId: string, query: Vod
     }
   }
 
-  const where: Record<string, unknown> = { platform: { startsWith: tenantId } };
+  const where: Record<string, unknown> = {};
 
   if (query.platform) {
     where.platform = query.platform;
@@ -105,9 +122,40 @@ export async function getVods(client: PrismaClient, tenantId: string, query: Vod
         [query.sort || 'created_at']: query.order || 'desc',
       },
       include: {
-        vod_uploads: {},
-        chapters: {},
-        games: {},
+        vod_uploads: {
+          select: {
+            upload_id: true,
+            platform: true,
+            type: true,
+            duration: true,
+            part: true,
+            status: true,
+            thumbnail_url: true,
+            created_at: true,
+          },
+        },
+        chapters: {
+          select: {
+            name: true,
+            image: true,
+            duration: true,
+            start: true,
+            end: true,
+          },
+        },
+        games: {
+          select: {
+            start_time: true,
+            end_time: true,
+            video_provider: true,
+            video_id: true,
+            thumbnail_url: true,
+            game_id: true,
+            game_name: true,
+            title: true,
+            chapter_image: true,
+          },
+        },
       },
     }),
     client.vod.count({ where }),
@@ -151,9 +199,40 @@ export async function getVodById(client: PrismaClient, tenantId: string, vodId: 
       id: vodId,
     },
     include: {
-      vod_uploads: {},
-      chapters: {},
-      games: {},
+      vod_uploads: {
+        select: {
+          upload_id: true,
+          platform: true,
+          type: true,
+          duration: true,
+          part: true,
+          status: true,
+          thumbnail_url: true,
+          created_at: true,
+        },
+      },
+      chapters: {
+        select: {
+          name: true,
+          image: true,
+          duration: true,
+          start: true,
+          end: true,
+        },
+      },
+      games: {
+        select: {
+          start_time: true,
+          end_time: true,
+          video_provider: true,
+          video_id: true,
+          thumbnail_url: true,
+          game_id: true,
+          game_name: true,
+          title: true,
+          chapter_image: true,
+        },
+      },
     },
   });
 

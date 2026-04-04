@@ -301,9 +301,12 @@ const main = async () => {
           const games = await oldPool.query('SELECT * FROM games');
           for (const game of games.rows) {
             try {
+              const startTime = game.start_time ? Math.round(Number(game.start_time)) : null;
+              const endTime = game.end_time ? Math.round(Number(game.end_time)) : null;
+
               await client.query(
                 `INSERT INTO "games_new" (vod_id, start_time, end_time, video_provider, video_id, thumbnail_url, game_id, game_name, title, chapter_image) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-                [game.vod_id, game.start_time, game.end_time, game.video_provider, game.video_id, game.thumbnail_url, game.game_id, game.game_name, game.title, game.chapter_image]
+                [game.vod_id, startTime, endTime, game.video_provider, game.video_id, game.thumbnail_url, game.game_id, game.game_name, game.title, game.chapter_image]
               );
             } catch (gameError) {
               errors.push(`Failed to migrate game for VOD ${game.vod_id}: ${String(gameError)}`);
