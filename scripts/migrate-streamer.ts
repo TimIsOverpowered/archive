@@ -169,25 +169,19 @@ const main = async () => {
             .replace(/CREATE TABLE "vods"/g, 'CREATE TABLE "vods_new"')
             .replace(/CREATE TABLE "emotes"/g, 'CREATE TABLE "emotes_new"')
             .replace(/CREATE TABLE "games"/g, 'CREATE TABLE "games_new"')
-            .replace(/CREATE TABLE "chat_messages"/g, 'CREATE TABLE "chat_messages_new"')
             .replace(/REFERENCES "vods"\(/g, 'REFERENCES "vods_new"(')
             .replace(/CONSTRAINT "vods_pkey"/g, 'CONSTRAINT "vods_new_pkey"')
             .replace(/CONSTRAINT "vods_platform_id_key"/g, 'CONSTRAINT "vods_new_platform_id_key"')
             .replace(/CONSTRAINT "emotes_pkey"/g, 'CONSTRAINT "emotes_new_pkey"')
             .replace(/CONSTRAINT "emotes_vod_id_key"/g, 'CONSTRAINT "emotes_new_vod_id_key"')
             .replace(/CONSTRAINT "games_pkey"/g, 'CONSTRAINT "games_new_pkey"')
-            .replace(/CONSTRAINT "chat_messages_pkey"/g, 'CONSTRAINT "chat_messages_new_pkey"')
-            .replace(/CONSTRAINT "chat_messages_new_pkey"/g, 'CONSTRAINT "chat_messages_new_pkey"')
             .replace(/ON "vods"\(/g, 'ON "vods_new"(')
             .replace(/ON "emotes"\(/g, 'ON "emotes_new"(')
             .replace(/ON "games"\(/g, 'ON "games_new"(')
-            .replace(/ON "chat_messages"\(/g, 'ON "chat_messages_new"(')
             .replace(/INDEX "vods_platform_idx"/g, 'INDEX "vods_new_platform_idx"')
             .replace(/INDEX "emotes_vod_id_key"/g, 'INDEX "emotes_new_vod_id_key"')
             .replace(/INDEX "games_vod_id_start_time_idx"/g, 'INDEX "games_new_vod_id_start_time_idx"')
             .replace(/INDEX "games_game_name_idx"/g, 'INDEX "games_new_game_name_idx"')
-            .replace(/INDEX "chat_messages_vod_id_content_offset_seconds_id_idx"/g, 'INDEX "chat_messages_new_vod_id_content_offset_seconds_id_idx"')
-            .replace(/INDEX "idx_chat_messages_vod_offset_id"/g, 'INDEX "idx_chat_messages_new_vod_offset_id"')
             .replace(/CONSTRAINT "emotes_vod_id_fkey"/g, 'CONSTRAINT "emotes_new_vod_id_fkey"')
             .replace(/CONSTRAINT "games_vod_id_fkey"/g, 'CONSTRAINT "games_new_vod_id_fkey"')
             .replace(/ALTER TABLE "emotes"/g, 'ALTER TABLE "emotes_new"')
@@ -196,7 +190,7 @@ const main = async () => {
           migrationSql = migrationSql
             .split('\n')
             .filter((line) => {
-              return !line.includes('ALTER TABLE "chat_messages"') && !line.includes('ALTER TABLE "chat_messages_new"') && !line.includes('chat_messages_vod_id_fkey');
+              return !line.includes('CREATE TABLE "chat_messages"') && !line.includes('chat_messages_pkey') && !line.includes('idx_chat_messages') && !line.includes('chat_messages_vod_id_fkey');
             })
             .join('\n');
 
@@ -323,6 +317,7 @@ const main = async () => {
 
         try {
           await client.query('ALTER TABLE logs RENAME TO chat_messages');
+          await client.query('ALTER TABLE "chat_messages" RENAME COLUMN "createdAt" TO "created_at"');
           console.log('✅ Renamed logs table to chat_messages\n');
         } catch (renameError) {
           errors.push(`Failed to rename logs table: ${String(renameError)}`);
