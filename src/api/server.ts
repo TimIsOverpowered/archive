@@ -1,4 +1,3 @@
-import pino from 'pino';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
@@ -7,7 +6,6 @@ import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
 import redisPlugin from './plugins/redis.plugin';
 import createTenantLoggerMiddleware from './middleware/tenant-logger';
-import { resolveCurrentDisplayName } from '../utils/async-context.js';
 import { extractErrorDetails } from '../utils/error.js';
 
 export async function buildServer() {
