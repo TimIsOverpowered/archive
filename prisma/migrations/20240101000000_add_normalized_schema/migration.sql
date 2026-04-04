@@ -45,8 +45,8 @@ CREATE TABLE "emotes" (
 CREATE TABLE "games" (
     "id" SERIAL NOT NULL,
     "vod_id" TEXT NOT NULL,
-    "start_time" DECIMAL(65,30),
-    "end_time" DECIMAL(65,30),
+    "start_time" INTEGER,
+    "end_time" INTEGER,
     "video_provider" TEXT,
     "video_id" TEXT,
     "thumbnail_url" TEXT,

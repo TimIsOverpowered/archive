@@ -61,8 +61,8 @@ model Emote {
 model Game {
   id             Int      @id(map: "games_new_pkey") @default(autoincrement())
   vod_id         String
-  start_time     Decimal?
-  end_time       Decimal?
+  start_time     Int?
+  end_time       Int?
   video_provider String?
   video_id       String?
   thumbnail_url  String?
