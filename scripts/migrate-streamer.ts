@@ -49,6 +49,192 @@ const parseDuration = (durationStr: string): number => {
   return 0;
 };
 
+interface ChatWorkerProgress {
+  workerId: number;
+  processed: number;
+  target: number;
+  startTime: number;
+  completed: boolean;
+}
+
+function getUuidRanges(workerCount: number): Array<{ min: string; max: string }> {
+  const ranges: Array<{ min: string; max: string }> = [];
+  const maxUuid = 0xffffffffffffffffffffffffffffffffn;
+  const step = maxUuid / BigInt(workerCount);
+
+  for (let i = 0; i < workerCount; i++) {
+    const min = (step * BigInt(i)).toString(16).padStart(32, '0');
+    const max = i === workerCount - 1 ? maxUuid.toString(16) : (step * BigInt(i + 1) - 1n).toString(16).padStart(32, '0');
+    ranges.push({ min, max });
+  }
+
+  return ranges;
+}
+
+async function migrateChatWorker(
+  oldPool: any,
+  newPool: any,
+  range: { min: string; max: string },
+  workerId: number,
+  batchSize: number,
+  vodIdMap: Map<string, number>,
+  progressCallback: (progress: ChatWorkerProgress) => void
+): Promise<{ processed: number }> {
+  const oldConn = await oldPool.connect();
+  const newConn = await newPool.connect();
+  let processed = 0;
+  const startTime = Date.now();
+  let completed = false;
+
+  try {
+    await oldConn.query('BEGIN');
+    await newConn.query('BEGIN');
+
+    await oldConn.query(
+      `DECLARE chat_cursor CURSOR FOR 
+       SELECT cm.id, cm.vod_id, cm.display_name, cm.content_offset_seconds,
+              cm.user_color, cm."createdAt", cm.message, cm.user_badges
+       FROM logs cm
+       WHERE cm.id >= $1::uuid AND cm.id <= $2::uuid
+       ORDER BY cm.id`,
+      [range.min, range.max]
+    );
+
+    try {
+      while (true) {
+        const rows: any = await oldConn.query(`FETCH FORWARD ${batchSize} IN chat_cursor`);
+
+        if (rows.rows.length === 0) break;
+
+        const insertRows: any[] = [];
+        for (const row of rows.rows) {
+          const newVodId = vodIdMap.get(row.vod_id);
+          if (newVodId) {
+            insertRows.push([row.id, newVodId, row.display_name, row.content_offset_seconds, row.user_color, row.createdAt, row.message, row.user_badges]);
+          }
+        }
+
+        if (insertRows.length > 0) {
+          const placeholders = insertRows.map((_, i) => `($${i * 8 + 1}, $${i * 8 + 2}, $${i * 8 + 3}, $${i * 8 + 4}, $${i * 8 + 5}, $${i * 8 + 6}, $${i * 8 + 7}, $${i * 8 + 8})`).join(', ');
+
+          await newConn.query(
+            `INSERT INTO "chat_messages_new" 
+             (id, vod_id, display_name, content_offset_seconds, user_color, created_at, message, user_badges)
+             VALUES ${placeholders}`,
+            insertRows.flat()
+          );
+        }
+
+        processed += insertRows.length;
+        progressCallback({ workerId, processed, target: 0, startTime, completed });
+      }
+
+      completed = true;
+      progressCallback({ workerId, processed, target: 0, startTime, completed });
+    } finally {
+      await oldConn.query('CLOSE chat_cursor');
+    }
+
+    await oldConn.query('COMMIT');
+    await newConn.query('COMMIT');
+  } catch (error) {
+    try {
+      await oldConn.query('ROLLBACK');
+      await newConn.query('ROLLBACK');
+    } catch (rollbackError) {}
+    throw error;
+  } finally {
+    oldConn.release();
+    newConn.release();
+  }
+
+  return { processed };
+}
+
+async function migrateChatMessagesParallel(
+  oldPool: any,
+  newPool: any,
+  totalChat: number,
+  workerCount: number,
+  batchSize: number,
+  vodIdMap: Map<string, number>,
+  streamerName: string
+): Promise<{ processed: number }> {
+  const ranges = getUuidRanges(workerCount);
+  const globalStartTime = Date.now();
+
+  const workerProgress: ChatWorkerProgress[] = ranges.map((_, i) => ({
+    workerId: i + 1,
+    processed: 0,
+    target: Math.ceil(totalChat / workerCount),
+    startTime: globalStartTime,
+    completed: false,
+  }));
+
+  const updateProgress = (progress: ChatWorkerProgress) => {
+    const idx = workerProgress.findIndex((wp) => wp.workerId === progress.workerId);
+    if (idx !== -1) {
+      workerProgress[idx] = progress;
+    }
+  };
+
+  const displayProgress = () => {
+    const now = Date.now();
+    const elapsedSec = Math.floor((now - globalStartTime) / 1000);
+    const elapsedMins = Math.floor(elapsedSec / 60);
+    const elapsedSecs = elapsedSec % 60;
+    const elapsedStr = `${elapsedMins.toString().padStart(2, '0')}:${elapsedSecs.toString().padStart(2, '0')}`;
+
+    const totalProcessed = workerProgress.reduce((sum, wp) => sum + wp.processed, 0);
+    const overallPercent = totalChat > 0 ? (totalProcessed / totalChat) * 100 : 0;
+
+    let overallRate = 0;
+    if (elapsedSec > 0) {
+      overallRate = totalProcessed / elapsedSec;
+    }
+
+    let etaStr = '--:--';
+    if (overallRate > 0 && totalProcessed < totalChat) {
+      const remaining = totalChat - totalProcessed;
+      const remainingSec = Math.ceil(remaining / overallRate);
+      const remainingMins = Math.floor(remainingSec / 60);
+      const remainingSecs = remainingSec % 60;
+      etaStr = `${remainingMins.toString().padStart(2, '0')}:${remainingSecs.toString().padStart(2, '0')}`;
+    }
+
+    console.log('\x1B[2J\x1B[H');
+    console.log(`🔄 Migrating chat messages for "${streamerName}"\n`);
+    console.log(`   Started: ${new Date(globalStartTime).toLocaleTimeString()}`);
+    console.log(`   Elapsed: ${elapsedStr} | ETA: ${etaStr}\n`);
+
+    workerProgress.forEach((wp) => {
+      const workerElapsed = Math.floor((now - wp.startTime) / 1000);
+      const workerRate = workerElapsed > 0 ? wp.processed / workerElapsed : 0;
+      const status = wp.completed ? '✓' : '';
+      const rateStr = workerRate > 0 ? ` (${workerRate.toFixed(1)}/s)` : '';
+      console.log(`   Worker ${wp.workerId}: ${wp.processed.toLocaleString()} processed ${status}${rateStr}`);
+    });
+
+    console.log('   ─────────────────────────────────────────────');
+    console.log(`   Total: ${totalProcessed.toLocaleString()}/${totalChat.toLocaleString()} (${overallPercent.toFixed(1)}%) | Rate: ${overallRate.toFixed(1)}/s\n`);
+  };
+
+  const progressInterval = setInterval(displayProgress, 1000);
+
+  try {
+    const results = await Promise.all(ranges.map((range, i) => migrateChatWorker(oldPool, newPool, range, i + 1, batchSize, vodIdMap, updateProgress)));
+
+    clearInterval(progressInterval);
+    displayProgress();
+
+    const totalProcessed = results.reduce((sum, r) => sum + r.processed, 0);
+    return { processed: totalProcessed };
+  } catch (error) {
+    clearInterval(progressInterval);
+    throw error;
+  }
+}
+
 const rollbackMigration = async (client: any) => {
   console.log('🔄 Rolling back migration...');
 
@@ -193,6 +379,23 @@ const main = async () => {
   if (!streamerName) {
     console.error('❌ Streamer name is required');
     process.exit(1);
+  }
+
+  let chatWorkers = 4;
+  let chatBatchSize = 100000;
+  const workersAnswer = await prompt('Number of chat migration workers? [4]:');
+  if (workersAnswer && workersAnswer.trim()) {
+    const parsed = parseInt(workersAnswer, 10);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= 8) {
+      chatWorkers = parsed;
+    }
+  }
+  const batchSizeAnswer = await prompt('Chat migration batch size? [100000]:');
+  if (batchSizeAnswer && batchSizeAnswer.trim()) {
+    const parsed = parseInt(batchSizeAnswer, 10);
+    if (!isNaN(parsed) && parsed >= 10000 && parsed <= 500000) {
+      chatBatchSize = parsed;
+    }
   }
 
   let dbUrl: string | null;
@@ -414,55 +617,33 @@ const main = async () => {
         console.log(`✅ Migrated ${games.rows.length} games`);
 
         const orphanedChatCheck = await client.query(`
-          SELECT COUNT(*) FROM logs cm
-          WHERE NOT EXISTS (SELECT 1 FROM vods v WHERE v.id = cm.vod_id)
-        `);
+  SELECT COUNT(*) FROM logs cm
+  WHERE NOT EXISTS (SELECT 1 FROM vods v WHERE v.id = cm.vod_id)
+`);
 
         if (Number(orphanedChatCheck.rows[0].count) > 0) {
           throw new Error(`${orphanedChatCheck.rows[0].count} chat messages reference non-existent VODs - FK integrity failed`);
         }
 
         const totalChatMessages = await client.query(`
-          SELECT COUNT(*) FROM logs cm
-          INNER JOIN "vods_new" vn ON cm.vod_id = vn.vod_id
-        `);
+  SELECT COUNT(*) FROM logs cm
+  INNER JOIN "vods_new" vn ON cm.vod_id = vn.vod_id
+`);
         const totalChat = Number(totalChatMessages.rows[0].count);
-        const chunkSize = 100000;
-        const totalChunks = Math.ceil(totalChat / chunkSize);
 
         console.log(`\n📊 Migrating chat messages (${totalChat.toLocaleString()} total)...`);
 
-        for (let chunk = 0; chunk < totalChunks; chunk++) {
-          const offset = chunk * chunkSize;
-          const remaining = totalChat - offset;
-          const currentChunkSize = Math.min(chunkSize, remaining);
+        const os = await import('os');
+        const availableMemoryMB = Math.floor(os.freemem() / 1024 / 1024);
+        const suggestedWorkers = Math.min(chatWorkers, Math.floor(availableMemoryMB / 200), 8);
+        const actualWorkerCount = Math.max(1, suggestedWorkers);
 
-          await client.query(
-            `
-            INSERT INTO "chat_messages_new" (id, vod_id, display_name, content_offset_seconds, user_color, created_at, message, user_badges)
-            SELECT 
-              cm.id,
-              vn.id,
-              cm.display_name,
-              cm.content_offset_seconds,
-              cm.user_color,
-              cm."createdAt",
-              cm.message,
-              cm.user_badges
-            FROM logs cm
-            INNER JOIN "vods_new" vn ON cm.vod_id = vn.vod_id
-            ORDER BY cm."createdAt"
-            LIMIT $1 OFFSET $2
-          `,
-            [currentChunkSize, offset]
-          );
+        console.log(`   Available memory: ${availableMemoryMB} MB`);
+        console.log(`   Using ${actualWorkerCount} worker(s) with batch size ${chatBatchSize.toLocaleString()}\n`);
 
-          const progress = ((offset + currentChunkSize) / totalChat) * 100;
-          console.log(`   Chat messages: ${Math.min(offset + currentChunkSize, totalChat).toLocaleString()}/${totalChat.toLocaleString()} (${progress.toFixed(1)}%)`);
-        }
+        const chatResult = await migrateChatMessagesParallel(oldPool, client, totalChat, actualWorkerCount, chatBatchSize, vodIdMap, streamerName);
 
-        const chatMessagesCount = await client.query('SELECT COUNT(*) FROM "chat_messages_new"');
-        console.log(`✅ Migrated ${chatMessagesCount.rows[0].count} chat messages\n`);
+        console.log(`✅ Migrated ${chatResult.processed.toLocaleString()} chat messages\n`);
 
         const fkCheckResult: any = await client.query(`
           SELECT 
