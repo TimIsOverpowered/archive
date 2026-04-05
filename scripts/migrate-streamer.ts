@@ -135,37 +135,37 @@ const createNormalizedSchema = async (client: any) => {
 
 const applySchemaMigrations = async (client: any) => {
   await client.query(`
-    ALTER TABLE "vods" 
+    ALTER TABLE "vods_new" 
     ADD COLUMN IF NOT EXISTS "is_live" BOOLEAN NOT NULL DEFAULT false,
     ADD COLUMN IF NOT EXISTS "started_at" TIMESTAMP(3),
     ADD COLUMN IF NOT EXISTS "ended_at" TIMESTAMP(3),
     ADD COLUMN IF NOT EXISTS "user_id" TEXT;
 
-    CREATE INDEX IF NOT EXISTS "vods_is_live_idx" ON "vods"("is_live");
-    CREATE INDEX IF NOT EXISTS "vods_user_id_platform_idx" ON "vods"("user_id", "platform");
+    CREATE INDEX IF NOT EXISTS "vods_is_live_idx" ON "vods_new"("is_live");
+    CREATE INDEX IF NOT EXISTS "vods_user_id_platform_idx" ON "vods_new"("user_id", "platform");
 
-    COMMENT ON COLUMN "vods"."is_live" IS 'Indicates if this VOD record represents an active live stream';
-    COMMENT ON COLUMN "vods"."started_at" IS 'Timestamp when the live stream started (set on offline->live transition)';
-    COMMENT ON COLUMN "vods"."ended_at" IS 'Timestamp when the live stream ended (set on live->offline transition)';
-    COMMENT ON COLUMN "vods"."user_id" IS 'Channel/user identifier for tracking which channel this VOD belongs to (multi-tenant/multi-channel support)';
+    COMMENT ON COLUMN "vods_new"."is_live" IS 'Indicates if this VOD record represents an active live stream';
+    COMMENT ON COLUMN "vods_new"."started_at" IS 'Timestamp when the live stream started (set on offline->live transition)';
+    COMMENT ON COLUMN "vods_new"."ended_at" IS 'Timestamp when the live stream ended (set on live->offline transition)';
+    COMMENT ON COLUMN "vods_new"."user_id" IS 'Channel/user identifier for tracking which channel this VOD belongs to (multi-tenant/multi-channel support)';
   `);
 
   await client.query(`
     UPDATE "vod_uploads" vu
     SET thumbnail_url = v.thumbnail_url
-    FROM "vods" v
+    FROM "vods_new" v
     WHERE vu.vod_id = v.id 
       AND v.thumbnail_url IS NOT NULL 
       AND vu.thumbnail_url IS NULL;
 
-    ALTER TABLE "vods" DROP COLUMN IF EXISTS "downloaded_at";
-    ALTER TABLE "vods" DROP COLUMN IF EXISTS "thumbnail_url";
-    ALTER TABLE "vods" DROP COLUMN IF EXISTS "user_id";
+    ALTER TABLE "vods_new" DROP COLUMN IF EXISTS "downloaded_at";
+    ALTER TABLE "vods_new" DROP COLUMN IF EXISTS "thumbnail_url";
+    ALTER TABLE "vods_new" DROP COLUMN IF EXISTS "user_id";
     DROP INDEX IF EXISTS "vods_user_id_platform_idx";
-    ALTER TABLE "vods" DROP COLUMN IF EXISTS "ended_at";
+    ALTER TABLE "vods_new" DROP COLUMN IF EXISTS "ended_at";
 
-    ALTER TABLE "vods" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
-    UPDATE "vods" SET "updated_at" = COALESCE("created_at", NOW()) WHERE "updated_at" IS NULL;
+    ALTER TABLE "vods_new" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+    UPDATE "vods_new" SET "updated_at" = COALESCE("created_at", NOW()) WHERE "updated_at" IS NULL;
 
     CREATE OR REPLACE FUNCTION update_updated_at_column()
     RETURNS TRIGGER AS $$
@@ -175,18 +175,18 @@ const applySchemaMigrations = async (client: any) => {
     END;
     $$ language 'plpgsql';
 
-    DROP TRIGGER IF EXISTS update_vods_updated_at ON "vods";
+    DROP TRIGGER IF EXISTS update_vods_updated_at ON "vods_new";
     CREATE TRIGGER update_vods_updated_at 
-    BEFORE UPDATE ON "vods" 
+    BEFORE UPDATE ON "vods_new" 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-    CREATE INDEX IF NOT EXISTS "vods_updated_at_idx" ON "vods"("updated_at");
+    CREATE INDEX IF NOT EXISTS "vods_updated_at_idx" ON "vods_new"("updated_at");
   `);
 
   await client.query(`
     ALTER TABLE "chat_messages" 
     ADD CONSTRAINT "chat_messages_vod_id_fkey" 
-    FOREIGN KEY ("vod_id") REFERENCES "vods"("id") ON DELETE CASCADE;
+    FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE;
   `);
 
   await client.query(`
