@@ -14,7 +14,7 @@ type JsonValue = string | number | boolean | { [key: string]: JsonValue } | Json
 
 interface ChatMessageCreateInput {
   id: string;
-  vod_id: string;
+  vod_id: number;
   display_name: string | null;
   content_offset_seconds: string; // String for Decimal precision preservation
   createdAt: Date;
@@ -98,10 +98,13 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
   let db = getClient(tenantId);
   if (!db) db = await createClient(config);
 
+  // Convert string vodId to number for the new schema
+  const vodIdInt = Number(vodId);
+
   // Smart resume - check for existing data if no manual override provided
   const lastSavedRecord = !startOffset
     ? await db.chatMessage.findFirst({
-        where: { vod_id: vodId },
+        where: { vod_id: vodIdInt },
         orderBy: { content_offset_seconds: 'desc' },
         select: { content_offset_seconds: true },
       })
@@ -202,12 +205,12 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
         messagesToInsert.push({
           id: node.id,
-          vod_id: vodId,
+          vod_id: vodIdInt,
           display_name: ('commenter' in node && node.commenter?.displayName) || null,
           content_offset_seconds: String(offsetSeconds), // Preserve Decimal precision
           createdAt: 'createdAt' in node && node.createdAt ? new Date(node.createdAt as string) : new Date(),
           message,
-          user_badges: userBadges ?? undefined,
+          user_badges: userBadges,
           user_color: ('message' in node && node.message?.userColor) || '#FFFFFF',
         });
       }
