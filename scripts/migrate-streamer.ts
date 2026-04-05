@@ -49,13 +49,32 @@ const parseDuration = (durationStr: string): number => {
   return 0;
 };
 
+const rollbackMigration = async (client: any) => {
+  console.log('🔄 Rolling back migration...');
+
+  try {
+    await client.query('DROP TABLE IF EXISTS "vods_new" CASCADE');
+    await client.query('DROP TABLE IF EXISTS "vod_uploads" CASCADE');
+    await client.query('DROP TABLE IF EXISTS "emotes_new" CASCADE');
+    await client.query('DROP TABLE IF EXISTS "games_new" CASCADE');
+    await client.query('DROP TABLE IF EXISTS "chapters" CASCADE');
+    await client.query('DROP TABLE IF EXISTS "chat_messages_new" CASCADE');
+
+    console.log('✅ Rollback complete');
+  } catch (error) {
+    console.error('❌ Rollback failed:', error);
+    throw error;
+  }
+};
+
 const createNormalizedSchema = async (client: any) => {
   await client.query('DROP TYPE IF EXISTS "UploadStatus" CASCADE');
   await client.query(`
     CREATE TYPE "UploadStatus" AS ENUM ('PENDING', 'UPLOADING', 'COMPLETED', 'FAILED');
 
     CREATE TABLE "vods_new" (
-      "id" TEXT NOT NULL,
+      "id" SERIAL NOT NULL,
+      "vod_id" TEXT NOT NULL,
       "platform" TEXT NOT NULL,
       "title" TEXT,
       "duration" INTEGER DEFAULT 0 NOT NULL,
@@ -63,12 +82,13 @@ const createNormalizedSchema = async (client: any) => {
       "created_at" TIMESTAMPTZ(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
       "is_live" BOOLEAN DEFAULT false NOT NULL,
       "started_at" TIMESTAMPTZ(3),
+      "updated_at" TIMESTAMPTZ(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
       CONSTRAINT "vods_new_pkey" PRIMARY KEY ("id"),
-      CONSTRAINT "vods_new_platform_id_key" UNIQUE ("platform", "id")
+      CONSTRAINT "vods_new_platform_vod_id_key" UNIQUE ("platform", "vod_id")
     );
 
     CREATE TABLE "vod_uploads" (
-      "vod_id" TEXT NOT NULL,
+      "vod_id" INTEGER NOT NULL,
       "upload_id" TEXT NOT NULL,
       "type" TEXT,
       "duration" INTEGER DEFAULT 0 NOT NULL,
@@ -81,7 +101,7 @@ const createNormalizedSchema = async (client: any) => {
 
     CREATE TABLE "emotes_new" (
       "id" SERIAL NOT NULL,
-      "vod_id" TEXT NOT NULL,
+      "vod_id" INTEGER NOT NULL,
       "ffz_emotes" JSONB,
       "bttv_emotes" JSONB,
       "seventv_emotes" JSONB,
@@ -91,7 +111,7 @@ const createNormalizedSchema = async (client: any) => {
 
     CREATE TABLE "games_new" (
       "id" SERIAL NOT NULL,
-      "vod_id" TEXT NOT NULL,
+      "vod_id" INTEGER NOT NULL,
       "start_time" INTEGER,
       "end_time" INTEGER,
       "video_provider" TEXT,
@@ -106,7 +126,7 @@ const createNormalizedSchema = async (client: any) => {
 
     CREATE TABLE "chapters" (
       "id" SERIAL NOT NULL,
-      "vod_id" TEXT NOT NULL,
+      "vod_id" INTEGER NOT NULL,
       "game_id" TEXT,
       "name" TEXT,
       "image" TEXT,
@@ -117,6 +137,18 @@ const createNormalizedSchema = async (client: any) => {
       CONSTRAINT "chapters_vod_id_start_key" UNIQUE ("vod_id", "start")
     );
 
+    CREATE TABLE "chat_messages_new" (
+      "id" UUID NOT NULL,
+      "vod_id" INTEGER NOT NULL,
+      "display_name" TEXT,
+      "content_offset_seconds" DECIMAL NOT NULL,
+      "user_color" TEXT,
+      "created_at" TIMESTAMPTZ(6) NOT NULL,
+      "message" JSONB,
+      "user_badges" JSONB,
+      CONSTRAINT "chat_messages_new_pkey" PRIMARY KEY ("id")
+    );
+
     CREATE INDEX "vods_new_platform_idx" ON "vods_new"("platform");
     CREATE INDEX "vod_uploads_vod_id_idx" ON "vod_uploads"("vod_id");
     CREATE INDEX "vod_uploads_status_idx" ON "vod_uploads"("status");
@@ -125,30 +157,18 @@ const createNormalizedSchema = async (client: any) => {
     CREATE INDEX "games_new_game_name_idx" ON "games_new"("game_name");
     CREATE INDEX "games_new_vod_id_start_time_idx" ON "games_new"("vod_id", "start_time");
     CREATE INDEX "chapters_vod_id_start_idx" ON "chapters"("vod_id", "start");
+    CREATE INDEX "idx_chat_messages_new_vod_offset_created" ON "chat_messages_new"("vod_id", "content_offset_seconds", "created_at");
 
     ALTER TABLE "vod_uploads" ADD CONSTRAINT "vod_uploads_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE ON UPDATE CASCADE;
     ALTER TABLE "emotes_new" ADD CONSTRAINT "emotes_new_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE ON UPDATE CASCADE;
     ALTER TABLE "games_new" ADD CONSTRAINT "games_new_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE ON UPDATE CASCADE;
     ALTER TABLE "chapters" ADD CONSTRAINT "chapters_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    ALTER TABLE "chat_messages_new" ADD CONSTRAINT "chat_messages_new_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE;
   `);
 };
 
 const applySchemaMigrations = async (client: any) => {
   await client.query(`
-    ALTER TABLE "vods_new" 
-    ADD COLUMN IF NOT EXISTS "is_live" BOOLEAN NOT NULL DEFAULT false,
-    ADD COLUMN IF NOT EXISTS "started_at" TIMESTAMP(3);
-
-    CREATE INDEX IF NOT EXISTS "vods_is_live_idx" ON "vods_new"("is_live");
-
-    COMMENT ON COLUMN "vods_new"."is_live" IS 'Indicates if this VOD record represents an active live stream';
-    COMMENT ON COLUMN "vods_new"."started_at" IS 'Timestamp when the live stream started (set on offline->live transition)';
-  `);
-
-  await client.query(`
-    ALTER TABLE "vods_new" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
-    UPDATE "vods_new" SET "updated_at" = COALESCE("created_at", NOW()) WHERE "updated_at" IS NULL;
-
     CREATE OR REPLACE FUNCTION update_updated_at_column()
     RETURNS TRIGGER AS $$
     BEGIN
@@ -164,19 +184,6 @@ const applySchemaMigrations = async (client: any) => {
 
     CREATE INDEX IF NOT EXISTS "vods_updated_at_idx" ON "vods_new"("updated_at");
   `);
-
-  await client.query(`
-    ALTER TABLE "chat_messages" 
-    ADD CONSTRAINT "chat_messages_vod_id_fkey" 
-    FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE;
-  `);
-
-  await client.query(`
-    UPDATE "chat_messages" SET "created_at" = NOW() WHERE "created_at" IS NULL;
-    ALTER TABLE "chat_messages" ALTER COLUMN "created_at" SET NOT NULL;
-    DROP INDEX IF EXISTS "idx_chat_messages_vod_offset_id";
-    CREATE INDEX "idx_chat_messages_vod_offset_created" ON "chat_messages"("vod_id", "content_offset_seconds", "created_at");
-  `);
 };
 
 const main = async () => {
@@ -188,7 +195,6 @@ const main = async () => {
     process.exit(1);
   }
 
-  // Fetch database URL from meta database for this tenant and decrypt it
   let dbUrl: string | null;
   try {
     const tenant = await metaClient.tenant.findUnique({
@@ -250,17 +256,20 @@ const main = async () => {
       const oldVodsCount = await oldPool.query('SELECT COUNT(*) FROM vods');
       const oldEmotesCount = await oldPool.query('SELECT COUNT(*) FROM emotes');
       const oldGamesCount = await oldPool.query('SELECT COUNT(*) FROM games');
+      const oldLogsCount = await oldPool.query('SELECT COUNT(*) FROM logs');
 
       console.log('📊 Legacy database row counts:');
       console.log(`   vods: ${oldVodsCount.rows[0].count}`);
       console.log(`   emotes: ${oldEmotesCount.rows[0].count}`);
-      console.log(`   games: ${oldGamesCount.rows[0].count}\n`);
+      console.log(`   games: ${oldGamesCount.rows[0].count}`);
+      console.log(`   logs (chat messages): ${oldLogsCount.rows[0].count}\n`);
 
       if (dryRunMode) {
         console.log('✅ Dry run validation complete');
         console.log(`   Would migrate: ${oldVodsCount.rows[0].count} VODs`);
         console.log(`   Would migrate: ${oldEmotesCount.rows[0].count} emote records`);
-        console.log(`   Would migrate: ${oldGamesCount.rows[0].count} game records\n`);
+        console.log(`   Would migrate: ${oldGamesCount.rows[0].count} game records`);
+        console.log(`   Would migrate: ${oldLogsCount.rows[0].count} chat messages\n`);
         poolEnded = true;
         await oldPool.end();
         return;
@@ -284,138 +293,203 @@ const main = async () => {
           throw schemaError;
         }
 
-        try {
-          const streamsResult = await oldPool.query('SELECT id, started_at FROM streams WHERE started_at IS NOT NULL');
-          const streamsMap = new Map<string, Date>();
-          for (const stream of streamsResult.rows) {
-            if (stream.id && stream.started_at) {
-              streamsMap.set(String(stream.id), new Date(stream.started_at));
-            }
+        const streamsResult = await oldPool.query('SELECT id, started_at FROM streams WHERE started_at IS NOT NULL');
+        const streamsMap = new Map<string, Date>();
+        for (const stream of streamsResult.rows) {
+          if (stream.id && stream.started_at) {
+            streamsMap.set(String(stream.id), new Date(stream.started_at));
           }
+        }
 
-          const vods = await oldPool.query('SELECT * FROM vods');
+        const vods = await oldPool.query('SELECT * FROM vods ORDER BY "createdAt" ASC');
 
-          for (const vod of vods.rows) {
-            const vodId = vod.id;
-            const platform = vod.platform;
-            const title = vod.title;
-            const duration = parseDuration(vod.duration);
-            const thumbnailUrl = vod.thumbnail_url;
-            const streamId = vod.stream_id;
-            const vodStartedAt = streamId ? streamsMap.get(streamId) || null : null;
+        const vodIdMap = new Map<string, number>();
 
-            try {
-              await client.query(`INSERT INTO "vods_new" (id, platform, title, duration, stream_id, started_at) VALUES ($1, $2, $3, $4, $5, $6)`, [
-                vodId,
-                platform,
-                title,
-                duration,
-                streamId,
-                vodStartedAt,
-              ]);
+        for (let i = 0; i < vods.rows.length; i++) {
+          const vod = vods.rows[i];
+          const legacyVodId = vod.id;
+          const newId = i + 1;
 
-              if (vod.youtube && Array.isArray(vod.youtube) && vod.youtube.length > 0) {
-                for (const upload of vod.youtube) {
-                  const uploadId = `${vodId}-${upload.id}`;
-                  const uploadDuration = Math.round(Number(upload.duration) || 0);
-                  const part = Number(upload.part) || 0;
+          const platform = vod.platform;
+          const title = vod.title;
+          const duration = parseDuration(vod.duration);
+          const thumbnailUrl = vod.thumbnail_url;
+          const streamId = vod.stream_id;
+          const vodStartedAt = streamId ? streamsMap.get(streamId) || null : null;
 
-                  try {
-                    await client.query(`INSERT INTO "vod_uploads" (vod_id, upload_id, type, duration, part, status, thumbnail_url) VALUES ($1, $2, $3, $4, $5, 'COMPLETED', $6)`, [
-                      vodId,
-                      uploadId,
-                      upload.type || null,
-                      uploadDuration,
-                      part,
-                      upload.thumbnail_url || thumbnailUrl || null,
-                    ]);
-                  } catch (uploadError) {
-                    errors.push(`Failed to migrate YouTube upload ${uploadId}: ${String(uploadError)}`);
-                  }
+          try {
+            await client.query(
+              `INSERT INTO "vods_new" (id, vod_id, platform, title, duration, stream_id, started_at, created_at) 
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+              [newId, legacyVodId, platform, title, duration, streamId, vodStartedAt, vod.createdAt || new Date()]
+            );
+
+            vodIdMap.set(legacyVodId, newId);
+
+            if (vod.youtube && Array.isArray(vod.youtube) && vod.youtube.length > 0) {
+              for (const upload of vod.youtube) {
+                const uploadId = `${legacyVodId}-${upload.id}`;
+                const uploadDuration = Math.round(Number(upload.duration) || 0);
+                const part = Number(upload.part) || 0;
+
+                try {
+                  await client.query(
+                    `INSERT INTO "vod_uploads" (vod_id, upload_id, type, duration, part, status, thumbnail_url) 
+                     VALUES ($1, $2, $3, $4, $5, 'COMPLETED', $6)`,
+                    [newId, uploadId, upload.type || null, uploadDuration, part, upload.thumbnail_url || thumbnailUrl || null]
+                  );
+                } catch (uploadError) {
+                  errors.push(`Failed to migrate YouTube upload ${uploadId}: ${String(uploadError)}`);
                 }
               }
+            }
 
-              if (vod.chapters && Array.isArray(vod.chapters) && vod.chapters.length > 0) {
-                for (const chapter of vod.chapters) {
-                  const start = Math.round(Number(chapter.start) || 0);
-                  const end = chapter.end ? Math.round(Number(chapter.end)) : null;
+            if (vod.chapters && Array.isArray(vod.chapters) && vod.chapters.length > 0) {
+              for (const chapter of vod.chapters) {
+                const start = Math.round(Number(chapter.start) || 0);
+                const end = chapter.end ? Math.round(Number(chapter.end)) : null;
 
-                  try {
-                    await client.query(`INSERT INTO "chapters" (vod_id, game_id, name, image, duration, start, "end") VALUES ($1, $2, $3, $4, $5, $6, $7)`, [
-                      vodId,
-                      chapter.gameId || null,
-                      chapter.name || null,
-                      chapter.image || null,
-                      chapter.duration || null,
-                      start,
-                      end,
-                    ]);
-                  } catch (chapterError) {
-                    errors.push(`Failed to migrate chapter for VOD ${vodId}: ${String(chapterError)}`);
-                  }
+                try {
+                  await client.query(
+                    `INSERT INTO "chapters" (vod_id, game_id, name, image, duration, start, "end") 
+                     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                    [newId, chapter.gameId || null, chapter.name || null, chapter.image || null, chapter.duration || null, start, end]
+                  );
+                } catch (chapterError) {
+                  errors.push(`Failed to migrate chapter for VOD ${legacyVodId}: ${String(chapterError)}`);
                 }
               }
-            } catch (vodError) {
-              errors.push(`Failed to migrate VOD ${vodId}: ${String(vodError)}`);
             }
+          } catch (vodError) {
+            errors.push(`Failed to migrate VOD ${legacyVodId}: ${String(vodError)}`);
+          }
+        }
+
+        console.log(`✅ Migrated ${vods.rows.length} VODs`);
+
+        const emotes = await oldPool.query('SELECT * FROM emotes');
+        for (const emote of emotes.rows) {
+          const newVodId = vodIdMap.get(emote.vod_id);
+          if (!newVodId) {
+            throw new Error(`Emote references non-existent VOD ${emote.vod_id} - FK integrity failed`);
           }
 
-          console.log(`✅ Migrated ${vods.rows.length} VODs`);
-        } catch (vodsError) {
-          errors.push(`VOD migration failed: ${String(vodsError)}`);
-          throw vodsError;
+          try {
+            await client.query(
+              `INSERT INTO "emotes_new" (vod_id, ffz_emotes, bttv_emotes, seventv_emotes) 
+               VALUES ($1, $2, $3, $4) ON CONFLICT (vod_id) DO UPDATE 
+               SET ffz_emotes = EXCLUDED.ffz_emotes, 
+                   bttv_emotes = EXCLUDED.bttv_emotes, 
+                   seventv_emotes = EXCLUDED.seventv_emotes`,
+              [newVodId, JSON.stringify(emote.ffz_emotes), JSON.stringify(emote.bttv_emotes), JSON.stringify(emote['7tv_emotes'])]
+            );
+          } catch (emoteError) {
+            errors.push(`Failed to migrate emote for VOD ${emote.vod_id}: ${String(emoteError)}`);
+          }
         }
 
-        try {
-          const emotes = await oldPool.query('SELECT * FROM emotes');
-          for (const emote of emotes.rows) {
-            try {
-              await client.query(
-                `INSERT INTO "emotes_new" (vod_id, ffz_emotes, bttv_emotes, seventv_emotes) VALUES ($1, $2, $3, $4) ON CONFLICT (vod_id) DO UPDATE SET ffz_emotes = EXCLUDED.ffz_emotes, bttv_emotes = EXCLUDED.bttv_emotes, seventv_emotes = EXCLUDED.seventv_emotes`,
-                [emote.vod_id, JSON.stringify(emote.ffz_emotes), JSON.stringify(emote.bttv_emotes), JSON.stringify(emote['7tv_emotes'])]
-              );
-            } catch (emoteError) {
-              errors.push(`Failed to migrate emote for VOD ${emote.vod_id}: ${String(emoteError)}`);
-            }
+        console.log(`✅ Migrated ${emotes.rows.length} emote records`);
+
+        const games = await oldPool.query('SELECT * FROM games');
+        for (const game of games.rows) {
+          const newVodId = vodIdMap.get(game.vod_id);
+          if (!newVodId) {
+            throw new Error(`Game references non-existent VOD ${game.vod_id} - FK integrity failed`);
           }
 
-          console.log(`✅ Migrated ${emotes.rows.length} emote records`);
-        } catch (emotesError) {
-          errors.push(`Emote migration failed: ${String(emotesError)}`);
-          throw emotesError;
-        }
+          const startTime = game.start_time ? Math.round(Number(game.start_time)) : null;
+          const endTime = game.end_time ? Math.round(Number(game.end_time)) : null;
 
-        try {
-          const games = await oldPool.query('SELECT * FROM games');
-          for (const game of games.rows) {
-            try {
-              const startTime = game.start_time ? Math.round(Number(game.start_time)) : null;
-              const endTime = game.end_time ? Math.round(Number(game.end_time)) : null;
-
-              await client.query(
-                `INSERT INTO "games_new" (vod_id, start_time, end_time, video_provider, video_id, thumbnail_url, game_id, game_name, title, chapter_image) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-                [game.vod_id, startTime, endTime, game.video_provider, game.video_id, game.thumbnail_url, game.game_id, game.game_name, game.title, game.chapter_image]
-              );
-            } catch (gameError) {
-              errors.push(`Failed to migrate game for VOD ${game.vod_id}: ${String(gameError)}`);
-            }
+          try {
+            await client.query(
+              `INSERT INTO "games_new" (vod_id, start_time, end_time, video_provider, video_id, thumbnail_url, game_id, game_name, title, chapter_image) 
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+              [newVodId, startTime, endTime, game.video_provider, game.video_id, game.thumbnail_url, game.game_id, game.game_name, game.title, game.chapter_image]
+            );
+          } catch (gameError) {
+            errors.push(`Failed to migrate game for VOD ${game.vod_id}: ${String(gameError)}`);
           }
-
-          console.log(`✅ Migrated ${games.rows.length} games`);
-        } catch (gamesError) {
-          errors.push(`Game migration failed: ${String(gamesError)}`);
-          throw gamesError;
         }
 
-        try {
-          await client.query('ALTER TABLE logs RENAME TO chat_messages');
-          await client.query('ALTER TABLE "chat_messages" RENAME COLUMN "createdAt" TO "created_at"');
-          await client.query('ALTER TABLE "chat_messages" DROP COLUMN "updatedAt"');
-          console.log('✅ Renamed logs table to chat_messages');
-        } catch (renameError) {
-          errors.push(`Failed to rename logs table: ${String(renameError)}`);
-          throw renameError;
+        console.log(`✅ Migrated ${games.rows.length} games`);
+
+        const orphanedChatCheck = await client.query(`
+          SELECT COUNT(*) FROM logs cm
+          WHERE NOT EXISTS (SELECT 1 FROM vods v WHERE v.id = cm.vod_id)
+        `);
+
+        if (Number(orphanedChatCheck.rows[0].count) > 0) {
+          throw new Error(`${orphanedChatCheck.rows[0].count} chat messages reference non-existent VODs - FK integrity failed`);
         }
+
+        const totalChatMessages = await client.query(`
+          SELECT COUNT(*) FROM logs cm
+          INNER JOIN "vods_new" vn ON cm.vod_id = vn.vod_id
+        `);
+        const totalChat = Number(totalChatMessages.rows[0].count);
+        const chunkSize = 100000;
+        const totalChunks = Math.ceil(totalChat / chunkSize);
+
+        console.log(`\n📊 Migrating chat messages (${totalChat.toLocaleString()} total)...`);
+
+        for (let chunk = 0; chunk < totalChunks; chunk++) {
+          const offset = chunk * chunkSize;
+          const remaining = totalChat - offset;
+          const currentChunkSize = Math.min(chunkSize, remaining);
+
+          await client.query(
+            `
+            INSERT INTO "chat_messages_new" (id, vod_id, display_name, content_offset_seconds, user_color, created_at, message, user_badges)
+            SELECT 
+              cm.id,
+              vn.id,
+              cm.display_name,
+              cm.content_offset_seconds,
+              cm.user_color,
+              cm."createdAt",
+              cm.message,
+              cm.user_badges
+            FROM logs cm
+            INNER JOIN "vods_new" vn ON cm.vod_id = vn.vod_id
+            ORDER BY cm."createdAt"
+            LIMIT $1 OFFSET $2
+          `,
+            [currentChunkSize, offset]
+          );
+
+          const progress = ((offset + currentChunkSize) / totalChat) * 100;
+          console.log(`   Chat messages: ${Math.min(offset + currentChunkSize, totalChat).toLocaleString()}/${totalChat.toLocaleString()} (${progress.toFixed(1)}%)`);
+        }
+
+        const chatMessagesCount = await client.query('SELECT COUNT(*) FROM "chat_messages_new"');
+        console.log(`✅ Migrated ${chatMessagesCount.rows[0].count} chat messages\n`);
+
+        const fkCheckResult: any = await client.query(`
+          SELECT 
+            (SELECT COUNT(*) FROM "emotes_new" e WHERE NOT EXISTS (SELECT 1 FROM "vods_new" v WHERE v.id = e.vod_id)) as emotes_count,
+            (SELECT COUNT(*) FROM "games_new" g WHERE NOT EXISTS (SELECT 1 FROM "vods_new" v WHERE v.id = g.vod_id)) as games_count,
+            (SELECT COUNT(*) FROM "chapters" c WHERE NOT EXISTS (SELECT 1 FROM "vods_new" v WHERE v.id = c.vod_id)) as chapters_count,
+            (SELECT COUNT(*) FROM "vod_uploads" u WHERE NOT EXISTS (SELECT 1 FROM "vods_new" v WHERE v.id = u.vod_id)) as uploads_count,
+            (SELECT COUNT(*) FROM "chat_messages_new" c WHERE NOT EXISTS (SELECT 1 FROM "vods_new" v WHERE v.id = c.vod_id)) as chat_count
+        `);
+
+        const fkResults = fkCheckResult.rows[0];
+        const tableInfo = [
+          { name: 'emotes_new', count: Number(fkResults.emotes_count) },
+          { name: 'games_new', count: Number(fkResults.games_count) },
+          { name: 'chapters', count: Number(fkResults.chapters_count) },
+          { name: 'vod_uploads', count: Number(fkResults.uploads_count) },
+          { name: 'chat_messages_new', count: Number(fkResults.chat_count) },
+        ];
+
+        for (const table of tableInfo) {
+          if (table.count > 0) {
+            throw new Error(`FK integrity check failed! ${table.count} orphaned records in ${table.name}`);
+          }
+        }
+
+        console.log('✅ FK integrity validation passed');
+        console.log('ℹ️ To clean __typename from chat messages, run: node scripts/cleanup-chat-typenames.js --streamer=<name>\n');
 
         try {
           await applySchemaMigrations(client);
@@ -433,13 +507,15 @@ const main = async () => {
         const newEmotesCount = await oldPool.query('SELECT COUNT(*) FROM "emotes_new"');
         const newGamesCount = await oldPool.query('SELECT COUNT(*) FROM "games_new"');
         const newChaptersCount = await oldPool.query('SELECT COUNT(*) FROM "chapters"');
+        const newChatMessagesCount = await oldPool.query('SELECT COUNT(*) FROM "chat_messages_new"');
 
         console.log('📊 New database row counts:');
         console.log(`   vods_new: ${newVodsCount.rows[0].count}`);
         console.log(`   vod_uploads: ${newUploadsCount.rows[0].count}`);
         console.log(`   emotes_new: ${newEmotesCount.rows[0].count}`);
         console.log(`   games_new: ${newGamesCount.rows[0].count}`);
-        console.log(`   chapters: ${newChaptersCount.rows[0].count}\n`);
+        console.log(`   chapters: ${newChaptersCount.rows[0].count}`);
+        console.log(`   chat_messages_new: ${newChatMessagesCount.rows[0].count}\n`);
 
         const renameLegacy = await confirm('Rename legacy tables and finalize migration?');
         if (renameLegacy) {
@@ -450,6 +526,8 @@ const main = async () => {
             await oldPool.query('ALTER TABLE "emotes_new" RENAME TO "emotes"');
             await oldPool.query('ALTER TABLE "games" RENAME TO "games_legacy"');
             await oldPool.query('ALTER TABLE "games_new" RENAME TO "games"');
+            await oldPool.query('ALTER TABLE "logs" RENAME TO "chat_messages_legacy"');
+            await oldPool.query('ALTER TABLE "chat_messages_new" RENAME TO "chat_messages"');
 
             try {
               await oldPool.query('ALTER TABLE "streams" RENAME TO "streams_legacy"');
@@ -477,12 +555,13 @@ const main = async () => {
       } catch (transactionError) {
         try {
           await client.query('ROLLBACK');
+          await rollbackMigration(client);
           errors.push(`Transaction rolled back due to error: ${String(transactionError)}`);
-          console.error('\n❌ Migration failed, transaction rolled back:');
+          console.error('\n❌ Migration failed and rolled back:');
           console.error(transactionError);
         } catch (rollbackError) {
           errors.push(`Failed to rollback transaction: ${String(rollbackError)}`);
-          console.error('⚠️  Failed to rollback transaction:', rollbackError);
+          console.error('❌ Rollback also failed:', rollbackError);
         }
 
         if (errors.length > 0) {
