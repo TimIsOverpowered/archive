@@ -12,7 +12,6 @@ interface VodResponse {
   started_at: Date | null;
   vod_uploads?: Array<{
     upload_id: string;
-    platform: string;
     type: string | null;
     duration: number;
     part: number;
@@ -87,9 +86,7 @@ export async function getVods(client: PrismaClient, tenantId: string, query: Vod
 
   if (query.uploaded === 'youtube') {
     where.vod_uploads = {
-      some: {
-        platform: 'youtube',
-      },
+      some: {},
     };
   }
 
@@ -125,7 +122,6 @@ export async function getVods(client: PrismaClient, tenantId: string, query: Vod
         vod_uploads: {
           select: {
             upload_id: true,
-            platform: true,
             type: true,
             duration: true,
             part: true,
@@ -165,7 +161,7 @@ export async function getVods(client: PrismaClient, tenantId: string, query: Vod
   const resultVods = hasMore ? vods.slice(0, limit) : vods;
 
   const response = {
-    vods: resultVods as VodResponse[],
+    vods: resultVods as unknown as VodResponse[],
     total,
   };
 
@@ -202,7 +198,6 @@ export async function getVodById(client: PrismaClient, tenantId: string, vodId: 
       vod_uploads: {
         select: {
           upload_id: true,
-          platform: true,
           type: true,
           duration: true,
           part: true,
