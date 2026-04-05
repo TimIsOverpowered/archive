@@ -314,14 +314,7 @@ const main = async () => {
             const streamId = vod.stream_id;
 
             try {
-              await client.query(`INSERT INTO "vods_new" (id, platform, title, duration, thumbnail_url, stream_id) VALUES ($1, $2, $3, $4, $5, $6)`, [
-                vodId,
-                platform,
-                title,
-                duration,
-                thumbnailUrl,
-                streamId,
-              ]);
+              await client.query(`INSERT INTO "vods_new" (id, platform, title, duration, stream_id) VALUES ($1, $2, $3, $4, $5)`, [vodId, platform, title, duration, streamId]);
 
               if (vod.youtube && Array.isArray(vod.youtube) && vod.youtube.length > 0) {
                 for (const upload of vod.youtube) {
@@ -336,7 +329,7 @@ const main = async () => {
                       upload.type || null,
                       uploadDuration,
                       part,
-                      upload.thumbnail_url || null,
+                      upload.thumbnail_url || thumbnailUrl || null,
                     ]);
                   } catch (uploadError) {
                     errors.push(`Failed to migrate YouTube upload ${uploadId}: ${String(uploadError)}`);
