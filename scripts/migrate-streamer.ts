@@ -3,8 +3,6 @@ import 'dotenv/config';
 import { PrismaClient } from '../prisma/generated/meta/index.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 import readline from 'readline';
-import path from 'path';
-import fs from 'fs';
 import { extractErrorDetails } from '../src/utils/error.js';
 
 const { decryptScalar } = await import('../src/utils/encryption');
@@ -49,6 +47,154 @@ const parseDuration = (durationStr: string): number => {
     return parts[0] * 60 + parts[1];
   }
   return 0;
+};
+
+const createNormalizedSchema = async (client: any) => {
+  await client.query('DROP TYPE IF EXISTS "UploadStatus" CASCADE');
+  await client.query(`
+    CREATE TYPE "UploadStatus" AS ENUM ('PENDING', 'UPLOADING', 'COMPLETED', 'FAILED');
+
+    CREATE TABLE "vods_new" (
+      "id" TEXT NOT NULL,
+      "platform" TEXT NOT NULL,
+      "title" TEXT,
+      "duration" INTEGER DEFAULT 0 NOT NULL,
+      "stream_id" TEXT,
+      "created_at" TIMESTAMPTZ(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      "is_live" BOOLEAN DEFAULT false NOT NULL,
+      "started_at" TIMESTAMPTZ(3),
+      CONSTRAINT "vods_new_pkey" PRIMARY KEY ("id"),
+      CONSTRAINT "vods_new_platform_id_key" UNIQUE ("platform", "id")
+    );
+
+    CREATE TABLE "vod_uploads" (
+      "vod_id" TEXT NOT NULL,
+      "upload_id" TEXT NOT NULL,
+      "type" TEXT,
+      "duration" INTEGER DEFAULT 0 NOT NULL,
+      "part" INTEGER DEFAULT 0 NOT NULL,
+      "status" "UploadStatus" DEFAULT 'PENDING' NOT NULL,
+      "thumbnail_url" TEXT,
+      "created_at" TIMESTAMPTZ(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      CONSTRAINT "vod_uploads_pkey" PRIMARY KEY ("upload_id")
+    );
+
+    CREATE TABLE "emotes_new" (
+      "id" SERIAL NOT NULL,
+      "vod_id" TEXT NOT NULL,
+      "ffz_emotes" JSONB,
+      "bttv_emotes" JSONB,
+      "seventv_emotes" JSONB,
+      CONSTRAINT "emotes_new_pkey" PRIMARY KEY ("id"),
+      CONSTRAINT "emotes_new_vod_id_key" UNIQUE ("vod_id")
+    );
+
+    CREATE TABLE "games_new" (
+      "id" SERIAL NOT NULL,
+      "vod_id" TEXT NOT NULL,
+      "start_time" INTEGER,
+      "end_time" INTEGER,
+      "video_provider" TEXT,
+      "video_id" TEXT,
+      "thumbnail_url" TEXT,
+      "game_id" TEXT,
+      "game_name" TEXT,
+      "title" TEXT,
+      "chapter_image" TEXT,
+      CONSTRAINT "games_new_pkey" PRIMARY KEY ("id")
+    );
+
+    CREATE TABLE "chapters" (
+      "id" SERIAL NOT NULL,
+      "vod_id" TEXT NOT NULL,
+      "game_id" TEXT,
+      "name" TEXT,
+      "image" TEXT,
+      "duration" TEXT,
+      "start" INTEGER DEFAULT 0 NOT NULL,
+      "end" INTEGER,
+      CONSTRAINT "chapters_pkey" PRIMARY KEY ("id"),
+      CONSTRAINT "chapters_vod_id_start_key" UNIQUE ("vod_id", "start")
+    );
+
+    CREATE INDEX "vods_new_platform_idx" ON "vods_new"("platform");
+    CREATE INDEX "vod_uploads_vod_id_idx" ON "vod_uploads"("vod_id");
+    CREATE INDEX "vod_uploads_status_idx" ON "vod_uploads"("status");
+    CREATE INDEX "vod_uploads_type_idx" ON "vod_uploads"("type");
+    CREATE INDEX "vod_uploads_vod_id_type_part_idx" ON "vod_uploads"("vod_id", "type", "part");
+    CREATE INDEX "games_new_game_name_idx" ON "games_new"("game_name");
+    CREATE INDEX "games_new_vod_id_start_time_idx" ON "games_new"("vod_id", "start_time");
+    CREATE INDEX "chapters_vod_id_start_idx" ON "chapters"("vod_id", "start");
+
+    ALTER TABLE "vod_uploads" ADD CONSTRAINT "vod_uploads_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    ALTER TABLE "emotes_new" ADD CONSTRAINT "emotes_new_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    ALTER TABLE "games_new" ADD CONSTRAINT "games_new_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    ALTER TABLE "chapters" ADD CONSTRAINT "chapters_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  `);
+};
+
+const applySchemaMigrations = async (client: any) => {
+  await client.query(`
+    ALTER TABLE "vods" 
+    ADD COLUMN IF NOT EXISTS "is_live" BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS "started_at" TIMESTAMP(3),
+    ADD COLUMN IF NOT EXISTS "ended_at" TIMESTAMP(3),
+    ADD COLUMN IF NOT EXISTS "user_id" TEXT;
+
+    CREATE INDEX IF NOT EXISTS "vods_is_live_idx" ON "vods"("is_live");
+    CREATE INDEX IF NOT EXISTS "vods_user_id_platform_idx" ON "vods"("user_id", "platform");
+
+    COMMENT ON COLUMN "vods"."is_live" IS 'Indicates if this VOD record represents an active live stream';
+    COMMENT ON COLUMN "vods"."started_at" IS 'Timestamp when the live stream started (set on offline->live transition)';
+    COMMENT ON COLUMN "vods"."ended_at" IS 'Timestamp when the live stream ended (set on live->offline transition)';
+    COMMENT ON COLUMN "vods"."user_id" IS 'Channel/user identifier for tracking which channel this VOD belongs to (multi-tenant/multi-channel support)';
+  `);
+
+  await client.query(`
+    UPDATE "vod_uploads" vu
+    SET thumbnail_url = v.thumbnail_url
+    FROM "vods" v
+    WHERE vu.vod_id = v.id 
+      AND v.thumbnail_url IS NOT NULL 
+      AND vu.thumbnail_url IS NULL;
+
+    ALTER TABLE "vods" DROP COLUMN IF EXISTS "downloaded_at";
+    ALTER TABLE "vods" DROP COLUMN IF EXISTS "thumbnail_url";
+    ALTER TABLE "vods" DROP COLUMN IF EXISTS "user_id";
+    DROP INDEX IF EXISTS "vods_user_id_platform_idx";
+    ALTER TABLE "vods" DROP COLUMN IF EXISTS "ended_at";
+
+    ALTER TABLE "vods" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+    UPDATE "vods" SET "updated_at" = COALESCE("created_at", NOW()) WHERE "updated_at" IS NULL;
+
+    CREATE OR REPLACE FUNCTION update_updated_at_column()
+    RETURNS TRIGGER AS $$
+    BEGIN
+      NEW.updated_at = CURRENT_TIMESTAMP;
+      RETURN NEW;
+    END;
+    $$ language 'plpgsql';
+
+    DROP TRIGGER IF EXISTS update_vods_updated_at ON "vods";
+    CREATE TRIGGER update_vods_updated_at 
+    BEFORE UPDATE ON "vods" 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+    CREATE INDEX IF NOT EXISTS "vods_updated_at_idx" ON "vods"("updated_at");
+  `);
+
+  await client.query(`
+    ALTER TABLE "chat_messages" 
+    ADD CONSTRAINT "chat_messages_vod_id_fkey" 
+    FOREIGN KEY ("vod_id") REFERENCES "vods"("id") ON DELETE CASCADE;
+  `);
+
+  await client.query(`
+    UPDATE "chat_messages" SET "created_at" = NOW() WHERE "created_at" IS NULL;
+    ALTER TABLE "chat_messages" ALTER COLUMN "created_at" SET NOT NULL;
+    DROP INDEX IF EXISTS "idx_chat_messages_vod_offset_id";
+    CREATE INDEX "idx_chat_messages_vod_offset_created" ON "chat_messages"("vod_id", "content_offset_seconds", "created_at");
+  `);
 };
 
 const main = async () => {
@@ -148,54 +294,8 @@ const main = async () => {
       try {
         await client.query('BEGIN');
 
-        let migrationSql;
         try {
-          const migrationPath = path.join(process.cwd(), 'prisma', 'migrations', '20240101000000_add_normalized_schema', 'migration.sql');
-          migrationSql = fs.readFileSync(migrationPath, 'utf8');
-        } catch (fsError) {
-          errors.push(`Failed to read migration SQL file: ${String(fsError)}`);
-          console.error('❌ Cannot find migration schema file. Please ensure prisma/migrations/20240101000000_add_normalized_schema/migration.sql exists');
-          await client.query('ROLLBACK');
-          throw new Error('Migration file not found');
-        }
-
-        try {
-          await client.query('DROP TYPE IF EXISTS "UploadStatus" CASCADE');
-
-          migrationSql = migrationSql
-            .replace(/CREATE TABLE "vods"/g, 'CREATE TABLE "vods_new"')
-            .replace(/CREATE TABLE "emotes"/g, 'CREATE TABLE "emotes_new"')
-            .replace(/CREATE TABLE "games"/g, 'CREATE TABLE "games_new"')
-            .replace(/REFERENCES "vods"\(/g, 'REFERENCES "vods_new"(')
-            .replace(/CONSTRAINT "vods_pkey"/g, 'CONSTRAINT "vods_new_pkey"')
-            .replace(/CONSTRAINT "vods_platform_id_key"/g, 'CONSTRAINT "vods_new_platform_id_key"')
-            .replace(/CONSTRAINT "emotes_pkey"/g, 'CONSTRAINT "emotes_new_pkey"')
-            .replace(/CONSTRAINT "emotes_vod_id_key"/g, 'CONSTRAINT "emotes_new_vod_id_key"')
-            .replace(/CONSTRAINT "games_pkey"/g, 'CONSTRAINT "games_new_pkey"')
-            .replace(/ON "vods"\(/g, 'ON "vods_new"(')
-            .replace(/ON "emotes"\(/g, 'ON "emotes_new"(')
-            .replace(/ON "games"\(/g, 'ON "games_new"(')
-            .replace(/INDEX "vods_platform_idx"/g, 'INDEX "vods_new_platform_idx"')
-            .replace(/INDEX "emotes_vod_id_key"/g, 'INDEX "emotes_new_vod_id_key"')
-            .replace(/INDEX "games_vod_id_start_time_idx"/g, 'INDEX "games_new_vod_id_start_time_idx"')
-            .replace(/INDEX "games_game_name_idx"/g, 'INDEX "games_new_game_name_idx"')
-            .replace(/CONSTRAINT "emotes_vod_id_fkey"/g, 'CONSTRAINT "emotes_new_vod_id_fkey"')
-            .replace(/CONSTRAINT "games_vod_id_fkey"/g, 'CONSTRAINT "games_new_vod_id_fkey"')
-            .replace(/ALTER TABLE "emotes"/g, 'ALTER TABLE "emotes_new"')
-            .replace(/ALTER TABLE "games"/g, 'ALTER TABLE "games_new"');
-
-          // Remove the entire chat_messages table block first
-          migrationSql = migrationSql.replace(/-- CreateTable\s+CREATE TABLE "chat_messages" \([\s\S]*?\n\);/g, '');
-
-          // Also remove chat_messages index creation
-          migrationSql = migrationSql
-            .split('\n')
-            .filter((line) => {
-              return !line.includes('idx_chat_messages') && !line.includes('chat_messages_vod_id_fkey');
-            })
-            .join('\n');
-
-          await client.query(migrationSql);
+          await createNormalizedSchema(client);
           console.log('✅ New schema created successfully\n');
         } catch (schemaError) {
           errors.push(`Failed to create new schema: ${String(schemaError)}`);
@@ -319,11 +419,19 @@ const main = async () => {
         try {
           await client.query('ALTER TABLE logs RENAME TO chat_messages');
           await client.query('ALTER TABLE "chat_messages" RENAME COLUMN "createdAt" TO "created_at"');
-          await client.query('ALTER TABLE "chat_messages" RENAME COLUMN "updatedAt" TO "updated_at"');
-          console.log('✅ Renamed logs table to chat_messages\n');
+          await client.query('ALTER TABLE "chat_messages" DROP COLUMN "updatedAt"');
+          console.log('✅ Renamed logs table to chat_messages');
         } catch (renameError) {
           errors.push(`Failed to rename logs table: ${String(renameError)}`);
           throw renameError;
+        }
+
+        try {
+          await applySchemaMigrations(client);
+          console.log('✅ Schema migrations applied');
+        } catch (schemaMigrationError) {
+          errors.push(`Failed to apply schema migrations: ${String(schemaMigrationError)}`);
+          throw schemaMigrationError;
         }
 
         await client.query('COMMIT');
@@ -359,55 +467,13 @@ const main = async () => {
             }
 
             console.log('✅ Legacy tables renamed and migration finalized\n');
-
-            const originalDbUrl = process.env.DATABASE_URL;
-            process.env.DATABASE_URL = dbUrl;
-
-            try {
-              const { execSync } = await import('child_process');
-              console.log('\n📝 Resolving migration state with Prisma...');
-
-              execSync('npx prisma migrate resolve --applied 20240101000000_add_normalized_schema', {
-                stdio: 'inherit',
-                cwd: process.cwd(),
-              });
-
-              console.log('✅ Migration state resolved successfully\n');
-            } catch (resolveError) {
-              errors.push(`Failed to resolve Prisma migration state: ${String(resolveError)}`);
-              console.warn('\n⚠️  Failed to resolve migration state. Run manually:');
-              console.warn('   npx prisma migrate resolve --applied 20240101000000_add_normalized_schema\n');
-            }
-
-            try {
-              const { execSync } = await import('child_process');
-              console.log('📝 Applying remaining Prisma migrations...');
-
-              execSync('npx prisma migrate deploy', {
-                stdio: 'inherit',
-                cwd: process.cwd(),
-              });
-
-              console.log('✅ All Prisma migrations applied successfully\n');
-            } catch (deployError) {
-              errors.push(`Failed to apply remaining Prisma migrations: ${String(deployError)}`);
-              console.warn('\n⚠️  Failed to apply remaining migrations. Run manually:');
-              console.warn('   npx prisma migrate deploy\n');
-            }
-
-            if (originalDbUrl) {
-              process.env.DATABASE_URL = originalDbUrl;
-            } else {
-              delete process.env.DATABASE_URL;
-            }
           } catch (renameError) {
             errors.push(`Failed to rename legacy tables: ${String(renameError)}`);
             throw renameError;
           }
         } else {
           console.log('\nℹ️  Migration data is in *_new tables. To finalize, run manually or re-run this script.');
-          console.log('   npx prisma migrate resolve --applied 20240101000000_add_normalized_schema');
-          console.log('   Then rename tables: ALTER TABLE "vods_new" RENAME TO "vods"; etc.\n');
+          console.log('   Run: ALTER TABLE "vods_new" RENAME TO "vods"; etc.\n');
         }
 
         if (errors.length > 0) {
