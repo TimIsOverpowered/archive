@@ -285,6 +285,14 @@ const main = async () => {
         }
 
         try {
+          const streamsResult = await oldPool.query('SELECT id, started_at FROM streams WHERE started_at IS NOT NULL');
+          const streamsMap = new Map<string, Date>();
+          for (const stream of streamsResult.rows) {
+            if (stream.id && stream.started_at) {
+              streamsMap.set(String(stream.id), new Date(stream.started_at));
+            }
+          }
+
           const vods = await oldPool.query('SELECT * FROM vods');
 
           for (const vod of vods.rows) {
@@ -294,9 +302,17 @@ const main = async () => {
             const duration = parseDuration(vod.duration);
             const thumbnailUrl = vod.thumbnail_url;
             const streamId = vod.stream_id;
+            const vodStartedAt = streamId ? streamsMap.get(streamId) || null : null;
 
             try {
-              await client.query(`INSERT INTO "vods_new" (id, platform, title, duration, stream_id) VALUES ($1, $2, $3, $4, $5)`, [vodId, platform, title, duration, streamId]);
+              await client.query(`INSERT INTO "vods_new" (id, platform, title, duration, stream_id, started_at) VALUES ($1, $2, $3, $4, $5, $6)`, [
+                vodId,
+                platform,
+                title,
+                duration,
+                streamId,
+                vodStartedAt,
+              ]);
 
               if (vod.youtube && Array.isArray(vod.youtube) && vod.youtube.length > 0) {
                 for (const upload of vod.youtube) {
