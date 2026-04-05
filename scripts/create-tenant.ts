@@ -537,7 +537,6 @@ async function main(): Promise<void> {
     console.log(`\nStreamer ID: ${channelName}`);
     console.log(`Tenant ID in meta DB: ${createdTenant.id}`);
     console.log(`\n🗄️  Database: postgresql://${dbUser}:***@${dbHost}:${dbPort}/${dbName}`);
-    console.log(`\n🗄️  Database: postgresql://${dbUser}:***@${dbHost}:${dbPort}/${dbName}`);
     console.log('   Schema: Migrated with normalized tables');
 
     // Optional Authentication Setup section
