@@ -486,15 +486,17 @@ const main = async () => {
 
       const client = await oldPool.connect();
       try {
-        await client.query('BEGIN');
-
+        // Create schema BEFORE transaction so parallel workers can see the tables
         try {
+          await rollbackMigration(client); // cleanup any existing tables from failed migrations
           await createNormalizedSchema(client);
           console.log('✅ New schema created successfully\n');
         } catch (schemaError) {
           errors.push(`Failed to create new schema: ${String(schemaError)}`);
           throw schemaError;
         }
+
+        await client.query('BEGIN');
 
         const streamsResult = await oldPool.query('SELECT id, started_at FROM streams WHERE started_at IS NOT NULL');
         const streamsMap = new Map<string, Date>();
