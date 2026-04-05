@@ -30,6 +30,6 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": false
   },
-  "include": ["src/**/*", "src/types/*.d.ts"],
+  "include": ["src/**/*", "src/types/*.d.ts", "scripts/**/*"],
   "exclude": ["node_modules", "dist"]
 }

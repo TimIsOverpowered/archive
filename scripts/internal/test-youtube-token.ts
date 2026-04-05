@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import 'dotenv/config';
 import { program } from 'commander';
-import { metaClient } from '../src/db/meta-client.js';
-import { extractErrorDetails } from '../src/utils/error.js';
+import { metaClient } from '../../src/db/meta-client.js';
+import { extractErrorDetails } from '../../src/utils/error.js';
 
 interface YoutubeAuth {
   access_token?: string;
@@ -13,7 +13,7 @@ interface YoutubeAuth {
 }
 
 async function decryptYoutubeAuth(encryptedValue: any): Promise<YoutubeAuth | null> {
-  const encryptionModule = await import('../src/utils/encryption.js');
+  const encryptionModule = await import('../../src/utils/encryption.js');
 
   // Auth is stored as encrypted JSON string (using encryptScalar on the JSON)
   try {
@@ -81,23 +81,28 @@ program
 
       if (options.forceRefresh && !options.checkOnly) {
         // Clear cache to force fresh read from DB after refresh
-        const youtubeServicePath = await import('../src/services/youtube.js');
+        const youtubeServicePath = await import('../../src/services/youtube.js');
 
         console.log('\nForcing token refresh...');
 
         try {
           // Load configs first to populate cache for youtube service (critical!)
-          const configLoaderModule = await import('../src/config/loader.js');
+          const configLoaderModule = await import('../../src/config/loader.js');
           console.log('Loading streamer configs from DB...');
-          await configLoaderModule.loadStreamerConfigs();
+          await configLoaderModule.loadTenantConfigs();
 
           // Use getAccessToken which will trigger the tokens event and persist changes
           if (decrypted.refresh_token) {
-            console.log('✅ Refresh token available - attempting API refresh via getAccessToken()');
+            console.log('✅ Refresh token available - attempting API refresh via validateYoutubeToken()');
 
-            const newToken = await youtubeServicePath.getAccessToken(tenantId);
+            const isValid = await youtubeServicePath.validateYoutubeToken(tenantId);
 
-            console.log(`✅ Token refreshed successfully! New access token: ...${newToken.slice(-15)}`);
+            if (!isValid) {
+              console.error('❌ Token validation failed');
+              process.exit(1);
+            }
+
+            console.log('✅ Token refreshed successfully!');
 
             // Wait for async DB persistence to complete (tokens event handler is synchronous but uses async/await internally)
             await new Promise((resolve) => setTimeout(resolve, 500));

@@ -57,103 +57,113 @@ interface ChatWorkerProgress {
   completed: boolean;
 }
 
-function getUuidRanges(workerCount: number): Array<{ min: string; max: string }> {
-  const ranges: Array<{ min: string; max: string }> = [];
-  const maxUuid = 0xffffffffffffffffffffffffffffffffn;
-  const step = maxUuid / BigInt(workerCount);
+async function getTableStats(pool: any): Promise<{ pages: number; rowsPerPage: number }> {
+  const result = await pool.query(`
+    SELECT relpages, reltuples,
+           ROUND(reltuples / NULLIF(relpages, 0)) as rows_per_page
+    FROM pg_class
+    WHERE relname = 'logs'
+  `);
+  const pages = Number(result.rows[0].relpages);
+  const rowsPerPage = Math.max(1, Number(result.rows[0].rows_per_page) || 100);
+  return { pages, rowsPerPage };
+}
 
-  for (let i = 0; i < workerCount; i++) {
-    const min = (step * BigInt(i)).toString(16).padStart(32, '0');
-    const max = i === workerCount - 1 ? maxUuid.toString(16) : (step * BigInt(i + 1) - 1n).toString(16).padStart(32, '0');
-    ranges.push({ min, max });
-  }
-
-  return ranges;
+function partitionPageRanges(totalPages: number, workerCount: number): Array<{ startPage: number; endPage: number }> {
+  const pagesPerWorker = Math.ceil(totalPages / workerCount);
+  return Array.from({ length: workerCount }, (_, i) => ({
+    startPage: i * pagesPerWorker,
+    endPage: Math.min((i + 1) * pagesPerWorker, totalPages),
+  }));
 }
 
 async function migrateChatWorker(
   pool: any,
-  range: { min: string; max: string },
   workerId: number,
+  startPage: number,
+  endPage: number,
   batchSize: number,
+  rowsPerPage: number,
   vodIdMap: Map<string, number>,
   progressCallback: (progress: ChatWorkerProgress) => void
 ): Promise<{ processed: number }> {
-  const conn = await pool.connect();
   let processed = 0;
   const startTime = Date.now();
-  let completed = false;
+  let batchCount = 0;
+  let currentPage = startPage;
+  const pagesPerBatch = Math.max(1, Math.ceil(batchSize / rowsPerPage));
 
+  const conn = await pool.connect();
   try {
-    await conn.query('BEGIN');
+    while (currentPage < endPage) {
+      const batchEndPage = Math.min(currentPage + pagesPerBatch, endPage);
 
-    await conn.query(
-      `DECLARE chat_cursor CURSOR FOR 
-       SELECT cm.id, cm.vod_id, cm.display_name, cm.content_offset_seconds,
-              cm.user_color, cm."createdAt", cm.message, cm.user_badges
-       FROM logs cm
-       WHERE cm.id >= $1::uuid AND cm.id <= $2::uuid
-       ORDER BY cm.id`,
-      [range.min, range.max]
-    );
+      const fetchStart = Date.now();
+      // Inside migrateChatWorker
+      const startTid = `(${currentPage},0)`;
+      const endTid = `(${batchEndPage},0)`;
 
-    try {
-      while (true) {
-        const rows: any = await conn.query(`FETCH FORWARD ${batchSize} IN chat_cursor`);
+      const rows: any = await conn.query(
+        `SELECT cm.id, cm.vod_id, cm.display_name, cm.content_offset_seconds,
+                cm.user_color, cm."createdAt", cm.message, cm.user_badges
+        FROM logs cm
+        WHERE cm.ctid >= $1::tid
+          AND cm.ctid < $2::tid`,
+        [startTid, endTid]
+      );
+      const fetchTime = Date.now() - fetchStart;
 
-        if (rows.rows.length === 0) break;
+      currentPage = batchEndPage;
 
-        const ids: string[] = [];
-        const vodIds: number[] = [];
-        const displayNames: (string | null)[] = [];
-        const offsets: any[] = [];
-        const colors: (string | null)[] = [];
-        const createdAts: Date[] = [];
-        const messages: (string | null)[] = [];
-        const badges: (string | null)[] = [];
+      if (rows.rows.length === 0) continue;
 
-        for (const row of rows.rows) {
-          const newVodId = vodIdMap.get(row.vod_id);
-          if (newVodId) {
-            ids.push(row.id);
-            vodIds.push(newVodId);
-            displayNames.push(row.display_name);
-            offsets.push(row.content_offset_seconds);
-            colors.push(row.user_color);
-            createdAts.push(row.createdAt);
-            messages.push(row.message ? JSON.stringify(row.message) : null);
-            badges.push(row.user_badges ? JSON.stringify(row.user_badges) : null);
-          }
+      const processStart = Date.now();
+      const ids: string[] = [];
+      const vodIds: number[] = [];
+      const displayNames: (string | null)[] = [];
+      const offsets: any[] = [];
+      const colors: (string | null)[] = [];
+      const createdAts: Date[] = [];
+      const messages: (string | null)[] = [];
+      const badges: (string | null)[] = [];
+
+      for (const row of rows.rows) {
+        const newVodId = vodIdMap.get(row.vod_id);
+        if (newVodId) {
+          ids.push(row.id);
+          vodIds.push(newVodId);
+          displayNames.push(row.display_name);
+          offsets.push(row.content_offset_seconds);
+          colors.push(row.user_color);
+          createdAts.push(row.createdAt);
+          messages.push(row.message ? JSON.stringify(row.message) : null);
+          badges.push(row.user_badges ? JSON.stringify(row.user_badges) : null);
         }
+      }
+      const processTime = Date.now() - processStart;
 
-        if (ids.length > 0) {
-          await conn.query(
-            `INSERT INTO "chat_messages_new" 
-             (id, vod_id, display_name, content_offset_seconds, user_color, created_at, message, user_badges)
-             SELECT id, vod_id, display_name, content_offset_seconds, user_color, created_at, message, user_badges
-             FROM UNNEST($1::uuid[], $2::int[], $3::text[], $4::decimal[], $5::text[], $6::timestamptz[], $7::jsonb[], $8::jsonb[])
-             AS t(id, vod_id, display_name, content_offset_seconds, user_color, created_at, message, user_badges)`,
-            [ids, vodIds, displayNames, offsets, colors, createdAts, messages, badges]
-          );
+      if (ids.length > 0) {
+        const insertStart = Date.now();
+        await conn.query(
+          `INSERT INTO "chat_messages_new"
+           (id, vod_id, display_name, content_offset_seconds, user_color, created_at, message, user_badges)
+           SELECT id, vod_id, display_name, content_offset_seconds, user_color, created_at, message, user_badges
+           FROM UNNEST($1::uuid[], $2::int[], $3::text[], $4::decimal[], $5::text[], $6::timestamptz[], $7::jsonb[], $8::jsonb[])
+           AS t(id, vod_id, display_name, content_offset_seconds, user_color, created_at, message, user_badges)
+           ON CONFLICT (id) DO NOTHING`,
+          [ids, vodIds, displayNames, offsets, colors, createdAts, messages, badges]
+        );
+        const insertTime = Date.now() - insertStart;
 
-          processed += ids.length;
-        }
-
-        progressCallback({ workerId, processed, target: 0, startTime, completed });
+        processed += ids.length;
+        batchCount++;
+        console.log(`Worker ${workerId}: batch ${batchCount} - ${ids.length.toLocaleString()} rows (fetch: ${fetchTime}ms, process: ${processTime}ms, insert: ${insertTime}ms)`);
       }
 
-      completed = true;
-      progressCallback({ workerId, processed, target: 0, startTime, completed });
-    } finally {
-      await conn.query('CLOSE chat_cursor');
+      progressCallback({ workerId, processed, target: 0, startTime, completed: false });
     }
 
-    await conn.query('COMMIT');
-  } catch (error) {
-    try {
-      await conn.query('ROLLBACK');
-    } catch (rollbackError) {}
-    throw error;
+    progressCallback({ workerId, processed, target: 0, startTime, completed: true });
   } finally {
     conn.release();
   }
@@ -162,10 +172,14 @@ async function migrateChatWorker(
 }
 
 async function migrateChatMessagesParallel(pool: any, totalChat: number, workerCount: number, batchSize: number, vodIdMap: Map<string, number>, streamerName: string): Promise<{ processed: number }> {
-  const ranges = getUuidRanges(workerCount);
   const globalStartTime = Date.now();
 
-  const workerProgress: ChatWorkerProgress[] = ranges.map((_, i) => ({
+  const { pages: totalPages, rowsPerPage } = await getTableStats(pool);
+  console.log(`📄 logs heap: ${totalPages.toLocaleString()} pages, ~${rowsPerPage} rows/page\n`);
+
+  const pagePartitions = partitionPageRanges(totalPages, workerCount);
+
+  const workerProgress: ChatWorkerProgress[] = Array.from({ length: workerCount }, (_, i) => ({
     workerId: i + 1,
     processed: 0,
     target: Math.ceil(totalChat / workerCount),
@@ -205,7 +219,7 @@ async function migrateChatMessagesParallel(pool: any, totalChat: number, workerC
     }
 
     console.log('\x1B[2J\x1B[H');
-    console.log(`🔄 Migrating chat messages for "${streamerName}"\n`);
+    console.log(`🔄 Migrating chat messages for "${streamerName}" (ctid scan)\n`);
     console.log(`   Started: ${new Date(globalStartTime).toLocaleTimeString()}`);
     console.log(`   Elapsed: ${elapsedStr} | ETA: ${etaStr}\n`);
 
@@ -224,7 +238,7 @@ async function migrateChatMessagesParallel(pool: any, totalChat: number, workerC
   const progressInterval = setInterval(displayProgress, 1000);
 
   try {
-    const results = await Promise.all(ranges.map((range, i) => migrateChatWorker(pool, range, i + 1, batchSize, vodIdMap, updateProgress)));
+    const results = await Promise.all(pagePartitions.map((partition, i) => migrateChatWorker(pool, i + 1, partition.startPage, partition.endPage, batchSize, rowsPerPage, vodIdMap, updateProgress)));
 
     clearInterval(progressInterval);
     displayProgress();
@@ -250,12 +264,10 @@ const rollbackMigration = async (client: any) => {
 
   if (existingTables.length > 0) {
     console.log(`🔄 Cleaning up existing tables: ${existingTables.join(', ')}`);
-
     try {
       for (const tableName of existingTables) {
         await client.query(`DROP TABLE IF EXISTS "${tableName}" CASCADE`);
       }
-
       console.log('✅ Cleanup complete');
     } catch (error) {
       console.error('❌ Cleanup failed:', error);
@@ -354,13 +366,11 @@ const createNormalizedSchema = async (client: any) => {
     CREATE INDEX "games_new_game_name_idx" ON "games_new"("game_name");
     CREATE INDEX "games_new_vod_id_start_time_idx" ON "games_new"("vod_id", "start_time");
     CREATE INDEX "chapters_vod_id_start_idx" ON "chapters"("vod_id", "start");
-    CREATE INDEX "idx_chat_messages_new_vod_offset_created" ON "chat_messages_new"("vod_id", "content_offset_seconds", "created_at");
 
     ALTER TABLE "vod_uploads" ADD CONSTRAINT "vod_uploads_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE ON UPDATE CASCADE;
     ALTER TABLE "emotes_new" ADD CONSTRAINT "emotes_new_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE ON UPDATE CASCADE;
     ALTER TABLE "games_new" ADD CONSTRAINT "games_new_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE ON UPDATE CASCADE;
     ALTER TABLE "chapters" ADD CONSTRAINT "chapters_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-    ALTER TABLE "chat_messages_new" ADD CONSTRAINT "chat_messages_new_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE;
   `);
 };
 
@@ -375,8 +385,8 @@ const applySchemaMigrations = async (client: any) => {
     $$ language 'plpgsql';
 
     DROP TRIGGER IF EXISTS update_vods_updated_at ON "vods_new";
-    CREATE TRIGGER update_vods_updated_at 
-    BEFORE UPDATE ON "vods_new" 
+    CREATE TRIGGER update_vods_updated_at
+    BEFORE UPDATE ON "vods_new"
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
     CREATE INDEX IF NOT EXISTS "vods_updated_at_idx" ON "vods_new"("updated_at");
@@ -394,14 +404,14 @@ const main = async () => {
 
   let chatWorkers = 8;
   let chatBatchSize = 100000;
-  const workersAnswer = await prompt('Number of chat migration workers? [8]:');
+  const workersAnswer = await prompt(`Number of chat migration workers? [${chatWorkers}]:`);
   if (workersAnswer && workersAnswer.trim()) {
     const parsed = parseInt(workersAnswer, 10);
     if (!isNaN(parsed) && parsed >= 1 && parsed <= 8) {
       chatWorkers = parsed;
     }
   }
-  const batchSizeAnswer = await prompt('Chat migration batch size? [100000]:');
+  const batchSizeAnswer = await prompt(`Chat migration batch size? [${chatBatchSize}}]:`);
   if (batchSizeAnswer && batchSizeAnswer.trim()) {
     const parsed = parseInt(batchSizeAnswer, 10);
     if (!isNaN(parsed) && parsed >= 10000 && parsed <= 500000) {
@@ -452,7 +462,15 @@ const main = async () => {
 
   try {
     const pg = await import('pg');
-    const oldPool = new pg.Pool({ connectionString: dbUrl });
+    const os = await import('os');
+    const availableMemoryMB = Math.floor(os.freemem() / 1024 / 1024);
+    const suggestedWorkers = Math.min(chatWorkers, Math.floor(availableMemoryMB / 200), 8);
+    const actualWorkerCount = Math.max(1, suggestedWorkers);
+
+    const oldPool = new pg.Pool({
+      connectionString: dbUrl,
+      max: actualWorkerCount + 4,
+    });
 
     let isAlreadyMigrated = false;
     try {
@@ -500,11 +518,12 @@ const main = async () => {
         process.exit(0);
       }
 
-      // PHASE 1: Create schema and migrate core data (VODs, emotes, games, chapters)
+      // PHASE 1: Create schema and migrate core data
       console.log('📌 PHASE 1: Migrating core data (VODs, emotes, games, chapters)...\n');
 
       const schemaClient = await oldPool.connect();
       let vodIdMap: Map<string, number>;
+      let schemaClientReleased = false;
 
       try {
         await schemaClient.query('BEGIN');
@@ -519,12 +538,16 @@ const main = async () => {
           throw schemaError;
         }
 
-        const streamsResult = await oldPool.query('SELECT id, started_at FROM streams WHERE started_at IS NOT NULL');
-        const streamsMap = new Map<string, Date>();
-        for (const stream of streamsResult.rows) {
-          if (stream.id && stream.started_at) {
-            streamsMap.set(String(stream.id), new Date(stream.started_at));
+        let streamsMap = new Map<string, Date>();
+        try {
+          const streamsResult = await oldPool.query('SELECT id, started_at FROM streams WHERE started_at IS NOT NULL');
+          for (const stream of streamsResult.rows) {
+            if (stream.id && stream.started_at) {
+              streamsMap.set(String(stream.id), new Date(stream.started_at));
+            }
           }
+        } catch {
+          console.warn('⚠️  streams table not found, started_at will be null for all VODs');
         }
 
         const vods = await oldPool.query('SELECT * FROM vods ORDER BY "createdAt" ASC');
@@ -545,7 +568,7 @@ const main = async () => {
           const vodStartedAt = streamId ? streamsMap.get(streamId) || null : null;
 
           await schemaClient.query(
-            `INSERT INTO "vods_new" (id, vod_id, platform, title, duration, stream_id, started_at, created_at) 
+            `INSERT INTO "vods_new" (id, vod_id, platform, title, duration, stream_id, started_at, created_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
             [newId, legacyVodId, platform, title, duration, streamId, vodStartedAt, vod.createdAt || new Date()]
           );
@@ -557,7 +580,7 @@ const main = async () => {
               const part = Number(upload.part) || 0;
 
               await schemaClient.query(
-                `INSERT INTO "vod_uploads" (vod_id, upload_id, type, duration, part, status, thumbnail_url) 
+                `INSERT INTO "vod_uploads" (vod_id, upload_id, type, duration, part, status, thumbnail_url)
                  VALUES ($1, $2, $3, $4, $5, 'COMPLETED', $6)`,
                 [newId, uploadId, upload.type || null, uploadDuration, part, upload.thumbnail_url || thumbnailUrl || null]
               );
@@ -570,13 +593,13 @@ const main = async () => {
               const end = chapter.end ? Math.round(Number(chapter.end)) : null;
 
               await schemaClient.query(
-                `INSERT INTO "chapters" (vod_id, game_id, name, image, duration, start, "end") 
+                `INSERT INTO "chapters" (vod_id, game_id, name, image, duration, start, "end")
                  VALUES ($1, $2, $3, $4, $5, $6, $7)
-                 ON CONFLICT (vod_id, start) DO UPDATE 
-                 SET game_id = EXCLUDED.game_id, 
-                     name = EXCLUDED.name, 
-                     image = EXCLUDED.image, 
-                     duration = EXCLUDED.duration, 
+                 ON CONFLICT (vod_id, start) DO UPDATE
+                 SET game_id = EXCLUDED.game_id,
+                     name = EXCLUDED.name,
+                     image = EXCLUDED.image,
+                     duration = EXCLUDED.duration,
                      "end" = EXCLUDED."end"`,
                 [newId, chapter.gameId || null, chapter.name || null, chapter.image || null, chapter.duration || null, start, end]
               );
@@ -596,12 +619,11 @@ const main = async () => {
           if (!newVodId) {
             throw new Error(`Emote references non-existent VOD ${emote.vod_id} - FK integrity failed`);
           }
-
           await schemaClient.query(
-            `INSERT INTO "emotes_new" (vod_id, ffz_emotes, bttv_emotes, seventv_emotes) 
-             VALUES ($1, $2, $3, $4) ON CONFLICT (vod_id) DO UPDATE 
-             SET ffz_emotes = EXCLUDED.ffz_emotes, 
-                 bttv_emotes = EXCLUDED.bttv_emotes, 
+            `INSERT INTO "emotes_new" (vod_id, ffz_emotes, bttv_emotes, seventv_emotes)
+             VALUES ($1, $2, $3, $4) ON CONFLICT (vod_id) DO UPDATE
+             SET ffz_emotes = EXCLUDED.ffz_emotes,
+                 bttv_emotes = EXCLUDED.bttv_emotes,
                  seventv_emotes = EXCLUDED.seventv_emotes`,
             [newVodId, JSON.stringify(emote.ffz_emotes), JSON.stringify(emote.bttv_emotes), JSON.stringify(emote['7tv_emotes'])]
           );
@@ -615,12 +637,11 @@ const main = async () => {
           if (!newVodId) {
             throw new Error(`Game references non-existent VOD ${game.vod_id} - FK integrity failed`);
           }
-
           const startTime = game.start_time ? Math.round(Number(game.start_time)) : null;
           const endTime = game.end_time ? Math.round(Number(game.end_time)) : null;
 
           await schemaClient.query(
-            `INSERT INTO "games_new" (vod_id, start_time, end_time, video_provider, video_id, thumbnail_url, game_id, game_name, title, chapter_image) 
+            `INSERT INTO "games_new" (vod_id, start_time, end_time, video_provider, video_id, thumbnail_url, game_id, game_name, title, chapter_image)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
             [newVodId, startTime, endTime, game.video_provider, game.video_id, game.thumbnail_url, game.game_id, game.game_name, game.title, game.chapter_image]
           );
@@ -649,19 +670,17 @@ const main = async () => {
         } catch (rollbackError) {
           errors.push(`Failed to rollback phase 1: ${String(rollbackError)}`);
         }
-
+        schemaClientReleased = true;
         schemaClient.release();
-        if (!poolEnded) {
-          await oldPool.end();
-        }
+        if (!poolEnded) await oldPool.end();
         await metaClient.$disconnect();
         process.exit(1);
       } finally {
-        schemaClient.release();
+        if (!schemaClientReleased) schemaClient.release();
       }
 
-      // PHASE 2: Parallel chat migration (separate transaction, already committed core data)
-      console.log('📌 PHASE 2: Migrating chat messages (parallel)...\n');
+      // PHASE 2: Parallel chat migration (ctid scan)
+      console.log('📌 PHASE 2: Migrating chat messages (parallel ctid scan)...\n');
 
       const orphanedChatCheck = await oldPool.query(`
         SELECT COUNT(*) FROM logs cm
@@ -678,27 +697,69 @@ const main = async () => {
       `);
       const totalChat = Number(totalChatMessages.rows[0].count);
 
-      console.log(`📊 Migrating chat messages (${totalChat.toLocaleString()} total)...`);
-
-      const os = await import('os');
-      const availableMemoryMB = Math.floor(os.freemem() / 1024 / 1024);
-      const suggestedWorkers = Math.min(chatWorkers, Math.floor(availableMemoryMB / 200), 8);
-      const actualWorkerCount = Math.max(1, suggestedWorkers);
-
+      console.log(`📊 Migrating chat messages (${totalChat.toLocaleString()} total)`);
       console.log(`   Available memory: ${availableMemoryMB} MB`);
       console.log(`   Using ${actualWorkerCount} worker(s) with batch size ${chatBatchSize.toLocaleString()}\n`);
 
-      const chatResult = await migrateChatMessagesParallel(oldPool, totalChat, actualWorkerCount, chatBatchSize, vodIdMap, streamerName);
+      // Disable autovacuum on destination for duration of bulk load
+      await oldPool.query(`ALTER TABLE chat_messages_new SET (autovacuum_enabled = false)`);
+
+      // Disable synchronous_commit for faster inserts — safe for migration
+      await oldPool.query(`ALTER SYSTEM SET synchronous_commit = off`);
+      await oldPool.query(`SELECT pg_reload_conf()`);
+      console.log('⚡ synchronous_commit disabled for migration performance\n');
+
+      let chatResult: { processed: number };
+      try {
+        chatResult = await migrateChatMessagesParallel(oldPool, totalChat, actualWorkerCount, chatBatchSize, vodIdMap, streamerName);
+      } finally {
+        // Always restore synchronous_commit and autovacuum regardless of success/failure
+        try {
+          await oldPool.query(`ALTER SYSTEM SET synchronous_commit = on`);
+          await oldPool.query(`SELECT pg_reload_conf()`);
+          console.log('✅ synchronous_commit restored\n');
+        } catch (e) {
+          errors.push(`Failed to restore synchronous_commit: ${String(e)}`);
+        }
+        try {
+          await oldPool.query(`ALTER TABLE chat_messages_new SET (autovacuum_enabled = true)`);
+        } catch (e) {
+          errors.push(`Failed to re-enable autovacuum: ${String(e)}`);
+        }
+      }
 
       console.log(`✅ Migrated ${chatResult.processed.toLocaleString()} chat messages\n`);
+
+      // Validate row count
+      if (chatResult.processed !== totalChat) {
+        const delta = totalChat - chatResult.processed;
+        console.warn(`⚠️  Row count mismatch: expected ${totalChat.toLocaleString()}, migrated ${chatResult.processed.toLocaleString()} (${delta.toLocaleString()} skipped)`);
+        const continueWithMismatch = await confirm('Continue to Phase 3 with row count mismatch?');
+        if (!continueWithMismatch) {
+          console.log('Migration stopped. Investigate skipped rows before retrying Phase 2.');
+          process.exit(1);
+        }
+      }
+
+      // Rebuild destination indexes and FK now that bulk load is complete
+      console.log('🔨 Rebuilding indexes and FK on chat_messages_new...');
+      await oldPool.query(`
+        CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_chat_messages_new_vod_offset_created
+        ON chat_messages_new (vod_id, content_offset_seconds, created_at)
+      `);
+      await oldPool.query(`
+        ALTER TABLE chat_messages_new
+        ADD CONSTRAINT chat_messages_new_vod_id_fkey
+        FOREIGN KEY (vod_id) REFERENCES vods_new(id) ON DELETE CASCADE
+      `);
+      console.log('✅ Indexes and FK rebuilt\n');
 
       // PHASE 3: FK validation and finalize
       console.log('📌 PHASE 3: Validating FK integrity and finalizing...\n');
 
-      const fkValidationClient = await oldPool.connect();
       try {
-        const fkCheckResult: any = await fkValidationClient.query(`
-          SELECT 
+        const fkCheckResult: any = await oldPool.query(`
+          SELECT
             (SELECT COUNT(*) FROM "emotes_new" e WHERE NOT EXISTS (SELECT 1 FROM "vods_new" v WHERE v.id = e.vod_id)) as emotes_count,
             (SELECT COUNT(*) FROM "games_new" g WHERE NOT EXISTS (SELECT 1 FROM "vods_new" v WHERE v.id = g.vod_id)) as games_count,
             (SELECT COUNT(*) FROM "chapters" c WHERE NOT EXISTS (SELECT 1 FROM "vods_new" v WHERE v.id = c.vod_id)) as chapters_count,
@@ -785,14 +846,9 @@ const main = async () => {
           console.log('');
         }
 
-        fkValidationClient.release();
-        if (!poolEnded) {
-          await oldPool.end();
-        }
+        if (!poolEnded) await oldPool.end();
         await metaClient.$disconnect();
         process.exit(1);
-      } finally {
-        fkValidationClient.release();
       }
     } catch (migrationError) {
       errors.push(`Migration failed: ${String(migrationError)}`);
@@ -807,9 +863,7 @@ const main = async () => {
 
       process.exit(1);
     } finally {
-      if (!poolEnded) {
-        await oldPool.end();
-      }
+      if (!poolEnded) await oldPool.end();
       await metaClient.$disconnect();
     }
   } catch (initError) {

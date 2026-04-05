@@ -16,7 +16,7 @@ console.log(enabled ? colors.green + '✅ Alerts enabled\n' + colors.reset : '\n
 
 async function post(msg: string) {
   try {
-    const response = await fetch(url, {
+    const response = await fetch(url!, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json' as any,
@@ -38,7 +38,7 @@ await post('🧪 Discord Webhook Test - Basic Message');
 
 async function embed() {
   try {
-    const response = await fetch(url, {
+    const response = await fetch(url!, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json' as any,

@@ -115,7 +115,6 @@ async function getTenant(streamerIdOrName: string): Promise<Tenant | null> {
     }
 
     return tenant as Tenant;
-    return tenant as Tenant;
   } catch (error: unknown) {
     console.error('Error getting tenant:', typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : String(error));
     return null;
@@ -426,12 +425,13 @@ async function storeAuthObject(tenantId: string, authObject: any): Promise<void>
     });
 
     console.log('\n=== Auth Object Stored Successfully ===\n');
-} catch (error: unknown) {
-      const isTenantNotFound = typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2025';
-      
-      if (isTenantNotFound) {
-        throw new Error(`Tenant not found in database: ${tenantId}`);
-      }
+  } catch (error: unknown) {
+    const isTenantNotFound = typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2025';
+
+    if (isTenantNotFound) {
+      throw new Error(`Tenant not found in database: ${tenantId}`);
+    }
+  }
 }
 
 program

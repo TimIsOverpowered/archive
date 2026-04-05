@@ -207,7 +207,7 @@ async function main(): Promise<void> {
 
   if (args.length === 0) {
     console.log('Usage: tsx import-tenant.ts <channel_name> <database_url>');
-    console.log('Example: tsx import-tenant.ts moonmoon " postgresql://<user>:***@<host>:5432/<db>"');
+    console.log('Example: tsx import-tenant.ts moonmoon "postgresql://<user>:***@<host>:5432/<db>"');
     process.exit(1);
   }
 
