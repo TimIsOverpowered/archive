@@ -8,7 +8,7 @@ export interface EmoteData extends Prisma.JsonObject {
 }
 
 export interface VodEmotes {
-  vodId: string;
+  vodId: number;
   ffz_emotes: EmoteData[];
   bttv_emotes: EmoteData[];
   seventv_emotes: EmoteData[];
