@@ -77,20 +77,20 @@ export async function getTenantStats(client: PrismaClient, tenantId: string): Pr
   if (youtube?.apiKey || youtube?.auth) platforms.push('youtube');
   if (kick?.username) platforms.push('kick');
 
-  const [vods, vodUploads, chatMessages, chapters] = await Promise.all([
+  const [vods, vodUploads, chapters] = await Promise.all([
     client.vod.findMany({ where: { platform: { startsWith: tenantId } } }),
     client.vodUpload.findMany({
       where: {
         vod: { platform: { startsWith: tenantId } },
       },
     }),
-    client.chatMessage.count({
-      where: { vod_id: { startsWith: tenantId } },
-    }),
     client.chapter.findMany({
       where: { vod: { platform: { startsWith: tenantId } } },
     }),
   ]);
+
+  const vodIds = vods.map((v) => v.id);
+  const chatMessages = vodIds.length > 0 ? await client.chatMessage.count({ where: { vod_id: { in: vodIds } } }) : 0;
 
   const byPlatform: Record<string, number> = {};
   vods.forEach((vod) => {
@@ -122,12 +122,15 @@ export async function getTenantStats(client: PrismaClient, tenantId: string): Pr
   const thisMonthChatStart = new Date();
   thisMonthChatStart.setMonth(thisMonthChatStart.getMonth() - 1);
 
-  const messagesThisMonth = await client.chatMessage.count({
-    where: {
-      vod_id: { startsWith: tenantId },
-      createdAt: { gte: thisMonthChatStart },
-    },
-  });
+  const messagesThisMonth =
+    vodIds.length > 0
+      ? await client.chatMessage.count({
+          where: {
+            vod_id: { in: vodIds },
+            createdAt: { gte: thisMonthChatStart },
+          },
+        })
+      : 0;
 
   const stats: TenantStats = {
     tenant: {

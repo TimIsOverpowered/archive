@@ -304,7 +304,7 @@ export async function getKickCategoryInfo(slug: string): Promise<Record<string, 
   }
 }
 
-export async function updateChapterDuringDownload(vodId: string, tenantId: string, streamerClient: PrismaClient): Promise<void> {
+export async function updateChapterDuringDownload(vodId: number, tenantId: string, streamerClient: PrismaClient): Promise<void> {
   try {
     const config = getTenantConfig(tenantId);
     const username = config?.kick?.username;
@@ -376,7 +376,7 @@ export async function updateChapterDuringDownload(vodId: string, tenantId: strin
   }
 }
 
-export async function finalizeKickChapters(vodId: string, finalDurationSeconds: number, streamerClient: PrismaClient): Promise<void> {
+export async function finalizeKickChapters(vodId: number, finalDurationSeconds: number, streamerClient: PrismaClient): Promise<void> {
   try {
     const incompleteChapter = await streamerClient.chapter.findFirst({
       where: {
