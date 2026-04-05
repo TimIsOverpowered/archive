@@ -641,7 +641,7 @@ const main = async () => {
         console.log(`   Available memory: ${availableMemoryMB} MB`);
         console.log(`   Using ${actualWorkerCount} worker(s) with batch size ${chatBatchSize.toLocaleString()}\n`);
 
-        const chatResult = await migrateChatMessagesParallel(oldPool, client, totalChat, actualWorkerCount, chatBatchSize, vodIdMap, streamerName);
+        const chatResult = await migrateChatMessagesParallel(oldPool, oldPool, totalChat, actualWorkerCount, chatBatchSize, vodIdMap, streamerName);
 
         console.log(`✅ Migrated ${chatResult.processed.toLocaleString()} chat messages\n`);
 
