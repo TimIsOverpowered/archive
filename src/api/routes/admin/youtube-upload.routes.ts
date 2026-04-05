@@ -9,7 +9,7 @@ import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound, serviceUnavailable, badRequest, internalServerError } from '../../../utils/http-error';
 
-type VodRecord = { id: string; title?: string | null; duration: number | string; platform: 'twitch' | 'kick' };
+type VodRecord = { id: number; title?: string | null; duration: number | string; platform: 'twitch' | 'kick' };
 
 interface ReUploadYoutubeParams {
   id: string;
@@ -61,7 +61,9 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
           serviceUnavailable('Database not available');
         }
 
-        const vodRecord = (await dbClient.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
+        const vodIdNum = Number(vodId);
+
+        const vodRecord = (await dbClient.vod.findUnique({ where: { id: vodIdNum } })) as VodRecord | null;
 
         if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
@@ -155,7 +157,9 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
           serviceUnavailable('Database not available');
         }
 
-        const vodRecord = (await dbClient.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
+        const vodIdNum = Number(vodId);
+
+        const vodRecord = (await dbClient.vod.findUnique({ where: { id: vodIdNum } })) as VodRecord | null;
 
         if (!vodRecord) notFound(`VOD ${vodId} not found`);
 

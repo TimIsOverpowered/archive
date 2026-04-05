@@ -5,7 +5,7 @@ import { getClient } from '../../../../db/client.js';
 type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
 
 export interface VodCreateOptions {
-  vodId: string;
+  vodId: number;
   platform: 'twitch' | 'kick';
   tenantId: string;
   title?: string | null;
@@ -16,7 +16,7 @@ export interface VodCreateOptions {
 
 export interface QueueEmoteOptions {
   tenantId: string;
-  vodId: string;
+  vodId: number;
   platform: 'twitch' | 'kick';
   platformId: string;
   log: FastifyRequest['log'];
@@ -55,7 +55,7 @@ export function getValidatedClient(tenantId: string): { client: StreamerDbClient
 /**
  * Fetches VOD record or returns null if not found
  */
-export async function findVodRecord(client: StreamerDbClient, vodId: string): Promise<unknown> {
+export async function findVodRecord(client: StreamerDbClient, vodId: number): Promise<unknown> {
   try {
     return await client.vod.findUnique({ where: { id: vodId } });
   } catch {
