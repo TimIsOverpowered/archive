@@ -17,7 +17,7 @@ const DISABLE_CACHE = process.env.DISABLE_REDIS_CACHE === 'true';
 
 interface ChatMessage {
   id: string;
-  vod_id: string;
+  vod_id: number;
   display_name: string | null;
   content_offset_seconds: number;
   message: unknown;
@@ -36,7 +36,7 @@ function computeBucketSize(commentsPer100s: number): number {
   return BOUNDARIES.reduce((prev, curr) => (Math.abs(curr - raw) < Math.abs(prev - raw) ? curr : prev));
 }
 
-async function getVodBucketSize(client: PrismaClient, tenantId: string, vodId: string): Promise<number> {
+async function getVodBucketSize(client: PrismaClient, tenantId: string, vodId: number): Promise<number> {
   const key = `${tenantId}:${vodId}:bucketSize`;
 
   if (!DISABLE_CACHE && redisClient) {
@@ -76,7 +76,7 @@ async function getVodBucketSize(client: PrismaClient, tenantId: string, vodId: s
   return bucketSize;
 }
 
-export async function getLogsByOffset(client: PrismaClient, tenantId: string, vodId: string, offsetSeconds: number): Promise<{ comments: ChatMessage[]; cursor?: string }> {
+export async function getLogsByOffset(client: PrismaClient, tenantId: string, vodId: number, offsetSeconds: number): Promise<{ comments: ChatMessage[]; cursor?: string }> {
   const bucketSize = await getVodBucketSize(client, tenantId, vodId);
   const bucket = Math.floor(offsetSeconds / bucketSize) * bucketSize;
   const cacheKey = `${tenantId}:${vodId}:bucket:${bucket}`;
@@ -146,7 +146,7 @@ export async function getLogsByOffset(client: PrismaClient, tenantId: string, vo
   return response;
 }
 
-export async function getLogsByCursor(client: PrismaClient, tenantId: string, vodId: string, cursor: string): Promise<{ comments: ChatMessage[]; cursor?: string }> {
+export async function getLogsByCursor(client: PrismaClient, tenantId: string, vodId: number, cursor: string): Promise<{ comments: ChatMessage[]; cursor?: string }> {
   const cacheKey = `${tenantId}:${vodId}:cursor:${cursor}`;
 
   if (!DISABLE_CACHE && redisClient) {
