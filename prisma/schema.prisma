@@ -8,7 +8,8 @@ datasource db {
 }
 
 model Vod {
-  id            String      @id(map: "vods_new_pkey")
+  id            Int         @id(map: "vods_new_pkey") @default(autoincrement())
+  vod_id        String
   platform      String
   title         String?
   duration      Int         @default(0)
@@ -22,13 +23,13 @@ model Vod {
   games         Game[]
   vod_uploads   VodUpload[]
 
-  @@unique([platform, id])
+  @@unique([platform, vod_id])
   @@index([platform], map: "vods_new_platform_idx")
   @@map("vods")
 }
 
 model VodUpload {
-  vod_id        String
+  vod_id        Int
   upload_id     String       @id
   type          String?
   duration      Int          @default(0)
@@ -47,7 +48,7 @@ model VodUpload {
 
 model Emote {
   id              Int    @id(map: "emotes_new_pkey") @default(autoincrement())
-  vod_id          String @unique(map: "emotes_new_vod_id_key")
+  vod_id          Int    @unique(map: "emotes_new_vod_id_key")
   ffz_emotes      Json?
   bttv_emotes     Json?
   seventv_emotes Json?
@@ -58,7 +59,7 @@ model Emote {
 
 model Game {
   id             Int      @id(map: "games_new_pkey") @default(autoincrement())
-  vod_id         String
+  vod_id         Int
   start_time     Int?
   end_time       Int?
   video_provider String?
@@ -77,7 +78,7 @@ model Game {
 
 model Chapter {
   id       Int     @id @default(autoincrement())
-  vod_id   String
+  vod_id   Int
   game_id  String?
   name     String?
   image    String?
@@ -93,7 +94,7 @@ model Chapter {
 
 model ChatMessage {
   id                     String    @id(map: "chat_messages_pkey") @db.Uuid
-  vod_id                 String
+  vod_id                 Int
   display_name           String?
   content_offset_seconds Decimal   @db.Decimal
   user_color             String?
