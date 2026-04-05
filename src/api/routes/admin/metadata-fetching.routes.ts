@@ -72,7 +72,9 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
           serviceUnavailable('Database not available');
         }
 
-        const vodRecord: VodRecord | null = (await client.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
+        const vodIdNum = Number(vodId);
+
+        const vodRecord: VodRecord | null = (await client.vod.findUnique({ where: { id: vodIdNum } })) as VodRecord | null;
 
         if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
@@ -131,7 +133,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
               await client.chapter.create({
                 data: {
-                  vod_id: vodId,
+                  vod_id: vodIdNum,
                   name: gameNode.displayName || null,
                   duration: durationFormatted,
                   start: startSeconds,
@@ -175,7 +177,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
             await client.chapter.create({
               data: {
-                vod_id: vodId,
+                vod_id: vodIdNum,
                 name: gameNode.displayName || null,
                 duration: '00:00:00',
                 start: 0,
@@ -235,7 +237,9 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
           serviceUnavailable('Database not available');
         }
 
-        const vodRecord: VodRecord | null = (await client.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
+        const vodIdNum = Number(vodId);
+
+        const vodRecord: VodRecord | null = (await client.vod.findUnique({ where: { id: vodIdNum } })) as VodRecord | null;
 
         if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
@@ -252,7 +256,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
             log.info(`Fetching emotes for channel ${channelId}`);
 
             const EmoteModule = await import('../../../services/emotes');
-            await EmoteModule.fetchAndSaveEmotes(tenantId, vodId, vodRecord.platform, channelId);
+            await EmoteModule.fetchAndSaveEmotes(tenantId, vodIdNum, vodRecord.platform, channelId);
 
             log.info(`Successfully fetched and saved emotes`);
           } else {

@@ -88,7 +88,7 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
           type: 'object',
           properties: {
             tenantId: { type: 'string', description: 'Tenant ID' },
-            vodId: { type: 'string', description: 'VOD ID' },
+            vodId: { type: 'number', description: 'VOD ID' },
           },
           required: ['tenantId', 'vodId'],
         },
@@ -108,7 +108,9 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
         serviceUnavailable('Database not available');
       }
 
-      const vod = await getVodById(client, tenantId, vodId);
+      const vodIdNum = Number(vodId);
+
+      const vod = await getVodById(client, tenantId, vodIdNum);
 
       if (!vod) {
         notFound('VOD not found');

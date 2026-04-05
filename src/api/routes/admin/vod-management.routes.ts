@@ -13,13 +13,13 @@ interface CreateVodParams {
 }
 interface DeleteVodParams {
   id: string;
-  vodId: string;
+  vodId: number;
 }
 interface StatsParams {
   id: string;
 }
 interface CreateVodBody {
-  vodId?: string;
+  vodId?: number;
   title?: string;
   createdAt?: string;
   duration?: number;
@@ -90,7 +90,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
         body: {
           type: 'object',
           properties: {
-            vodId: { type: 'string' },
+            vodId: { type: 'number' },
             title: { type: 'string' },
             createdAt: { type: 'string' },
             duration: { type: 'number' },
@@ -116,15 +116,17 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
           badRequest('vodId is required');
         }
 
-        const existing = await client.vod.findUnique({ where: { id: body.vodId } });
+        const vodIdNum = Number(body.vodId);
+
+        const existing = await client.vod.findUnique({ where: { id: vodIdNum } });
 
         if (existing) {
-          return { data: { message: `${body.vodId} already exists!`, vodId: body.vodId } };
+          return { data: { message: `${vodIdNum} already exists!`, vodId: vodIdNum } };
         }
 
         const newVod = await client.vod.create({
           data: {
-            id: body.vodId,
+            vod_id: String(vodIdNum),
             title: body.title || null,
             created_at: body.createdAt ? new Date(body.createdAt) : undefined,
             duration: Number(body.duration) || 0,
@@ -132,7 +134,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
           },
         });
 
-        log.info(`Created VOD ${body.vodId}`);
+        log.info(`Created VOD ${vodIdNum}`);
 
         return { data: { message: `${newVod.id} created!`, vodId: newVod.id } };
       } catch (error) {
@@ -171,7 +173,9 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
 
         if (!client) serviceUnavailable('Database not available');
 
-        await client.vod.delete({ where: { id: vodId } });
+        const vodIdNum = Number(vodId);
+
+        await client.vod.delete({ where: { id: vodIdNum } });
 
         log.info(`Deleted VOD ${vodId} and all related data (cascade)`);
 

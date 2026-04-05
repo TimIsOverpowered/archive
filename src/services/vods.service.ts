@@ -2,7 +2,7 @@ import { PrismaClient, UploadStatus } from '../../generated/streamer/client';
 import { redisClient } from '../api/plugins/redis.plugin';
 
 interface VodResponse {
-  id: string;
+  id: number;
   platform: string;
   title: string | null;
   duration: number;
@@ -176,7 +176,7 @@ export async function getVods(client: PrismaClient, tenantId: string, query: Vod
   return response;
 }
 
-export async function getVodById(client: PrismaClient, tenantId: string, vodId: string): Promise<VodResponse | null> {
+export async function getVodById(client: PrismaClient, tenantId: string, vodId: number): Promise<VodResponse | null> {
   const cacheKey = `vod:${tenantId}:${vodId}`;
 
   if (!DISABLE_CACHE && redisClient) {
