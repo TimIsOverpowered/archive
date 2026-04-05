@@ -35,12 +35,15 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
     db = await createClient(config);
   }
 
+  // Convert string vodId to number for the new schema
+  const vodIdInt = Number(vodId);
+
   try {
     const privacyStatus = config.youtube.public ? 'public' : 'unlisted';
     const splitDuration = config.youtube.splitDuration;
 
     if (type === 'vod') {
-      const vodRecord = await db.vod.findUnique({ where: { id: vodId } });
+      const vodRecord = await db.vod.findUnique({ where: { id: vodIdInt } });
 
       if (!vodRecord) throw new Error(`VOD record not found for ${vodId}`);
 
@@ -214,7 +217,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
       for (const video of uploadedVideos) {
         await db.vodUpload.create({
           data: {
-            vod_id: vodId,
+            vod_id: vodIdInt,
             upload_id: video.id,
             platform: 'youtube',
             type: 'vod',
@@ -244,7 +247,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
           log.info(`[${vodId}] Skipping game upload: ${job.data.platform} is not main platform (simulcast mode)`);
 
           await db.game.updateMany({
-            where: { vod_id: vodId },
+            where: { vod_id: vodIdInt },
             data: { video_provider: null, video_id: null, thumbnail_url: null },
           });
 
@@ -255,7 +258,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
       }
       if (!chapter) throw new Error('Chapter data required for game upload type');
 
-      const vodRecord = await db.vod.findUnique({ where: { id: vodId } });
+      const vodRecord = await db.vod.findUnique({ where: { id: vodIdInt } });
 
       if (!vodRecord) throw new Error(`VOD record not found for ${vodId}`);
 
@@ -271,7 +274,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
         const gameCountResult = await db.game.count({
           where: {
             game_name: chapter.name,
-            vod_id: { not: vodId }, // Exclude current VOD from count
+            vod_id: { not: vodIdInt }, // Exclude current VOD from count
           },
         });
         totalGames = gameCountResult;
@@ -381,7 +384,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
             const createdGameRecord = await db.game.create({
               data: {
-                vod_id: vodId,
+                vod_id: vodIdInt,
                 start_time: startTime + chapter.start,
                 end_time: endTime + chapter.start,
                 video_provider: 'youtube',
@@ -481,7 +484,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
         const createdGameRecord = await db.game.create({
           data: {
-            vod_id: vodId,
+            vod_id: vodIdInt,
             start_time: chapter.start,
             end_time: chapter.end,
             video_provider: 'youtube',
@@ -513,7 +516,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
     );
 
     await db.vodUpload.updateMany({
-      where: { vod_id: vodId },
+      where: { vod_id: vodIdInt },
       data: { status: 'FAILED' },
     });
 
