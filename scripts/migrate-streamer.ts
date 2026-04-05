@@ -230,7 +230,7 @@ const main = async () => {
                   const part = Number(upload.part) || 0;
 
                   try {
-                    await client.query(`INSERT INTO "vod_uploads" (vod_id, platform, upload_id, type, duration, part, status, thumbnail_url) VALUES ($1, 'youtube', $2, $3, $4, $5, 'COMPLETED', $6)`, [
+                    await client.query(`INSERT INTO "vod_uploads" (vod_id, upload_id, type, duration, part, status, thumbnail_url) VALUES ($1, $2, $3, $4, $5, 'COMPLETED', $6)`, [
                       vodId,
                       uploadId,
                       upload.type || null,

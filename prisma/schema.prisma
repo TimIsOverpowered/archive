@@ -29,7 +29,6 @@ model Vod {
 
 model VodUpload {
   vod_id        String
-  platform      String
   upload_id     String       @id
   type          String?
   duration      Int          @default(0)
@@ -39,8 +38,7 @@ model VodUpload {
   created_at    DateTime     @default(now())
   vod           Vod          @relation(fields: [vod_id], references: [id], onDelete: Cascade)
 
-  @@index([vod_id, platform])
-  @@index([platform])
+  @@index([vod_id])
   @@index([status])
   @@index([type])
   @@index([vod_id, type, part])
