@@ -137,33 +137,15 @@ const applySchemaMigrations = async (client: any) => {
   await client.query(`
     ALTER TABLE "vods_new" 
     ADD COLUMN IF NOT EXISTS "is_live" BOOLEAN NOT NULL DEFAULT false,
-    ADD COLUMN IF NOT EXISTS "started_at" TIMESTAMP(3),
-    ADD COLUMN IF NOT EXISTS "ended_at" TIMESTAMP(3),
-    ADD COLUMN IF NOT EXISTS "user_id" TEXT;
+    ADD COLUMN IF NOT EXISTS "started_at" TIMESTAMP(3);
 
     CREATE INDEX IF NOT EXISTS "vods_is_live_idx" ON "vods_new"("is_live");
-    CREATE INDEX IF NOT EXISTS "vods_user_id_platform_idx" ON "vods_new"("user_id", "platform");
 
     COMMENT ON COLUMN "vods_new"."is_live" IS 'Indicates if this VOD record represents an active live stream';
     COMMENT ON COLUMN "vods_new"."started_at" IS 'Timestamp when the live stream started (set on offline->live transition)';
-    COMMENT ON COLUMN "vods_new"."ended_at" IS 'Timestamp when the live stream ended (set on live->offline transition)';
-    COMMENT ON COLUMN "vods_new"."user_id" IS 'Channel/user identifier for tracking which channel this VOD belongs to (multi-tenant/multi-channel support)';
   `);
 
   await client.query(`
-    UPDATE "vod_uploads" vu
-    SET thumbnail_url = v.thumbnail_url
-    FROM "vods_new" v
-    WHERE vu.vod_id = v.id 
-      AND v.thumbnail_url IS NOT NULL 
-      AND vu.thumbnail_url IS NULL;
-
-    ALTER TABLE "vods_new" DROP COLUMN IF EXISTS "downloaded_at";
-    ALTER TABLE "vods_new" DROP COLUMN IF EXISTS "thumbnail_url";
-    ALTER TABLE "vods_new" DROP COLUMN IF EXISTS "user_id";
-    DROP INDEX IF EXISTS "vods_user_id_platform_idx";
-    ALTER TABLE "vods_new" DROP COLUMN IF EXISTS "ended_at";
-
     ALTER TABLE "vods_new" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
     UPDATE "vods_new" SET "updated_at" = COALESCE("created_at", NOW()) WHERE "updated_at" IS NULL;
 
