@@ -29,7 +29,7 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
           type: 'object',
           properties: {
             tenantId: { type: 'string', description: 'Tenant ID' },
-            vodId: { type: 'number', description: 'VOD ID' },
+            vodId: { type: 'string', description: 'VOD ID' },
           },
           required: ['tenantId', 'vodId'],
         },

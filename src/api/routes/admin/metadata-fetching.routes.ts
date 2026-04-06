@@ -50,7 +50,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       schema: {
         tags: ['Admin'],
         description: 'Fetch and save game chapters from Twitch API (Twitch only)',
-        params: { type: 'object', properties: { id: { type: 'string' }, vodId: { type: 'number' } }, required: ['id', 'vodId'] },
+        params: { type: 'object', properties: { id: { type: 'string' }, vodId: { type: 'string' } }, required: ['id', 'vodId'] },
         security: [{ apiKey: [] }],
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
@@ -213,7 +213,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       schema: {
         tags: ['Admin'],
         description: 'Fetch and save emote metadata for a VOD',
-        params: { type: 'object', properties: { id: { type: 'string' }, vodId: { type: 'number' } }, required: ['id', 'vodId'] },
+        params: { type: 'object', properties: { id: { type: 'string' }, vodId: { type: 'string' } }, required: ['id', 'vodId'] },
         security: [{ apiKey: [] }],
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],

@@ -138,7 +138,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
         body: {
           type: 'object',
           properties: {
-            vodId: { type: 'number' },
+            vodId: { type: 'string' },
             claims: {}, // Accept any format - array or JSON string
             partIndex: { type: 'number' }, // Optional - if provided, processes only that part (0-indexed)
             platform: { type: 'string', enum: ['twitch', 'kick'] },
