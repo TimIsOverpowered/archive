@@ -119,34 +119,6 @@ export async function sendDiscordAlert(message: string): Promise<string | null> 
   }
 }
 
-export async function updateDiscordMessage(messageId: string, message: string): Promise<void> {
-  if (!isAlertsEnabled()) {
-    return;
-  }
-
-  const webhookUrl = process.env.DISCORD_ALERT_WEBHOOK_URL;
-  if (!webhookUrl) {
-    return;
-  }
-
-  try {
-    const updateUrl = getUpdateUrl(webhookUrl, messageId);
-
-    const response = await fetch(updateUrl, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ content: message }),
-      signal: AbortSignal.timeout(10000),
-    });
-
-    throwOnHttpError(response, 'Webhook');
-  } catch (err) {
-    logger.error(extractErrorDetails(err), 'Failed to update Discord message');
-  }
-}
-
 export async function sendRichAlert(data: RichEmbedData): Promise<string | null> {
   if (!isAlertsEnabled()) {
     return null;

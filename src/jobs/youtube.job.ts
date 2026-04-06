@@ -47,33 +47,3 @@ export async function triggerYoutubeUpload(
   const jobId = `youtube_${vodId}`;
   return enqueueYoutubeUpload(jobData, jobId);
 }
-
-export async function triggerYoutubeUploadWithChapters(
-  tenantId: string,
-  vodId: string,
-  filePath: string,
-  title: string,
-  description: string,
-  type: 'vod' | 'game',
-  platform?: 'twitch' | 'kick',
-  part?: number,
-  chapters?: { name: string; start: number; end: number; gameId?: string }[]
-): Promise<string[]> {
-  if (!chapters || chapters.length === 0) {
-    const jobId = await triggerYoutubeUpload(tenantId, vodId, filePath, title, description, type, platform, part);
-    return jobId ? [jobId] : [];
-  }
-
-  // Upload parts sequentially with chapter information
-  const jobIds: string[] = [];
-
-  for (const chapter of chapters) {
-    const jobId = await triggerYoutubeUpload(tenantId, vodId, filePath, title, description, type, platform, part && chapters.length > 1 ? part : undefined, chapter.name, chapter.gameId);
-
-    if (jobId) {
-      jobIds.push(jobId);
-    }
-  }
-
-  return jobIds;
-}
