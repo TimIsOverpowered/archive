@@ -72,7 +72,7 @@ export async function getTwitchStreamStatus(userId: string, tenantId: string): P
   } catch (error: unknown) {
     const { message } = extractErrorDetails(error);
     logger.error({ userId, err: message }, `[Twitch Live Check] Failed to get stream status for user ${userId}`);
-    return null;
+    throw error;
   }
 }
 
@@ -123,6 +123,6 @@ export async function getLatestTwitchVodObject(userId: string, expectedStreamId:
   } catch (error: unknown) {
     const { message } = extractErrorDetails(error);
     logger.error({ userId, err: message }, `[Twitch] Failed to get VOD object for user ${userId}`);
-    return null;
+    throw error;
   }
 }
