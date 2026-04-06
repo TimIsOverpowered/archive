@@ -52,7 +52,11 @@ async function getCycleTLS(): Promise<CycleTLSClient> {
  * Session-based CycleTLS client for persistent connections (HLS live downloads)
  */
 export class CycleTLSSession {
-  private closed: boolean = false;
+  private _closed: boolean = false;
+
+  get closed(): boolean {
+    return this._closed;
+  }
 
   async fetchText(url: string): Promise<string> {
     if (this.closed) throw new Error('Session is closed');
@@ -105,9 +109,9 @@ export class CycleTLSSession {
   }
 
   async close(): Promise<void> {
-    if (this.closed) return;
+    if (this._closed) return;
 
-    this.closed = true;
+    this._closed = true;
     logger.debug(`[CycleTLS] Closed`);
   }
 }
