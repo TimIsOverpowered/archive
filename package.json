@@ -41,6 +41,7 @@
     "admin:create": "tsx scripts/create-admin.ts",
     "admin:reset": "tsx scripts/reset-admin-key.ts",
     "prisma:meta:generate": "npx prisma generate --schema=./prisma/meta/schema.prisma",
+    "prisma:generate": "npx prisma generate --schema=./prisma/schema.prisma",
     "start:pm2": "pm2 start ecosystem.config.js --env production && pm2 save",
     "stop:pm2": "pm2 stop all && pm2 delete all",
     "restart:pm2": "pm2 restart all",

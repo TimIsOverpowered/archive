@@ -185,6 +185,7 @@ async function main(): Promise<void> {
       client_id: clientId,
       client_secret: clientSecret,
       access_token: oauthResult.access_token,
+      expires_in: oauthResult.expires_in,
     };
 
     console.log('\nEncrypting credentials with AES-256-GCM...');
