@@ -149,8 +149,10 @@ export async function cleanupOrphanedTmpFiles(vodDir: string, log: ReturnType<ty
   }
 }
 
-function updateAlertProgress(messageId: string | null, platform: string, totalSegmentsFound: number, vodId: string, startedAt?: string): void {
+function updateAlertProgress(messageId: string | null, platform: string, totalSegmentsFound: number, vodId: string, tenantId: string, startedAt?: string): void {
   if (!messageId || !isAlertsEnabled()) return;
+
+  const streamerName = getTenantConfig(tenantId)?.displayName || tenantId;
 
   // Calculate elapsed time
   const startTime = startedAt ? new Date(startedAt) : new Date();
@@ -170,7 +172,7 @@ function updateAlertProgress(messageId: string | null, platform: string, totalSe
 
   updateDiscordEmbed(messageId, {
     title: `📥 Downloading ${vodId} (LIVE)`,
-    description: `${platform.toUpperCase()} live HLS download in progress`,
+    description: `${streamerName} - ${platform.toUpperCase()} live HLS download in progress`,
     status: 'warning',
     fields,
     timestamp: startTime.toISOString(),
@@ -489,7 +491,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
 
           await downloadSegmentsParallel(newSegments, vodDir, baseURL, strategy, concurrency, retryAttempts, log, () => {
             if (isAlertsEnabled() && messageId) {
-              updateAlertProgress(messageId, platform, segments.length, vodId, startedAt);
+              updateAlertProgress(messageId, platform, segments.length, vodId, tenantId, startedAt);
             }
           });
         } catch (error: unknown) {
