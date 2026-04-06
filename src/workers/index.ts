@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { extractErrorDetails } from '../utils/error.js';
-import { Worker, Queue, BaseJobOptions } from 'bullmq';
+import { Worker, Queue, BaseJobOptions, Job } from 'bullmq';
 import { loadTenantConfigs, clearConfigCache } from '../config/loader.js';
 import { QUEUE_NAMES, getQueue, ChatDownloadJob, YoutubeUploadJob, DmcaProcessingJob, ChatDownloadResult, YoutubeUploadResult, DmcaProcessingResult } from '../jobs/queues.js';
 import { redisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
@@ -358,11 +358,11 @@ async function bootstrap() {
       // Stop monitor polling loops first (also clears intervals)
       await stopMonitorService();
 
-      // Close workers
-      await vodWorker.close();
-      await chatWorker.close();
-      await youtubeWorker.close();
-      await dmcaWorker.close();
+      // Signal workers to stop via abortSignal (BullMQ fires this to processors on close)
+      vodWorker.close();
+      chatWorker.close();
+      youtubeWorker.close();
+      dmcaWorker.close();
 
       // Close DB clients
       const clientModule = await import('../db/client.js');
@@ -373,7 +373,7 @@ async function bootstrap() {
 
       clearConfigCache();
 
-      process.exit(0);
+      setTimeout(() => process.exit(0), 100);
     };
 
     // Register shutdown handlers (don't remove existing listeners from other modules)
