@@ -358,14 +358,6 @@ async function bootstrap() {
       // Stop monitor polling loops first (also clears intervals)
       await stopMonitorService();
 
-      // Clear YouTube OAuth clients cache
-      try {
-        const youtubeModule = await import('../services/youtube.js');
-        if (youtubeModule.shutdown) {
-          youtubeModule.shutdown();
-        }
-      } catch {}
-
       // Close workers
       await vodWorker.close();
       await chatWorker.close();
