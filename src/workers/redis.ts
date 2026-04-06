@@ -57,7 +57,6 @@ export async function closeWorkersRedis(): Promise<void> {
   if (redisInstance.status === 'ready' || redisInstance.status === 'connecting') {
     logger.info('[Workers Redis] Closing connection...');
     await redisInstance.quit();
-    logger.info('[Workers Redis] Connection closed');
   }
 }
 
