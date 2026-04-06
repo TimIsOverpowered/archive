@@ -187,7 +187,7 @@ export async function enqueueJobWithLogging(
   const context = { jobId: String(job.id), state, ...extraContext };
 
   if (state === 'active' || state === 'completed' || state === 'failed') {
-    logger.info(context, `Job already exists in state ${state}, skipping`);
+    logger.debug(context, `Job already exists in state ${state}, skipping`);
     return { jobId: String(job.id), isNew: false };
   } else {
     logger.info(context, successMessage);

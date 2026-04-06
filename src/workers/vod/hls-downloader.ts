@@ -46,13 +46,14 @@ async function downloadSegmentsParallel(
   strategy: DownloadStrategy,
   concurrency: number,
   retryAttempts: number,
-  log: ReturnType<typeof loggerWithTenant>
+  log: ReturnType<typeof loggerWithTenant>,
+  onBatchComplete?: (completedCount: number) => void
 ): Promise<void> {
   const limit = pLimit(concurrency);
   let completedCount = 0;
   const totalSegments = segments.length;
 
-  log.info({ count: totalSegments, concurrency, retryAttempts, strategy: strategy.type }, `Starting parallel segment download`);
+  log.debug({ count: totalSegments, concurrency, retryAttempts, strategy: strategy.type }, `Starting parallel segment download`);
 
   const isAborted = () => (strategy.type === 'fetch' ? strategy.signal?.aborted : strategy.session.closed);
 
@@ -96,11 +97,7 @@ async function downloadSegmentsParallel(
           await fsPromises.rename(tempPath, outputPath);
           completedCount++;
 
-          const progress = Math.round((completedCount / totalSegments) * 100);
-
-          if (progress % 10 === 0 || completedCount === totalSegments) {
-            log.debug({ current: completedCount, total: totalSegments, progress }, `Download progress: ${progress}%`);
-          }
+          log.debug({ uri: segment.uri, current: completedCount, total: totalSegments }, `Segment downloaded`);
           return;
         } catch (error: unknown) {
           if (isAborted()) {
@@ -124,7 +121,10 @@ async function downloadSegmentsParallel(
   );
 
   if (!isAborted()) {
-    log.info({ total: totalSegments }, `All segments downloaded successfully`);
+    log.debug({ total: totalSegments }, `All segments downloaded successfully`);
+    if (onBatchComplete) {
+      onBatchComplete(completedCount);
+    }
   }
 }
 
@@ -169,7 +169,7 @@ function updateAlertProgress(messageId: string | null, platform: string, totalSe
   ];
 
   updateDiscordEmbed(messageId, {
-    title: `📥 Downloading ${vodId}`,
+    title: `📥 Downloading ${vodId} (LIVE)`,
     description: `${platform.toUpperCase()} live HLS download in progress`,
     status: 'warning',
     fields,
@@ -408,20 +408,6 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
 
   while (true) {
     try {
-      const filesInDir = await fsPromises.readdir(vodDir);
-
-      const mp4Segments = filesInDir.filter((f) => f.endsWith('.mp4'));
-      const tsSegments = filesInDir.filter((f) => f.endsWith('.ts'));
-      const segmentCount = mp4Segments.length || tsSegments.length;
-
-      if (segmentCount > totalSegmentsFound && isAlertsEnabled() && messageId) {
-        totalSegmentsFound = segmentCount;
-
-        updateAlertProgress(messageId, platform, totalSegmentsFound, vodId, startedAt);
-
-        log.debug({ vodId, newSegmentCount: totalSegmentsFound }, `[HLS-Downloader] Detected ${totalSegmentsFound} TS segments on disk`);
-      }
-
       log.trace({ vodId, retryCount: retryCount + 1 }, `Polling HLS playlist (attempt #${retryCount + 1})...`);
 
       let variantM3u8String: string = '';
@@ -493,7 +479,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
       const newSegments = segments.filter((seg) => !fs.existsSync(pathMod.join(vodDir, seg.uri)));
 
       if (newSegments.length > 0) {
-        log.info(`[${vodId}] Found ${newSegments.length} new segments to download...`);
+        log.debug(`[${vodId}] Found ${newSegments.length} new segments to download...`);
 
         const concurrency = 3;
         const retryAttempts = 3;
@@ -501,7 +487,13 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
         try {
           const strategy: DownloadStrategy = platform === 'kick' && cycleTLS ? { type: 'cycletls', session: cycleTLS } : { type: 'fetch', signal };
 
-          await downloadSegmentsParallel(newSegments, vodDir, baseURL, strategy, concurrency, retryAttempts, log);
+          await downloadSegmentsParallel(newSegments, vodDir, baseURL, strategy, concurrency, retryAttempts, log, (completed) => {
+            if (isAlertsEnabled() && messageId) {
+              const newTotal = totalSegmentsFound + completed;
+              updateAlertProgress(messageId, platform, newTotal, vodId, startedAt);
+              totalSegmentsFound = newTotal;
+            }
+          });
         } catch (error: unknown) {
           const details = extractErrorDetails(error);
 
