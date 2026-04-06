@@ -29,7 +29,10 @@ export async function buildServer() {
     const code = isClientError ? (error as { code?: string }).code || 'BAD_REQUEST' : 'INTERNAL_ERROR';
     const errorMessage = isClientError ? details.message : 'Internal server error';
 
-    logger.error({ err: details.message, stack: details.stack }, 'Request error');
+    // Only log 5xx errors (server errors). 4xx are expected client errors and clutter logs.
+    if (statusCode >= 500) {
+      logger.error({ err: details.message, stack: details.stack }, 'Request error');
+    }
 
     return reply.status(statusCode).send({
       error: {
