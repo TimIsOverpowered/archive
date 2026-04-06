@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { extractErrorDetails } from '../utils/error.js';
-import { Worker, Queue, BaseJobOptions, Job } from 'bullmq';
+import { Worker, Queue, BaseJobOptions } from 'bullmq';
 import { loadTenantConfigs, clearConfigCache } from '../config/loader.js';
 import { QUEUE_NAMES, getQueue, ChatDownloadJob, YoutubeUploadJob, DmcaProcessingJob, ChatDownloadResult, YoutubeUploadResult, DmcaProcessingResult } from '../jobs/queues.js';
 import { redisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';

@@ -19,6 +19,8 @@ import { updateChapterDuringDownload, finalizeKickChapters } from '../../service
 import { saveVodChapters as saveTwitchVodChapters } from '../../services/twitch.js';
 import { fileExists } from '../../utils/path.js';
 
+type DownloadStrategy = { type: 'fetch'; signal?: AbortSignal } | { type: 'cycletls'; session: CycleTLSSession };
+
 export interface HlsDownloadOptions {
   dbId: number;
   vodId: string;
@@ -33,151 +35,34 @@ export interface HlsDownloadOptions {
 }
 
 /**
- * Download a single segment (universal - handles both .ts and .mp4)
- * Uses standard fetch for Twitch
- */
-async function downloadSegment(segmentUri: string, vodDir: string, baseURL: string, retryAttempts: number = 3, signal?: AbortSignal): Promise<void> {
-  const url = `${baseURL}/${segmentUri}`;
-  const outputPath = pathMod.join(vodDir, segmentUri);
-  const tempPath = outputPath + '.tmp';
-
-  const exists = await fileExists(outputPath);
-
-  if (exists) {
-    return;
-  }
-
-  let lastError: Error | null = null;
-  let lastResponse: Response | null = null;
-
-  for (let attempt = 1; attempt <= retryAttempts; attempt++) {
-    if (signal?.aborted) {
-      throw new Error('Download aborted');
-    }
-
-    try {
-      const response = await fetch(url, { signal });
-      lastResponse = response;
-
-      throwOnHttpError(response, `Download segment ${url} (attempt ${attempt}/${retryAttempts})`);
-
-      const writer = fs.createWriteStream(tempPath);
-      const nodeWebStream = response.body as unknown as NodeWebStream<Uint8Array>;
-
-      await pipeline(Readable.fromWeb(nodeWebStream), writer);
-
-      await fsPromises.rename(tempPath, outputPath);
-      return;
-    } catch (error: unknown) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-
-      try {
-        await fsPromises.unlink(tempPath).catch(() => {});
-      } catch {}
-
-      if (signal?.aborted) {
-        throw new Error('Download aborted');
-      }
-
-      if (lastResponse && lastResponse.status >= 400 && lastResponse.status < 500) {
-        break;
-      }
-    }
-  }
-
-  throw lastError ?? new Error('Unknown error downloading segment');
-}
-
-/**
  * Download segments in parallel using p-limit for concurrency control
  * Universal function - works with both .ts and .mp4 (fMP4) segments
+ * Supports both fetch (Twitch) and CycleTLS (Kick) download strategies
  */
 async function downloadSegmentsParallel(
-  segments: HLS.types.Segment[],
+  segments: { uri: string }[],
   vodDir: string,
   baseURL: string,
+  strategy: DownloadStrategy,
   concurrency: number,
   retryAttempts: number,
-  log: ReturnType<typeof loggerWithTenant>,
-  signal?: AbortSignal
+  log: ReturnType<typeof loggerWithTenant>
 ): Promise<void> {
   const limit = pLimit(concurrency);
   let completedCount = 0;
   const totalSegments = segments.length;
 
-  log.info({ count: totalSegments, concurrency, retryAttempts }, `Starting parallel segment download`);
+  log.info({ count: totalSegments, concurrency, retryAttempts, strategy: strategy.type }, `Starting parallel segment download`);
+
+  const isAborted = () => (strategy.type === 'fetch' ? strategy.signal?.aborted : strategy.session.closed);
 
   await Promise.all(
     segments.map(async (segment) => {
-      if (signal?.aborted) {
+      if (isAborted()) {
         return;
       }
 
-      let lastError: Error | null = null;
-
-      for (let attempt = 1; attempt <= retryAttempts; attempt++) {
-        if (signal?.aborted) {
-          return;
-        }
-
-        try {
-          await limit(() => downloadSegment(segment.uri, vodDir, baseURL, 1, signal));
-
-          completedCount++;
-          const progress = Math.round((completedCount / totalSegments) * 100);
-
-          if (progress % 10 === 0 || completedCount === totalSegments) {
-            log.debug({ current: completedCount, total: totalSegments, progress }, `Download progress: ${progress}%`);
-          }
-          return;
-        } catch (error: unknown) {
-          if (signal?.aborted) {
-            return;
-          }
-
-          lastError = error instanceof Error ? error : new Error(String(error));
-          log.debug({ uri: segment.uri, attempt, error: lastError.message }, `Failed to download segment`);
-        }
-      }
-
-      if (!signal?.aborted && lastError) {
-        throw lastError;
-      }
-    })
-  );
-
-  if (!signal?.aborted) {
-    log.info({ total: totalSegments }, `All segments downloaded successfully`);
-  }
-}
-
-/**
- * Download segments using CycleTLS for Kick platform
- * Parallel version with concurrency control
- */
-async function downloadKickSegmentsParallel(
-  segmentUris: string[],
-  vodDir: string,
-  baseURL: string,
-  session: CycleTLSSession,
-  concurrency: number,
-  retryAttempts: number,
-  log: ReturnType<typeof loggerWithTenant>,
-  signal?: AbortSignal
-): Promise<void> {
-  const limit = pLimit(concurrency);
-  let completedCount = 0;
-  const totalSegments = segmentUris.length;
-
-  log.info({ count: totalSegments, concurrency, retryAttempts }, `Starting parallel Kick segment download (CycleTLS)`);
-
-  await Promise.all(
-    segmentUris.map(async (uri) => {
-      if (signal?.aborted) {
-        return;
-      }
-
-      const outputPath = pathMod.join(vodDir, uri);
+      const outputPath = pathMod.join(vodDir, segment.uri);
       const tempPath = outputPath + '.tmp';
 
       const exists = await fileExists(outputPath);
@@ -190,24 +75,35 @@ async function downloadKickSegmentsParallel(
       let lastError: Error | null = null;
 
       for (let attempt = 1; attempt <= retryAttempts; attempt++) {
-        if (signal?.aborted) {
+        if (isAborted()) {
           return;
         }
 
         try {
-          await limit(() => session.streamToFile(`${baseURL}/${uri}`, tempPath));
+          await limit(async () => {
+            if (strategy.type === 'fetch') {
+              const response = await fetch(`${baseURL}/${segment.uri}`, { signal: strategy.signal });
+              throwOnHttpError(response, `Download segment (attempt ${attempt}/${retryAttempts})`);
+
+              const writer = fs.createWriteStream(tempPath);
+              const nodeWebStream = response.body as unknown as NodeWebStream<Uint8Array>;
+              await pipeline(Readable.fromWeb(nodeWebStream), writer);
+            } else {
+              await strategy.session.streamToFile(`${baseURL}/${segment.uri}`, tempPath);
+            }
+          });
 
           await fsPromises.rename(tempPath, outputPath);
-
           completedCount++;
+
           const progress = Math.round((completedCount / totalSegments) * 100);
 
           if (progress % 10 === 0 || completedCount === totalSegments) {
-            log.debug({ current: completedCount, total: totalSegments, progress }, `Kick download progress: ${progress}%`);
+            log.debug({ current: completedCount, total: totalSegments, progress }, `Download progress: ${progress}%`);
           }
           return;
         } catch (error: unknown) {
-          if (signal?.aborted) {
+          if (isAborted()) {
             return;
           }
 
@@ -217,18 +113,18 @@ async function downloadKickSegmentsParallel(
             await fsPromises.unlink(tempPath).catch(() => {});
           } catch {}
 
-          log.debug({ uri, attempt, error: lastError.message }, `Failed to download Kick segment`);
+          log.debug({ uri: segment.uri, attempt, error: lastError.message }, `Failed to download segment`);
         }
       }
 
-      if (!signal?.aborted && lastError) {
+      if (!isAborted() && lastError) {
         throw lastError;
       }
     })
   );
 
-  if (!signal?.aborted) {
-    log.info({ total: totalSegments }, `All Kick segments downloaded successfully`);
+  if (!isAborted()) {
+    log.info({ total: totalSegments }, `All segments downloaded successfully`);
   }
 }
 
@@ -501,10 +397,10 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
   let totalSegmentsFound = 0;
 
   // Create persistent CycleTLS session for Kick downloads
-  let kickSession: CycleTLSSession | null = null;
+  let cycleTLS: CycleTLSSession | null = null;
 
   if (platform === 'kick') {
-    kickSession = createSession();
+    cycleTLS = createSession();
     log.info(`[${vodId}] Created CycleTLS session for Kick HLS download`);
   }
 
@@ -543,7 +439,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
         variantM3u8String = result.variantM3u8String;
         fetchedBaseURL = result.baseURL;
       } else if (platform === 'kick') {
-        const result = await fetchKickPlaylist(vodId, sourceUrl, log, retryCount, maxRetryBeforeEndDetection, kickSession ?? undefined);
+        const result = await fetchKickPlaylist(vodId, sourceUrl, log, retryCount, maxRetryBeforeEndDetection, cycleTLS ?? undefined);
 
         if (!result) {
           retryCount++;
@@ -603,13 +499,9 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
         const retryAttempts = 3;
 
         try {
-          if (platform === 'kick' && kickSession) {
-            const segmentUris = newSegments.map((seg) => seg.uri);
+          const strategy: DownloadStrategy = platform === 'kick' && cycleTLS ? { type: 'cycletls', session: cycleTLS } : { type: 'fetch', signal };
 
-            await downloadKickSegmentsParallel(segmentUris, vodDir, baseURL, kickSession!, concurrency, retryAttempts, log, undefined);
-          } else {
-            await downloadSegmentsParallel(newSegments, vodDir, baseURL, concurrency, retryAttempts, log, undefined);
-          }
+          await downloadSegmentsParallel(newSegments, vodDir, baseURL, strategy, concurrency, retryAttempts, log);
         } catch (error: unknown) {
           const details = extractErrorDetails(error);
 
@@ -781,8 +673,8 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
     throw error;
   } finally {
     // Close CycleTLS session for Kick downloads
-    if (kickSession) {
-      await kickSession.close();
+    if (cycleTLS) {
+      await cycleTLS.close();
       log.info(`[${vodId}] Closed CycleTLS session`);
     }
 
