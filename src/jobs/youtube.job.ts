@@ -17,6 +17,7 @@ export async function enqueueYoutubeUpload(job: Omit<YoutubeUploadJob, 'id'>, jo
 
 export async function triggerYoutubeUpload(
   tenantId: string,
+  dbId: number,
   vodId: string,
   filePath: string,
   title: string,
@@ -29,6 +30,7 @@ export async function triggerYoutubeUpload(
 ): Promise<string | null> {
   const jobData: Omit<YoutubeUploadJob, 'id'> = {
     tenantId,
+    dbId,
     vodId,
     filePath,
     title,

@@ -84,7 +84,7 @@ function extractEdges(commentsObj: Record<string, unknown>): TwitchChatEdge[] {
 }
 
 const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job: Job<ChatDownloadJob>): Promise<ChatDownloadResult> => {
-  const { tenantId, vodId, platform, duration, startOffset } = job.data;
+  const { tenantId, dbId, vodId, platform, duration, startOffset } = job.data;
   const log = createAutoLogger(tenantId);
 
   if (platform !== 'twitch') {
@@ -98,13 +98,10 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
   let db = getClient(tenantId);
   if (!db) db = await createClient(config);
 
-  // Convert string vodId to number for the new schema
-  const vodIdInt = Number(vodId);
-
   // Smart resume - check for existing data if no manual override provided
   const lastSavedRecord = !startOffset
     ? await db.chatMessage.findFirst({
-        where: { vod_id: vodIdInt },
+        where: { vod_id: dbId },
         orderBy: { content_offset_seconds: 'desc' },
         select: { content_offset_seconds: true },
       })
@@ -205,9 +202,9 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
         messagesToInsert.push({
           id: node.id,
-          vod_id: vodIdInt,
+          vod_id: dbId,
           display_name: ('commenter' in node && node.commenter?.displayName) || null,
-          content_offset_seconds: String(offsetSeconds), // Preserve Decimal precision
+          content_offset_seconds: String(offsetSeconds),
           createdAt: 'createdAt' in node && node.createdAt ? new Date(node.createdAt as string) : new Date(),
           message,
           user_badges: userBadges,

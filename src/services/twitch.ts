@@ -451,7 +451,7 @@ export async function downloadVodAsMp4(vodId: string, tenantId: string): Promise
     const vodPath = `${config.settings.vodPath}/${vodId}.mp4`;
 
     const streamerName = config.displayName || tenantId;
-    messageId = await sendVodDownloadStarted('twitch', tenantId, Number(vodId), streamerName);
+    messageId = await sendVodDownloadStarted('twitch', tenantId, vodId, streamerName);
 
     // Fetch m3u8 playlist and detect fMP4 format (Twitch can use both .ts or fMP4)
     const response = await fetch(m3u8Url);
@@ -462,12 +462,12 @@ export async function downloadVodAsMp4(vodId: string, tenantId: string): Promise
     const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
 
     // Download directly to MP4 using ffmpeg HLS streaming
-    await convertHlsToMp4(m3u8Url, vodPath, { vodId: Number(vodId), isFmp4 });
+    await convertHlsToMp4(m3u8Url, vodPath, { vodId, isFmp4 });
 
     log.info(`Downloaded ${vodId}.mp4`);
 
     // Success alert
-    await sendVodDownloadSuccess(messageId!, 'twitch', Number(vodId), vodPath, streamerName);
+    await sendVodDownloadSuccess(messageId!, 'twitch', vodId, vodPath, streamerName);
 
     return vodPath;
   } catch (error) {
@@ -477,22 +477,22 @@ export async function downloadVodAsMp4(vodId: string, tenantId: string): Promise
     log.error(`ffmpeg error occurred: ${errorMsg}`);
 
     // Failure alert
-    await sendVodDownloadFailed(messageId!, 'twitch', Number(vodId), errorMsg, tenantId);
+    await sendVodDownloadFailed(messageId!, 'twitch', vodId, errorMsg, tenantId);
 
     throw error;
   }
 }
 
-export async function saveVodChapters(vodId: number, tenantId: string, finalDurationSeconds: number, client: PrismaClient): Promise<void> {
+export async function saveVodChapters(dbId: number, vodId: string, tenantId: string, finalDurationSeconds: number, client: PrismaClient): Promise<void> {
   try {
-    const vod = await client.vod.findUnique({ where: { id: vodId }, select: { vod_id: true } });
+    const vod = await client.vod.findUnique({ where: { id: dbId }, select: { vod_id: true } });
     if (!vod) {
-      log.warn({ vodId }, 'VOD not found');
+      log.warn({ dbId, vodId }, 'VOD not found');
       return;
     }
 
     await client.chapter.deleteMany({
-      where: { vod_id: vodId },
+      where: { vod_id: dbId },
     });
 
     const chaptersData = await getChapters(vod.vod_id);
@@ -516,7 +516,7 @@ export async function saveVodChapters(vodId: number, tenantId: string, finalDura
 
       await client.chapter.create({
         data: {
-          vod_id: vodId,
+          vod_id: dbId,
           game_id: gameId,
           name: typeof game.displayName === 'string' ? game.displayName : null,
           image: gameData && typeof gameData.box_art_url === 'string' ? gameData.box_art_url.replace('{width}x{height}', '40x53') : null,
@@ -526,7 +526,7 @@ export async function saveVodChapters(vodId: number, tenantId: string, finalDura
         },
       });
 
-      log.info({ vodId, game: typeof game.displayName === 'string' ? game.displayName : 'unknown' }, 'Created single chapter from game info');
+      log.info({ dbId, vodId, game: typeof game.displayName === 'string' ? game.displayName : 'unknown' }, 'Created single chapter from game info');
       return;
     }
 
@@ -543,7 +543,7 @@ export async function saveVodChapters(vodId: number, tenantId: string, finalDura
       const gameImage = typeof game?.boxArtURL === 'string' ? (game.boxArtURL as string) : null;
 
       return {
-        vod_id: vodId,
+        vod_id: dbId,
         game_id: gameId,
         name: gameName,
         image: gameImage,
@@ -557,8 +557,8 @@ export async function saveVodChapters(vodId: number, tenantId: string, finalDura
       data: chaptersToCreate,
     });
 
-    log.info({ vodId, chapterCount: chaptersToCreate.length }, 'Saved all chapters');
+    log.info({ dbId, vodId, chapterCount: chaptersToCreate.length }, 'Saved all chapters');
   } catch (error) {
-    log.error(createErrorContext(error, { vodId }), 'Failed to save chapters');
+    log.error(createErrorContext(error, { dbId, vodId }), 'Failed to save chapters');
   }
 }

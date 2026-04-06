@@ -20,7 +20,8 @@ import { saveVodChapters as saveTwitchVodChapters } from '../../services/twitch.
 import { fileExists } from '../../utils/path.js';
 
 export interface HlsDownloadOptions {
-  vodId: number;
+  dbId: number;
+  vodId: string;
   platform: 'twitch' | 'kick';
   tenantId: string;
   platformUserId: string;
@@ -210,7 +211,7 @@ export async function cleanupOrphanedTmpFiles(vodDir: string, log: ReturnType<ty
   }
 }
 
-function updateAlertProgress(messageId: string | null, platform: string, totalSegmentsFound: number, vodId: number, startedAt?: string): void {
+function updateAlertProgress(messageId: string | null, platform: string, totalSegmentsFound: number, vodId: string, startedAt?: string): void {
   if (!messageId || !isAlertsEnabled()) return;
 
   // Calculate elapsed time
@@ -240,12 +241,12 @@ function updateAlertProgress(messageId: string | null, platform: string, totalSe
 }
 
 async function fetchTwitchPlaylist(
-  vodId: number,
+  vodId: string,
   log: ReturnType<typeof loggerWithTenant>,
   retryCount: number,
   maxRetryBeforeEndDetection: number
 ): Promise<{ variantM3u8String: string; baseURL: string } | null> {
-  const tokenSig = await getVodTokenSig(String(vodId));
+  const tokenSig = await getVodTokenSig(vodId);
 
   try {
     const masterPlaylistContent = await getTwitchM3u8(String(vodId), tokenSig.value, tokenSig.signature);
@@ -309,12 +310,12 @@ async function fetchTwitchPlaylist(
 }
 
 async function fetchKickPlaylist(
-  vodId: number,
+  vodId: string,
   sourceUrl: string | undefined,
   log: ReturnType<typeof loggerWithTenant>,
   retryCount: number,
   maxRetryBeforeEndDetection: number,
-  session?: CycleTLSSession // Optional parameter for persistent sessions
+  session?: CycleTLSSession
 ): Promise<{ variantM3u8String: string; baseURL: string } | null> {
   const fetchUrl = sourceUrl || '';
 
@@ -373,12 +374,13 @@ async function fetchKickPlaylist(
 }
 
 export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ success: true; finalPath: string; durationSeconds?: number }> {
-  const { vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl } = options;
+  const { dbId, vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl } = options;
 
   const log = loggerWithTenant(tenantId);
 
   log.info(
     {
+      dbId,
       vodId,
       platform,
       tenantId,
@@ -393,7 +395,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
   try {
     if (!streamerClient) throw new Error('Streamer database client not available');
 
-    const vodRecord = await streamerClient.vod.findUnique({ where: { id: vodId } });
+    const vodRecord = await streamerClient.vod.findUnique({ where: { id: dbId } });
 
     if (!vodRecord || !vodRecord.id) throw new Error(`VOD record not found for ${vodId}`);
   } catch (error: unknown) {
@@ -587,7 +589,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
       retryCount = 0;
 
       if (platform === 'kick' && streamerClient) {
-        await updateChapterDuringDownload(vodId, tenantId, streamerClient);
+        await updateChapterDuringDownload(dbId, vodId, tenantId, streamerClient);
       }
 
       await sleep(60000); // Poll every 60 seconds for VOD downloads
@@ -667,12 +669,12 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
       const durationSeconds = Math.round(actualDuration);
 
       if (platform === 'kick') {
-        await finalizeKickChapters(vodId, durationSeconds, streamerClient);
+        await finalizeKickChapters(dbId, vodId, durationSeconds, streamerClient);
       } else if (platform === 'twitch') {
-        await saveTwitchVodChapters(vodId, tenantId, durationSeconds, streamerClient);
+        await saveTwitchVodChapters(dbId, vodId, tenantId, durationSeconds, streamerClient);
       }
 
-      await streamerClient.vod.update({ where: { id: vodId }, data: { duration: durationSeconds, is_live: false } });
+      await streamerClient.vod.update({ where: { id: dbId }, data: { duration: durationSeconds, is_live: false } });
 
       log.info(`[${vodId}] Updated VOD with duration ${formattedDuration} and marked as ended`);
 
@@ -694,7 +696,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
         try {
           const { queueYoutubeUpload } = await import('../../utils/upload-queue.js');
 
-          await queueYoutubeUpload(options.tenantId, options.vodId, finalMp4Path, options.uploadMode || 'all', options.platform, log);
+          await queueYoutubeUpload(options.tenantId, options.dbId, options.vodId, finalMp4Path, options.uploadMode || 'all', options.platform, log);
 
           log.info({ vodId }, `Upload job(s) queued after HLS download completion`);
         } catch (error) {
@@ -706,7 +708,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
       return { success: true as const, finalPath: finalMp4Path, durationSeconds: actualDuration };
     } else {
       log.warn(`[${vodId}] Could not determine video duration from MP4 file`);
-      await streamerClient.vod.update({ where: { id: vodId }, data: { is_live: false } });
+      await streamerClient.vod.update({ where: { id: dbId }, data: { is_live: false } });
 
       return { success: true as const, finalPath: finalMp4Path };
     }

@@ -20,7 +20,7 @@ type ExtendedYoutubeUploadJob = YoutubeUploadJob & { dmcaProcessed?: boolean };
 const YOUTUBE_MAX_DURATION = 43199; // YouTube hard limit: 12 hours - 1 second (720 minutes)
 
 const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async (job: Job<YoutubeUploadJob>) => {
-  const { tenantId, vodId, filePath, type, part, chapter } = job.data;
+  const { tenantId, dbId, vodId, filePath, type, part, chapter } = job.data;
 
   const log = createAutoLogger(String(tenantId));
 
@@ -35,15 +35,12 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
     db = await createClient(config);
   }
 
-  // Convert string vodId to number for the new schema
-  const vodIdInt = Number(vodId);
-
   try {
     const privacyStatus = config.youtube.public ? 'public' : 'unlisted';
     const splitDuration = config.youtube.splitDuration;
 
     if (type === 'vod') {
-      const vodRecord = await db.vod.findUnique({ where: { id: vodIdInt } });
+      const vodRecord = await db.vod.findUnique({ where: { id: dbId } });
 
       if (!vodRecord) throw new Error(`VOD record not found for ${vodId}`);
 
@@ -217,9 +214,8 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
       for (const video of uploadedVideos) {
         await db.vodUpload.create({
           data: {
-            vod_id: vodIdInt,
+            vod_id: dbId,
             upload_id: video.id,
-            platform: 'youtube',
             type: 'vod',
             part: video.part,
             status: 'COMPLETED',
@@ -247,7 +243,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
           log.info(`[${vodId}] Skipping game upload: ${job.data.platform} is not main platform (simulcast mode)`);
 
           await db.game.updateMany({
-            where: { vod_id: vodIdInt },
+            where: { vod_id: dbId },
             data: { video_provider: null, video_id: null, thumbnail_url: null },
           });
 
@@ -258,7 +254,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
       }
       if (!chapter) throw new Error('Chapter data required for game upload type');
 
-      const vodRecord = await db.vod.findUnique({ where: { id: vodIdInt } });
+      const vodRecord = await db.vod.findUnique({ where: { id: dbId } });
 
       if (!vodRecord) throw new Error(`VOD record not found for ${vodId}`);
 
@@ -274,7 +270,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
         const gameCountResult = await db.game.count({
           where: {
             game_name: chapter.name,
-            vod_id: { not: vodIdInt }, // Exclude current VOD from count
+            vod_id: { not: dbId },
           },
         });
         totalGames = gameCountResult;
@@ -384,7 +380,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
             const createdGameRecord = await db.game.create({
               data: {
-                vod_id: vodIdInt,
+                vod_id: dbId,
                 start_time: startTime + chapter.start,
                 end_time: endTime + chapter.start,
                 video_provider: 'youtube',
@@ -484,7 +480,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
         const createdGameRecord = await db.game.create({
           data: {
-            vod_id: vodIdInt,
+            vod_id: dbId,
             start_time: chapter.start,
             end_time: chapter.end,
             video_provider: 'youtube',
@@ -516,11 +512,11 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
     );
 
     await db.vodUpload.updateMany({
-      where: { vod_id: vodIdInt },
+      where: { vod_id: dbId },
       data: { status: 'FAILED' },
     });
 
-    throw error; // Error details already logged above - individual upload callbacks handle Discord notifications for their specific uploads
+    throw error;
   }
 };
 
