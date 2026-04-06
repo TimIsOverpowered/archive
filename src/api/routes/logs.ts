@@ -23,7 +23,7 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
     '/:tenantId/vods/:vodId/comments',
     {
       schema: {
-        tags: ['Chat Comments'],
+        tags: ['VODs'],
         description: 'Get chat comments for a VOD with pagination',
         params: {
           type: 'object',
