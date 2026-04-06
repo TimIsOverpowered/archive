@@ -140,6 +140,53 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
           required: ['tenantId', 'platform', 'platformVodId'],
         },
       },
+      constraints: {
+        platform: 'twitch',
+      },
+      onRequest: rateLimitMiddleware,
+    },
+    async (request) => {
+      const { tenantId, platform, platformVodId } = request.params as { tenantId: string; platform: 'twitch' | 'kick'; platformVodId: string };
+
+      const config = getTenantConfig(tenantId);
+      if (!config) {
+        notFound('Streamer not found');
+      }
+
+      const client = getClient(tenantId);
+      if (!client) {
+        serviceUnavailable('Database not available');
+      }
+
+      const vod = await getVodByPlatformId(client, tenantId, platform, platformVodId);
+
+      if (!vod) {
+        notFound('VOD not found');
+      }
+
+      return { data: vod };
+    }
+  );
+
+  fastify.get(
+    '/:tenantId/vods/:platform/:platformVodId',
+    {
+      schema: {
+        tags: ['VODs'],
+        description: 'Get a single VOD by platform-specific ID',
+        params: {
+          type: 'object',
+          properties: {
+            tenantId: { type: 'string', description: 'Tenant ID' },
+            platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Platform' },
+            platformVodId: { type: 'string', description: 'Platform-specific VOD ID' },
+          },
+          required: ['tenantId', 'platform', 'platformVodId'],
+        },
+      },
+      constraints: {
+        platform: 'kick',
+      },
       onRequest: rateLimitMiddleware,
     },
     async (request) => {
