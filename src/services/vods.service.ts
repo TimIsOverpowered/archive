@@ -247,3 +247,76 @@ export async function getVodById(client: PrismaClient, tenantId: string, vodId: 
 
   return null;
 }
+
+export async function getVodByPlatformId(client: PrismaClient, tenantId: string, platform: 'twitch' | 'kick', platformVodId: string): Promise<VodResponse | null> {
+  const cacheKey = `vod:platform:${tenantId}:${platform}:${platformVodId}`;
+
+  if (!DISABLE_CACHE && redisClient) {
+    try {
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached) as VodResponse;
+      }
+    } catch {
+      // Ignore cache errors
+    }
+  }
+
+  const vod = await client.vod.findFirst({
+    where: {
+      platform,
+      vod_id: platformVodId,
+    },
+    include: {
+      vod_uploads: {
+        select: {
+          upload_id: true,
+          type: true,
+          duration: true,
+          part: true,
+          status: true,
+          thumbnail_url: true,
+          created_at: true,
+        },
+      },
+      chapters: {
+        select: {
+          name: true,
+          image: true,
+          duration: true,
+          start: true,
+          end: true,
+        },
+      },
+      games: {
+        select: {
+          start_time: true,
+          end_time: true,
+          video_provider: true,
+          video_id: true,
+          thumbnail_url: true,
+          game_id: true,
+          game_name: true,
+          title: true,
+          chapter_image: true,
+        },
+      },
+    },
+  });
+
+  if (vod) {
+    const response = vod as unknown as VodResponse;
+
+    if (!DISABLE_CACHE && redisClient) {
+      try {
+        await redisClient.set(cacheKey, JSON.stringify(response), 'EX', VODS_CACHE_TTL);
+      } catch {
+        // Ignore cache errors
+      }
+    }
+
+    return response;
+  }
+
+  return null;
+}
