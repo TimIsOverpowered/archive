@@ -80,12 +80,14 @@ async function getValidYoutubeToken(tenantId: string): Promise<string> {
       throw new Error('Token refresh failed - no access token or expiry returned');
     }
 
-    // Update DB with new token (fire-and-forget)
+    // Update DB with new token (await to prevent race conditions)
     if (credentials.refresh_token) {
-      updateYoutubeTokenInDb(tenantId, credentials.access_token, credentials.expiry_date, credentials.refresh_token).catch((err) => {
+      try {
+        await updateYoutubeTokenInDb(tenantId, credentials.access_token, credentials.expiry_date, credentials.refresh_token);
+      } catch (err) {
         const { message } = extractErrorDetails(err);
         log.warn({ tenantId, error: message }, 'Failed to update YouTube token in database');
-      });
+      }
     }
 
     log.info({ tenantId, expiry_date: credentials.expiry_date }, 'YouTube token refreshed');
