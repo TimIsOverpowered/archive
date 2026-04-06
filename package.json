@@ -34,6 +34,7 @@
     "api": "cross-env NODE_ENV=development tsx src/index.ts",
     "workers": "cross-env NODE_ENV=development tsx src/workers/index.ts",
     "auth:youtube": "tsx scripts/auth-youtube.ts",
+    "auth:twitch": "tsx scripts/auth-twitch.ts",
     "streamer:migrate": "tsx scripts/migrate-streamer.ts",
     "tenant:create": "tsx scripts/create-tenant.ts",
     "tenant:import": "tsx scripts/import-tenant.ts",

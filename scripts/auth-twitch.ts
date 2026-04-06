@@ -86,28 +86,6 @@ interface TwitchAuthResponse {
   token_type: string;
 }
 
-async function generateAccessToken(clientId: string, clientSecret: string): Promise<string> {
-  const response = await fetch('https://id.twitch.tv/oauth2/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      client_secret: clientSecret,
-      grant_type: 'client_credentials',
-    }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.text();
-    throw new Error(`Twitch API returned ${response.status}: ${errorData}`);
-  }
-
-  const oauthResult: TwitchAuthResponse = await response.json();
-  return oauthResult.access_token;
-}
-
 async function main(): Promise<void> {
   let tenantIdToUpdate: string | null = null;
 
@@ -163,7 +141,7 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
-    const clientSecret = await promptHidden('Client Secret: ');
+    const clientSecret = await prompt('Client Secret: ');
 
     if (!clientSecret) {
       console.error('\n❌ Client Secret is required.');
@@ -173,9 +151,26 @@ async function main(): Promise<void> {
     // Phase 3: Generate Access Token
     console.log('\n🔄 Generating access token via Twitch OAuth client credentials flow...');
 
-    let accessToken: string;
+    let oauthResult: TwitchAuthResponse;
     try {
-      accessToken = await generateAccessToken(clientId, clientSecret);
+      const response = await fetch('https://id.twitch.tv/oauth2/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+          grant_type: 'client_credentials',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`Twitch API returned ${response.status}: ${errorData}`);
+      }
+
+      oauthResult = await response.json();
       console.log('✓ Access token generated successfully!');
     } catch (error) {
       const details = extractErrorDetails(error);
@@ -189,7 +184,7 @@ async function main(): Promise<void> {
     const twitchAuthObject = {
       client_id: clientId,
       client_secret: clientSecret,
-      access_token: accessToken,
+      access_token: oauthResult.access_token,
     };
 
     console.log('\nEncrypting credentials with AES-256-GCM...');
@@ -246,7 +241,7 @@ async function main(): Promise<void> {
     console.log('╚══════════════╝\n');
 
     const clientIdPreview = clientId.length > 8 ? `${clientId.substring(0, 8)}...` : clientId;
-    const tokenPrefix = accessToken.substring(0, 25);
+    const tokenPrefix = oauthResult.access_token.substring(0, 25);
 
     console.log(`Tenant ID: ${tenantId}\n`);
 
@@ -256,7 +251,8 @@ async function main(): Promise<void> {
 
     console.log('Credentials encrypted with AES-256-GCM and stored in meta database.\n');
 
-    console.log('Note: Access token expires after ~6 hours but can be refreshed');
+    const expiresInHours = Math.round(oauthResult.expires_in / 3600);
+    console.log(`Note: Access token expires after ~${expiresInHours} hours but can be refreshed`);
     console.log('      automatically using the stored client_id + client_secret.');
   } catch (error) {
     const details = extractErrorDetails(error);
