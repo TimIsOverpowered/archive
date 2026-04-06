@@ -18,7 +18,7 @@ export async function enqueueVodDownload(job: Omit<VODDownloadJob, 'id'>, jobId:
 export async function triggerVodDownload(
   tenantId: string,
   platformUserId: string,
-  vodId: string,
+  vodId: number,
   platform: 'twitch' | 'kick',
   externalVodId: string,
   platformUsername?: string

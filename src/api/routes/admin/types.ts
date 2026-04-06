@@ -20,7 +20,7 @@ export interface CreateVodParams {
 
 export interface DeleteVodParams {
   id: string;
-  vodId: string;
+  vodId: number;
 }
 
 export interface StatsParams {
@@ -28,7 +28,7 @@ export interface StatsParams {
 }
 
 export interface CreateVodBody {
-  vodId?: string;
+  vodId?: number;
   title?: string;
   createdAt?: string;
   duration?: number;
@@ -37,7 +37,7 @@ export interface CreateVodBody {
 
 // Download jobs types
 export interface VodRecordBase {
-  id: string;
+  id: number;
   title: string | null;
   created_at: Date;
   duration: number;
@@ -46,14 +46,14 @@ export interface VodRecordBase {
 }
 
 export interface VODDownloadJobBody {
-  vodId?: string;
+  vodId?: number;
   type?: 'live' | 'vod';
   platform?: 'twitch' | 'kick';
   path?: string;
 }
 
 export interface HLSDownloadBody {
-  vodId: string;
+  vodId: number;
   platform?: 'twitch' | 'kick';
   skipEmotes?: boolean;
 }

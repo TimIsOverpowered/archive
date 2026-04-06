@@ -13,7 +13,7 @@ import { notFound, serviceUnavailable, internalServerError } from '../../../util
 
 dayjs.extend(durationPlugin);
 
-type RouteParams = { id: string; vodId: string };
+type RouteParams = { id: string; vodId: number };
 
 interface ChapterGame {
   id?: string;
@@ -34,7 +34,7 @@ interface ChapterEdge {
 
 type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
 
-type VodRecord = { id: string; platform: 'twitch' | 'kick'; duration: number | string; stream_id?: string | null };
+type VodRecord = { id: number; platform: 'twitch' | 'kick'; duration: number | string; stream_id?: string | null };
 
 export default async function metadataFetchingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   if (!adminRateLimiter) {
@@ -50,7 +50,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       schema: {
         tags: ['Admin'],
         description: 'Fetch and save game chapters from Twitch API (Twitch only)',
-        params: { type: 'object', properties: { id: { type: 'string' }, vodId: { type: 'string' } }, required: ['id', 'vodId'] },
+        params: { type: 'object', properties: { id: { type: 'string' }, vodId: { type: 'number' } }, required: ['id', 'vodId'] },
         security: [{ apiKey: [] }],
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
@@ -72,9 +72,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
           serviceUnavailable('Database not available');
         }
 
-        const vodIdNum = Number(vodId);
-
-        const vodRecord: VodRecord | null = (await client.vod.findUnique({ where: { id: vodIdNum } })) as VodRecord | null;
+        const vodRecord: VodRecord | null = (await client.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
 
         if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
@@ -90,7 +88,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
         try {
           const twitch = await import('../../../services/twitch');
-          const rawChapters = (await twitch.getChapters(vodId)) as ChapterEdge[] | null;
+          const rawChapters = (await twitch.getChapters(String(vodId))) as ChapterEdge[] | null;
           chapterEdges = rawChapters || [];
         } catch {
           log.warn(`Failed to fetch chapter data from Twitch API`);
@@ -133,7 +131,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
               await client.chapter.create({
                 data: {
-                  vod_id: vodIdNum,
+                  vod_id: vodId,
                   name: gameNode.displayName || null,
                   duration: durationFormatted,
                   start: startSeconds,
@@ -154,7 +152,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
           try {
             const twitch = await import('../../../services/twitch');
-            chapterData = await twitch.getChapter(vodId);
+            chapterData = await twitch.getChapter(String(vodId));
           } catch {
             log.warn(`Failed to fetch single chapter data from Twitch API`);
           }
@@ -177,7 +175,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
             await client.chapter.create({
               data: {
-                vod_id: vodIdNum,
+                vod_id: vodId,
                 name: gameNode.displayName || null,
                 duration: '00:00:00',
                 start: 0,
@@ -215,7 +213,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       schema: {
         tags: ['Admin'],
         description: 'Fetch and save emote metadata for a VOD',
-        params: { type: 'object', properties: { id: { type: 'string' }, vodId: { type: 'string' } }, required: ['id', 'vodId'] },
+        params: { type: 'object', properties: { id: { type: 'string' }, vodId: { type: 'number' } }, required: ['id', 'vodId'] },
         security: [{ apiKey: [] }],
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
@@ -237,9 +235,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
           serviceUnavailable('Database not available');
         }
 
-        const vodIdNum = Number(vodId);
-
-        const vodRecord: VodRecord | null = (await client.vod.findUnique({ where: { id: vodIdNum } })) as VodRecord | null;
+        const vodRecord: VodRecord | null = (await client.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
 
         if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
@@ -248,7 +244,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
         // Only supported for Twitch with stream_id available
         if (vodRecord.platform === 'twitch' && vodRecord.stream_id) {
           const twitch = await import('../../../services/twitch');
-          const vodData: TwitchVodData = await twitch.getVodData(vodId, tenantId);
+          const vodData: TwitchVodData = await twitch.getVodData(String(vodId), tenantId);
 
           channelId = vodData.user_id;
 
@@ -256,7 +252,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
             log.info(`Fetching emotes for channel ${channelId}`);
 
             const EmoteModule = await import('../../../services/emotes');
-            await EmoteModule.fetchAndSaveEmotes(tenantId, vodIdNum, vodRecord.platform, channelId);
+            await EmoteModule.fetchAndSaveEmotes(tenantId, vodId, vodRecord.platform, channelId);
 
             log.info(`Successfully fetched and saved emotes`);
           } else {

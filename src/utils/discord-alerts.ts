@@ -28,7 +28,7 @@ interface DiscordEmbed {
 
 export interface StreamAlertData {
   platform: 'twitch' | 'kick';
-  vodId: string;
+  vodId: number;
   alertType: 'in_progress' | 'failure' | 'success';
   streamerName?: string;
   durationSeconds?: number;
@@ -319,7 +319,7 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
 /**
  * Send a VOD download started alert
  */
-export async function sendVodDownloadStarted(platform: 'kick' | 'twitch', tenantId: string, vodId: string, streamerName?: string): Promise<string | null> {
+export async function sendVodDownloadStarted(platform: 'kick' | 'twitch', tenantId: string, vodId: number, streamerName?: string): Promise<string | null> {
   if (!isAlertsEnabled()) return null;
 
   const name = streamerName || getTenantDisplayName(tenantId);
@@ -340,7 +340,7 @@ export async function sendVodDownloadStarted(platform: 'kick' | 'twitch', tenant
 /**
  * Send a VOD download success alert
  */
-export async function sendVodDownloadSuccess(messageId: string, platform: 'kick' | 'twitch', vodId: string, vodPath: string, _streamerName?: string): Promise<void> {
+export async function sendVodDownloadSuccess(messageId: string, platform: 'kick' | 'twitch', vodId: number, vodPath: string, _streamerName?: string): Promise<void> {
   if (!isAlertsEnabled()) return;
 
   const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
@@ -361,7 +361,7 @@ export async function sendVodDownloadSuccess(messageId: string, platform: 'kick'
 /**
  * Send a VOD download failed alert
  */
-export async function sendVodDownloadFailed(messageId: string, platform: 'kick' | 'twitch', vodId: string, error: string, _tenantId?: string): Promise<void> {
+export async function sendVodDownloadFailed(messageId: string, platform: 'kick' | 'twitch', vodId: number, error: string, _tenantId?: string): Promise<void> {
   if (!isAlertsEnabled()) return;
 
   const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);

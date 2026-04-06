@@ -391,7 +391,7 @@ export async function downloadVodAsMp4(vodId: string, tenantId: string): Promise
     const vodPath = `${config.settings.vodPath}/${vodId}.mp4`;
 
     const streamerName = config.displayName || tenantId;
-    messageId = await sendVodDownloadStarted('twitch', tenantId, vodId, streamerName);
+    messageId = await sendVodDownloadStarted('twitch', tenantId, Number(vodId), streamerName);
 
     // Fetch m3u8 playlist and detect fMP4 format (Twitch can use both .ts or fMP4)
     const response = await fetch(m3u8Url);
@@ -402,12 +402,12 @@ export async function downloadVodAsMp4(vodId: string, tenantId: string): Promise
     const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
 
     // Download directly to MP4 using ffmpeg HLS streaming
-    await convertHlsToMp4(m3u8Url, vodPath, { vodId, isFmp4 });
+    await convertHlsToMp4(m3u8Url, vodPath, { vodId: Number(vodId), isFmp4 });
 
     log.info(`Downloaded ${vodId}.mp4`);
 
     // Success alert
-    await sendVodDownloadSuccess(messageId!, 'twitch', vodId, vodPath, streamerName);
+    await sendVodDownloadSuccess(messageId!, 'twitch', Number(vodId), vodPath, streamerName);
 
     return vodPath;
   } catch (error) {
@@ -417,7 +417,7 @@ export async function downloadVodAsMp4(vodId: string, tenantId: string): Promise
     log.error(`ffmpeg error occurred: ${errorMsg}`);
 
     // Failure alert
-    await sendVodDownloadFailed(messageId!, 'twitch', vodId, errorMsg, tenantId);
+    await sendVodDownloadFailed(messageId!, 'twitch', Number(vodId), errorMsg, tenantId);
 
     throw error;
   }

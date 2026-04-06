@@ -18,7 +18,7 @@ export async function enqueueChatDownload(job: Omit<ChatDownloadJob, 'id'>, jobI
 export async function triggerChatDownload(
   tenantId: string,
   platformUserId: string,
-  vodId: string,
+  vodId: number,
   platform: 'twitch' | 'kick',
   duration: number,
   vodStartDate?: string,

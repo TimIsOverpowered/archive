@@ -13,12 +13,12 @@ type VodRecord = { id: number; title?: string | null; duration: number | string;
 
 interface ReUploadYoutubeParams {
   id: string;
-  vodId: string;
+  vodId: number;
 }
 
 interface ReDownloadVodParams {
   id: string;
-  vodId: string;
+  vodId: number;
 }
 
 export default async function youtubeUploadRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
@@ -35,7 +35,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       schema: {
         tags: ['Admin'],
         description: 'Manually trigger YouTube re-upload for a VOD with duration validation',
-        params: { type: 'object', properties: { id: { type: 'string' }, vodId: { type: 'string' } }, required: ['id', 'vodId'] },
+        params: { type: 'object', properties: { id: { type: 'string' }, vodId: { type: 'number' } }, required: ['id', 'vodId'] },
         security: [{ apiKey: [] }],
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
@@ -61,9 +61,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
           serviceUnavailable('Database not available');
         }
 
-        const vodIdNum = Number(vodId);
-
-        const vodRecord = (await dbClient.vod.findUnique({ where: { id: vodIdNum } })) as VodRecord | null;
+        const vodRecord = (await dbClient.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
 
         if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
@@ -106,7 +104,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
         const youtubeJob = {
           tenantId,
-          vodId,
+          vodId: String(vodId),
           filePath: finalMp4Path,
           title: `Re-upload: ${vodRecord.title || vodId}`,
           description: 'Manual re-upload triggered via admin endpoint',
@@ -133,7 +131,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       schema: {
         tags: ['Admin'],
         description: 'Manually trigger VOD download (clears Redis dedup key first)',
-        params: { type: 'object', properties: { id: { type: 'string' }, vodId: { type: 'string' } }, required: ['id', 'vodId'] },
+        params: { type: 'object', properties: { id: { type: 'string' }, vodId: { type: 'number' } }, required: ['id', 'vodId'] },
         security: [{ apiKey: [] }],
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
@@ -157,9 +155,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
           serviceUnavailable('Database not available');
         }
 
-        const vodIdNum = Number(vodId);
-
-        const vodRecord = (await dbClient.vod.findUnique({ where: { id: vodIdNum } })) as VodRecord | null;
+        const vodRecord = (await dbClient.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
 
         if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
@@ -169,7 +165,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
         const downloadJob = {
           tenantId: tenantId,
           platformUserId: tenantId,
-          vodId,
+          vodId: vodId,
           platform: vodRecord.platform as 'twitch' | 'kick',
         };
 

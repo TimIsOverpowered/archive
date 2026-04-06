@@ -12,9 +12,9 @@ interface ProgressEvent {
  * Options for HLS to MP4 conversion
  */
 export interface HlsToMp4Options {
-  vodId?: string; // for logging context (optional)
-  onProgress?: (percent: number) => void; // progress callback (optional - not using now)
-  isFmp4?: boolean; // whether source uses fragmented MP4 segments (caller determines this)
+  vodId?: number;
+  onProgress?: (percent: number) => void;
+  isFmp4?: boolean;
 }
 
 /**
