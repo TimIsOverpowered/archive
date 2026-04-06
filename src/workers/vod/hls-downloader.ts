@@ -380,7 +380,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
 
   try {
     await fsPromises.mkdir(vodDir, { recursive: true });
-    log.info(`[${vodId}] Created download directory: ${vodDir}`);
+    log.debug(`[${vodId}] Created download directory: ${vodDir}`);
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
       throw new Error(`Failed to create VOD directory ${vodDir}: ${(error as Error).message}`);
@@ -404,7 +404,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
     log.info(`[${vodId}] Created CycleTLS session for Kick HLS download`);
   }
 
-  log.info(`[${vodId}] Starting HLS polling loop...`);
+  log.debug(`[${vodId}] Starting HLS polling loop...`);
 
   while (true) {
     try {
