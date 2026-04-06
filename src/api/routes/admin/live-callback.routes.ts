@@ -23,7 +23,7 @@ type LiveCallbackParams = { id: string };
 
 interface LiveCallbackResponseData {
   message: string;
-  vodId: string;
+  vodId: number;
   jobId?: string | undefined;
   path: string;
 }
@@ -116,9 +116,11 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         }
 
         // Look up VOD record by stream_id or id
+        const streamIdNum = Number(request.body.streamId);
+
         let vodRecord: VodRecordBase | null = await client.vod.findFirst({
           where: {
-            OR: [{ id: request.body.streamId }, { stream_id: request.body.streamId }],
+            OR: [{ id: streamIdNum }, { stream_id: request.body.streamId }],
           },
         });
 
@@ -128,7 +130,8 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
 
           vodRecord = await client.vod.create({
             data: {
-              id: request.body.streamId,
+              id: streamIdNum,
+              vod_id: request.body.streamId,
               platform: request.body.platform,
               title: `${request.body.platform.toUpperCase()} Live Recording`,
               duration: request.body.durationSecs || 0,
@@ -163,7 +166,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
           return <{ data: LiveCallbackResponseData }>{
             data: {
               message: 'YouTube live upload is disabled for this tenant. Recording processed but no upload queued.',
-              vodId: request.body.streamId,
+              vodId: streamIdNum,
               path: request.body.path,
             },
           };
@@ -171,11 +174,11 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
 
         const youtubeJobData = {
           tenantId,
-          vodId: request.body.streamId,
-          filePath: request.body.path, // Pre-recorded MP4 path from recorder
+          vodId: String(streamIdNum),
+          filePath: request.body.path,
           title: vodRecord.title || `${request.body.platform.toUpperCase()} VOD`,
           description: config.youtube.description || '',
-          type: 'live' as const, // Special live upload type (no splitting/trimming)
+          type: 'live' as const,
           platform: request.body.platform,
         };
 
@@ -201,7 +204,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         return <{ data: LiveCallbackResponseData }>{
           data: {
             message: 'YouTube upload queued successfully',
-            vodId: request.body.streamId,
+            vodId: streamIdNum,
             jobId,
             path: request.body.path,
           },

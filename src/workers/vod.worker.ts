@@ -3,7 +3,7 @@ import pathMod from 'path';
 import { fileExists } from '../utils/path.js';
 
 export interface LiveHlsDownloadJobData {
-  vodId: string;
+  vodId: number;
   platform: 'twitch' | 'kick';
   tenantId: string;
   platformUserId: string;
@@ -15,7 +15,7 @@ export interface LiveHlsDownloadJobData {
 }
 
 export interface StandardVodDownloadJobData {
-  vodId: string;
+  vodId: number;
   platform: 'twitch' | 'kick';
   tenantId: string;
   platformUserId: string;
@@ -54,7 +54,7 @@ const vodProcessor: Processor<LiveHlsDownloadJobData | StandardVodDownloadJobDat
       throw new Error(`VOD path not configured for streamer ${tenantId}`);
     }
 
-    const vodDirPath = pathMod.join(config.settings.livePath || config.settings.vodPath, tenantId, vodId);
+    const vodDirPath = pathMod.join(config.settings.livePath || config.settings.vodPath, tenantId, String(vodId));
 
     const exists = await fileExists(vodDirPath);
 

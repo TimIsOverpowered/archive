@@ -6,13 +6,13 @@ export interface VODDownloadJob {
   tenantId: string;
   platformUserId: string;
   platformUsername?: string;
-  vodId: string;
+  vodId: number;
   platform: 'twitch' | 'kick';
   externalVodId?: string;
 }
 
 export interface LiveHlsDownloadJob {
-  vodId: string;
+  vodId: number;
   platform: 'twitch' | 'kick';
   tenantId: string;
   platformUserId: string;
@@ -28,7 +28,7 @@ export interface ChatDownloadJob {
   tenantId: string;
   platformUserId: string;
   platformUsername?: string;
-  vodId: string;
+  vodId: number;
   platform: 'twitch' | 'kick';
   duration: number;
   vodStartDate?: string;

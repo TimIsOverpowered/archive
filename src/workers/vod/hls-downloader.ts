@@ -20,7 +20,7 @@ import { saveVodChapters as saveTwitchVodChapters } from '../../services/twitch.
 import { fileExists } from '../../utils/path.js';
 
 export interface HlsDownloadOptions {
-  vodId: string;
+  vodId: number;
   platform: 'twitch' | 'kick';
   tenantId: string;
   platformUserId: string;
@@ -210,7 +210,7 @@ export async function cleanupOrphanedTmpFiles(vodDir: string, log: ReturnType<ty
   }
 }
 
-function updateAlertProgress(messageId: string | null, platform: string, totalSegmentsFound: number, vodId: string, startedAt?: string): void {
+function updateAlertProgress(messageId: string | null, platform: string, totalSegmentsFound: number, vodId: number, startedAt?: string): void {
   if (!messageId || !isAlertsEnabled()) return;
 
   // Calculate elapsed time
@@ -240,15 +240,15 @@ function updateAlertProgress(messageId: string | null, platform: string, totalSe
 }
 
 async function fetchTwitchPlaylist(
-  vodId: string,
+  vodId: number,
   log: ReturnType<typeof loggerWithTenant>,
   retryCount: number,
   maxRetryBeforeEndDetection: number
 ): Promise<{ variantM3u8String: string; baseURL: string } | null> {
-  const tokenSig = await getVodTokenSig(vodId);
+  const tokenSig = await getVodTokenSig(String(vodId));
 
   try {
-    const masterPlaylistContent = await getTwitchM3u8(vodId, tokenSig.value, tokenSig.signature);
+    const masterPlaylistContent = await getTwitchM3u8(String(vodId), tokenSig.value, tokenSig.signature);
 
     if (!masterPlaylistContent) {
       log.error(`[${vodId}] Failed to fetch Twitch master playlist`);
@@ -309,7 +309,7 @@ async function fetchTwitchPlaylist(
 }
 
 async function fetchKickPlaylist(
-  vodId: string,
+  vodId: number,
   sourceUrl: string | undefined,
   log: ReturnType<typeof loggerWithTenant>,
   retryCount: number,
@@ -436,7 +436,7 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
   }
 
   const basePath = config.settings.livePath || config.settings.vodPath || '';
-  const vodDir = pathMod.join(basePath, tenantId, vodId);
+  const vodDir = pathMod.join(basePath, tenantId, String(vodId));
 
   try {
     await fsPromises.mkdir(vodDir, { recursive: true });

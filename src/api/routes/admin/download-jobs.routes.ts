@@ -15,7 +15,7 @@ import { notFound, serviceUnavailable, badRequest } from '../../../utils/http-er
 type StreamerDbClient = ReturnType<typeof getClient>;
 
 type VodRecord = {
-  id: string;
+  id: number;
   title: string | null;
   created_at: Date;
   duration: number;
@@ -25,7 +25,7 @@ type VodRecord = {
 
 type Logger = ReturnType<typeof createAutoLogger>;
 
-async function validateVodFile(tenantId: string, vodId: string, expectedDuration: number, filePath: string, log: Logger): Promise<{ valid: boolean; filePath: string }> {
+async function validateVodFile(tenantId: string, vodId: number, expectedDuration: number, filePath: string, log: Logger): Promise<{ valid: boolean; filePath: string }> {
   const exists = await fileExists(filePath);
 
   if (!exists) {
@@ -62,7 +62,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
   /**
    * Shared VOD creation logic for both /download and /hlsDownload endpoints
    */
-  async function ensureVodRecord(tenantId: string, vodId: string, platform: 'twitch' | 'kick', logInstance: Logger): Promise<VodRecord> {
+  async function ensureVodRecord(tenantId: string, vodId: number, platform: 'twitch' | 'kick', logInstance: Logger): Promise<VodRecord> {
     const config = getTenantConfig(tenantId);
 
     if (!config) notFound('Tenant not found');
@@ -102,7 +102,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
       if (platform === 'twitch') {
         const twitch = await import('../../../services/twitch');
-        const vodMetadata: TwitchVodData = await twitch.getVodData(vodId, tenantId);
+        const vodMetadata: TwitchVodData = await twitch.getVodData(String(vodId), tenantId);
 
         // Validate ownership
         if (!config.twitch?.id || vodMetadata.user_id !== config.twitch.id) {
@@ -120,6 +120,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         vodRecord = (await client.vod.create({
           data: {
             id: vodId,
+            vod_id: String(vodId),
             title: vodMetadata.title || null,
             created_at: new Date(vodMetadata.created_at),
             duration: totalSeconds,
@@ -136,16 +137,17 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           badRequest('Kick username not configured for this tenant');
         }
 
-        const vodMetadata: KickVod = await kick.getVod(config.kick.username, vodId);
+        const vodMetadata: KickVod = await kick.getVod(config.kick.username, String(vodId));
 
         logInstance.info(`Fetched Kick VOD ${vodId} from channel ${config.kick.username}`);
 
         vodRecord = (await client.vod.create({
           data: {
-            id: String(vodId),
+            id: vodId,
+            vod_id: String(vodId),
             title: vodMetadata.session_title || null,
             created_at: new Date(vodMetadata.created_at),
-            duration: Math.floor(Number(vodMetadata.duration) / 1000), // Convert ms to seconds
+            duration: Math.floor(Number(vodMetadata.duration) / 1000),
             stream_id: `${vodMetadata.id}`,
             platform: 'kick',
           },
@@ -168,7 +170,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
   // Main download endpoint - creates VOD record if missing, then queues download + emote + chat jobs + upload (Twitch/Kick)
   fastify.post<{
-    Body: { vodId: string; type?: 'live' | 'vod'; platform: 'twitch' | 'kick'; path?: string; uploadMode?: 'vod' | 'all'; mode?: 'hls' | 'mp4' };
+    Body: { vodId: number; type?: 'live' | 'vod'; platform: 'twitch' | 'kick'; path?: string; uploadMode?: 'vod' | 'all'; mode?: 'hls' | 'mp4' };
     Params: { id: string };
   }>(
     '/:id/upload',
@@ -180,7 +182,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         body: {
           type: 'object',
           properties: {
-            vodId: { type: 'string' },
+            vodId: { type: 'number' },
             type: { type: 'string', enum: ['live', 'vod'], default: 'vod' },
             platform: { type: 'string', enum: ['twitch', 'kick'] },
             mode: { type: 'string', enum: ['hls', 'mp4'], default: 'hls' },

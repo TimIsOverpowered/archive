@@ -216,15 +216,15 @@ export async function downloadMP4(tenantId: string, vod: KickVod): Promise<strin
     const vodPath = `${config.settings.vodPath}/${vod.id}.mp4`;
 
     const streamerName = config.displayName || tenantId;
-    messageId = await sendVodDownloadStarted('kick', tenantId, String(vod.id), streamerName);
+    messageId = await sendVodDownloadStarted('kick', tenantId, Number(vod.id), streamerName);
 
     // Download directly to MP4 using ffmpeg HLS streaming
-    await convertHlsToMp4(m3u8Url, vodPath, { vodId: String(vod.id), isFmp4: false });
+    await convertHlsToMp4(m3u8Url, vodPath, { vodId: Number(vod.id), isFmp4: false });
 
     log.info(`Downloaded ${String(vod.id)}.mp4`);
 
     // Success alert
-    await sendVodDownloadSuccess(messageId!, 'kick', String(vod.id), vodPath, streamerName);
+    await sendVodDownloadSuccess(messageId!, 'kick', Number(vod.id), vodPath, streamerName);
 
     return vodPath;
   } catch (error) {
@@ -234,7 +234,7 @@ export async function downloadMP4(tenantId: string, vod: KickVod): Promise<strin
     log.error(`ffmpeg error occurred: ${errorMsg}`);
 
     // Failure alert
-    await sendVodDownloadFailed(messageId!, 'kick', String(vod.id), errorMsg, tenantId);
+    await sendVodDownloadFailed(messageId!, 'kick', Number(vod.id), errorMsg, tenantId);
 
     throw error;
   }

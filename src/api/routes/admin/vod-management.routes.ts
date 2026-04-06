@@ -116,17 +116,15 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
           badRequest('vodId is required');
         }
 
-        const vodIdNum = Number(body.vodId);
-
-        const existing = await client.vod.findUnique({ where: { id: vodIdNum } });
+        const existing = await client.vod.findUnique({ where: { id: body.vodId } });
 
         if (existing) {
-          return { data: { message: `${vodIdNum} already exists!`, vodId: vodIdNum } };
+          return { data: { message: `${body.vodId} already exists!`, vodId: body.vodId } };
         }
 
         const newVod = await client.vod.create({
           data: {
-            vod_id: String(vodIdNum),
+            vod_id: String(body.vodId),
             title: body.title || null,
             created_at: body.createdAt ? new Date(body.createdAt) : undefined,
             duration: Number(body.duration) || 0,
@@ -134,7 +132,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
           },
         });
 
-        log.info(`Created VOD ${vodIdNum}`);
+        log.info(`Created VOD ${body.vodId}`);
 
         return { data: { message: `${newVod.id} created!`, vodId: newVod.id } };
       } catch (error) {
@@ -156,7 +154,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
         description: 'Delete a VOD and all related data (chapters, games, uploads)',
         params: {
           type: 'object',
-          properties: { id: { type: 'string' }, vodId: { type: 'string' } },
+          properties: { id: { type: 'string' }, vodId: { type: 'number' } },
           required: ['id', 'vodId'],
         },
         security: [{ apiKey: [] }],
@@ -173,9 +171,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
 
         if (!client) serviceUnavailable('Database not available');
 
-        const vodIdNum = Number(vodId);
-
-        await client.vod.delete({ where: { id: vodIdNum } });
+        await client.vod.delete({ where: { id: vodId } });
 
         log.info(`Deleted VOD ${vodId} and all related data (cascade)`);
 

@@ -10,7 +10,7 @@ import { sendVodDownloadStarted, sendVodDownloadSuccess, sendVodDownloadFailed }
 import { extractErrorDetails } from '../../utils/error.js';
 
 export interface StandardVodDownloadOptions {
-  vodId: string;
+  vodId: number;
   platform: 'twitch' | 'kick';
   tenantId: string;
   platformUserId: string;
@@ -48,7 +48,7 @@ export async function downloadStandardVod(options: StandardVodDownloadOptions): 
         throw new Error('Kick username not configured for streamer');
       }
 
-      const vodMetadata = await kickModule.getVod(username, vodId);
+      const vodMetadata = await kickModule.getVod(username, String(vodId));
 
       if (!vodMetadata?.source) {
         throw new Error('VOD source URL not available');
@@ -83,7 +83,7 @@ export async function downloadStandardVod(options: StandardVodDownloadOptions): 
 
       return { success: true, finalPath, durationSeconds: actualDuration ?? undefined };
     } else if (platform === 'twitch') {
-      const tokenSig = await getVodTokenSig(vodId);
+      const tokenSig = await getVodTokenSig(String(vodId));
 
       if (!tokenSig) {
         throw new Error(`Failed to get token/sig for ${vodId}`);

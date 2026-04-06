@@ -24,7 +24,7 @@ interface LastFailedJob {
   errorMessage: string;
   attemptsMade: number;
   maxAttempts: number;
-  vodId?: string;
+  vodId?: number;
   failedAt?: Date;
 }
 
@@ -72,7 +72,7 @@ async function getLastFailedJob(queue: Queue): Promise<LastFailedJob | null> {
       errorMessage: (job.failedReason || 'Unknown error').substring(0, 500),
       attemptsMade: job.attemptsMade ?? 0,
       maxAttempts: ((job.opts as Partial<BaseJobOptions>).attempts ?? 3) as number,
-      vodId: 'vodId' in rawData ? String(rawData.vodId) : undefined,
+      vodId: 'vodId' in rawData ? Number(rawData.vodId) : undefined,
       failedAt: finishedAtTimestamp ?? new Date(),
     };
   } catch {

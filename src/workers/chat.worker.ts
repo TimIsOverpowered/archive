@@ -124,7 +124,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
         status: 'warning',
         fields: [
           { name: 'Platform', value: platform, inline: true },
-          { name: 'VOD ID', value: vodId, inline: false },
+          { name: 'VOD ID', value: String(vodId), inline: false },
           ...(effectiveOffset > 0
             ? [
                 {
@@ -146,7 +146,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
     log.info('[' + vodId + '] Starting chat download' + (effectiveOffset > 0 ? ' from offset ' + effectiveOffset.toFixed(2) + 's' : ''));
 
     // Move initial fetch OUTSIDE the loop - proper cursor-based pagination
-    let rawPage = await fetchComments(vodId, effectiveOffset);
+    let rawPage = await fetchComments(String(vodId), effectiveOffset);
 
     // Cursor stagnation protection variables
     let lastCursor: string | null = null;
@@ -262,7 +262,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
       await sleep(RATE_LIMIT_MS);
 
-      rawPage = await fetchNextComments(vodId, pageCursor); // Only used for subsequent pages now!
+      rawPage = await fetchNextComments(String(vodId), pageCursor); // Only used for subsequent pages now!
     }
 
     resetFailures(tenantId);

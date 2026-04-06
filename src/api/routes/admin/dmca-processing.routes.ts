@@ -10,7 +10,7 @@ import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound, serviceUnavailable, internalServerError } from '../../../utils/http-error';
 
-type VodRecord = { id: string; platform: 'twitch' | 'kick' };
+type VodRecord = { id: number; platform: 'twitch' | 'kick' };
 
 type StreamerDbClient = ReturnType<typeof getClient>;
 
@@ -28,7 +28,7 @@ type StrictDmcaClaims = Array<{
 }>;
 
 interface DmcaRequestBody {
-  vodId: string;
+  vodId: number;
   claims: DmcaClaim[] | string;
   platform?: 'twitch' | 'kick';
   type?: 'vod' | 'live';
@@ -36,7 +36,7 @@ interface DmcaRequestBody {
 }
 
 interface ProcessDmcaResponse {
-  data: { message: string; vodId: string; part?: number };
+  data: { message: string; vodId: number; part?: number };
 }
 
 export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
@@ -121,7 +121,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
     return {
       data: {
         message: body.partIndex !== undefined ? `DMCA part processing started` : 'DMCA processing started',
-        vodId: String(vodRecord.id),
+        vodId: vodRecord.id,
         ...(body.partIndex !== undefined && { part: Number(body.partIndex) + 1 }),
       },
     };
@@ -138,7 +138,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
         body: {
           type: 'object',
           properties: {
-            vodId: { type: 'string' },
+            vodId: { type: 'number' },
             claims: {}, // Accept any format - array or JSON string
             partIndex: { type: 'number' }, // Optional - if provided, processes only that part (0-indexed)
             platform: { type: 'string', enum: ['twitch', 'kick'] },
