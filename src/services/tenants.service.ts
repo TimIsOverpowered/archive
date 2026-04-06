@@ -66,26 +66,12 @@ export async function getTenantStats(client: PrismaClient, tenantId: string): Pr
 
   const platforms: string[] = [];
   const twitch = tenant.twitch as Record<string, unknown> | null;
-  const youtube = tenant.youtube as Record<string, unknown> | null;
   const kick = tenant.kick as Record<string, unknown> | null;
 
-  if (twitch?.username) platforms.push('twitch');
-  if (youtube?.apiKey || youtube?.auth) platforms.push('youtube');
-  if (kick?.username) platforms.push('kick');
+  if (twitch?.enabled) platforms.push('twitch');
+  if (kick?.enabled) platforms.push('kick');
 
-  const [vods, vodUploads, chapters] = await Promise.all([
-    client.vod.findMany({ where: { platform: { startsWith: tenantId } } }),
-    client.vodUpload.findMany({
-      where: {
-        vod: { platform: { startsWith: tenantId } },
-      },
-    }),
-    client.chapter.findMany({
-      where: { vod: { platform: { startsWith: tenantId } } },
-    }),
-  ]);
-
-  const vodIds = vods.map((v) => v.id);
+  const [vods, vodUploads, chapters] = await Promise.all([client.vod.findMany({}), client.vodUpload.findMany({}), client.chapter.findMany({})]);
 
   const byPlatform: Record<string, number> = {};
   vods.forEach((vod) => {
@@ -177,12 +163,10 @@ export async function getAllTenants(): Promise<
   return tenants.map((t) => {
     const platforms: string[] = [];
     const twitch = t.twitch as Record<string, unknown> | null;
-    const youtube = t.youtube as Record<string, unknown> | null;
     const kick = t.kick as Record<string, unknown> | null;
 
-    if (twitch?.username) platforms.push('twitch');
-    if (youtube?.apiKey || youtube?.auth) platforms.push('youtube');
-    if (kick?.username) platforms.push('kick');
+    if (twitch?.enabled) platforms.push('twitch');
+    if (kick?.enabled) platforms.push('kick');
 
     return {
       id: t.id,
