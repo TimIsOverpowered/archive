@@ -37,8 +37,11 @@ export type VODDownloadResult =
     };
 
 const vodProcessor: Processor<LiveHlsDownloadJobData | StandardVodDownloadJobData, VODDownloadResult, string> = async (
-  job: Job<LiveHlsDownloadJobData | StandardVodDownloadJobData, VODDownloadResult, string>
+  job: Job<LiveHlsDownloadJobData | StandardVodDownloadJobData, VODDownloadResult, string>,
+  token
 ) => {
+  const signal = (token as { abortSignal?: AbortSignal })?.abortSignal;
+
   const { dbId, vodId, platform, tenantId } = job.data;
 
   const { createAutoLogger: loggerWithTenant } = await import('../utils/auto-tenant-logger.js');
@@ -68,18 +71,21 @@ const vodProcessor: Processor<LiveHlsDownloadJobData | StandardVodDownloadJobDat
     }
 
     const liveData = job.data as LiveHlsDownloadJobData;
-    const result = await downloadLiveHls({
-      dbId,
-      vodId,
-      platform,
-      tenantId,
-      platformUserId: liveData.platformUserId,
-      platformUsername: liveData.platformUsername,
-      startedAt: liveData.startedAt,
-      sourceUrl: liveData.sourceUrl,
-      uploadAfterDownload: liveData.uploadAfterDownload,
-      uploadMode: liveData.uploadMode,
-    });
+    const result = await downloadLiveHls(
+      {
+        dbId,
+        vodId,
+        platform,
+        tenantId,
+        platformUserId: liveData.platformUserId,
+        platformUsername: liveData.platformUsername,
+        startedAt: liveData.startedAt,
+        sourceUrl: liveData.sourceUrl,
+        uploadAfterDownload: liveData.uploadAfterDownload,
+        uploadMode: liveData.uploadMode,
+      },
+      signal
+    );
 
     return result!;
   } else if (job.name === 'standard_vod_download') {

@@ -36,7 +36,7 @@ export interface HlsDownloadOptions {
  * Download a single segment (universal - handles both .ts and .mp4)
  * Uses standard fetch for Twitch
  */
-async function downloadSegment(segmentUri: string, vodDir: string, baseURL: string, retryAttempts: number = 3): Promise<void> {
+async function downloadSegment(segmentUri: string, vodDir: string, baseURL: string, retryAttempts: number = 3, signal?: AbortSignal): Promise<void> {
   const url = `${baseURL}/${segmentUri}`;
   const outputPath = pathMod.join(vodDir, segmentUri);
   const tempPath = outputPath + '.tmp';
@@ -51,8 +51,12 @@ async function downloadSegment(segmentUri: string, vodDir: string, baseURL: stri
   let lastResponse: Response | null = null;
 
   for (let attempt = 1; attempt <= retryAttempts; attempt++) {
+    if (signal?.aborted) {
+      throw new Error('Download aborted');
+    }
+
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal });
       lastResponse = response;
 
       throwOnHttpError(response, `Download segment ${url} (attempt ${attempt}/${retryAttempts})`);
@@ -70,6 +74,10 @@ async function downloadSegment(segmentUri: string, vodDir: string, baseURL: stri
       try {
         await fsPromises.unlink(tempPath).catch(() => {});
       } catch {}
+
+      if (signal?.aborted) {
+        throw new Error('Download aborted');
+      }
 
       if (lastResponse && lastResponse.status >= 400 && lastResponse.status < 500) {
         break;
@@ -90,7 +98,8 @@ async function downloadSegmentsParallel(
   baseURL: string,
   concurrency: number,
   retryAttempts: number,
-  log: ReturnType<typeof loggerWithTenant>
+  log: ReturnType<typeof loggerWithTenant>,
+  signal?: AbortSignal
 ): Promise<void> {
   const limit = pLimit(concurrency);
   let completedCount = 0;
@@ -100,11 +109,19 @@ async function downloadSegmentsParallel(
 
   await Promise.all(
     segments.map(async (segment) => {
+      if (signal?.aborted) {
+        return;
+      }
+
       let lastError: Error | null = null;
 
       for (let attempt = 1; attempt <= retryAttempts; attempt++) {
+        if (signal?.aborted) {
+          return;
+        }
+
         try {
-          await limit(() => downloadSegment(segment.uri, vodDir, baseURL, 1));
+          await limit(() => downloadSegment(segment.uri, vodDir, baseURL, 1, signal));
 
           completedCount++;
           const progress = Math.round((completedCount / totalSegments) * 100);
@@ -114,16 +131,24 @@ async function downloadSegmentsParallel(
           }
           return;
         } catch (error: unknown) {
+          if (signal?.aborted) {
+            return;
+          }
+
           lastError = error instanceof Error ? error : new Error(String(error));
           log.debug({ uri: segment.uri, attempt, error: lastError.message }, `Failed to download segment`);
         }
       }
 
-      throw lastError;
+      if (!signal?.aborted && lastError) {
+        throw lastError;
+      }
     })
   );
 
-  log.info({ total: totalSegments }, `All segments downloaded successfully`);
+  if (!signal?.aborted) {
+    log.info({ total: totalSegments }, `All segments downloaded successfully`);
+  }
 }
 
 /**
@@ -137,7 +162,8 @@ async function downloadKickSegmentsParallel(
   session: CycleTLSSession,
   concurrency: number,
   retryAttempts: number,
-  log: ReturnType<typeof loggerWithTenant>
+  log: ReturnType<typeof loggerWithTenant>,
+  signal?: AbortSignal
 ): Promise<void> {
   const limit = pLimit(concurrency);
   let completedCount = 0;
@@ -147,6 +173,10 @@ async function downloadKickSegmentsParallel(
 
   await Promise.all(
     segmentUris.map(async (uri) => {
+      if (signal?.aborted) {
+        return;
+      }
+
       const outputPath = pathMod.join(vodDir, uri);
       const tempPath = outputPath + '.tmp';
 
@@ -160,6 +190,10 @@ async function downloadKickSegmentsParallel(
       let lastError: Error | null = null;
 
       for (let attempt = 1; attempt <= retryAttempts; attempt++) {
+        if (signal?.aborted) {
+          return;
+        }
+
         try {
           await limit(() => session.streamToFile(`${baseURL}/${uri}`, tempPath));
 
@@ -173,6 +207,10 @@ async function downloadKickSegmentsParallel(
           }
           return;
         } catch (error: unknown) {
+          if (signal?.aborted) {
+            return;
+          }
+
           lastError = error instanceof Error ? error : new Error(String(error));
 
           try {
@@ -183,11 +221,15 @@ async function downloadKickSegmentsParallel(
         }
       }
 
-      throw lastError;
+      if (!signal?.aborted && lastError) {
+        throw lastError;
+      }
     })
   );
 
-  log.info({ total: totalSegments }, `All Kick segments downloaded successfully`);
+  if (!signal?.aborted) {
+    log.info({ total: totalSegments }, `All Kick segments downloaded successfully`);
+  }
 }
 
 export async function cleanupOrphanedTmpFiles(vodDir: string, log: ReturnType<typeof loggerWithTenant>): Promise<void> {
@@ -373,7 +415,7 @@ async function fetchKickPlaylist(
   }
 }
 
-export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ success: true; finalPath: string; durationSeconds?: number }> {
+export async function downloadLiveHls(options: HlsDownloadOptions, signal?: AbortSignal): Promise<{ success: true; finalPath: string; durationSeconds?: number }> {
   const { dbId, vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl } = options;
 
   const log = loggerWithTenant(tenantId);
@@ -564,12 +606,18 @@ export async function downloadLiveHls(options: HlsDownloadOptions): Promise<{ su
           if (platform === 'kick' && kickSession) {
             const segmentUris = newSegments.map((seg) => seg.uri);
 
-            await downloadKickSegmentsParallel(segmentUris, vodDir, baseURL, kickSession!, concurrency, retryAttempts, log);
+            await downloadKickSegmentsParallel(segmentUris, vodDir, baseURL, kickSession!, concurrency, retryAttempts, log, undefined);
           } else {
-            await downloadSegmentsParallel(newSegments, vodDir, baseURL, concurrency, retryAttempts, log);
+            await downloadSegmentsParallel(newSegments, vodDir, baseURL, concurrency, retryAttempts, log, undefined);
           }
         } catch (error: unknown) {
           const details = extractErrorDetails(error);
+
+          if (details.message === 'Download aborted') {
+            log.info({ vodId }, `[${vodId}] Download aborted`);
+            throw error;
+          }
+
           log.error({ ...details, vodId }, `[${vodId}] Error downloading segments`);
 
           retryCount++;
