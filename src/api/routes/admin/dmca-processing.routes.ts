@@ -1,5 +1,5 @@
 import type { DmcaProcessingJob } from '../../../types/queues.js';
-import { enqueueJobWithLogging } from '../../../jobs/utils.js';
+import { enqueueJobWithLogging } from '../../../jobs/queues.js';
 import { extractErrorDetails } from '../../../utils/error.js';
 import { FastifyInstance } from 'fastify';
 import { getTenantConfig } from '../../../config/loader';

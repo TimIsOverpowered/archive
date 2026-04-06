@@ -8,10 +8,7 @@ interface ProgressEvent {
   percent?: number;
 }
 
-/**
- * Options for HLS to MP4 conversion
- */
-export interface HlsToMp4Options {
+interface HlsToMp4Options {
   vodId?: number;
   onProgress?: (percent: number) => void;
   isFmp4?: boolean;

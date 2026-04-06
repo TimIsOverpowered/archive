@@ -63,8 +63,3 @@ export async function checkPuppeteerHealth(browserInstance?: Browser): Promise<P
     return cachedStatus;
   }
 }
-
-export function clearPuppeteerHealthCache(): void {
-  cachedStatus = null;
-  cacheTimestamp = 0;
-}

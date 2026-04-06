@@ -21,23 +21,7 @@ const KICK_PAGE_DELAY_MS = 2000;
 
 const log = childLogger({ module: 'kick' });
 
-/**
- * Fetches Kick's HLS playlist using cycletls (JA3 fingerprinting).
- */
-export async function getKickM3u8(sourceUrl: string): Promise<string> {
-  const session = createSession();
-
-  try {
-    return await session.fetchText(sourceUrl);
-  } finally {
-    await session.close();
-  }
-}
-
-/**
- * Fetch best variant URL from master playlist
- */
-export function getKickParsedM3u8(m3u8: string, baseURL: string): string | null {
+function getKickParsedM3u8(m3u8: string, baseURL: string): string | null {
   try {
     const parsed = HLS.parse(m3u8);
 
@@ -45,7 +29,6 @@ export function getKickParsedM3u8(m3u8: string, baseURL: string): string | null 
       return null;
     }
 
-    // Select highest quality variant (first one in the list)
     const bestVariant = parsed.variants[0];
 
     if (!bestVariant.uri) {
@@ -80,59 +63,6 @@ export interface KickVod {
     src?: string | null;
     srcset?: string | null;
   } | null;
-}
-
-export async function getVods(channelName: string): Promise<KickVod[]> {
-  const result = await navigateToUrl(`https://kick.com/api/v2/channels/${channelName}/videos`, {
-    isJsonUrl: true,
-  });
-
-  if (!result.success) {
-    throw new Error('Failed to load Kick videos API after retries');
-  }
-
-  const page = result.page;
-
-  try {
-    await sleep(KICK_PAGE_DELAY_MS);
-
-    // Use extracted data from navigator if available
-    let dataArray: unknown[] | undefined;
-    if ('data' in result && Array.isArray(result.data)) {
-      dataArray = result.data as unknown[];
-    } else {
-      const content = await page.content();
-      try {
-        dataArray = JSON.parse(content);
-      } catch (error) {
-        log.debug(createErrorContext(error, { channelName }), 'Failed to parse videos API response');
-        return [];
-      }
-    }
-
-    if (!dataArray || !Array.isArray(dataArray)) {
-      return [];
-    }
-
-    const vodsData = dataArray.map((video): KickVod => {
-      if (!video || typeof video !== 'object') {
-        throw new Error('Invalid video object in array');
-      }
-
-      return {
-        id: String((video as Record<string, unknown>).id),
-        slug: ((video as Record<string, unknown>).slug as string) ?? null,
-        session_title: ((video as Record<string, unknown>).session_title as string) ?? null,
-        duration: (video as Record<string, unknown>).duration ? Number((video as Record<string, unknown>).duration) : null,
-        created_at: String((video as Record<string, unknown>).createdAt || ''),
-        source: ((video as Record<string, unknown>).source as string) ?? null,
-      };
-    });
-
-    return vodsData;
-  } finally {
-    await page.close();
-  }
 }
 
 export async function getVod(channelName: string, vodId: string): Promise<KickVod> {

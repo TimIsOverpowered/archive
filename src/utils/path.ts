@@ -18,24 +18,6 @@ export function normalizePath(basePath?: string): string | undefined {
 }
 
 /**
- * Safely joins a base config path with segments for cross-platform compatibility.
- * Handles undefined/empty paths gracefully and filters out empty segments.
- */
-export function joinConfigPath(basePath?: string, ...segments: string[]): string {
-  if (!basePath) return path.join(...segments);
-
-  const normalizedBase = normalizePath(basePath)!;
-  return path.join(normalizedBase, ...segments.filter((s) => s !== ''));
-}
-
-/**
- * Ensures consistent file separators in a path for cross-platform usage.
- */
-export function ensureConsistentSeparators(filePath: string): string {
-  return path.normalize(filePath);
-}
-
-/**
  * Checks if a file exists at the given path.
  */
 export async function fileExists(filePath: string): Promise<boolean> {

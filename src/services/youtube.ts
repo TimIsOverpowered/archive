@@ -1,13 +1,11 @@
-import { google, Auth } from 'googleapis';
+import { google } from 'googleapis';
 import fs from 'fs';
 import { getTenantConfig, configCache } from '../config/loader.js';
 import { decryptObject, encryptObject } from '../utils/encryption.js';
 import { metaClient } from '../db/meta-client.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { sleep } from '../utils/delay.js';
-import { logger as baseLogger } from '../utils/logger.js';
 import { createAutoLogger as loggerWithTenant } from '../utils/auto-tenant-logger.js';
-import { Prisma } from '../../prisma/generated/meta/client.js';
 
 export interface UploadProgressCallbackData {
   milestone: 'starting' | 'processing_metadata' | 'success' | 'error';
@@ -19,58 +17,22 @@ export interface UploadProgressCallbackData {
 export type YoutubeUploadProgress = (data: UploadProgressCallbackData) => void | Promise<void>;
 
 interface AuthObject {
-  access_token?: string; // Optional - may not exist if expired and not refreshed yet
-  refresh_token: string; // Always required for persistence
-  expiry_date: number; // Absolute timestamp (Option A per user choice)
-  scope?: string; // Preserve from OAuth grant
-  token_type?: string; // Usually "Bearer" - preserve but optional
+  access_token?: string;
+  refresh_token: string;
+  expiry_date: number;
+  scope?: string;
+  token_type?: string;
 }
 
 interface DecryptedYoutubeCreds {
   clientId: string;
   clientSecret: string;
   refreshToken: string;
-  accessToken?: string; // Optional cached short-lived token if still valid
-}
-
-// Define structure of youtube JSONB field for type safety
-export interface YoutubeJson extends Prisma.JsonObject {
-  // Encrypted string containing the AuthObject (access_token, refresh_token, etc.)
-  auth: string;
-
-  // Metadata and Settings from your sample
-  description: string;
-  public: boolean;
-  vodUpload: boolean;
-  perGameUpload: boolean;
-  restrictedGames: string[];
-  splitDuration: number;
-  liveUpload: boolean;
-  multiTrack: boolean;
-  upload: boolean;
-
-  // Optional/Legacy fields
-  apiKey?: string;
+  accessToken?: string;
 }
 
 // Global redirect URI for Google OAuth flow (Google playground)
 const REDIRECT_URI = 'https://developers.google.com/oauthplayground';
-
-/**
- * Fast local expiry check without network call.
- * Returns true if token is expired or will expire within next minute (clock skew buffer).
- */
-function isTokenExpired(client: Auth.OAuth2Client): boolean {
-  const expiry = client.credentials.expiry_date as number | undefined;
-
-  // No expiry set means no valid access token cached - assume needs refresh
-  if (!expiry) return true;
-
-  const now = Date.now();
-
-  // Return true if expired OR expiring within next 60 seconds (buffer for clock skew/network latency)
-  return now >= expiry - 60_000;
-}
 
 /**
  * Get valid YouTube access token, refreshing if expired.
@@ -352,40 +314,6 @@ export async function uploadVideo(
 
     throw err; // Re-throw for upstream retry handling in worker
   }
-}
-
-export async function addChapters(tenantId: string, videoId: string, chapters: { time: string; title: string }[]): Promise<void> {
-  const creds = getYoutubeCredentials(tenantId);
-  if (!creds) {
-    throw new Error('YouTube credentials not configured');
-  }
-  const accessToken = await getValidYoutubeToken(tenantId);
-  const oauth2Client = new google.auth.OAuth2(creds.clientId, creds.clientSecret, REDIRECT_URI);
-  oauth2Client.setCredentials({ access_token: accessToken });
-  const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
-
-  const currentVideo = await youtube.videos.list({
-    part: ['snippet'],
-    id: [videoId],
-  });
-
-  const currentDescription = currentVideo.data?.items?.[0]?.snippet?.description || '';
-  const chapterTimestamps = chapters.map((c) => `${c.time} ${c.title}`).join('\n');
-
-  let newDescription = currentDescription;
-  if (!newDescription.includes(chapterTimestamps)) {
-    newDescription = currentDescription ? `${currentDescription}\n\n${chapterTimestamps}` : chapterTimestamps;
-  }
-
-  await youtube.videos.update({
-    part: ['snippet'],
-    requestBody: {
-      id: videoId,
-      snippet: {
-        description: newDescription,
-      },
-    },
-  });
 }
 
 export async function linkParts(tenantId: string, videoIds: { id: string; part: number }[]): Promise<void> {
