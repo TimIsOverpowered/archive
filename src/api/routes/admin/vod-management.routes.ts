@@ -90,7 +90,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
         body: {
           type: 'object',
           properties: {
-            vodId: { type: 'number' },
+            vodId: { type: 'string' },
             title: { type: 'string' },
             createdAt: { type: 'string' },
             duration: { type: 'number' },

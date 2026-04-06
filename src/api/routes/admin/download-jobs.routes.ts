@@ -182,7 +182,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         body: {
           type: 'object',
           properties: {
-            vodId: { type: 'number' },
+            vodId: { type: 'string' },
             type: { type: 'string', enum: ['live', 'vod'], default: 'vod' },
             platform: { type: 'string', enum: ['twitch', 'kick'] },
             mode: { type: 'string', enum: ['hls', 'mp4'], default: 'hls' },
