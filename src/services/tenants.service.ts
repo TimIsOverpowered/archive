@@ -100,7 +100,7 @@ export async function getTenantStats(client: PrismaClient, tenantId: string): Pr
       id: tenantId,
       display_name: config.displayName ?? null,
       platforms,
-      created_at: new Date(),
+      created_at: config.createdAt,
     },
     database: {
       status: dbStatus,
@@ -155,7 +155,7 @@ export async function getAllTenants(): Promise<
       id: config.id,
       display_name: config.displayName ?? null,
       platforms,
-      created_at: new Date(),
+      created_at: config.createdAt,
     };
   });
 }

@@ -22,6 +22,7 @@ export async function loadTenantConfigs(): Promise<TenantConfig[]> {
     const tenantConfig: TenantConfig = {
       id: tenant.id,
       displayName: tenant.displayName,
+      createdAt: tenant.createdAt,
       database: { url: dbUrl },
       settings: {
         domainName: typeof settingsObj.domainName === 'string' ? settingsObj.domainName : '',
