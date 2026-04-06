@@ -1,5 +1,5 @@
 import { PrismaClient } from '../../generated/streamer/client';
-import { metaClient } from '../db/meta-client';
+import { getTenantConfig, getConfigs } from '../config/loader';
 import { redisClient } from '../api/plugins/redis.plugin';
 
 const STATS_CACHE_TTL = parseInt(process.env.STATS_CACHE_TTL || '60', 10);
@@ -49,11 +49,9 @@ export async function getTenantStats(client: PrismaClient, tenantId: string): Pr
     }
   }
 
-  const tenant = await metaClient.tenant.findFirst({
-    where: { id: tenantId },
-  });
+  const config = getTenantConfig(tenantId);
 
-  if (!tenant) {
+  if (!config) {
     throw new Error('Tenant not found');
   }
 
@@ -65,11 +63,8 @@ export async function getTenantStats(client: PrismaClient, tenantId: string): Pr
   }
 
   const platforms: string[] = [];
-  const twitch = tenant.twitch as Record<string, unknown> | null;
-  const kick = tenant.kick as Record<string, unknown> | null;
-
-  if (twitch?.enabled) platforms.push('twitch');
-  if (kick?.enabled) platforms.push('kick');
+  if (config.twitch?.enabled) platforms.push('twitch');
+  if (config.kick?.enabled) platforms.push('kick');
 
   const [vods, vodUploads, chapters] = await Promise.all([client.vod.findMany({}), client.vodUpload.findMany({}), client.chapter.findMany({})]);
 
@@ -103,9 +98,9 @@ export async function getTenantStats(client: PrismaClient, tenantId: string): Pr
   const stats: TenantStats = {
     tenant: {
       id: tenantId,
-      display_name: tenant.displayName,
+      display_name: config.displayName ?? null,
       platforms,
-      created_at: tenant.createdAt,
+      created_at: new Date(),
     },
     database: {
       status: dbStatus,
@@ -149,30 +144,18 @@ export async function getAllTenants(): Promise<
     created_at: Date;
   }>
 > {
-  const tenants = await metaClient.tenant.findMany({
-    select: {
-      id: true,
-      displayName: true,
-      twitch: true,
-      kick: true,
-      youtube: true,
-      createdAt: true,
-    },
-  });
+  const configs = getConfigs();
 
-  return tenants.map((t) => {
+  return configs.map((config) => {
     const platforms: string[] = [];
-    const twitch = t.twitch as Record<string, unknown> | null;
-    const kick = t.kick as Record<string, unknown> | null;
-
-    if (twitch?.enabled) platforms.push('twitch');
-    if (kick?.enabled) platforms.push('kick');
+    if (config.twitch?.enabled) platforms.push('twitch');
+    if (config.kick?.enabled) platforms.push('kick');
 
     return {
-      id: t.id,
-      display_name: t.displayName,
+      id: config.id,
+      display_name: config.displayName ?? null,
       platforms,
-      created_at: t.createdAt,
+      created_at: new Date(),
     };
   });
 }
