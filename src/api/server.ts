@@ -25,8 +25,8 @@ export async function buildServer() {
         },
       };
     },
-    deriveConstraint(request: { params: Record<string, string> }) {
-      return request.params.platform;
+    deriveConstraint(request: { params?: Record<string, string> }) {
+      return request.params?.platform;
     },
     mustMatchWhenDerived: true,
     validate(value: string) {
