@@ -125,7 +125,7 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
   );
 
   fastify.get(
-    '/:tenantId/:platform/:platformVodId',
+    '/:tenantId/vods/:platform/:platformVodId',
     {
       schema: {
         tags: ['VODs'],
