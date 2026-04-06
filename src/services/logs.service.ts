@@ -115,6 +115,7 @@ export async function getLogsByOffset(client: PrismaClient, tenantId: string, vo
     message: msg.message,
     user_badges: msg.user_badges,
     user_color: msg.user_color,
+    created_at: msg.createdAt,
   }));
 
   let cursor: string | undefined;
@@ -206,6 +207,7 @@ export async function getLogsByCursor(client: PrismaClient, tenantId: string, vo
     message: msg.message,
     user_badges: msg.user_badges,
     user_color: msg.user_color,
+    created_at: msg.createdAt,
   }));
 
   let nextCursor: string | undefined;
