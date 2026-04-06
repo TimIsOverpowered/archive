@@ -1,6 +1,7 @@
 export interface TenantConfig {
   id: string;
   displayName?: string;
+  createdAt: Date;
   twitch?: { enabled: boolean; auth?: string; username?: string; mainPlatform?: boolean; id?: string };
   youtube?: {
     auth?: string;
