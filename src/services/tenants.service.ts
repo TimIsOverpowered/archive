@@ -30,8 +30,10 @@ interface TenantStats {
     uploadSuccessRate: number;
   };
   chapters: {
-    totalChapters: number;
-    gamesCount: number;
+    count: number;
+  };
+  games: {
+    count: number;
   };
 }
 
@@ -120,8 +122,10 @@ export async function getTenantStats(client: PrismaClient, tenantId: string): Pr
       uploadSuccessRate,
     },
     chapters: {
-      totalChapters: chapters.length,
-      gamesCount: uniqueGames.size,
+      count: chapters.length,
+    },
+    games: {
+      count: uniqueGames.size,
     },
   };
 
