@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { getVods, getVodById } from '../../services/vods.service';
+import { getVods, getVodById, getVodByPlatformId } from '../../services/vods.service';
 import { getClient } from '../../db/client';
 import { getTenantConfig } from '../../config/loader';
 import createRateLimitMiddleware from '../middleware/rate-limit';
@@ -110,7 +110,52 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
 
       const vodIdNum = Number(vodId);
 
+      if (isNaN(vodIdNum) || vodIdNum < 0 || vodIdNum > 2147483647) {
+        notFound('VOD not found');
+      }
+
       const vod = await getVodById(client, tenantId, vodIdNum);
+
+      if (!vod) {
+        notFound('VOD not found');
+      }
+
+      return { data: vod };
+    }
+  );
+
+  fastify.get(
+    '/:tenantId/:platform/:platformVodId',
+    {
+      schema: {
+        tags: ['VODs'],
+        description: 'Get a single VOD by platform-specific ID',
+        params: {
+          type: 'object',
+          properties: {
+            tenantId: { type: 'string', description: 'Tenant ID' },
+            platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Platform' },
+            platformVodId: { type: 'string', description: 'Platform-specific VOD ID' },
+          },
+          required: ['tenantId', 'platform', 'platformVodId'],
+        },
+      },
+      onRequest: rateLimitMiddleware,
+    },
+    async (request) => {
+      const { tenantId, platform, platformVodId } = request.params as { tenantId: string; platform: 'twitch' | 'kick'; platformVodId: string };
+
+      const config = getTenantConfig(tenantId);
+      if (!config) {
+        notFound('Streamer not found');
+      }
+
+      const client = getClient(tenantId);
+      if (!client) {
+        serviceUnavailable('Database not available');
+      }
+
+      const vod = await getVodByPlatformId(client, tenantId, platform, platformVodId);
 
       if (!vod) {
         notFound('VOD not found');
