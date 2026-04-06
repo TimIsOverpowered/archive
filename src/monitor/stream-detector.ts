@@ -6,8 +6,9 @@ import { createAutoLogger as loggerWithTenant } from '../utils/auto-tenant-logge
 import { QUEUE_NAMES, type LiveHlsDownloadJob, getLiveHlsDownloadQueue, enqueueJobWithLogging } from '../jobs/queues.js';
 import { createClient, getClient } from '../db/client.js';
 import type { TenantConfig } from '../config/types.js';
-import { getTwitchStreamStatus, getLatestTwitchVodObject } from '../services/twitch-live.js';
+import { getTwitchStreamStatus, getLatestTwitchVodObject, type TwitchStreamStatus } from '../services/twitch-live.js';
 import { getKickStreamStatus, getLatestKickVodObject } from '../services/kick-live.js';
+import type { KickStreamStatus } from '../types/kick.js';
 import { sendRichAlert } from '../utils/discord-alerts.js';
 import { formatDuration } from '../utils/formatting.js';
 import { extractErrorDetails, createErrorContext } from '../utils/error.js';
@@ -125,7 +126,15 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
 
   log.debug(`[Twitch]: Checking live status for: ${twitchUsername}`);
 
-  const streamStatus = await getTwitchStreamStatus(twitchId, tenantId);
+  let streamStatus: TwitchStreamStatus | null;
+
+  try {
+    streamStatus = await getTwitchStreamStatus(twitchId, tenantId);
+  } catch (error: unknown) {
+    const details = extractErrorDetails(error);
+    log.warn({ userId: twitchId, err: details.message }, `[Twitch]: API error - skipping offline check`);
+    return;
+  }
 
   // Streamer is OFFLINE - mark any active live record as ended
   if (!streamStatus || streamStatus.type !== 'live') {
@@ -271,7 +280,15 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
 
   log.debug(`[Kick]: Checking live status for channel ${kickUsername}...`);
 
-  const streamStatus = await getKickStreamStatus(kickUsername);
+  let streamStatus: KickStreamStatus | null;
+
+  try {
+    streamStatus = await getKickStreamStatus(kickUsername);
+  } catch (error: unknown) {
+    const details = extractErrorDetails(error);
+    log.warn({ username: kickUsername, err: details.message }, `[Kick]: API error - skipping offline check`);
+    return;
+  }
 
   // Streamer is OFFLINE - mark any active live record as ended
   if (!streamStatus) {

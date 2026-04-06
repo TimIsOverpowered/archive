@@ -131,7 +131,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
   } catch (error) {
     const details = extractErrorDetails(error);
     logger.error({ username, ...details }, `[Kick Live Check] Failed to get stream status for ${username}`);
-    return null;
+    throw error;
   }
 }
 
@@ -209,6 +209,6 @@ export async function getLatestKickVodObject(username: string, expectedStreamId:
   } catch (error) {
     const details = extractErrorDetails(error);
     logger.error({ username, ...details }, `[Kick] Failed to get video object for ${username}`);
-    return null;
+    throw error;
   }
 }
