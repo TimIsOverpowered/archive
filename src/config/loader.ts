@@ -3,7 +3,7 @@ import { decryptScalar } from '../utils/encryption';
 import { normalizePath } from '../utils/path';
 import { TenantConfig } from './types';
 
-const configCache = new Map<string, TenantConfig>();
+export const configCache = new Map<string, TenantConfig>();
 
 // Default configuration constants
 const DEFAULT_YOUTUBE_SPLIT_DURATION = 10800; // 3 hours in seconds

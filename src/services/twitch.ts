@@ -1,6 +1,8 @@
 import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
 import { extractErrorDetails, createErrorContext, throwOnHttpError } from '../utils/error.js';
-import { getTenantConfig as getConfig } from '../config/loader.js';
+import { getTenantConfig as getConfig, configCache } from '../config/loader.js';
+import { encryptObject, decryptObject } from '../utils/encryption.js';
+import { metaClient } from '../db/meta-client.js';
 import { toHHMMSS } from '../utils/formatting.js';
 import { PrismaClient } from '../../generated/streamer/client.js';
 import { childLogger } from '../utils/logger.js';
@@ -32,7 +34,6 @@ interface VodTokenSig {
   value: string;
   signature: string;
 }
-const tokenCache = new Map<string, { token: string; expiresAt: number }>();
 const log = childLogger({ module: 'twitch' });
 
 export async function getAppAccessToken(tenantId: string): Promise<string> {
@@ -40,10 +41,18 @@ export async function getAppAccessToken(tenantId: string): Promise<string> {
   if (!creds) {
     throw new Error('Twitch credentials not configured');
   }
-  const cached = tokenCache.get(tenantId);
-  if (cached && cached.expiresAt > Date.now() + 24 * 60 * 60 * 1000) {
-    return cached.token;
+
+  // Check if stored token is still valid (expires > 1 hour from now)
+  if (creds.accessToken && creds.expiresIn) {
+    const expiresAt = Date.now() + creds.expiresIn * 1000;
+    const oneHourFromNow = Date.now() + 60 * 60 * 1000;
+
+    if (expiresAt > oneHourFromNow) {
+      return creds.accessToken;
+    }
   }
+
+  // Fetch new token from Twitch API
   const url = new URL('https://id.twitch.tv/oauth2/token');
   url.searchParams.append('client_id', creds.clientId);
   url.searchParams.append('client_secret', creds.clientSecret);
@@ -55,11 +64,60 @@ export async function getAppAccessToken(tenantId: string): Promise<string> {
   throwOnHttpError(response, 'Twitch token');
   const data = await response.json();
   const { access_token, expires_in } = data;
-  tokenCache.set(tenantId, {
-    token: access_token,
-    expiresAt: Date.now() + expires_in * 1000,
+
+  log.info({ tenantId, expires_in }, 'Fetched new Twitch access token');
+
+  // Update token in database (fire-and-forget)
+  updateTwitchTokenInDb(tenantId, access_token, expires_in).catch((err) => {
+    const { message } = extractErrorDetails(err);
+    log.warn({ tenantId, error: message }, 'Failed to update Twitch token in database');
   });
+
   return access_token;
+}
+
+async function updateTwitchTokenInDb(tenantId: string, newToken: string, expiresIn: number): Promise<void> {
+  const config = getConfig(tenantId);
+  if (!config?.twitch?.auth) {
+    return;
+  }
+
+  try {
+    const auth = decryptObject<{ client_id: string; client_secret: string; access_token?: string; expires_in?: number }>(config.twitch.auth);
+
+    const updatedAuth = {
+      client_id: auth.client_id,
+      client_secret: auth.client_secret,
+      access_token: newToken,
+      expires_in: expiresIn,
+    };
+
+    const encryptedAuth = encryptObject(updatedAuth);
+
+    await metaClient.tenant.update({
+      where: { id: tenantId },
+      data: {
+        twitch: {
+          ...config.twitch,
+          auth: encryptedAuth,
+        },
+      },
+    });
+
+    // Update in-memory config cache
+    configCache.set(tenantId, {
+      ...config,
+      twitch: {
+        ...config.twitch,
+        auth: encryptedAuth,
+      },
+    });
+
+    log.info({ tenantId, expires_in: expiresIn }, 'Updated Twitch token');
+  } catch (err) {
+    const { message } = extractErrorDetails(err);
+    log.warn({ tenantId, error: message }, 'Failed to update Twitch token in database');
+  }
 }
 export async function getVodData(vodId: string, tenantId: string): Promise<VodData> {
   const accessToken = await getAppAccessToken(tenantId);
