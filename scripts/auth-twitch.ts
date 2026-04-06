@@ -181,11 +181,13 @@ async function main(): Promise<void> {
     }
 
     // Phase 4: Build Auth Object & Encrypt
+    const expiryDate = Date.now() + oauthResult.expires_in * 1000;
+
     const twitchAuthObject = {
       client_id: clientId,
       client_secret: clientSecret,
       access_token: oauthResult.access_token,
-      expires_in: oauthResult.expires_in,
+      expiry_date: expiryDate,
     };
 
     console.log('\nEncrypting credentials with AES-256-GCM...');
@@ -253,7 +255,8 @@ async function main(): Promise<void> {
     console.log('Credentials encrypted with AES-256-GCM and stored in meta database.\n');
 
     const expiresInHours = Math.round(oauthResult.expires_in / 3600);
-    console.log(`Note: Access token expires after ~${expiresInHours} hours but can be refreshed`);
+    const expiryDateStr = new Date(expiryDate).toISOString();
+    console.log(`Note: Access token expires after ~${expiresInHours} hours (at ${expiryDateStr}) but can be refreshed`);
     console.log('      automatically using the stored client_id + client_secret.');
   } catch (error) {
     const details = extractErrorDetails(error);

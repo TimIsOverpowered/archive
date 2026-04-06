@@ -6,14 +6,14 @@ interface TwitchAuth {
   client_id: string;
   client_secret: string;
   access_token?: string;
-  expires_in?: number;
+  expiry_date?: number;
 }
 
 export interface TwitchCredentials {
   clientId: string;
   clientSecret: string;
   accessToken?: string;
-  expiresIn?: number;
+  expiryDate?: number;
 }
 
 /**
@@ -37,7 +37,7 @@ export function getTwitchCredentials(tenantId: string): TwitchCredentials | null
       return null;
     }
 
-    return { clientId: auth.client_id, clientSecret: auth.client_secret, accessToken: auth.access_token, expiresIn: auth.expires_in };
+    return { clientId: auth.client_id, clientSecret: auth.client_secret, accessToken: auth.access_token, expiryDate: auth.expiry_date };
   } catch {
     return null;
   }
