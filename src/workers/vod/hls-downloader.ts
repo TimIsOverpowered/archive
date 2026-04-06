@@ -487,11 +487,9 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
         try {
           const strategy: DownloadStrategy = platform === 'kick' && cycleTLS ? { type: 'cycletls', session: cycleTLS } : { type: 'fetch', signal };
 
-          await downloadSegmentsParallel(newSegments, vodDir, baseURL, strategy, concurrency, retryAttempts, log, (completed) => {
+          await downloadSegmentsParallel(newSegments, vodDir, baseURL, strategy, concurrency, retryAttempts, log, () => {
             if (isAlertsEnabled() && messageId) {
-              const newTotal = totalSegmentsFound + completed;
-              updateAlertProgress(messageId, platform, newTotal, vodId, startedAt);
-              totalSegmentsFound = newTotal;
+              updateAlertProgress(messageId, platform, segments.length, vodId, startedAt);
             }
           });
         } catch (error: unknown) {
@@ -544,6 +542,11 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
     }
   }
 
+  const filesInDir = await fsPromises.readdir(vodDir);
+  const mp4Segments = filesInDir.filter((f) => f.endsWith('.mp4'));
+  const tsSegments = filesInDir.filter((f) => f.endsWith('.ts'));
+  const finalSegmentCount = mp4Segments.length || tsSegments.length;
+
   if (isAlertsEnabled() && messageId) {
     updateDiscordEmbed(messageId, {
       title: `[HLS] Converting ${vodId}`,
@@ -551,22 +554,18 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
       status: 'warning',
       fields: [
         { name: 'Platform', value: platform, inline: true },
-        { name: 'Total Segments', value: String(totalSegmentsFound), inline: false },
+        { name: 'Total Segments', value: String(finalSegmentCount), inline: false },
       ],
       timestamp: startedAt || new Date().toISOString(),
       updatedTimestamp: new Date().toISOString(),
     });
   }
 
-  log.info({ vodId, platform, totalSegmentsDownloaded: totalSegmentsFound }, `[HLS-Downloader] Stream download complete. Starting finalization and MP4 conversion...`);
+  log.info({ vodId, platform, totalSegmentsDownloaded: finalSegmentCount }, `[HLS-Downloader] Stream download complete. Starting finalization and MP4 conversion...`);
 
   try {
-    const filesInDir = await fsPromises.readdir(vodDir);
-
     // Detect segment format: fMP4 vs traditional TS HLS
     const hasInitSegment = filesInDir.some((f) => f.includes('init') && f.endsWith('.mp4'));
-    const mp4Segments = filesInDir.filter((f) => f.endsWith('.mp4'));
-    const tsSegments = filesInDir.filter((f) => f.endsWith('.ts'));
 
     const finalMp4Path = pathMod.join(basePath, tenantId, `${vodId}.mp4`);
 
