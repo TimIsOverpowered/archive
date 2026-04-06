@@ -6,7 +6,7 @@ import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import type { PrismaClient } from '../../../../generated/streamer/client';
 import type { VodRecordBase } from './types';
-import { enqueueJobWithLogging } from '../../../jobs/utils.js';
+import { enqueueJobWithLogging } from '../../../jobs/queues.js';
 import { fileExists } from '../../../utils/path.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';

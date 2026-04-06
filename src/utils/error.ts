@@ -30,44 +30,6 @@ export function extractErrorDetails(error: unknown): ErrorDetails {
 }
 
 /**
- * Safely executes an async function with standardized error handling.
- * Logs the error and returns fallback value or re-throws based on configuration.
- */
-export async function safeAsync<T>(fn: () => Promise<T>, onError?: (err: Error) => void, fallback?: T): Promise<T> {
-  try {
-    return await fn();
-  } catch (error) {
-    const details = extractErrorDetails(error);
-
-    if (onError) {
-      const errObj = error instanceof Error ? error : new Error(details.message);
-      onError(errObj);
-    }
-
-    if (fallback !== undefined) {
-      return fallback;
-    }
-
-    throw error;
-  }
-}
-
-/**
- * Silently catches and ignores errors (for non-critical operations like alerts).
- * Use sparingly - only for truly optional operations where failure is acceptable.
- */
-export function silentFail(fn: () => void | Promise<void>): void {
-  try {
-    const result = fn();
-    if (result instanceof Promise) {
-      result.catch(() => {});
-    }
-  } catch {
-    // Silently ignore
-  }
-}
-
-/**
  * Creates a standardized error logging context object.
  * Use this to ensure consistent error logging across the codebase.
  *
