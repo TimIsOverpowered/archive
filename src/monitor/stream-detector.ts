@@ -65,7 +65,7 @@ export async function checkPlatformStatus(tenantId: string, platform: PlatformTy
  * Handle Twitch-specific live detection logic - NO FALLBACK, only downloads after VOD object confirmed available
  */
 
-async function sendStreamLiveAlert(platform: PlatformType, vodId: number, title: string, username: string, displayName?: string): Promise<void> {
+async function sendStreamLiveAlert(platform: PlatformType, vodId: string, title: string, username: string, displayName?: string): Promise<void> {
   const streamerName = displayName || username;
 
   try {
@@ -86,7 +86,7 @@ async function sendStreamLiveAlert(platform: PlatformType, vodId: number, title:
   }
 }
 
-async function sendStreamOfflineAlert(platform: PlatformType, vodId: number, startedAt?: Date, username?: string, displayName?: string): Promise<void> {
+async function sendStreamOfflineAlert(platform: PlatformType, vodId: string, startedAt?: Date, username?: string, displayName?: string): Promise<void> {
   const streamerName = displayName || username;
 
   try {
@@ -115,30 +115,21 @@ async function sendStreamOfflineAlert(platform: PlatformType, vodId: number, sta
 
 async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string, platform: PlatformType, config: TenantConfig): Promise<void> {
   const log = loggerWithTenant(tenantId);
+
+  if (!config.twitch?.enabled) return;
+
   const twitchUsername = config.twitch?.username;
+  const twitchId = config.twitch?.id;
 
-  if (!twitchUsername || !config.twitch?.enabled) return;
+  if (!twitchId || !twitchUsername) return;
 
-  let userIdCache: string | null = null;
+  log.debug(`[Twitch]: Checking live status for: ${twitchUsername}`);
 
-  if (config.twitch?.id) {
-    userIdCache = String(config.twitch.id);
-  } else if (twitchUsername.startsWith('!')) {
-    userIdCache = twitchUsername.slice(1);
-  } else {
-    log.warn(`[Monitor]: No Twitch user_id available for channel ${twitchUsername}. Skipping check.`);
-    return;
-  }
-
-  if (!userIdCache) return;
-
-  log.debug(`[Twitch]: Checking live status for user_id: ${userIdCache}`);
-
-  const streamStatus = await getTwitchStreamStatus(userIdCache, tenantId);
+  const streamStatus = await getTwitchStreamStatus(twitchId, tenantId);
 
   // Streamer is OFFLINE - mark any active live record as ended
   if (!streamStatus || streamStatus.type !== 'live') {
-    log.debug(`[Monitor]: Twitch user ${userIdCache} is OFFLINE`);
+    log.debug(`[Monitor]: Twitch user ${twitchUsername} is OFFLINE`);
 
     const activeLiveVod = await prisma.vod.findFirst({
       where: { platform, is_live: true },
@@ -153,8 +144,7 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
       });
 
       // Send Discord stream ended alert
-      const twitchUsername = config.twitch?.username;
-      await sendStreamOfflineAlert(platform, Number(activeLiveVod.vod_id), activeLiveVod.started_at ?? undefined, twitchUsername || undefined, config.displayName);
+      await sendStreamOfflineAlert(platform, activeLiveVod.vod_id, activeLiveVod.started_at ?? undefined, twitchUsername || undefined, config.displayName);
     } else {
       log.debug(`[Monitor]:  No active live VOD to update for offline stream`);
     }
@@ -166,16 +156,16 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
   log.debug(`[Twitch]: Stream is LIVE - ID: ${streamStatus.id}, Title: "${streamStatus.title}", Started: ${streamStatus.started_at}`);
 
   const existingVod = await prisma.vod.findFirst({
-    where: { vod_id: String(streamStatus.id), platform },
+    where: { stream_id: streamStatus.id, platform },
   });
 
   if (!existingVod) {
     log.info(`[Monitor]: New Twitch live detected! Stream ID: ${streamStatus.id}. Checking for VOD object...`);
 
-    const vodResult = await getLatestTwitchVodObject(userIdCache, streamStatus.id, tenantId);
+    const vodResult = await getLatestTwitchVodObject(twitchId, streamStatus.id, tenantId);
 
-    if (!vodResult || !vodResult.id) {
-      log.debug(`[Monitor]: VOD object not ready yet for stream ${streamStatus.id}. Will retry on next poll.`);
+    if (!vodResult) {
+      log.debug(`[Monitor]: No VODs found.`);
       return; // Exit immediately - don't block! Next poll in 30s will check again
     }
 
@@ -199,28 +189,29 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
     // Safe to create now - no other poll has claimed this stream yet
     log.info(`[Monitor]: Created VOD record for live stream ${vodResult.id}. Started at: ${streamStatus.started_at}`);
 
-    await prisma.vod.create({
+    const createdVod = await prisma.vod.create({
       data: {
-        vod_id: vodResult.id, // Legacy platform-specific ID (Twitch-assigned)
+        vod_id: vodResult.id,
         platform,
         is_live: true,
         created_at: new Date(vodResult.created_at),
         started_at: new Date(streamStatus.started_at),
-        title: streamStatus.title || 'Live Stream',
+        title: vodResult.title,
         stream_id: vodResult.stream_id,
       },
     });
 
     // Send Discord stream started alert
-    await sendStreamLiveAlert(platform, Number(vodResult.id), streamStatus.title || 'Live Stream', twitchUsername, config.displayName);
+    await sendStreamLiveAlert(platform, vodResult.id, streamStatus.title || '', twitchUsername, config.displayName);
 
     log.info(`[Monitor]: Queuing HLS download for ${vodResult.id}`);
 
     await enqueueLiveHlsDownload({
-      vodId: Number(vodResult.id),
+      dbId: createdVod.id,
+      vodId: vodResult.id,
       platform,
       tenantId: tenantId,
-      platformUserId: userIdCache,
+      platformUserId: twitchId,
       platformUsername: twitchUsername,
       startedAt: new Date(streamStatus.started_at),
     });
@@ -234,17 +225,18 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
       data: {
         is_live: true,
         started_at: new Date(streamStatus.started_at),
-        title: streamStatus.title || existingVod.title,
+        title: existingVod.title,
       },
     });
 
     log.info(`[Monitor]: Queuing HLS download for VOD ${existingVod.vod_id}`);
 
     await enqueueLiveHlsDownload({
-      vodId: Number(existingVod.vod_id),
+      dbId: existingVod.id,
+      vodId: existingVod.vod_id,
       platform,
       tenantId: tenantId,
-      platformUserId: userIdCache,
+      platformUserId: twitchId,
       platformUsername: twitchUsername,
       startedAt: new Date(streamStatus.started_at),
     });
@@ -253,12 +245,13 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
     log.debug(`[Monitor]: VOD ${existingVod.vod_id} is live - ensuring download is queued`);
 
     await enqueueLiveHlsDownload({
-      vodId: Number(existingVod.vod_id),
+      dbId: existingVod.id,
+      vodId: existingVod.vod_id,
       platform,
       tenantId: tenantId,
-      platformUserId: userIdCache,
+      platformUserId: twitchId,
       platformUsername: twitchUsername,
-      startedAt: existingVod.started_at ?? new Date(),
+      startedAt: existingVod.started_at ?? new Date(streamStatus.started_at),
     });
   }
 }
@@ -268,16 +261,20 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
  */
 async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, platform: PlatformType, config: TenantConfig): Promise<void> {
   const log = loggerWithTenant(tenantId);
-  const kickUsername = config.kick?.username;
 
-  if (!kickUsername || !config.kick?.enabled) return;
+  if (!config.kick?.enabled) return;
+
+  const kickUsername = config.kick?.username;
+  const kickId = config.kick?.id;
+
+  if (!kickUsername || !kickId) return;
 
   log.debug(`[Kick]: Checking live status for channel ${kickUsername}...`);
 
   const streamStatus = await getKickStreamStatus(kickUsername);
 
   // Streamer is OFFLINE - mark any active live record as ended
-  if (!streamStatus || !streamStatus.id) {
+  if (!streamStatus) {
     log.debug(`[Monitor]: Kick channel ${kickUsername} is offline`);
 
     const activeLiveVod = await prisma.vod.findFirst({
@@ -293,8 +290,7 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
       });
 
       // Send Discord stream ended alert
-      const kickUsername = config.kick?.username;
-      await sendStreamOfflineAlert(platform, Number(activeLiveVod.vod_id), activeLiveVod.started_at ?? undefined, kickUsername || undefined, config.displayName);
+      await sendStreamOfflineAlert(platform, activeLiveVod.vod_id, activeLiveVod.started_at ?? undefined, kickUsername || undefined, config.displayName);
     } else {
       log.debug(`[Monitor]:  No active live Kick VOD to update`);
     }
@@ -302,22 +298,19 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
     return; // Nothing more to do - offline handled by worker independently
   }
 
-  // LIVE STREAM DETECTED on Kick
-  const kickStreamIdStr = String(streamStatus.id);
-
-  log.debug(`[Kick]: Stream is LIVE - ID: ${kickStreamIdStr}, Title: "${streamStatus.session_title}", Started: ${streamStatus.created_at}`);
+  log.debug(`[Kick]: Stream is LIVE - ID: ${streamStatus.id}, Title: "${streamStatus.session_title}", Started: ${streamStatus.created_at}`);
 
   const existingVod = await prisma.vod.findFirst({
-    where: { vod_id: kickStreamIdStr, platform },
+    where: { vod_id: streamStatus.id, platform },
   });
 
   if (!existingVod) {
-    log.info(`[Monitor]: New Kick live detected! Stream ID: ${kickStreamIdStr}. Checking for video object...`);
+    log.info(`[Monitor]: New Kick live detected! Stream ID: ${streamStatus.id}. Checking for video object...`);
 
     const vodObject = await getLatestKickVodObject(kickUsername, streamStatus.id);
 
-    if (!vodObject || !vodObject.id) {
-      log.debug(`[Monitor]: Video object not ready yet for Kick stream ${kickStreamIdStr}. Will retry on next poll.`);
+    if (!vodObject) {
+      log.debug(`[Monitor]: No VODs found.`);
       return; // Exit immediately - don't block! Next poll in 30s will check again
     }
 
@@ -327,40 +320,41 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
     });
 
     if (vodAlreadyExists) {
-      log.debug(`[Monitor]: VOD ${kickStreamIdStr} was created by concurrent poll. Skipping duplicate creation.`);
+      log.debug(`[Monitor]: VOD ${streamStatus.id} was created by concurrent poll. Skipping duplicate creation.`);
 
       // Another instance handling it - nothing more to do here
       return;
     }
 
     // Safe to create now - no other poll has claimed this stream yet
-    await prisma.vod.create({
+    const createdVod = await prisma.vod.create({
       data: {
-        vod_id: vodObject.id,
+        vod_id: streamStatus.id,
         platform,
         is_live: true,
         created_at: new Date(streamStatus.created_at),
         started_at: new Date(streamStatus.created_at),
         title: streamStatus.session_title,
-        stream_id: kickStreamIdStr,
+        stream_id: streamStatus.id,
       },
     });
 
     log.info(`[Monitor]: Created Kick VOD record ${vodObject.id}. Started at: ${streamStatus.created_at}`);
 
     // Send Discord stream started alert
-    await sendStreamLiveAlert(platform, Number(vodObject.id), streamStatus.session_title || 'Live Stream', kickUsername, config.displayName);
+    await sendStreamLiveAlert(platform, vodObject.id, streamStatus.session_title ?? '', kickUsername, config.displayName);
 
     log.info(`[Monitor]: Queuing HLS download for ${vodObject.id}`);
 
     await enqueueLiveHlsDownload({
-      vodId: Number(vodObject.id),
+      dbId: createdVod.id,
+      vodId: streamStatus.id,
       platform,
       tenantId: tenantId,
-      platformUserId: kickUsername,
+      platformUserId: kickId,
       platformUsername: kickUsername,
       startedAt: new Date(streamStatus.created_at),
-      sourceUrl: vodObject?.source ?? streamStatus.playback_url ?? undefined,
+      sourceUrl: vodObject?.source ?? undefined,
     });
   } else if (existingVod && !existingVod.is_live) {
     // Record exists but not marked live - update and queue download
@@ -372,7 +366,7 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
       data: {
         is_live: true,
         started_at: new Date(streamStatus.created_at),
-        title: streamStatus.session_title || existingVod.title,
+        title: streamStatus.session_title,
       },
     });
 
@@ -381,10 +375,11 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
     const vodObject = await getLatestKickVodObject(kickUsername, existingVod.vod_id);
 
     await enqueueLiveHlsDownload({
-      vodId: Number(existingVod.vod_id),
+      dbId: existingVod.id,
+      vodId: existingVod.vod_id,
       platform,
       tenantId: tenantId,
-      platformUserId: kickUsername,
+      platformUserId: kickId,
       platformUsername: kickUsername,
       startedAt: new Date(existingVod.created_at),
       sourceUrl: vodObject?.source ?? undefined,
@@ -396,12 +391,13 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
     const vodObject = await getLatestKickVodObject(kickUsername, existingVod.vod_id);
 
     await enqueueLiveHlsDownload({
-      vodId: Number(existingVod.vod_id),
+      dbId: existingVod.id,
+      vodId: existingVod.vod_id,
       platform,
       tenantId: tenantId,
-      platformUserId: kickUsername,
+      platformUserId: kickId,
       platformUsername: kickUsername,
-      startedAt: existingVod.started_at ?? new Date(),
+      startedAt: new Date(existingVod.created_at),
       sourceUrl: vodObject?.source ?? undefined,
     });
   }
@@ -453,7 +449,8 @@ async function validateVodPath(tenantId: string): Promise<{ valid: boolean }> {
  * Enqueue Live HLS Download job
  */
 async function enqueueLiveHlsDownload(params: {
-  vodId: number;
+  dbId: number;
+  vodId: string;
   platform: PlatformType;
   tenantId: string;
   platformUserId: string;
@@ -479,6 +476,7 @@ async function enqueueLiveHlsDownload(params: {
       queue,
       'live_hls_download',
       {
+        dbId: params.dbId,
         vodId: params.vodId,
         platform: params.platform,
         tenantId: params.tenantId,
@@ -495,7 +493,7 @@ async function enqueueLiveHlsDownload(params: {
       },
       { info: log.info.bind(log), debug: log.debug.bind(log) },
       `[Monitor] Live HLS download job enqueued successfully`,
-      { vodId: params.vodId, platform: params.platform, queueName: QUEUE_NAMES.VOD_DOWNLOAD }
+      { dbId: params.dbId, vodId: params.vodId, platform: params.platform, queueName: QUEUE_NAMES.VOD_DOWNLOAD }
     );
 
     if (isNew) {

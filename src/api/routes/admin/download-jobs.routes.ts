@@ -16,6 +16,7 @@ type StreamerDbClient = ReturnType<typeof getClient>;
 
 type VodRecord = {
   id: number;
+  vod_id: string;
   title: string | null;
   created_at: Date;
   duration: number;
@@ -260,12 +261,13 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           if (skipDownload) {
             const { queueYoutubeUpload } = await import('../../../utils/upload-queue.js');
 
-            await queueYoutubeUpload(tenantId, vodRecord.id, filePath, request.body.uploadMode || 'all', request.body.platform, log);
+            await queueYoutubeUpload(tenantId, vodRecord.id, vodRecord.vod_id, filePath, request.body.uploadMode || 'all', request.body.platform, log);
 
             return {
               data: {
                 message: 'Live file already exists and validated, upload queued',
-                vodId: vodRecord.id,
+                dbId: vodRecord.id,
+                vodId: vodRecord.vod_id,
                 path: filePath,
                 platform: request.body.platform,
               },
@@ -277,44 +279,46 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           const vodDownloadJob = {
             tenantId: tenantId,
             platformUserId: tenantId,
-            vodId: request.body.vodId,
+            dbId: vodRecord.id,
+            vodId: vodRecord.vod_id,
             platform,
             uploadAfterDownload: true,
             uploadMode: request.body.uploadMode || 'all',
           };
 
           void VodQueueModule.getVODDownloadQueue().add('vod_download', vodDownloadJob, {
-            jobId: `download_${request.body.vodId}`,
+            jobId: `download_${vodRecord.vod_id}`,
           });
 
-          const vodJobId = `download_${request.body.vodId}`;
+          const vodJobId = `download_${vodRecord.vod_id}`;
 
           // Calculate duration for chat download job
           const durationSeconds = parseDurationToSeconds(vodRecord.duration, request.body.platform as 'twitch' | 'kick');
 
           void VodQueueModule.getChatDownloadQueue().add(
             'chat_download',
-            { tenantId: tenantId, platformUserId: tenantId, vodId: request.body.vodId, platform: request.body.platform as 'twitch' | 'kick', duration: durationSeconds },
-            { jobId: `chat_${request.body.vodId}` }
+            { tenantId: tenantId, platformUserId: tenantId, dbId: vodRecord.id, vodId: vodRecord.vod_id, platform: request.body.platform as 'twitch' | 'kick', duration: durationSeconds },
+            { jobId: `chat_${vodRecord.vod_id}` }
           );
 
-          const chatJobId = `chat_${request.body.vodId}`;
+          const chatJobId = `chat_${vodRecord.vod_id}`;
 
-          log.info(`Queued live HLS download jobs for ${request.body.vodId}: vod=${vodJobId}, chat=${chatJobId}`);
+          log.info(`Queued live HLS download jobs for ${vodRecord.vod_id}: vod=${vodJobId}, chat=${chatJobId}`);
 
-          return { data: { message: 'Live HLS download queued', vodId: request.body.vodId, jobId: vodJobId, chatJobId } };
+          return { data: { message: 'Live HLS download queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: vodJobId, chatJobId } };
         } else if (request.body.mode === 'mp4') {
           // Standard archived VOD re-download - queue job for standard-vod-downloader.ts handler
 
           if (skipDownload && filePath) {
             const { queueYoutubeUpload } = await import('../../../utils/upload-queue.js');
 
-            await queueYoutubeUpload(tenantId, vodRecord.id, filePath, request.body.uploadMode || 'all', request.body.platform, log);
+            await queueYoutubeUpload(tenantId, vodRecord.id, vodRecord.vod_id, filePath, request.body.uploadMode || 'all', request.body.platform, log);
 
             return {
               data: {
                 message: 'File already exists and validated, upload queued',
-                vodId: vodRecord.id,
+                dbId: vodRecord.id,
+                vodId: vodRecord.vod_id,
                 path: filePath,
                 platform: request.body.platform,
               },
@@ -326,31 +330,32 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           const vodDownloadJob = {
             tenantId: tenantId,
             platformUserId: tenantId,
-            vodId: request.body.vodId,
+            dbId: vodRecord.id,
+            vodId: vodRecord.vod_id,
             platform,
             uploadMode: request.body.uploadMode || 'all',
           };
 
           void VodQueueModule.getVODDownloadQueue().add('standard_vod_download', vodDownloadJob, {
-            jobId: `download_${request.body.vodId}`,
+            jobId: `download_${vodRecord.vod_id}`,
           });
 
-          const vodJobId = `download_${request.body.vodId}`;
+          const vodJobId = `download_${vodRecord.vod_id}`;
 
           // Calculate duration for chat download job
           const durationSeconds = parseDurationToSeconds(vodRecord.duration, request.body.platform as 'twitch' | 'kick');
 
           void VodQueueModule.getChatDownloadQueue().add(
             'chat_download',
-            { tenantId: tenantId, platformUserId: tenantId, vodId: request.body.vodId, platform, duration: durationSeconds },
-            { jobId: `chat_${request.body.vodId}` }
+            { tenantId: tenantId, platformUserId: tenantId, dbId: vodRecord.id, vodId: vodRecord.vod_id, platform, duration: durationSeconds },
+            { jobId: `chat_${vodRecord.vod_id}` }
           );
 
-          const chatJobId = `chat_${request.body.vodId}`;
+          const chatJobId = `chat_${vodRecord.vod_id}`;
 
-          log.info(`Queued standard VOD download jobs for ${request.body.vodId}: vod=${vodJobId}, chat=${chatJobId}`);
+          log.info(`Queued standard VOD download jobs for ${vodRecord.vod_id}: vod=${vodJobId}, chat=${chatJobId}`);
 
-          return { data: { message: 'VOD download queued', vodId: request.body.vodId, jobId: vodJobId, chatJobId } };
+          return { data: { message: 'VOD download queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: vodJobId, chatJobId } };
         } else {
           badRequest('Download mode must be "hls" or "mp4"');
         }

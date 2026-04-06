@@ -8,7 +8,7 @@ interface Logger {
   warn: (context: Record<string, unknown>, message: string) => void;
 }
 
-export async function queueYoutubeUpload(tenantId: string, vodId: number, filePath: string, uploadMode: 'vod' | 'all', platform: 'twitch' | 'kick', log: Logger): Promise<void> {
+export async function queueYoutubeUpload(tenantId: string, dbId: number, vodId: string, filePath: string, uploadMode: 'vod' | 'all', platform: 'twitch' | 'kick', log: Logger): Promise<void> {
   const config = getTenantConfig(tenantId);
 
   if (!config?.youtube?.auth) {
@@ -23,32 +23,32 @@ export async function queueYoutubeUpload(tenantId: string, vodId: number, filePa
     return;
   }
 
-  const vodJobId = await triggerYoutubeUpload(tenantId, String(vodId), filePath, '', '', 'vod', platform);
+  const vodJobId = await triggerYoutubeUpload(tenantId, dbId, vodId, filePath, '', '', 'vod', platform);
 
   if (vodJobId) {
-    log.info({ tenantId, vodId, jobId: vodJobId }, `Queued VOD upload job`);
+    log.info({ tenantId, dbId, vodId, jobId: vodJobId }, `Queued VOD upload job`);
   }
 
   if (uploadMode === 'all' && config.youtube.perGameUpload) {
     const chapters = await client.chapter.findMany({
-      where: { vod_id: vodId },
+      where: { vod_id: dbId },
       orderBy: { start: 'asc' },
     });
 
     const eligibleChapters = filterEligibleChapters(chapters, config.youtube.restrictedGames, log, tenantId);
 
     if (eligibleChapters.length > 0) {
-      log.info({ tenantId, vodId, count: eligibleChapters.length }, `Queuing game upload(s) for VOD`);
+      log.info({ tenantId, dbId, vodId, count: eligibleChapters.length }, `Queuing game upload(s) for VOD`);
 
       for (const chapter of eligibleChapters) {
         if (!chapter.name || chapter.start === (chapter.end || 0)) {
           continue;
         }
 
-        const gameJobId = await triggerYoutubeUpload(tenantId, String(vodId), filePath, '', '', 'game', platform, undefined, chapter.name, chapter.game_id || undefined);
+        const gameJobId = await triggerYoutubeUpload(tenantId, dbId, vodId, filePath, '', '', 'game', platform, undefined, chapter.name, chapter.game_id || undefined);
 
         if (gameJobId) {
-          log.debug({ tenantId, vodId, gameId: chapter.game_id, gameName: chapter.name, jobId: gameJobId }, `Queued game upload job`);
+          log.debug({ tenantId, dbId, vodId, gameId: chapter.game_id, gameName: chapter.name, jobId: gameJobId }, `Queued game upload job`);
         }
       }
     } else {

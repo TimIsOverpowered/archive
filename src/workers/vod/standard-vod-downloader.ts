@@ -10,7 +10,8 @@ import { sendVodDownloadStarted, sendVodDownloadSuccess, sendVodDownloadFailed }
 import { extractErrorDetails } from '../../utils/error.js';
 
 export interface StandardVodDownloadOptions {
-  vodId: number;
+  dbId: number;
+  vodId: string;
   platform: 'twitch' | 'kick';
   tenantId: string;
   platformUserId: string;
@@ -24,7 +25,7 @@ export interface StandardVodDownloadResult {
 }
 
 export async function downloadStandardVod(options: StandardVodDownloadOptions): Promise<StandardVodDownloadResult> {
-  const { vodId, platform, tenantId, uploadMode } = options;
+  const { dbId, vodId, platform, tenantId, uploadMode } = options;
   const log = loggerWithTenant(tenantId);
 
   const config = getTenantConfig(tenantId);
@@ -48,7 +49,7 @@ export async function downloadStandardVod(options: StandardVodDownloadOptions): 
         throw new Error('Kick username not configured for streamer');
       }
 
-      const vodMetadata = await kickModule.getVod(username, String(vodId));
+      const vodMetadata = await kickModule.getVod(username, vodId);
 
       if (!vodMetadata?.source) {
         throw new Error('VOD source URL not available');
@@ -70,20 +71,20 @@ export async function downloadStandardVod(options: StandardVodDownloadOptions): 
         const client = getClient(tenantId);
 
         if (client) {
-          await finalizeKickChapters(vodId, Math.round(actualDuration), client);
-          await client.vod.update({ where: { id: vodId }, data: { duration: Math.round(actualDuration) } });
+          await finalizeKickChapters(dbId, vodId, Math.round(actualDuration), client);
+          await client.vod.update({ where: { id: dbId }, data: { duration: Math.round(actualDuration) } });
         }
       }
 
       await sendVodDownloadSuccess(messageId!, platform, vodId, finalPath, streamerName);
 
       if (uploadMode) {
-        await queueYoutubeUpload(tenantId, vodId, finalPath, uploadMode, platform, log);
+        await queueYoutubeUpload(tenantId, dbId, vodId, finalPath, uploadMode, platform, log);
       }
 
       return { success: true, finalPath, durationSeconds: actualDuration ?? undefined };
     } else if (platform === 'twitch') {
-      const tokenSig = await getVodTokenSig(String(vodId));
+      const tokenSig = await getVodTokenSig(vodId);
 
       if (!tokenSig) {
         throw new Error(`Failed to get token/sig for ${vodId}`);
@@ -111,15 +112,15 @@ export async function downloadStandardVod(options: StandardVodDownloadOptions): 
         const client = getClient(tenantId);
 
         if (client) {
-          await saveTwitchVodChapters(vodId, tenantId, Math.round(actualDuration), client);
-          await client.vod.update({ where: { id: vodId }, data: { duration: Math.round(actualDuration) } });
+          await saveTwitchVodChapters(dbId, vodId, tenantId, Math.round(actualDuration), client);
+          await client.vod.update({ where: { id: dbId }, data: { duration: Math.round(actualDuration) } });
         }
       }
 
       await sendVodDownloadSuccess(messageId!, platform, vodId, finalPath, streamerName);
 
       if (uploadMode) {
-        await queueYoutubeUpload(tenantId, vodId, finalPath, uploadMode, platform, log);
+        await queueYoutubeUpload(tenantId, dbId, vodId, finalPath, uploadMode, platform, log);
       }
 
       return { success: true, finalPath, durationSeconds: actualDuration ?? undefined };

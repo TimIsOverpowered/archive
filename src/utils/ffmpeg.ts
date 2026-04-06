@@ -9,7 +9,7 @@ interface ProgressEvent {
 }
 
 interface HlsToMp4Options {
-  vodId?: number;
+  vodId?: string | number;
   onProgress?: (percent: number) => void;
   isFmp4?: boolean;
 }

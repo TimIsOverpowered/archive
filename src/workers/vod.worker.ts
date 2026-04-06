@@ -3,7 +3,8 @@ import pathMod from 'path';
 import { fileExists } from '../utils/path.js';
 
 export interface LiveHlsDownloadJobData {
-  vodId: number;
+  dbId: number;
+  vodId: string;
   platform: 'twitch' | 'kick';
   tenantId: string;
   platformUserId: string;
@@ -15,7 +16,8 @@ export interface LiveHlsDownloadJobData {
 }
 
 export interface StandardVodDownloadJobData {
-  vodId: number;
+  dbId: number;
+  vodId: string;
   platform: 'twitch' | 'kick';
   tenantId: string;
   platformUserId: string;
@@ -37,12 +39,12 @@ export type VODDownloadResult =
 const vodProcessor: Processor<LiveHlsDownloadJobData | StandardVodDownloadJobData, VODDownloadResult, string> = async (
   job: Job<LiveHlsDownloadJobData | StandardVodDownloadJobData, VODDownloadResult, string>
 ) => {
-  const { vodId, platform, tenantId } = job.data;
+  const { dbId, vodId, platform, tenantId } = job.data;
 
   const { createAutoLogger: loggerWithTenant } = await import('../utils/auto-tenant-logger.js');
 
   const log = loggerWithTenant(tenantId);
-  log.info({ jobId: job.id, vodId, platform, tenantId }, '[VOD Processor] Starting job processing');
+  log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[VOD Processor] Starting job processing');
 
   if (job.name === 'live_hls_download') {
     const { cleanupOrphanedTmpFiles, downloadLiveHls } = await import('./vod/hls-downloader.js');
@@ -54,7 +56,7 @@ const vodProcessor: Processor<LiveHlsDownloadJobData | StandardVodDownloadJobDat
       throw new Error(`VOD path not configured for streamer ${tenantId}`);
     }
 
-    const vodDirPath = pathMod.join(config.settings.livePath || config.settings.vodPath, tenantId, String(vodId));
+    const vodDirPath = pathMod.join(config.settings.livePath || config.settings.vodPath, tenantId, vodId);
 
     const exists = await fileExists(vodDirPath);
 
@@ -67,6 +69,7 @@ const vodProcessor: Processor<LiveHlsDownloadJobData | StandardVodDownloadJobDat
 
     const liveData = job.data as LiveHlsDownloadJobData;
     const result = await downloadLiveHls({
+      dbId,
       vodId,
       platform,
       tenantId,
@@ -84,6 +87,7 @@ const vodProcessor: Processor<LiveHlsDownloadJobData | StandardVodDownloadJobDat
 
     const standardData = job.data as StandardVodDownloadJobData;
     const result = await downloadStandardVod({
+      dbId,
       vodId,
       platform,
       tenantId,

@@ -146,15 +146,15 @@ export async function downloadMP4(tenantId: string, vod: KickVod): Promise<strin
     const vodPath = `${config.settings.vodPath}/${vod.id}.mp4`;
 
     const streamerName = config.displayName || tenantId;
-    messageId = await sendVodDownloadStarted('kick', tenantId, Number(vod.id), streamerName);
+    messageId = await sendVodDownloadStarted('kick', tenantId, vod.id, streamerName);
 
     // Download directly to MP4 using ffmpeg HLS streaming
-    await convertHlsToMp4(m3u8Url, vodPath, { vodId: Number(vod.id), isFmp4: false });
+    await convertHlsToMp4(m3u8Url, vodPath, { vodId: vod.id, isFmp4: false });
 
-    log.info(`Downloaded ${String(vod.id)}.mp4`);
+    log.info(`Downloaded ${vod.id}.mp4`);
 
     // Success alert
-    await sendVodDownloadSuccess(messageId!, 'kick', Number(vod.id), vodPath, streamerName);
+    await sendVodDownloadSuccess(messageId!, 'kick', vod.id, vodPath, streamerName);
 
     return vodPath;
   } catch (error) {
@@ -164,7 +164,7 @@ export async function downloadMP4(tenantId: string, vod: KickVod): Promise<strin
     log.error(`ffmpeg error occurred: ${errorMsg}`);
 
     // Failure alert
-    await sendVodDownloadFailed(messageId!, 'kick', Number(vod.id), errorMsg, tenantId);
+    await sendVodDownloadFailed(messageId!, 'kick', vod.id, errorMsg, tenantId);
 
     throw error;
   }
@@ -234,18 +234,18 @@ export async function getKickCategoryInfo(slug: string): Promise<Record<string, 
   }
 }
 
-export async function updateChapterDuringDownload(vodId: number, tenantId: string, streamerClient: PrismaClient): Promise<void> {
+export async function updateChapterDuringDownload(dbId: number, vodId: string, tenantId: string, streamerClient: PrismaClient): Promise<void> {
   try {
     const config = getTenantConfig(tenantId);
     const username = config?.kick?.username;
     if (!username) {
-      log.warn({ vodId }, 'Kick username not configured');
+      log.warn({ dbId, vodId }, 'Kick username not configured');
       return;
     }
 
     const streamData = await getKickStreamStatus(username);
     if (!streamData || !streamData.category) {
-      log.debug({ vodId }, 'No active stream or category data');
+      log.debug({ dbId, vodId }, 'No active stream or category data');
       return;
     }
 
@@ -253,7 +253,7 @@ export async function updateChapterDuringDownload(vodId: number, tenantId: strin
     const currentTimeSeconds = Math.round((Date.now() - new Date(created_at).getTime()) / 1000);
 
     const lastChapter = await streamerClient.chapter.findFirst({
-      where: { vod_id: vodId },
+      where: { vod_id: dbId },
       orderBy: { start: 'desc' },
     });
 
@@ -291,7 +291,7 @@ export async function updateChapterDuringDownload(vodId: number, tenantId: strin
 
     await streamerClient.chapter.create({
       data: {
-        vod_id: vodId,
+        vod_id: dbId,
         game_id: String(category.id),
         name: category.name,
         image: bannerImage,
@@ -300,17 +300,17 @@ export async function updateChapterDuringDownload(vodId: number, tenantId: strin
       },
     });
 
-    log.info({ vodId, categoryId: category.id, categoryName: category.name, startTime: lastChapter?.start || 0 }, 'Created new chapter');
+    log.info({ dbId, vodId, categoryId: category.id, categoryName: category.name, startTime: lastChapter?.start || 0 }, 'Created new chapter');
   } catch (error) {
-    log.error(createErrorContext(error, { vodId }), 'Failed to update chapter');
+    log.error(createErrorContext(error, { dbId, vodId }), 'Failed to update chapter');
   }
 }
 
-export async function finalizeKickChapters(vodId: number, finalDurationSeconds: number, streamerClient: PrismaClient): Promise<void> {
+export async function finalizeKickChapters(dbId: number, vodId: string, finalDurationSeconds: number, streamerClient: PrismaClient): Promise<void> {
   try {
     const incompleteChapter = await streamerClient.chapter.findFirst({
       where: {
-        vod_id: vodId,
+        vod_id: dbId,
         end: null,
       },
       orderBy: { start: 'desc' },

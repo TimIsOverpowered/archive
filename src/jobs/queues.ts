@@ -8,13 +8,15 @@ export interface VODDownloadJob {
   tenantId: string;
   platformUserId: string;
   platformUsername?: string;
-  vodId: number;
+  dbId: number;
+  vodId: string;
   platform: 'twitch' | 'kick';
   externalVodId?: string;
 }
 
 export interface LiveHlsDownloadJob {
-  vodId: number;
+  dbId: number;
+  vodId: string;
   platform: 'twitch' | 'kick';
   tenantId: string;
   platformUserId: string;
@@ -30,7 +32,8 @@ export interface ChatDownloadJob {
   tenantId: string;
   platformUserId: string;
   platformUsername?: string;
-  vodId: number;
+  dbId: number;
+  vodId: string;
   platform: 'twitch' | 'kick';
   duration: number;
   vodStartDate?: string;
@@ -39,6 +42,7 @@ export interface ChatDownloadJob {
 
 export interface YoutubeUploadJob {
   tenantId: string;
+  dbId: number;
   vodId: string;
   filePath: string;
   title: string;
@@ -57,6 +61,7 @@ export interface YoutubeUploadJob {
 
 export interface DmcaProcessingJob {
   tenantId: string;
+  dbId: number;
   vodId: string;
   receivedClaims: DMCAClaim[];
   type: 'vod' | 'live';

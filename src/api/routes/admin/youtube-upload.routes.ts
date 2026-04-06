@@ -9,7 +9,7 @@ import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound, serviceUnavailable, badRequest, internalServerError } from '../../../utils/http-error';
 
-type VodRecord = { id: number; title?: string | null; duration: number | string; platform: 'twitch' | 'kick' };
+type VodRecord = { id: number; vod_id: string; title?: string | null; duration: number | string; platform: 'twitch' | 'kick' };
 
 interface ReUploadYoutubeParams {
   id: string;
@@ -104,16 +104,17 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
         const youtubeJob = {
           tenantId,
-          vodId: String(vodId),
+          dbId: vodRecord.id,
+          vodId: vodRecord.vod_id,
           filePath: finalMp4Path,
-          title: `Re-upload: ${vodRecord.title || vodId}`,
+          title: `Re-upload: ${vodRecord.title || vodRecord.vod_id}`,
           description: 'Manual re-upload triggered via admin endpoint',
           type: 'vod' as const,
         };
 
-        await YouTubeQueueModule.getYoutubeUploadQueue().add('youtube_upload', youtubeJob, { jobId: `youtube-reupload_${vodId}` });
+        await YouTubeQueueModule.getYoutubeUploadQueue().add('youtube_upload', youtubeJob, { jobId: `youtube-reupload_${vodRecord.vod_id}` });
 
-        return { data: { message: 'YouTube re-upload job queued', vodId, jobId: `youtube-reupload_${vodId}`, durationValidation: null } };
+        return { data: { message: 'YouTube re-upload job queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: `youtube-reupload_${vodRecord.vod_id}`, durationValidation: null } };
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
@@ -165,13 +166,14 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
         const downloadJob = {
           tenantId: tenantId,
           platformUserId: tenantId,
-          vodId: vodId,
+          dbId: vodRecord.id,
+          vodId: vodRecord.vod_id,
           platform: vodRecord.platform as 'twitch' | 'kick',
         };
 
-        void YouTubeQueueModule.getVODDownloadQueue().add('vod_download', downloadJob, { jobId: `download_${vodId}` });
+        void YouTubeQueueModule.getVODDownloadQueue().add('vod_download', downloadJob, { jobId: `download_${vodRecord.vod_id}` });
 
-        return { data: { message: 'Re-download job queued', vodId, jobId: `download_${vodId}` } };
+        return { data: { message: 'Re-download job queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: `download_${vodRecord.vod_id}` } };
       } catch (error) {
         const details = extractErrorDetails(error);
         const errorMsg = details.message;
