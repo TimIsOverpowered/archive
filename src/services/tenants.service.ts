@@ -29,10 +29,6 @@ interface TenantStats {
     lastUploadDate: Date | null;
     uploadSuccessRate: number;
   };
-  chat: {
-    totalMessages: number;
-    messagesThisMonth: number;
-  };
   chapters: {
     totalChapters: number;
     gamesCount: number;
@@ -90,7 +86,6 @@ export async function getTenantStats(client: PrismaClient, tenantId: string): Pr
   ]);
 
   const vodIds = vods.map((v) => v.id);
-  const chatMessages = vodIds.length > 0 ? await client.chatMessage.count({ where: { vod_id: { in: vodIds } } }) : 0;
 
   const byPlatform: Record<string, number> = {};
   vods.forEach((vod) => {
@@ -119,19 +114,6 @@ export async function getTenantStats(client: PrismaClient, tenantId: string): Pr
       .filter(Boolean)
   );
 
-  const thisMonthChatStart = new Date();
-  thisMonthChatStart.setMonth(thisMonthChatStart.getMonth() - 1);
-
-  const messagesThisMonth =
-    vodIds.length > 0
-      ? await client.chatMessage.count({
-          where: {
-            vod_id: { in: vodIds },
-            createdAt: { gte: thisMonthChatStart },
-          },
-        })
-      : 0;
-
   const stats: TenantStats = {
     tenant: {
       id: tenantId,
@@ -155,10 +137,6 @@ export async function getTenantStats(client: PrismaClient, tenantId: string): Pr
       failedUploads: failedUploads.length,
       lastUploadDate,
       uploadSuccessRate,
-    },
-    chat: {
-      totalMessages: chatMessages,
-      messagesThisMonth,
     },
     chapters: {
       totalChapters: chapters.length,
