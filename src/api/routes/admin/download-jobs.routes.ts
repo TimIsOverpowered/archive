@@ -171,7 +171,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
   // Main download endpoint - creates VOD record if missing, then queues download + emote + chat jobs + upload (Twitch/Kick)
   fastify.post<{
-    Body: { vodId: number; type?: 'live' | 'vod'; platform: 'twitch' | 'kick'; path?: string; uploadMode?: 'vod' | 'all'; mode?: 'hls' | 'mp4' };
+    Body: { vodId: number; type?: 'live' | 'vod'; platform: 'twitch' | 'kick'; path?: string; uploadMode?: 'vod' | 'all'; downloadMethod?: 'ffmpeg' | 'hls' };
     Params: { id: string };
   }>(
     '/:id/upload',
@@ -186,8 +186,8 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
             vodId: { type: 'string' },
             type: { type: 'string', enum: ['live', 'vod'], default: 'vod' },
             platform: { type: 'string', enum: ['twitch', 'kick'] },
-            mode: { type: 'string', enum: ['hls', 'mp4'], default: 'hls' },
             uploadMode: { type: 'string', enum: ['vod', 'all'], default: 'all' },
+            downloadMethod: { type: 'string', enum: ['ffmpeg', 'hls'], default: 'hls' },
           },
           required: ['vodId', 'platform'],
         },
@@ -254,111 +254,56 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           }
         }
 
-        // Queue VOD download job
-        if (request.body.mode === 'hls') {
-          // Live stream HLS download - queue job for hls-downloader.ts handler
+        // Queue VOD download job (standard archived VOD download)
 
-          if (skipDownload) {
-            const { queueYoutubeUpload } = await import('../../../utils/upload-queue.js');
+        if (skipDownload && filePath) {
+          const { queueYoutubeUpload } = await import('../../../utils/upload-queue.js');
 
-            await queueYoutubeUpload(tenantId, vodRecord.id, vodRecord.vod_id, filePath, request.body.uploadMode || 'all', request.body.platform, log);
+          await queueYoutubeUpload(tenantId, vodRecord.id, vodRecord.vod_id, filePath, request.body.uploadMode || 'all', request.body.platform, log);
 
-            return {
-              data: {
-                message: 'Live file already exists and validated, upload queued',
-                dbId: vodRecord.id,
-                vodId: vodRecord.vod_id,
-                path: filePath,
-                platform: request.body.platform,
-              },
-            };
-          }
-
-          const VodQueueModule = await import('../../../jobs/queues');
-
-          const vodDownloadJob = {
-            tenantId: tenantId,
-            platformUserId: tenantId,
-            dbId: vodRecord.id,
-            vodId: vodRecord.vod_id,
-            platform,
-            uploadAfterDownload: true,
-            uploadMode: request.body.uploadMode || 'all',
+          return {
+            data: {
+              message: 'File already exists and validated, upload queued',
+              dbId: vodRecord.id,
+              vodId: vodRecord.vod_id,
+              path: filePath,
+              platform: request.body.platform,
+            },
           };
-
-          void VodQueueModule.getVODDownloadQueue().add('vod_download', vodDownloadJob, {
-            jobId: `download_${vodRecord.vod_id}`,
-          });
-
-          const vodJobId = `download_${vodRecord.vod_id}`;
-
-          // Calculate duration for chat download job
-          const durationSeconds = parseDurationToSeconds(vodRecord.duration, request.body.platform as 'twitch' | 'kick');
-
-          void VodQueueModule.getChatDownloadQueue().add(
-            'chat_download',
-            { tenantId: tenantId, platformUserId: tenantId, dbId: vodRecord.id, vodId: vodRecord.vod_id, platform: request.body.platform as 'twitch' | 'kick', duration: durationSeconds },
-            { jobId: `chat_${vodRecord.vod_id}` }
-          );
-
-          const chatJobId = `chat_${vodRecord.vod_id}`;
-
-          log.info(`Queued live HLS download jobs for ${vodRecord.vod_id}: vod=${vodJobId}, chat=${chatJobId}`);
-
-          return { data: { message: 'Live HLS download queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: vodJobId, chatJobId } };
-        } else if (request.body.mode === 'mp4') {
-          // Standard archived VOD re-download - queue job for standard-vod-downloader.ts handler
-
-          if (skipDownload && filePath) {
-            const { queueYoutubeUpload } = await import('../../../utils/upload-queue.js');
-
-            await queueYoutubeUpload(tenantId, vodRecord.id, vodRecord.vod_id, filePath, request.body.uploadMode || 'all', request.body.platform, log);
-
-            return {
-              data: {
-                message: 'File already exists and validated, upload queued',
-                dbId: vodRecord.id,
-                vodId: vodRecord.vod_id,
-                path: filePath,
-                platform: request.body.platform,
-              },
-            };
-          }
-
-          const VodQueueModule = await import('../../../jobs/queues');
-
-          const vodDownloadJob = {
-            tenantId: tenantId,
-            platformUserId: tenantId,
-            dbId: vodRecord.id,
-            vodId: vodRecord.vod_id,
-            platform,
-            uploadMode: request.body.uploadMode || 'all',
-          };
-
-          void VodQueueModule.getVODDownloadQueue().add('standard_vod_download', vodDownloadJob, {
-            jobId: `download_${vodRecord.vod_id}`,
-          });
-
-          const vodJobId = `download_${vodRecord.vod_id}`;
-
-          // Calculate duration for chat download job
-          const durationSeconds = parseDurationToSeconds(vodRecord.duration, request.body.platform as 'twitch' | 'kick');
-
-          void VodQueueModule.getChatDownloadQueue().add(
-            'chat_download',
-            { tenantId: tenantId, platformUserId: tenantId, dbId: vodRecord.id, vodId: vodRecord.vod_id, platform, duration: durationSeconds },
-            { jobId: `chat_${vodRecord.vod_id}` }
-          );
-
-          const chatJobId = `chat_${vodRecord.vod_id}`;
-
-          log.info(`Queued standard VOD download jobs for ${vodRecord.vod_id}: vod=${vodJobId}, chat=${chatJobId}`);
-
-          return { data: { message: 'VOD download queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: vodJobId, chatJobId } };
-        } else {
-          badRequest('Download mode must be "hls" or "mp4"');
         }
+
+        const VodQueueModule = await import('../../../jobs/queues');
+
+        const vodDownloadJob = {
+          tenantId: tenantId,
+          platformUserId: tenantId,
+          dbId: vodRecord.id,
+          vodId: vodRecord.vod_id,
+          platform,
+          uploadMode: request.body.uploadMode || 'all',
+          downloadMethod: request.body.downloadMethod || 'hls',
+        };
+
+        void VodQueueModule.getVODDownloadQueue().add('standard_vod_download', vodDownloadJob, {
+          jobId: `download_${vodRecord.vod_id}`,
+        });
+
+        const vodJobId = `download_${vodRecord.vod_id}`;
+
+        // Calculate duration for chat download job
+        const durationSeconds = parseDurationToSeconds(vodRecord.duration, request.body.platform as 'twitch' | 'kick');
+
+        void VodQueueModule.getChatDownloadQueue().add(
+          'chat_download',
+          { tenantId: tenantId, platformUserId: tenantId, dbId: vodRecord.id, vodId: vodRecord.vod_id, platform, duration: durationSeconds },
+          { jobId: `chat_${vodRecord.vod_id}` }
+        );
+
+        const chatJobId = `chat_${vodRecord.vod_id}`;
+
+        log.info(`Queued standard VOD download jobs for ${vodRecord.vod_id}: vod=${vodJobId}, chat=${chatJobId}`);
+
+        return { data: { message: 'VOD download queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: vodJobId, chatJobId } };
       } catch (error) {
         log.error({ err: error }, 'Download failed');
         throw error;

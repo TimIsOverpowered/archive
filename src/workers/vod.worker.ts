@@ -22,6 +22,7 @@ export interface StandardVodDownloadJobData {
   tenantId: string;
   platformUserId: string;
   uploadMode?: 'vod' | 'all';
+  downloadMethod?: 'ffmpeg' | 'hls';
 }
 
 export type VODDownloadResult =
@@ -99,6 +100,7 @@ const vodProcessor: Processor<LiveHlsDownloadJobData | StandardVodDownloadJobDat
       tenantId,
       platformUserId: standardData.platformUserId,
       uploadMode: standardData.uploadMode,
+      downloadMethod: standardData.downloadMethod,
     });
 
     return result;
