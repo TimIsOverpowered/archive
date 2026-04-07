@@ -10,7 +10,7 @@ import { getClient } from '../../../db/client.js';
 import { fileExists } from '../../../utils/path.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { notFound, serviceUnavailable, badRequest } from '../../../utils/http-error';
+import { notFound, serviceUnavailable, badRequest, internalServerError } from '../../../utils/http-error';
 
 type StreamerDbClient = ReturnType<typeof getClient>;
 
@@ -63,7 +63,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
   /**
    * Shared VOD creation logic for both /download and /hlsDownload endpoints
    */
-  async function ensureVodRecord(tenantId: string, vodId: number, platform: 'twitch' | 'kick', logInstance: Logger): Promise<VodRecord> {
+  async function ensureVodRecord(tenantId: string, vodId: string | number, platform: 'twitch' | 'kick', logInstance: Logger): Promise<VodRecord> {
     const config = getTenantConfig(tenantId);
 
     if (!config) notFound('Tenant not found');
@@ -78,7 +78,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
       let vodRecord: VodRecord | null = null;
       try {
-        const rawVodRecord = await findVodRecord(client, vodId);
+        const rawVodRecord = await findVodRecord(client, vodId, platform);
         if (rawVodRecord) {
           vodRecord = rawVodRecord as VodRecord;
         }
@@ -120,7 +120,6 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
         vodRecord = (await client.vod.create({
           data: {
-            id: vodId,
             vod_id: String(vodId),
             title: vodMetadata.title || null,
             created_at: new Date(vodMetadata.created_at),
@@ -144,7 +143,6 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
         vodRecord = (await client.vod.create({
           data: {
-            id: vodId,
             vod_id: String(vodId),
             title: vodMetadata.session_title || null,
             created_at: new Date(vodMetadata.created_at),
@@ -171,7 +169,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
   // Main download endpoint - creates VOD record if missing, then queues download + emote + chat jobs + upload (Twitch/Kick)
   fastify.post<{
-    Body: { vodId: number; type?: 'live' | 'vod'; platform: 'twitch' | 'kick'; path?: string; uploadMode?: 'vod' | 'all'; downloadMethod?: 'ffmpeg' | 'hls' };
+    Body: { vodId: string | number; type?: 'live' | 'vod'; platform: 'twitch' | 'kick'; path?: string; uploadMode?: 'vod' | 'all'; downloadMethod?: 'ffmpeg' | 'hls' };
     Params: { id: string };
   }>(
     '/:id/upload',
@@ -179,11 +177,11 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       schema: {
         tags: ['Admin'],
         description: 'Create VOD record if missing, then queue download + emote + chat jobs (Twitch/Kick)',
-        params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+        params: { type: 'object', properties: { id: { type: 'string', minLength: 1, maxLength: 100 } }, required: ['id'] },
         body: {
           type: 'object',
           properties: {
-            vodId: { type: 'string' },
+            vodId: { type: 'string', minLength: 1, maxLength: 100 },
             type: { type: 'string', enum: ['live', 'vod'], default: 'vod' },
             platform: { type: 'string', enum: ['twitch', 'kick'] },
             uploadMode: { type: 'string', enum: ['vod', 'all'], default: 'all' },
@@ -213,7 +211,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         const vodRecord: VodRecord | null = await ensureVodRecord(tenantId, request.body.vodId, request.body.platform as 'twitch' | 'kick', log);
 
         if (!vodRecord) {
-          throw new Error('Failed to create VOD record');
+          internalServerError('Failed to create VOD record');
         }
 
         // Queue emote save job (fire-and-forget within request context)
@@ -305,7 +303,10 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
         return { data: { message: 'VOD download queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: vodJobId, chatJobId } };
       } catch (error) {
-        log.error({ err: error }, 'Download failed');
+        const statusCode = (error as { statusCode?: number }).statusCode;
+        if (!statusCode || statusCode >= 500) {
+          log.error({ err: error }, 'Download failed');
+        }
         throw error;
       }
     }

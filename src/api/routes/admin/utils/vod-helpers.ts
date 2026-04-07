@@ -55,9 +55,12 @@ export function getValidatedClient(tenantId: string): { client: StreamerDbClient
 /**
  * Fetches VOD record or returns null if not found
  */
-export async function findVodRecord(client: StreamerDbClient, vodId: number): Promise<unknown> {
+export async function findVodRecord(client: StreamerDbClient, vodId: number | string, platform?: 'twitch' | 'kick'): Promise<unknown> {
   try {
-    return await client.vod.findUnique({ where: { id: vodId } });
+    if (platform) {
+      return await client.vod.findUnique({ where: { platform_vod_id: { platform, vod_id: String(vodId) } } });
+    }
+    return await client.vod.findFirst({ where: { vod_id: String(vodId) } });
   } catch {
     return null;
   }
