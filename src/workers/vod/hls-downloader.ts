@@ -1,25 +1,22 @@
 import fsPromises from 'fs/promises';
-import { extractErrorDetails, createErrorContext, throwOnHttpError } from '../../utils/error.js';
+import { extractErrorDetails } from '../../utils/error.js';
 import fs from 'fs';
 import pathMod from 'path';
 import HLS from 'hls-parser';
-import { pipeline } from 'stream/promises';
-import { Readable } from 'stream';
 import { getTenantConfig } from '../../config/loader';
 import { getClient } from '../../db/client';
 import { sendRichAlert, updateDiscordEmbed, resetFailures, isAlertsEnabled } from '../../utils/discord-alerts.js';
-import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch';
 import { createAutoLogger as loggerWithTenant } from '../../utils/auto-tenant-logger.js';
 import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
 import { toHHMMSS } from '../../utils/formatting.js';
-import { sleep, getRetryDelay } from '../../utils/delay.js';
-import type { ReadableStream as NodeWebStream } from 'node:stream/web';
-import pLimit from 'p-limit';
 import { updateChapterDuringDownload, finalizeKickChapters } from '../../services/kick.js';
 import { saveVodChapters as saveTwitchVodChapters } from '../../services/twitch.js';
 import { fileExists } from '../../utils/path.js';
+import { downloadSegmentsParallel, cleanupOrphanedTmpFiles, fetchTwitchPlaylist, fetchKickPlaylist, type DownloadStrategy } from './hls-utils.js';
+import { sleep, getRetryDelay } from '../../utils/delay.js';
 
-type DownloadStrategy = { type: 'fetch'; signal?: AbortSignal } | { type: 'cycletls'; session: CycleTLSSession };
+// Re-export for backward compatibility
+export { cleanupOrphanedTmpFiles };
 
 export interface HlsDownloadOptions {
   dbId: number;
@@ -32,121 +29,6 @@ export interface HlsDownloadOptions {
   sourceUrl?: string;
   uploadAfterDownload?: boolean;
   uploadMode?: 'vod' | 'all';
-}
-
-/**
- * Download segments in parallel using p-limit for concurrency control
- * Universal function - works with both .ts and .mp4 (fMP4) segments
- * Supports both fetch (Twitch) and CycleTLS (Kick) download strategies
- */
-async function downloadSegmentsParallel(
-  segments: { uri: string }[],
-  vodDir: string,
-  baseURL: string,
-  strategy: DownloadStrategy,
-  concurrency: number,
-  retryAttempts: number,
-  log: ReturnType<typeof loggerWithTenant>,
-  onBatchComplete?: (completedCount: number) => void
-): Promise<void> {
-  const limit = pLimit(concurrency);
-  let completedCount = 0;
-  const totalSegments = segments.length;
-
-  log.debug({ count: totalSegments, concurrency, retryAttempts, strategy: strategy.type }, `Starting parallel segment download`);
-
-  const isAborted = () => (strategy.type === 'fetch' ? strategy.signal?.aborted : strategy.session.closed);
-
-  await Promise.all(
-    segments.map(async (segment) => {
-      if (isAborted()) {
-        return;
-      }
-
-      const outputPath = pathMod.join(vodDir, segment.uri);
-      const tempPath = outputPath + '.tmp';
-
-      const exists = await fileExists(outputPath);
-
-      if (exists) {
-        completedCount++;
-        return;
-      }
-
-      let lastError: Error | null = null;
-
-      for (let attempt = 1; attempt <= retryAttempts; attempt++) {
-        if (isAborted()) {
-          return;
-        }
-
-        try {
-          await limit(async () => {
-            if (strategy.type === 'fetch') {
-              const response = await fetch(`${baseURL}/${segment.uri}`, { signal: strategy.signal });
-              throwOnHttpError(response, `Download segment (attempt ${attempt}/${retryAttempts})`);
-
-              const writer = fs.createWriteStream(tempPath);
-              const nodeWebStream = response.body as unknown as NodeWebStream<Uint8Array>;
-              await pipeline(Readable.fromWeb(nodeWebStream), writer);
-            } else {
-              await strategy.session.streamToFile(`${baseURL}/${segment.uri}`, tempPath);
-            }
-          });
-
-          await fsPromises.rename(tempPath, outputPath);
-          completedCount++;
-
-          log.debug({ uri: segment.uri, current: completedCount, total: totalSegments }, `Segment downloaded`);
-          return;
-        } catch (error: unknown) {
-          if (isAborted()) {
-            return;
-          }
-
-          lastError = error instanceof Error ? error : new Error(String(error));
-
-          try {
-            await fsPromises.unlink(tempPath).catch(() => {});
-          } catch {}
-
-          log.debug({ uri: segment.uri, attempt, error: lastError.message }, `Failed to download segment`);
-        }
-      }
-
-      if (!isAborted() && lastError) {
-        throw lastError;
-      }
-    })
-  );
-
-  if (!isAborted()) {
-    log.debug({ total: totalSegments }, `All segments downloaded successfully`);
-    if (onBatchComplete) {
-      onBatchComplete(completedCount);
-    }
-  }
-}
-
-export async function cleanupOrphanedTmpFiles(vodDir: string, log: ReturnType<typeof loggerWithTenant>): Promise<void> {
-  try {
-    const files = await fsPromises.readdir(vodDir);
-
-    for (const file of files) {
-      if (file.endsWith('.tmp')) {
-        const filePath = pathMod.join(vodDir, file);
-
-        try {
-          await fsPromises.unlink(filePath);
-          log.debug(`Cleaned up orphaned .tmp file: ${file}`);
-        } catch (error) {
-          log.warn({ error: extractErrorDetails(error).message }, `Failed to clean up orphaned .tmp file: ${file}`);
-        }
-      }
-    }
-  } catch (error) {
-    log.warn({ error: extractErrorDetails(error).message }, `Failed to scan for orphaned files in directory`);
-  }
 }
 
 function updateAlertProgress(messageId: string | null, platform: string, totalSegmentsFound: number, vodId: string, tenantId: string, startedAt?: string): void {
@@ -178,139 +60,6 @@ function updateAlertProgress(messageId: string | null, platform: string, totalSe
     timestamp: startTime.toISOString(),
     updatedTimestamp: new Date().toISOString(),
   });
-}
-
-async function fetchTwitchPlaylist(
-  vodId: string,
-  log: ReturnType<typeof loggerWithTenant>,
-  retryCount: number,
-  maxRetryBeforeEndDetection: number
-): Promise<{ variantM3u8String: string; baseURL: string } | null> {
-  const tokenSig = await getVodTokenSig(vodId);
-
-  try {
-    const masterPlaylistContent = await getTwitchM3u8(String(vodId), tokenSig.value, tokenSig.signature);
-
-    if (!masterPlaylistContent) {
-      log.error(`[${vodId}] Failed to fetch Twitch master playlist`);
-
-      if (retryCount > maxRetryBeforeEndDetection) {
-        log.warn(`[${vodId}] Too many consecutive failures. Assuming stream ended or platform issue.`);
-        return null;
-      }
-
-      await sleep(5000 * Math.min(retryCount, 6));
-      return null;
-    }
-
-    const parsedMaster: HLS.types.MasterPlaylist | HLS.types.MediaPlaylist = HLS.parse(masterPlaylistContent);
-
-    if (!parsedMaster) {
-      log.error(`[${vodId}] Failed to parse Twitch master playlist`);
-
-      await sleep(5000);
-      return null;
-    }
-
-    const bestVariantUrl = (parsedMaster as HLS.types.MasterPlaylist).variants?.[0]?.uri || parsedMaster.uri;
-
-    if (!bestVariantUrl) {
-      log.error(`[${vodId}] No variant URL found in master playlist`);
-      return null;
-    }
-    let baseURL: string = '';
-    let variantM3u8String: string = '';
-
-    if (!bestVariantUrl.startsWith('http')) {
-      baseURL = masterPlaylistContent.substring(0, masterPlaylistContent.lastIndexOf('/'));
-
-      const response1 = await fetch(bestVariantUrl.includes('/') ? bestVariantUrl : `${baseURL}/${bestVariantUrl}`);
-      if (!response1.ok) throw new Error(`Fetch failed with status ${response1.status}`);
-      variantM3u8String = await response1.text();
-    } else {
-      baseURL = bestVariantUrl.substring(0, bestVariantUrl.lastIndexOf('/'));
-
-      const response2 = await fetch(bestVariantUrl);
-      if (!response2.ok) throw new Error(`Fetch failed with status ${response2.status}`);
-      variantM3u8String = await response2.text();
-    }
-
-    return { variantM3u8String, baseURL };
-  } catch (error: unknown) {
-    log.error(createErrorContext(error, { vodId }), `[${vodId}] Failed to get Twitch HLS playlist`);
-
-    if (retryCount > maxRetryBeforeEndDetection) {
-      log.warn(`[${vodId}] Too many consecutive failures. Assuming stream ended or platform issue.`);
-      return null;
-    }
-
-    await sleep(5000 * Math.min(retryCount, 6));
-    return null;
-  }
-}
-
-async function fetchKickPlaylist(
-  vodId: string,
-  sourceUrl: string | undefined,
-  log: ReturnType<typeof loggerWithTenant>,
-  retryCount: number,
-  maxRetryBeforeEndDetection: number,
-  session?: CycleTLSSession
-): Promise<{ variantM3u8String: string; baseURL: string } | null> {
-  const fetchUrl = sourceUrl || '';
-
-  if (!fetchUrl) {
-    log.error(`[${vodId}] No Kick HLS source URL provided. Cannot continue download.`);
-
-    await sleep(5000);
-
-    if (retryCount > maxRetryBeforeEndDetection * 2) {
-      log.error(`[${vodId}] Aborting download - no source URL available after multiple attempts`);
-      return null;
-    }
-
-    return null;
-  }
-
-  let baseURL: string = '';
-
-  try {
-    const tempSession = session || createSession(); // Create if not provided
-
-    if (fetchUrl.includes('master.m3u8')) {
-      const baseEndpoint = fetchUrl.substring(0, fetchUrl.lastIndexOf('/'));
-      baseURL = `${baseEndpoint}/1080p60`;
-
-      const variantM3u8String = await tempSession.fetchText(`${baseURL}/playlist.m3u8`);
-
-      if (!session) {
-        await tempSession.close(); // Only close temporary sessions
-      }
-
-      return { variantM3u8String, baseURL };
-    } else {
-      const response = await tempSession.fetchText(fetchUrl);
-
-      baseURL = fetchUrl.substring(0, fetchUrl.lastIndexOf('/'));
-
-      if (!session) {
-        await tempSession.close();
-      }
-
-      return { variantM3u8String: response, baseURL };
-    }
-  } catch (error: unknown) {
-    log.error(createErrorContext(error, { vodId }), `[${vodId}] Failed to fetch Kick HLS playlist`);
-
-    await sleep(5000 * Math.min(retryCount, 6));
-
-    if (retryCount > maxRetryBeforeEndDetection) {
-      log.warn(`[${vodId}] Too many consecutive failures. Assuming stream ended or platform issue.`);
-      return null;
-    }
-
-    return null;
-  }
 }
 
 export async function downloadLiveHls(options: HlsDownloadOptions, signal?: AbortSignal): Promise<{ success: true; finalPath: string; durationSeconds?: number }> {
@@ -396,7 +145,6 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
   let lastSegmentUri: string | null = null;
   let noChangePollCounter = 0;
   let baseURL: string = '';
-  let totalSegmentsFound = 0;
 
   // Create persistent CycleTLS session for Kick downloads
   let cycleTLS: CycleTLSSession | null = null;
