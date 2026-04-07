@@ -1,6 +1,6 @@
 import type { DmcaProcessingJob } from '../../../types/queues.js';
 import { enqueueJobWithLogging } from '../../../jobs/queues.js';
-import { extractErrorDetails } from '../../../utils/error.js';
+
 import { FastifyInstance } from 'fastify';
 import { getTenantConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
@@ -8,7 +8,7 @@ import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { getClient } from '../../../db/client.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { notFound, serviceUnavailable, internalServerError } from '../../../utils/http-error';
+import { notFound, serviceUnavailable } from '../../../utils/http-error';
 
 type VodRecord = { id: number; platform: 'twitch' | 'kick' };
 
@@ -154,15 +154,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
       const tenantId = request.params.id;
       const log = createAutoLogger(tenantId);
 
-      try {
-        return await processDmcaRequest(tenantId, request.body, log);
-      } catch (error) {
-        const details = extractErrorDetails(error);
-        const errorMsg = details.message;
-        log.error(`DMCA processing failed: ${errorMsg}`);
-
-        internalServerError('Failed to queue DMCA processing job');
-      }
+      return await processDmcaRequest(tenantId, request.body, log);
     }
   );
 

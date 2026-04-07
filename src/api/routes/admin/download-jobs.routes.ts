@@ -197,118 +197,110 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       const tenantId = request.params.id;
       const log = createAutoLogger(tenantId);
 
-      try {
-        // Validate tenant and platform enablement
-        const platform = request.body.platform;
-        const validation = validateTenantPlatform(tenantId, platform);
+      // Validate tenant and platform enablement
+      const platform = request.body.platform;
+      const validation = validateTenantPlatform(tenantId, platform);
 
-        if (validation.error) throw validation.error;
+      if (validation.error) throw validation.error;
 
-        // Get config for reference to username fields if needed
-        const config = validation.config;
+      // Get config for reference to username fields if needed
+      const config = validation.config;
 
-        // Ensure VOD record exists or create it from platform API metadata
-        const vodRecord: VodRecord | null = await ensureVodRecord(tenantId, request.body.vodId, request.body.platform as 'twitch' | 'kick', log);
+      // Ensure VOD record exists or create it from platform API metadata
+      const vodRecord: VodRecord | null = await ensureVodRecord(tenantId, request.body.vodId, request.body.platform as 'twitch' | 'kick', log);
 
-        if (!vodRecord) {
-          internalServerError('Failed to create VOD record');
-        }
-
-        // Queue emote save job (fire-and-forget within request context)
-        const platformId = config?.[platform]?.id;
-
-        if (platformId) {
-          await queueEmoteFetch({
-            tenantId,
-            vodId: vodRecord.id,
-            platform: request.body.platform as 'twitch' | 'kick',
-            platformId,
-            log,
-          });
-        } else {
-          log.warn(`No platform ID available for emote fetching on VOD ${request.body.vodId}`);
-        }
-
-        // Determine file path based on type
-        const type = request.body.type;
-        const streamerConfig = getTenantConfig(tenantId);
-        const filePath =
-          type === 'live'
-            ? streamerConfig?.settings.livePath
-              ? path.join(streamerConfig.settings.livePath, tenantId, `${vodRecord.id}.mp4`)
-              : ''
-            : streamerConfig?.settings.vodPath
-              ? path.join(streamerConfig.settings.vodPath, tenantId, `${vodRecord.id}.mp4`)
-              : '';
-
-        // File validation before download
-        let skipDownload = false;
-
-        if (filePath) {
-          const validation = await validateVodFile(tenantId, vodRecord.id, vodRecord.duration, filePath, log);
-
-          if (validation.valid) {
-            skipDownload = true;
-          }
-        }
-
-        // Queue VOD download job (standard archived VOD download)
-
-        if (skipDownload && filePath) {
-          const { queueYoutubeUpload } = await import('../../../utils/upload-queue.js');
-
-          await queueYoutubeUpload(tenantId, vodRecord.id, vodRecord.vod_id, filePath, request.body.uploadMode || 'all', request.body.platform, log);
-
-          return {
-            data: {
-              message: 'File already exists and validated, upload queued',
-              dbId: vodRecord.id,
-              vodId: vodRecord.vod_id,
-              path: filePath,
-              platform: request.body.platform,
-            },
-          };
-        }
-
-        const VodQueueModule = await import('../../../jobs/queues');
-
-        const vodDownloadJob = {
-          tenantId: tenantId,
-          platformUserId: tenantId,
-          dbId: vodRecord.id,
-          vodId: vodRecord.vod_id,
-          platform,
-          uploadMode: request.body.uploadMode || 'all',
-          downloadMethod: request.body.downloadMethod || 'hls',
-        };
-
-        void VodQueueModule.getVODDownloadQueue().add('standard_vod_download', vodDownloadJob, {
-          jobId: `download_${vodRecord.vod_id}`,
-        });
-
-        const vodJobId = `download_${vodRecord.vod_id}`;
-
-        // Calculate duration for chat download job
-        const durationSeconds = parseDurationToSeconds(vodRecord.duration, request.body.platform as 'twitch' | 'kick');
-
-        void VodQueueModule.getChatDownloadQueue().add(
-          'chat_download',
-          { tenantId: tenantId, platformUserId: tenantId, dbId: vodRecord.id, vodId: vodRecord.vod_id, platform, duration: durationSeconds },
-          { jobId: `chat_${vodRecord.vod_id}` }
-        );
-
-        const chatJobId = `chat_${vodRecord.vod_id}`;
-
-        log.info(`Queued standard VOD download jobs for ${vodRecord.vod_id}: vod=${vodJobId}, chat=${chatJobId}`);
-
-        return { data: { message: 'VOD download queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: vodJobId, chatJobId } };
-      } catch (error) {
-        const statusCode = (error as { statusCode?: number }).statusCode;
-        if (!statusCode || statusCode >= 500) {
-          log.error({ err: error }, 'Download failed');
-        }
-        throw error;
+      if (!vodRecord) {
+        internalServerError('Failed to create VOD record');
       }
+
+      // Queue emote save job (fire-and-forget within request context)
+      const platformId = config?.[platform]?.id;
+
+      if (platformId) {
+        await queueEmoteFetch({
+          tenantId,
+          vodId: vodRecord.id,
+          platform: request.body.platform as 'twitch' | 'kick',
+          platformId,
+          log,
+        });
+      } else {
+        log.warn(`No platform ID available for emote fetching on VOD ${request.body.vodId}`);
+      }
+
+      // Determine file path based on type
+      const type = request.body.type;
+      const streamerConfig = getTenantConfig(tenantId);
+      const filePath =
+        type === 'live'
+          ? streamerConfig?.settings.livePath
+            ? path.join(streamerConfig.settings.livePath, tenantId, `${vodRecord.id}.mp4`)
+            : ''
+          : streamerConfig?.settings.vodPath
+            ? path.join(streamerConfig.settings.vodPath, tenantId, `${vodRecord.id}.mp4`)
+            : '';
+
+      // File validation before download
+      let skipDownload = false;
+
+      if (filePath) {
+        const validation = await validateVodFile(tenantId, vodRecord.id, vodRecord.duration, filePath, log);
+
+        if (validation.valid) {
+          skipDownload = true;
+        }
+      }
+
+      // Queue VOD download job (standard archived VOD download)
+
+      if (skipDownload && filePath) {
+        const { queueYoutubeUpload } = await import('../../../utils/upload-queue.js');
+
+        await queueYoutubeUpload(tenantId, vodRecord.id, vodRecord.vod_id, filePath, request.body.uploadMode || 'all', request.body.platform, log);
+
+        return {
+          data: {
+            message: 'File already exists and validated, upload queued',
+            dbId: vodRecord.id,
+            vodId: vodRecord.vod_id,
+            path: filePath,
+            platform: request.body.platform,
+          },
+        };
+      }
+
+      const VodQueueModule = await import('../../../jobs/queues');
+
+      const vodDownloadJob = {
+        tenantId: tenantId,
+        platformUserId: tenantId,
+        dbId: vodRecord.id,
+        vodId: vodRecord.vod_id,
+        platform,
+        uploadMode: request.body.uploadMode || 'all',
+        downloadMethod: request.body.downloadMethod || 'hls',
+      };
+
+      void VodQueueModule.getVODDownloadQueue().add('standard_vod_download', vodDownloadJob, {
+        jobId: `download_${vodRecord.vod_id}`,
+      });
+
+      const vodJobId = `download_${vodRecord.vod_id}`;
+
+      // Calculate duration for chat download job
+      const durationSeconds = parseDurationToSeconds(vodRecord.duration, request.body.platform as 'twitch' | 'kick');
+
+      void VodQueueModule.getChatDownloadQueue().add(
+        'chat_download',
+        { tenantId: tenantId, platformUserId: tenantId, dbId: vodRecord.id, vodId: vodRecord.vod_id, platform, duration: durationSeconds },
+        { jobId: `chat_${vodRecord.vod_id}` }
+      );
+
+      const chatJobId = `chat_${vodRecord.vod_id}`;
+
+      log.info(`Queued standard VOD download jobs for ${vodRecord.vod_id}: vod=${vodJobId}, chat=${chatJobId}`);
+
+      return { data: { message: 'VOD download queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: vodJobId, chatJobId } };
     }
   );
   return fastify;

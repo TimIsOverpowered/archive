@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { extractErrorDetails } from '../../../utils/error.js';
+
 import path from 'path';
 import { getTenantConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
@@ -7,7 +7,7 @@ import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { fileExists } from '../../../utils/path.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { notFound, serviceUnavailable, badRequest, internalServerError } from '../../../utils/http-error';
+import { notFound, serviceUnavailable, badRequest } from '../../../utils/http-error';
 
 type VodRecord = { id: number; vod_id: string; title?: string | null; duration: number | string; platform: 'twitch' | 'kick' };
 
@@ -45,83 +45,75 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       const vodId = request.params.vodId;
       const log = createAutoLogger(tenantId);
 
-      try {
-        const config = getTenantConfig(tenantId);
+      const config = getTenantConfig(tenantId);
 
-        if (!config) notFound('Tenant not found');
+      if (!config) notFound('Tenant not found');
 
-        if (!config.youtube) badRequest('YouTube integration not configured for this tenant');
+      if (!config.youtube) badRequest('YouTube integration not configured for this tenant');
 
-        const { getClient } = await import('../../../db/client.js');
+      const { getClient } = await import('../../../db/client.js');
 
-        const dbClient = getClient(tenantId);
+      const dbClient = getClient(tenantId);
 
-        if (!dbClient) {
-          log.error('Database not available');
-          serviceUnavailable('Database not available');
-        }
-
-        const vodRecord = (await dbClient.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
-
-        if (!vodRecord) notFound(`VOD ${vodId} not found`);
-
-        const finalMp4Path = path.join(config.settings.vodPath!, tenantId, `${vodId}.mp4`);
-
-        const exists = await fileExists(finalMp4Path);
-
-        if (!exists) {
-          notFound('MP4 file not found. VOD may not have been processed yet.');
-        }
-
-        const YouTubeQueueModule = await import('../../../jobs/queues');
-
-        // Validate duration if available (optional, non-blocking)
-        try {
-          const { getDuration } = await import('../../../utils/ffmpeg.js');
-          const actualDuration: number | null = await getDuration(finalMp4Path);
-
-          if (!actualDuration) throw new Error('Could not determine video duration from MP4 file');
-
-          let expectedSeconds: number | null = null;
-
-          // Parse duration based on platform format
-          const durationStr = String(vodRecord.duration);
-
-          if (vodRecord.platform === 'twitch') {
-            const [hrs, mins, secs] = durationStr.split(':').map(Number);
-            expectedSeconds = hrs * 3600 + mins * 60 + secs;
-
-            if (expectedSeconds > 0) {
-              log.info(`Duration validation: actual=${actualDuration}s vs expected=${expectedSeconds}s`);
-            } else {
-              log.info(`Duration validation: actual=${actualDuration}s (no expected duration to compare)`);
-            }
-          }
-        } catch (validationError) {
-          // Non-critical - just log and continue with upload anyway
-          log.warn(validationError instanceof Error ? `Duration check failed: ${validationError.message}` : 'Duration validation skipped');
-        }
-
-        const youtubeJob = {
-          tenantId,
-          dbId: vodRecord.id,
-          vodId: vodRecord.vod_id,
-          filePath: finalMp4Path,
-          title: `Re-upload: ${vodRecord.title || vodRecord.vod_id}`,
-          description: 'Manual re-upload triggered via admin endpoint',
-          type: 'vod' as const,
-        };
-
-        await YouTubeQueueModule.getYoutubeUploadQueue().add('youtube_upload', youtubeJob, { jobId: `youtube-reupload_${vodRecord.vod_id}` });
-
-        return { data: { message: 'YouTube re-upload job queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: `youtube-reupload_${vodRecord.vod_id}`, durationValidation: null } };
-      } catch (error) {
-        const details = extractErrorDetails(error);
-        const errorMsg = details.message;
-        log.error(`Re-upload failed for ${vodId}: ${errorMsg}`);
-
-        internalServerError('Failed to queue re-upload job');
+      if (!dbClient) {
+        log.error('Database not available');
+        serviceUnavailable('Database not available');
       }
+
+      const vodRecord = (await dbClient.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
+
+      if (!vodRecord) notFound(`VOD ${vodId} not found`);
+
+      const finalMp4Path = path.join(config.settings.vodPath!, tenantId, `${vodId}.mp4`);
+
+      const exists = await fileExists(finalMp4Path);
+
+      if (!exists) {
+        notFound('MP4 file not found. VOD may not have been processed yet.');
+      }
+
+      const YouTubeQueueModule = await import('../../../jobs/queues');
+
+      // Validate duration if available (optional, non-blocking)
+      try {
+        const { getDuration } = await import('../../../utils/ffmpeg.js');
+        const actualDuration: number | null = await getDuration(finalMp4Path);
+
+        if (!actualDuration) throw new Error('Could not determine video duration from MP4 file');
+
+        let expectedSeconds: number | null = null;
+
+        // Parse duration based on platform format
+        const durationStr = String(vodRecord.duration);
+
+        if (vodRecord.platform === 'twitch') {
+          const [hrs, mins, secs] = durationStr.split(':').map(Number);
+          expectedSeconds = hrs * 3600 + mins * 60 + secs;
+
+          if (expectedSeconds > 0) {
+            log.info(`Duration validation: actual=${actualDuration}s vs expected=${expectedSeconds}s`);
+          } else {
+            log.info(`Duration validation: actual=${actualDuration}s (no expected duration to compare)`);
+          }
+        }
+      } catch (validationError) {
+        // Non-critical - just log and continue with upload anyway
+        log.warn(validationError instanceof Error ? `Duration check failed: ${validationError.message}` : 'Duration validation skipped');
+      }
+
+      const youtubeJob = {
+        tenantId,
+        dbId: vodRecord.id,
+        vodId: vodRecord.vod_id,
+        filePath: finalMp4Path,
+        title: `Re-upload: ${vodRecord.title || vodRecord.vod_id}`,
+        description: 'Manual re-upload triggered via admin endpoint',
+        type: 'vod' as const,
+      };
+
+      await YouTubeQueueModule.getYoutubeUploadQueue().add('youtube_upload', youtubeJob, { jobId: `youtube-reupload_${vodRecord.vod_id}` });
+
+      return { data: { message: 'YouTube re-upload job queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: `youtube-reupload_${vodRecord.vod_id}`, durationValidation: null } };
     }
   );
 
@@ -142,45 +134,37 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       const vodId = request.params.vodId;
       const log = createAutoLogger(tenantId);
 
-      try {
-        const config = getTenantConfig(tenantId);
+      const config = getTenantConfig(tenantId);
 
-        if (!config) notFound('Tenant not found');
+      if (!config) notFound('Tenant not found');
 
-        const { getClient } = await import('../../../db/client.js');
+      const { getClient } = await import('../../../db/client.js');
 
-        const dbClient = getClient(tenantId);
+      const dbClient = getClient(tenantId);
 
-        if (!dbClient) {
-          log.error('Database not available');
-          serviceUnavailable('Database not available');
-        }
-
-        const vodRecord = (await dbClient.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
-
-        if (!vodRecord) notFound(`VOD ${vodId} not found`);
-
-        // Queue download job
-        const YouTubeQueueModule = await import('../../../jobs/queues');
-
-        const downloadJob = {
-          tenantId: tenantId,
-          platformUserId: tenantId,
-          dbId: vodRecord.id,
-          vodId: vodRecord.vod_id,
-          platform: vodRecord.platform as 'twitch' | 'kick',
-        };
-
-        void YouTubeQueueModule.getVODDownloadQueue().add('vod_download', downloadJob, { jobId: `download_${vodRecord.vod_id}` });
-
-        return { data: { message: 'Re-download job queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: `download_${vodRecord.vod_id}` } };
-      } catch (error) {
-        const details = extractErrorDetails(error);
-        const errorMsg = details.message;
-        log.error(`Re-download failed for ${vodId}: ${errorMsg}`);
-
-        internalServerError('Failed to queue re-download job');
+      if (!dbClient) {
+        log.error('Database not available');
+        serviceUnavailable('Database not available');
       }
+
+      const vodRecord = (await dbClient.vod.findUnique({ where: { id: vodId } })) as VodRecord | null;
+
+      if (!vodRecord) notFound(`VOD ${vodId} not found`);
+
+      // Queue download job
+      const YouTubeQueueModule = await import('../../../jobs/queues');
+
+      const downloadJob = {
+        tenantId: tenantId,
+        platformUserId: tenantId,
+        dbId: vodRecord.id,
+        vodId: vodRecord.vod_id,
+        platform: vodRecord.platform as 'twitch' | 'kick',
+      };
+
+      void YouTubeQueueModule.getVODDownloadQueue().add('vod_download', downloadJob, { jobId: `download_${vodRecord.vod_id}` });
+
+      return { data: { message: 'Re-download job queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: `download_${vodRecord.vod_id}` } };
     }
   );
 

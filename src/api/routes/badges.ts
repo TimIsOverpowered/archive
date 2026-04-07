@@ -1,9 +1,9 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import Redis from 'ioredis';
 import { getTenantConfig } from '../../config/loader';
-import { extractErrorDetails } from '../../utils/error.js';
+
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { notFound, internalServerError } from '../../utils/http-error';
+import { notFound } from '../../utils/http-error';
 
 interface BadgesRoutesOptions {
   prefix: string;
@@ -24,55 +24,48 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
       const tenantId = request.params.id;
       const log = createAutoLogger(tenantId);
 
+      const config = getTenantConfig(tenantId);
+
+      if (!config?.twitch?.id) notFound('Twitch not configured for this tenant');
+
+      // Check Redis cache first (60-minute TTL)
+      const redisInstance = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+
       try {
-        const config = getTenantConfig(tenantId);
+        const cachedBadges = await redisInstance.get(`twitch_badges:${tenantId}`);
 
-        if (!config?.twitch?.id) notFound('Twitch not configured for this tenant');
+        if (cachedBadges) {
+          log.info('Returning cached Twitch badges');
 
-        // Check Redis cache first (60-minute TTL)
-        const redisInstance = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+          return { data: JSON.parse(cachedBadges) };
+        }
+      } catch {
+        // Cache miss or Redis error - continue to fetch from API
+      }
 
+      // Fetch from Twitch API on cache miss
+      const twitch = await import('../../services/twitch');
+
+      try {
+        const [channelBadges, globalBadges] = await Promise.all([twitch.getChannelBadges(tenantId).catch(() => null), twitch.getGlobalBadges(tenantId).catch(() => null)]);
+
+        const badgesData = { channel: channelBadges || null, global: globalBadges || null };
+
+        // Cache in Redis with 60-minute TTL (3600 seconds) if fetch succeeded
         try {
-          const cachedBadges = await redisInstance.get(`twitch_badges:${tenantId}`);
+          await redisInstance.set(`twitch_badges:${tenantId}`, JSON.stringify(badgesData), 'EX', 3600);
 
-          if (cachedBadges) {
-            log.info('Returning cached Twitch badges');
+          log.info('Fetched and cached Twitch badges');
 
-            return { data: JSON.parse(cachedBadges) };
-          }
+          return { data: badgesData };
         } catch {
-          // Cache miss or Redis error - continue to fetch from API
+          // Cache write failure - still return the fetched data even if caching fails
+          log.warn('Failed to cache Twitch badges in Redis, returning uncached result');
+
+          return { data: badgesData };
         }
-
-        // Fetch from Twitch API on cache miss
-        const twitch = await import('../../services/twitch');
-
-        try {
-          const [channelBadges, globalBadges] = await Promise.all([twitch.getChannelBadges(tenantId).catch(() => null), twitch.getGlobalBadges(tenantId).catch(() => null)]);
-
-          const badgesData = { channel: channelBadges || null, global: globalBadges || null };
-
-          // Cache in Redis with 60-minute TTL (3600 seconds) if fetch succeeded
-          try {
-            await redisInstance.set(`twitch_badges:${tenantId}`, JSON.stringify(badgesData), 'EX', 3600);
-
-            log.info('Fetched and cached Twitch badges');
-
-            return { data: badgesData };
-          } catch {
-            // Cache write failure - still return the fetched data even if caching fails
-            log.warn('Failed to cache Twitch badges in Redis, returning uncached result');
-
-            return { data: badgesData };
-          }
-        } finally {
-          await redisInstance.quit().catch(() => {}); // Graceful disconnect - ignore errors
-        }
-      } catch (error) {
-        const details = extractErrorDetails(error);
-        log.error({ ...details, tenantId }, 'Failed to fetch Twitch badges');
-
-        internalServerError('Something went wrong trying to retrieve channel badges');
+      } finally {
+        await redisInstance.quit().catch(() => {}); // Graceful disconnect - ignore errors
       }
     }
   );

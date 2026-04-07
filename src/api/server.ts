@@ -53,18 +53,16 @@ export async function buildServer() {
 
     // For 5xx errors, use generic code to avoid leaking internal error codes
     const isClientError = statusCode >= 400 && statusCode < 500;
-    const code = isClientError ? (error as { code?: string }).code || 'BAD_REQUEST' : 'INTERNAL_ERROR';
     const errorMessage = isClientError ? details.message : 'Internal server error';
 
     // Only log 5xx errors (server errors). 4xx are expected client errors and clutter logs.
     if (statusCode >= 500) {
-      logger.error({ err: details.message, stack: details.stack }, 'Request error');
+      logger.error({ err: error }, 'Request error');
     }
 
     return reply.status(statusCode).send({
       error: {
         message: errorMessage,
-        code,
         statusCode,
       },
     });

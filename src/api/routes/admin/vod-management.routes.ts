@@ -1,12 +1,12 @@
 import { FastifyInstance } from 'fastify';
-import { extractErrorDetails } from '../../../utils/error.js';
+
 import { getTenantStats, getAllTenants } from '../../../services/tenants.service';
 import { getClient } from '../../../db/client.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { serviceUnavailable, badRequest, internalServerError } from '../../../utils/http-error';
+import { serviceUnavailable, badRequest } from '../../../utils/http-error';
 
 interface CreateVodParams {
   id: string;
@@ -106,42 +106,34 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       const body = request.body;
       const log = createAutoLogger(tenantId);
 
-      try {
-        const client = getClient(tenantId);
+      const client = getClient(tenantId);
 
-        if (!client) serviceUnavailable('Database not available');
+      if (!client) serviceUnavailable('Database not available');
 
-        // Validate vodId is provided
-        if (!body.vodId) {
-          badRequest('vodId is required');
-        }
-
-        const existing = await client.vod.findUnique({ where: { id: body.vodId } });
-
-        if (existing) {
-          return { data: { message: `${body.vodId} already exists!`, vodId: body.vodId } };
-        }
-
-        const newVod = await client.vod.create({
-          data: {
-            vod_id: String(body.vodId),
-            title: body.title || null,
-            created_at: body.createdAt ? new Date(body.createdAt) : undefined,
-            duration: Number(body.duration) || 0,
-            platform: body.platform || 'twitch',
-          },
-        });
-
-        log.info(`Created VOD ${body.vodId}`);
-
-        return { data: { message: `${newVod.id} created!`, vodId: newVod.id } };
-      } catch (error) {
-        const details = extractErrorDetails(error);
-        const errorMsg = details.message;
-        log.error(`VOD creation failed: ${errorMsg}`);
-
-        internalServerError('Failed to create VOD record');
+      // Validate vodId is provided
+      if (!body.vodId) {
+        badRequest('vodId is required');
       }
+
+      const existing = await client.vod.findUnique({ where: { id: body.vodId } });
+
+      if (existing) {
+        return { data: { message: `${body.vodId} already exists!`, vodId: body.vodId } };
+      }
+
+      const newVod = await client.vod.create({
+        data: {
+          vod_id: String(body.vodId),
+          title: body.title || null,
+          created_at: body.createdAt ? new Date(body.createdAt) : undefined,
+          duration: Number(body.duration) || 0,
+          platform: body.platform || 'twitch',
+        },
+      });
+
+      log.info(`Created VOD ${body.vodId}`);
+
+      return { data: { message: `${newVod.id} created!`, vodId: newVod.id } };
     }
   );
 
@@ -166,23 +158,15 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       const vodId = request.params.vodId;
       const log = createAutoLogger(tenantId);
 
-      try {
-        const client = getClient(tenantId);
+      const client = getClient(tenantId);
 
-        if (!client) serviceUnavailable('Database not available');
+      if (!client) serviceUnavailable('Database not available');
 
-        await client.vod.delete({ where: { id: vodId } });
+      await client.vod.delete({ where: { id: vodId } });
 
-        log.info(`Deleted VOD ${vodId} and all related data (cascade)`);
+      log.info(`Deleted VOD ${vodId} and all related data (cascade)`);
 
-        return { data: { message: `Deleted VOD ${vodId} and all related data`, vodId } };
-      } catch (error) {
-        const details = extractErrorDetails(error);
-        const errorMsg = details.message;
-        log.error(`VOD deletion failed: ${errorMsg}`);
-
-        internalServerError('Failed to delete VOD record');
-      }
+      return { data: { message: `Deleted VOD ${vodId} and all related data`, vodId } };
     }
   );
 
