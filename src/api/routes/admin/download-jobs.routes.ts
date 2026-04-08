@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-import path from 'path';
 import type { VodData as TwitchVodData } from '../../../services/twitch.js';
 import { getTenantConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
@@ -238,15 +237,10 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
       // Determine file path based on type
       const type = request.body.type;
-      const streamerConfig = getTenantConfig(tenantId);
-      const filePath =
-        type === 'live'
-          ? streamerConfig?.settings.livePath
-            ? path.join(streamerConfig.settings.livePath, tenantId, `${vodRecord.id}.mp4`)
-            : ''
-          : streamerConfig?.settings.vodPath
-            ? path.join(streamerConfig.settings.vodPath, tenantId, `${vodRecord.id}.mp4`)
-            : '';
+      const { getVodFilePath, getLiveFilePath } = await import('../../../utils/path.js');
+
+      // For live streams, use stream_id; for archived, use vod_id
+      const filePath = type === 'live' ? getLiveFilePath({ tenantId, streamId: vodRecord.stream_id || vodRecord.vod_id }) : getVodFilePath({ tenantId, vodId: vodRecord.vod_id });
 
       // File validation before download
       let skipDownload = false;

@@ -22,6 +22,16 @@ export interface QueueEmoteOptions {
   log: FastifyRequest['log'];
 }
 
+export interface EnsureVodDownloadOptions {
+  tenantId: string;
+  dbId: number;
+  vodId: string;
+  platform: 'twitch' | 'kick';
+  type: 'live' | 'vod';
+  downloadMethod?: 'ffmpeg' | 'hls';
+  uploadMode?: 'vod' | 'all';
+}
+
 /**
  * Validates tenant config and platform enablement
  */
@@ -129,4 +139,130 @@ export async function queueEmoteFetch(options: QueueEmoteOptions): Promise<void>
     });
 
   log.info(`[${tenantId}] Queued async emote fetch for ${vodId} (platform=${platform}) (platformId=${platformId})`);
+}
+
+import { getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
+import { getDuration } from '../../../../utils/ffmpeg.js';
+import { getVODDownloadQueue } from '../../../../jobs/queues.js';
+import { createAutoLogger } from '../../../../utils/auto-tenant-logger.js';
+import type { StandardVodDownloadJobData, VODDownloadResult } from '../../../../workers/vod.worker.js';
+
+/**
+ * Ensures a VOD file exists and is valid. If missing or invalid, downloads and waits for completion.
+ *
+ * @returns filePath - Absolute path to the validated MP4 file
+ * @throws Error if download fails or configuration is missing
+ */
+export async function ensureVodDownload(options: EnsureVodDownloadOptions): Promise<string> {
+  const { tenantId, dbId, vodId, platform, type, downloadMethod = 'hls', uploadMode } = options;
+  const log = createAutoLogger(tenantId);
+
+  const config = getTenantConfig(tenantId);
+  if (!config) {
+    throw new Error(`Tenant ${tenantId} not found`);
+  }
+
+  const platformUserId = platform === 'twitch' ? config.twitch?.id : config.kick?.id;
+  if (!platformUserId) {
+    throw new Error(`Platform ${platform} not configured for tenant ${tenantId}`);
+  }
+
+  // Determine file path based on type
+  const filePath = type === 'live' ? getLiveFilePath({ tenantId, streamId: vodId }) : getVodFilePath({ tenantId, vodId });
+
+  const needsDownload = await checkIfDownloadNeeded(filePath, dbId, tenantId, platform, log);
+
+  if (!needsDownload) {
+    log.debug({ vodId, filePath, type }, 'VOD file already exists and is valid');
+    return filePath;
+  }
+
+  log.info({ vodId, filePath, type }, 'Queuing VOD download');
+
+  const queue = getVODDownloadQueue();
+  const jobData: StandardVodDownloadJobData = {
+    tenantId,
+    platformUserId,
+    dbId,
+    vodId,
+    platform,
+    uploadMode,
+    downloadMethod,
+  };
+  const job = await queue.add('standard_vod_download', jobData, { jobId: `download_${vodId}` });
+
+  // Poll job state until completed or failed (max 4 hours)
+  const maxWaitTime = 4 * 60 * 60 * 1000;
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWaitTime) {
+    const state = await job.getState();
+
+    if (state === 'completed') {
+      const result = job.returnvalue as unknown as VODDownloadResult | undefined;
+      if (!result?.success) {
+        log.error({ vodId }, 'VOD download completed but returned unsuccessful result');
+        throw new Error(`VOD download completed but returned unsuccessful result for ${vodId}`);
+      }
+      break;
+    }
+
+    if (state === 'failed') {
+      const attempts = await job.attemptsMade;
+      log.error({ vodId, attempts }, 'VOD download failed');
+      throw new Error(`VOD download failed for ${vodId} after ${attempts} attempts`);
+    }
+
+    // Wait 5 seconds before checking again
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
+
+  // If we exit the loop, check final state
+  const finalState = await job.getState();
+  if (finalState !== 'completed') {
+    log.error({ vodId, finalState }, 'VOD download timed out');
+    throw new Error(`VOD download timed out for ${vodId} after ${maxWaitTime / 1000 / 60} minutes`);
+  }
+
+  log.info({ vodId, filePath, type }, 'VOD download completed');
+  return filePath;
+}
+
+/**
+ * Checks if a VOD file needs to be downloaded (missing or duration mismatch).
+ */
+async function checkIfDownloadNeeded(filePath: string, dbId: number, tenantId: string, platform: 'twitch' | 'kick', log: ReturnType<typeof createAutoLogger>): Promise<boolean> {
+  const exists = await fileExists(filePath);
+  if (!exists) {
+    log.debug({ filePath }, 'File does not exist');
+    return true;
+  }
+
+  const actualDuration = await getDuration(filePath);
+  if (!actualDuration) {
+    log.warn({ filePath }, 'Could not determine file duration');
+    return true;
+  }
+
+  const client = getClient(tenantId);
+  if (!client) {
+    log.warn({ tenantId }, 'Database client not available');
+    return true;
+  }
+
+  const vodRecord = await client.vod.findUnique({ where: { id: dbId } });
+  if (!vodRecord) {
+    log.warn({ dbId }, 'VOD record not found in database');
+    return true;
+  }
+
+  const expectedDuration = parseDurationToSeconds(vodRecord.duration, platform);
+  const diff = Math.abs(actualDuration - expectedDuration);
+
+  if (diff > 1) {
+    log.debug({ dbId, expectedDuration, actualDuration, diff }, 'Duration mismatch exceeds tolerance');
+    return true;
+  }
+
+  return false;
 }

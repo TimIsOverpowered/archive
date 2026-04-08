@@ -1,10 +1,8 @@
 import { FastifyInstance } from 'fastify';
 
-import path from 'path';
 import { getTenantConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
-import { fileExists } from '../../../utils/path.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound, serviceUnavailable, badRequest } from '../../../utils/http-error';
@@ -64,13 +62,15 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
-      const finalMp4Path = path.join(config.settings.vodPath!, tenantId, `${vodId}.mp4`);
+      const { ensureVodDownload } = await import('./utils/vod-helpers.js');
 
-      const exists = await fileExists(finalMp4Path);
-
-      if (!exists) {
-        notFound('MP4 file not found. VOD may not have been processed yet.');
-      }
+      const finalMp4Path = await ensureVodDownload({
+        tenantId,
+        dbId: vodId,
+        vodId: String(vodId),
+        platform: vodRecord.platform,
+        type: 'vod',
+      });
 
       const YouTubeQueueModule = await import('../../../jobs/queues');
 

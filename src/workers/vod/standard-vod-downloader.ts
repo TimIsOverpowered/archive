@@ -40,7 +40,9 @@ export async function downloadStandardVod(options: StandardVodDownloadOptions): 
     throw new Error(`No vodPath configured for streamer ${tenantId}`);
   }
 
-  const finalPath = `${config.settings.vodPath}/${vodId}.mp4`;
+  const { getVodFilePath } = await import('../../utils/path.js');
+
+  const finalPath = getVodFilePath({ tenantId, vodId });
   const streamerName = config.displayName || tenantId;
   let messageId: string | null = null;
 
@@ -150,8 +152,9 @@ async function downloadWithHls(
   config: ReturnType<typeof getTenantConfig>,
   log: ReturnType<typeof loggerWithTenant>
 ): Promise<void> {
-  const basePath = config?.settings.vodPath || '';
-  const vodDir = pathMod.join(basePath, tenantId, String(vodId));
+  const { getVodDirPath } = await import('../../utils/path.js');
+
+  const vodDir = getVodDirPath({ tenantId, vodId });
   const m3u8Path = pathMod.join(vodDir, `${vodId}.m3u8`);
 
   try {

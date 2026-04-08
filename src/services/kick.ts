@@ -143,7 +143,9 @@ export async function downloadMP4(tenantId: string, vod: KickVod): Promise<strin
       throw new Error('Failed to parse Kick HLS playlist');
     }
 
-    const vodPath = `${config.settings.vodPath}/${vod.id}.mp4`;
+    const { getVodFilePath } = await import('../utils/path.js');
+
+    const vodPath = getVodFilePath({ tenantId, vodId: vod.id });
 
     const streamerName = config.displayName || tenantId;
     messageId = await sendVodDownloadStarted('kick', tenantId, vod.id, streamerName);

@@ -40,3 +40,85 @@ export async function deleteFileIfExists(filePath: string): Promise<void> {
     });
   }
 }
+
+import { getTenantConfig } from '../config/loader.js';
+
+export interface VodFilePathOptions {
+  tenantId: string;
+  vodId: string;
+}
+
+export interface VodDirPathOptions {
+  tenantId: string;
+  vodId: string;
+}
+
+export interface LiveFilePathOptions {
+  tenantId: string;
+  streamId: string;
+}
+
+export interface LiveDirPathOptions {
+  tenantId: string;
+  streamId: string;
+}
+
+/**
+ * Gets the file path for an archived VOD.
+ * Path: {vodPath}/{tenantId}/{vodId}/{vodId}.mp4
+ */
+export function getVodFilePath(options: VodFilePathOptions): string {
+  const { tenantId, vodId } = options;
+  const config = getTenantConfig(tenantId);
+
+  if (!config?.settings.vodPath) {
+    throw new Error(`VOD path not configured for tenant ${tenantId}`);
+  }
+
+  return path.join(config.settings.vodPath, tenantId, vodId, `${vodId}.mp4`);
+}
+
+/**
+ * Gets the directory path for an archived VOD.
+ * Path: {vodPath}/{tenantId}/{vodId}
+ */
+export function getVodDirPath(options: VodDirPathOptions): string {
+  const { tenantId, vodId } = options;
+  const config = getTenantConfig(tenantId);
+
+  if (!config?.settings.vodPath) {
+    throw new Error(`VOD path not configured for tenant ${tenantId}`);
+  }
+
+  return path.join(config.settings.vodPath, tenantId, vodId);
+}
+
+/**
+ * Gets the file path for a live VOD.
+ * Path: {livePath}/{tenantId}/{streamId}/{streamId}.mp4
+ */
+export function getLiveFilePath(options: LiveFilePathOptions): string {
+  const { tenantId, streamId } = options;
+  const config = getTenantConfig(tenantId);
+
+  if (!config?.settings.livePath) {
+    throw new Error(`Live path not configured for tenant ${tenantId}`);
+  }
+
+  return path.join(config.settings.livePath, tenantId, streamId, `${streamId}.mp4`);
+}
+
+/**
+ * Gets the directory path for a live VOD.
+ * Path: {livePath}/{tenantId}/{streamId}
+ */
+export function getLiveDirPath(options: LiveDirPathOptions): string {
+  const { tenantId, streamId } = options;
+  const config = getTenantConfig(tenantId);
+
+  if (!config?.settings.livePath) {
+    throw new Error(`Live path not configured for tenant ${tenantId}`);
+  }
+
+  return path.join(config.settings.livePath, tenantId, streamId);
+}

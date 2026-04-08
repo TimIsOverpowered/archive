@@ -448,7 +448,9 @@ export async function downloadVodAsMp4(vodId: string, tenantId: string): Promise
     // Build authenticated HLS URL (reference line 136-205 + hls-downloader.ts pattern with allow_source=true)
     const m3u8Url = `https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h264,hevc&playlist_include_framerate=true&nauthsig=${tokenSig.signature}&nauth=${tokenSig.value}`;
 
-    const vodPath = `${config.settings.vodPath}/${vodId}.mp4`;
+    const { getVodFilePath } = await import('../utils/path.js');
+
+    const vodPath = getVodFilePath({ tenantId, vodId });
 
     const streamerName = config.displayName || tenantId;
     messageId = await sendVodDownloadStarted('twitch', tenantId, vodId, streamerName);

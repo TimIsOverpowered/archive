@@ -126,8 +126,9 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
     }
   }
 
-  const basePath = config.settings.livePath || config.settings.vodPath || '';
-  const vodDir = pathMod.join(basePath, tenantId, String(vodId));
+  const { getVodDirPath } = await import('../../utils/path.js');
+
+  const vodDir = getVodDirPath({ tenantId, vodId: String(vodId) });
 
   try {
     await fsPromises.mkdir(vodDir, { recursive: true });
@@ -317,7 +318,9 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
     // Detect segment format: fMP4 vs traditional TS HLS
     const hasInitSegment = filesInDir.some((f) => f.includes('init') && f.endsWith('.mp4'));
 
-    const finalMp4Path = pathMod.join(basePath, tenantId, `${vodId}.mp4`);
+    const { getVodFilePath } = await import('../../utils/path.js');
+
+    const finalMp4Path = getVodFilePath({ tenantId, vodId });
 
     if (hasInitSegment && mp4Segments.length > 0) {
       log.info(`[${vodId}] Detected fMP4 segments (${mp4Segments.length} files).`);
@@ -419,7 +422,9 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
       log.info(`[${vodId}] Closed CycleTLS session`);
     }
 
-    const finalMp4Path = pathMod.join(basePath, tenantId, `${vodId}.mp4`);
+    const { getVodFilePath } = await import('../../utils/path.js');
+
+    const finalMp4Path = getVodFilePath({ tenantId, vodId });
 
     const exists = await fileExists(finalMp4Path);
 

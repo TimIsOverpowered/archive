@@ -2,7 +2,6 @@ import { Processor, Job } from 'bullmq';
 import dayjs from 'dayjs';
 import utcPlugin from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import path from 'path';
 
 dayjs.extend(utcPlugin);
 dayjs.extend(timezone);
@@ -14,7 +13,6 @@ import { getYoutubeUploadQueue } from '../jobs/queues.js';
 import type { DMCAClaim } from '../utils/dmca.js';
 import { isBlockingPolicy, buildMuteFilters, muteAudioSections, blackoutVideoSections, cleanupTempFiles, BlackoutSection } from '../utils/dmca.js';
 import { trimVideo as ffmpegTrim } from '../utils/ffmpeg.js';
-import { fileExists } from '../utils/path.js';
 import { createAutoLogger as loggerWithTenant } from '../utils/auto-tenant-logger.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
@@ -44,19 +42,18 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     throw new Error(`VOD not found in database for streamer ${tenantId}`);
   }
 
-  let videoPath: string;
+  const { ensureVodDownload } = await import('../api/routes/admin/utils/vod-helpers.js');
 
-  if (type === 'live') {
-    const username = platform === 'twitch' ? config.twitch!.username! : config.kick!.username!;
-    const liveDir = path.join(config.settings.livePath!, username, vodRecord.stream_id || vodId);
-    videoPath = path.join(liveDir, `${vodRecord.stream_id}.mp4`);
-  } else {
-    videoPath = path.join(config.settings.vodPath!, tenantId, `${vodId}.mp4`);
-  }
+  // For live streams, use stream_id; for archived, use vod_id
+  const fileIdentifier = type === 'live' ? vodRecord.stream_id || vodId : vodId;
 
-  if (!(await fileExists(videoPath))) {
-    throw new Error(`Video file not found at ${videoPath}`);
-  }
+  const videoPath = await ensureVodDownload({
+    tenantId,
+    dbId: vodRecord.id,
+    vodId: fileIdentifier,
+    platform,
+    type: job.data.type,
+  });
 
   const blockingClaims = receivedClaims.filter(isBlockingPolicy);
 
