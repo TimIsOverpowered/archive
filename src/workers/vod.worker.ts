@@ -1,5 +1,4 @@
 import { Processor, Job } from 'bullmq';
-import pathMod from 'path';
 import { fileExists } from '../utils/path.js';
 
 export interface LiveHlsDownloadJobData {
@@ -60,7 +59,9 @@ const vodProcessor: Processor<LiveHlsDownloadJobData | StandardVodDownloadJobDat
       throw new Error(`VOD path not configured for streamer ${tenantId}`);
     }
 
-    const vodDirPath = pathMod.join(config.settings.livePath || config.settings.vodPath, tenantId, vodId);
+    const { getVodDirPath } = await import('../utils/path.js');
+
+    const vodDirPath = getVodDirPath({ tenantId, vodId });
 
     const exists = await fileExists(vodDirPath);
 
