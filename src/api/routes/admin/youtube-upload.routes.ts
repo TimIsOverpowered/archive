@@ -34,13 +34,13 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
 
-  // Manually trigger YouTube re-upload for a VOD with duration validation
+  // Manually trigger YouTube re-upload for a VOD
   fastify.post<{ Params: ReUploadYoutubeParams; Body: ReUploadYoutubeBody }>(
     '/:tenantId/vods/re-upload-youtube',
     {
       schema: {
         tags: ['Admin'],
-        description: 'Manually trigger YouTube re-upload for a VOD with duration validation',
+        description: 'Manually trigger YouTube re-upload for a VOD',
         params: { type: 'object', properties: { tenantId: { type: 'string', description: 'Tenant ID' } }, required: ['tenantId'] },
         body: {
           type: 'object',
@@ -90,33 +90,6 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
       const YouTubeQueueModule = await import('../../../jobs/queues');
 
-      // Validate duration if available (optional, non-blocking)
-      try {
-        const { getDuration } = await import('../../../utils/ffmpeg.js');
-        const actualDuration: number | null = await getDuration(finalMp4Path);
-
-        if (!actualDuration) throw new Error('Could not determine video duration from MP4 file');
-
-        let expectedSeconds: number | null = null;
-
-        // Parse duration based on platform format
-        const durationStr = String(vodRecord.duration);
-
-        if (vodRecord.platform === 'twitch') {
-          const [hrs, mins, secs] = durationStr.split(':').map(Number);
-          expectedSeconds = hrs * 3600 + mins * 60 + secs;
-
-          if (expectedSeconds > 0) {
-            log.info(`Duration validation: actual=${actualDuration}s vs expected=${expectedSeconds}s`);
-          } else {
-            log.info(`Duration validation: actual=${actualDuration}s (no expected duration to compare)`);
-          }
-        }
-      } catch (validationError) {
-        // Non-critical - just log and continue with upload anyway
-        log.warn(validationError instanceof Error ? `Duration check failed: ${validationError.message}` : 'Duration validation skipped');
-      }
-
       const youtubeJob = {
         tenantId,
         dbId: vodRecord.id,
@@ -129,7 +102,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
       await YouTubeQueueModule.getYoutubeUploadQueue().add('youtube_upload', youtubeJob, { jobId: `youtube-reupload_${vodRecord.vod_id}` });
 
-      return { data: { message: 'YouTube re-upload job queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: `youtube-reupload_${vodRecord.vod_id}`, durationValidation: null } };
+      return { data: { message: 'YouTube re-upload job queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: `youtube-reupload_${vodRecord.vod_id}` } };
     }
   );
 
