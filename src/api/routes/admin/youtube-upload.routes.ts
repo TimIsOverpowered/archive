@@ -36,7 +36,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
   // Manually trigger YouTube re-upload for a VOD
   fastify.post<{ Params: ReUploadYoutubeParams; Body: ReUploadYoutubeBody }>(
-    '/:tenantId/vods/re-upload-youtube',
+    '/vods/re-upload-youtube',
     {
       schema: {
         tags: ['Admin'],
@@ -108,7 +108,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
   // Manually trigger VOD download (clears Redis dedup key first)
   fastify.post<{ Params: ReDownloadVodParams; Body: ReDownloadVodBody }>(
-    '/:tenantId/vods/re-download',
+    '/vods/re-download',
     {
       schema: {
         tags: ['Admin'],

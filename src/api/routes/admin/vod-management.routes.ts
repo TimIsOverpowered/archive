@@ -1,12 +1,16 @@
 import { FastifyInstance } from 'fastify';
 
-import { getTenantStats, getAllTenants } from '../../../services/tenants.service';
+import { getTenantStats } from '../../../services/tenants.service';
 import { getClient } from '../../../db/client.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { serviceUnavailable, badRequest } from '../../../utils/http-error';
+
+interface StatsParams {
+  tenantId: string;
+}
 
 interface CreateVodParams {
   tenantId: string;
@@ -17,9 +21,6 @@ interface DeleteVodParams {
 interface DeleteVodBody {
   vodId: string;
   platform: 'twitch' | 'kick';
-}
-interface StatsParams {
-  tenantId: string;
 }
 interface CreateVodBody {
   vodId?: number;
@@ -36,26 +37,9 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
 
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
 
-  // List all tenants (streamers)
-  fastify.get(
-    '/tenants',
-    {
-      schema: {
-        tags: ['Admin'],
-        description: 'List all tenants (streamers)',
-        security: [{ apiKey: [] }],
-      },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
-    },
-    async (_request) => {
-      const tenants = await getAllTenants();
-      return { data: tenants };
-    }
-  );
-
   // Get detailed stats for a tenant
   fastify.get<{ Params: StatsParams }>(
-    '/:tenantId/stats',
+    '/stats',
     {
       schema: {
         tags: ['Admin'],
@@ -84,7 +68,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
 
   // Create a VOD record manually
   fastify.post<{ Params: CreateVodParams; Body: CreateVodBody }>(
-    '/:tenantId/vods/create',
+    '/vods/create',
     {
       schema: {
         tags: ['Admin'],
@@ -142,7 +126,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
 
   // Delete a VOD and all related data
   fastify.delete<{ Params: DeleteVodParams; Body: DeleteVodBody }>(
-    '/:tenantId/vods/delete',
+    '/vods/delete',
     {
       schema: {
         tags: ['Admin'],

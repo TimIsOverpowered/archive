@@ -38,7 +38,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
   // Callback endpoint for twitch-recorder-go when live stream recording completes
   fastify.route<{ Params: LiveCallbackParams; Body: LiveCallbackBody }>({
     method: 'POST',
-    url: '/:tenantId/live',
+    url: '/live',
     schema: {
       tags: ['Admin'],
       description: 'Callback from external recorder when live HLS download/merge completes. Queues YouTube upload.',

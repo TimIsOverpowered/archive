@@ -55,7 +55,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
   // Fetch and save game chapters from Twitch API (Twitch only)
   fastify.post<{ Params: RouteParams; Body: ChaptersBody }>(
-    '/:tenantId/vods/chapters',
+    '/vods/chapters',
     {
       schema: {
         tags: ['Admin'],
@@ -218,7 +218,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
   // Fetch and save emote metadata for a VOD
   fastify.post<{ Params: RouteParams; Body: EmotesSaveBody }>(
-    '/:tenantId/vods/emotes/save',
+    '/vods/emotes/save',
     {
       schema: {
         tags: ['Admin'],
