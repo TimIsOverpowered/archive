@@ -6,7 +6,6 @@ import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { validateTenantPlatform, findVodRecord, parseDurationToSeconds, queueEmoteFetch } from './utils/vod-helpers';
 import type { KickVod } from '../../../services/kick.js';
 import { getClient } from '../../../db/client.js';
-import { fileExists } from '../../../utils/path.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound, serviceUnavailable, badRequest } from '../../../utils/http-error';
@@ -24,33 +23,6 @@ type VodRecord = {
 };
 
 type Logger = ReturnType<typeof createAutoLogger>;
-
-async function validateVodFile(tenantId: string, vodId: number, expectedDuration: number, filePath: string, log: Logger): Promise<{ valid: boolean; filePath: string }> {
-  const exists = await fileExists(filePath);
-
-  if (!exists) {
-    log.debug({ tenantId, vodId, filePath }, `File does not exist`);
-    return { valid: false, filePath };
-  }
-
-  const ffmpegModule = await import('../../../utils/ffmpeg.js');
-  const actualDuration = await ffmpegModule.getDuration(filePath);
-
-  if (actualDuration === null) {
-    log.warn({ tenantId, vodId, filePath }, `Could not determine file duration`);
-    return { valid: false, filePath };
-  }
-
-  const durationDiff = Math.abs(actualDuration - expectedDuration);
-
-  if (durationDiff <= 1) {
-    log.info({ tenantId, vodId, expectedDuration, actualDuration, filePath }, `File exists and duration is valid`);
-    return { valid: true, filePath };
-  }
-
-  log.warn({ tenantId, vodId, expectedDuration, actualDuration, diff: durationDiff, filePath }, `File duration mismatch exceeds tolerance`);
-  return { valid: false, filePath };
-}
 
 export default async function downloadJobsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   if (!adminRateLimiter) {
@@ -235,61 +207,31 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         log.warn(`No platform ID available for emote fetching on VOD ${request.body.vodId}`);
       }
 
-      // Determine file path based on type
+      const { ensureVodDownload } = await import('./utils/vod-helpers.js');
+
       const type = request.body.type;
-      const { getVodFilePath, getLiveFilePath } = await import('../../../utils/path.js');
 
       // For live streams, use stream_id; for archived, use vod_id
-      const filePath = type === 'live' ? getLiveFilePath({ tenantId, streamId: vodRecord.stream_id || vodRecord.vod_id }) : getVodFilePath({ tenantId, vodId: vodRecord.vod_id });
+      const fileIdentifier = type === 'live' ? vodRecord.stream_id || vodRecord.vod_id : vodRecord.vod_id;
 
-      // File validation before download
-      let skipDownload = false;
-
-      if (filePath) {
-        const validation = await validateVodFile(tenantId, vodRecord.id, vodRecord.duration, filePath, log);
-
-        if (validation.valid) {
-          skipDownload = true;
-        }
-      }
-
-      // Queue VOD download job (standard archived VOD download)
-
-      if (skipDownload && filePath) {
-        const { queueYoutubeUpload } = await import('../../../utils/upload-queue.js');
-
-        await queueYoutubeUpload(tenantId, vodRecord.id, vodRecord.vod_id, filePath, request.body.uploadMode || 'all', request.body.platform, log);
-
-        return {
-          data: {
-            message: 'File already exists and validated, upload queued',
-            dbId: vodRecord.id,
-            vodId: vodRecord.vod_id,
-            path: filePath,
-            platform: request.body.platform,
-          },
-        };
-      }
-
-      const VodQueueModule = await import('../../../jobs/queues');
-
-      const vodDownloadJob = {
-        tenantId: tenantId,
-        platformUserId: tenantId,
+      const filePath = await ensureVodDownload({
+        tenantId,
         dbId: vodRecord.id,
-        vodId: vodRecord.vod_id,
-        platform,
-        uploadMode: request.body.uploadMode || 'all',
+        vodId: fileIdentifier,
+        platform: request.body.platform as 'twitch' | 'kick',
+        type: type as 'live' | 'vod',
         downloadMethod: request.body.downloadMethod || 'hls',
-      };
-
-      void VodQueueModule.getVODDownloadQueue().add('standard_vod_download', vodDownloadJob, {
-        jobId: `download_${vodRecord.vod_id}`,
+        uploadMode: request.body.uploadMode || 'all',
       });
 
-      const vodJobId = `download_${vodRecord.vod_id}`;
+      // File is now guaranteed to exist and be valid (ensureVodDownload validated it)
+      const { queueYoutubeUpload } = await import('../../../utils/upload-queue.js');
 
-      // Calculate duration for chat download job
+      await queueYoutubeUpload(tenantId, vodRecord.id, vodRecord.vod_id, filePath, request.body.uploadMode || 'all', request.body.platform, log);
+
+      // Queue chat download job
+      const VodQueueModule = await import('../../../jobs/queues');
+
       const durationSeconds = parseDurationToSeconds(vodRecord.duration, request.body.platform as 'twitch' | 'kick');
 
       void VodQueueModule.getChatDownloadQueue().add(
@@ -300,9 +242,17 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
       const chatJobId = `chat_${vodRecord.vod_id}`;
 
-      log.info(`Queued standard VOD download jobs for ${vodRecord.vod_id}: vod=${vodJobId}, chat=${chatJobId}`);
+      log.info(`VOD download complete, upload queued for ${vodRecord.vod_id}, chat job: ${chatJobId}`);
 
-      return { data: { message: 'VOD download queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: vodJobId, chatJobId } };
+      return {
+        data: {
+          message: 'VOD download complete, upload queued',
+          dbId: vodRecord.id,
+          vodId: vodRecord.vod_id,
+          path: filePath,
+          chatJobId,
+        },
+      };
     }
   );
   return fastify;
