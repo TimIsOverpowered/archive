@@ -28,9 +28,9 @@ type StrictDmcaClaims = Array<{
 }>;
 
 interface DmcaRequestBody {
-  vodId: number;
+  vodId: string | number;
   claims: DmcaClaim[] | string;
-  platform?: 'twitch' | 'kick';
+  platform: 'twitch' | 'kick';
   type?: 'vod' | 'live';
   partIndex?: number;
 }
@@ -66,7 +66,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
     let vodRecord: VodRecord | null = null;
 
     try {
-      const dbResult = await client.vod.findUnique({ where: { id: body.vodId } });
+      const dbResult = await client.vod.findUnique({ where: { platform_vod_id: { vod_id: String(body.vodId), platform: body.platform } } });
       if (dbResult) {
         vodRecord = dbResult as VodRecord;
       }
@@ -85,7 +85,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
       vodId: String(vodRecord.id),
       receivedClaims: claimsArray as StrictDmcaClaims,
       type: body.type || 'vod',
-      platform: body.platform || (vodRecord.platform as 'twitch' | 'kick'),
+      platform: body.platform,
     };
 
     // Only add part field if partIndex is explicitly provided and valid
@@ -128,30 +128,30 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
   }
 
   // Main DMCA endpoint - process claims for full VOD or specific part
-  fastify.post<{ Body: DmcaRequestBody; Params: { id: string } }>(
-    '/:id/dmca',
+  fastify.post<{ Body: DmcaRequestBody; Params: { tenantId: string } }>(
+    '/:tenantId/dmca',
     {
       schema: {
         tags: ['Admin'],
         description: 'Process DMCA claims for a VOD (or specific part if provided) - mutes audio or applies blackout, then queues YouTube upload',
-        params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+        params: { type: 'object', properties: { tenantId: { type: 'string', description: 'Tenant ID' } }, required: ['tenantId'] },
         body: {
           type: 'object',
           properties: {
-            vodId: { type: 'string' },
-            claims: {}, // Accept any format - array or JSON string
-            partIndex: { type: 'number' }, // Optional - if provided, processes only that part (0-indexed)
-            platform: { type: 'string', enum: ['twitch', 'kick'] },
+            vodId: { type: 'string', description: 'Platform VOD ID' },
+            claims: {},
+            partIndex: { type: 'number' },
+            platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Source platform' },
             type: { type: 'string', enum: ['vod', 'live'] },
           },
-          required: ['vodId', 'claims'],
+          required: ['vodId', 'claims', 'platform'],
         },
         security: [{ apiKey: [] }],
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
     async (request) => {
-      const tenantId = request.params.id;
+      const tenantId = request.params.tenantId;
       const log = createAutoLogger(tenantId);
 
       return await processDmcaRequest(tenantId, request.body, log);

@@ -181,14 +181,14 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
   // Main download endpoint - creates VOD record if missing, then queues download + emote + chat jobs + upload (Twitch/Kick)
   fastify.post<{
     Body: { vodId: string | number; type?: 'live' | 'vod'; platform: 'twitch' | 'kick'; path?: string; uploadMode?: 'vod' | 'all'; downloadMethod?: 'ffmpeg' | 'hls' };
-    Params: { id: string };
+    Params: { tenantId: string };
   }>(
-    '/:id/upload',
+    '/:tenantId/upload',
     {
       schema: {
         tags: ['Admin'],
         description: 'Create VOD record if missing, then queue download + emote + chat jobs (Twitch/Kick)',
-        params: { type: 'object', properties: { id: { type: 'string', minLength: 1, maxLength: 100 } }, required: ['id'] },
+        params: { type: 'object', properties: { tenantId: { type: 'string', minLength: 1, maxLength: 100, description: 'Tenant ID' } }, required: ['tenantId'] },
         body: {
           type: 'object',
           properties: {
@@ -205,7 +205,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
     async (request) => {
-      const tenantId = request.params.id;
+      const tenantId = request.params.tenantId;
       const log = createAutoLogger(tenantId);
 
       // Validate tenant and platform enablement
