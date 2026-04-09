@@ -129,7 +129,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
 
   // Main DMCA endpoint - process claims for full VOD or specific part
   fastify.post<{ Body: DmcaRequestBody; Params: { tenantId: string } }>(
-    '/:tenantId/dmca',
+    '/dmca',
     {
       schema: {
         tags: ['Admin'],

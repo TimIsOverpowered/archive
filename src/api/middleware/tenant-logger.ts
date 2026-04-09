@@ -16,7 +16,7 @@ declare module 'fastify' {
  */
 export default function createTenantLoggerMiddleware() {
   return async function tenantLoggerMiddleware(request: FastifyRequest, _reply: FastifyReply) {
-    // Extract tenantId from params (routes like /api/v1/:tenantId/vods/* or /api/v1/admin/:tenantId/...)
+    // Extract tenantId from params (routes like /api/v1/:tenantId/vods/* or /api/v1/:tenantId/admin/...)
     const params = request.params as Record<string, string>;
 
     let tenantId: string | undefined;

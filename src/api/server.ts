@@ -163,10 +163,16 @@ export async function buildServer() {
     await instance.register(badgesRoutes.default, { prefix: '/api/v1' });
   });
 
-  // Register admin routes
+  // Register global admin routes (no tenantId required)
+  await fastify.register(async (instance) => {
+    const { globalAdminRoutes } = await import('./routes/admin');
+    await instance.register(globalAdminRoutes, { prefix: '/api/v1/admin' });
+  });
+
+  // Register tenant-scoped admin routes
   await fastify.register(async (instance) => {
     const adminRoutes = await import('./routes/admin');
-    await instance.register(adminRoutes.default, { prefix: '/api/v1/admin' });
+    await instance.register(adminRoutes.default, { prefix: '/api/v1/:tenantId/admin' });
   });
 
   return fastify;

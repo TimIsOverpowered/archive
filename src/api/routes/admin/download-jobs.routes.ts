@@ -155,7 +155,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
     Body: { vodId: string | number; type?: 'live' | 'vod'; platform: 'twitch' | 'kick'; path?: string; uploadMode?: 'vod' | 'all'; downloadMethod?: 'ffmpeg' | 'hls' };
     Params: { tenantId: string };
   }>(
-    '/:tenantId/upload',
+    '/upload',
     {
       schema: {
         tags: ['Admin'],
