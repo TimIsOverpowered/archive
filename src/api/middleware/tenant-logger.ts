@@ -16,17 +16,14 @@ declare module 'fastify' {
  */
 export default function createTenantLoggerMiddleware() {
   return async function tenantLoggerMiddleware(request: FastifyRequest, _reply: FastifyReply) {
-    // Extract tenantId from params (routes like /api/v1/:tenantId/vods/* or /api/v1/admin/:id/...)
+    // Extract tenantId from params (routes like /api/v1/:tenantId/vods/* or /api/v1/admin/:tenantId/...)
     const params = request.params as Record<string, string>;
 
     let tenantId: string | undefined;
 
     if ('tenantId' in params) {
-      // Standard VOD routes use 'tenantId' parameter
+      // Routes use 'tenantId' parameter
       tenantId = String(params.tenantId);
-    } else if ('id' in params && (request.url?.includes('/admin/') || request.url?.includes('tenant'))) {
-      // Admin routes use 'id' instead of 'tenantId' for tenant identification
-      tenantId = String(params.id);
     }
 
     if (!tenantId) return; // No tenant context available for this route (e.g., health check, root paths)

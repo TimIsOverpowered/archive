@@ -9,14 +9,17 @@ import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { serviceUnavailable, badRequest } from '../../../utils/http-error';
 
 interface CreateVodParams {
-  id: string;
+  tenantId: string;
 }
 interface DeleteVodParams {
-  id: string;
-  vodId: number;
+  tenantId: string;
+}
+interface DeleteVodBody {
+  vodId: string;
+  platform: 'twitch' | 'kick';
 }
 interface StatsParams {
-  id: string;
+  tenantId: string;
 }
 interface CreateVodBody {
   vodId?: number;
@@ -52,22 +55,22 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
 
   // Get detailed stats for a tenant
   fastify.get<{ Params: StatsParams }>(
-    '/:id/stats',
+    '/:tenantId/stats',
     {
       schema: {
         tags: ['Admin'],
         description: 'Get detailed stats for a tenant',
         params: {
           type: 'object',
-          properties: { id: { type: 'string', description: 'Tenant ID' } },
-          required: ['id'],
+          properties: { tenantId: { type: 'string', description: 'Tenant ID' } },
+          required: ['tenantId'],
         },
         security: [{ apiKey: [] }],
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
     async (request) => {
-      const tenantId = request.params.id;
+      const tenantId = request.params.tenantId;
       const client = getClient(tenantId);
 
       if (!client) {
@@ -81,12 +84,12 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
 
   // Create a VOD record manually
   fastify.post<{ Params: CreateVodParams; Body: CreateVodBody }>(
-    '/:id/vods/create',
+    '/:tenantId/vods/create',
     {
       schema: {
         tags: ['Admin'],
-        description: 'Create a VOD record manually (without drive field)',
-        params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+        description: 'Create a VOD record manually',
+        params: { type: 'object', properties: { tenantId: { type: 'string', description: 'Tenant ID' } }, required: ['tenantId'] },
         body: {
           type: 'object',
           properties: {
@@ -102,7 +105,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
     async (request) => {
-      const tenantId = request.params.id;
+      const tenantId = request.params.tenantId;
       const body = request.body;
       const log = createAutoLogger(tenantId);
 
@@ -138,33 +141,41 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
   );
 
   // Delete a VOD and all related data
-  fastify.delete<{ Params: DeleteVodParams }>(
-    '/:id/vods/:vodId/delete',
+  fastify.delete<{ Params: DeleteVodParams; Body: DeleteVodBody }>(
+    '/:tenantId/vods/delete',
     {
       schema: {
         tags: ['Admin'],
-        description: 'Delete a VOD and all related data (chapters, games, uploads)',
+        description: 'Delete a VOD and all related data (chapters, games, uploads, logs)',
         params: {
           type: 'object',
-          properties: { id: { type: 'string' }, vodId: { type: 'number' } },
-          required: ['id', 'vodId'],
+          properties: { tenantId: { type: 'string', description: 'Tenant ID' } },
+          required: ['tenantId'],
+        },
+        body: {
+          type: 'object',
+          properties: {
+            vodId: { type: 'string', description: 'Platform VOD ID' },
+            platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Source platform' },
+          },
+          required: ['vodId', 'platform'],
         },
         security: [{ apiKey: [] }],
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
     async (request) => {
-      const tenantId = request.params.id;
-      const vodId = request.params.vodId;
+      const tenantId = request.params.tenantId;
+      const { vodId, platform } = request.body;
       const log = createAutoLogger(tenantId);
 
       const client = getClient(tenantId);
 
       if (!client) serviceUnavailable('Database not available');
 
-      await client.vod.delete({ where: { id: vodId } });
+      await client.vod.delete({ where: { platform_vod_id: { vod_id: vodId, platform } } });
 
-      log.info(`Deleted VOD ${vodId} and all related data (cascade)`);
+      log.info(`Deleted VOD ${vodId} (${platform}) and all related data (cascade)`);
 
       return { data: { message: `Deleted VOD ${vodId} and all related data`, vodId } };
     }

@@ -19,7 +19,7 @@ interface LiveCallbackBody {
   platform: 'twitch' | 'kick';
 }
 
-type LiveCallbackParams = { id: string };
+type LiveCallbackParams = { tenantId: string };
 
 interface LiveCallbackResponseData {
   message: string;
@@ -38,18 +38,18 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
   // Callback endpoint for twitch-recorder-go when live stream recording completes
   fastify.route<{ Params: LiveCallbackParams; Body: LiveCallbackBody }>({
     method: 'POST',
-    url: '/:id/live',
+    url: '/:tenantId/live',
     schema: {
       tags: ['Admin'],
       description: 'Callback from external recorder when live HLS download/merge completes. Queues YouTube upload.',
-      params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+      params: { type: 'object', properties: { tenantId: { type: 'string', description: 'Tenant ID' } }, required: ['tenantId'] },
       body: {
         type: 'object',
         properties: {
           streamId: { type: 'string', description: 'VOD/Stream ID' },
           path: { type: 'string', description: 'Local filesystem path to recorded MP4 file' },
           durationSecs: { type: 'number', description: 'Duration in seconds (optional)' },
-          platform: { type: 'string', enum: ['twitch', 'kick'] },
+          platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Source platform' },
         },
         required: ['streamId', 'path', 'platform'],
       },
@@ -57,7 +57,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
     },
     onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     handler: async (request) => {
-      const tenantId = request.params.id;
+      const tenantId = request.params.tenantId;
       const log = createAutoLogger(tenantId);
 
       // Validate tenant exists

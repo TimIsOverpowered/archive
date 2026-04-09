@@ -12,16 +12,16 @@ interface BadgesRoutesOptions {
 export default async function badgesRoutes(fastify: FastifyInstance, _options: BadgesRoutesOptions) {
   // Get Twitch badges for a channel (global + subscriber) with Redis caching
   fastify.get(
-    '/:id/badges/twitch',
+    '/:tenantId/badges/twitch',
     {
       schema: {
         tags: ['Badges'],
         description: 'Get Twitch badges for a channel (global + subscriber)',
-        params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+        params: { type: 'object', properties: { tenantId: { type: 'string', description: 'Tenant ID' } }, required: ['tenantId'] },
       },
     },
-    async (request: FastifyRequest<{ Params: { id: string }; Body?: unknown }>): Promise<unknown> => {
-      const tenantId = request.params.id;
+    async (request: FastifyRequest<{ Params: { tenantId: string }; Body?: unknown }>): Promise<unknown> => {
+      const tenantId = request.params.tenantId;
       const log = createAutoLogger(tenantId);
 
       const config = getTenantConfig(tenantId);
