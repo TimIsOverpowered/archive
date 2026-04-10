@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
-import { tenantPlatformMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
+import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import { parseDurationToSeconds, queueEmoteFetch, ensureVodRecord } from './utils/vod-helpers';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
@@ -16,7 +16,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
   // Main download endpoint - creates VOD record if missing, then queues download + emote + chat jobs + upload (Twitch/Kick)
   fastify.post<{
-    Body: { vodId: string | number; type?: 'live' | 'vod'; platform: 'twitch' | 'kick'; path?: string; uploadMode?: 'vod' | 'all'; downloadMethod?: 'ffmpeg' | 'hls' };
+    Body: { vodId: string; type?: 'live' | 'vod'; platform: 'twitch' | 'kick'; path?: string; uploadMode?: 'vod' | 'all'; downloadMethod?: 'ffmpeg' | 'hls' };
     Params: { tenantId: string };
   }>(
     '/upload',
@@ -38,7 +38,8 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantPlatformMiddleware],
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      preValidation: [platformValidationMiddleware],
     },
     async (request) => {
       const { tenantId, config, client, platform } = request.tenant as TenantPlatformContext;

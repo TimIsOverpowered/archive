@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
-import { tenantPlatformMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
+import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { notFound, badRequest } from '../../../utils/http-error';
 
@@ -51,7 +51,8 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantPlatformMiddleware],
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      preValidation: [platformValidationMiddleware],
     },
     async (request) => {
       const { tenantId, config, client, platform } = request.tenant as TenantPlatformContext;
@@ -109,7 +110,8 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantPlatformMiddleware],
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      preValidation: [platformValidationMiddleware],
     },
     async (request) => {
       const { tenantId, client, platform } = request.tenant as TenantPlatformContext;

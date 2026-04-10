@@ -3,7 +3,7 @@ import { FastifyInstance } from 'fastify';
 import { getTenantStats } from '../../../services/tenants.service';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
-import { tenantPlatformMiddleware, tenantMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
+import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest } from '../../../utils/http-error';
@@ -137,7 +137,8 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantPlatformMiddleware],
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      preValidation: [platformValidationMiddleware],
     },
     async (request) => {
       const { tenantId, client, platform } = request.tenant as TenantPlatformContext;

@@ -6,7 +6,7 @@ import { getTenantConfig } from '../../../config/loader';
 import { getClient } from '../../../db/client.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
-import { tenantPlatformMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
+import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error';
@@ -27,7 +27,7 @@ type StrictDmcaClaims = Array<{
 }>;
 
 interface DmcaRequestBody {
-  vodId: string | number;
+  vodId: string;
   claims: DmcaClaim[] | string;
   platform: 'twitch' | 'kick';
   type?: 'vod' | 'live';
@@ -140,7 +140,8 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantPlatformMiddleware],
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      preValidation: [platformValidationMiddleware],
     },
     async (request) => {
       const { tenantId, config, client, platform } = request.tenant as TenantPlatformContext;
