@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import fs from 'fs/promises';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
-import { tenantPlatformMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
+import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import type { VodRecordBase } from './types';
 import { enqueueJobWithLogging } from '../../../jobs/queues.js';
 import { fileExists } from '../../../utils/path.js';
@@ -54,7 +54,8 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
       },
       security: [{ apiKey: [] }],
     },
-    onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantPlatformMiddleware],
+    onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+    preValidation: [platformValidationMiddleware],
     handler: async (request) => {
       const { tenantId, config, client, platform } = request.tenant as TenantPlatformContext;
       const log = createAutoLogger(tenantId);

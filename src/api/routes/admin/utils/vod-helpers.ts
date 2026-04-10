@@ -258,7 +258,7 @@ export async function ensureVodRecord(
   config: ReturnType<typeof getTenantConfig>,
   client: StreamerDbClient,
   tenantId: string,
-  vodId: string | number,
+  vodId: string,
   platform: 'twitch' | 'kick',
   log: ReturnType<typeof createAutoLogger>
 ): Promise<VodRecord | null> {
