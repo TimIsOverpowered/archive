@@ -1,11 +1,10 @@
 import { FastifyInstance } from 'fastify';
 
-import { getTenantConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
+import { tenantPlatformMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
-import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { notFound, serviceUnavailable, badRequest } from '../../../utils/http-error';
+import { notFound, badRequest } from '../../../utils/http-error';
 
 type VodRecord = { id: number; vod_id: string; title?: string | null; duration: number | string; platform: 'twitch' | 'kick' };
 
@@ -52,29 +51,15 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantPlatformMiddleware],
     },
     async (request) => {
-      const tenantId = request.params.tenantId;
-      const { vodId, platform } = request.body;
-      const log = createAutoLogger(tenantId);
+      const { tenantId, config, client, platform } = request.tenant as TenantPlatformContext;
+      const { vodId } = request.body;
 
-      const config = getTenantConfig(tenantId);
+      if (!config?.youtube) badRequest('YouTube integration not configured for this tenant');
 
-      if (!config) notFound('Tenant not found');
-
-      if (!config.youtube) badRequest('YouTube integration not configured for this tenant');
-
-      const { getClient } = await import('../../../db/client.js');
-
-      const dbClient = getClient(tenantId);
-
-      if (!dbClient) {
-        log.error('Database not available');
-        serviceUnavailable('Database not available');
-      }
-
-      const vodRecord = (await dbClient.vod.findUnique({ where: { platform_vod_id: { vod_id: vodId, platform } } })) as VodRecord | null;
+      const vodRecord = (await client.vod.findUnique({ where: { platform_vod_id: { vod_id: vodId, platform } } })) as VodRecord | null;
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
@@ -124,27 +109,13 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantPlatformMiddleware],
     },
     async (request) => {
-      const tenantId = request.params.tenantId;
-      const { vodId, platform } = request.body;
-      const log = createAutoLogger(tenantId);
+      const { tenantId, client, platform } = request.tenant as TenantPlatformContext;
+      const { vodId } = request.body;
 
-      const config = getTenantConfig(tenantId);
-
-      if (!config) notFound('Tenant not found');
-
-      const { getClient } = await import('../../../db/client.js');
-
-      const dbClient = getClient(tenantId);
-
-      if (!dbClient) {
-        log.error('Database not available');
-        serviceUnavailable('Database not available');
-      }
-
-      const vodRecord = (await dbClient.vod.findUnique({ where: { platform_vod_id: { vod_id: vodId, platform } } })) as VodRecord | null;
+      const vodRecord = (await client.vod.findUnique({ where: { platform_vod_id: { vod_id: vodId, platform } } })) as VodRecord | null;
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 

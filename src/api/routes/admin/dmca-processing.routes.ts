@@ -3,16 +3,15 @@ import { enqueueJobWithLogging } from '../../../jobs/queues.js';
 
 import { FastifyInstance } from 'fastify';
 import { getTenantConfig } from '../../../config/loader';
+import { getClient } from '../../../db/client.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
-import { getClient } from '../../../db/client.js';
+import { tenantPlatformMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { notFound, serviceUnavailable } from '../../../utils/http-error';
+import { notFound } from '../../../utils/http-error';
 
 type VodRecord = { id: number; platform: 'twitch' | 'kick' };
-
-type StreamerDbClient = ReturnType<typeof getClient>;
 
 interface DmcaClaim {
   type?: string;
@@ -49,20 +48,13 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
   /**
    * Shared DMCA processing logic - handles both full VOD and specific part processing
    */
-  async function processDmcaRequest(tenantId: string, body: DmcaRequestBody, log: ReturnType<typeof createAutoLogger>): Promise<ProcessDmcaResponse> {
-    const config = getTenantConfig(tenantId);
-
-    if (!config) notFound('Tenant not found');
-
-    let client: StreamerDbClient | null = null;
-
-    client = getClient(tenantId);
-
-    if (!client) {
-      log.error('Database error in DMCA processing');
-      serviceUnavailable('Database not available');
-    }
-
+  async function processDmcaRequest(
+    config: NonNullable<ReturnType<typeof getTenantConfig>>,
+    client: NonNullable<ReturnType<typeof getClient>>,
+    tenantId: string,
+    body: DmcaRequestBody,
+    log: ReturnType<typeof createAutoLogger>
+  ): Promise<ProcessDmcaResponse> {
     let vodRecord: VodRecord | null = null;
 
     try {
@@ -148,13 +140,13 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantPlatformMiddleware],
     },
     async (request) => {
-      const tenantId = request.params.tenantId;
+      const { tenantId, config, client, platform } = request.tenant as TenantPlatformContext;
       const log = createAutoLogger(tenantId);
 
-      return await processDmcaRequest(tenantId, request.body, log);
+      return await processDmcaRequest(config!, client, tenantId, { ...request.body, platform }, log);
     }
   );
 

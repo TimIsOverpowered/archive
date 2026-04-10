@@ -1,12 +1,12 @@
 import { FastifyInstance } from 'fastify';
 
 import { getTenantStats } from '../../../services/tenants.service';
-import { getClient } from '../../../db/client.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
+import { tenantPlatformMiddleware, tenantMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { serviceUnavailable, badRequest } from '../../../utils/http-error';
+import { badRequest } from '../../../utils/http-error';
 
 interface StatsParams {
   tenantId: string;
@@ -51,15 +51,10 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const tenantId = request.params.tenantId;
-      const client = getClient(tenantId);
-
-      if (!client) {
-        serviceUnavailable('Database not available');
-      }
+      const { tenantId, client } = request.tenant!;
 
       const stats = await getTenantStats(client, tenantId);
       return { data: stats };
@@ -86,16 +81,12 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const tenantId = request.params.tenantId;
+      const { tenantId, client } = request.tenant!;
       const body = request.body;
       const log = createAutoLogger(tenantId);
-
-      const client = getClient(tenantId);
-
-      if (!client) serviceUnavailable('Database not available');
 
       // Validate vodId is provided
       if (!body.vodId) {
@@ -146,16 +137,12 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantPlatformMiddleware],
     },
     async (request) => {
-      const tenantId = request.params.tenantId;
-      const { vodId, platform } = request.body;
+      const { tenantId, client, platform } = request.tenant as TenantPlatformContext;
+      const { vodId } = request.body;
       const log = createAutoLogger(tenantId);
-
-      const client = getClient(tenantId);
-
-      if (!client) serviceUnavailable('Database not available');
 
       await client.vod.delete({ where: { platform_vod_id: { vod_id: vodId, platform } } });
 

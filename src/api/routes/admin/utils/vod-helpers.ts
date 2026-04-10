@@ -33,36 +33,6 @@ export interface EnsureVodDownloadOptions {
 }
 
 /**
- * Validates tenant config and platform enablement
- */
-export function validateTenantPlatform(tenantId: string, platform: 'twitch' | 'kick'): { config: ReturnType<typeof getTenantConfig> | null; error?: Error } {
-  const config = getTenantConfig(tenantId);
-
-  if (!config) {
-    return { config: null, error: new Error('Tenant not found') };
-  }
-
-  if (platform === 'twitch' && !config.twitch?.enabled) {
-    return { config, error: new Error('Twitch is not enabled for this tenant') };
-  }
-
-  if (platform === 'kick' && !config.kick?.enabled) {
-    return { config, error: new Error('Kick is not enabled for this tenant') };
-  }
-
-  return { config };
-}
-
-/**
- * Gets and validates database client for streamer
- */
-export function getValidatedClient(tenantId: string): { client: StreamerDbClient | null; error?: Error } {
-  const client = getClient(tenantId);
-  if (!client) return { client: null, error: new Error('Database not available') };
-  return { client };
-}
-
-/**
  * Fetches VOD record or returns null if not found
  */
 export async function findVodRecord(client: StreamerDbClient, vodId: number | string, platform?: 'twitch' | 'kick'): Promise<unknown> {
@@ -265,4 +235,113 @@ async function checkIfDownloadNeeded(filePath: string, dbId: number, tenantId: s
   }
 
   return false;
+}
+
+import type { VodData as TwitchVodData } from '../../../../services/twitch.js';
+import type { KickVod } from '../../../../services/kick.js';
+
+type VodRecord = {
+  id: number;
+  vod_id: string;
+  title: string | null;
+  created_at: Date;
+  duration: number;
+  stream_id: string | null;
+  platform: string;
+};
+
+/**
+ * Ensures a VOD record exists in the database, creating it from platform API if needed
+ * Returns null if VOD cannot be found or created
+ */
+export async function ensureVodRecord(
+  config: ReturnType<typeof getTenantConfig>,
+  client: StreamerDbClient,
+  tenantId: string,
+  vodId: string | number,
+  platform: 'twitch' | 'kick',
+  log: ReturnType<typeof createAutoLogger>
+): Promise<VodRecord | null> {
+  // Try to find existing VOD record
+  const rawVodRecord = await findVodRecord(client, vodId, platform);
+
+  if (rawVodRecord) {
+    const vodRecord = rawVodRecord as VodRecord;
+
+    // VOD exists - return it with platform validation warning if needed
+    const typedRecord: Record<string, unknown> = vodRecord as Record<string, unknown>;
+    if ((typedRecord.platform as string | undefined) !== platform) {
+      log.warn(`VOD ${vodId} exists but has different platform: expected=${platform}, actual=${typedRecord.platform}`);
+    }
+
+    log.info(`Using existing VOD record for ${vodId}`);
+
+    return vodRecord;
+  }
+
+  // Create new VOD record by fetching metadata from platform API
+  log.info(`Creating new VOD ${vodId} for platform ${platform}`);
+
+  let vodRecord: VodRecord;
+
+  if (platform === 'twitch') {
+    const twitch = await import('../../../../services/twitch');
+    const vodMetadata: TwitchVodData = await twitch.getVodData(String(vodId), tenantId);
+
+    if (!config?.twitch?.id) {
+      return null;
+    }
+
+    if (vodMetadata.user_id !== config.twitch.id) {
+      return null;
+    }
+
+    const durationStr = String(vodMetadata.duration);
+    const durationParts: string[] = durationStr.replace('PT', '').split(/[HMS]/);
+    let totalSeconds = 0;
+
+    if (durationParts.length >= 3 && !isNaN(parseInt(durationParts[1]))) {
+      totalSeconds += parseInt(durationParts[0] || '0') * 3600 + parseInt(durationParts[1]) * 60 + parseInt(durationParts[2]);
+    }
+
+    vodRecord = (await client.vod.create({
+      data: {
+        vod_id: String(vodId),
+        title: vodMetadata.title || null,
+        created_at: new Date(vodMetadata.created_at),
+        duration: totalSeconds,
+        stream_id: vodMetadata.stream_id || null,
+        platform: 'twitch',
+      },
+    })) as VodRecord;
+
+    log.info(`Created Twitch VOD ${vodId} with user_id=${vodMetadata.user_id}`);
+  } else if (platform === 'kick') {
+    const kick = await import('../../../../services/kick');
+
+    if (!config?.kick?.username) {
+      return null;
+    }
+
+    const vodMetadata: KickVod = await kick.getVod(config.kick.username, String(vodId));
+
+    log.info(`Fetched Kick VOD ${vodId} from channel ${config.kick.username}`);
+
+    vodRecord = (await client.vod.create({
+      data: {
+        vod_id: String(vodId),
+        title: vodMetadata.session_title || null,
+        created_at: new Date(vodMetadata.created_at),
+        duration: Math.floor(Number(vodMetadata.duration) / 1000),
+        stream_id: `${vodMetadata.id}`,
+        platform: 'kick',
+      },
+    })) as VodRecord;
+
+    log.info(`Created Kick VOD ${vodId} with duration=${Number(vodMetadata.duration)}ms`);
+  } else {
+    return null;
+  }
+
+  return vodRecord;
 }

@@ -2,14 +2,13 @@ import type { FastifyInstance } from 'fastify';
 
 import dayjs from 'dayjs';
 import durationPlugin from 'dayjs/plugin/duration';
-import { getTenantConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
-import { getClient } from '../../../db/client.js';
+import { tenantPlatformMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import type { VodData as TwitchVodData } from '../../../services/twitch.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { notFound, serviceUnavailable } from '../../../utils/http-error';
+import { notFound } from '../../../utils/http-error';
 
 dayjs.extend(durationPlugin);
 
@@ -42,8 +41,6 @@ interface ChapterEdge {
   node?: ChapterNode;
 }
 
-type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
-
 type VodRecord = { id: number; platform: 'twitch' | 'kick'; duration: number | string; stream_id?: string | null };
 
 export default async function metadataFetchingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
@@ -71,23 +68,12 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantPlatformMiddleware],
     },
     async (request) => {
-      const tenantId = request.params.tenantId;
-      const { vodId, platform } = request.body;
+      const { tenantId, client, platform } = request.tenant as TenantPlatformContext;
+      const { vodId } = request.body;
       const log = createAutoLogger(tenantId);
-
-      const config = getTenantConfig(tenantId);
-
-      if (!config) notFound('Tenant not found');
-
-      const client: StreamerDbClient | undefined = getClient(tenantId);
-
-      if (!client) {
-        log.error('Database error: Database not available');
-        serviceUnavailable('Database not available');
-      }
 
       const vodRecord: VodRecord | null = (await client.vod.findUnique({ where: { platform_vod_id: { vod_id: vodId, platform } } })) as VodRecord | null;
 
@@ -234,23 +220,12 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantPlatformMiddleware],
     },
     async (request) => {
-      const tenantId = request.params.tenantId;
-      const { vodId, platform } = request.body;
+      const { tenantId, client, platform } = request.tenant as TenantPlatformContext;
+      const { vodId } = request.body;
       const log = createAutoLogger(tenantId);
-
-      const config = getTenantConfig(tenantId);
-
-      if (!config) notFound('Tenant not found');
-
-      const client: StreamerDbClient | undefined = getClient(tenantId);
-
-      if (!client) {
-        log.error('Database error: Database not available');
-        serviceUnavailable('Database not available');
-      }
 
       const vodRecord: VodRecord | null = (await client.vod.findUnique({ where: { platform_vod_id: { vod_id: vodId, platform } } })) as VodRecord | null;
 
