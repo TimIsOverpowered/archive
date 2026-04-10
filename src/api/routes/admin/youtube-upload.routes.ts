@@ -4,7 +4,6 @@ import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { notFound, badRequest } from '../../../utils/http-error';
-import type { VodRecord } from '../../../types/db.js';
 
 interface ReUploadYoutubeParams {
   tenantId: string;

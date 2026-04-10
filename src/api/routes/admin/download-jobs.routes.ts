@@ -6,7 +6,6 @@ import { parseDurationToSeconds, queueEmoteFetch, ensureVodRecord, findVodRecord
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error';
-import type { VodRecord } from '../../../types/db.js';
 
 interface ReDownloadVodParams {
   tenantId: string;

@@ -37,7 +37,7 @@ export interface EnsureVodDownloadOptions {
 /**
  * Fetches VOD record or returns null if not found
  */
-export async function findVodRecord(client: StreamerDbClient, vodId: string, platform: 'twitch' | 'kick'): Promise<unknown> {
+export async function findVodRecord(client: StreamerDbClient, vodId: string, platform: 'twitch' | 'kick'): Promise<VodRecord | null> {
   try {
     return await client.vod.findUnique({ where: { platform_vod_id: { platform, vod_id: vodId } } });
   } catch {
@@ -255,7 +255,7 @@ export async function ensureVodRecord(
 
   if (rawVodRecord) {
     log.info(`Using existing VOD record for ${vodId}`);
-    return rawVodRecord as VodRecord;
+    return rawVodRecord;
   }
 
   // Create new VOD record by fetching metadata from platform API
