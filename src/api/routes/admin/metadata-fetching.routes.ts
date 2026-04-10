@@ -92,7 +92,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
       try {
         const twitch = await import('../../../services/twitch');
-        const rawChapters = (await twitch.getChapters(String(vodId))) as ChapterEdge[] | null;
+        const rawChapters = (await twitch.getChapters(vodId)) as ChapterEdge[] | null;
         chapterEdges = rawChapters || [];
       } catch {
         log.warn(`Failed to fetch chapter data from Twitch API`);
@@ -156,7 +156,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
         try {
           const twitch = await import('../../../services/twitch');
-          chapterData = await twitch.getChapter(String(vodId));
+          chapterData = await twitch.getChapter(vodId);
         } catch {
           log.warn(`Failed to fetch single chapter data from Twitch API`);
         }

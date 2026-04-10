@@ -7,11 +7,11 @@ import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformCont
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest } from '../../../utils/http-error';
+import { findVodRecord } from './utils/vod-helpers';
 
 interface StatsParams {
   tenantId: string;
 }
-
 interface CreateVodParams {
   tenantId: string;
 }
@@ -23,11 +23,11 @@ interface DeleteVodBody {
   platform: 'twitch' | 'kick';
 }
 interface CreateVodBody {
-  vodId?: number;
+  vodId?: string;
   title?: string;
   createdAt?: string;
   duration?: number;
-  platform?: 'twitch' | 'kick';
+  platform: 'twitch' | 'kick';
 }
 
 export default async function vodManagementRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
@@ -82,9 +82,10 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
         security: [{ apiKey: [] }],
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, client } = request.tenant!;
+      const { tenantId, client, platform } = request.tenant as TenantPlatformContext;
       const body = request.body;
       const log = createAutoLogger(tenantId);
 
@@ -93,19 +94,19 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
         badRequest('vodId is required');
       }
 
-      const existing = await client.vod.findUnique({ where: { id: body.vodId } });
+      const vodRecord = await findVodRecord(client, body.vodId, platform);
 
-      if (existing) {
+      if (vodRecord) {
         return { data: { message: `${body.vodId} already exists!`, vodId: body.vodId } };
       }
 
       const newVod = await client.vod.create({
         data: {
-          vod_id: String(body.vodId),
+          vod_id: body.vodId,
           title: body.title || null,
           created_at: body.createdAt ? new Date(body.createdAt) : undefined,
           duration: Number(body.duration) || 0,
-          platform: body.platform || 'twitch',
+          platform: body.platform,
         },
       });
 
