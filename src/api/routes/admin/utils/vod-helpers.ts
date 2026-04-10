@@ -3,6 +3,12 @@ import { getTenantConfig } from '../../../../config/loader';
 import { getClient } from '../../../../db/client.js';
 import type { VodData as TwitchVodData } from '../../../../services/twitch.js';
 import type { KickVod } from '../../../../services/kick.js';
+import { getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
+import { getDuration } from '../../../../utils/ffmpeg.js';
+import { getVODDownloadQueue } from '../../../../jobs/queues.js';
+import { createAutoLogger } from '../../../../utils/auto-tenant-logger.js';
+import type { StandardVodDownloadJobData, VODDownloadResult } from '../../../../workers/vod.worker.js';
+import type { VodRecord } from '../../../../types/db.js';
 
 type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
 
@@ -109,12 +115,6 @@ export async function queueEmoteFetch(options: QueueEmoteOptions): Promise<void>
 
   log.info(`[${tenantId}] Queued async emote fetch for ${vodId} (platform=${platform}) (platformId=${platformId})`);
 }
-
-import { getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
-import { getDuration } from '../../../../utils/ffmpeg.js';
-import { getVODDownloadQueue } from '../../../../jobs/queues.js';
-import { createAutoLogger } from '../../../../utils/auto-tenant-logger.js';
-import type { StandardVodDownloadJobData, VODDownloadResult } from '../../../../workers/vod.worker.js';
 
 /**
  * Ensures a VOD file exists and is valid. If missing or invalid, downloads and waits for completion.
@@ -235,8 +235,6 @@ async function checkIfDownloadNeeded(filePath: string, dbId: number, tenantId: s
 
   return false;
 }
-
-import type { VodRecord } from '../../../../types/db.js';
 
 /**
  * Ensures a VOD record exists in the database, creating it from platform API if needed
