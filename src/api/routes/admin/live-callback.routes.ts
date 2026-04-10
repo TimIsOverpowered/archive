@@ -1,16 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 
 import fs from 'fs/promises';
-import { getTenantConfig } from '../../../config/loader';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
-import type { PrismaClient } from '../../../../generated/streamer/client';
+import { tenantPlatformMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import type { VodRecordBase } from './types';
 import { enqueueJobWithLogging } from '../../../jobs/queues.js';
 import { fileExists } from '../../../utils/path.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { notFound, badRequest, serviceUnavailable } from '../../../utils/http-error';
+import { notFound, badRequest } from '../../../utils/http-error';
 
 interface LiveCallbackBody {
   streamId: string;
@@ -55,26 +54,10 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
       },
       security: [{ apiKey: [] }],
     },
-    onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
+    onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantPlatformMiddleware],
     handler: async (request) => {
-      const tenantId = request.params.tenantId;
+      const { tenantId, config, client, platform } = request.tenant as TenantPlatformContext;
       const log = createAutoLogger(tenantId);
-
-      // Validate tenant exists
-      const config = getTenantConfig(tenantId);
-
-      if (!config) {
-        notFound('Tenant not found');
-      }
-
-      // Validate platform is enabled for this tenant
-      if (request.body.platform === 'twitch' && !config.twitch?.enabled) {
-        badRequest('Twitch is not enabled for this tenant');
-      }
-
-      if (request.body.platform === 'kick' && !config.kick?.enabled) {
-        badRequest('Kick is not enabled for this tenant');
-      }
 
       // Validate file path exists and is accessible
       try {
@@ -97,23 +80,6 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         notFound('Recording file not found or inaccessible');
       }
 
-      // Get database client
-      let client: PrismaClient;
-      try {
-        const ClientModule = await import('../../../db/client');
-        const retrievedClient = ClientModule.getClient(tenantId);
-
-        if (!retrievedClient) {
-          serviceUnavailable('Database not available for tenant');
-        }
-
-        client = retrievedClient;
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        log.error({ message: errorMessage, tenantId }, 'Database error');
-        serviceUnavailable('Database connection failed');
-      }
-
       // Look up VOD record by stream_id or id
       const streamIdNum = Number(request.body.streamId);
 
@@ -131,16 +97,16 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
           data: {
             id: streamIdNum,
             vod_id: request.body.streamId,
-            platform: request.body.platform,
-            title: `${request.body.platform.toUpperCase()} Live Recording`,
+            platform,
+            title: `${platform.toUpperCase()} Live Recording`,
             duration: request.body.durationSecs || 0,
             stream_id: request.body.streamId,
           },
         });
 
         log.info(`Created placeholder VOD ${request.body.streamId}`);
-      } else if (vodRecord.platform !== request.body.platform) {
-        log.warn(`Platform mismatch for VOD ${request.body.streamId}: expected=${request.body.platform}, actual=${vodRecord.platform}`);
+      } else if (vodRecord.platform !== platform) {
+        log.warn(`Platform mismatch for VOD ${request.body.streamId}: expected=${platform}, actual=${vodRecord.platform}`);
       }
 
       // Update duration if provided and different from current value
@@ -159,7 +125,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
       // Queue YouTube upload job for the pre-recorded MP4 file at `path`
       const YoutubeQueueModule = await import('../../../jobs/queues');
 
-      if (!config.youtube?.liveUpload) {
+      if (!config?.youtube?.liveUpload) {
         log.warn(`YouTube live upload not enabled, skipping queue for ${request.body.streamId}`);
 
         return <{ data: LiveCallbackResponseData }>{
@@ -175,10 +141,10 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         tenantId,
         vodId: String(streamIdNum),
         filePath: request.body.path,
-        title: vodRecord.title || `${request.body.platform.toUpperCase()} VOD`,
-        description: config.youtube.description || '',
+        title: vodRecord.title || `${platform.toUpperCase()} VOD`,
+        description: config?.youtube.description || '',
         type: 'live' as const,
-        platform: request.body.platform,
+        platform,
       };
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
