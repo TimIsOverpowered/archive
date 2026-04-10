@@ -7,13 +7,12 @@ dayjs.extend(utcPlugin);
 dayjs.extend(timezone);
 
 import type { DmcaProcessingJob, DmcaProcessingResult, YoutubeUploadJob } from '../jobs/queues.js';
-import { getTenantConfig } from '../config/loader.js';
-import { getClient, createClient } from '../db/client.js';
 import { getYoutubeUploadQueue } from '../jobs/queues.js';
 import type { DMCAClaim } from '../utils/dmca.js';
 import { isBlockingPolicy, buildMuteFilters, muteAudioSections, blackoutVideoSections, cleanupTempFiles, BlackoutSection } from '../utils/dmca.js';
 import { trimVideo as ffmpegTrim } from '../utils/ffmpeg.js';
 import { createAutoLogger as loggerWithTenant } from '../utils/auto-tenant-logger.js';
+import { getJobContext } from './job-context.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
   const { tenantId, dbId, vodId, receivedClaims, type, platform, part } = job.data;
@@ -25,15 +24,10 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     return { success: true, message: 'No blocking claims found' };
   }
 
-  const config = getTenantConfig(tenantId);
+  const { config, db } = await getJobContext(tenantId);
 
-  if (!config?.youtube) {
-    throw new Error('YouTube not configured for streamer');
-  }
-
-  let db = getClient(tenantId);
-  if (!db) {
-    db = await createClient(config);
+  if (!config.youtube) {
+    throw new Error(`YouTube not configured for tenant ${tenantId}`);
   }
 
   const vodRecord = await db.vod.findUnique({ where: { id: dbId } });

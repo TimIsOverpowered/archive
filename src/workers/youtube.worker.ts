@@ -5,8 +5,6 @@ import timezone from 'dayjs/plugin/timezone';
 dayjs.extend(timezone);
 
 import type { YoutubeUploadJob, YoutubeUploadResult } from '../jobs/queues.js';
-import { getTenantConfig } from '../config/loader.js';
-import { getClient, createClient } from '../db/client.js';
 import { splitVideo, trimVideo, getDuration, deleteFile } from '../utils/ffmpeg.js';
 import { uploadVideo, linkParts } from '../services/youtube.js';
 import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/discord-alerts.js';
@@ -14,6 +12,7 @@ import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { toHHMMSS } from '../utils/formatting.js';
 import { createYoutubeUploadProgressHandler } from '../utils/youtube-upload-progress.js';
+import { getJobContext } from './job-context.js';
 
 type ExtendedYoutubeUploadJob = YoutubeUploadJob & { dmcaProcessed?: boolean };
 
@@ -24,15 +23,10 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
   const log = createAutoLogger(String(tenantId));
 
-  const config = getTenantConfig(tenantId);
+  const { config, db } = await getJobContext(tenantId);
 
-  if (!config?.youtube) {
-    throw new Error('YouTube not configured for streamer');
-  }
-
-  let db = getClient(tenantId);
-  if (!db) {
-    db = await createClient(config);
+  if (!config.youtube) {
+    throw new Error(`YouTube not configured for tenant ${tenantId}`);
   }
 
   try {

@@ -1,4 +1,4 @@
-import type { DmcaProcessingJob } from '../../../types/queues.js';
+import type { DmcaProcessingJob } from '../../../jobs/queues.js';
 import { enqueueJobWithLogging } from '../../../jobs/queues.js';
 
 import { FastifyInstance } from 'fastify';
@@ -11,7 +11,7 @@ import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error';
 
-type VodRecord = { id: number; platform: 'twitch' | 'kick' };
+type VodRecord = { id: number; vod_id: string; platform: 'twitch' | 'kick' };
 
 interface DmcaClaim {
   type?: string;
@@ -74,7 +74,8 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
     // Cast at boundary to match strict queue type definition
     const dmcaJobData: Omit<DmcaProcessingJob, 'receivedClaims'> & { receivedClaims: StrictDmcaClaims } = {
       tenantId,
-      vodId: String(vodRecord.id),
+      dbId: vodRecord.id,
+      vodId: String(vodRecord.vod_id),
       receivedClaims: claimsArray as StrictDmcaClaims,
       type: body.type || 'vod',
       platform: body.platform,
