@@ -15,15 +15,8 @@ interface ReUploadYoutubeParams {
 interface ReUploadYoutubeBody {
   vodId: string;
   platform: 'twitch' | 'kick';
-}
-
-interface ReDownloadVodParams {
-  tenantId: string;
-}
-
-interface ReDownloadVodBody {
-  vodId: string;
-  platform: 'twitch' | 'kick';
+  downloadMethod?: 'ffmpeg' | 'hls';
+  type?: 'live' | 'vod';
 }
 
 export default async function youtubeUploadRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
@@ -46,6 +39,8 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
           properties: {
             vodId: { type: 'string', description: 'Platform VOD ID' },
             platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Source platform' },
+            downloadMethod: { type: 'string', enum: ['ffmpeg', 'hls'], default: 'hls', description: 'Download method' },
+            type: { type: 'string', enum: ['live', 'vod'], default: 'vod', description: 'File type for checking' },
           },
           required: ['vodId', 'platform'],
         },
@@ -56,85 +51,35 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
     },
     async (request) => {
       const { tenantId, config, client, platform } = request.tenant as TenantPlatformContext;
-      const { vodId } = request.body;
+      const { vodId, downloadMethod, type } = request.body;
 
       if (!config?.youtube) badRequest('YouTube integration not configured for this tenant');
 
-      const vodRecord = (await client.vod.findUnique({ where: { platform_vod_id: { vod_id: vodId, platform } } })) as VodRecord | null;
+      const { findVodRecord } = await import('./utils/vod-helpers.js');
+
+      const vodRecord = (await findVodRecord(client, vodId, platform)) as VodRecord | null;
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
-      const { ensureVodDownload } = await import('./utils/vod-helpers.js');
+      const VodQueueModule = await import('../../../jobs/queues');
 
-      const finalMp4Path = await ensureVodDownload({
-        tenantId,
-        dbId: vodRecord.id,
-        vodId: vodId,
-        platform: platform,
-        type: 'vod',
-      });
-
-      const YouTubeQueueModule = await import('../../../jobs/queues');
-
-      const youtubeJob = {
-        tenantId,
-        dbId: vodRecord.id,
-        vodId: vodRecord.vod_id,
-        filePath: finalMp4Path,
-        title: `Re-upload: ${vodRecord.title || vodRecord.vod_id}`,
-        description: 'Manual re-upload triggered via admin endpoint',
-        type: 'vod' as const,
-      };
-
-      await YouTubeQueueModule.getYoutubeUploadQueue().add('youtube_upload', youtubeJob, { jobId: `youtube-reupload_${vodRecord.vod_id}` });
-
-      return { data: { message: 'YouTube re-upload job queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: `youtube-reupload_${vodRecord.vod_id}` } };
-    }
-  );
-
-  // Manually trigger VOD download (clears Redis dedup key first)
-  fastify.post<{ Params: ReDownloadVodParams; Body: ReDownloadVodBody }>(
-    '/vods/re-download',
-    {
-      schema: {
-        tags: ['Admin'],
-        description: 'Manually trigger VOD download (clears Redis dedup key first)',
-        params: { type: 'object', properties: { tenantId: { type: 'string', description: 'Tenant ID' } }, required: ['tenantId'] },
-        body: {
-          type: 'object',
-          properties: {
-            vodId: { type: 'string', description: 'Platform VOD ID' },
-            platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Source platform' },
-          },
-          required: ['vodId', 'platform'],
-        },
-        security: [{ apiKey: [] }],
-      },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
-      preValidation: [platformValidationMiddleware],
-    },
-    async (request) => {
-      const { tenantId, client, platform } = request.tenant as TenantPlatformContext;
-      const { vodId } = request.body;
-
-      const vodRecord = (await client.vod.findUnique({ where: { platform_vod_id: { vod_id: vodId, platform } } })) as VodRecord | null;
-
-      if (!vodRecord) notFound(`VOD ${vodId} not found`);
-
-      // Queue download job
-      const YouTubeQueueModule = await import('../../../jobs/queues');
+      const fileIdentifier = type === 'live' ? vodRecord.stream_id || vodRecord.vod_id : vodRecord.vod_id;
 
       const downloadJob = {
-        tenantId: tenantId,
+        tenantId,
         platformUserId: tenantId,
         dbId: vodRecord.id,
-        vodId: vodRecord.vod_id,
-        platform: platform,
+        vodId: fileIdentifier,
+        platform,
+        uploadMode: 'vod' as const,
+        downloadMethod: downloadMethod || 'hls',
       };
 
-      void YouTubeQueueModule.getVODDownloadQueue().add('vod_download', downloadJob, { jobId: `download_${vodRecord.vod_id}` });
+      const downloadJobId = `download_${vodRecord.vod_id}`;
 
-      return { data: { message: 'Re-download job queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId: `download_${vodRecord.vod_id}` } };
+      void VodQueueModule.getVODDownloadQueue().add('standard_vod_download', downloadJob, { jobId: downloadJobId });
+
+      return { data: { message: 'VOD download queued, YouTube upload will be triggered after completion', dbId: vodRecord.id, vodId: vodRecord.vod_id, downloadJobId } };
     }
   );
 

@@ -2,10 +2,23 @@ import { FastifyInstance } from 'fastify';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
-import { parseDurationToSeconds, queueEmoteFetch, ensureVodRecord } from './utils/vod-helpers';
+import { parseDurationToSeconds, queueEmoteFetch, ensureVodRecord, findVodRecord } from './utils/vod-helpers';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error';
+
+type VodRecord = { id: number; vod_id: string; stream_id: string | null; title?: string | null; duration: number | string; platform: 'twitch' | 'kick' };
+
+interface ReDownloadVodParams {
+  tenantId: string;
+}
+
+interface ReDownloadVodBody {
+  vodId: string;
+  platform: 'twitch' | 'kick';
+  downloadMethod?: 'ffmpeg' | 'hls';
+  type?: 'live' | 'vod';
+}
 
 export default async function downloadJobsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   if (!adminRateLimiter) {
@@ -67,31 +80,31 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         log.warn(`No platform ID available for emote fetching on VOD ${request.body.vodId}`);
       }
 
-      const { ensureVodDownload } = await import('./utils/vod-helpers.js');
-
       const type = request.body.type;
 
       // For live streams, use stream_id; for archived, use vod_id
       const fileIdentifier = type === 'live' ? vodRecord.stream_id || vodRecord.vod_id : vodRecord.vod_id;
 
-      const filePath = await ensureVodDownload({
+      // Queue download job (fire-and-forget)
+      const VodQueueModule = await import('../../../jobs/queues');
+
+      const downloadJob = {
         tenantId,
+        platformUserId: tenantId,
         dbId: vodRecord.id,
         vodId: fileIdentifier,
         platform,
-        type: type as 'live' | 'vod',
-        downloadMethod: request.body.downloadMethod || 'hls',
         uploadMode: request.body.uploadMode || 'all',
-      });
+        downloadMethod: request.body.downloadMethod || 'hls',
+      };
 
-      // File is now guaranteed to exist and be valid (ensureVodDownload validated it)
-      const { queueYoutubeUpload } = await import('../../../utils/upload-queue.js');
+      const downloadJobId = `download_${vodRecord.vod_id}`;
 
-      await queueYoutubeUpload(tenantId, vodRecord.id, vodRecord.vod_id, filePath, request.body.uploadMode || 'all', platform, log);
+      void VodQueueModule.getVODDownloadQueue().add('standard_vod_download', downloadJob, { jobId: downloadJobId });
+
+      log.info({ vodId: vodRecord.vod_id, downloadJobId }, 'VOD download queued, YouTube upload will be triggered after completion');
 
       // Queue chat download job
-      const VodQueueModule = await import('../../../jobs/queues');
-
       const durationSeconds = parseDurationToSeconds(vodRecord.duration, platform);
 
       void VodQueueModule.getChatDownloadQueue().add(
@@ -102,18 +115,69 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
       const chatJobId = `chat_${vodRecord.vod_id}`;
 
-      log.info(`VOD download complete, upload queued for ${vodRecord.vod_id}, chat job: ${chatJobId}`);
-
       return {
         data: {
-          message: 'VOD download complete, upload queued',
+          message: 'VOD download queued, YouTube upload will be triggered after completion',
           dbId: vodRecord.id,
           vodId: vodRecord.vod_id,
-          path: filePath,
+          downloadJobId,
           chatJobId,
         },
       };
     }
   );
+
+  // Manually trigger VOD download
+  fastify.post<{ Params: ReDownloadVodParams; Body: ReDownloadVodBody }>(
+    '/vods/re-download',
+    {
+      schema: {
+        tags: ['Admin'],
+        description: 'Manually trigger VOD download',
+        params: { type: 'object', properties: { tenantId: { type: 'string', description: 'Tenant ID' } }, required: ['tenantId'] },
+        body: {
+          type: 'object',
+          properties: {
+            vodId: { type: 'string', description: 'Platform VOD ID' },
+            platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Source platform' },
+            downloadMethod: { type: 'string', enum: ['ffmpeg', 'hls'], default: 'hls', description: 'Download method' },
+            type: { type: 'string', enum: ['live', 'vod'], default: 'vod', description: 'File type for checking' },
+          },
+          required: ['vodId', 'platform'],
+        },
+        security: [{ apiKey: [] }],
+      },
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      preValidation: [platformValidationMiddleware],
+    },
+    async (request) => {
+      const { tenantId, client, platform } = request.tenant as TenantPlatformContext;
+      const { vodId, downloadMethod, type } = request.body;
+
+      const vodRecord = (await findVodRecord(client, vodId, platform)) as VodRecord | null;
+
+      if (!vodRecord) notFound(`VOD ${vodId} not found`);
+
+      const VodQueueModule = await import('../../../jobs/queues');
+
+      const fileIdentifier = type === 'live' ? vodRecord.stream_id || vodRecord.vod_id : vodRecord.vod_id;
+
+      const downloadJob = {
+        tenantId,
+        platformUserId: tenantId,
+        dbId: vodRecord.id,
+        vodId: fileIdentifier,
+        platform,
+        downloadMethod: downloadMethod || 'hls',
+      };
+
+      const downloadJobId = `download_${vodRecord.vod_id}`;
+
+      void VodQueueModule.getVODDownloadQueue().add('standard_vod_download', downloadJob, { jobId: downloadJobId });
+
+      return { data: { message: 'VOD download queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, downloadJobId } };
+    }
+  );
+
   return fastify;
 }
