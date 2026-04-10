@@ -1,12 +1,10 @@
 import { FastifyInstance } from 'fastify';
-
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { notFound, badRequest } from '../../../utils/http-error';
-
-type VodRecord = { id: number; vod_id: string; title?: string | null; duration: number | string; platform: 'twitch' | 'kick' };
+import type { VodRecord } from '../../../types/db.js';
 
 interface ReUploadYoutubeParams {
   tenantId: string;
@@ -57,7 +55,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
       const { findVodRecord } = await import('./utils/vod-helpers.js');
 
-      const vodRecord = (await findVodRecord(client, vodId, platform)) as VodRecord | null;
+      const vodRecord = await findVodRecord(client, vodId, platform);
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
