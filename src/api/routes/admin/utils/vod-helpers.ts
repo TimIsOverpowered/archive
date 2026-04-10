@@ -1,6 +1,8 @@
 import { FastifyRequest } from 'fastify';
 import { getTenantConfig } from '../../../../config/loader';
 import { getClient } from '../../../../db/client.js';
+import type { VodData as TwitchVodData } from '../../../../services/twitch.js';
+import type { KickVod } from '../../../../services/kick.js';
 
 type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
 
@@ -234,18 +236,7 @@ async function checkIfDownloadNeeded(filePath: string, dbId: number, tenantId: s
   return false;
 }
 
-import type { VodData as TwitchVodData } from '../../../../services/twitch.js';
-import type { KickVod } from '../../../../services/kick.js';
-
-type VodRecord = {
-  id: number;
-  vod_id: string;
-  title: string | null;
-  created_at: Date;
-  duration: number;
-  stream_id: string | null;
-  platform: string;
-};
+import type { VodRecord } from '../../../../types/db.js';
 
 /**
  * Ensures a VOD record exists in the database, creating it from platform API if needed

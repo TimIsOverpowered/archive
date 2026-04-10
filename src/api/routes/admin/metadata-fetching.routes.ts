@@ -9,6 +9,7 @@ import type { VodData as TwitchVodData } from '../../../services/twitch.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error';
+import type { VodRecord } from '../../../types/db.js';
 
 dayjs.extend(durationPlugin);
 
@@ -40,8 +41,6 @@ interface ChapterNode {
 interface ChapterEdge {
   node?: ChapterNode;
 }
-
-type VodRecord = { id: number; platform: 'twitch' | 'kick'; duration: number | string; stream_id?: string | null };
 
 export default async function metadataFetchingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   if (!adminRateLimiter) {
@@ -76,7 +75,9 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       const { vodId } = request.body;
       const log = createAutoLogger(tenantId);
 
-      const vodRecord: VodRecord | null = (await client.vod.findUnique({ where: { platform_vod_id: { vod_id: vodId, platform } } })) as VodRecord | null;
+      const { findVodRecord } = await import('./utils/vod-helpers.js');
+
+      const vodRecord = await findVodRecord(client, vodId, platform);
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
@@ -229,7 +230,9 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       const { vodId } = request.body;
       const log = createAutoLogger(tenantId);
 
-      const vodRecord: VodRecord | null = (await client.vod.findUnique({ where: { platform_vod_id: { vod_id: vodId, platform } } })) as VodRecord | null;
+      const { findVodRecord } = await import('./utils/vod-helpers.js');
+
+      const vodRecord = await findVodRecord(client, vodId, platform);
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 

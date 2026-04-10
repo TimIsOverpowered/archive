@@ -6,8 +6,7 @@ import { parseDurationToSeconds, queueEmoteFetch, ensureVodRecord, findVodRecord
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error';
-
-type VodRecord = { id: number; vod_id: string; stream_id: string | null; title?: string | null; duration: number | string; platform: 'twitch' | 'kick' };
+import type { VodRecord } from '../../../types/db.js';
 
 interface ReDownloadVodParams {
   tenantId: string;
@@ -154,7 +153,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       const { tenantId, client, platform } = request.tenant as TenantPlatformContext;
       const { vodId, downloadMethod, type } = request.body;
 
-      const vodRecord = (await findVodRecord(client, vodId, platform)) as VodRecord | null;
+      const vodRecord = await findVodRecord(client, vodId, platform);
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
