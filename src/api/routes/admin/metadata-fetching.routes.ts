@@ -9,7 +9,6 @@ import type { VodData as TwitchVodData } from '../../../services/twitch.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error';
-import type { VodRecord } from '../../../types/db.js';
 
 dayjs.extend(durationPlugin);
 
