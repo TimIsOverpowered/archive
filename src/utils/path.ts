@@ -65,7 +65,7 @@ export interface LiveDirPathOptions {
 
 /**
  * Gets the file path for an archived VOD.
- * Path: {vodPath}/{tenantId}/{vodId}/{vodId}.mp4
+ * Path: {vodPath}/{tenantId}/{vodId}.mp4
  */
 export function getVodFilePath(options: VodFilePathOptions): string {
   const { tenantId, vodId } = options;
@@ -75,7 +75,7 @@ export function getVodFilePath(options: VodFilePathOptions): string {
     throw new Error(`VOD path not configured for tenant ${tenantId}`);
   }
 
-  return path.join(config.settings.vodPath, tenantId, vodId, `${vodId}.mp4`);
+  return path.join(config.settings.vodPath, tenantId, `${vodId}.mp4`);
 }
 
 /**
