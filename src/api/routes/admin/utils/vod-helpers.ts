@@ -35,12 +35,9 @@ export interface EnsureVodDownloadOptions {
 /**
  * Fetches VOD record or returns null if not found
  */
-export async function findVodRecord(client: StreamerDbClient, vodId: number | string, platform?: 'twitch' | 'kick'): Promise<unknown> {
+export async function findVodRecord(client: StreamerDbClient, vodId: string, platform: 'twitch' | 'kick'): Promise<unknown> {
   try {
-    if (platform) {
-      return await client.vod.findUnique({ where: { platform_vod_id: { platform, vod_id: String(vodId) } } });
-    }
-    return await client.vod.findFirst({ where: { vod_id: String(vodId) } });
+    return await client.vod.findUnique({ where: { platform_vod_id: { platform, vod_id: vodId } } });
   } catch {
     return null;
   }
@@ -266,17 +263,8 @@ export async function ensureVodRecord(
   const rawVodRecord = await findVodRecord(client, vodId, platform);
 
   if (rawVodRecord) {
-    const vodRecord = rawVodRecord as VodRecord;
-
-    // VOD exists - return it with platform validation warning if needed
-    const typedRecord: Record<string, unknown> = vodRecord as Record<string, unknown>;
-    if ((typedRecord.platform as string | undefined) !== platform) {
-      log.warn(`VOD ${vodId} exists but has different platform: expected=${platform}, actual=${typedRecord.platform}`);
-    }
-
     log.info(`Using existing VOD record for ${vodId}`);
-
-    return vodRecord;
+    return rawVodRecord as VodRecord;
   }
 
   // Create new VOD record by fetching metadata from platform API
@@ -286,7 +274,7 @@ export async function ensureVodRecord(
 
   if (platform === 'twitch') {
     const twitch = await import('../../../../services/twitch');
-    const vodMetadata: TwitchVodData = await twitch.getVodData(String(vodId), tenantId);
+    const vodMetadata: TwitchVodData = await twitch.getVodData(vodId, tenantId);
 
     if (!config?.twitch?.id) {
       return null;
@@ -306,7 +294,7 @@ export async function ensureVodRecord(
 
     vodRecord = (await client.vod.create({
       data: {
-        vod_id: String(vodId),
+        vod_id: vodId,
         title: vodMetadata.title || null,
         created_at: new Date(vodMetadata.created_at),
         duration: totalSeconds,
@@ -323,13 +311,13 @@ export async function ensureVodRecord(
       return null;
     }
 
-    const vodMetadata: KickVod = await kick.getVod(config.kick.username, String(vodId));
+    const vodMetadata: KickVod = await kick.getVod(config.kick.username, vodId);
 
     log.info(`Fetched Kick VOD ${vodId} from channel ${config.kick.username}`);
 
     vodRecord = (await client.vod.create({
       data: {
-        vod_id: String(vodId),
+        vod_id: vodId,
         title: vodMetadata.session_title || null,
         created_at: new Date(vodMetadata.created_at),
         duration: Math.floor(Number(vodMetadata.duration) / 1000),

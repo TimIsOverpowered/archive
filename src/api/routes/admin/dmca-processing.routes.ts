@@ -58,7 +58,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
     let vodRecord: VodRecord | null = null;
 
     try {
-      const dbResult = await client.vod.findUnique({ where: { platform_vod_id: { vod_id: String(body.vodId), platform: body.platform } } });
+      const dbResult = await client.vod.findUnique({ where: { platform_vod_id: { vod_id: body.vodId, platform: body.platform } } });
       if (dbResult) {
         vodRecord = dbResult as VodRecord;
       }
