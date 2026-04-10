@@ -1,5 +1,6 @@
 import { Processor, Job } from 'bullmq';
 import { fileExists } from '../utils/path.js';
+import { getJobContext } from './job-context.js';
 
 export interface LiveHlsDownloadJobData {
   dbId: number;
@@ -51,12 +52,11 @@ const vodProcessor: Processor<LiveHlsDownloadJobData | StandardVodDownloadJobDat
 
   if (job.name === 'live_hls_download') {
     const { cleanupOrphanedTmpFiles, downloadLiveHls } = await import('./vod/hls-downloader.js');
-    const { getTenantConfig } = await import('../config/loader.js');
 
-    const config = getTenantConfig(tenantId);
+    const { config } = await getJobContext(tenantId);
 
-    if (!config?.settings.vodPath) {
-      throw new Error(`VOD path not configured for streamer ${tenantId}`);
+    if (!config.settings.vodPath) {
+      throw new Error(`VOD path not configured for tenant ${tenantId}`);
     }
 
     const { getVodDirPath } = await import('../utils/path.js');

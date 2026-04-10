@@ -1,6 +1,4 @@
 import { Processor, Job } from 'bullmq';
-import { getClient, createClient } from '../db/client.js';
-import { getTenantConfig } from '../config/loader.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { sleep } from '../utils/delay.js';
 import { fetchComments, fetchNextComments, type TwitchChatEdge } from '../services/twitch';
@@ -8,6 +6,7 @@ import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures
 import type { ChatDownloadJob, ChatDownloadResult } from '../jobs/queues.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { parseDuration } from '../utils/formatting.js';
+import { getJobContext } from './job-context.js';
 
 // Custom JSON value type compatible with Prisma's InputJsonValue without importing internal types
 type JsonValue = string | number | boolean | { [key: string]: JsonValue } | JsonValue[];
@@ -92,11 +91,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
     return { success: true, skipped: true };
   }
 
-  const config = getTenantConfig(tenantId);
-  if (!config) throw new Error(`Stream config not found for ${tenantId}`);
-
-  let db = getClient(tenantId);
-  if (!db) db = await createClient(config);
+  const { db } = await getJobContext(tenantId);
 
   // Smart resume - check for existing data if no manual override provided
   const lastSavedRecord = !startOffset
