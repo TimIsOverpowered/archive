@@ -276,11 +276,7 @@ export async function ensureVodRecord(
     const twitch = await import('../../../../services/twitch');
     const vodMetadata: TwitchVodData = await twitch.getVodData(vodId, tenantId);
 
-    if (!config?.twitch?.id) {
-      return null;
-    }
-
-    if (vodMetadata.user_id !== config.twitch.id) {
+    if (vodMetadata.user_id !== config?.twitch.id) {
       return null;
     }
 
@@ -299,7 +295,7 @@ export async function ensureVodRecord(
         created_at: new Date(vodMetadata.created_at),
         duration: totalSeconds,
         stream_id: vodMetadata.stream_id || null,
-        platform: 'twitch',
+        platform,
       },
     })) as VodRecord;
 
@@ -322,7 +318,7 @@ export async function ensureVodRecord(
         created_at: new Date(vodMetadata.created_at),
         duration: Math.floor(Number(vodMetadata.duration) / 1000),
         stream_id: `${vodMetadata.id}`,
-        platform: 'kick',
+        platform,
       },
     })) as VodRecord;
 
