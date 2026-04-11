@@ -24,12 +24,10 @@ export interface LiveDownloadJobData {
   platformUsername?: string;
   startedAt?: string;
   sourceUrl?: string;
-  uploadMode?: 'vod' | 'all';
 }
 
-// Second argument is the AbortSignal provided by BullMQ on job cancellation
 const liveProcessor: Processor<LiveDownloadJobData, unknown, string> = async (job: Job<LiveDownloadJobData, unknown, string>) => {
-  const { dbId, vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl, uploadMode } = job.data;
+  const { dbId, vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl } = job.data;
   const log = createAutoLogger(tenantId);
 
   log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[Live Worker] Starting job');
