@@ -1,20 +1,6 @@
 import type { StandardVodJob } from './queues.js';
 import { getStandardVodQueue } from './queues.js';
 
-export async function enqueueVodDownload(job: Omit<StandardVodJob, 'id'>, jobId: string): Promise<string | null> {
-  const queue = getStandardVodQueue();
-
-  try {
-    const addedJob = await queue.add('standard_vod_download', job, {
-      jobId,
-      deduplication: { id: jobId },
-    });
-    return addedJob.id ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export async function triggerVodDownload(
   tenantId: string,
   platformUserId: string,
@@ -25,16 +11,23 @@ export async function triggerVodDownload(
   platformUsername?: string
 ): Promise<string | null> {
   const jobId = `vod_${vodId}`;
-  return enqueueVodDownload(
-    {
-      tenantId,
-      platformUserId,
-      platformUsername,
-      dbId,
-      vodId,
-      platform,
-      externalVodId,
-    },
-    jobId
-  );
+  const job: StandardVodJob = {
+    tenantId,
+    platformUserId,
+    platformUsername,
+    dbId,
+    vodId,
+    platform,
+    externalVodId,
+  };
+
+  try {
+    const added = await getStandardVodQueue().add('standard_vod_download', job, {
+      jobId,
+      deduplication: { id: jobId },
+    });
+    return added.id ?? null;
+  } catch {
+    return null;
+  }
 }
