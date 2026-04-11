@@ -1,6 +1,6 @@
 import { Queue, QueueOptions, JobsOptions } from 'bullmq';
-import type { DMCAClaim } from '../utils/dmca.js';
-import { redisInstance } from '../workers/redis.js';
+import type { DMCAClaim } from '../../utils/dmca.js';
+import { redisInstance } from '../redis.js';
 
 export type VodJobType = 'STANDARD_VOD_DOWNLOAD' | 'LIVE_HLS_DOWNLOAD';
 

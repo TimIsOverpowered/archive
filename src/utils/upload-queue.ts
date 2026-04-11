@@ -1,6 +1,6 @@
 import { getTenantConfig } from '../config/loader.js';
 import { getClient } from '../db/client.js';
-import { triggerYoutubeUpload } from '../jobs/youtube.job.js';
+import { triggerYoutubeUpload } from '../workers/jobs/youtube.job.js';
 
 interface Logger {
   info: (context: Record<string, unknown>, message: string) => void;

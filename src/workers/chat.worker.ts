@@ -3,7 +3,7 @@ import { extractErrorDetails } from '../utils/error.js';
 import { sleep } from '../utils/delay.js';
 import { fetchComments, fetchNextComments, type TwitchChatEdge } from '../services/twitch';
 import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/discord-alerts.js';
-import type { ChatDownloadJob, ChatDownloadResult } from '../jobs/queues.js';
+import type { ChatDownloadJob, ChatDownloadResult } from './jobs/queues.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { parseDuration } from '../utils/formatting.js';
 import { getJobContext } from './job-context.js';

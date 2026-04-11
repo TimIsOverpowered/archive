@@ -4,7 +4,7 @@ import timezone from 'dayjs/plugin/timezone';
 
 dayjs.extend(timezone);
 
-import type { YoutubeUploadJob, YoutubeUploadResult } from '../jobs/queues.js';
+import type { YoutubeUploadJob, YoutubeUploadResult } from './jobs/queues.js';
 import { splitVideo, trimVideo, getDuration, deleteFile } from '../utils/ffmpeg.js';
 import { uploadVideo, linkParts } from '../services/youtube.js';
 import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/discord-alerts.js';

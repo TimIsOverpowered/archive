@@ -84,7 +84,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       const fileIdentifier = type === 'live' ? vodRecord.stream_id || vodRecord.vod_id : vodRecord.vod_id;
 
       // Queue download job (fire-and-forget)
-      const VodQueueModule = await import('../../../jobs/queues');
+      const VodQueueModule = await import('../../../workers/jobs/queues');
 
       const downloadJob = {
         tenantId,
@@ -156,7 +156,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
-      const VodQueueModule = await import('../../../jobs/queues');
+      const VodQueueModule = await import('../../../workers/jobs/queues');
 
       const fileIdentifier = type === 'live' ? vodRecord.stream_id || vodRecord.vod_id : vodRecord.vod_id;
 
