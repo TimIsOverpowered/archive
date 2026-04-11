@@ -2,7 +2,7 @@ import type { LogFn } from 'pino';
 import { getTenantDisplayName } from '../config/loader.js';
 import { logger as baseLogger } from './logger.js';
 
-type AppLogger = typeof baseLogger;
+export type AppLogger = typeof baseLogger;
 
 // Define a specific call signature for the wrapper to satisfy ESLint
 type InternalLogCall = (arg1: unknown, ...args: unknown[]) => void;
