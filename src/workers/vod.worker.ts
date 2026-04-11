@@ -51,7 +51,8 @@ const vodProcessor: Processor<LiveHlsDownloadJobData | StandardVodDownloadJobDat
   log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[VOD Processor] Starting job processing');
 
   if (job.name === 'live_hls_download') {
-    const { cleanupOrphanedTmpFiles, downloadLiveHls } = await import('./vod/hls-downloader.js');
+    const { downloadLiveHls } = await import('./vod/hls-downloader.js');
+    const { cleanupOrphanedTmpFiles } = await import('./vod/hls-utils.js');
 
     const { config } = await getJobContext(tenantId);
 
