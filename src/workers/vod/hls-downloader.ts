@@ -12,11 +12,8 @@ import { toHHMMSS } from '../../utils/formatting.js';
 import { updateChapterDuringDownload, finalizeKickChapters } from '../../services/kick.js';
 import { saveVodChapters as saveTwitchVodChapters } from '../../services/twitch.js';
 import { fileExists } from '../../utils/path.js';
-import { downloadSegmentsParallel, cleanupOrphanedTmpFiles, fetchTwitchPlaylist, fetchKickPlaylist, type DownloadStrategy } from './hls-utils.js';
+import { downloadSegmentsParallel, fetchTwitchPlaylist, fetchKickPlaylist, type DownloadStrategy } from './hls-utils.js';
 import { sleep, getRetryDelay } from '../../utils/delay.js';
-
-// Re-export for backward compatibility
-export { cleanupOrphanedTmpFiles };
 
 export interface HlsDownloadOptions {
   dbId: number;
@@ -40,16 +37,10 @@ function updateAlertProgress(messageId: string | null, platform: string, totalSe
   const startTime = startedAt ? new Date(startedAt) : new Date();
   const elapsedSeconds = Math.floor((Date.now() - startTime.getTime()) / 1000);
 
-  // Format as HH:MM:SS
-  const hours = Math.floor(elapsedSeconds / 3600);
-  const minutes = Math.floor((elapsedSeconds % 3600) / 60);
-  const seconds = elapsedSeconds % 60;
-  const elapsedFormatted = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-
   const fields = [
     { name: 'Platform', value: platform, inline: true },
     { name: 'Segments', value: String(totalSegmentsFound), inline: true },
-    { name: 'Elapsed Time', value: elapsedFormatted, inline: false },
+    { name: 'Elapsed Time', value: toHHMMSS(elapsedSeconds), inline: false },
   ];
 
   updateDiscordEmbed(messageId, {
