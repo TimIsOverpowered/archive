@@ -160,6 +160,7 @@ async function bootstrap() {
     const vodWorker = new Worker<LiveHlsDownloadJobData | StandardVodDownloadJobData, VODDownloadResult>(QUEUE_NAMES.VOD_DOWNLOAD as string, vodProcessor, {
       connection: redisConnection,
       concurrency: 10,
+      useWorkerThreads: true,
     });
 
     registerWorker('vod_download', vodWorker);
@@ -168,6 +169,7 @@ async function bootstrap() {
     const chatWorker = new Worker<ChatDownloadJob, ChatDownloadResult>(QUEUE_NAMES.CHAT_DOWNLOAD as string, chatProcessor, {
       connection: redisConnection,
       concurrency: 3,
+      useWorkerThreads: true,
     });
 
     registerWorker('chat_download', chatWorker);
@@ -176,6 +178,7 @@ async function bootstrap() {
     const youtubeWorker = new Worker<YoutubeUploadJob, YoutubeUploadResult>(QUEUE_NAMES.YOUTUBE_UPLOAD as string, youtubeProcessor, {
       connection: redisConnection,
       concurrency: 3,
+      useWorkerThreads: true,
     });
 
     registerWorker('youtube_upload', youtubeWorker);
@@ -184,6 +187,7 @@ async function bootstrap() {
     const dmcaWorker = new Worker<DmcaProcessingJob, DmcaProcessingResult>(QUEUE_NAMES.DMCA_PROCESSING as string, dmcaProcessor, {
       connection: redisConnection,
       concurrency: 1, // CPU-intensive re-encoding operations
+      useWorkerThreads: true,
     });
 
     registerWorker('dmca_processing', dmcaWorker);
