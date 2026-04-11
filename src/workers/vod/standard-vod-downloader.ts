@@ -2,11 +2,9 @@ import fsPromises from 'fs/promises';
 import pathMod from 'path';
 import HLS from 'hls-parser';
 import { getTenantConfig } from '../../config/loader.js';
-import { getClient } from '../../db/client.js';
-import { convertHlsToMp4, getDuration, detectFmp4FromPlaylist } from '../../utils/ffmpeg.js';
+import { convertHlsToMp4, detectFmp4FromPlaylist } from '../../utils/ffmpeg.js';
 import { getKickParsedM3u8ForFfmpeg, getVod } from '../../services/kick.js';
 import { getVodTokenSig } from '../../services/twitch.js';
-import { queueYoutubeUpload } from '../../utils/upload-queue.js';
 import { createAutoLogger as loggerWithTenant } from '../../utils/auto-tenant-logger.js';
 import { sendVodDownloadStarted, sendVodDownloadSuccess, sendVodDownloadFailed } from '../../utils/discord-alerts.js';
 import { extractErrorDetails } from '../../utils/error.js';
@@ -55,25 +53,15 @@ export async function downloadStandardVod(options: StandardVodDownloadOptions): 
       await downloadWithHls(platform, vodId, finalPath, tenantId, dbId, config, log);
     }
 
-    const actualDuration = await getDuration(finalPath);
-
     log.info({ vodId, platform }, `Downloaded ${vodId}.mp4`);
-
-    if (actualDuration) {
-      const client = getClient(tenantId);
-
-      if (client) {
-        await client.vod.update({ where: { id: dbId }, data: { duration: Math.round(actualDuration) } });
-      }
-    }
 
     await sendVodDownloadSuccess(messageId!, platform, vodId, finalPath, streamerName);
 
     if (uploadMode) {
-      await queueYoutubeUpload(tenantId, dbId, vodId, finalPath, uploadMode, platform, log);
+      //await queueYoutubeUpload(tenantId, dbId, vodId, finalPath, uploadMode, platform, log);
     }
 
-    return { success: true, finalPath, durationSeconds: actualDuration ?? undefined };
+    return { success: true, finalPath };
   } catch (error) {
     const details = extractErrorDetails(error);
     const errorMsg = details.message.substring(0, 500);

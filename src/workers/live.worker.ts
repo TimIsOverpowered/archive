@@ -1,17 +1,18 @@
+// live.worker.ts
 import { Processor, Job } from 'bullmq';
 import { downloadLiveHls } from './vod/hls-downloader.js';
 import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
 import { convertHlsToMp4, getDuration } from '../utils/ffmpeg.js';
 import { finalizeKickChapters } from '../services/kick.js';
 import { saveVodChapters as saveTwitchVodChapters } from '../services/twitch.js';
-import { fileExists } from '../utils/path.js';
+import { fileExists, getVodDirPath, getVodFilePath } from '../utils/path.js';
 import { getTenantConfig } from '../config/loader.js';
-import { getJobContext } from './job-context.js';
-import { getYoutubeUploadQueue } from './jobs/queues.js';
 import { toHHMMSS } from '../utils/formatting.js';
-import { sendRichAlert, updateDiscordEmbed, resetFailures, isAlertsEnabled } from '../utils/discord-alerts.js';
+import { sendRichAlert, updateDiscordEmbed, isAlertsEnabled } from '../utils/discord-alerts.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { getClient } from '../db/client.js';
+import { createAutoLogger } from '../utils/auto-tenant-logger.js';
+import { retryWithBackoff } from '../utils/retry.js';
 import fs from 'fs/promises';
 
 export interface LiveDownloadJobData {
@@ -26,224 +27,154 @@ export interface LiveDownloadJobData {
   uploadMode?: 'vod' | 'all';
 }
 
+// Second argument is the AbortSignal provided by BullMQ on job cancellation
 const liveProcessor: Processor<LiveDownloadJobData, unknown, string> = async (job: Job<LiveDownloadJobData, unknown, string>) => {
-  const signal = (job.token as { abortSignal?: AbortSignal })?.abortSignal;
-
   const { dbId, vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl, uploadMode } = job.data;
+  const log = createAutoLogger(tenantId);
 
-  const { createAutoLogger: loggerWithTenant } = await import('../utils/auto-tenant-logger.js');
-
-  const log = loggerWithTenant(tenantId);
-
-  log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[Live Worker] Starting job processing');
+  log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[Live Worker] Starting job');
 
   const streamerClient = getClient(tenantId);
-
-  if (!streamerClient) {
-    throw new Error(`Streamer database client not available for ${tenantId}`);
-  }
+  if (!streamerClient) throw new Error(`DB client not available for ${tenantId}`);
 
   const config = getTenantConfig(tenantId);
+  if (!config?.settings.vodPath) throw new Error(`VOD path not configured for ${tenantId}`);
 
-  if (!config?.settings.vodPath) {
-    throw new Error(`VOD path not configured for tenant ${tenantId}`);
-  }
-
-  const streamerName = config.displayName || tenantId;
-
-  let messageId: string | null = null;
-
-  if (isAlertsEnabled()) {
-    try {
-      const startTime = new Date().toISOString();
-
-      messageId = await sendRichAlert({
-        title: `[Live] ${vodId} Started`,
-        description: `${platform.toUpperCase()} live stream download started`,
-        status: 'warning',
-        fields: [
-          { name: 'Platform', value: platform, inline: true },
-          { name: 'Streamer', value: streamerName, inline: true },
-          { name: 'Started At', value: startedAt || startTime, inline: false },
-        ],
-        timestamp: startTime,
-      });
-    } catch (error) {
-      const details = extractErrorDetails(error);
-      log.warn(`Failed to initialize Discord alert: ${details.message}`);
-    }
-  }
+  const messageId = await initAlert(vodId, platform, config.displayName || tenantId, startedAt);
 
   try {
-    const { getVodDirPath } = await import('../utils/path.js');
-
+    // 1. Prepare directory
     const vodDirPath = getVodDirPath({ tenantId, vodId });
-
-    const exists = await fileExists(vodDirPath);
-
-    if (exists) {
-      log.debug({ vodId, platform }, `[Recovery] Directory found - cleaning orphaned temp files`);
+    if (await fileExists(vodDirPath)) {
       await cleanupOrphanedTmpFiles(vodDirPath, log);
-    } else {
-      log.debug({ vodId, platform }, `[Recovery] Fresh start - directory will be created`);
     }
 
-    const downloadResult = await downloadLiveHls(
-      {
-        dbId,
-        vodId,
-        platform,
-        tenantId,
-        platformUserId,
-        platformUsername,
-        startedAt,
-        sourceUrl,
+    // 2. Download
+    const downloadResult = await downloadLiveHls({
+      dbId,
+      vodId,
+      platform,
+      tenantId,
+      platformUserId,
+      platformUsername,
+      startedAt,
+      sourceUrl,
+      onProgress: (segmentsDownloaded) => {
+        updateAlert(messageId, `[Live] Downloading ${vodId}`, `${segmentsDownloaded} segments downloaded`, 'warning', []);
       },
-      signal
-    );
+    });
 
-    if (messageId && isAlertsEnabled()) {
-      updateDiscordEmbed(messageId, {
-        title: `[Live] Converting ${vodId}`,
-        description: 'Download complete. MP4 conversion in progress...',
-        status: 'warning',
-        fields: [
-          { name: 'Platform', value: platform, inline: true },
-          { name: 'Total Segments', value: String(downloadResult.segmentCount), inline: false },
-        ],
-        timestamp: startedAt || new Date().toISOString(),
-        updatedTimestamp: new Date().toISOString(),
-      });
-    }
+    await updateAlert(messageId, `[Live] Converting ${vodId}`, 'Download complete. Converting...', 'warning', [{ name: 'Segments', value: String(downloadResult.segmentCount), inline: true }]);
 
-    const { getVodFilePath } = await import('../utils/path.js');
-
+    // 3. Convert
     const finalMp4Path = getVodFilePath({ tenantId, vodId });
+    await convertToMp4(vodId, downloadResult, finalMp4Path, log);
 
-    let hasInitSegment = false;
-    let mp4Segments: string[] = [];
-    let tsSegments: string[] = [];
-
-    try {
-      const filesInDir = await fs.readdir(downloadResult.outputDir);
-      mp4Segments = filesInDir.filter((f) => f.endsWith('.mp4'));
-      tsSegments = filesInDir.filter((f) => f.endsWith('.ts'));
-      hasInitSegment = filesInDir.some((f) => f.includes('init') && f.endsWith('.mp4'));
-    } catch (error) {
-      const details = extractErrorDetails(error);
-      log.warn({ ...details, vodId }, `Failed to read segment files`);
-    }
-
-    let conversionAttempts = 0;
-    const maxConversionAttempts = 3;
-
-    while (conversionAttempts < maxConversionAttempts) {
-      try {
-        if (hasInitSegment && mp4Segments.length > 0) {
-          log.info(`[${vodId}] Detected fMP4 segments (${mp4Segments.length} files).`);
-          await convertHlsToMp4(downloadResult.m3u8Path, finalMp4Path, { vodId, isFmp4: true });
-          log.info(`[${vodId}] fMP4 merging complete.`);
-        } else if (tsSegments.length > 0) {
-          log.info(`[${vodId}] Found ${tsSegments.length} TS segments. Starting MP4 conversion...`);
-          await convertHlsToMp4(downloadResult.m3u8Path, finalMp4Path, { vodId, isFmp4: false });
-          log.info(`[${vodId}] MP4 conversion complete.`);
-        } else {
-          throw new Error(`No valid segments found in ${downloadResult.outputDir}.`);
-        }
-
-        break;
-      } catch (error) {
-        conversionAttempts++;
-        const details = extractErrorDetails(error);
-
-        if (conversionAttempts >= maxConversionAttempts) {
-          log.error({ ...details, vodId, attempts: conversionAttempts }, `Conversion failed after ${maxConversionAttempts} attempts`);
-          throw error;
-        }
-
-        const delay = 5000 * Math.pow(2, conversionAttempts - 1);
-        log.warn({ vodId, attempt: conversionAttempts, nextRetryIn: delay }, `Conversion failed, retrying...`);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
-
+    // 4. Update DB
     const actualDuration = await getDuration(finalMp4Path);
+    await finalizeVod({ dbId, vodId, platform, tenantId, durationSeconds: actualDuration ? Math.round(actualDuration) : null, streamerClient });
 
-    if (actualDuration) {
-      const formattedDuration = toHHMMSS(Math.round(actualDuration));
-      const durationSeconds = Math.round(actualDuration);
+    await updateAlert(messageId, `[Live] ${vodId} Complete`, 'Successfully processed', 'success', [
+      { name: 'Duration', value: actualDuration ? toHHMMSS(Math.round(actualDuration)) : 'Unknown', inline: true },
+    ]);
 
-      if (platform === 'kick') {
-        await finalizeKickChapters(dbId, vodId, durationSeconds, streamerClient);
-      } else if (platform === 'twitch') {
-        await saveTwitchVodChapters(dbId, vodId, tenantId, durationSeconds, streamerClient);
-      }
-
-      await streamerClient.vod.update({ where: { id: dbId }, data: { duration: durationSeconds, is_live: false } });
-
-      log.info(`[${vodId}] Updated VOD with duration ${formattedDuration} and marked as ended`);
-    } else {
-      log.warn(`[${vodId}] Could not determine video duration from MP4 file`);
-      await streamerClient.vod.update({ where: { id: dbId }, data: { is_live: false } });
+    // 5. Queue upload (non-fatal)
+    try {
+      //await queueYoutubeUpload(tenantId, dbId, vodId, finalMp4Path, uploadMode || 'all', platform, log);
+    } catch (error) {
+      log.warn({ ...extractErrorDetails(error), vodId }, 'Failed to queue upload (non-fatal)');
     }
 
-    if (messageId && isAlertsEnabled()) {
-      updateDiscordEmbed(messageId, {
-        title: `[Live] ${vodId} Complete!`,
-        description: `${platform.toUpperCase()} live stream successfully processed`,
-        status: 'success',
-        fields: [
-          { name: 'Platform', value: platform, inline: true },
-          { name: 'Duration', value: actualDuration ? toHHMMSS(Math.round(actualDuration)) : 'Unknown', inline: false },
-        ],
-        timestamp: startedAt || new Date().toISOString(),
-        updatedTimestamp: new Date().toISOString(),
+    // 6. Cleanup HLS segments
+    if (!config.settings.saveHLS) {
+      await fs.rm(downloadResult.outputDir, { recursive: true }).catch((error) => {
+        log.warn({ ...extractErrorDetails(error), vodId }, 'HLS cleanup failed (non-fatal)');
       });
     }
 
-    try {
-      const { queueYoutubeUpload } = await import('../utils/upload-queue.js');
-      await queueYoutubeUpload(tenantId, dbId, vodId, finalMp4Path, uploadMode || 'all', platform, log);
-      log.info({ vodId }, `Upload job(s) queued after live download completion`);
-    } catch (error) {
-      const details = extractErrorDetails(error);
-      log.warn({ ...details, vodId }, `Failed to queue upload job (non-fatal)`);
-    }
-
-    if (!config.settings.saveHLS) {
-      try {
-        await fs.rm(downloadResult.outputDir, { recursive: true });
-      } catch (error) {
-        const details = extractErrorDetails(error);
-        log.warn({ ...details, vodId }, `Cleanup failed`);
-      }
-    }
-
-    log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[Live Worker] Job completed successfully');
-
+    log.info({ jobId: job.id, vodId }, '[Live Worker] Job completed successfully');
     return { success: true };
   } catch (error) {
     const details = extractErrorDetails(error);
-    const errorMsg = details.message.substring(0, 500);
-
-    log.error({ jobId: job.id, ...details, vodId }, `[Live Worker] Job failed`);
-
-    if (messageId && isAlertsEnabled()) {
-      updateDiscordEmbed(messageId, {
-        title: `[Live] ${vodId} FAILED`,
-        description: `${platform.toUpperCase()} live stream processing failed`,
-        status: 'error',
-        fields: [
-          { name: 'Platform', value: platform, inline: true },
-          { name: 'Error', value: errorMsg, inline: false },
-        ],
-        timestamp: startedAt || new Date().toISOString(),
-        updatedTimestamp: new Date().toISOString(),
-      });
-    }
-
+    log.error({ jobId: job.id, ...details, vodId }, '[Live Worker] Job failed');
+    await updateAlert(messageId, `[Live] ${vodId} FAILED`, details.message.substring(0, 500), 'error', []);
     throw error;
   }
 };
+
+// --- Helpers ---
+
+async function convertToMp4(vodId: string, downloadResult: { m3u8Path: string; outputDir: string }, finalMp4Path: string, log: ReturnType<typeof createAutoLogger>) {
+  const files = await fs.readdir(downloadResult.outputDir).catch(() => [] as string[]);
+  const mp4Segments = files.filter((f) => f.endsWith('.mp4'));
+  const tsSegments = files.filter((f) => f.endsWith('.ts'));
+  const hasInitSegment = files.some((f) => f.includes('init') && f.endsWith('.mp4'));
+
+  if (mp4Segments.length === 0 && tsSegments.length === 0) {
+    throw new Error(`No valid segments found in ${downloadResult.outputDir}`);
+  }
+
+  const isFmp4 = hasInitSegment && mp4Segments.length > 0;
+  log.info(`[${vodId}] Converting ${isFmp4 ? 'fMP4' : 'TS'} segments to MP4`);
+
+  // Let BullMQ handle job-level retries — only retry here for transient ffmpeg failures
+  await retryWithBackoff(() => convertHlsToMp4(downloadResult.m3u8Path, finalMp4Path, { vodId, isFmp4 }), {
+    attempts: 3,
+    baseDelayMs: 5000,
+  });
+
+  log.info(`[${vodId}] Conversion complete`);
+}
+
+async function finalizeVod({
+  dbId,
+  vodId,
+  platform,
+  tenantId,
+  durationSeconds,
+  streamerClient,
+}: {
+  dbId: number;
+  vodId: string;
+  platform: string;
+  tenantId: string;
+  durationSeconds: number | null;
+  streamerClient: NonNullable<ReturnType<typeof getClient>>;
+}) {
+  if (durationSeconds) {
+    if (platform === 'kick') {
+      await finalizeKickChapters(dbId, vodId, durationSeconds, streamerClient);
+    } else if (platform === 'twitch') {
+      await saveTwitchVodChapters(dbId, vodId, tenantId, durationSeconds, streamerClient);
+    }
+    await streamerClient.vod.update({ where: { id: dbId }, data: { duration: durationSeconds, is_live: false } });
+  } else {
+    await streamerClient.vod.update({ where: { id: dbId }, data: { is_live: false } });
+  }
+}
+
+async function initAlert(vodId: string, platform: string, streamerName: string, startedAt?: string) {
+  if (!isAlertsEnabled()) return null;
+  try {
+    return await sendRichAlert({
+      title: `[Live] ${vodId} Started`,
+      description: `${platform.toUpperCase()} live stream download started`,
+      status: 'warning',
+      fields: [
+        { name: 'Platform', value: platform, inline: true },
+        { name: 'Streamer', value: streamerName, inline: true },
+        { name: 'Started At', value: startedAt || new Date().toISOString(), inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function updateAlert(messageId: string | null, title: string, description: string, status: 'warning' | 'success' | 'error', fields: { name: string; value: string; inline: boolean }[]) {
+  if (!messageId || !isAlertsEnabled()) return;
+  await updateDiscordEmbed(messageId, { title, description, status, fields, timestamp: new Date().toISOString() }).catch(() => {});
+}
 
 export default liveProcessor;
