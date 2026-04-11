@@ -39,7 +39,9 @@ export async function buildServer() {
     exposeHeadRoutes: true,
     logger: false,
     trustProxy: true,
-    ignoreTrailingSlash: true,
+    routerOptions: {
+      ignoreTrailingSlash: true,
+    },
     constraints: {
       platform: platformConstraintStrategy as never,
     },
