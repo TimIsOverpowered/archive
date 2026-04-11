@@ -4,8 +4,9 @@ import { sleep } from '../utils/delay.js';
 import { fetchComments, fetchNextComments, type TwitchChatEdge } from '../services/twitch';
 import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/discord-alerts.js';
 import type { ChatDownloadJob, ChatDownloadResult } from './jobs/queues.js';
-import { createAutoLogger } from '../utils/auto-tenant-logger.js';
+import { createAutoLogger, type AppLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './job-context.js';
+import type { PrismaClient } from '../../generated/streamer/client';
 
 // Custom JSON value type compatible with Prisma's InputJsonValue without importing internal types
 type JsonValue = string | number | boolean | { [key: string]: JsonValue } | JsonValue[];
@@ -79,9 +80,9 @@ function extractEdges(commentsObj: Record<string, unknown>): TwitchChatEdge[] {
 }
 
 async function flushBatch(
-  db: any,
+  db: PrismaClient,
   buffer: ChatMessageCreateInput[],
-  log: any,
+  log: AppLogger,
   vodId: string,
   tenantId: string,
   messageId: string | null,
@@ -213,8 +214,8 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
       })
     : null;
 
-  let totalMessages = 0;
-  let batchCount = 0;
+  const totalMessages = 0;
+  const batchCount = 0;
   const batchBuffer: ChatMessageCreateInput[] = [];
 
   try {
