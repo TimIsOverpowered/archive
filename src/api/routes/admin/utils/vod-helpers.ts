@@ -5,9 +5,9 @@ import type { VodData as TwitchVodData } from '../../../../services/twitch.js';
 import type { KickVod } from '../../../../services/kick.js';
 import { getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
 import { getDuration } from '../../../../utils/ffmpeg.js';
-import { getVODDownloadQueue } from '../../../../workers/jobs/queues.js';
+import { getStandardVodQueue } from '../../../../workers/jobs/queues.js';
 import { createAutoLogger } from '../../../../utils/auto-tenant-logger.js';
-import type { StandardVodDownloadJobData, VODDownloadResult } from '../../../../workers/vod.worker.js';
+import type { StandardVodDownloadJobData } from '../../../../workers/vod.worker.js';
 import type { VodRecord } from '../../../../types/db.js';
 
 type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
@@ -148,7 +148,7 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
 
   log.info({ vodId, filePath, type }, 'Queuing VOD download');
 
-  const queue = getVODDownloadQueue();
+  const queue = getStandardVodQueue();
   const jobData: StandardVodDownloadJobData = {
     tenantId,
     platformUserId,
@@ -168,7 +168,7 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
     const state = await job.getState();
 
     if (state === 'completed') {
-      const result = job.returnvalue as unknown as VODDownloadResult | undefined;
+      const result = job.returnvalue as unknown as { success: boolean } | undefined;
       if (!result?.success) {
         log.error({ vodId }, 'VOD download completed but returned unsuccessful result');
         throw new Error(`VOD download completed but returned unsuccessful result for ${vodId}`);

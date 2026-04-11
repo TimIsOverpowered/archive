@@ -4,20 +4,22 @@ import { Worker, Queue, BaseJobOptions } from 'bullmq';
 import { loadTenantConfigs, clearConfigCache } from '../config/loader.js';
 import { QUEUE_NAMES, getQueue, ChatDownloadJob, YoutubeUploadJob, DmcaProcessingJob, ChatDownloadResult, YoutubeUploadResult, DmcaProcessingResult } from './jobs/queues.js';
 import { redisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
-import vodProcessor from './vod.worker.js';
+import liveProcessor from './live.worker.js';
+import standardVodProcessor from './vod.worker.js';
 import chatProcessor from './chat.worker.js';
 import youtubeProcessor from './youtube.worker.js';
 import dmcaProcessor from './dmca.worker.js';
 import { startTokenHealthCron } from '../cron/token-health.js';
 import { startMonitorService, stopMonitorService } from './monitor/index.js';
 import { logger as baseLogger } from '../utils/logger.js';
-import type { LiveHlsDownloadJobData, StandardVodDownloadJobData, VODDownloadResult } from './vod.worker.js';
+import type { LiveDownloadJobData } from './live.worker.js';
+import type { StandardVodDownloadJobData } from './vod.worker.js';
 
 const logger = baseLogger;
 
-export type WorkerName = 'vod_download' | 'chat_download' | 'youtube_upload' | 'dmca_processing';
+export type WorkerName = 'vod_live' | 'vod_standard' | 'chat_download' | 'youtube_upload' | 'dmca_processing';
 
-type AllJobData = LiveHlsDownloadJobData | ChatDownloadJob | YoutubeUploadJob | DmcaProcessingJob;
+type AllJobData = LiveDownloadJobData | StandardVodDownloadJobData | ChatDownloadJob | YoutubeUploadJob | DmcaProcessingJob;
 
 interface LastFailedJob {
   jobId: string;
@@ -43,7 +45,7 @@ export function registerWorker(name: WorkerName, worker: Worker) {
 }
 
 async function clearAllJobsOnStartup() {
-  const queues = [getQueue(QUEUE_NAMES.VOD_DOWNLOAD), getQueue(QUEUE_NAMES.CHAT_DOWNLOAD), getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD), getQueue(QUEUE_NAMES.DMCA_PROCESSING)];
+  const queues = [getQueue(QUEUE_NAMES.VOD_LIVE), getQueue(QUEUE_NAMES.VOD_STANDARD), getQueue(QUEUE_NAMES.CHAT_DOWNLOAD), getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD), getQueue(QUEUE_NAMES.DMCA_PROCESSING)];
 
   await Promise.allSettled(queues.map((queue) => queue.obliterate({ force: true })));
 
@@ -157,14 +159,23 @@ async function bootstrap() {
 
     await clearAllJobsOnStartup();
 
-    const vodWorker = new Worker<LiveHlsDownloadJobData | StandardVodDownloadJobData, VODDownloadResult>(QUEUE_NAMES.VOD_DOWNLOAD as string, vodProcessor, {
+    const liveWorker = new Worker<LiveDownloadJobData, unknown>(QUEUE_NAMES.VOD_LIVE as string, liveProcessor, {
+      connection: redisConnection,
+      concurrency: 50,
+      useWorkerThreads: true,
+    });
+
+    registerWorker('vod_live', liveWorker);
+    logger.info('[Workers] Live HLS download worker created');
+
+    const standardVodWorker = new Worker<StandardVodDownloadJobData, unknown>(QUEUE_NAMES.VOD_STANDARD as string, standardVodProcessor, {
       connection: redisConnection,
       concurrency: 10,
       useWorkerThreads: true,
     });
 
-    registerWorker('vod_download', vodWorker);
-    logger.info({ isRunning: vodWorker.isRunning }, '[Workers] VOD worker status');
+    registerWorker('vod_standard', standardVodWorker);
+    logger.info('[Workers] Standard VOD download worker created');
 
     const chatWorker = new Worker<ChatDownloadJob, ChatDownloadResult>(QUEUE_NAMES.CHAT_DOWNLOAD as string, chatProcessor, {
       connection: redisConnection,
@@ -193,7 +204,7 @@ async function bootstrap() {
     registerWorker('dmca_processing', dmcaWorker);
     logger.info('[Workers] DMCA processing worker created and registered');
 
-    vodWorker.on('active', async (job) => {
+    liveWorker.on('active', async (job) => {
       if (!job) return;
 
       const data = job.data;
@@ -203,14 +214,13 @@ async function bootstrap() {
           vodId: data?.vodId,
           platform: data?.platform,
           tenantId: data?.tenantId,
-          platformUserId: data?.platformUserId,
           attemptsMade: job.attemptsMade,
         },
-        `VOD download job started processing`
+        `Live HLS download job started processing`
       );
     });
 
-    vodWorker.on('completed', async (job) => {
+    liveWorker.on('completed', async (job) => {
       if (!job) return;
 
       const data = job.data;
@@ -220,13 +230,12 @@ async function bootstrap() {
           vodId: data?.vodId,
           platform: data?.platform,
           tenantId: data?.tenantId,
-          platformUserId: data?.platformUserId,
         },
-        `VOD download completed successfully`
+        `Live HLS download completed successfully`
       );
     });
 
-    vodWorker.on('failed', async (job, err) => {
+    liveWorker.on('failed', async (job, err) => {
       if (!job || !err) return;
 
       const jobData = job.data;
@@ -236,30 +245,62 @@ async function bootstrap() {
           vodId: jobData?.vodId,
           platform: jobData?.platform,
           tenantId: jobData?.tenantId,
-          platformUserId: jobData?.platformUserId,
           attemptsMade: job.attemptsMade,
           maxAttempts: (job.opts as Partial<BaseJobOptions>).attempts ?? 3,
           errorMessage: err.message || String(err),
           errorStack: 'stack' in err ? String((err as Error & { stack?: string }).stack) : 'No stack trace available',
         },
-        `VOD download failed - check logs for details`
+        `Live HLS download failed`
       );
     });
 
-    vodWorker.on('progress', async (job, progress) => {
+    standardVodWorker.on('active', async (job) => {
       if (!job) return;
 
       const data = job.data;
-      logger.debug({ jobId: String(job.id), vodId: data?.vodId, progress }, `VOD download progress update`);
+      logger.info(
+        {
+          jobId: String(job.id),
+          vodId: data?.vodId,
+          platform: data?.platform,
+          tenantId: data?.tenantId,
+          attemptsMade: job.attemptsMade,
+        },
+        `Standard VOD download job started processing`
+      );
     });
 
-    vodWorker.on('error', (err) => {
+    standardVodWorker.on('completed', async (job) => {
+      if (!job) return;
+
+      const data = job.data;
+      logger.info(
+        {
+          jobId: String(job.id),
+          vodId: data?.vodId,
+          platform: data?.platform,
+          tenantId: data?.tenantId,
+        },
+        `Standard VOD download completed successfully`
+      );
+    });
+
+    standardVodWorker.on('failed', async (job, err) => {
+      if (!job || !err) return;
+
+      const jobData = job.data;
       logger.error(
         {
+          jobId: String(job.id),
+          vodId: jobData?.vodId,
+          platform: jobData?.platform,
+          tenantId: jobData?.tenantId,
+          attemptsMade: job.attemptsMade,
+          maxAttempts: (job.opts as Partial<BaseJobOptions>).attempts ?? 3,
           errorMessage: err.message || String(err),
           errorStack: 'stack' in err ? String((err as Error & { stack?: string }).stack) : 'No stack trace available',
         },
-        `VOD worker error (not job-specific)`
+        `Standard VOD download failed`
       );
     });
 
@@ -363,7 +404,8 @@ async function bootstrap() {
       await stopMonitorService();
 
       // Signal workers to stop via abortSignal (BullMQ fires this to processors on close)
-      vodWorker.close();
+      liveWorker.close();
+      standardVodWorker.close();
       chatWorker.close();
       youtubeWorker.close();
       dmcaWorker.close();

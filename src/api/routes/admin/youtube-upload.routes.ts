@@ -74,7 +74,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
       const downloadJobId = `download_${vodRecord.vod_id}`;
 
-      void VodQueueModule.getVODDownloadQueue().add('standard_vod_download', downloadJob, { jobId: downloadJobId });
+      void VodQueueModule.getStandardVodQueue().add('standard_vod_download', downloadJob, { jobId: downloadJobId });
 
       return { data: { message: 'VOD download queued, YouTube upload will be triggered after completion', dbId: vodRecord.id, vodId: vodRecord.vod_id, downloadJobId } };
     }

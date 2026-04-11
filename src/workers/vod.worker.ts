@@ -1,19 +1,5 @@
 import { Processor, Job } from 'bullmq';
-import { fileExists } from '../utils/path.js';
-import { getJobContext } from './job-context.js';
-
-export interface LiveHlsDownloadJobData {
-  dbId: number;
-  vodId: string;
-  platform: 'twitch' | 'kick';
-  tenantId: string;
-  platformUserId: string;
-  platformUsername?: string;
-  startedAt?: string;
-  sourceUrl?: string;
-  uploadAfterDownload?: boolean;
-  uploadMode?: 'vod' | 'all';
-}
+import { downloadStandardVod } from './vod/standard-vod-downloader.js';
 
 export interface StandardVodDownloadJobData {
   dbId: number;
@@ -25,90 +11,27 @@ export interface StandardVodDownloadJobData {
   downloadMethod?: 'ffmpeg' | 'hls';
 }
 
-export type VODDownloadResult =
-  | {
-      success: true;
-      finalPath: string;
-      durationSeconds?: number;
-    }
-  | {
-      success: true;
-      finalPath: string;
-      durationSeconds?: number;
-    };
-
-const vodProcessor: Processor<LiveHlsDownloadJobData | StandardVodDownloadJobData, VODDownloadResult, string> = async (
-  job: Job<LiveHlsDownloadJobData | StandardVodDownloadJobData, VODDownloadResult, string>,
-  token
-) => {
-  const signal = (token as { abortSignal?: AbortSignal })?.abortSignal;
-
+const vodProcessor: Processor<StandardVodDownloadJobData, unknown, string> = async (job: Job<StandardVodDownloadJobData, unknown, string>) => {
   const { dbId, vodId, platform, tenantId } = job.data;
 
   const { createAutoLogger: loggerWithTenant } = await import('../utils/auto-tenant-logger.js');
 
   const log = loggerWithTenant(tenantId);
-  log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[VOD Processor] Starting job processing');
+  log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[Standard VOD Processor] Starting job processing');
 
-  if (job.name === 'live_hls_download') {
-    const { downloadLiveHls } = await import('./vod/hls-downloader.js');
-    const { cleanupOrphanedTmpFiles } = await import('./vod/hls-utils.js');
+  const result = await downloadStandardVod({
+    dbId,
+    vodId,
+    platform,
+    tenantId,
+    platformUserId: job.data.platformUserId,
+    uploadMode: job.data.uploadMode,
+    downloadMethod: job.data.downloadMethod,
+  });
 
-    const { config } = await getJobContext(tenantId);
+  log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[Standard VOD Processor] Job completed successfully');
 
-    if (!config.settings.vodPath) {
-      throw new Error(`VOD path not configured for tenant ${tenantId}`);
-    }
-
-    const { getVodDirPath } = await import('../utils/path.js');
-
-    const vodDirPath = getVodDirPath({ tenantId, vodId });
-
-    const exists = await fileExists(vodDirPath);
-
-    if (exists) {
-      log.debug({ vodId, platform }, `[Recovery] Directory found - cleaning orphaned temp files`);
-      await cleanupOrphanedTmpFiles(vodDirPath, log);
-    } else {
-      log.debug({ vodId, platform }, `[Recovery] Fresh start - directory will be created`);
-    }
-
-    const liveData = job.data as LiveHlsDownloadJobData;
-    const result = await downloadLiveHls(
-      {
-        dbId,
-        vodId,
-        platform,
-        tenantId,
-        platformUserId: liveData.platformUserId,
-        platformUsername: liveData.platformUsername,
-        startedAt: liveData.startedAt,
-        sourceUrl: liveData.sourceUrl,
-        uploadAfterDownload: liveData.uploadAfterDownload,
-        uploadMode: liveData.uploadMode,
-      },
-      signal
-    );
-
-    return result!;
-  } else if (job.name === 'standard_vod_download') {
-    const { downloadStandardVod } = await import('./vod/standard-vod-downloader.js');
-
-    const standardData = job.data as StandardVodDownloadJobData;
-    const result = await downloadStandardVod({
-      dbId,
-      vodId,
-      platform,
-      tenantId,
-      platformUserId: standardData.platformUserId,
-      uploadMode: standardData.uploadMode,
-      downloadMethod: standardData.downloadMethod,
-    });
-
-    return result;
-  } else {
-    throw new Error(`Unsupported job type: ${job.name}`);
-  }
+  return result;
 };
 
 export default vodProcessor;
