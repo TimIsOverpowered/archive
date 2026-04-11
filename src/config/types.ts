@@ -2,8 +2,8 @@ export interface TenantConfig {
   id: string;
   displayName?: string;
   createdAt: Date;
-  twitch: { enabled: boolean; auth?: string; username?: string; mainPlatform?: boolean; id?: string };
-  youtube: {
+  twitch?: { enabled: boolean; auth?: string; username?: string; mainPlatform?: boolean; id?: string };
+  youtube?: {
     auth?: string;
     public: boolean;
     upload: boolean;
@@ -16,7 +16,7 @@ export interface TenantConfig {
     restrictedGames: string[];
     description: string;
   };
-  kick: { id?: string; enabled: boolean; username?: string; mainPlatform?: boolean };
+  kick?: { id?: string; enabled: boolean; username?: string; mainPlatform?: boolean };
   database: { url: string; connectionLimit?: number };
   settings: {
     vodPath?: string;

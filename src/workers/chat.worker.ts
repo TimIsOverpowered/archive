@@ -86,6 +86,8 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
   const { tenantId, dbId, vodId, platform, duration, startOffset } = job.data;
   const log = createAutoLogger(tenantId);
 
+  log.debug({ jobId: job.id, tenantId, dbId, vodId, platform, duration, startOffset }, '[Chat] Job received');
+
   if (platform !== 'twitch') {
     log.info(`Chat download for ${platform} is deferred`);
     return { success: true, skipped: true };
@@ -101,6 +103,8 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
         select: { content_offset_seconds: true },
       })
     : null;
+
+  log.debug({ vodId, startOffset, hasExistingData: !!lastSavedRecord, lastOffset: lastSavedRecord?.content_offset_seconds }, '[Chat] Resume check completed');
 
   let effectiveOffset = startOffset || 0;
 
@@ -131,17 +135,20 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
       })
     : null;
 
-  try {
-    let totalMessages = 0;
-    let batchCount = 0;
+  let totalMessages = 0;
+  let batchCount = 0;
 
+  try {
     log.info('[' + vodId + '] Starting chat download' + (effectiveOffset > 0 ? ' from offset ' + effectiveOffset.toFixed(2) + 's' : ''));
 
     // Move initial fetch OUTSIDE the loop - proper cursor-based pagination
     let rawPage = await fetchComments(String(vodId), effectiveOffset);
 
+    log.debug({ vodId, effectiveOffset }, '[Chat] Initial comments fetch completed');
+
     // Cursor stagnation protection variables
     let lastCursor: string | null = null;
+    let lastOffset = effectiveOffset;
 
     while (true) {
       if (!rawPage || typeof rawPage !== 'object') break;
@@ -207,20 +214,32 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
         });
       }
 
+      const firstOffset = edges[0]?.node?.contentOffsetSeconds ?? effectiveOffset;
+      lastOffset = edges[edges.length - 1]?.node?.contentOffsetSeconds ?? lastOffset;
+
       if (messagesToInsert.length > 0) {
         await db.chatMessage.createMany({
           data: messagesToInsert, // Type-safe! JsonValue type matches Prisma requirements
           skipDuplicates: true,
         });
         totalMessages += messagesToInsert.length;
+        batchCount++;
+
+        log.debug(
+          {
+            vodId,
+            batchNumber: batchCount,
+            messagesInBatch: messagesToInsert.length,
+            totalMessages,
+            timeRange: `${firstOffset.toFixed(2)}s - ${lastOffset.toFixed(2)}s`,
+            currentTime: formatTime(lastOffset),
+          },
+          '[Chat] Batch inserted into database'
+        );
       }
 
-      batchCount++;
-
-      const lastOffset = edges[edges.length - 1]?.node?.contentOffsetSeconds ?? effectiveOffset;
-
-      // Progress update every ~50 batches (every BATCH_SIZE messages)
-      if (messageId && isAlertsEnabled() && batchCount * 50 >= BATCH_SIZE) {
+      // Progress update after every batch
+      if (messageId && isAlertsEnabled() && messagesToInsert.length > 0) {
         const percent = duration > 0 ? Math.min(Math.round((lastOffset / duration) * 100), 100) : 0;
 
         updateDiscordEmbed(messageId, {
@@ -228,7 +247,8 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
           description: tenantId + (startOffset || lastSavedRecord?.content_offset_seconds ? ' - Resuming' : '') + ' chat download for ' + vodId,
           status: 'warning',
           fields: [
-            { name: 'Current Time Offset', value: lastOffset.toFixed(2) + 's (' + formatTime(lastOffset) + ')', inline: true },
+            { name: 'Current Offset', value: lastOffset.toFixed(2) + 's (' + formatTime(lastOffset) + ')', inline: true },
+            { name: 'Batch', value: '#' + batchCount + ' (' + messagesToInsert.length + ' messages)', inline: true },
             {
               name: 'Progress',
               value: formatProgressMessage('Chat Download' + (startOffset || lastSavedRecord?.content_offset_seconds ? ' (Resumed)' : ''), tenantId, percent, totalMessages),
@@ -238,8 +258,6 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
           timestamp: new Date().toISOString(),
           updatedTimestamp: new Date().toISOString(),
         });
-
-        batchCount = 0;
       }
 
       // Cursor stagnation check - prevent infinite loops without hard caps
@@ -259,6 +277,8 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
     resetFailures(tenantId);
 
+    log.debug({ vodId, totalMessages, batchCount, finalOffset: lastOffset }, '[Chat] Download completed successfully');
+
     if (messageId && isAlertsEnabled()) {
       const resumeIndicator = startOffset || lastSavedRecord?.content_offset_seconds ? ' [Resumed]' : '';
 
@@ -272,6 +292,11 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
             name: 'Total Messages Processed',
             value: String(totalMessages),
             inline: false,
+          },
+          {
+            name: 'Total Batches',
+            value: String(batchCount),
+            inline: true,
           },
           ...(startOffset || lastSavedRecord?.content_offset_seconds
             ? [
@@ -291,7 +316,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
     return { success: true, totalMessages };
   } catch (error) {
     const details = extractErrorDetails(error);
-    log.error({ vodId, platform, ...details }, 'Chat download failed');
+    log.error({ vodId, platform, totalMessages, batchCount, ...details }, 'Chat download failed');
 
     if (messageId && isAlertsEnabled()) {
       updateDiscordEmbed(messageId, {
@@ -300,6 +325,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
         status: 'error',
         fields: [
           { name: 'Platform', value: platform, inline: true },
+          { name: 'Messages Processed Before Failure', value: String(totalMessages), inline: true },
           { name: 'Error', value: details.message.substring(0, 500), inline: false },
         ],
         timestamp: new Date().toISOString(),
