@@ -5,7 +5,6 @@ import { fetchComments, fetchNextComments, type TwitchChatEdge } from '../servic
 import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/discord-alerts.js';
 import type { ChatDownloadJob, ChatDownloadResult } from './jobs/queues.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { parseDuration } from '../utils/formatting.js';
 import { getJobContext } from './job-context.js';
 
 // Custom JSON value type compatible with Prisma's InputJsonValue without importing internal types
@@ -24,11 +23,8 @@ interface ChatMessageCreateInput {
 
 const BATCH_SIZE = 2500;
 const RATE_LIMIT_MS = 150;
-
-function formatTime(seconds: number): string {
-  const { hrs, mins, secs } = parseDuration(seconds);
-  return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toFixed(1).toString()}`;
-}
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
 
 function stripTypename(obj: unknown): unknown {
   if (obj === null || obj === undefined) return obj;
@@ -82,6 +78,88 @@ function extractEdges(commentsObj: Record<string, unknown>): TwitchChatEdge[] {
   return rawEdges.filter((item): item is TwitchChatEdge => item !== null && typeof item === 'object' && 'node' in item && 'cursor' in item);
 }
 
+async function flushBatch(
+  db: any,
+  buffer: ChatMessageCreateInput[],
+  log: any,
+  vodId: string,
+  tenantId: string,
+  messageId: string | null,
+  duration: number,
+  lastOffset: number,
+  totalMessagesRef: { value: number },
+  batchCountRef: { value: number }
+): Promise<void> {
+  if (buffer.length === 0) return;
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      await db.chatMessage.createMany({
+        data: buffer,
+        skipDuplicates: true,
+      });
+
+      totalMessagesRef.value += buffer.length;
+      batchCountRef.value++;
+
+      log.debug(
+        {
+          vodId,
+          batchNumber: batchCountRef.value,
+          messagesInBatch: buffer.length,
+          totalMessages: totalMessagesRef.value,
+        },
+        '[Chat] Batch flushed to database'
+      );
+
+      if (messageId && isAlertsEnabled()) {
+        const percent = duration > 0 ? Math.min(Math.round((lastOffset / duration) * 100), 100) : 0;
+
+        updateDiscordEmbed(messageId, {
+          title: '💬 Downloading Chat',
+          description: tenantId + ' chat download for ' + vodId,
+          status: 'warning',
+          fields: [
+            { name: 'Current Offset', value: lastOffset.toFixed(2) + 's', inline: true },
+            { name: 'Batch', value: '#' + batchCountRef.value + ' (' + buffer.length + ' messages)', inline: true },
+            {
+              name: 'Progress',
+              value: formatProgressMessage('Chat Download', tenantId, percent, totalMessagesRef.value),
+              inline: false,
+            },
+          ],
+          timestamp: new Date().toISOString(),
+          updatedTimestamp: new Date().toISOString(),
+        });
+      }
+
+      buffer.length = 0;
+      return;
+    } catch (error) {
+      lastError = error as Error;
+      log.warn(
+        {
+          vodId,
+          attempt,
+          maxRetries: MAX_RETRIES,
+          bufferLength: buffer.length,
+          error: extractErrorDetails(error).message,
+        },
+        '[Chat] Batch flush failed, retrying...'
+      );
+
+      if (attempt < MAX_RETRIES) {
+        await sleep(RETRY_DELAY_MS * attempt);
+      }
+    }
+  }
+
+  log.error({ vodId, bufferLength: buffer.length }, '[Chat] Batch flush failed after all retries');
+  throw lastError;
+}
+
 const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job: Job<ChatDownloadJob>): Promise<ChatDownloadResult> => {
   const { tenantId, dbId, vodId, platform, duration, startOffset } = job.data;
   const log = createAutoLogger(tenantId);
@@ -125,7 +203,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
             ? [
                 {
                   name: startOffset ? 'Start Offset' : 'Resume Offset',
-                  value: effectiveOffset.toFixed(2) + 's (' + formatTime(effectiveOffset) + ')',
+                  value: effectiveOffset.toFixed(2) + 's',
                   inline: true,
                 },
               ]
@@ -137,6 +215,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
   let totalMessages = 0;
   let batchCount = 0;
+  const batchBuffer: ChatMessageCreateInput[] = [];
 
   try {
     log.info('[' + vodId + '] Starting chat download' + (effectiveOffset > 0 ? ' from offset ' + effectiveOffset.toFixed(2) + 's' : ''));
@@ -193,8 +272,6 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
         return { success: true, totalMessages: 0 }; // Success with zero count
       }
 
-      const messagesToInsert: ChatMessageCreateInput[] = [];
-
       for (const edge of edges) {
         const node = edge.node;
         if (!node || !('id' in node)) continue;
@@ -202,7 +279,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
         const { message, userBadges } = extractMessageData(node);
         const offsetSeconds = 'contentOffsetSeconds' in node ? (node.contentOffsetSeconds ?? 0) : 0;
 
-        messagesToInsert.push({
+        batchBuffer.push({
           id: node.id,
           vod_id: dbId,
           display_name: ('commenter' in node && node.commenter?.displayName) || null,
@@ -214,50 +291,10 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
         });
       }
 
-      const firstOffset = edges[0]?.node?.contentOffsetSeconds ?? effectiveOffset;
       lastOffset = edges[edges.length - 1]?.node?.contentOffsetSeconds ?? lastOffset;
 
-      if (messagesToInsert.length > 0) {
-        await db.chatMessage.createMany({
-          data: messagesToInsert, // Type-safe! JsonValue type matches Prisma requirements
-          skipDuplicates: true,
-        });
-        totalMessages += messagesToInsert.length;
-        batchCount++;
-
-        log.debug(
-          {
-            vodId,
-            batchNumber: batchCount,
-            messagesInBatch: messagesToInsert.length,
-            totalMessages,
-            timeRange: `${firstOffset.toFixed(2)}s - ${lastOffset.toFixed(2)}s`,
-            currentTime: formatTime(lastOffset),
-          },
-          '[Chat] Batch inserted into database'
-        );
-      }
-
-      // Progress update after every batch
-      if (messageId && isAlertsEnabled() && messagesToInsert.length > 0) {
-        const percent = duration > 0 ? Math.min(Math.round((lastOffset / duration) * 100), 100) : 0;
-
-        updateDiscordEmbed(messageId, {
-          title: '💬 Downloading Chat',
-          description: tenantId + (startOffset || lastSavedRecord?.content_offset_seconds ? ' - Resuming' : '') + ' chat download for ' + vodId,
-          status: 'warning',
-          fields: [
-            { name: 'Current Offset', value: lastOffset.toFixed(2) + 's (' + formatTime(lastOffset) + ')', inline: true },
-            { name: 'Batch', value: '#' + batchCount + ' (' + messagesToInsert.length + ' messages)', inline: true },
-            {
-              name: 'Progress',
-              value: formatProgressMessage('Chat Download' + (startOffset || lastSavedRecord?.content_offset_seconds ? ' (Resumed)' : ''), tenantId, percent, totalMessages),
-              inline: false,
-            },
-          ],
-          timestamp: new Date().toISOString(),
-          updatedTimestamp: new Date().toISOString(),
-        });
+      if (batchBuffer.length >= BATCH_SIZE) {
+        await flushBatch(db, batchBuffer, log, vodId, tenantId, messageId, duration, lastOffset, { value: totalMessages }, { value: batchCount });
       }
 
       // Cursor stagnation check - prevent infinite loops without hard caps
@@ -273,6 +310,10 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
       await sleep(RATE_LIMIT_MS);
 
       rawPage = await fetchNextComments(String(vodId), pageCursor); // Only used for subsequent pages now!
+    }
+
+    if (batchBuffer.length > 0) {
+      await flushBatch(db, batchBuffer, log, vodId, tenantId, messageId, duration, lastOffset, { value: totalMessages }, { value: batchCount });
     }
 
     resetFailures(tenantId);
