@@ -2,14 +2,14 @@ import 'dotenv/config';
 import { extractErrorDetails } from '../utils/error.js';
 import { Worker, Queue, BaseJobOptions } from 'bullmq';
 import { loadTenantConfigs, clearConfigCache } from '../config/loader.js';
-import { QUEUE_NAMES, getQueue, ChatDownloadJob, YoutubeUploadJob, DmcaProcessingJob, ChatDownloadResult, YoutubeUploadResult, DmcaProcessingResult } from '../jobs/queues.js';
+import { QUEUE_NAMES, getQueue, ChatDownloadJob, YoutubeUploadJob, DmcaProcessingJob, ChatDownloadResult, YoutubeUploadResult, DmcaProcessingResult } from './jobs/queues.js';
 import { redisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
 import vodProcessor from './vod.worker.js';
 import chatProcessor from './chat.worker.js';
 import youtubeProcessor from './youtube.worker.js';
 import dmcaProcessor from './dmca.worker.js';
 import { startTokenHealthCron } from '../cron/token-health.js';
-import { startMonitorService, stopMonitorService } from '../monitor/index.js';
+import { startMonitorService, stopMonitorService } from './monitor/index.js';
 import { logger as baseLogger } from '../utils/logger.js';
 import type { LiveHlsDownloadJobData, StandardVodDownloadJobData, VODDownloadResult } from './vod.worker.js';
 

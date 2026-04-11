@@ -6,8 +6,8 @@ import timezone from 'dayjs/plugin/timezone';
 dayjs.extend(utcPlugin);
 dayjs.extend(timezone);
 
-import type { DmcaProcessingJob, DmcaProcessingResult, YoutubeUploadJob } from '../jobs/queues.js';
-import { getYoutubeUploadQueue } from '../jobs/queues.js';
+import type { DmcaProcessingJob, DmcaProcessingResult, YoutubeUploadJob } from './jobs/queues.js';
+import { getYoutubeUploadQueue } from './jobs/queues.js';
 import type { DMCAClaim } from '../utils/dmca.js';
 import { isBlockingPolicy, buildMuteFilters, muteAudioSections, blackoutVideoSections, cleanupTempFiles, BlackoutSection } from '../utils/dmca.js';
 import { trimVideo as ffmpegTrim } from '../utils/ffmpeg.js';

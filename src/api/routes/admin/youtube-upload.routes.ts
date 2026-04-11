@@ -58,7 +58,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
-      const VodQueueModule = await import('../../../jobs/queues');
+      const VodQueueModule = await import('../../../workers/jobs/queues');
 
       const fileIdentifier = type === 'live' ? vodRecord.stream_id || vodRecord.vod_id : vodRecord.vod_id;
 

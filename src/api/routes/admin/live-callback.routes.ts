@@ -5,7 +5,7 @@ import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import type { VodRecordBase } from './types';
-import { enqueueJobWithLogging } from '../../../jobs/queues.js';
+import { enqueueJobWithLogging } from '../../../workers/jobs/queues.js';
 import { fileExists } from '../../../utils/path.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
@@ -124,7 +124,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
       }
 
       // Queue YouTube upload job for the pre-recorded MP4 file at `path`
-      const YoutubeQueueModule = await import('../../../jobs/queues');
+      const YoutubeQueueModule = await import('../../../workers/jobs/queues');
 
       if (!config?.youtube?.liveUpload) {
         log.warn(`YouTube live upload not enabled, skipping queue for ${request.body.streamId}`);
