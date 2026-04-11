@@ -1,4 +1,4 @@
-import type { ChatDownloadJob, VODDownloadJob } from './queues.js';
+import type { ChatDownloadJob, StandardVodJob } from './queues.js';
 import { getChatDownloadQueue } from './queues.js';
 
 export async function enqueueChatDownload(job: Omit<ChatDownloadJob, 'id'>, jobId: string): Promise<string | null> {
@@ -41,7 +41,7 @@ export async function triggerChatDownload(
   );
 }
 
-export async function triggerChatAfterVod(vodJob: VODDownloadJob): Promise<string | null> {
+export async function triggerChatAfterVod(vodJob: StandardVodJob): Promise<string | null> {
   if (vodJob.platform === 'kick') {
     return null;
   }

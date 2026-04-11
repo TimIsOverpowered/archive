@@ -5,15 +5,13 @@ import pathMod from 'path';
 import HLS from 'hls-parser';
 import { getTenantConfig } from '../../config/loader';
 import { getClient } from '../../db/client';
-import { sendRichAlert, updateDiscordEmbed, resetFailures, isAlertsEnabled } from '../../utils/discord-alerts.js';
+import { sendRichAlert, updateDiscordEmbed, isAlertsEnabled } from '../../utils/discord-alerts.js';
 import { createAutoLogger as loggerWithTenant } from '../../utils/auto-tenant-logger.js';
 import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
-import { toHHMMSS } from '../../utils/formatting.js';
-import { updateChapterDuringDownload, finalizeKickChapters } from '../../services/kick.js';
-import { saveVodChapters as saveTwitchVodChapters } from '../../services/twitch.js';
-import { fileExists } from '../../utils/path.js';
+import { updateChapterDuringDownload } from '../../services/kick.js';
 import { downloadSegmentsParallel, fetchTwitchPlaylist, fetchKickPlaylist, type DownloadStrategy } from './hls-utils.js';
 import { sleep, getRetryDelay } from '../../utils/delay.js';
+import { toHHMMSS } from '../../utils/formatting.js';
 
 export interface HlsDownloadOptions {
   dbId: number;
@@ -24,8 +22,13 @@ export interface HlsDownloadOptions {
   platformUsername?: string;
   startedAt?: string;
   sourceUrl?: string;
-  uploadAfterDownload?: boolean;
-  uploadMode?: 'vod' | 'all';
+}
+
+export interface HlsDownloadResult {
+  success: true;
+  m3u8Path: string;
+  outputDir: string;
+  segmentCount: number;
 }
 
 function updateAlertProgress(messageId: string | null, platform: string, totalSegmentsFound: number, vodId: string, tenantId: string, startedAt?: string): void {
@@ -53,7 +56,7 @@ function updateAlertProgress(messageId: string | null, platform: string, totalSe
   });
 }
 
-export async function downloadLiveHls(options: HlsDownloadOptions, signal?: AbortSignal): Promise<{ success: true; finalPath: string; durationSeconds?: number }> {
+export async function downloadLiveHls(options: HlsDownloadOptions, signal?: AbortSignal): Promise<HlsDownloadResult> {
   const { dbId, vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl } = options;
 
   const log = loggerWithTenant(tenantId);
@@ -289,166 +292,20 @@ export async function downloadLiveHls(options: HlsDownloadOptions, signal?: Abor
   const tsSegments = filesInDir.filter((f) => f.endsWith('.ts'));
   const finalSegmentCount = mp4Segments.length || tsSegments.length;
 
-  if (isAlertsEnabled() && messageId) {
-    updateDiscordEmbed(messageId, {
-      title: `[HLS] Converting ${vodId}`,
-      description: 'Download complete. MP4 conversion in progress...',
-      status: 'warning',
-      fields: [
-        { name: 'Platform', value: platform, inline: true },
-        { name: 'Total Segments', value: String(finalSegmentCount), inline: false },
-      ],
-      timestamp: startedAt || new Date().toISOString(),
-      updatedTimestamp: new Date().toISOString(),
-    });
+  // Close CycleTLS session for Kick downloads
+  if (cycleTLS) {
+    await cycleTLS.close();
+    log.info(`[${vodId}] Closed CycleTLS session`);
   }
 
-  log.info({ vodId, platform, totalSegmentsDownloaded: finalSegmentCount }, `[HLS-Downloader] Stream download complete. Starting finalization and MP4 conversion...`);
+  log.info({ vodId, platform, totalSegmentsDownloaded: finalSegmentCount }, `[HLS-Downloader] Stream download complete`);
 
-  try {
-    // Detect segment format: fMP4 vs traditional TS HLS
-    const hasInitSegment = filesInDir.some((f) => f.includes('init') && f.endsWith('.mp4'));
-
-    const { getVodFilePath } = await import('../../utils/path.js');
-
-    const finalMp4Path = getVodFilePath({ tenantId, vodId });
-
-    if (hasInitSegment && mp4Segments.length > 0) {
-      log.info(`[${vodId}] Detected fMP4 segments (${mp4Segments.length} files).`);
-
-      const { convertHlsToMp4 } = await import('../../utils/ffmpeg.js');
-
-      await convertHlsToMp4(m3u8Path, finalMp4Path, { vodId, isFmp4: true });
-
-      log.info(`[${vodId}] fMP4 merging complete. File saved to ${finalMp4Path}`);
-    } else if (tsSegments.length > 0) {
-      const tsFilesCount = tsSegments.length;
-
-      log.info(`[${vodId}] Found ${tsFilesCount} TS segments. Starting MP4 conversion...`);
-
-      const { convertHlsToMp4 } = await import('../../utils/ffmpeg.js');
-
-      await convertHlsToMp4(m3u8Path, finalMp4Path, { vodId, isFmp4: false });
-
-      log.info(`[${vodId}] MP4 conversion complete. File saved to ${finalMp4Path}`);
-    } else {
-      throw new Error(`No valid segments found in ${vodDir}. Download may have failed or stream was empty.`);
-    }
-
-    const { getDuration } = await import('../../utils/ffmpeg.js');
-
-    const actualDuration = await getDuration(finalMp4Path);
-
-    if (actualDuration) {
-      const formattedDuration = toHHMMSS(Math.round(actualDuration));
-      const durationSeconds = Math.round(actualDuration);
-
-      if (platform === 'kick') {
-        await finalizeKickChapters(dbId, vodId, durationSeconds, streamerClient);
-      } else if (platform === 'twitch') {
-        await saveTwitchVodChapters(dbId, vodId, tenantId, durationSeconds, streamerClient);
-      }
-
-      await streamerClient.vod.update({ where: { id: dbId }, data: { duration: durationSeconds, is_live: false } });
-
-      log.info(`[${vodId}] Updated VOD with duration ${formattedDuration} and marked as ended`);
-
-      if (isAlertsEnabled() && messageId) {
-        updateDiscordEmbed(messageId, {
-          title: `[HLS] ${vodId} Complete!`,
-          description: `${platform.toUpperCase()} live stream successfully processed and converted to MP4`,
-          status: 'success',
-          fields: [
-            { name: 'Platform', value: platform, inline: true },
-            { name: 'Duration', value: formattedDuration, inline: false },
-          ],
-          timestamp: startedAt || new Date().toISOString(),
-          updatedTimestamp: new Date().toISOString(),
-        });
-      }
-
-      if (options.uploadAfterDownload) {
-        try {
-          const { queueYoutubeUpload } = await import('../../utils/upload-queue.js');
-
-          await queueYoutubeUpload(options.tenantId, options.dbId, options.vodId, finalMp4Path, options.uploadMode || 'all', options.platform, log);
-
-          log.info({ vodId }, `Upload job(s) queued after HLS download completion`);
-        } catch (error) {
-          const details = extractErrorDetails(error);
-          log.warn({ ...details, vodId }, `Failed to queue upload job after HLS download`);
-        }
-      }
-
-      return { success: true as const, finalPath: finalMp4Path, durationSeconds: actualDuration };
-    } else {
-      log.warn(`[${vodId}] Could not determine video duration from MP4 file`);
-      await streamerClient.vod.update({ where: { id: dbId }, data: { is_live: false } });
-
-      return { success: true as const, finalPath: finalMp4Path };
-    }
-  } catch (error: unknown) {
-    const details = extractErrorDetails(error);
-    log.error({ ...details, vodId }, `[${vodId}] Finalization failed`);
-
-    if (messageId && isAlertsEnabled()) {
-      updateDiscordEmbed(messageId, {
-        title: `[HLS] ${vodId} FAILED`,
-        description: `${platform.toUpperCase()} live stream processing failed`,
-        status: 'error',
-        fields: [
-          { name: 'Platform', value: platform, inline: true },
-          { name: 'Error', value: (error as Error).message.substring(0, 500), inline: false },
-        ],
-        timestamp: startedAt || new Date().toISOString(),
-        updatedTimestamp: new Date().toISOString(),
-      });
-    }
-
-    throw error;
-  } finally {
-    // Close CycleTLS session for Kick downloads
-    if (cycleTLS) {
-      await cycleTLS.close();
-      log.info(`[${vodId}] Closed CycleTLS session`);
-    }
-
-    const { getVodFilePath } = await import('../../utils/path.js');
-
-    const finalMp4Path = getVodFilePath({ tenantId, vodId });
-
-    const exists = await fileExists(finalMp4Path);
-
-    if (exists) {
-      if (!config.settings.saveHLS) {
-        try {
-          await fsPromises.rm(vodDir, { recursive: true });
-          resetFailures(tenantId);
-
-          log.info({ vodId }, `Cleaned up temporary directory ${vodDir}`);
-        } catch (error: unknown) {
-          const details = extractErrorDetails(error);
-          log.warn({ ...details, vodId }, `Failed to clean up temporary directory`);
-        }
-      } else {
-        resetFailures(tenantId);
-
-        log.info({ vodId }, `HLS files preserved in ${vodDir} (saveHLS=true)`);
-      }
-    } else {
-      const details = extractErrorDetails(new Error('Final MP4 file not found'));
-      log.error({ ...details, vodId }, `Final MP4 file not found`);
-
-      if (!config.settings.saveHLS) {
-        try {
-          await fsPromises.rm(vodDir, { recursive: true });
-        } catch (error: unknown) {
-          const details = extractErrorDetails(error);
-          log.warn({ ...details, vodId }, `Cleanup failed`);
-        }
-      }
-    }
-  }
+  return {
+    success: true,
+    m3u8Path,
+    outputDir: vodDir,
+    segmentCount: finalSegmentCount,
+  };
 }
 
 export default downloadLiveHls;

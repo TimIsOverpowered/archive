@@ -2,19 +2,7 @@ import { Queue, QueueOptions, JobsOptions } from 'bullmq';
 import type { DMCAClaim } from '../../utils/dmca.js';
 import { redisInstance } from '../redis.js';
 
-export type VodJobType = 'STANDARD_VOD_DOWNLOAD' | 'LIVE_HLS_DOWNLOAD';
-
-export interface VODDownloadJob {
-  tenantId: string;
-  platformUserId: string;
-  platformUsername?: string;
-  dbId: number;
-  vodId: string;
-  platform: 'twitch' | 'kick';
-  externalVodId?: string;
-}
-
-export interface LiveHlsDownloadJob {
+export interface LiveDownloadJob {
   dbId: number;
   vodId: string;
   platform: 'twitch' | 'kick';
@@ -23,7 +11,18 @@ export interface LiveHlsDownloadJob {
   platformUsername?: string;
   startedAt?: string;
   sourceUrl?: string;
-  isFallback?: boolean;
+  uploadMode?: 'vod' | 'all';
+}
+
+export interface StandardVodJob {
+  tenantId: string;
+  platformUserId: string;
+  platformUsername?: string;
+  dbId: number;
+  vodId: string;
+  platform: 'twitch' | 'kick';
+  externalVodId?: string;
+  downloadMethod?: 'ffmpeg' | 'hls';
   uploadAfterDownload?: boolean;
   uploadMode?: 'vod' | 'all';
 }
@@ -108,7 +107,8 @@ export interface DmcaProcessingSuccessResult {
 export type DmcaProcessingResult = DmcaProcessingSuccessResult;
 
 export const QUEUE_NAMES = {
-  VOD_DOWNLOAD: 'vod_download',
+  VOD_LIVE: 'vod_live',
+  VOD_STANDARD: 'vod_standard',
   CHAT_DOWNLOAD: 'chat_download',
   YOUTUBE_UPLOAD: 'youtube_upload',
   DMCA_PROCESSING: 'dmca_processing',
@@ -143,12 +143,12 @@ export function getQueue<TData = unknown, TFinishedData = unknown>(name: string,
   return queue;
 }
 
-export function getVODDownloadQueue(): Queue<VODDownloadJob, VODDownloadJob, string> {
-  return getQueue(QUEUE_NAMES.VOD_DOWNLOAD);
+export function getLiveDownloadQueue(): Queue<LiveDownloadJob, LiveDownloadJob, string> {
+  return getQueue(QUEUE_NAMES.VOD_LIVE);
 }
 
-export function getLiveHlsDownloadQueue(): Queue<LiveHlsDownloadJob, LiveHlsDownloadJob, string> {
-  return getQueue(QUEUE_NAMES.VOD_DOWNLOAD) as unknown as Queue<LiveHlsDownloadJob, LiveHlsDownloadJob, string>;
+export function getStandardVodQueue(): Queue<StandardVodJob, StandardVodJob, string> {
+  return getQueue(QUEUE_NAMES.VOD_STANDARD);
 }
 
 export function getChatDownloadQueue(): Queue<ChatDownloadJob, ChatDownloadJob, string> {

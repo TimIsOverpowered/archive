@@ -98,7 +98,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
       const downloadJobId = `download_${vodRecord.vod_id}`;
 
-      void VodQueueModule.getVODDownloadQueue().add('standard_vod_download', downloadJob, { jobId: downloadJobId });
+      void VodQueueModule.getStandardVodQueue().add('standard_vod_download', downloadJob, { jobId: downloadJobId });
 
       log.info({ vodId: vodRecord.vod_id, downloadJobId }, 'VOD download queued, YouTube upload will be triggered after completion');
 
@@ -171,7 +171,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
       const downloadJobId = `download_${vodRecord.vod_id}`;
 
-      void VodQueueModule.getVODDownloadQueue().add('standard_vod_download', downloadJob, { jobId: downloadJobId });
+      void VodQueueModule.getStandardVodQueue().add('standard_vod_download', downloadJob, { jobId: downloadJobId });
 
       return { data: { message: 'VOD download queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, downloadJobId } };
     }

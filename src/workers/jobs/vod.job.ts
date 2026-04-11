@@ -1,11 +1,11 @@
-import type { VODDownloadJob } from './queues.js';
-import { getVODDownloadQueue } from './queues.js';
+import type { StandardVodJob } from './queues.js';
+import { getStandardVodQueue } from './queues.js';
 
-export async function enqueueVodDownload(job: Omit<VODDownloadJob, 'id'>, jobId: string): Promise<string | null> {
-  const queue = getVODDownloadQueue();
+export async function enqueueVodDownload(job: Omit<StandardVodJob, 'id'>, jobId: string): Promise<string | null> {
+  const queue = getStandardVodQueue();
 
   try {
-    const addedJob = await queue.add('vod_download', job, {
+    const addedJob = await queue.add('standard_vod_download', job, {
       jobId,
       deduplication: { id: jobId },
     });

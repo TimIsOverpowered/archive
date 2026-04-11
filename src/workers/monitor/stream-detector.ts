@@ -3,7 +3,7 @@ import path from 'path';
 import { getTenantConfig } from '../../config/loader.js';
 import { logger } from '../../utils/logger.js';
 import { createAutoLogger as loggerWithTenant } from '../../utils/auto-tenant-logger.js';
-import { QUEUE_NAMES, type LiveHlsDownloadJob, getLiveHlsDownloadQueue, enqueueJobWithLogging } from '../../workers/jobs/queues.js';
+import { QUEUE_NAMES, type LiveDownloadJob, getLiveDownloadQueue, enqueueJobWithLogging } from '../../workers/jobs/queues.js';
 import { createClient, getClient } from '../../db/client.js';
 import type { TenantConfig } from '../../config/types.js';
 import { getTwitchStreamStatus, getLatestTwitchVodObject, type TwitchStreamStatus } from '../../services/twitch-live.js';
@@ -484,7 +484,7 @@ async function enqueueLiveHlsDownload(params: {
     return; // Don't attempt to queue job if path is invalid
   }
 
-  const queue = getLiveHlsDownloadQueue();
+  const queue = getLiveDownloadQueue();
 
   try {
     log.debug({ vodId: params.vodId, platform: params.platform, tenantId: params.tenantId }, `[Monitor] Attempting to enqueue Live HLS download job`);
@@ -501,7 +501,7 @@ async function enqueueLiveHlsDownload(params: {
         platformUsername: params.platformUsername,
         startedAt: params.startedAt.toISOString(),
         sourceUrl: params.sourceUrl,
-      } satisfies LiveHlsDownloadJob,
+      } satisfies LiveDownloadJob,
       {
         jobId: `live_hls_${params.vodId}`,
         attempts: 10,
@@ -510,7 +510,7 @@ async function enqueueLiveHlsDownload(params: {
       },
       { info: log.info.bind(log), debug: log.debug.bind(log) },
       `[Monitor] Live HLS download job enqueued successfully`,
-      { dbId: params.dbId, vodId: params.vodId, platform: params.platform, queueName: QUEUE_NAMES.VOD_DOWNLOAD }
+      { dbId: params.dbId, vodId: params.vodId, platform: params.platform, queueName: QUEUE_NAMES.VOD_LIVE }
     );
 
     if (isNew) {
