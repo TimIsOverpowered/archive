@@ -1,15 +1,14 @@
 import type { ChatDownloadJob, StandardVodJob } from './queues.js';
 import { getChatDownloadQueue } from './queues.js';
 
-export async function enqueueChatDownload(job: Omit<ChatDownloadJob, 'id'>, jobId: string): Promise<string | null> {
-  const queue = getChatDownloadQueue();
-
+async function enqueue(job: ChatDownloadJob): Promise<string | null> {
+  const jobId = `chat_${job.vodId}`;
   try {
-    const addedJob = await queue.add('chat_download', job, {
+    const added = await getChatDownloadQueue().add('chat_download', job, {
       jobId,
       deduplication: { id: jobId },
     });
-    return addedJob.id ?? null;
+    return added.id ?? null;
   } catch {
     return null;
   }
@@ -25,44 +24,19 @@ export async function triggerChatDownload(
   vodStartDate?: string,
   platformUsername?: string
 ): Promise<string | null> {
-  const jobId = `chat_${vodId}`;
-  return enqueueChatDownload(
-    {
-      tenantId,
-      platformUserId,
-      platformUsername,
-      dbId,
-      vodId,
-      platform,
-      duration,
-      vodStartDate,
-    },
-    jobId
-  );
+  return enqueue({ tenantId, platformUserId, platformUsername, dbId, vodId, platform, duration, vodStartDate });
 }
 
 export async function triggerChatAfterVod(vodJob: StandardVodJob): Promise<string | null> {
-  if (vodJob.platform === 'kick') {
-    return null;
-  }
+  if (vodJob.platform === 'kick') return null;
 
-  const tenantId = vodJob.tenantId || undefined;
-
-  if (!tenantId) {
-    return null;
-  }
-
-  const jobId = `chat_${vodJob.vodId}`;
-  return enqueueChatDownload(
-    {
-      tenantId: tenantId,
-      platformUserId: vodJob.platformUserId,
-      platformUsername: vodJob.platformUsername,
-      dbId: vodJob.dbId,
-      vodId: vodJob.vodId,
-      platform: vodJob.platform,
-      duration: 0,
-    },
-    jobId
-  );
+  return enqueue({
+    tenantId: vodJob.tenantId,
+    platformUserId: vodJob.platformUserId,
+    platformUsername: vodJob.platformUsername,
+    dbId: vodJob.dbId,
+    vodId: vodJob.vodId,
+    platform: vodJob.platform,
+    duration: 0,
+  });
 }

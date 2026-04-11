@@ -1,7 +1,7 @@
 import type { YoutubeUploadJob } from './queues.js';
 import { getYoutubeUploadQueue } from './queues.js';
 
-export async function enqueueYoutubeUpload(job: Omit<YoutubeUploadJob, 'id'>, jobId: string): Promise<string | null> {
+export async function enqueueYoutubeUpload(job: YoutubeUploadJob, jobId: string): Promise<string | null> {
   const queue = getYoutubeUploadQueue();
 
   try {
@@ -24,11 +24,9 @@ export async function triggerYoutubeUpload(
   description: string,
   type: 'vod' | 'game',
   platform?: 'twitch' | 'kick',
-  part?: number,
-  chapterName?: string,
-  gameId?: string
+  part?: number
 ): Promise<string | null> {
-  const jobData: Omit<YoutubeUploadJob, 'id'> = {
+  const jobData: YoutubeUploadJob = {
     tenantId,
     dbId,
     vodId,
@@ -40,12 +38,6 @@ export async function triggerYoutubeUpload(
     part,
   };
 
-  if (chapterName && gameId) {
-    jobData.chapter = { name: chapterName, start: 0, end: 0, gameId };
-  } else if (part) {
-    // For parts without chapters, no chapter field needed
-  }
-
-  const jobId = `youtube_${vodId}`;
+  const jobId = `youtube_${jobData.vodId}_${jobData.type}${jobData.part != null ? `_part${jobData.part}` : ''}${jobData.chapter?.gameId ? `_${jobData.chapter.gameId}` : ''}`;
   return enqueueYoutubeUpload(jobData, jobId);
 }
