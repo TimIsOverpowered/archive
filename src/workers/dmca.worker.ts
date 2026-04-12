@@ -6,7 +6,7 @@ import timezone from 'dayjs/plugin/timezone';
 dayjs.extend(utcPlugin);
 dayjs.extend(timezone);
 
-import type { DmcaProcessingJob, DmcaProcessingResult, YoutubeUploadJob } from './jobs/queues.js';
+import type { DmcaProcessingJob, DmcaProcessingResult, YoutubeUploadJob, YoutubeVodUploadJob } from './jobs/queues.js';
 import { getYoutubeUploadQueue } from './jobs/queues.js';
 import type { DMCAClaim } from '../utils/dmca.js';
 import { isBlockingPolicy, buildMuteFilters, muteAudioSections, blackoutVideoSections, cleanupTempFiles, BlackoutSection } from '../utils/dmca.js';
@@ -138,20 +138,27 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
 
     log.info(`Queuing YouTube upload for ${finalTitle}`);
 
-    const youtubeJobData: YoutubeUploadJob = {
-      tenantId,
-      dbId,
-      vodId,
-      filePath: processedPath,
-      title: finalTitle,
-      description: config.youtube.description || '',
-      type: 'vod',
-      platform: platform as 'twitch' | 'kick',
-      part,
-      dmcaProcessed: true,
-    };
+    const { queueYoutubeVodUpload } = await import('./jobs/youtube.job.js');
 
-    const uploadJob = await getYoutubeUploadQueue().add('youtube_upload', youtubeJobData, { jobId: `youtube-dmca_${vodId}` });
+    const jobId = await queueYoutubeVodUpload(tenantId, dbId, vodId, processedPath, platform as 'twitch' | 'kick');
+
+    if (!jobId) {
+      throw new Error('Failed to queue YouTube upload job');
+    }
+
+    const uploadJob = await getYoutubeUploadQueue().add(
+      'youtube_upload',
+      {
+        tenantId,
+        dbId,
+        vodId,
+        filePath: processedPath,
+        type: 'vod',
+        platform: platform as 'twitch' | 'kick',
+        dmcaProcessed: true,
+      } as YoutubeVodUploadJob,
+      { jobId: `youtube-dmca_${vodId}` }
+    );
 
     log.info(`YouTube upload job queued with ID ${uploadJob.id!}`);
 

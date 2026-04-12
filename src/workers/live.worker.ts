@@ -78,7 +78,7 @@ const liveProcessor: Processor<LiveDownloadJobData, unknown, string> = async (jo
 
     // 5. Queue upload (non-fatal)
     try {
-      //await queueYoutubeUpload(tenantId, dbId, vodId, finalMp4Path, uploadMode || 'all', platform, log);
+      await queueYoutubeUploads(tenantId, dbId, vodId, finalMp4Path, platform, config, log);
     } catch (error) {
       log.warn({ ...extractErrorDetails(error), vodId }, 'Failed to queue upload (non-fatal)');
     }
@@ -173,6 +173,38 @@ async function initAlert(vodId: string, platform: string, streamerName: string, 
 async function updateAlert(messageId: string | null, title: string, description: string, status: 'warning' | 'success' | 'error', fields: { name: string; value: string; inline: boolean }[]) {
   if (!messageId || !isAlertsEnabled()) return;
   await updateDiscordEmbed(messageId, { title, description, status, fields, timestamp: new Date().toISOString() }).catch(() => {});
+}
+
+async function queueYoutubeUploads(
+  tenantId: string,
+  dbId: number,
+  vodId: string,
+  filePath: string,
+  platform: 'twitch' | 'kick',
+  config: ReturnType<typeof getTenantConfig>,
+  log: ReturnType<typeof createAutoLogger>
+): Promise<void> {
+  const { queueYoutubeVodUpload, queueYoutubeGameUploadsForVod } = await import('./jobs/youtube.job.js');
+
+  // VOD Upload
+  if (config?.youtube?.vodUpload) {
+    try {
+      await queueYoutubeVodUpload(tenantId, dbId, vodId, filePath, platform);
+      log.info({ vodId }, 'Queued YouTube VOD upload');
+    } catch (error) {
+      log.warn({ error: (error as Error).message, vodId }, 'Failed to queue YouTube VOD upload');
+    }
+  }
+
+  // Game Uploads
+  if (config?.youtube?.perGameUpload) {
+    try {
+      await queueYoutubeGameUploadsForVod(tenantId, dbId, vodId, filePath, platform);
+      log.info({ vodId }, 'Queued YouTube game uploads');
+    } catch (error) {
+      log.warn({ error: (error as Error).message, vodId }, 'Failed to queue YouTube game uploads');
+    }
+  }
 }
 
 export default liveProcessor;
