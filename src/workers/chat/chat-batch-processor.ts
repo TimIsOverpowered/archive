@@ -2,7 +2,6 @@ import type { PrismaClient } from '../../../generated/streamer/client';
 import type { ChatMessageCreateInput } from './chat-types.js';
 import type { AppLogger } from '../../utils/auto-tenant-logger.js';
 import { sleep } from '../../utils/delay.js';
-import { updateAlert, formatProgressMessage } from '../../utils/discord-alerts.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { CHAT_MAX_RETRIES, CHAT_RETRY_DELAY_MS } from '../../constants.js';
 
@@ -16,16 +15,14 @@ export interface FlushBatchOptions {
   buffer: ChatMessageCreateInput[];
   log: AppLogger;
   vodId: string;
-  tenantId: string;
-  messageId: string | null;
-  duration: number;
+  onProgress?: (offset: number, batchNumber: number, messagesInBatch: number) => void;
   lastOffset: number;
   totalMessages: number;
   batchCount: number;
 }
 
 export async function flushChatBatch(options: FlushBatchOptions): Promise<FlushBatchResult> {
-  const { db, buffer, log, vodId, tenantId, messageId, duration, lastOffset, totalMessages, batchCount } = options;
+  const { db, buffer, log, vodId, onProgress, lastOffset, totalMessages, batchCount } = options;
 
   if (buffer.length === 0) {
     return { totalMessages, batchCount };
@@ -53,26 +50,7 @@ export async function flushChatBatch(options: FlushBatchOptions): Promise<FlushB
         '[Chat] Batch flushed to database'
       );
 
-      if (messageId) {
-        const percent = duration > 0 ? Math.min(Math.round((lastOffset / duration) * 100), 100) : 0;
-
-        void updateAlert(messageId, {
-          title: '💬 Downloading Chat',
-          description: `${tenantId} chat download for ${vodId}`,
-          status: 'warning',
-          fields: [
-            { name: 'Current Offset', value: `${lastOffset.toFixed(2)}s`, inline: true },
-            { name: 'Batch', value: `#${newBatchCount} (${buffer.length} messages)`, inline: true },
-            {
-              name: 'Progress',
-              value: formatProgressMessage('Chat Download', tenantId, percent, newTotalMessages),
-              inline: false,
-            },
-          ],
-          timestamp: new Date().toISOString(),
-          updatedTimestamp: new Date().toISOString(),
-        });
-      }
+      onProgress?.(lastOffset, newBatchCount, buffer.length);
 
       buffer.length = 0;
       return { totalMessages: newTotalMessages, batchCount: newBatchCount };

@@ -9,7 +9,7 @@ import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
 import { sleep } from '../../utils/delay.js';
 import type { ReadableStream as NodeWebStream } from 'node:stream/web';
 import pLimit from 'p-limit';
-import { createAutoLogger as loggerWithTenant } from '../../utils/auto-tenant-logger.js';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { fileExists } from '../../utils/path.js';
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch.js';
 
@@ -32,7 +32,7 @@ export async function downloadSegmentsParallel(
   strategy: DownloadStrategy,
   concurrency: number,
   retryAttempts: number,
-  log: ReturnType<typeof loggerWithTenant>,
+  log: ReturnType<typeof createAutoLogger>,
   onBatchComplete?: (completedCount: number) => void
 ): Promise<void> {
   const limit = pLimit(concurrency);
@@ -114,7 +114,7 @@ export async function downloadSegmentsParallel(
   }
 }
 
-export async function cleanupOrphanedTmpFiles(vodDir: string, log: ReturnType<typeof loggerWithTenant>): Promise<void> {
+export async function cleanupOrphanedTmpFiles(vodDir: string, log: ReturnType<typeof createAutoLogger>): Promise<void> {
   try {
     const files = await fsPromises.readdir(vodDir);
 
@@ -135,7 +135,7 @@ export async function cleanupOrphanedTmpFiles(vodDir: string, log: ReturnType<ty
   }
 }
 
-export async function fetchTwitchPlaylist(vodId: string, log: ReturnType<typeof loggerWithTenant>, retryCount: number, maxRetryBeforeEndDetection: number): Promise<FetchPlaylistResult | null> {
+export async function fetchTwitchPlaylist(vodId: string, log: ReturnType<typeof createAutoLogger>, retryCount: number, maxRetryBeforeEndDetection: number): Promise<FetchPlaylistResult | null> {
   const tokenSig = await getVodTokenSig(vodId);
 
   try {
@@ -202,7 +202,7 @@ export async function fetchTwitchPlaylist(vodId: string, log: ReturnType<typeof 
 export async function fetchKickPlaylist(
   vodId: string,
   sourceUrl: string | undefined,
-  log: ReturnType<typeof loggerWithTenant>,
+  log: ReturnType<typeof createAutoLogger>,
   retryCount: number,
   maxRetryBeforeEndDetection: number,
   session?: CycleTLSSession

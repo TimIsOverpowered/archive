@@ -7,7 +7,7 @@ const globalDiscordAlertsEnabled = process.env.DISCORD_ALERTS_ENABLED !== 'false
 
 export type AlertStatus = 'success' | 'warning' | 'error';
 
-interface RichEmbedData {
+export interface RichEmbedData {
   title: string;
   description?: string;
   status: AlertStatus;
@@ -204,23 +204,25 @@ export function resetFailures(tenantId: string): void {
   failureCounts.delete(tenantId);
 }
 
-export function createProgressBar(percent: number, total?: number, current?: number): string {
+export function formatProgressMessage(operation: string, streamerName: string, percent: number, current?: number, total?: number): string {
+  const bar = createProgressBarInternal(percent);
+
+  if (total !== undefined && current !== undefined) {
+    return `[${operation}] ${streamerName} ${bar} ${Math.round((current / total) * 100)}% (${current}/${total})`;
+  }
+
+  return `[${operation}] ${streamerName} ${bar} ${percent}%`;
+}
+
+export function createProgressBar(percent: number): string {
+  return createProgressBarInternal(percent) + ` ${percent}%`;
+}
+
+function createProgressBarInternal(percent: number): string {
   const bars = 20;
   const filled = Math.round((percent / 100) * bars);
   const empty = bars - filled;
-
-  const bar = '█'.repeat(filled) + '░'.repeat(empty);
-
-  if (total !== undefined && current !== undefined) {
-    return `${bar} ${Math.round((current / total) * 100)}% (${current}/${total})`;
-  }
-
-  return `${bar} ${percent}%`;
-}
-
-export function formatProgressMessage(operation: string, streamerName: string, percent: number, current?: number, total?: number): string {
-  const bar = createProgressBar(percent, total, current);
-  return `[${operation}] ${streamerName} ${bar}`;
+  return '█'.repeat(filled) + '░'.repeat(empty);
 }
 
 export async function sendStreamAlert(data: StreamAlertData): Promise<string | null> {

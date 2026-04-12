@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { getTenantConfig } from '../../config/loader.js';
 import { logger } from '../../utils/logger.js';
-import { createAutoLogger as loggerWithTenant } from '../../utils/auto-tenant-logger.js';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { QUEUE_NAMES, type LiveDownloadJob, getLiveDownloadQueue, enqueueJobWithLogging } from '../../workers/jobs/queues.js';
 import { createClient, getClient } from '../../db/client.js';
 import type { TenantConfig } from '../../config/types.js';
@@ -20,7 +20,7 @@ type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
  * Main polling function - called every 30 seconds per tenant/platform pair
  */
 export async function checkPlatformStatus(tenantId: string, platform: PlatformType, config: TenantConfig): Promise<void> {
-  const log = loggerWithTenant(tenantId);
+  const log = createAutoLogger(tenantId);
 
   log.debug(`[Monitor]: Polling ${platform} status for streamer...`);
   log.debug(`[Monitor]: Config values - vodDownload: ${config.settings?.vodDownload}, ${platform}.enabled: ${config[platform as 'twitch' | 'kick']?.enabled}`);
@@ -115,7 +115,7 @@ async function sendStreamOfflineAlert(platform: PlatformType, vodId: string, sta
 }
 
 async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string, platform: PlatformType, config: TenantConfig): Promise<void> {
-  const log = loggerWithTenant(tenantId);
+  const log = createAutoLogger(tenantId);
 
   if (!config.twitch?.enabled) return;
 
@@ -269,7 +269,7 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
  * Handle Kick-specific live detection logic - NO FALLBACK, only downloads after video object confirmed available
  */
 async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, platform: PlatformType, config: TenantConfig): Promise<void> {
-  const log = loggerWithTenant(tenantId);
+  const log = createAutoLogger(tenantId);
 
   if (!config.kick?.enabled) return;
 
@@ -424,7 +424,7 @@ async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, p
  * Validate that the VOD path exists and is writable before queuing a download job
  */
 async function validateVodPath(tenantId: string): Promise<{ valid: boolean }> {
-  const log = loggerWithTenant(tenantId);
+  const log = createAutoLogger(tenantId);
 
   try {
     const streamerConfig = getTenantConfig(tenantId);
@@ -475,7 +475,7 @@ async function enqueueLiveHlsDownload(params: {
   startedAt: Date;
   sourceUrl?: string;
 }): Promise<void> {
-  const log = loggerWithTenant(params.tenantId);
+  const log = createAutoLogger(params.tenantId);
 
   // Validate VOD path before attempting to queue job
   const validationResult = await validateVodPath(params.tenantId);
@@ -526,7 +526,7 @@ async function enqueueLiveHlsDownload(params: {
  * Start independent polling loop per tenant/platform pair (concurrent async execution)
  */
 export function startStreamDetectionLoop(tenantId: string, platform: PlatformType, config: TenantConfig): void {
-  const log = loggerWithTenant(tenantId);
+  const log = createAutoLogger(tenantId);
   log.info(`[Platform]: ${platform}] Starting stream detection polling every 30 seconds...`);
 
   // Run immediately on startup, then every 30s

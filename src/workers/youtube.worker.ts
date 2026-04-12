@@ -1,19 +1,11 @@
 import { Processor, Job } from 'bullmq';
-
 import type { YoutubeUploadJob, YoutubeUploadResult, YoutubeVodUploadJob, YoutubeGameUploadJob } from './jobs/queues.js';
-import { splitVideo, trimVideo, getDuration, deleteFile } from './vod/ffmpeg.js';
-import { uploadVideo, linkParts } from '../services/youtube.js';
-import { initRichAlert, updateAlert, formatProgressMessage, resetFailures } from '../utils/discord-alerts.js';
-import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { toHHMMSS, capitalizePlatform } from '../utils/formatting.js';
 import { getJobContext } from './job-context.js';
-import { getEffectiveSplitDuration } from './youtube/validation.js';
 import { handleWorkerError } from './utils/error-handler.js';
-import { YOUTUBE_MAX_DURATION } from '../constants.js';
-import { buildYoutubeMetadata } from './youtube/metadata-builder.js';
-import { createVodUploadProgressHandler, createGameUploadProgressHandler } from './youtube/progress-handlers.js';
-
-type TenantConfig = NonNullable<Awaited<ReturnType<typeof getJobContext>>['config']>;
+import { processVodUpload, linkVodPartsAfterDelay } from './youtube/vod-upload-processor.js';
+import { processGameUpload } from './youtube/game-upload-processor.js';
+import { createAutoLogger } from '../utils/auto-tenant-logger.js';
+import { resetFailures } from '../utils/discord-alerts.js';
 
 const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async (job: Job<YoutubeUploadJob>) => {
   const { tenantId, dbId, vodId, type } = job.data;
@@ -27,9 +19,9 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
   try {
     if (type === 'vod') {
-      return await processVodUpload(job.data, config, db, vodId, log, type);
+      return await processVodUploadJob(job.data, config, db, log);
     } else {
-      return await processGameUpload(job.data, config, db, vodId, log);
+      return await processGameUploadJob(job.data, config, db, log);
     }
   } catch (error) {
     handleWorkerError(error, log, { vodId, tenantId, dbId, jobId: job.id });
@@ -43,159 +35,35 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
   }
 };
 
-// ============== VOD Processing ==============
-
-async function processVodUpload(
+async function processVodUploadJob(
   job: YoutubeVodUploadJob,
-  config: NonNullable<TenantConfig>,
+  config: NonNullable<Awaited<ReturnType<typeof getJobContext>>['config']>,
   db: Awaited<ReturnType<typeof getJobContext>>['db'],
-  vodId: string,
-  log: ReturnType<typeof createAutoLogger>,
-  type: 'vod' | 'live'
-): Promise<Extract<YoutubeUploadResult, { videos: Array<{ id: string; part: number }> }>> {
-  const { tenantId, dbId, filePath, dmcaProcessed } = job;
-  const vodRecord = await db.vod.findUnique({ where: { id: dbId } });
+  log: ReturnType<typeof createAutoLogger>
+): Promise<YoutubeUploadResult> {
+  const { tenantId, dbId, vodId, filePath, dmcaProcessed } = job;
 
+  const vodRecord = await db.vod.findUnique({ where: { id: dbId } });
   if (!vodRecord) throw new Error(`VOD record not found for ${vodId}`);
 
-  const privacyStatus = config.youtube!.public ? 'public' : 'unlisted';
-  const splitDuration = getEffectiveSplitDuration(config.youtube!.splitDuration);
-  const duration = (await getDuration(filePath)) ?? 0;
-
-  const channelName = config.displayName || tenantId;
-  const platformName = capitalizePlatform(vodRecord.platform);
-  const vodStreamTitle = vodRecord.title ? vodRecord.title.replace(/>|</gi, '') : '';
-  const domainName = config.settings?.domainName || 'localhost';
-
-  const needsSplitting = duration > splitDuration;
-  const uploadedVideos: Array<{ id: string; part: number }> = [];
-
-  if (needsSplitting) {
-    log.info({ duration, parts: Math.ceil(duration / splitDuration) }, 'VOD exceeds YouTube split duration, auto-splitting');
-    const totalParts = Math.ceil(duration / splitDuration);
-
-    const splitAlertMessageId = await initRichAlert({
-      title: '📺 VOD Splitting in Progress',
-      description: `${tenantId} - Preparing ${totalParts} parts...`,
-      status: 'warning',
-      fields: [
-        { name: 'VOD ID', value: vodId, inline: true },
-        { name: 'Total Duration', value: toHHMMSS(duration), inline: true },
-        { name: 'Parts Count', value: String(totalParts), inline: false },
-      ],
-      timestamp: new Date().toISOString(),
-    });
-
-    const parts = await splitVideo(filePath, duration, splitDuration, vodId, (percent: number) => {
-      void updateAlert(splitAlertMessageId, {
-        title: '📺 Splitting VOD',
-        description: `${tenantId} - Preparing video parts for upload`,
-        status: 'warning',
-        fields: [{ name: 'Progress', value: formatProgressMessage('VOD Splitting', tenantId, percent), inline: false }],
-        timestamp: new Date().toISOString(),
-        updatedTimestamp: new Date().toISOString(),
-      });
-    });
-
-    for (let i = 0; i < parts.length; i++) {
-      const currentPartNum = i + 1;
-
-      const uploadAlertMessageId = await initRichAlert({
-        title: `📺 YouTube Upload (Part ${currentPartNum}/${totalParts})`,
-        description: `${tenantId} - Uploading video part to YouTube...`,
-        status: 'warning',
-        fields: [
-          { name: 'VOD ID', value: vodId, inline: true },
-          { name: 'Platform', value: platformName.toUpperCase(), inline: true },
-          { name: 'Part', value: `${currentPartNum} of ${totalParts}`, inline: false },
-        ],
-        timestamp: new Date().toISOString(),
-      });
-
-      const { title: partTitle, description: youtubeDescription } = buildYoutubeMetadata({
-        channelName,
-        platform: vodRecord.platform,
-        vodDate: vodRecord.created_at,
-        vodTitle: vodStreamTitle,
-        domainName,
-        timezone: config.settings?.timezone || 'UTC',
-        youtubeDescription: config.youtube!.description,
-        part: i > 0 ? i + 1 : undefined,
-        type: type as 'vod' | 'live',
-      });
-
-      const onUploadProgress = uploadAlertMessageId
-        ? createVodUploadProgressHandler({
-            messageId: uploadAlertMessageId,
-            channelName,
-            videoTitle: partTitle,
-            part: currentPartNum,
-            totalParts,
-          })
-        : () => {};
-
-      const result = await uploadVideo(tenantId, channelName, parts[i], partTitle, youtubeDescription, privacyStatus, onUploadProgress);
-
-      uploadedVideos.push({ id: result.videoId, part: i + 1 });
-
-      if (!config.settings.saveMP4) {
-        await deleteFile(parts[i]);
-      }
-    }
-
-    // Update splitting alert on completion
-    void updateAlert(splitAlertMessageId, {
-      title: `✅ VOD Splitting Complete`,
-      description: `${tenantId} - Successfully split into ${totalParts} parts`,
-      status: 'success',
-      fields: [
-        { name: 'Total Duration', value: toHHMMSS(duration), inline: true },
-        { name: 'Parts Count', value: String(totalParts), inline: false },
-      ],
-      timestamp: new Date().toISOString(),
-      updatedTimestamp: new Date().toISOString(),
-    });
-  } else {
-    const { title: vodTitle, description: youtubeDescription } = buildYoutubeMetadata({
-      channelName,
+  const result = await processVodUpload({
+    tenantId,
+    dbId,
+    vodId,
+    filePath,
+    db,
+    config,
+    vodRecord: {
       platform: vodRecord.platform,
-      vodDate: vodRecord.created_at,
-      vodTitle: vodStreamTitle,
-      domainName,
-      timezone: config.settings?.timezone || 'UTC',
-      youtubeDescription: config.youtube!.description,
-      type: type as 'vod' | 'live',
-    });
+      created_at: vodRecord.created_at,
+      title: vodRecord.title,
+    },
+    dmcaProcessed,
+    log,
+    type: 'vod',
+  });
 
-    const uploadAlertMessageId = await initRichAlert({
-      title: '📺 YouTube Upload Started',
-      description: `${tenantId} - Uploading VOD to YouTube...`,
-      status: 'warning',
-      fields: [
-        { name: 'VOD ID', value: vodId, inline: true },
-        { name: 'Platform', value: platformName.toUpperCase(), inline: true },
-      ],
-      timestamp: new Date().toISOString(),
-    });
-
-    const onUploadProgress = uploadAlertMessageId
-      ? createVodUploadProgressHandler({
-          messageId: uploadAlertMessageId,
-          channelName,
-          videoTitle: vodTitle,
-        })
-      : () => {};
-
-    const result = await uploadVideo(tenantId, channelName, filePath, vodTitle, youtubeDescription, privacyStatus, onUploadProgress);
-
-    uploadedVideos.push({ id: result.videoId, part: 1 });
-
-    if (!config.settings.saveMP4 || dmcaProcessed === true) {
-      await deleteFile(filePath);
-    }
-  }
-
-  for (const video of uploadedVideos) {
+  for (const video of result.uploadedVideos) {
     await db.vodUpload.create({
       data: {
         vod_id: dbId,
@@ -207,27 +75,18 @@ async function processVodUpload(
     });
   }
 
-  if (uploadedVideos.length > 1) {
-    setTimeout(() => {
-      void linkParts(tenantId, uploadedVideos);
-    }, 60000);
-  }
+  await linkVodPartsAfterDelay(tenantId, result.uploadedVideos);
 
-  resetFailures(tenantId);
-
-  return { success: true, videos: uploadedVideos };
+  return { success: true, videos: result.uploadedVideos };
 }
 
-// ============== Game Processing ==============
-
-async function processGameUpload(
+async function processGameUploadJob(
   job: YoutubeGameUploadJob,
-  config: NonNullable<TenantConfig>,
+  config: NonNullable<Awaited<ReturnType<typeof getJobContext>>['config']>,
   db: Awaited<ReturnType<typeof getJobContext>>['db'],
-  vodId: string,
   log: ReturnType<typeof createAutoLogger>
-): Promise<Extract<YoutubeUploadResult, { videoId: string } | { videos: Array<{ id: string; part: number; startTime: number; endTime: number; gameId: string }> }>> {
-  const { tenantId, dbId, filePath, platform, chapterName, chapterStart, chapterEnd } = job;
+): Promise<YoutubeUploadResult> {
+  const { tenantId, dbId, vodId, filePath, platform, chapterName, chapterStart, chapterEnd, chapterGameId, title, description } = job;
 
   const hasTwitch = config.twitch?.enabled === true;
   const hasKick = config.kick?.enabled === true;
@@ -244,195 +103,28 @@ async function processGameUpload(
       });
 
       resetFailures(tenantId);
-
       return { success: true, videoId: '', gameId: '' };
     }
   }
 
-  const trimmedPath = await trimVideo(filePath, chapterStart, chapterEnd, `${vodId}-${chapterName}`);
-  const trimmedDuration = (await getDuration(trimmedPath)) ?? 0;
-
-  const gameExceedsYoutubeMax = trimmedDuration > YOUTUBE_MAX_DURATION;
-
-  if (gameExceedsYoutubeMax) {
-    log.info({ duration: trimmedDuration, parts: Math.ceil(trimmedDuration / YOUTUBE_MAX_DURATION) }, `Game clip exceeds YouTube max duration, auto-splitting`);
-
-    return await processSplitGameUpload(job, trimmedPath, trimmedDuration, config, db, vodId);
-  } else {
-    return await processSingleGameUpload(job, trimmedPath, config, db, vodId);
-  }
-}
-
-async function processSingleGameUpload(
-  job: YoutubeGameUploadJob,
-  trimmedPath: string,
-  config: NonNullable<TenantConfig>,
-  db: Awaited<ReturnType<typeof getJobContext>>['db'],
-  vodId: string
-): Promise<Extract<YoutubeUploadResult, { videoId: string }>> {
-  const { tenantId, dbId, chapterStart, chapterEnd, chapterGameId, title, description } = job;
-  const channelName = config.displayName || tenantId;
-
-  // Send initial upload alert for single game uploads (non-split)
-  const uploadAlertMessageId = await initRichAlert({
-    title: '🎮 Game Upload Started',
-    description: `${tenantId} - Uploading game clip to YouTube...`,
-    status: 'warning',
-    fields: [
-      { name: 'Game Name', value: job.chapterName, inline: true },
-      { name: 'VOD ID', value: vodId, inline: false },
-    ],
-    timestamp: new Date().toISOString(),
-  });
-
-  const onUploadProgress = uploadAlertMessageId
-    ? createGameUploadProgressHandler({
-        messageId: uploadAlertMessageId,
-        channelName,
-        gameName: job.chapterName,
-      })
-    : () => {};
-
-  const result = await uploadVideo(tenantId, channelName, trimmedPath, title, description, 'public', onUploadProgress);
-
-  const createdGameRecord = await db.game.create({
-    data: {
-      vod_id: dbId,
-      start_time: chapterStart,
-      end_time: chapterEnd,
-      video_provider: 'youtube',
-      video_id: result.videoId,
-      thumbnail_url: result.thumbnailUrl || null,
-      game_id: chapterGameId || null,
-      game_name: job.chapterName,
-      title: job.chapterName,
-    },
-  });
-
-  await deleteFile(trimmedPath);
-
-  resetFailures(tenantId);
-
-  return { success: true, videoId: result.videoId, gameId: String(createdGameRecord.id) };
-}
-
-async function processSplitGameUpload(
-  job: YoutubeGameUploadJob,
-  trimmedPath: string,
-  trimmedDuration: number,
-  config: NonNullable<TenantConfig>,
-  db: Awaited<ReturnType<typeof getJobContext>>['db'],
-  vodId: string
-): Promise<Extract<YoutubeUploadResult, { videos: Array<{ id: string; part: number; startTime: number; endTime: number; gameId: string }> }>> {
-  const { tenantId, dbId, chapterStart, chapterGameId } = job;
-  const totalParts = Math.ceil(trimmedDuration / YOUTUBE_MAX_DURATION);
-
-  // Create splitting progress alert for game clips
-  const splitAlertMessageId = await initRichAlert({
-    title: `✂️ Game Clip Splitting in Progress`,
-    description: `${tenantId} - Preparing ${totalParts} parts...`,
-    status: 'warning',
-    fields: [
-      { name: 'Game Name', value: job.chapterName, inline: true },
-      { name: 'Total Duration', value: toHHMMSS(trimmedDuration), inline: true },
-      { name: 'Parts Count', value: String(totalParts), inline: false },
-    ],
-    timestamp: new Date().toISOString(),
-  });
-
-  const splitPaths = await splitVideo(trimmedPath, trimmedDuration, YOUTUBE_MAX_DURATION, `${vodId}-game`, (percent: number) => {
-    void updateAlert(splitAlertMessageId, {
-      title: `✂️ Splitting Game Clip`,
-      description: `${tenantId} - Game clip exceeds YouTube max duration`,
-      status: 'warning',
-      fields: [{ name: 'Progress', value: formatProgressMessage('Game Splitting', tenantId, percent), inline: false }],
-      timestamp: new Date().toISOString(),
-      updatedTimestamp: new Date().toISOString(),
-    });
-  });
-
-  const uploadedGameVideos: Array<{ id: string; part: number; startTime: number; endTime: number; gameId: string }> = [];
-
-  for (let i = 0; i < totalParts; i++) {
-    const currentPartNum = i + 1;
-    const startTime = i * YOUTUBE_MAX_DURATION;
-    const endTime = Math.min(startTime + YOUTUBE_MAX_DURATION, trimmedDuration);
-
-    const partTitle = i > 0 ? `${job.title} PART ${i + 1}` : job.title;
-
-    const uploadAlertMessageId = await initRichAlert({
-      title: `🎮 Game Upload (Part ${currentPartNum}/${totalParts})`,
-      description: `${tenantId} - Uploading game clip part to YouTube...`,
-      status: 'warning',
-      fields: [
-        { name: 'Game Name', value: job.chapterName, inline: true },
-        { name: 'VOD ID', value: vodId, inline: true },
-        { name: 'Part', value: `${currentPartNum} of ${totalParts}`, inline: false },
-      ],
-      timestamp: new Date().toISOString(),
-    });
-
-    let result;
-    try {
-      const onUploadProgress = uploadAlertMessageId
-        ? createGameUploadProgressHandler({
-            messageId: uploadAlertMessageId,
-            channelName: config.displayName || tenantId,
-            gameName: job.chapterName,
-            videoTitle: partTitle,
-            part: currentPartNum,
-            totalParts,
-          })
-        : () => {};
-
-      result = await uploadVideo(tenantId, config.displayName || tenantId, splitPaths[i], partTitle, job.description, 'public', onUploadProgress);
-
-      const createdGameRecord = await db.game.create({
-        data: {
-          vod_id: dbId,
-          start_time: startTime + chapterStart,
-          end_time: endTime + chapterStart,
-          video_provider: 'youtube',
-          video_id: result.videoId,
-          thumbnail_url: result.thumbnailUrl || null,
-          game_id: chapterGameId || null,
-          game_name: job.chapterName,
-          title: job.chapterName,
-        },
-      });
-
-      uploadedGameVideos.push({
-        id: result.videoId,
-        part: currentPartNum,
-        startTime,
-        endTime,
-        gameId: String(createdGameRecord.id),
-      });
-    } catch (error) {
-      throw error;
-    }
-
-    if (!config.settings.saveMP4) {
-      await deleteFile(splitPaths[i]);
-    }
-  }
-
-  // Update splitting alert on completion
-  void updateAlert(splitAlertMessageId, {
-    title: `✅ Game Clip Splitting Complete`,
-    description: `${tenantId} - Successfully split into ${totalParts} parts`,
-    status: 'success',
-    fields: [
-      { name: 'Total Duration', value: toHHMMSS(trimmedDuration), inline: true },
-      { name: 'Parts Count', value: String(totalParts), inline: false },
-    ],
-    timestamp: new Date().toISOString(),
-    updatedTimestamp: new Date().toISOString(),
+  const result = await processGameUpload({
+    tenantId,
+    dbId,
+    vodId,
+    filePath,
+    chapterStart,
+    chapterEnd,
+    chapterName,
+    chapterGameId,
+    title,
+    description,
+    db,
+    config,
+    log,
   });
 
   resetFailures(tenantId);
-
-  return { success: true, videos: uploadedGameVideos };
+  return result as YoutubeUploadResult;
 }
 
 export default youtubeProcessor;
