@@ -5,10 +5,11 @@ import type { DmcaProcessingJob, DmcaProcessingResult, YoutubeVodUploadJob } fro
 import { getYoutubeUploadQueue } from './jobs/queues.js';
 import type { DMCAClaim } from '../utils/dmca.js';
 import { isBlockingPolicy, buildMuteFilters, muteAudioSections, blackoutVideoSections, cleanupTempFiles, BlackoutSection } from '../utils/dmca.js';
-import { trimVideo as ffmpegTrim } from '../utils/ffmpeg.js';
+import { trimVideo as ffmpegTrim } from './vod/ffmpeg.js';
 import { createAutoLogger as loggerWithTenant } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './job-context.js';
 import { capitalizePlatform } from '../utils/formatting.js';
+import { handleWorkerError } from './utils/error-handler.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
   const { tenantId, dbId, vodId, receivedClaims, type, platform, part } = job.data;
@@ -153,7 +154,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
 
     return { success: true, youtubeJobId: (uploadJob.id || '').toString(), vodId };
   } catch (error) {
-    log.error(`DMCA processing failed for ${vodId}`);
+    handleWorkerError(error, log, { vodId, dbId, tenantId, jobId: job.id, platform });
 
     throw error;
   } finally {

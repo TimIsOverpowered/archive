@@ -1,82 +1,16 @@
 import { Processor, Job } from 'bullmq';
-import { extractErrorDetails } from '../utils/error.js';
 import { sleep } from '../utils/delay.js';
-import { fetchComments, fetchNextComments, type TwitchChatEdge } from '../services/twitch';
+import { fetchComments, fetchNextComments, extractMessageData } from '../services/twitch';
 import { initRichAlert, updateAlert, formatProgressMessage, resetFailures } from '../utils/discord-alerts.js';
+import { extractErrorDetails } from '../utils/error.js';
 import type { ChatDownloadJob, ChatDownloadResult } from './jobs/queues.js';
 import { createAutoLogger, type AppLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './job-context.js';
 import type { PrismaClient } from '../../generated/streamer/client';
-import type { InputJsonValue } from '../../generated/streamer/internal/prismaNamespace';
 import { CHAT_BATCH_SIZE, CHAT_RATE_LIMIT_MS, CHAT_MAX_RETRIES, CHAT_RETRY_DELAY_MS } from '../constants.js';
-
-interface ChatMessageCreateInput {
-  id: string;
-  vod_id: number;
-  display_name: string | null;
-  content_offset_seconds: string;
-  createdAt: Date;
-  message?: InputJsonValue;
-  user_badges?: InputJsonValue;
-  user_color: string | null;
-}
-
-const BATCH_SIZE = CHAT_BATCH_SIZE;
-const RATE_LIMIT_MS = CHAT_RATE_LIMIT_MS;
-const MAX_RETRIES = CHAT_MAX_RETRIES;
-const RETRY_DELAY_MS = CHAT_RETRY_DELAY_MS;
-
-function stripTypename(obj: unknown): unknown {
-  if (obj === null || obj === undefined) return obj;
-  if (Array.isArray(obj)) {
-    return obj.map((item) => stripTypename(item));
-  }
-  if (typeof obj === 'object') {
-    const cleaned: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      if (key !== '__typename') {
-        cleaned[key] = stripTypename(value);
-      }
-    }
-    return cleaned;
-  }
-  return obj;
-}
-
-function extractMessageData(node: TwitchChatEdge['node']): { message: InputJsonValue; userBadges?: InputJsonValue | undefined } {
-  if (!node || !node.message) {
-    return { message: { content: '', fragments: [] }, userBadges: undefined };
-  }
-
-  const rawFragments = node.message.fragments || [];
-  const cleanFragments = stripTypename(rawFragments);
-  const badgesRaw = node.message.userBadges ?? null;
-
-  return {
-    message: {
-      content: (Array.isArray(cleanFragments) ? cleanFragments : [])
-        .map((f: unknown) => {
-          if (typeof f !== 'object' || f === null) return '';
-          const text = (f as Record<string, unknown>).text;
-          return String(text ?? '');
-        })
-        .join(''),
-      fragments: Array.isArray(cleanFragments) ? cleanFragments.map((frag) => ({ ...frag })) : [],
-    },
-    userBadges: badgesRaw && typeof stripTypename(badgesRaw) === 'object' ? (stripTypename(badgesRaw) as InputJsonValue) : undefined,
-  };
-}
-
-function extractEdges(commentsObj: Record<string, unknown>): TwitchChatEdge[] {
-  const rawEdges = commentsObj.edges;
-
-  if (!Array.isArray(rawEdges)) {
-    return [];
-  }
-
-  // Type guard proves to TypeScript that these are valid edges at runtime
-  return rawEdges.filter((item): item is TwitchChatEdge => item !== null && typeof item === 'object' && 'node' in item && 'cursor' in item);
-}
+import { extractEdges } from './chat/chat-helpers.js';
+import type { ChatMessageCreateInput } from './chat/chat-types.js';
+import { handleWorkerError } from './utils/error-handler.js';
 
 async function flushBatch(
   db: PrismaClient,
@@ -94,7 +28,7 @@ async function flushBatch(
 
   let lastError: Error | null = null;
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 1; attempt <= CHAT_MAX_RETRIES; attempt++) {
     try {
       await db.chatMessage.createMany({
         data: buffer,
@@ -143,15 +77,15 @@ async function flushBatch(
         {
           vodId,
           attempt,
-          maxRetries: MAX_RETRIES,
+          maxRetries: CHAT_MAX_RETRIES,
           bufferLength: buffer.length,
           error: extractErrorDetails(error).message,
         },
         '[Chat] Batch flush failed, retrying...'
       );
 
-      if (attempt < MAX_RETRIES) {
-        await sleep(RETRY_DELAY_MS * attempt);
+      if (attempt < CHAT_MAX_RETRIES) {
+        await sleep(CHAT_RETRY_DELAY_MS * attempt);
       }
     }
   }
@@ -241,10 +175,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
       const edges = extractEdges(commentsObj);
 
-      if (edges.length === 0) continue; // Type-safe access to .length property
-
-      // Empty first page scenario - treat as success with warning, not failure
-      if (!edges || edges.length === 0) {
+      if (edges.length === 0) {
         log.warn('[' + vodId + '] No chat messages found for this VOD (or at current offset ' + effectiveOffset.toFixed(2) + 's). This may be due to disabled chat history or indexing delay.');
 
         resetFailures(tenantId);
@@ -267,7 +198,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
           });
         }
 
-        return { success: true, totalMessages: 0 }; // Success with zero count
+        return { success: true, totalMessages: 0 };
       }
 
       for (const edge of edges) {
@@ -291,7 +222,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
       lastOffset = edges[edges.length - 1]?.node?.contentOffsetSeconds ?? lastOffset;
 
-      if (batchBuffer.length >= BATCH_SIZE) {
+      if (batchBuffer.length >= CHAT_BATCH_SIZE) {
         const result = await flushBatch(db, batchBuffer, log, vodId, tenantId, messageId, duration, lastOffset, totalMessages, batchCount);
         totalMessages = result.totalMessages;
         batchCount = result.batchCount;
@@ -307,7 +238,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
       lastCursor = pageCursor;
 
-      await sleep(RATE_LIMIT_MS);
+      await sleep(CHAT_RATE_LIMIT_MS);
 
       rawPage = await fetchNextComments(String(vodId), pageCursor); // Only used for subsequent pages now!
     }
@@ -358,8 +289,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
     return { success: true, totalMessages };
   } catch (error) {
-    const details = extractErrorDetails(error);
-    log.error({ vodId, platform, totalMessages, batchCount, ...details }, 'Chat download failed');
+    const errorMsg = handleWorkerError(error, log, { vodId, platform, dbId, tenantId, jobId: job.id });
 
     if (messageId) {
       void updateAlert(messageId, {
@@ -369,7 +299,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
         fields: [
           { name: 'Platform', value: platform, inline: true },
           { name: 'Messages Processed Before Failure', value: String(totalMessages), inline: true },
-          { name: 'Error', value: details.message.substring(0, 500), inline: false },
+          { name: 'Error', value: errorMsg, inline: false },
         ],
         timestamp: new Date().toISOString(),
         updatedTimestamp: new Date().toISOString(),

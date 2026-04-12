@@ -1,7 +1,9 @@
 import ffmpeg from 'fluent-ffmpeg';
 import fs from 'fs/promises';
 import path from 'path';
-import { logger } from './logger.js';
+import { childLogger } from '../../utils/logger.js';
+
+const logger = childLogger({ module: 'ffmpeg' });
 import HLS from 'hls-parser';
 
 interface ProgressEvent {

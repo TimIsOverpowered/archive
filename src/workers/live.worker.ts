@@ -1,10 +1,8 @@
 // live.worker.ts
 import { Processor, Job } from 'bullmq';
-import { downloadLiveHls } from './vod/hls-downloader.js';
 import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
-import { convertHlsToMp4, detectFmp4FromPlaylist, getDuration } from '../utils/ffmpeg.js';
-import { fileExists, getVodDirPath, getVodFilePath } from '../utils/path.js';
-import { toHHMMSS } from '../utils/formatting.js';
+import { getDuration } from './vod/ffmpeg.js';
+import { fileExists, getVodDirPath } from '../utils/path.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
@@ -13,7 +11,9 @@ import { getJobContext } from './job-context.js';
 import { finalizeVod } from '../services/vod-finalization.js';
 import { queueYoutubeUploads } from './jobs/youtube.job.js';
 import { cleanupHlsFiles } from './vod/hls-cleanup.js';
-import fs from 'fs/promises';
+import { downloadHlsStream } from './vod/hls-orchestrator.js';
+import { handleWorkerError } from './utils/error-handler.js';
+import { createLiveWorkerAlerts } from './utils/alert-factories.js';
 import type { LiveDownloadJob } from './jobs/queues.js';
 
 const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: Job<LiveDownloadJob, unknown, string>) => {
@@ -25,17 +25,10 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
   const { config, db: streamerClient } = await getJobContext(tenantId);
   if (!config?.settings.vodPath) throw new Error(`VOD path not configured for ${tenantId}`);
 
-  const messageId = await initRichAlert({
-    title: `[Live] ${vodId} Started`,
-    description: `${platform.toUpperCase()} live stream download started`,
-    status: 'warning',
-    fields: [
-      { name: 'Platform', value: platform, inline: true },
-      { name: 'Streamer', value: config.displayName || tenantId, inline: true },
-      { name: 'Started At', value: startedAt || new Date().toISOString(), inline: false },
-    ],
-    timestamp: new Date().toISOString(),
-  });
+  const streamerName = config.displayName || tenantId;
+  const alerts = createLiveWorkerAlerts();
+
+  const messageId = await initRichAlert(alerts.init(vodId, platform, streamerName, startedAt));
 
   try {
     // 1. Prepare directory
@@ -44,8 +37,8 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
       await cleanupOrphanedTmpFiles(vodDirPath, log);
     }
 
-    // 2. Download
-    const downloadResult = await downloadLiveHls({
+    // 2. Download (includes conversion)
+    const downloadResult = await downloadHlsStream({
       dbId,
       vodId,
       platform,
@@ -54,14 +47,9 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
       platformUsername,
       startedAt,
       sourceUrl,
+      isLive: true,
       onProgress: (segmentsDownloaded) => {
-        void updateAlert(messageId, {
-          title: `[Live] Downloading ${vodId}`,
-          description: `${segmentsDownloaded} segments downloaded`,
-          status: 'warning',
-          fields: [],
-          timestamp: new Date().toISOString(),
-        });
+        void updateAlert(messageId, alerts.progress(vodId, segmentsDownloaded));
       },
     });
 
@@ -73,59 +61,35 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
       timestamp: new Date().toISOString(),
     });
 
-    // 3. Convert
-    const finalMp4Path = getVodFilePath({ tenantId, vodId });
-    await convertToMp4(vodId, downloadResult, finalMp4Path, log);
-
-    // 4. Update DB
+    // 3. Update DB
+    const finalMp4Path = downloadResult.finalMp4Path;
     const actualDuration = await getDuration(finalMp4Path);
     await finalizeVod({ dbId, vodId, platform, tenantId, durationSeconds: actualDuration ? Math.round(actualDuration) : null, streamerClient });
 
-    await updateAlert(messageId, {
-      title: `[Live] ${vodId} Complete`,
-      description: 'Successfully processed',
-      status: 'success',
-      fields: [{ name: 'Duration', value: actualDuration ? toHHMMSS(Math.round(actualDuration)) : 'Unknown', inline: true }],
-      timestamp: new Date().toISOString(),
-    });
+    await updateAlert(messageId, alerts.complete(vodId, actualDuration ? Math.round(actualDuration) : undefined));
 
-    // 5. Queue upload (non-fatal)
+    // 4. Queue upload (non-fatal)
     try {
       await queueYoutubeUploads({ tenantId, dbId, vodId, filePath: finalMp4Path, platform, config, log });
     } catch (error) {
       log.warn({ ...extractErrorDetails(error), vodId }, 'Failed to queue upload (non-fatal)');
     }
 
-    // 6. Cleanup HLS segments
-    await cleanupHlsFiles(downloadResult.outputDir, config.settings.saveHLS ?? false, log);
+    // 5. Cleanup HLS segments
+    const shouldKeepHls = config.settings.saveHLS ?? false;
+    if (!shouldKeepHls) {
+      await cleanupHlsFiles(downloadResult.outputDir, shouldKeepHls, log);
+    } else {
+      log.info({ vodId }, `HLS files preserved in ${downloadResult.outputDir} (saveHLS=true)`);
+    }
 
     log.info({ jobId: job.id, vodId }, '[Live Worker] Job completed successfully');
     return { success: true };
   } catch (error) {
-    const details = extractErrorDetails(error);
-    log.error({ jobId: job.id, ...details, vodId }, '[Live Worker] Job failed');
-    await updateAlert(messageId, {
-      title: `[Live] ${vodId} FAILED`,
-      description: details.message.substring(0, 500),
-      status: 'error',
-      fields: [],
-      timestamp: new Date().toISOString(),
-    });
+    const errorMsg = handleWorkerError(error, log, { vodId, jobId: job.id, platform, dbId, tenantId });
+    await updateAlert(messageId, alerts.error(vodId, errorMsg));
     throw error;
   }
 };
-
-// --- Helpers ---
-
-async function convertToMp4(vodId: string, downloadResult: { m3u8Path: string; outputDir: string }, finalMp4Path: string, log: ReturnType<typeof createAutoLogger>) {
-  const m3u8Content = await fs.readFile(downloadResult.m3u8Path, 'utf8');
-  const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
-
-  log.info(`[${vodId}] Converting ${isFmp4 ? 'fMP4' : 'TS'} segments to MP4`);
-
-  await convertHlsToMp4(downloadResult.m3u8Path, finalMp4Path, { vodId, isFmp4 });
-
-  log.info(`[${vodId}] Conversion complete`);
-}
 
 export default liveProcessor;

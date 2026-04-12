@@ -2,14 +2,15 @@ import { Processor, Job } from 'bullmq';
 import dayjs from '../utils/dayjs.js';
 
 import type { YoutubeUploadJob, YoutubeUploadResult, YoutubeVodUploadJob, YoutubeGameUploadJob } from './jobs/queues.js';
-import { splitVideo, trimVideo, getDuration, deleteFile } from '../utils/ffmpeg.js';
+import { splitVideo, trimVideo, getDuration, deleteFile } from './vod/ffmpeg.js';
 import { uploadVideo, linkParts } from '../services/youtube.js';
 import { initRichAlert, updateAlert, formatProgressMessage, resetFailures } from '../utils/discord-alerts.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { extractErrorDetails } from '../utils/error.js';
 import { toHHMMSS, capitalizePlatform } from '../utils/formatting.js';
 import { createYoutubeUploadProgressHandler } from '../utils/youtube-upload-progress.js';
 import { getJobContext } from './job-context.js';
+import { getEffectiveSplitDuration } from './youtube/validation.js';
+import { handleWorkerError } from './utils/error-handler.js';
 import { YOUTUBE_MAX_DURATION } from '../constants.js';
 
 type TenantConfig = NonNullable<Awaited<ReturnType<typeof getJobContext>>['config']>;
@@ -31,16 +32,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
       return await processGameUpload(job.data, config, db, vodId, log);
     }
   } catch (error) {
-    const details = extractErrorDetails(error);
-
-    log.error(
-      {
-        ...details,
-        vodId,
-        tenantId,
-      },
-      `YouTube upload failed for ${vodId}`
-    );
+    handleWorkerError(error, log, { vodId, tenantId, dbId, jobId: job.id });
 
     await db.vodUpload.updateMany({
       where: { vod_id: dbId },
@@ -441,14 +433,6 @@ async function processSplitGameUpload(
   resetFailures(tenantId);
 
   return { success: true, videos: uploadedGameVideos };
-}
-
-// ============== Helper Functions ==============
-
-function getEffectiveSplitDuration(splitDuration: number): number {
-  if (!splitDuration || splitDuration <= 0) return YOUTUBE_MAX_DURATION;
-  if (splitDuration > YOUTUBE_MAX_DURATION) return YOUTUBE_MAX_DURATION;
-  return splitDuration;
 }
 
 export default youtubeProcessor;

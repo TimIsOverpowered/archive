@@ -6,6 +6,10 @@ import { metaClient } from '../db/meta-client.js';
 import { toHHMMSS } from '../utils/formatting.js';
 import { PrismaClient } from '../../generated/streamer/client.js';
 import { childLogger } from '../utils/logger.js';
+import { stripTypename } from '../workers/chat/chat-helpers.js';
+import type { InputJsonValue } from '../../generated/streamer/internal/prismaNamespace.js';
+import { sendVodDownloadStarted, sendVodDownloadSuccess, sendVodDownloadFailed } from '../utils/discord-alerts.js';
+import { convertHlsToMp4, detectFmp4FromPlaylist } from '../workers/vod/ffmpeg.js';
 
 // Twitch API constants
 // Other GQL Client-Id 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp';
@@ -422,8 +426,33 @@ export interface TwitchVideoCommentResponse {
   comments: TwitchCommentsConnection | null;
 }
 
-import { sendVodDownloadStarted, sendVodDownloadSuccess, sendVodDownloadFailed } from '../utils/discord-alerts.js';
-import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
+/**
+ * Extracts message data from a Twitch chat node.
+ * Cleans fragments and handles user badges.
+ */
+export function extractMessageData(node: TwitchChatMessageNode | null | undefined): { message: InputJsonValue; userBadges?: InputJsonValue | undefined } {
+  if (!node || !node.message) {
+    return { message: { content: '', fragments: [] }, userBadges: undefined };
+  }
+
+  const rawFragments = node.message.fragments || [];
+  const cleanFragments = stripTypename(rawFragments);
+  const badgesRaw = node.message.userBadges ?? null;
+
+  return {
+    message: {
+      content: (Array.isArray(cleanFragments) ? cleanFragments : [])
+        .map((f: unknown) => {
+          if (typeof f !== 'object' || f === null) return '';
+          const text = (f as Record<string, unknown>).text;
+          return String(text ?? '');
+        })
+        .join(''),
+      fragments: Array.isArray(cleanFragments) ? cleanFragments.map((frag) => ({ ...frag })) : [],
+    },
+    userBadges: badgesRaw && typeof stripTypename(badgesRaw) === 'object' ? (stripTypename(badgesRaw) as InputJsonValue) : undefined,
+  };
+}
 
 /**
  * Download Twitch VOD directly to MP4 using ffmpeg HLS streaming
