@@ -6,9 +6,8 @@ import { initRichAlert, updateAlert, formatProgressMessage } from '../../utils/d
 import { toHHMMSS } from '../../utils/formatting.js';
 import { getEffectiveSplitDuration } from './validation.js';
 import { buildYoutubeMetadata } from './metadata-builder.js';
-import { createVodUploadProgressHandler } from './progress-handlers.js';
-
-type TenantConfig = NonNullable<ReturnType<typeof import('../../workers/job-context.js').getJobContext> extends Promise<infer T> ? T : never>['config'];
+import { createYoutubeUploadProgressHandler as createVodUploadProgressHandler } from '../../utils/youtube-upload-progress.js';
+import type { TenantConfig } from '../../config/types.js';
 
 export interface VodUploadContext {
   tenantId: string;
@@ -16,7 +15,7 @@ export interface VodUploadContext {
   vodId: string;
   filePath: string;
   db: PrismaClient;
-  config: NonNullable<TenantConfig>;
+  config: TenantConfig;
   vodRecord: {
     platform: string;
     created_at: Date;
@@ -140,6 +139,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
     const onUploadProgress = uploadAlertMessageId
       ? createVodUploadProgressHandler({
           messageId: uploadAlertMessageId,
+          type: 'vod',
           channelName,
           videoTitle: partTitle,
           part: currentPartNum,
@@ -207,6 +207,7 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
   const onUploadProgress = uploadAlertMessageId
     ? createVodUploadProgressHandler({
         messageId: uploadAlertMessageId,
+        type: 'vod',
         channelName,
         videoTitle: vodTitle,
       })

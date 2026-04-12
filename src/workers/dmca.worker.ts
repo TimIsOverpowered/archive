@@ -9,6 +9,8 @@ import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './job-context.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { ensureVodDownload } from '../api/routes/admin/utils/vod-helpers.js';
+import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
+import { createDmcaWorkerAlerts } from './utils/alert-factories.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
   const { tenantId, dbId, vodId, receivedClaims, type, platform, part } = job.data;
@@ -43,10 +45,15 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     type: job.data.type,
   });
 
+  const dmcaAlerts = createDmcaWorkerAlerts();
+  const blockingClaimsCount = receivedClaims.filter(isBlockingPolicy).length;
+  const messageId = await initRichAlert(dmcaAlerts.processing(vodId, blockingClaimsCount, part));
+
   const blockingClaims = receivedClaims.filter(isBlockingPolicy);
 
   if (blockingClaims.length === 0) {
     log.info({ vodId }, 'No blocking claims for VOD, uploading original');
+    await updateAlert(messageId, dmcaAlerts.complete(vodId, 'N/A'));
 
     return { success: true, message: 'No action needed' };
   }
@@ -123,10 +130,12 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     }
 
     log.info({ vodId, jobId }, 'YouTube upload job queued');
+    await updateAlert(messageId, dmcaAlerts.complete(vodId, jobId));
 
     return { success: true, youtubeJobId: jobId, vodId };
   } catch (error) {
-    handleWorkerError(error, log, { vodId, dbId, tenantId, jobId: job.id, platform });
+    const errorMsg = handleWorkerError(error, log, { vodId, dbId, tenantId, jobId: job.id, platform });
+    await updateAlert(messageId, dmcaAlerts.error(vodId, errorMsg));
 
     throw error;
   } finally {

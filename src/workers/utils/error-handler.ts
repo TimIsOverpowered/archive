@@ -44,26 +44,3 @@ export function handleWorkerError(error: unknown, log: AppLogger, context: Worke
 
   return errorMsg;
 }
-
-/**
- * Creates a standardized try-catch wrapper for worker operations.
- *
- * @param operation - Async operation to execute
- * @param log - Logger instance
- * @param context - Error context
- * @param onError - Optional callback for error handling (e.g., update alert)
- * @returns Promise that resolves on success or throws with formatted error
- */
-export async function tryWorkerOperation<T>(operation: () => Promise<T>, log: AppLogger, context: WorkerErrorContext, onError?: (errorMsg: string) => Promise<void> | void): Promise<T> {
-  try {
-    return await operation();
-  } catch (error) {
-    const errorMsg = handleWorkerError(error, log, context);
-
-    if (onError) {
-      await onError(errorMsg);
-    }
-
-    throw error;
-  }
-}

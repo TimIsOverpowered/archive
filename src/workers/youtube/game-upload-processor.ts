@@ -4,10 +4,9 @@ import { trimVideo, splitVideo, getDuration, deleteFile } from '../vod/ffmpeg.js
 import { uploadVideo } from '../../services/youtube.js';
 import { initRichAlert, updateAlert, formatProgressMessage } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
-import { createGameUploadProgressHandler } from './progress-handlers.js';
+import { createYoutubeUploadProgressHandler as createGameUploadProgressHandler } from '../../utils/youtube-upload-progress.js';
 import { YOUTUBE_MAX_DURATION } from '../../constants.js';
-
-type TenantConfig = NonNullable<ReturnType<typeof import('../../workers/job-context.js').getJobContext> extends Promise<infer T> ? T : never>['config'];
+import type { TenantConfig } from '../../config/types.js';
 
 export interface GameUploadContext {
   tenantId: string;
@@ -21,7 +20,7 @@ export interface GameUploadContext {
   title: string;
   description: string;
   db: PrismaClient;
-  config: NonNullable<TenantConfig>;
+  config: TenantConfig;
   log: AppLogger;
 }
 
@@ -63,6 +62,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
   const onUploadProgress = uploadAlertMessageId
     ? createGameUploadProgressHandler({
         messageId: uploadAlertMessageId,
+        type: 'game',
         channelName,
         gameName: chapterName,
       })
@@ -139,6 +139,7 @@ async function processSplitGameUpload(ctx: GameUploadContext, trimmedPath: strin
     const onUploadProgress = uploadAlertMessageId
       ? createGameUploadProgressHandler({
           messageId: uploadAlertMessageId,
+          type: 'game',
           channelName: config.displayName || tenantId,
           gameName: chapterName,
           videoTitle: partTitle,

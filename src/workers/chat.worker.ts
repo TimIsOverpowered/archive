@@ -10,8 +10,8 @@ import { extractEdges, calculateResumeOffset } from './chat/chat-helpers.js';
 import type { ChatMessageCreateInput } from './chat/chat-types.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { flushChatBatch } from './chat/chat-batch-processor.js';
-import { createChatAlertHandler } from './chat/chat-alert-handler.js';
 import { createChatWorkerAlerts } from './utils/alert-factories.js';
+import { updateAlert } from '../utils/discord-alerts.js';
 
 const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job: Job<ChatDownloadJob>): Promise<ChatDownloadResult> => {
   const { tenantId, dbId, vodId, platform, duration, startOffset } = job.data;
@@ -33,8 +33,6 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
   const chatAlerts = createChatWorkerAlerts();
   const isResume = hasExistingData && !startOffset;
   const messageId = await initRichAlert(chatAlerts.init(tenantId, vodId, platform, isResume, isResume ? effectiveOffset : undefined));
-
-  const alerts = createChatAlertHandler({ messageId, tenantId, vodId, platform, duration });
 
   let totalMessages = 0;
   let batchCount = 0;
@@ -66,7 +64,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
       if (edges.length === 0) {
         log.warn({ vodId, effectiveOffset }, 'No chat messages found for VOD');
         resetFailures(tenantId);
-        alerts.noMessages();
+        void updateAlert(messageId, chatAlerts.noMessages(tenantId, vodId, platform, effectiveOffset));
         return { success: true, totalMessages: 0 };
       }
 
@@ -97,7 +95,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
           buffer: batchBuffer,
           log,
           vodId,
-          onProgress: (offset, batchNumber, messagesInBatch) => alerts.updateProgress(offset, batchNumber, messagesInBatch, totalMessages),
+          onProgress: (offset, batchNumber, messagesInBatch) => void updateAlert(messageId, chatAlerts.progress(tenantId, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)),
           lastOffset,
           totalMessages,
           batchCount,
@@ -124,7 +122,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
         buffer: batchBuffer,
         log,
         vodId,
-        onProgress: (offset, batchNumber, messagesInBatch) => alerts.updateProgress(offset, batchNumber, messagesInBatch, totalMessages),
+        onProgress: (offset, batchNumber, messagesInBatch) => void updateAlert(messageId, chatAlerts.progress(tenantId, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)),
         lastOffset,
         totalMessages,
         batchCount,
@@ -137,12 +135,12 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
     log.debug({ vodId, totalMessages, batchCount, finalOffset: lastOffset }, '[Chat] Download completed successfully');
 
     const resumeIndicator = startOffset || hasExistingData;
-    alerts.complete(totalMessages, batchCount, resumeIndicator ? (startOffset ?? 0) : undefined);
+    void updateAlert(messageId, chatAlerts.complete(tenantId, vodId, platform, totalMessages, batchCount, resumeIndicator ? (startOffset ?? 0) : undefined));
 
     return { success: true, totalMessages };
   } catch (error) {
     const errorMsg = handleWorkerError(error, log, { vodId, platform, dbId, tenantId, jobId: job.id });
-    alerts.error(totalMessages, errorMsg);
+    void updateAlert(messageId, chatAlerts.error(tenantId, vodId, platform, totalMessages, errorMsg));
     throw error;
   }
 };

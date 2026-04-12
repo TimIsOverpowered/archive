@@ -24,12 +24,14 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
       return await processGameUploadJob(job.data, config, db, log);
     }
   } catch (error) {
-    handleWorkerError(error, log, { vodId, tenantId, dbId, jobId: job.id });
+    const errorMsg = handleWorkerError(error, log, { vodId, tenantId, dbId, jobId: job.id });
 
     await db.vodUpload.updateMany({
       where: { vod_id: dbId },
       data: { status: 'FAILED' },
     });
+
+    log.warn({ vodId, errorMsg }, 'YouTube upload job failed');
 
     throw error;
   }

@@ -96,7 +96,8 @@ export async function getWorkersHealth(): Promise<Record<string, WorkerHealthSta
       const counts = await queue.getJobCounts();
       const lastFailed = await getLastFailedJob(queue);
 
-      const isRunningVal = typeof workers.get(name)?.isRunning === 'function' ? (workers.get(name)!.isRunning as unknown as () => boolean)() : !!(workers.get(name)?.isRunning ?? false);
+      const workerInstance = workers.get(name);
+      const isRunningVal = typeof workerInstance?.isRunning === 'function' ? workerInstance.isRunning() : !!(workerInstance?.isRunning ?? false);
 
       let status: 'healthy' | 'warning' | 'error' = 'healthy';
 
