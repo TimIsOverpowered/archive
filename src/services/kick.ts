@@ -6,7 +6,7 @@ import durationPlugin from 'dayjs/plugin/duration';
 import { extractErrorDetails, createErrorContext } from '../utils/error.js';
 import { sleep } from '../utils/delay.js';
 import { sendVodDownloadStarted, sendVodDownloadSuccess, sendVodDownloadFailed } from '../utils/discord-alerts.js';
-import { convertHlsToMp4 } from '../utils/ffmpeg.js';
+import { convertHlsToMp4 } from '../workers/vod/ffmpeg.js';
 import { childLogger } from '../utils/logger.js';
 import { getTenantConfig } from '../config/loader.js';
 import { toHHMMSS } from '../utils/formatting.js';

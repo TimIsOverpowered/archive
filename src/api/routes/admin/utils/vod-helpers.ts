@@ -4,7 +4,7 @@ import { getClient } from '../../../../db/client.js';
 import type { VodData as TwitchVodData } from '../../../../services/twitch.js';
 import type { KickVod } from '../../../../services/kick.js';
 import { getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
-import { getDuration } from '../../../../utils/ffmpeg.js';
+import { getDuration } from '../../../../workers/vod/ffmpeg.js';
 import { getStandardVodQueue, type StandardVodJob } from '../../../../workers/jobs/queues.js';
 import { createAutoLogger } from '../../../../utils/auto-tenant-logger.js';
 import type { VodRecord } from '../../../../types/db.js';
