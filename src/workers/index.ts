@@ -9,8 +9,10 @@ import { startMonitorService, stopMonitorService } from './monitor/index.js';
 import { logger as baseLogger } from '../utils/logger.js';
 import { AllJobData, WORKER_DEFINITIONS, WorkerName } from './worker-definitions.js';
 import { createWorker } from './create-worker.js';
+import { loadWorkersConfig } from '../config/env.js';
 
 const logger = baseLogger;
+const workerConfig = loadWorkersConfig();
 
 interface LastFailedJob {
   jobId: string;
@@ -35,7 +37,7 @@ export function registerWorker(name: WorkerName, worker: Worker<Record<string, u
 }
 
 async function clearAllJobsOnStartup() {
-  if (process.env.CLEAR_QUEUES_ON_STARTUP !== 'true') return;
+  if (!workerConfig.CLEAR_QUEUES_ON_STARTUP) return;
 
   logger.warn('[Queues] CLEAR_QUEUES_ON_STARTUP=true — all queued jobs will be permanently deleted');
 
@@ -147,7 +149,7 @@ async function waitForWorkersReady(workers: Worker[]): Promise<void> {
 }
 
 async function bootstrap() {
-  logger.info(`Starting worker process (NODE_ENV: ${process.env.NODE_ENV})`);
+  logger.info(`Starting worker process (NODE_ENV: ${workerConfig.NODE_ENV})`);
 
   try {
     await loadTenantConfigs();
