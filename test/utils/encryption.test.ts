@@ -32,6 +32,10 @@ describe('Encryption', () => {
       expect(validateEncryptionKey('0123456789abcdef0123456789abcdefg')).to.be.false;
     });
 
+    it('should reject key with correct length but invalid hex characters', () => {
+      expect(validateEncryptionKey('z'.repeat(64))).to.be.false;
+    });
+
     it('should reject empty key', () => {
       expect(validateEncryptionKey('')).to.be.false;
     });

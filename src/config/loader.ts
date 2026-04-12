@@ -1,10 +1,10 @@
 import { metaClient } from '../db/meta-client';
 import { decryptScalar } from '../utils/encryption';
-import { SettingsSchema, YoutubeSchema } from './schemas';
+import { SettingsSchema, YoutubeSchema, TwitchSchema, KickSchema } from './schemas';
 import { TenantConfig } from './types';
 import type { JsonObject } from '@prisma/client/runtime/client';
 
-export const configCache = new Map<string, TenantConfig>();
+const configCache = new Map<string, TenantConfig>();
 
 export async function loadTenantConfigs(): Promise<TenantConfig[]> {
   const tenants = await metaClient.tenant.findMany();
@@ -31,23 +31,7 @@ export async function loadTenantConfigs(): Promise<TenantConfig[]> {
     };
 
     if (tenant.twitch && typeof tenant.twitch === 'object') {
-      const twitch = tenant.twitch as JsonObject;
-
-      tenantConfig.twitch = { enabled: (twitch.enabled ?? false) as boolean };
-
-      if ('auth' in twitch && twitch.auth) {
-        tenantConfig.twitch.auth = twitch.auth as string;
-      }
-
-      if ('username' in twitch && twitch.username) {
-        tenantConfig.twitch.username = twitch.username as string;
-      }
-
-      if ('id' in twitch && twitch.id) {
-        tenantConfig.twitch.id = String(twitch.id);
-      }
-
-      tenantConfig.twitch.mainPlatform = (twitch.mainPlatform ?? false) as boolean;
+      tenantConfig.twitch = TwitchSchema.parse(tenant.twitch);
     }
 
     if (tenant.youtube && typeof tenant.youtube === 'object') {
@@ -67,19 +51,7 @@ export async function loadTenantConfigs(): Promise<TenantConfig[]> {
     }
 
     if (tenant.kick && typeof tenant.kick === 'object') {
-      const kick = tenant.kick as JsonObject;
-
-      tenantConfig.kick = { enabled: (kick.enabled ?? false) as boolean };
-
-      if ('id' in kick && kick.id) {
-        tenantConfig.kick.id = kick.id as string;
-      }
-
-      if ('username' in kick && kick.username) {
-        tenantConfig.kick.username = kick.username as string;
-      }
-
-      tenantConfig.kick.mainPlatform = (kick.mainPlatform ?? false) as boolean;
+      tenantConfig.kick = KickSchema.parse(tenant.kick);
     }
 
     configCache.set(tenantConfig.id, tenantConfig);
@@ -103,4 +75,22 @@ export function getConfigs(): TenantConfig[] {
 export function getTenantDisplayName(tenantId: string): string {
   const config = configCache.get(tenantId);
   return config?.displayName || tenantId; // fallback to ID if somehow not found
+}
+
+export function updateTenantTwitchAuth(tenantId: string, encryptedAuth: string): void {
+  const config = configCache.get(tenantId);
+  if (!config?.twitch?.auth) return;
+  configCache.set(tenantId, {
+    ...config,
+    twitch: { ...config.twitch, auth: encryptedAuth },
+  });
+}
+
+export function updateTenantYoutubeAuth(tenantId: string, encryptedAuth: string): void {
+  const config = configCache.get(tenantId);
+  if (!config?.youtube?.auth) return;
+  configCache.set(tenantId, {
+    ...config,
+    youtube: { ...config.youtube, auth: encryptedAuth },
+  });
 }

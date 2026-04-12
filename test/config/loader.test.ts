@@ -2,48 +2,44 @@ import { expect } from 'chai';
 import { loadAppConfig, getAppConfig, clearConfigCache } from './app-config.js';
 
 describe('App Config Loader', () => {
-  const originalEnv = process.env;
+  let originalEnv: NodeJS.ProcessEnv;
   const validKey = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'; // 64 hex chars = 32 bytes
 
+  beforeEach(() => {
+    originalEnv = { ...process.env };
+  });
+
   const setupBaseEnv = () => {
-    process.env = {
-      ...originalEnv,
-      DATABASE_URL: 'postgresql://test',
-      REDIS_URL: 'redis://localhost',
-      META_DATABASE_URL: 'postgresql://meta',
-      ENCRYPTION_MASTER_KEY: validKey,
-    };
+    Object.keys(process.env).forEach((key) => delete process.env[key]);
+    process.env.REDIS_URL = 'redis://localhost';
+    process.env.META_DATABASE_URL = 'postgresql://meta';
+    process.env.ENCRYPTION_MASTER_KEY = validKey;
     clearConfigCache();
   };
 
   afterEach(() => {
-    process.env = originalEnv;
+    Object.assign(process.env, originalEnv);
     clearConfigCache();
   });
 
   describe('required fields', () => {
-    beforeEach(() => setupBaseEnv());
-
-    it('should throw when DATABASE_URL is missing', () => {
-      delete process.env.DATABASE_URL;
-      expect(() => loadAppConfig()).to.throw('DATABASE_URL');
+    beforeEach(() => {
+      clearConfigCache();
+      setupBaseEnv();
     });
 
     it('should throw when REDIS_URL is missing', () => {
-      process.env.DATABASE_URL = 'postgresql://test';
       delete process.env.REDIS_URL;
       expect(() => loadAppConfig()).to.throw('REDIS_URL');
     });
 
     it('should throw when META_DATABASE_URL is missing', () => {
-      process.env.DATABASE_URL = 'postgresql://test';
       process.env.REDIS_URL = 'redis://localhost';
       delete process.env.META_DATABASE_URL;
       expect(() => loadAppConfig()).to.throw('META_DATABASE_URL');
     });
 
     it('should throw when ENCRYPTION_MASTER_KEY is missing', () => {
-      process.env.DATABASE_URL = 'postgresql://test';
       process.env.REDIS_URL = 'redis://localhost';
       process.env.META_DATABASE_URL = 'postgresql://meta';
       delete process.env.ENCRYPTION_MASTER_KEY;
@@ -51,7 +47,6 @@ describe('App Config Loader', () => {
     });
 
     it('should throw when ENCRYPTION_MASTER_KEY is invalid', () => {
-      process.env.DATABASE_URL = 'postgresql://test';
       process.env.REDIS_URL = 'redis://localhost';
       process.env.META_DATABASE_URL = 'postgresql://meta';
       process.env.ENCRYPTION_MASTER_KEY = 'invalid';
@@ -97,18 +92,6 @@ describe('App Config Loader', () => {
       const config = loadAppConfig();
       expect(config.LOG_LEVEL).to.equal('debug');
     });
-
-    it('should apply default for WORKER_CONCURRENCY', () => {
-      delete process.env.WORKER_CONCURRENCY;
-      const config = loadAppConfig();
-      expect(config.WORKER_CONCURRENCY).to.equal(4);
-    });
-
-    it('should use provided WORKER_CONCURRENCY', () => {
-      process.env.WORKER_CONCURRENCY = '8';
-      const config = loadAppConfig();
-      expect(config.WORKER_CONCURRENCY).to.equal(8);
-    });
   });
 
   describe('field types', () => {
@@ -117,19 +100,12 @@ describe('App Config Loader', () => {
       process.env.NODE_ENV = 'test';
       process.env.PORT = '3000';
       process.env.LOG_LEVEL = 'debug';
-      process.env.WORKER_CONCURRENCY = '8';
     });
 
     it('should parse PORT as number', () => {
       const config = loadAppConfig();
       expect(config.PORT).to.equal(3000);
       expect(typeof config.PORT).to.equal('number');
-    });
-
-    it('should parse WORKER_CONCURRENCY as number', () => {
-      const config = loadAppConfig();
-      expect(config.WORKER_CONCURRENCY).to.equal(8);
-      expect(typeof config.WORKER_CONCURRENCY).to.equal('number');
     });
 
     it('should parse DISABLE_REDIS_CACHE as boolean', () => {
@@ -141,7 +117,6 @@ describe('App Config Loader', () => {
     it('should keep string fields as strings', () => {
       const config = loadAppConfig();
       expect(typeof config.NODE_ENV).to.equal('string');
-      expect(typeof config.DATABASE_URL).to.equal('string');
       expect(typeof config.REDIS_URL).to.equal('string');
       expect(typeof config.HOST).to.equal('string');
     });

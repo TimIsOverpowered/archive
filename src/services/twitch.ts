@@ -1,6 +1,6 @@
 import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
 import { extractErrorDetails, createErrorContext, throwOnHttpError } from '../utils/error.js';
-import { getTenantConfig as getConfig, configCache } from '../config/loader.js';
+import { getTenantConfig as getConfig, updateTenantTwitchAuth } from '../config/loader.js';
 import { encryptObject, decryptObject } from '../utils/encryption.js';
 import { metaClient } from '../db/meta-client.js';
 import { toHHMMSS } from '../utils/formatting.js';
@@ -111,13 +111,7 @@ async function updateTwitchTokenInDb(tenantId: string, newToken: string, expiryD
     });
 
     // Update in-memory config cache
-    configCache.set(tenantId, {
-      ...config,
-      twitch: {
-        ...config.twitch,
-        auth: encryptedAuth,
-      },
-    });
+    updateTenantTwitchAuth(tenantId, encryptedAuth);
 
     log.info({ tenantId, expiry_date: expiryDate }, 'Updated Twitch token');
   } catch (err) {
