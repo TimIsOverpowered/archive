@@ -11,7 +11,6 @@ export interface LiveDownloadJob {
   platformUsername?: string;
   startedAt?: string;
   sourceUrl?: string;
-  uploadMode?: 'vod' | 'all';
 }
 
 export interface StandardVodJob {
@@ -39,24 +38,33 @@ export interface ChatDownloadJob {
   startOffset?: number;
 }
 
-export interface YoutubeUploadJob {
+export interface YoutubeVodUploadJob {
   tenantId: string;
   dbId: number;
   vodId: string;
   filePath: string;
-  title: string;
-  description: string;
-  type: 'vod' | 'game';
-  platform?: 'twitch' | 'kick';
-  part?: number;
-  chapter?: {
-    name: string;
-    start: number;
-    end: number;
-    gameId?: string;
-  };
+  type: 'vod';
+  platform: 'twitch' | 'kick';
   dmcaProcessed?: boolean;
 }
+
+export interface YoutubeGameUploadJob {
+  tenantId: string;
+  dbId: number;
+  vodId: string;
+  filePath: string;
+  type: 'game';
+  platform: 'twitch' | 'kick';
+  chapterId: number;
+  chapterName: string;
+  chapterStart: number;
+  chapterEnd: number;
+  chapterGameId?: string;
+  title: string;
+  description: string;
+}
+
+export type YoutubeUploadJob = YoutubeVodUploadJob | YoutubeGameUploadJob;
 
 export interface DmcaProcessingJob {
   tenantId: string;
@@ -82,12 +90,12 @@ export interface YoutubeUploadVodResult {
 export interface YoutubeUploadGameResult {
   success: true;
   videoId: string;
-  gameId?: string;
+  gameId: string;
 }
 
-export interface YoutubeUploadSplitGamesResult {
+export interface YoutubeUploadSplitGameResult {
   success: true;
-  videos: Array<{ id: string; part: number; startTime: number; endTime: number; gameId?: string }>;
+  videos: Array<{ id: string; part: number; startTime: number; endTime: number; gameId: string }>;
 }
 
 export interface YoutubeUploadSkippedResult {
@@ -95,7 +103,7 @@ export interface YoutubeUploadSkippedResult {
   skipped: boolean;
 }
 
-export type YoutubeUploadResult = YoutubeUploadVodResult | YoutubeUploadGameResult | YoutubeUploadSplitGamesResult | YoutubeUploadSkippedResult;
+export type YoutubeUploadResult = YoutubeUploadVodResult | YoutubeUploadGameResult | YoutubeUploadSplitGameResult | YoutubeUploadSkippedResult;
 
 export interface DmcaProcessingSuccessResult {
   success: true;

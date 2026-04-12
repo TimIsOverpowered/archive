@@ -58,7 +58,7 @@ export async function downloadStandardVod(options: StandardVodDownloadOptions): 
     await sendVodDownloadSuccess(messageId!, platform, vodId, finalPath, streamerName);
 
     if (uploadMode) {
-      //await queueYoutubeUpload(tenantId, dbId, vodId, finalPath, uploadMode, platform, log);
+      await queueYoutubeUploads(tenantId, dbId, vodId, finalPath, uploadMode, platform, config, log);
     }
 
     return { success: true, finalPath };
@@ -246,6 +246,39 @@ async function downloadWithHls(
           log.warn({ error: extractErrorDetails(error).message, vodId }, `Cleanup failed`);
         }
       }
+    }
+  }
+}
+
+async function queueYoutubeUploads(
+  tenantId: string,
+  dbId: number,
+  vodId: string,
+  filePath: string,
+  uploadMode: 'vod' | 'all',
+  platform: 'twitch' | 'kick',
+  config: ReturnType<typeof getTenantConfig>,
+  log: ReturnType<typeof loggerWithTenant>
+): Promise<void> {
+  const { queueYoutubeVodUpload, queueYoutubeGameUploadsForVod } = await import('../jobs/youtube.job.js');
+
+  // VOD Upload
+  if ((uploadMode === 'vod' || uploadMode === 'all') && config?.youtube?.vodUpload) {
+    try {
+      await queueYoutubeVodUpload(tenantId, dbId, vodId, filePath, platform);
+      log.info({ vodId }, 'Queued YouTube VOD upload');
+    } catch (error) {
+      log.warn({ error: (error as Error).message, vodId }, 'Failed to queue YouTube VOD upload');
+    }
+  }
+
+  // Game Uploads
+  if (uploadMode === 'all' && config?.youtube?.perGameUpload) {
+    try {
+      await queueYoutubeGameUploadsForVod(tenantId, dbId, vodId, filePath, platform);
+      log.info({ vodId }, 'Queued YouTube game uploads');
+    } catch (error) {
+      log.warn({ error: (error as Error).message, vodId }, 'Failed to queue YouTube game uploads');
     }
   }
 }
