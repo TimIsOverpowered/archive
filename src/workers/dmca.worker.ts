@@ -5,14 +5,14 @@ import { queueYoutubeVodUpload } from './jobs/youtube.job.js';
 import type { DMCAClaim } from '../utils/dmca.js';
 import { isBlockingPolicy, buildMuteFilters, muteAudioSections, blackoutVideoSections, cleanupTempFiles, BlackoutSection } from '../utils/dmca.js';
 import { trimVideo as ffmpegTrim } from './vod/ffmpeg.js';
-import { createAutoLogger as loggerWithTenant } from '../utils/auto-tenant-logger.js';
+import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './job-context.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { ensureVodDownload } from '../api/routes/admin/utils/vod-helpers.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
   const { tenantId, dbId, vodId, receivedClaims, type, platform, part } = job.data;
-  const log = loggerWithTenant(String(tenantId));
+  const log = createAutoLogger(String(tenantId));
 
   if (!receivedClaims || receivedClaims.length === 0) {
     log.warn({ vodId }, 'No claims to process for VOD');

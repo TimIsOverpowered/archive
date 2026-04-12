@@ -3,19 +3,9 @@
  * Each factory provides init, progress, complete, and error alert builders.
  */
 
-import { formatDuration as formatDurationSeconds } from '../../utils/formatting.js';
-
-type AlertStatus = 'success' | 'warning' | 'error';
-
-interface RichEmbedData {
-  title: string;
-  description?: string;
-  status: AlertStatus;
-  fields?: Array<{ name: string; value: string; inline?: boolean }>;
-  timestamp?: string;
-  updatedTimestamp?: string;
-  mention?: 'everyone' | 'here' | string;
-}
+import { formatDuration } from '../../utils/formatting.js';
+import type { RichEmbedData } from '../../utils/discord-alerts.js';
+import { createProgressBar } from '../../utils/discord-alerts.js';
 
 // ============================================================================
 // VOD Worker Alerts
@@ -116,7 +106,7 @@ export function createLiveWorkerAlerts(): LiveWorkerAlerts {
       title: `[Live] ${vodId} Complete`,
       description: 'Successfully processed',
       status: 'success',
-      fields: [{ name: 'Duration', value: duration ? formatDurationSeconds(duration) : 'Unknown', inline: true }],
+      fields: [{ name: 'Duration', value: duration ? formatDuration(duration) : 'Unknown', inline: true }],
       timestamp: new Date().toISOString(),
     }),
 
@@ -236,7 +226,7 @@ export function createYoutubeWorkerAlerts(): YoutubeWorkerAlerts {
       status: 'warning',
       fields: [
         { name: 'VOD ID', value: vodId, inline: true },
-        { name: 'Total Duration', value: formatDurationSeconds(duration), inline: true },
+        { name: 'Total Duration', value: formatDuration(duration), inline: true },
         { name: 'Parts Count', value: String(totalParts), inline: false },
       ],
       timestamp: new Date().toISOString(),
@@ -318,15 +308,4 @@ export function createDmcaWorkerAlerts(): DmcaWorkerAlerts {
       timestamp: new Date().toISOString(),
     }),
   };
-}
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-function createProgressBar(percent: number): string {
-  const bars = 20;
-  const filled = Math.round((percent / 100) * bars);
-  const empty = bars - filled;
-  return '█'.repeat(filled) + '░'.repeat(empty) + ` ${percent}%`;
 }
