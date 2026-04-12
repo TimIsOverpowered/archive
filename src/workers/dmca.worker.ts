@@ -6,13 +6,14 @@ import timezone from 'dayjs/plugin/timezone';
 dayjs.extend(utcPlugin);
 dayjs.extend(timezone);
 
-import type { DmcaProcessingJob, DmcaProcessingResult, YoutubeUploadJob, YoutubeVodUploadJob } from './jobs/queues.js';
+import type { DmcaProcessingJob, DmcaProcessingResult, YoutubeVodUploadJob } from './jobs/queues.js';
 import { getYoutubeUploadQueue } from './jobs/queues.js';
 import type { DMCAClaim } from '../utils/dmca.js';
 import { isBlockingPolicy, buildMuteFilters, muteAudioSections, blackoutVideoSections, cleanupTempFiles, BlackoutSection } from '../utils/dmca.js';
 import { trimVideo as ffmpegTrim } from '../utils/ffmpeg.js';
 import { createAutoLogger as loggerWithTenant } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './job-context.js';
+import { capitalizePlatform } from '../utils/formatting.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
   const { tenantId, dbId, vodId, receivedClaims, type, platform, part } = job.data;
@@ -124,16 +125,9 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       .tz(config.settings.timezone || 'UTC')
       .format('MMMM DD YYYY')
       .toUpperCase();
+    const platformName = capitalizePlatform(vodRecord.platform?.toString() || platform).toUpperCase();
 
-    const platformName = (vodRecord.platform?.toString() || platform).toUpperCase();
-
-    let baseTitle;
-    if (type === 'live') {
-      baseTitle = `${config.settings.domainName} ${platformName} LIVE VOD - ${dateStr}`;
-    } else {
-      baseTitle = `${config.settings.domainName} ${platformName} VOD - ${dateStr}`;
-    }
-
+    const baseTitle = `${config.settings.domainName} ${platformName}${type === 'live' ? ' LIVE' : ''} VOD - ${dateStr}`;
     const finalTitle = part ? `${baseTitle} PART ${part}` : baseTitle;
 
     log.info(`Queuing YouTube upload for ${finalTitle}`);

@@ -351,3 +351,34 @@ export async function sendVodDownloadFailed(messageId: string, platform: 'kick' 
     updatedTimestamp: new Date().toISOString(),
   });
 }
+
+// ============================================================================
+// Generic Alert Helper Functions
+// ============================================================================
+
+export interface AlertContext {
+  messageId: string | null;
+  enabled: boolean;
+}
+
+export function createAlertContext(): AlertContext {
+  return {
+    messageId: null,
+    enabled: isAlertsEnabled(),
+  };
+}
+
+export async function initRichAlert(data: RichEmbedData): Promise<string | null> {
+  if (!isAlertsEnabled()) return null;
+
+  try {
+    return await sendRichAlert(data);
+  } catch {
+    return null;
+  }
+}
+
+export async function updateAlert(messageId: string | null, data: RichEmbedData): Promise<void> {
+  if (!messageId || !isAlertsEnabled()) return;
+  await updateDiscordEmbed(messageId, data).catch(() => {});
+}
