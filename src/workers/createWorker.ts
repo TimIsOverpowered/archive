@@ -2,7 +2,7 @@
 import { Worker, BaseJobOptions } from 'bullmq';
 import { logger } from '../utils/logger.js';
 import { registerWorker } from './index.js';
-import { WorkerConfig } from './workerDefinitions.js';
+import { WorkerConfig } from './worker-definitions.js';
 import type { Redis } from 'ioredis';
 
 export function createWorker<TData extends object, TResult>(config: WorkerConfig<TData, TResult> & { connection: Redis }): Worker<TData, TResult> {
