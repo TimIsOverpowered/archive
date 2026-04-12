@@ -3,6 +3,8 @@
  * Each factory provides init, progress, complete, and error alert builders.
  */
 
+import { formatDuration as formatDurationSeconds } from '../../utils/formatting.js';
+
 type AlertStatus = 'success' | 'warning' | 'error';
 
 interface RichEmbedData {
@@ -114,7 +116,7 @@ export function createLiveWorkerAlerts(): LiveWorkerAlerts {
       title: `[Live] ${vodId} Complete`,
       description: 'Successfully processed',
       status: 'success',
-      fields: [{ name: 'Duration', value: duration ? formatDuration(duration) : 'Unknown', inline: true }],
+      fields: [{ name: 'Duration', value: duration ? formatDurationSeconds(duration) : 'Unknown', inline: true }],
       timestamp: new Date().toISOString(),
     }),
 
@@ -234,7 +236,7 @@ export function createYoutubeWorkerAlerts(): YoutubeWorkerAlerts {
       status: 'warning',
       fields: [
         { name: 'VOD ID', value: vodId, inline: true },
-        { name: 'Total Duration', value: formatDuration(duration), inline: true },
+        { name: 'Total Duration', value: formatDurationSeconds(duration), inline: true },
         { name: 'Parts Count', value: String(totalParts), inline: false },
       ],
       timestamp: new Date().toISOString(),
@@ -327,18 +329,4 @@ function createProgressBar(percent: number): string {
   const filled = Math.round((percent / 100) * bars);
   const empty = bars - filled;
   return '█'.repeat(filled) + '░'.repeat(empty) + ` ${percent}%`;
-}
-
-function formatDuration(seconds: number): string {
-  const hrs = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-
-  if (hrs > 0) {
-    return `${hrs}h ${mins}m ${secs}s`;
-  }
-  if (mins > 0) {
-    return `${mins}m ${secs}s`;
-  }
-  return `${secs}s`;
 }

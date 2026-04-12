@@ -150,7 +150,6 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
   const queue = getStandardVodQueue();
   const jobData: StandardVodJob = {
     tenantId,
-    platformUserId,
     dbId,
     vodId,
     platform,

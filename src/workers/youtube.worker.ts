@@ -1,5 +1,4 @@
 import { Processor, Job } from 'bullmq';
-import dayjs from '../utils/dayjs.js';
 
 import type { YoutubeUploadJob, YoutubeUploadResult, YoutubeVodUploadJob, YoutubeGameUploadJob } from './jobs/queues.js';
 import { splitVideo, trimVideo, getDuration, deleteFile } from './vod/ffmpeg.js';
@@ -7,11 +6,12 @@ import { uploadVideo, linkParts } from '../services/youtube.js';
 import { initRichAlert, updateAlert, formatProgressMessage, resetFailures } from '../utils/discord-alerts.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { toHHMMSS, capitalizePlatform } from '../utils/formatting.js';
-import { createYoutubeUploadProgressHandler } from '../utils/youtube-upload-progress.js';
 import { getJobContext } from './job-context.js';
 import { getEffectiveSplitDuration } from './youtube/validation.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { YOUTUBE_MAX_DURATION } from '../constants.js';
+import { buildYoutubeMetadata } from './youtube/metadata-builder.js';
+import { createVodUploadProgressHandler, createGameUploadProgressHandler } from './youtube/progress-handlers.js';
 
 type TenantConfig = NonNullable<Awaited<ReturnType<typeof getJobContext>>['config']>;
 
@@ -27,7 +27,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
   try {
     if (type === 'vod') {
-      return await processVodUpload(job.data, config, db, vodId, log);
+      return await processVodUpload(job.data, config, db, vodId, log, type);
     } else {
       return await processGameUpload(job.data, config, db, vodId, log);
     }
@@ -50,7 +50,8 @@ async function processVodUpload(
   config: NonNullable<TenantConfig>,
   db: Awaited<ReturnType<typeof getJobContext>>['db'],
   vodId: string,
-  log: ReturnType<typeof createAutoLogger>
+  log: ReturnType<typeof createAutoLogger>,
+  type: 'vod' | 'live'
 ): Promise<Extract<YoutubeUploadResult, { videos: Array<{ id: string; part: number }> }>> {
   const { tenantId, dbId, filePath, dmcaProcessed } = job;
   const vodRecord = await db.vod.findUnique({ where: { id: dbId } });
@@ -63,10 +64,6 @@ async function processVodUpload(
 
   const channelName = config.displayName || tenantId;
   const platformName = capitalizePlatform(vodRecord.platform);
-  const dateFormatted = dayjs(vodRecord.created_at)
-    .tz(config.settings?.timezone || 'UTC')
-    .format('MMMM DD YYYY')
-    .toUpperCase();
   const vodStreamTitle = vodRecord.title ? vodRecord.title.replace(/>|</gi, '') : '';
   const domainName = config.settings?.domainName || 'localhost';
 
@@ -74,12 +71,11 @@ async function processVodUpload(
   const uploadedVideos: Array<{ id: string; part: number }> = [];
 
   if (needsSplitting) {
-    log.info({ duration: duration, parts: Math.ceil(duration / splitDuration) }, `Vod exceeds YouTube split duration, auto-splitting`);
+    log.info({ duration, parts: Math.ceil(duration / splitDuration) }, 'VOD exceeds YouTube split duration, auto-splitting');
     const totalParts = Math.ceil(duration / splitDuration);
 
-    // Create splitting progress alert
     const splitAlertMessageId = await initRichAlert({
-      title: `📺 VOD Splitting in Progress`,
+      title: '📺 VOD Splitting in Progress',
       description: `${tenantId} - Preparing ${totalParts} parts...`,
       status: 'warning',
       fields: [
@@ -92,7 +88,7 @@ async function processVodUpload(
 
     const parts = await splitVideo(filePath, duration, splitDuration, vodId, (percent: number) => {
       void updateAlert(splitAlertMessageId, {
-        title: `📺 Splitting VOD`,
+        title: '📺 Splitting VOD',
         description: `${tenantId} - Preparing video parts for upload`,
         status: 'warning',
         fields: [{ name: 'Progress', value: formatProgressMessage('VOD Splitting', tenantId, percent), inline: false }],
@@ -116,26 +112,31 @@ async function processVodUpload(
         timestamp: new Date().toISOString(),
       });
 
-      const partTitle = `${channelName} ${platformName} VOD - ${dateFormatted}${i > 0 ? ` PART ${i + 1}` : ''}`;
-      const youtubeDescription = `Chat Replay: https://${domainName}/youtube/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube!.description || ''}`;
+      const { title: partTitle, description: youtubeDescription } = buildYoutubeMetadata({
+        channelName,
+        platform: vodRecord.platform,
+        vodDate: vodRecord.created_at,
+        vodTitle: vodStreamTitle,
+        domainName,
+        timezone: config.settings?.timezone || 'UTC',
+        youtubeDescription: config.youtube!.description,
+        part: i > 0 ? i + 1 : undefined,
+        type: type as 'vod' | 'live',
+      });
 
-      let result;
-      try {
-        const onUploadProgress = createYoutubeUploadProgressHandler({
-          messageId: uploadAlertMessageId,
-          type: 'vod',
-          channelName,
-          videoTitle: partTitle,
-          part: currentPartNum,
-          totalParts,
-        });
+      const onUploadProgress = uploadAlertMessageId
+        ? createVodUploadProgressHandler({
+            messageId: uploadAlertMessageId,
+            channelName,
+            videoTitle: partTitle,
+            part: currentPartNum,
+            totalParts,
+          })
+        : () => {};
 
-        result = await uploadVideo(tenantId, channelName, parts[i], partTitle, youtubeDescription, privacyStatus, onUploadProgress);
+      const result = await uploadVideo(tenantId, channelName, parts[i], partTitle, youtubeDescription, privacyStatus, onUploadProgress);
 
-        uploadedVideos.push({ id: result.videoId, part: i + 1 });
-      } catch (error) {
-        throw error;
-      }
+      uploadedVideos.push({ id: result.videoId, part: i + 1 });
 
       if (!config.settings.saveMP4) {
         await deleteFile(parts[i]);
@@ -155,11 +156,19 @@ async function processVodUpload(
       updatedTimestamp: new Date().toISOString(),
     });
   } else {
-    const vodTitle = `${channelName} ${platformName} VOD - ${dateFormatted}`;
-    const youtubeDescription = `Chat Replay: https://${domainName}/youtube/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube!.description || ''}`;
+    const { title: vodTitle, description: youtubeDescription } = buildYoutubeMetadata({
+      channelName,
+      platform: vodRecord.platform,
+      vodDate: vodRecord.created_at,
+      vodTitle: vodStreamTitle,
+      domainName,
+      timezone: config.settings?.timezone || 'UTC',
+      youtubeDescription: config.youtube!.description,
+      type: type as 'vod' | 'live',
+    });
 
     const uploadAlertMessageId = await initRichAlert({
-      title: `📺 YouTube Upload Started`,
+      title: '📺 YouTube Upload Started',
       description: `${tenantId} - Uploading VOD to YouTube...`,
       status: 'warning',
       fields: [
@@ -169,20 +178,15 @@ async function processVodUpload(
       timestamp: new Date().toISOString(),
     });
 
-    const result = await uploadVideo(
-      tenantId,
-      channelName,
-      filePath,
-      vodTitle,
-      youtubeDescription,
-      privacyStatus,
-      createYoutubeUploadProgressHandler({
-        messageId: uploadAlertMessageId,
-        type: 'vod',
-        channelName,
-        videoTitle: vodTitle,
-      })
-    );
+    const onUploadProgress = uploadAlertMessageId
+      ? createVodUploadProgressHandler({
+          messageId: uploadAlertMessageId,
+          channelName,
+          videoTitle: vodTitle,
+        })
+      : () => {};
+
+    const result = await uploadVideo(tenantId, channelName, filePath, vodTitle, youtubeDescription, privacyStatus, onUploadProgress);
 
     uploadedVideos.push({ id: result.videoId, part: 1 });
 
@@ -271,7 +275,7 @@ async function processSingleGameUpload(
 
   // Send initial upload alert for single game uploads (non-split)
   const uploadAlertMessageId = await initRichAlert({
-    title: `🎮 Game Upload Started`,
+    title: '🎮 Game Upload Started',
     description: `${tenantId} - Uploading game clip to YouTube...`,
     status: 'warning',
     fields: [
@@ -281,20 +285,15 @@ async function processSingleGameUpload(
     timestamp: new Date().toISOString(),
   });
 
-  const result = await uploadVideo(
-    tenantId,
-    channelName,
-    trimmedPath,
-    title,
-    description,
-    'public',
-    createYoutubeUploadProgressHandler({
-      messageId: uploadAlertMessageId,
-      type: 'game',
-      channelName,
-      gameName: job.chapterName,
-    })
-  );
+  const onUploadProgress = uploadAlertMessageId
+    ? createGameUploadProgressHandler({
+        messageId: uploadAlertMessageId,
+        channelName,
+        gameName: job.chapterName,
+      })
+    : () => {};
+
+  const result = await uploadVideo(tenantId, channelName, trimmedPath, title, description, 'public', onUploadProgress);
 
   const createdGameRecord = await db.game.create({
     data: {
@@ -375,15 +374,16 @@ async function processSplitGameUpload(
 
     let result;
     try {
-      const onUploadProgress = createYoutubeUploadProgressHandler({
-        messageId: uploadAlertMessageId,
-        type: 'game',
-        channelName: config.displayName || tenantId,
-        videoTitle: partTitle,
-        gameName: job.chapterName,
-        part: currentPartNum,
-        totalParts,
-      });
+      const onUploadProgress = uploadAlertMessageId
+        ? createGameUploadProgressHandler({
+            messageId: uploadAlertMessageId,
+            channelName: config.displayName || tenantId,
+            gameName: job.chapterName,
+            videoTitle: partTitle,
+            part: currentPartNum,
+            totalParts,
+          })
+        : () => {};
 
       result = await uploadVideo(tenantId, config.displayName || tenantId, splitPaths[i], partTitle, job.description, 'public', onUploadProgress);
 

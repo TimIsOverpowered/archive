@@ -131,11 +131,7 @@ async function downloadWithHls(
 
   const shouldKeepHls = config?.settings.saveHLS ?? false;
 
-  if (!shouldKeepHls) {
-    await cleanupHlsFiles(result.outputDir, shouldKeepHls, log);
-  } else {
-    log.info({ vodId }, `HLS files preserved in ${result.outputDir} (saveHLS=true)`);
-  }
+  await cleanupHlsFiles(result.outputDir, shouldKeepHls, log);
 }
 
 async function getKickSourceUrl(config: NonNullable<Awaited<ReturnType<typeof getJobContext>>['config']>, vodId: string): Promise<string | undefined> {

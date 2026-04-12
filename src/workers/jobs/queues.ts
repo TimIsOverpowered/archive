@@ -15,20 +15,16 @@ export interface LiveDownloadJob {
 
 export interface StandardVodJob {
   tenantId: string;
-  platformUserId: string;
-  platformUsername?: string;
   dbId: number;
   vodId: string;
   platform: 'twitch' | 'kick';
-  externalVodId?: string;
   downloadMethod?: 'ffmpeg' | 'hls';
-  uploadAfterDownload?: boolean;
   uploadMode?: 'vod' | 'all';
 }
 
 export interface ChatDownloadJob {
   tenantId: string;
-  platformUserId: string;
+  platformUserId?: string;
   platformUsername?: string;
   dbId: number;
   vodId: string;
