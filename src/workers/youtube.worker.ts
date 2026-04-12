@@ -10,15 +10,13 @@ import { uploadVideo, linkParts } from '../services/youtube.js';
 import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/discord-alerts.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../utils/error.js';
-import { toHHMMSS } from '../utils/formatting.js';
+import { toHHMMSS, capitalizePlatform } from '../utils/formatting.js';
 import { createYoutubeUploadProgressHandler } from '../utils/youtube-upload-progress.js';
 import { getJobContext } from './job-context.js';
-import { getTenantConfig } from '../config/loader.js';
 
 const YOUTUBE_MAX_DURATION = 43199; // YouTube hard limit: 12 hours - 1 second (720 minutes)
 
-type TenantConfig = ReturnType<typeof getTenantConfig>;
-type DbClient = ReturnType<Awaited<ReturnType<typeof getJobContext>>['db']['vod']['findUnique']>;
+type TenantConfig = NonNullable<Awaited<ReturnType<typeof getJobContext>>['config']>;
 
 const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async (job: Job<YoutubeUploadJob>) => {
   const { tenantId, dbId, vodId, type } = job.data;
@@ -62,7 +60,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 async function processVodUpload(
   job: YoutubeVodUploadJob,
   config: NonNullable<TenantConfig>,
-  db: any,
+  db: Awaited<ReturnType<typeof getJobContext>>['db'],
   vodId: string,
   log: ReturnType<typeof createAutoLogger>
 ): Promise<Extract<YoutubeUploadResult, { videos: Array<{ id: string; part: number }> }>> {
@@ -76,8 +74,11 @@ async function processVodUpload(
   const duration = (await getDuration(filePath)) ?? 0;
 
   const channelName = config.displayName || tenantId;
-  const platformName = vodRecord.platform.charAt(0).toUpperCase() + vodRecord.platform.slice(1);
-  const dateFormatted = formatVodDate(vodRecord.created_at, config);
+  const platformName = capitalizePlatform(vodRecord.platform);
+  const dateFormatted = dayjs(vodRecord.created_at)
+    .tz(config.settings?.timezone || 'UTC')
+    .format('MMMM DD YYYY')
+    .toUpperCase();
   const vodStreamTitle = vodRecord.title ? vodRecord.title.replace(/>|</gi, '') : '';
   const domainName = config.settings?.domainName || 'localhost';
 
@@ -85,6 +86,7 @@ async function processVodUpload(
   const uploadedVideos: Array<{ id: string; part: number }> = [];
 
   if (needsSplitting) {
+    log.info({ duration: duration, parts: Math.ceil(duration / splitDuration) }, `Vod exceeds YouTube split duration, auto-splitting`);
     const totalParts = Math.ceil(duration / splitDuration);
 
     // Create splitting progress alert
@@ -242,11 +244,11 @@ async function processVodUpload(
 async function processGameUpload(
   job: YoutubeGameUploadJob,
   config: NonNullable<TenantConfig>,
-  db: any,
+  db: Awaited<ReturnType<typeof getJobContext>>['db'],
   vodId: string,
   log: ReturnType<typeof createAutoLogger>
 ): Promise<Extract<YoutubeUploadResult, { videoId: string } | { videos: Array<{ id: string; part: number; startTime: number; endTime: number; gameId: string }> }>> {
-  const { tenantId, dbId, filePath, platform, chapterName, chapterStart, chapterEnd, chapterGameId, title, description } = job;
+  const { tenantId, dbId, filePath, platform, chapterName, chapterStart, chapterEnd } = job;
 
   const hasTwitch = config.twitch?.enabled === true;
   const hasKick = config.kick?.enabled === true;
@@ -276,9 +278,9 @@ async function processGameUpload(
   if (gameExceedsYoutubeMax) {
     log.info({ duration: trimmedDuration, parts: Math.ceil(trimmedDuration / YOUTUBE_MAX_DURATION) }, `Game clip exceeds YouTube max duration, auto-splitting`);
 
-    return await processSplitGameUpload(job, trimmedPath, trimmedDuration, config, db, vodId, log);
+    return await processSplitGameUpload(job, trimmedPath, trimmedDuration, config, db, vodId);
   } else {
-    return await processSingleGameUpload(job, trimmedPath, config, db, vodId, log);
+    return await processSingleGameUpload(job, trimmedPath, config, db, vodId);
   }
 }
 
@@ -286,9 +288,8 @@ async function processSingleGameUpload(
   job: YoutubeGameUploadJob,
   trimmedPath: string,
   config: NonNullable<TenantConfig>,
-  db: any,
-  vodId: string,
-  log: ReturnType<typeof createAutoLogger>
+  db: Awaited<ReturnType<typeof getJobContext>>['db'],
+  vodId: string
 ): Promise<Extract<YoutubeUploadResult, { videoId: string }>> {
   const { tenantId, dbId, chapterStart, chapterEnd, chapterGameId, title, description } = job;
   const channelName = config.displayName || tenantId;
@@ -349,9 +350,8 @@ async function processSplitGameUpload(
   trimmedPath: string,
   trimmedDuration: number,
   config: NonNullable<TenantConfig>,
-  db: any,
-  vodId: string,
-  log: ReturnType<typeof createAutoLogger>
+  db: Awaited<ReturnType<typeof getJobContext>>['db'],
+  vodId: string
 ): Promise<Extract<YoutubeUploadResult, { videos: Array<{ id: string; part: number; startTime: number; endTime: number; gameId: string }> }>> {
   const { tenantId, dbId, chapterStart, chapterGameId } = job;
   const totalParts = Math.ceil(trimmedDuration / YOUTUBE_MAX_DURATION);
@@ -479,13 +479,6 @@ function getEffectiveSplitDuration(splitDuration: number): number {
   if (!splitDuration || splitDuration <= 0) return YOUTUBE_MAX_DURATION;
   if (splitDuration > YOUTUBE_MAX_DURATION) return YOUTUBE_MAX_DURATION;
   return splitDuration;
-}
-
-function formatVodDate(createdAt: Date, config: { settings?: { timezone?: string } }): string {
-  return dayjs(createdAt)
-    .tz(config.settings?.timezone || 'UTC')
-    .format('MMMM DD YYYY')
-    .toUpperCase();
 }
 
 export default youtubeProcessor;

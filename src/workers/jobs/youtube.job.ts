@@ -232,3 +232,43 @@ export async function triggerYoutubeUpload(
   }
   return null;
 }
+
+// ============== Upload Queue Helpers ==============
+
+export interface QueueYoutubeUploadsOptions {
+  tenantId: string;
+  dbId: number;
+  vodId: string;
+  filePath: string;
+  platform: 'twitch' | 'kick';
+  uploadMode?: 'vod' | 'all';
+  config: ReturnType<typeof getTenantConfig>;
+  log: {
+    info: (ctx: Record<string, unknown>, msg: string) => void;
+    warn: (ctx: Record<string, unknown>, msg: string) => void;
+  };
+}
+
+export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): Promise<void> {
+  const { tenantId, dbId, vodId, filePath, platform, uploadMode = 'vod', config, log } = options;
+
+  // VOD Upload
+  if ((uploadMode === 'vod' || uploadMode === 'all') && config?.youtube?.vodUpload) {
+    try {
+      await queueYoutubeVodUpload(tenantId, dbId, vodId, filePath, platform);
+      log.info({ vodId }, 'Queued YouTube VOD upload');
+    } catch (error) {
+      log.warn({ error: (error as Error).message, vodId }, 'Failed to queue YouTube VOD upload');
+    }
+  }
+
+  // Game Uploads
+  if (uploadMode === 'all' && config?.youtube?.perGameUpload) {
+    try {
+      await queueYoutubeGameUploadsForVod(tenantId, dbId, vodId, filePath, platform);
+      log.info({ vodId }, 'Queued YouTube game uploads');
+    } catch (error) {
+      log.warn({ error: (error as Error).message, vodId }, 'Failed to queue YouTube game uploads');
+    }
+  }
+}

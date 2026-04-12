@@ -88,10 +88,10 @@ async function flushBatch(
   messageId: string | null,
   duration: number,
   lastOffset: number,
-  totalMessagesRef: { value: number },
-  batchCountRef: { value: number }
-): Promise<void> {
-  if (buffer.length === 0) return;
+  totalMessages: number,
+  batchCount: number
+): Promise<{ totalMessages: number; batchCount: number }> {
+  if (buffer.length === 0) return { totalMessages, batchCount };
 
   let lastError: Error | null = null;
 
@@ -102,15 +102,15 @@ async function flushBatch(
         skipDuplicates: true,
       });
 
-      totalMessagesRef.value += buffer.length;
-      batchCountRef.value++;
+      totalMessages += buffer.length;
+      batchCount++;
 
       log.debug(
         {
           vodId,
-          batchNumber: batchCountRef.value,
+          batchNumber: batchCount,
           messagesInBatch: buffer.length,
-          totalMessages: totalMessagesRef.value,
+          totalMessages,
         },
         '[Chat] Batch flushed to database'
       );
@@ -124,10 +124,10 @@ async function flushBatch(
           status: 'warning',
           fields: [
             { name: 'Current Offset', value: lastOffset.toFixed(2) + 's', inline: true },
-            { name: 'Batch', value: '#' + batchCountRef.value + ' (' + buffer.length + ' messages)', inline: true },
+            { name: 'Batch', value: '#' + batchCount + ' (' + buffer.length + ' messages)', inline: true },
             {
               name: 'Progress',
-              value: formatProgressMessage('Chat Download', tenantId, percent, totalMessagesRef.value),
+              value: formatProgressMessage('Chat Download', tenantId, percent, totalMessages),
               inline: false,
             },
           ],
@@ -137,7 +137,7 @@ async function flushBatch(
       }
 
       buffer.length = 0;
-      return;
+      return { totalMessages, batchCount };
     } catch (error) {
       lastError = error as Error;
       log.warn(
@@ -158,7 +158,7 @@ async function flushBatch(
   }
 
   log.error({ vodId, bufferLength: buffer.length }, '[Chat] Batch flush failed after all retries');
-  throw lastError;
+  throw lastError || new Error('Batch flush failed');
 }
 
 const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job: Job<ChatDownloadJob>): Promise<ChatDownloadResult> => {
@@ -214,8 +214,8 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
       })
     : null;
 
-  const totalMessages = 0;
-  const batchCount = 0;
+  let totalMessages = 0;
+  let batchCount = 0;
   const batchBuffer: ChatMessageCreateInput[] = [];
 
   try {
@@ -295,7 +295,9 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
       lastOffset = edges[edges.length - 1]?.node?.contentOffsetSeconds ?? lastOffset;
 
       if (batchBuffer.length >= BATCH_SIZE) {
-        await flushBatch(db, batchBuffer, log, vodId, tenantId, messageId, duration, lastOffset, { value: totalMessages }, { value: batchCount });
+        const result = await flushBatch(db, batchBuffer, log, vodId, tenantId, messageId, duration, lastOffset, totalMessages, batchCount);
+        totalMessages = result.totalMessages;
+        batchCount = result.batchCount;
       }
 
       // Cursor stagnation check - prevent infinite loops without hard caps
@@ -314,7 +316,9 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
     }
 
     if (batchBuffer.length > 0) {
-      await flushBatch(db, batchBuffer, log, vodId, tenantId, messageId, duration, lastOffset, { value: totalMessages }, { value: batchCount });
+      const result = await flushBatch(db, batchBuffer, log, vodId, tenantId, messageId, duration, lastOffset, totalMessages, batchCount);
+      totalMessages = result.totalMessages;
+      batchCount = result.batchCount;
     }
 
     resetFailures(tenantId);
