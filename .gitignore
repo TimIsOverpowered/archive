@@ -118,7 +118,6 @@ prisma/generated/meta/
 config/*
 !config/example.config.json
 
-*.opencode*
 .env*
 !.env.example
 
@@ -126,3 +125,6 @@ config/*
 logs/
 .pm2/
 pm2-debug.log
+
+*.opencode*
+AGENTS.md
