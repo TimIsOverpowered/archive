@@ -1,5 +1,8 @@
 import type { ChatDownloadJob, StandardVodJob } from './queues.js';
 import { getChatDownloadQueue } from './queues.js';
+import { childLogger } from '../../utils/logger.js';
+
+const log = childLogger({ module: 'chat-job' });
 
 async function enqueue(job: ChatDownloadJob): Promise<string | null> {
   const jobId = `chat_${job.vodId}`;
@@ -9,7 +12,12 @@ async function enqueue(job: ChatDownloadJob): Promise<string | null> {
       deduplication: { id: jobId },
     });
     return added.id ?? null;
-  } catch {
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    const isDedup = msg.includes('deduplication');
+    if (!isDedup) {
+      log.error({ jobId, tenantId: job.tenantId, error: msg }, 'Failed to enqueue chat job');
+    }
     return null;
   }
 }

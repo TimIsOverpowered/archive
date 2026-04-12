@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { loadAppConfig } from './config/env.js';
 import { buildServer } from './api/server';
 import { closeAllClients } from './db/client';
 import { logger } from './utils/logger';
@@ -7,8 +8,9 @@ import { extractErrorDetails } from './utils/error.js';
 import { startCloudflareIpRangesCron } from './cron/cloudflare-ip-ranges.js';
 import { getCachedRangeInfo, getCloudflareIpRanges } from './utils/cloudflare-ip-validator.js';
 
-const PORT = process.env.PORT || 3030;
-const HOST = process.env.HOST || '0.0.0.0';
+const config = loadAppConfig();
+const PORT = config.PORT;
+const HOST = config.HOST;
 
 let server: Awaited<ReturnType<typeof buildServer>> | null = null;
 

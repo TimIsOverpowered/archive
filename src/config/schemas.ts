@@ -37,3 +37,18 @@ export const YoutubeSchema = z.object({
   description: z.string().default(''),
   auth: z.string().default(''),
 });
+
+export const TwitchSchema = z.object({
+  enabled: z.boolean().default(false),
+  mainPlatform: z.boolean().default(false),
+  auth: z.string().optional(),
+  username: z.string().optional(),
+  id: z.string().optional(),
+});
+
+export const KickSchema = z.object({
+  enabled: z.boolean().default(false),
+  mainPlatform: z.boolean().default(false),
+  id: z.string().optional(),
+  username: z.string().optional(),
+});

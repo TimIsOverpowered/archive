@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import fs from 'fs';
-import { getTenantConfig, configCache } from '../config/loader.js';
+import { getTenantConfig, updateTenantYoutubeAuth } from '../config/loader.js';
 import { decryptObject, encryptObject } from '../utils/encryption.js';
 import { metaClient } from '../db/meta-client.js';
 import { extractErrorDetails } from '../utils/error.js';
@@ -134,13 +134,7 @@ async function updateYoutubeTokenInDb(tenantId: string, newAccessToken: string, 
     });
 
     // Update specific tenant's config in cache (like Twitch)
-    configCache.set(tenantId, {
-      ...config,
-      youtube: {
-        ...config.youtube,
-        auth: encryptedAuth,
-      },
-    });
+    updateTenantYoutubeAuth(tenantId, encryptedAuth);
 
     log.info({ tenantId }, 'Updated YouTube token in database');
   } catch (err) {

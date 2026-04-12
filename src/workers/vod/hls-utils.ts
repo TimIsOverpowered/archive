@@ -12,6 +12,7 @@ import pLimit from 'p-limit';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { fileExists } from '../../utils/path.js';
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch.js';
+import { retryWithBackoff } from '../../utils/retry.js';
 
 export type DownloadStrategy = { type: 'fetch'; signal?: AbortSignal } | { type: 'cycletls'; session: CycleTLSSession };
 
@@ -59,48 +60,54 @@ export async function downloadSegmentsParallel(
         return;
       }
 
-      let lastError: Error | null = null;
+      try {
+        await retryWithBackoff(
+          async () => {
+            if (isAborted()) {
+              throw new Error('Aborted');
+            }
+            await limit(async () => {
+              if (strategy.type === 'fetch') {
+                const response = await fetch(`${baseURL}/${segment.uri}`, { signal: strategy.signal });
+                throwOnHttpError(response, 'Download segment');
 
-      for (let attempt = 1; attempt <= retryAttempts; attempt++) {
+                const writer = fs.createWriteStream(tempPath);
+                const nodeWebStream = response.body as unknown as NodeWebStream<Uint8Array>;
+                await pipeline(Readable.fromWeb(nodeWebStream), writer);
+              } else {
+                await strategy.session.streamToFile(`${baseURL}/${segment.uri}`, tempPath);
+              }
+            });
+          },
+          {
+            attempts: retryAttempts,
+            baseDelayMs: 1000,
+            maxDelayMs: 30000,
+            jitter: true,
+            shouldRetry: (error) => {
+              if (isAborted()) return false;
+              const msg = error instanceof Error ? error.message : String(error);
+              return msg !== 'Aborted';
+            },
+          }
+        );
+
+        await fsPromises.rename(tempPath, outputPath);
+        completedCount++;
+
+        log.debug({ uri: segment.uri, current: completedCount, total: totalSegments }, `Segment downloaded`);
+      } catch (error: unknown) {
         if (isAborted()) {
           return;
         }
 
+        const lastError = error instanceof Error ? error : new Error(String(error));
+
         try {
-          await limit(async () => {
-            if (strategy.type === 'fetch') {
-              const response = await fetch(`${baseURL}/${segment.uri}`, { signal: strategy.signal });
-              throwOnHttpError(response, `Download segment (attempt ${attempt}/${retryAttempts})`);
+          await fsPromises.unlink(tempPath).catch(() => {});
+        } catch {}
 
-              const writer = fs.createWriteStream(tempPath);
-              const nodeWebStream = response.body as unknown as NodeWebStream<Uint8Array>;
-              await pipeline(Readable.fromWeb(nodeWebStream), writer);
-            } else {
-              await strategy.session.streamToFile(`${baseURL}/${segment.uri}`, tempPath);
-            }
-          });
-
-          await fsPromises.rename(tempPath, outputPath);
-          completedCount++;
-
-          log.debug({ uri: segment.uri, current: completedCount, total: totalSegments }, `Segment downloaded`);
-          return;
-        } catch (error: unknown) {
-          if (isAborted()) {
-            return;
-          }
-
-          lastError = error instanceof Error ? error : new Error(String(error));
-
-          try {
-            await fsPromises.unlink(tempPath).catch(() => {});
-          } catch {}
-
-          log.debug({ uri: segment.uri, attempt, error: lastError.message }, `Failed to download segment`);
-        }
-      }
-
-      if (!isAborted() && lastError) {
+        log.debug({ uri: segment.uri, error: lastError.message }, `Failed to download segment`);
         throw lastError;
       }
     })

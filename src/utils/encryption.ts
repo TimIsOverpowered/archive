@@ -7,13 +7,8 @@ const AUTH_TAG_LENGTH = 16;
 
 export function validateEncryptionKey(key: string): boolean {
   if (!key) return false;
-  if (key.length !== KEY_LENGTH * 2) return false; // Hex is double the byte length
-  try {
-    Buffer.from(key, 'hex');
-    return true;
-  } catch {
-    return false;
-  }
+  if (key.length !== KEY_LENGTH * 2) return false;
+  return /^[0-9a-fA-F]+$/.test(key);
 }
 
 export function getKeyBuffer(): Buffer {
