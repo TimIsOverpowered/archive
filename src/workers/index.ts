@@ -8,7 +8,7 @@ import { startTokenHealthCron } from '../cron/token-health.js';
 import { startMonitorService, stopMonitorService } from './monitor/index.js';
 import { logger as baseLogger } from '../utils/logger.js';
 import { AllJobData, WORKER_DEFINITIONS, WorkerName } from './worker-definitions.js';
-import { createWorker } from './createWorker.js';
+import { createWorker } from './create-worker.js';
 
 const logger = baseLogger;
 
