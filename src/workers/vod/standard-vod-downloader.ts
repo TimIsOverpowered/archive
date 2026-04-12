@@ -121,10 +121,7 @@ async function downloadWithFfmpeg(
       throw new Error(`Twitch HLS playlist request failed: ${response.status}`);
     }
 
-    const m3u8Content = await response.text();
-    const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
-
-    await convertHlsToMp4(m3u8Url, finalPath, { vodId, isFmp4 });
+    await convertHlsToMp4(m3u8Url, finalPath, { vodId, isFmp4: false });
   } else {
     throw new Error(`Unsupported platform: ${platform}`);
   }
@@ -157,8 +154,6 @@ async function downloadWithHls(
 
   let cycleTLS: Awaited<ReturnType<typeof createSession>> | null = null;
   let baseURL: string = '';
-  let m3u8Content: string = '';
-  let isFmp4: boolean = false;
 
   try {
     if (platform === 'twitch') {
@@ -168,9 +163,9 @@ async function downloadWithHls(
         throw new Error('Failed to fetch Twitch HLS playlist');
       }
 
-      m3u8Content = result.variantM3u8String;
       baseURL = result.baseURL;
-      isFmp4 = detectFmp4FromPlaylist(m3u8Content);
+
+      await fsPromises.writeFile(m3u8Path, result.variantM3u8String);
     } else if (platform === 'kick') {
       const username = config?.kick?.username;
 
@@ -192,15 +187,14 @@ async function downloadWithHls(
         throw new Error('Failed to fetch Kick HLS playlist');
       }
 
-      m3u8Content = result.variantM3u8String;
       baseURL = result.baseURL;
-      isFmp4 = false;
+
+      await fsPromises.writeFile(m3u8Path, result.variantM3u8String);
     } else {
       throw new Error(`Unsupported platform: ${platform}`);
     }
 
-    await fsPromises.writeFile(m3u8Path, m3u8Content);
-
+    const m3u8Content = await fsPromises.readFile(m3u8Path, 'utf8');
     const parsedM3u8 = HLS.parse(m3u8Content);
 
     if (!parsedM3u8 || !('segments' in parsedM3u8)) {
@@ -218,6 +212,8 @@ async function downloadWithHls(
     const strategy: DownloadStrategy = platform === 'kick' && cycleTLS ? { type: 'cycletls', session: cycleTLS } : { type: 'fetch' };
 
     await downloadSegmentsParallel(segments, vodDir, baseURL, strategy, 3, 3, log);
+
+    const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
 
     await convertHlsToMp4(m3u8Path, finalPath, { vodId, isFmp4 });
   } finally {

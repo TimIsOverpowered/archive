@@ -2,13 +2,13 @@
 import { Processor, Job } from 'bullmq';
 import { downloadLiveHls } from './vod/hls-downloader.js';
 import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
-import { convertHlsToMp4, getDuration } from '../utils/ffmpeg.js';
+import { convertHlsToMp4, detectFmp4FromPlaylist, getDuration } from '../utils/ffmpeg.js';
 import { fileExists, getVodDirPath, getVodFilePath } from '../utils/path.js';
 import { toHHMMSS } from '../utils/formatting.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { retryWithBackoff } from '../utils/retry.js';
+
 import { getJobContext } from './job-context.js';
 import { finalizeVod } from '../services/vod-finalization.js';
 import { queueYoutubeUploads } from './jobs/youtube.job.js';
@@ -124,23 +124,12 @@ const liveProcessor: Processor<LiveDownloadJobData, unknown, string> = async (jo
 // --- Helpers ---
 
 async function convertToMp4(vodId: string, downloadResult: { m3u8Path: string; outputDir: string }, finalMp4Path: string, log: ReturnType<typeof createAutoLogger>) {
-  const files = await fs.readdir(downloadResult.outputDir).catch(() => [] as string[]);
-  const mp4Segments = files.filter((f) => f.endsWith('.mp4'));
-  const tsSegments = files.filter((f) => f.endsWith('.ts'));
-  const hasInitSegment = files.some((f) => f.includes('init') && f.endsWith('.mp4'));
+  const m3u8Content = await fs.readFile(downloadResult.m3u8Path, 'utf8');
+  const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
 
-  if (mp4Segments.length === 0 && tsSegments.length === 0) {
-    throw new Error(`No valid segments found in ${downloadResult.outputDir}`);
-  }
-
-  const isFmp4 = hasInitSegment && mp4Segments.length > 0;
   log.info(`[${vodId}] Converting ${isFmp4 ? 'fMP4' : 'TS'} segments to MP4`);
 
-  // Let BullMQ handle job-level retries — only retry here for transient ffmpeg failures
-  await retryWithBackoff(() => convertHlsToMp4(downloadResult.m3u8Path, finalMp4Path, { vodId, isFmp4 }), {
-    attempts: 3,
-    baseDelayMs: 5000,
-  });
+  await convertHlsToMp4(downloadResult.m3u8Path, finalMp4Path, { vodId, isFmp4 });
 
   log.info(`[${vodId}] Conversion complete`);
 }
