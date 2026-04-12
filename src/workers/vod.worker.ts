@@ -2,7 +2,7 @@ import { Processor, Job } from 'bullmq';
 import { getVodFilePath } from '../utils/path.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { getJobContext } from './job-context.js';
+import { getJobContext } from './utils/job-context.js';
 import { queueYoutubeUploads } from './jobs/youtube.job.js';
 import { cleanupHlsFiles } from './vod/hls-cleanup.js';
 import { downloadHlsStream } from './vod/hls-orchestrator.js';

@@ -6,7 +6,7 @@ import type { DMCAClaim } from '../utils/dmca.js';
 import { isBlockingPolicy, buildMuteFilters, muteAudioSections, blackoutVideoSections, cleanupTempFiles, BlackoutSection } from '../utils/dmca.js';
 import { trimVideo as ffmpegTrim } from './vod/ffmpeg.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { getJobContext } from './job-context.js';
+import { getJobContext } from './utils/job-context.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { ensureVodDownload } from '../api/routes/admin/utils/vod-helpers.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';

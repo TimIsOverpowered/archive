@@ -1,7 +1,7 @@
-import { getTenantConfig } from '../config/loader.js';
-import { getClient, createClient } from '../db/client.js';
-import type { TenantConfig } from '../config/types.js';
-import type { PrismaClient } from '../../generated/streamer/client';
+import { getTenantConfig } from '../../config/loader.js';
+import { getClient, createClient } from '../../db/client.js';
+import type { TenantConfig } from '../../config/types.js';
+import type { PrismaClient } from '../../../generated/streamer/client.js';
 
 export interface JobContext {
   config: TenantConfig;

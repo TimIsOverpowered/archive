@@ -1,6 +1,6 @@
 import { Processor, Job } from 'bullmq';
 import type { YoutubeUploadJob, YoutubeUploadResult, YoutubeVodUploadJob, YoutubeGameUploadJob } from './jobs/queues.js';
-import { getJobContext } from './job-context.js';
+import { getJobContext } from './utils/job-context.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { processVodUpload, linkVodPartsAfterDelay } from './youtube/vod-upload-processor.js';
 import { processGameUpload } from './youtube/game-upload-processor.js';

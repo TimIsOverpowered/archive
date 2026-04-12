@@ -7,7 +7,7 @@ import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 
-import { getJobContext } from './job-context.js';
+import { getJobContext } from './utils/job-context.js';
 import { finalizeVod } from '../services/vod-finalization.js';
 import { queueYoutubeUploads } from './jobs/youtube.job.js';
 import { cleanupHlsFiles } from './vod/hls-cleanup.js';
