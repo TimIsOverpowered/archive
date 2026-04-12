@@ -34,12 +34,6 @@ export interface HlsDownloadResult {
   finalMp4Path: string;
 }
 
-const MAX_CONSECUTIVE_ERRORS = HLS_MAX_CONSECUTIVE_ERRORS;
-const NO_CHANGE_THRESHOLD = HLS_NO_CHANGE_THRESHOLD;
-const POLL_INTERVAL_MS = HLS_POLL_INTERVAL_MS;
-const SEGMENT_CONCURRENCY = HLS_SEGMENT_CONCURRENCY;
-const SEGMENT_RETRY_ATTEMPTS = HLS_SEGMENT_RETRY_ATTEMPTS;
-
 export async function downloadHlsStream(options: HlsDownloadOptions): Promise<HlsDownloadResult> {
   const { dbId, vodId, platform, tenantId, startedAt, sourceUrl, isLive = false, onProgress } = options;
   const log = createAutoLogger(tenantId);
@@ -149,8 +143,8 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
 
       if (currentLastUri && currentLastUri === lastSegmentUri) {
         noChangePollCount++;
-        log.info({ vodId, pollCount: noChangePollCount, threshold: NO_CHANGE_THRESHOLD }, 'No new segments');
-        if (noChangePollCount >= NO_CHANGE_THRESHOLD) {
+        log.info({ vodId, pollCount: noChangePollCount, threshold: HLS_NO_CHANGE_THRESHOLD }, 'No new segments');
+        if (noChangePollCount >= HLS_NO_CHANGE_THRESHOLD) {
           log.info({ vodId }, 'Stream end detected');
           break;
         }
@@ -167,7 +161,7 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
       if (newSegments.length > 0) {
         const strategy: DownloadStrategy = platform === 'kick' && ctx.cycleTLS ? { type: 'cycletls', session: ctx.cycleTLS } : { type: 'fetch' };
 
-        await downloadSegmentsParallel(newSegments, ctx.vodDir, baseURL, strategy, SEGMENT_CONCURRENCY, SEGMENT_RETRY_ATTEMPTS, log, () => ctx.onProgress?.(downloadedSegments.size));
+        await downloadSegmentsParallel(newSegments, ctx.vodDir, baseURL, strategy, HLS_SEGMENT_CONCURRENCY, HLS_SEGMENT_RETRY_ATTEMPTS, log, () => ctx.onProgress?.(downloadedSegments.size));
 
         for (const seg of newSegments) downloadedSegments.add(seg.uri);
       }
@@ -178,7 +172,7 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
         await updateChapterDuringDownload(ctx.dbId, vodId, ctx.tenantId, ctx.streamerClient);
       }
 
-      await sleep(POLL_INTERVAL_MS);
+      await sleep(HLS_POLL_INTERVAL_MS);
     } catch (error) {
       const details = extractErrorDetails(error);
 
@@ -188,7 +182,7 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
       consecutiveErrors++;
       await sleep(getRetryDelay(consecutiveErrors));
 
-      if (consecutiveErrors > MAX_CONSECUTIVE_ERRORS) {
+      if (consecutiveErrors > HLS_MAX_CONSECUTIVE_ERRORS) {
         throw new Error(`Live HLS polling failed after ${consecutiveErrors} consecutive errors`);
       }
     }
@@ -230,19 +224,19 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
 
   const strategy: DownloadStrategy = platform === 'kick' && cycleTLS ? { type: 'cycletls', session: cycleTLS } : { type: 'fetch' };
 
-  await downloadSegmentsParallel(segments, vodDir, baseURL, strategy, SEGMENT_CONCURRENCY, SEGMENT_RETRY_ATTEMPTS, log);
+  await downloadSegmentsParallel(segments, vodDir, baseURL, strategy, HLS_SEGMENT_CONCURRENCY, HLS_SEGMENT_RETRY_ATTEMPTS, log);
 }
 
 async function fetchPlaylist(ctx: LivePollingContext, retryCount: number) {
   if (ctx.platform === 'twitch') {
-    return fetchTwitchPlaylist(ctx.vodId, ctx.log, retryCount, MAX_CONSECUTIVE_ERRORS);
+    return fetchTwitchPlaylist(ctx.vodId, ctx.log, retryCount, HLS_MAX_CONSECUTIVE_ERRORS);
   }
-  return fetchKickPlaylist(ctx.vodId, ctx.sourceUrl, ctx.log, retryCount, MAX_CONSECUTIVE_ERRORS, ctx.cycleTLS ?? undefined);
+  return fetchKickPlaylist(ctx.vodId, ctx.sourceUrl, ctx.log, retryCount, HLS_MAX_CONSECUTIVE_ERRORS, ctx.cycleTLS ?? undefined);
 }
 
 async function fetchPlaylistForArchived(ctx: ArchivedVodContext) {
   if (ctx.platform === 'twitch') {
-    return fetchTwitchPlaylist(ctx.vodId, ctx.log, 0, MAX_CONSECUTIVE_ERRORS);
+    return fetchTwitchPlaylist(ctx.vodId, ctx.log, 0, HLS_MAX_CONSECUTIVE_ERRORS);
   }
-  return fetchKickPlaylist(ctx.vodId, ctx.sourceUrl, ctx.log, 0, MAX_CONSECUTIVE_ERRORS, ctx.cycleTLS ?? undefined);
+  return fetchKickPlaylist(ctx.vodId, ctx.sourceUrl, ctx.log, 0, HLS_MAX_CONSECUTIVE_ERRORS, ctx.cycleTLS ?? undefined);
 }
