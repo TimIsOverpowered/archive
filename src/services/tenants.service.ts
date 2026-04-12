@@ -1,9 +1,8 @@
 import { PrismaClient } from '../../generated/streamer/client';
 import { getTenantConfig, getConfigs } from '../config/loader';
-import { redisClient } from '../api/plugins/redis.plugin';
+import { withCache } from '../utils/cache.js';
 
 const STATS_CACHE_TTL = parseInt(process.env.STATS_CACHE_TTL || '60', 10);
-const DISABLE_CACHE = process.env.DISABLE_REDIS_CACHE === 'true';
 
 interface TenantStats {
   tenant: {
@@ -40,17 +39,6 @@ interface TenantStats {
 export async function getTenantStats(client: PrismaClient, tenantId: string): Promise<TenantStats> {
   const cacheKey = `stats:${tenantId}`;
 
-  if (!DISABLE_CACHE && redisClient) {
-    try {
-      const cached = await redisClient.get(cacheKey);
-      if (cached) {
-        return JSON.parse(cached) as TenantStats;
-      }
-    } catch {
-      // Ignore cache errors
-    }
-  }
-
   const config = getTenantConfig(tenantId);
 
   if (!config) {
@@ -68,34 +56,58 @@ export async function getTenantStats(client: PrismaClient, tenantId: string): Pr
   if (config.twitch?.enabled) platforms.push('twitch');
   if (config.kick?.enabled) platforms.push('kick');
 
-  const [vods, vodUploads, chapters] = await Promise.all([client.vod.findMany({}), client.vodUpload.findMany({}), client.chapter.findMany({})]);
-
-  const byPlatform: Record<string, number> = {};
-  vods.forEach((vod) => {
-    byPlatform[vod.platform] = (byPlatform[vod.platform] || 0) + 1;
-  });
-
-  const totalDurationSeconds = vods.reduce((sum, vod) => sum + vod.duration, 0);
-  const lastVodDate = vods.length > 0 ? new Date(Math.max(...vods.map((v) => v.created_at.getTime()))) : null;
-
   const thisMonthStart = new Date();
   thisMonthStart.setDate(1);
   thisMonthStart.setHours(0, 0, 0, 0);
-  const thisMonthVods = vods.filter((v) => v.created_at >= thisMonthStart).length;
 
-  const completedUploads = vodUploads.filter((u) => u.status === 'COMPLETED');
-  const failedUploads = vodUploads.filter((u) => u.status === 'FAILED');
-  const totalUploads = completedUploads.length + failedUploads.length;
-  const lastUploadDate = completedUploads.length > 0 ? new Date(Math.max(...completedUploads.map((u) => u.created_at.getTime()))) : null;
+  const [vodStats, uploadStats, chapterCount, thisMonthCount, uniqueGamesCount] = await Promise.all([
+    client.vod.groupBy({
+      by: ['platform'],
+      _count: { id: true },
+      _sum: { duration: true },
+      _max: { created_at: true },
+    }),
+    client.vodUpload.aggregate({
+      _count: {
+        upload_id: true,
+        where: { status: 'FAILED' },
+      },
+    }),
+    client.chapter.count(),
+    client.vod.count({
+      where: { created_at: { gte: thisMonthStart } },
+    }),
+    client.$queryRaw<Array<{ game_id: string }>>`SELECT DISTINCT game_id FROM chapter WHERE game_id IS NOT NULL`,
+  ]);
 
-  const uploadSuccessRate = totalUploads > 0 ? Math.round((completedUploads.length / totalUploads) * 1000) / 10 : 0;
+  const byPlatform: Record<string, number> = {};
+  let totalDurationSeconds = 0;
+  let lastVodDate: Date | null = null;
 
-  const uniqueGames = new Set(
-    chapters
-      .filter((c) => c.game_id)
-      .map((c) => c.game_id)
-      .filter(Boolean)
-  );
+  for (const stat of vodStats) {
+    byPlatform[stat.platform] = stat._count.id;
+    totalDurationSeconds += stat._sum.duration ?? 0;
+    if (stat._max.created_at && (!lastVodDate || stat._max.created_at > lastVodDate)) {
+      lastVodDate = stat._max.created_at;
+    }
+  }
+
+  const failedUploads = uploadStats._count.upload_id;
+  const totalUploadsResult = await client.vodUpload.count({
+    where: { status: { in: ['COMPLETED', 'FAILED'] } },
+  });
+  const completedUploads = totalUploadsResult - failedUploads;
+  const lastUploadDateResult = await client.vodUpload.findMany({
+    where: { status: 'COMPLETED' },
+    orderBy: { created_at: 'desc' },
+    take: 1,
+    select: { created_at: true },
+  });
+  const lastUploadDate = lastUploadDateResult.length > 0 ? lastUploadDateResult[0].created_at : null;
+
+  const uploadSuccessRate = totalUploadsResult > 0 ? Math.round((completedUploads / totalUploadsResult) * 1000) / 10 : 0;
+
+  const uniqueGames = new Set(uniqueGamesCount.map((g) => g.game_id));
 
   const stats: TenantStats = {
     tenant: {
@@ -109,35 +121,27 @@ export async function getTenantStats(client: PrismaClient, tenantId: string): Pr
       lastChecked: new Date(),
     },
     vods: {
-      totalCount: vods.length,
+      totalCount: vodStats.reduce((sum, s) => sum + s._count.id, 0),
       byPlatform,
       totalHours: Math.round((totalDurationSeconds / 3600) * 10) / 10,
       lastVodDate,
-      thisMonthCount: thisMonthVods,
+      thisMonthCount,
     },
     youtube: {
-      totalUploads: completedUploads.length,
-      failedUploads: failedUploads.length,
+      totalUploads: completedUploads,
+      failedUploads,
       lastUploadDate,
       uploadSuccessRate,
     },
     chapters: {
-      count: chapters.length,
+      count: chapterCount,
     },
     games: {
       count: uniqueGames.size,
     },
   };
 
-  if (!DISABLE_CACHE && redisClient) {
-    try {
-      await redisClient.set(cacheKey, JSON.stringify(stats), 'EX', STATS_CACHE_TTL);
-    } catch {
-      // Ignore cache errors
-    }
-  }
-
-  return stats;
+  return await withCache(cacheKey, STATS_CACHE_TTL, () => Promise.resolve(stats));
 }
 
 export async function getAllTenants(): Promise<

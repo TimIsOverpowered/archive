@@ -35,11 +35,15 @@ export function registerWorker(name: WorkerName, worker: Worker<Record<string, u
 }
 
 async function clearAllJobsOnStartup() {
+  if (process.env.CLEAR_QUEUES_ON_STARTUP !== 'true') return;
+
+  logger.warn('[Queues] CLEAR_QUEUES_ON_STARTUP=true — all queued jobs will be permanently deleted');
+
   const queues = [getQueue(QUEUE_NAMES.VOD_LIVE), getQueue(QUEUE_NAMES.VOD_STANDARD), getQueue(QUEUE_NAMES.CHAT_DOWNLOAD), getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD), getQueue(QUEUE_NAMES.DMCA_PROCESSING)];
 
   await Promise.allSettled(queues.map((queue) => queue.obliterate({ force: true })));
 
-  logger.info(`[Queues] Cleared all queues`);
+  logger.warn('[Queues] All queues cleared');
 }
 
 async function getLastFailedJob(queue: Queue): Promise<LastFailedJob | null> {
@@ -151,11 +155,11 @@ async function bootstrap() {
     startTokenHealthCron();
     await clearAllJobsOnStartup();
 
-    const workers = WORKER_DEFINITIONS.map((def) => createWorker({ ...def, connection: redisInstance }));
+    const workerInstances = WORKER_DEFINITIONS.map((def) => createWorker({ ...def, connection: redisInstance }));
 
-    await waitForWorkersReady(workers);
+    await waitForWorkersReady(workerInstances);
 
-    registerShutdownHandlers(workers);
+    registerShutdownHandlers();
 
     await startMonitorService();
 
@@ -166,11 +170,16 @@ async function bootstrap() {
   }
 }
 
-function registerShutdownHandlers(workers: Worker[]) {
+function registerShutdownHandlers() {
   const shutdown = async () => {
     logger.info('Shutting down workers...');
     await stopMonitorService();
-    await Promise.all(workers.map((w) => w.close(true)));
+
+    for (const [name, worker] of workers.entries()) {
+      await worker.close(true);
+      logger.info({ name }, 'Worker closed');
+    }
+
     const { closeAllClients } = await import('../db/client.js');
     await closeAllClients();
     await closeWorkersRedis();

@@ -1,6 +1,7 @@
 import { PrismaClient } from '../../generated/streamer/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { TenantConfig } from '../config/types';
+import { logger } from '../utils/logger.js';
 
 const clients = new Map<string, PrismaClient>();
 
@@ -28,7 +29,9 @@ export async function closeClient(tenantId: string): Promise<void> {
   if (client) {
     try {
       await client.$disconnect();
-    } catch {}
+    } catch (error) {
+      logger.warn({ tenantId, error }, 'Failed to disconnect DB client during shutdown');
+    }
     clients.delete(tenantId);
   }
 }
@@ -37,7 +40,9 @@ export async function closeAllClients(): Promise<void> {
   for (const [tenantId, client] of clients.entries()) {
     try {
       await client.$disconnect();
-    } catch {}
+    } catch (error) {
+      logger.warn({ tenantId, error }, 'Failed to disconnect DB client during shutdown');
+    }
     clients.delete(tenantId);
   }
 }

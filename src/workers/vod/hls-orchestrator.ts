@@ -44,6 +44,8 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
   const config = getTenantConfig(tenantId);
   if (!config?.settings.vodPath) throw new Error(`VOD path not configured for ${tenantId}`);
 
+  const concurrency = HLS_SEGMENT_CONCURRENCY;
+
   const vodDir = getVodDirPath({ tenantId, vodId });
   const finalMp4Path = getVodFilePath({ tenantId, vodId });
   await fsPromises.mkdir(vodDir, { recursive: true });
@@ -67,6 +69,7 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
         cycleTLS,
         streamerClient,
         log,
+        concurrency,
         onProgress,
       });
     } else {
@@ -115,10 +118,11 @@ interface LivePollingContext {
   streamerClient: NonNullable<ReturnType<typeof getClient>>;
   log: ReturnType<typeof createAutoLogger>;
   onProgress?: (segmentsDownloaded: number) => void;
+  concurrency: number;
 }
 
 async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
-  const { vodId, platform, log } = ctx;
+  const { vodId, platform, log, concurrency } = ctx;
 
   let consecutiveErrors = 0;
   let noChangePollCount = 0;
@@ -161,7 +165,7 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
       if (newSegments.length > 0) {
         const strategy: DownloadStrategy = platform === 'kick' && ctx.cycleTLS ? { type: 'cycletls', session: ctx.cycleTLS } : { type: 'fetch' };
 
-        await downloadSegmentsParallel(newSegments, ctx.vodDir, baseURL, strategy, HLS_SEGMENT_CONCURRENCY, HLS_SEGMENT_RETRY_ATTEMPTS, log, () => ctx.onProgress?.(downloadedSegments.size));
+        await downloadSegmentsParallel(newSegments, ctx.vodDir, baseURL, strategy, concurrency, HLS_SEGMENT_RETRY_ATTEMPTS, log, () => ctx.onProgress?.(downloadedSegments.size));
 
         for (const seg of newSegments) downloadedSegments.add(seg.uri);
       }
@@ -203,6 +207,8 @@ interface ArchivedVodContext {
 async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
   const { vodId, platform, vodDir, m3u8Path, cycleTLS, log } = ctx;
 
+  const concurrency = HLS_SEGMENT_CONCURRENCY;
+
   const playlist = await fetchPlaylistForArchived(ctx);
 
   if (!playlist) {
@@ -224,7 +230,7 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
 
   const strategy: DownloadStrategy = platform === 'kick' && cycleTLS ? { type: 'cycletls', session: cycleTLS } : { type: 'fetch' };
 
-  await downloadSegmentsParallel(segments, vodDir, baseURL, strategy, HLS_SEGMENT_CONCURRENCY, HLS_SEGMENT_RETRY_ATTEMPTS, log);
+  await downloadSegmentsParallel(segments, vodDir, baseURL, strategy, concurrency, HLS_SEGMENT_RETRY_ATTEMPTS, log);
 }
 
 async function fetchPlaylist(ctx: LivePollingContext, retryCount: number) {

@@ -7,12 +7,11 @@ export const CHAT_RATE_LIMIT_MS = 150;
 export const CHAT_MAX_RETRIES = 3;
 export const CHAT_RETRY_DELAY_MS = 1000;
 
-// HLS download constants
 export const HLS_POLL_INTERVAL_MS = 60_000;
 export const HLS_MAX_CONSECUTIVE_ERRORS = 12;
 export const HLS_NO_CHANGE_THRESHOLD = 5;
-export const HLS_SEGMENT_CONCURRENCY = 5;
 export const HLS_SEGMENT_RETRY_ATTEMPTS = 3;
+export const HLS_SEGMENT_CONCURRENCY = 5;
 
 // Redis connection
 export const REDIS_RETRY_TIMEOUT_MS = 30000;
