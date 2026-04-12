@@ -29,7 +29,6 @@ export interface WorkerHealthStatus {
 }
 
 const workers = new Map<WorkerName, Worker<Record<string, unknown>, unknown>>();
-let redisConnectionForWorkers: unknown | null = null;
 
 export function registerWorker(name: WorkerName, worker: Worker<Record<string, unknown>, unknown>) {
   workers.set(name, worker);
@@ -76,7 +75,7 @@ async function getLastFailedJob(queue: Queue): Promise<LastFailedJob | null> {
 export async function getWorkersHealth(): Promise<Record<string, WorkerHealthStatus>> {
   const result: Record<string, WorkerHealthStatus> = {};
 
-  if (!redisConnectionForWorkers) {
+  if (!redisInstance) {
     for (const [name] of workers) {
       result[name as string] = {
         isRunning: null,
@@ -130,23 +129,34 @@ export async function getWorkersHealth(): Promise<Record<string, WorkerHealthSta
   return result;
 }
 
+async function waitForWorkersReady(workers: Worker[]): Promise<void> {
+  const readyPromises = workers.map((worker) => {
+    if (worker.isRunning()) return Promise.resolve();
+
+    return new Promise<void>((resolve) => {
+      worker.once('ready', () => resolve());
+    });
+  });
+
+  await Promise.all(readyPromises);
+}
+
 async function bootstrap() {
   logger.info(`Starting worker process (NODE_ENV: ${process.env.NODE_ENV})`);
 
   try {
     await loadTenantConfigs();
-    await startMonitorService();
     await waitForRedisReady;
-
-    const connection = redisInstance;
-    redisConnectionForWorkers = connection;
-
+    startTokenHealthCron();
     await clearAllJobsOnStartup();
 
-    const workers = WORKER_DEFINITIONS.map((def) => createWorker({ ...def, connection }));
+    const workers = WORKER_DEFINITIONS.map((def) => createWorker({ ...def, connection: redisInstance }));
 
-    startTokenHealthCron();
+    await waitForWorkersReady(workers);
+
     registerShutdownHandlers(workers);
+
+    await startMonitorService();
 
     logger.info('All workers started successfully');
   } catch (error) {
