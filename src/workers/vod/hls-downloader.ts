@@ -11,6 +11,7 @@ import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
 import { updateChapterDuringDownload } from '../../services/kick.js';
 import { downloadSegmentsParallel, fetchTwitchPlaylist, fetchKickPlaylist, type DownloadStrategy } from './hls-utils.js';
 import { sleep, getRetryDelay } from '../../utils/delay.js';
+import { HLS_MAX_CONSECUTIVE_ERRORS, HLS_NO_CHANGE_THRESHOLD, HLS_POLL_INTERVAL_MS, HLS_SEGMENT_CONCURRENCY, HLS_SEGMENT_RETRY_ATTEMPTS } from '../../constants.js';
 
 export interface HlsDownloadOptions {
   dbId: number;
@@ -31,11 +32,11 @@ export interface HlsDownloadResult {
   segmentCount: number;
 }
 
-const MAX_CONSECUTIVE_ERRORS = 12;
-const NO_CHANGE_THRESHOLD = 5; // 5 × 60s = 5 min end detection
-const POLL_INTERVAL_MS = 60_000;
-const SEGMENT_CONCURRENCY = 5;
-const SEGMENT_RETRY_ATTEMPTS = 3;
+const MAX_CONSECUTIVE_ERRORS = HLS_MAX_CONSECUTIVE_ERRORS;
+const NO_CHANGE_THRESHOLD = HLS_NO_CHANGE_THRESHOLD;
+const POLL_INTERVAL_MS = HLS_POLL_INTERVAL_MS;
+const SEGMENT_CONCURRENCY = HLS_SEGMENT_CONCURRENCY;
+const SEGMENT_RETRY_ATTEMPTS = HLS_SEGMENT_RETRY_ATTEMPTS;
 
 export async function downloadLiveHls(options: HlsDownloadOptions): Promise<HlsDownloadResult> {
   const { dbId, vodId, platform, tenantId, startedAt, sourceUrl, onProgress } = options;

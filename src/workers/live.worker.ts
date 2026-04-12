@@ -12,13 +12,11 @@ import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './job-context.js';
 import { finalizeVod } from '../services/vod-finalization.js';
 import { queueYoutubeUploads } from './jobs/youtube.job.js';
+import { cleanupHlsFiles } from './vod/hls-cleanup.js';
 import fs from 'fs/promises';
+import type { LiveDownloadJob } from './jobs/queues.js';
 
-type LiveDownloadJobData = import('./jobs/queues.js').LiveDownloadJob;
-
-export { type LiveDownloadJobData };
-
-const liveProcessor: Processor<LiveDownloadJobData, unknown, string> = async (job: Job<LiveDownloadJobData, unknown, string>) => {
+const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: Job<LiveDownloadJob, unknown, string>) => {
   const { dbId, vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl } = job.data;
   const log = createAutoLogger(tenantId);
 
@@ -99,11 +97,7 @@ const liveProcessor: Processor<LiveDownloadJobData, unknown, string> = async (jo
     }
 
     // 6. Cleanup HLS segments
-    if (!config.settings.saveHLS) {
-      await fs.rm(downloadResult.outputDir, { recursive: true }).catch((error) => {
-        log.warn({ ...extractErrorDetails(error), vodId }, 'HLS cleanup failed (non-fatal)');
-      });
-    }
+    await cleanupHlsFiles(downloadResult.outputDir, config.settings.saveHLS ?? false, log);
 
     log.info({ jobId: job.id, vodId }, '[Live Worker] Job completed successfully');
     return { success: true };
