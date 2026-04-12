@@ -1,8 +1,7 @@
 import type { PrismaClient } from '../../../generated/streamer/client';
 import type { ChatMessageCreateInput } from './chat-types.js';
 import type { AppLogger } from '../../utils/auto-tenant-logger.js';
-import { sleep } from '../../utils/delay.js';
-import { extractErrorDetails } from '../../utils/error.js';
+import { retryWithBackoff } from '../../utils/retry.js';
 import { CHAT_MAX_RETRIES, CHAT_RETRY_DELAY_MS } from '../../constants.js';
 
 export interface FlushBatchResult {
@@ -28,51 +27,23 @@ export async function flushChatBatch(options: FlushBatchOptions): Promise<FlushB
     return { totalMessages, batchCount };
   }
 
-  let lastError: Error | null = null;
+  await retryWithBackoff(() => db.chatMessage.createMany({ data: buffer, skipDuplicates: true }), { attempts: CHAT_MAX_RETRIES, baseDelayMs: CHAT_RETRY_DELAY_MS });
 
-  for (let attempt = 1; attempt <= CHAT_MAX_RETRIES; attempt++) {
-    try {
-      await db.chatMessage.createMany({
-        data: buffer,
-        skipDuplicates: true,
-      });
+  const newTotalMessages = totalMessages + buffer.length;
+  const newBatchCount = batchCount + 1;
 
-      const newTotalMessages = totalMessages + buffer.length;
-      const newBatchCount = batchCount + 1;
+  log.debug(
+    {
+      vodId,
+      batchNumber: newBatchCount,
+      messagesInBatch: buffer.length,
+      totalMessages: newTotalMessages,
+    },
+    '[Chat] Batch flushed to database'
+  );
 
-      log.debug(
-        {
-          vodId,
-          batchNumber: newBatchCount,
-          messagesInBatch: buffer.length,
-          totalMessages: newTotalMessages,
-        },
-        '[Chat] Batch flushed to database'
-      );
+  onProgress?.(lastOffset, newBatchCount, buffer.length);
 
-      onProgress?.(lastOffset, newBatchCount, buffer.length);
-
-      buffer.length = 0;
-      return { totalMessages: newTotalMessages, batchCount: newBatchCount };
-    } catch (error) {
-      lastError = error as Error;
-      log.warn(
-        {
-          vodId,
-          attempt,
-          maxRetries: CHAT_MAX_RETRIES,
-          bufferLength: buffer.length,
-          error: extractErrorDetails(error).message,
-        },
-        '[Chat] Batch flush failed, retrying...'
-      );
-
-      if (attempt < CHAT_MAX_RETRIES) {
-        await sleep(CHAT_RETRY_DELAY_MS * attempt);
-      }
-    }
-  }
-
-  log.error({ vodId, bufferLength: buffer.length }, '[Chat] Batch flush failed after all retries');
-  throw lastError || new Error('Batch flush failed');
+  buffer.length = 0;
+  return { totalMessages: newTotalMessages, batchCount: newBatchCount };
 }

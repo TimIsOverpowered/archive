@@ -6,7 +6,7 @@ import { initRichAlert, updateAlert, formatProgressMessage } from '../../utils/d
 import { toHHMMSS } from '../../utils/formatting.js';
 import { getEffectiveSplitDuration } from './validation.js';
 import { buildYoutubeMetadata } from './metadata-builder.js';
-import { createYoutubeUploadProgressHandler as createVodUploadProgressHandler } from '../../utils/youtube-upload-progress.js';
+import { createYoutubeUploadProgressHandler as createVodUploadProgressHandler } from './youtube-upload-progress.js';
 import type { TenantConfig } from '../../config/types.js';
 
 export interface VodUploadContext {

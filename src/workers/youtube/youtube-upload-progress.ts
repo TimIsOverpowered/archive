@@ -1,6 +1,6 @@
-import type { UploadProgressCallbackData } from '../services/youtube.js';
-import { extractErrorDetails } from './error.js';
-import { updateDiscordEmbed, isAlertsEnabled } from './discord-alerts.js';
+import type { UploadProgressCallbackData } from '../../services/youtube.js';
+import { extractErrorDetails } from '../../utils/error.js';
+import { updateDiscordEmbed, isAlertsEnabled } from '../../utils/discord-alerts.js';
 
 interface UploadProgressOptions {
   messageId: string | null;

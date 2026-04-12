@@ -4,7 +4,7 @@ import { trimVideo, splitVideo, getDuration, deleteFile } from '../vod/ffmpeg.js
 import { uploadVideo } from '../../services/youtube.js';
 import { initRichAlert, updateAlert, formatProgressMessage } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
-import { createYoutubeUploadProgressHandler as createGameUploadProgressHandler } from '../../utils/youtube-upload-progress.js';
+import { createYoutubeUploadProgressHandler as createGameUploadProgressHandler } from './youtube-upload-progress.js';
 import { YOUTUBE_MAX_DURATION } from '../../constants.js';
 import type { TenantConfig } from '../../config/types.js';
 

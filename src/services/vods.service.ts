@@ -1,5 +1,5 @@
 import { PrismaClient, UploadStatus } from '../../generated/streamer/client';
-import { redisClient } from '../api/plugins/redis.plugin';
+import { withCache } from '../utils/cache.js';
 
 interface VodResponse {
   id: number;
@@ -52,7 +52,6 @@ interface VodQuery {
 }
 
 const VODS_CACHE_TTL = 86400; // 24 hours
-const DISABLE_CACHE = process.env.DISABLE_REDIS_CACHE === 'true';
 
 export async function getVods(client: PrismaClient, tenantId: string, query: VodQuery): Promise<{ vods: VodResponse[]; total: number }> {
   const page = Math.max(1, query.page || 1);
@@ -60,17 +59,6 @@ export async function getVods(client: PrismaClient, tenantId: string, query: Vod
   const offset = (page - 1) * limit;
 
   const cacheKey = `vods:${tenantId}:${JSON.stringify({ ...query, page, limit })}`;
-
-  if (!DISABLE_CACHE && redisClient) {
-    try {
-      const cached = await redisClient.get(cacheKey);
-      if (cached) {
-        return JSON.parse(cached);
-      }
-    } catch {
-      // Ignore cache errors
-    }
-  }
 
   const where: Record<string, unknown> = {};
 
@@ -165,30 +153,11 @@ export async function getVods(client: PrismaClient, tenantId: string, query: Vod
     total,
   };
 
-  if (!DISABLE_CACHE && redisClient) {
-    try {
-      await redisClient.set(cacheKey, JSON.stringify(response), 'EX', VODS_CACHE_TTL);
-    } catch {
-      // Ignore cache errors
-    }
-  }
-
-  return response;
+  return await withCache(cacheKey, VODS_CACHE_TTL, () => Promise.resolve(response));
 }
 
 export async function getVodById(client: PrismaClient, tenantId: string, vodId: number): Promise<VodResponse | null> {
   const cacheKey = `vod:${tenantId}:${vodId}`;
-
-  if (!DISABLE_CACHE && redisClient) {
-    try {
-      const cached = await redisClient.get(cacheKey);
-      if (cached) {
-        return JSON.parse(cached) as VodResponse;
-      }
-    } catch {
-      // Ignore cache errors
-    }
-  }
 
   const vod = await client.vod.findFirst({
     where: {
@@ -233,16 +202,7 @@ export async function getVodById(client: PrismaClient, tenantId: string, vodId: 
 
   if (vod) {
     const response = vod as unknown as VodResponse;
-
-    if (!DISABLE_CACHE && redisClient) {
-      try {
-        await redisClient.set(cacheKey, JSON.stringify(response), 'EX', VODS_CACHE_TTL);
-      } catch {
-        // Ignore cache errors
-      }
-    }
-
-    return response;
+    return await withCache(cacheKey, VODS_CACHE_TTL, () => Promise.resolve(response));
   }
 
   return null;
@@ -250,17 +210,6 @@ export async function getVodById(client: PrismaClient, tenantId: string, vodId: 
 
 export async function getVodByPlatformId(client: PrismaClient, tenantId: string, platform: 'twitch' | 'kick', platformVodId: string): Promise<VodResponse | null> {
   const cacheKey = `vod:platform:${tenantId}:${platform}:${platformVodId}`;
-
-  if (!DISABLE_CACHE && redisClient) {
-    try {
-      const cached = await redisClient.get(cacheKey);
-      if (cached) {
-        return JSON.parse(cached) as VodResponse;
-      }
-    } catch {
-      // Ignore cache errors
-    }
-  }
 
   const vod = await client.vod.findFirst({
     where: {
@@ -306,16 +255,7 @@ export async function getVodByPlatformId(client: PrismaClient, tenantId: string,
 
   if (vod) {
     const response = vod as unknown as VodResponse;
-
-    if (!DISABLE_CACHE && redisClient) {
-      try {
-        await redisClient.set(cacheKey, JSON.stringify(response), 'EX', VODS_CACHE_TTL);
-      } catch {
-        // Ignore cache errors
-      }
-    }
-
-    return response;
+    return await withCache(cacheKey, VODS_CACHE_TTL, () => Promise.resolve(response));
   }
 
   return null;

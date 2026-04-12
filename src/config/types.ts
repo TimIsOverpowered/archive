@@ -27,7 +27,5 @@ export interface TenantConfig {
     timezone: string;
     saveMP4: boolean;
     saveHLS: boolean;
-    hlsDownloadConcurrency?: number;
-    hlsDownloadRetryAttempts?: number;
   };
 }
