@@ -3,22 +3,20 @@ import { getStandardVodQueue } from './queues.js';
 
 export async function triggerVodDownload(
   tenantId: string,
-  platformUserId: string,
   dbId: number,
   vodId: string,
   platform: 'twitch' | 'kick',
-  externalVodId: string,
-  platformUsername?: string
+  downloadMethod?: 'ffmpeg' | 'hls',
+  uploadMode?: 'vod' | 'all'
 ): Promise<string | null> {
   const jobId = `vod_${vodId}`;
   const job: StandardVodJob = {
     tenantId,
-    platformUserId,
-    platformUsername,
     dbId,
     vodId,
     platform,
-    externalVodId,
+    downloadMethod,
+    uploadMode,
   };
 
   try {

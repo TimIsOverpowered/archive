@@ -77,11 +77,7 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
 
     // 5. Cleanup HLS segments
     const shouldKeepHls = config.settings.saveHLS ?? false;
-    if (!shouldKeepHls) {
-      await cleanupHlsFiles(downloadResult.outputDir, shouldKeepHls, log);
-    } else {
-      log.info({ vodId }, `HLS files preserved in ${downloadResult.outputDir} (saveHLS=true)`);
-    }
+    await cleanupHlsFiles(downloadResult.outputDir, shouldKeepHls, log);
 
     log.info({ jobId: job.id, vodId }, '[Live Worker] Job completed successfully');
     return { success: true };

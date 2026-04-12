@@ -1,22 +1,21 @@
 import { Processor, Job } from 'bullmq';
-import dayjs from '../utils/dayjs.js';
 
-import type { DmcaProcessingJob, DmcaProcessingResult, YoutubeVodUploadJob } from './jobs/queues.js';
-import { getYoutubeUploadQueue } from './jobs/queues.js';
+import type { DmcaProcessingJob, DmcaProcessingResult } from './jobs/queues.js';
+import { queueYoutubeVodUpload } from './jobs/youtube.job.js';
 import type { DMCAClaim } from '../utils/dmca.js';
 import { isBlockingPolicy, buildMuteFilters, muteAudioSections, blackoutVideoSections, cleanupTempFiles, BlackoutSection } from '../utils/dmca.js';
 import { trimVideo as ffmpegTrim } from './vod/ffmpeg.js';
 import { createAutoLogger as loggerWithTenant } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './job-context.js';
-import { capitalizePlatform } from '../utils/formatting.js';
 import { handleWorkerError } from './utils/error-handler.js';
+import { ensureVodDownload } from '../api/routes/admin/utils/vod-helpers.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
   const { tenantId, dbId, vodId, receivedClaims, type, platform, part } = job.data;
   const log = loggerWithTenant(String(tenantId));
 
   if (!receivedClaims || receivedClaims.length === 0) {
-    log.warn(`No claims to process for VOD ${vodId}`);
+    log.warn({ vodId }, 'No claims to process for VOD');
 
     return { success: true, message: 'No blocking claims found' };
   }
@@ -33,8 +32,6 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     throw new Error(`VOD not found in database for streamer ${tenantId}`);
   }
 
-  const { ensureVodDownload } = await import('../api/routes/admin/utils/vod-helpers.js');
-
   // For live streams, use stream_id; for archived, use vod_id
   const fileIdentifier = type === 'live' ? vodRecord.stream_id || vodId : vodId;
 
@@ -49,7 +46,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
   const blockingClaims = receivedClaims.filter(isBlockingPolicy);
 
   if (blockingClaims.length === 0) {
-    log.info(`No blocking claims for VOD ${vodId}, uploading original`);
+    log.info({ vodId }, 'No blocking claims for VOD, uploading original');
 
     return { success: true, message: 'No action needed' };
   }
@@ -62,7 +59,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       const splitDuration = config.youtube.splitDuration || 10800;
       const startOffset = splitDuration * (parseInt(String(part)) - 1);
 
-      log.info(`Extracting part ${part} from VOD ${vodId}`);
+      log.info({ vodId, part }, 'Extracting part from VOD');
 
       processedPath = await ffmpegTrim(videoPath, startOffset, startOffset + splitDuration, `${vodId}-part-${part}`, () => {});
     }
@@ -73,7 +70,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     let intermediateMutedPath: string | null = null;
 
     if (audioClaims.length > 0) {
-      log.info(`Processing ${audioClaims.length} audio claims for VOD ${vodId}`);
+      log.info({ vodId, count: audioClaims.length }, 'Processing audio claims');
 
       const muteFilters = buildMuteFilters(audioClaims as DMCAClaim[]);
       const mutedPath = `${processedPath.replace('.mp4', '-muted.mp4')}`;
@@ -90,7 +87,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     }
 
     if (visualClaims.length > 0) {
-      log.info(`Processing ${visualClaims.length} visual claims for VOD ${vodId}`);
+      log.info({ vodId, count: visualClaims.length }, 'Processing visual claims');
 
       const blackoutSections: BlackoutSection[] = [];
 
@@ -99,7 +96,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
         const durationSeconds = parseInt(claim.matchDetails.longestMatchDurationSeconds) || 0;
         const endSeconds = startSeconds + durationSeconds;
 
-        log.info(`Blackouting ${startSeconds}s-${endSeconds}s for VOD ${vodId}`);
+        log.info({ vodId, startSeconds, endSeconds }, 'Blackouting section');
 
         blackoutSections.push({ startSeconds, durationSeconds, endSeconds });
       }
@@ -117,18 +114,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       processedPath = blackoutedPath;
     }
 
-    const dateStr = dayjs(vodRecord.created_at)
-      .tz(config.settings.timezone || 'UTC')
-      .format('MMMM DD YYYY')
-      .toUpperCase();
-    const platformName = capitalizePlatform(vodRecord.platform?.toString() || platform).toUpperCase();
-
-    const baseTitle = `${config.settings.domainName} ${platformName}${type === 'live' ? ' LIVE' : ''} VOD - ${dateStr}`;
-    const finalTitle = part ? `${baseTitle} PART ${part}` : baseTitle;
-
-    log.info(`Queuing YouTube upload for ${finalTitle}`);
-
-    const { queueYoutubeVodUpload } = await import('./jobs/youtube.job.js');
+    log.info({ vodId, part }, 'Queuing YouTube upload');
 
     const jobId = await queueYoutubeVodUpload(tenantId, dbId, vodId, processedPath, platform as 'twitch' | 'kick');
 
@@ -136,23 +122,9 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       throw new Error('Failed to queue YouTube upload job');
     }
 
-    const uploadJob = await getYoutubeUploadQueue().add(
-      'youtube_upload',
-      {
-        tenantId,
-        dbId,
-        vodId,
-        filePath: processedPath,
-        type: 'vod',
-        platform: platform as 'twitch' | 'kick',
-        dmcaProcessed: true,
-      } as YoutubeVodUploadJob,
-      { jobId: `youtube-dmca_${vodId}` }
-    );
+    log.info({ vodId, jobId }, 'YouTube upload job queued');
 
-    log.info(`YouTube upload job queued with ID ${uploadJob.id!}`);
-
-    return { success: true, youtubeJobId: (uploadJob.id || '').toString(), vodId };
+    return { success: true, youtubeJobId: jobId, vodId };
   } catch (error) {
     handleWorkerError(error, log, { vodId, dbId, tenantId, jobId: job.id, platform });
 

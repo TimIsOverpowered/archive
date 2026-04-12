@@ -1,4 +1,5 @@
 import type { TwitchChatMessageNode } from '../../services/twitch.js';
+import type { PrismaClient } from '../../../generated/streamer/client';
 
 /**
  * Removes __typename fields from GraphQL response objects recursively.
@@ -33,4 +34,27 @@ export function extractEdges(commentsObj: Record<string, unknown>): Array<{ node
   }
 
   return rawEdges.filter((item): item is { node: TwitchChatMessageNode | null | undefined; cursor: string | null } => item !== null && typeof item === 'object' && 'node' in item && 'cursor' in item);
+}
+
+/**
+ * Calculates the effective resume offset for chat download.
+ * If no manual startOffset is provided, checks for existing chat data and resumes from the last saved offset.
+ */
+export async function calculateResumeOffset(db: PrismaClient, vodId: number, manualStartOffset?: number): Promise<{ offset: number; hasExistingData: boolean }> {
+  if (manualStartOffset) {
+    return { offset: manualStartOffset, hasExistingData: false };
+  }
+
+  const lastSavedRecord = await db.chatMessage.findFirst({
+    where: { vod_id: vodId },
+    orderBy: { content_offset_seconds: 'desc' },
+    select: { content_offset_seconds: true },
+  });
+
+  if (!lastSavedRecord?.content_offset_seconds) {
+    return { offset: 0, hasExistingData: false };
+  }
+
+  const resumeOffset = parseFloat(lastSavedRecord.content_offset_seconds.toString());
+  return { offset: resumeOffset, hasExistingData: true };
 }

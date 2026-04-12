@@ -32,8 +32,6 @@ export async function triggerChatAfterVod(vodJob: StandardVodJob): Promise<strin
 
   return enqueue({
     tenantId: vodJob.tenantId,
-    platformUserId: vodJob.platformUserId,
-    platformUsername: vodJob.platformUsername,
     dbId: vodJob.dbId,
     vodId: vodJob.vodId,
     platform: vodJob.platform,
