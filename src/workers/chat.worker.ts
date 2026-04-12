@@ -4,7 +4,7 @@ import { fetchComments, fetchNextComments, extractMessageData } from '../service
 import { initRichAlert, resetFailures } from '../utils/discord-alerts.js';
 import type { ChatDownloadJob, ChatDownloadResult } from './jobs/queues.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { getJobContext } from './job-context.js';
+import { getJobContext } from './utils/job-context.js';
 import { CHAT_BATCH_SIZE, CHAT_RATE_LIMIT_MS } from '../constants.js';
 import { extractEdges, calculateResumeOffset } from './chat/chat-helpers.js';
 import type { ChatMessageCreateInput } from './chat/chat-types.js';
