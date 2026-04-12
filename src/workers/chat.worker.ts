@@ -2,30 +2,29 @@ import { Processor, Job } from 'bullmq';
 import { extractErrorDetails } from '../utils/error.js';
 import { sleep } from '../utils/delay.js';
 import { fetchComments, fetchNextComments, type TwitchChatEdge } from '../services/twitch';
-import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/discord-alerts.js';
+import { initRichAlert, updateAlert, formatProgressMessage, resetFailures } from '../utils/discord-alerts.js';
 import type { ChatDownloadJob, ChatDownloadResult } from './jobs/queues.js';
 import { createAutoLogger, type AppLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './job-context.js';
 import type { PrismaClient } from '../../generated/streamer/client';
-
-// Custom JSON value type compatible with Prisma's InputJsonValue without importing internal types
-type JsonValue = string | number | boolean | { [key: string]: JsonValue } | JsonValue[];
+import type { InputJsonValue } from '../../generated/streamer/internal/prismaNamespace';
+import { CHAT_BATCH_SIZE, CHAT_RATE_LIMIT_MS, CHAT_MAX_RETRIES, CHAT_RETRY_DELAY_MS } from '../constants.js';
 
 interface ChatMessageCreateInput {
   id: string;
   vod_id: number;
   display_name: string | null;
-  content_offset_seconds: string; // String for Decimal precision preservation
+  content_offset_seconds: string;
   createdAt: Date;
-  message?: JsonValue;
-  user_badges?: JsonValue;
+  message?: InputJsonValue;
+  user_badges?: InputJsonValue;
   user_color: string | null;
 }
 
-const BATCH_SIZE = 2500;
-const RATE_LIMIT_MS = 150;
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 1000;
+const BATCH_SIZE = CHAT_BATCH_SIZE;
+const RATE_LIMIT_MS = CHAT_RATE_LIMIT_MS;
+const MAX_RETRIES = CHAT_MAX_RETRIES;
+const RETRY_DELAY_MS = CHAT_RETRY_DELAY_MS;
 
 function stripTypename(obj: unknown): unknown {
   if (obj === null || obj === undefined) return obj;
@@ -44,7 +43,7 @@ function stripTypename(obj: unknown): unknown {
   return obj;
 }
 
-function extractMessageData(node: TwitchChatEdge['node']): { message: JsonValue; userBadges?: JsonValue | undefined } {
+function extractMessageData(node: TwitchChatEdge['node']): { message: InputJsonValue; userBadges?: InputJsonValue | undefined } {
   if (!node || !node.message) {
     return { message: { content: '', fragments: [] }, userBadges: undefined };
   }
@@ -64,7 +63,7 @@ function extractMessageData(node: TwitchChatEdge['node']): { message: JsonValue;
         .join(''),
       fragments: Array.isArray(cleanFragments) ? cleanFragments.map((frag) => ({ ...frag })) : [],
     },
-    userBadges: badgesRaw && typeof stripTypename(badgesRaw) === 'object' ? (stripTypename(badgesRaw) as JsonValue) : undefined,
+    userBadges: badgesRaw && typeof stripTypename(badgesRaw) === 'object' ? (stripTypename(badgesRaw) as InputJsonValue) : undefined,
   };
 }
 
@@ -115,10 +114,10 @@ async function flushBatch(
         '[Chat] Batch flushed to database'
       );
 
-      if (messageId && isAlertsEnabled()) {
+      if (messageId) {
         const percent = duration > 0 ? Math.min(Math.round((lastOffset / duration) * 100), 100) : 0;
 
-        updateDiscordEmbed(messageId, {
+        void updateAlert(messageId, {
           title: '💬 Downloading Chat',
           description: tenantId + ' chat download for ' + vodId,
           status: 'warning',
@@ -192,27 +191,25 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
     log.info('[' + vodId + '] Found existing chat data, resuming from offset ' + effectiveOffset.toFixed(2) + 's');
   }
 
-  const messageId = isAlertsEnabled()
-    ? await sendRichAlert({
-        title: lastSavedRecord?.content_offset_seconds && !startOffset ? `💬 Chat Download Resumed` : `💬 Chat Download Started`,
-        description: `${tenantId} - ${lastSavedRecord?.content_offset_seconds && !startOffset ? 'Continuing from offset ' + effectiveOffset.toFixed(2) + 's' : 'Fetching chat messages'} for ${vodId}`,
-        status: 'warning',
-        fields: [
-          { name: 'Platform', value: platform, inline: true },
-          { name: 'VOD ID', value: String(vodId), inline: false },
-          ...(effectiveOffset > 0
-            ? [
-                {
-                  name: startOffset ? 'Start Offset' : 'Resume Offset',
-                  value: effectiveOffset.toFixed(2) + 's',
-                  inline: true,
-                },
-              ]
-            : []),
-        ],
-        timestamp: new Date().toISOString(),
-      })
-    : null;
+  const messageId = await initRichAlert({
+    title: lastSavedRecord?.content_offset_seconds && !startOffset ? `💬 Chat Download Resumed` : `💬 Chat Download Started`,
+    description: `${tenantId} - ${lastSavedRecord?.content_offset_seconds && !startOffset ? 'Continuing from offset ' + effectiveOffset.toFixed(2) + 's' : 'Fetching chat messages'} for ${vodId}`,
+    status: 'warning',
+    fields: [
+      { name: 'Platform', value: platform, inline: true },
+      { name: 'VOD ID', value: String(vodId), inline: false },
+      ...(effectiveOffset > 0
+        ? [
+            {
+              name: startOffset ? 'Start Offset' : 'Resume Offset',
+              value: effectiveOffset.toFixed(2) + 's',
+              inline: true,
+            },
+          ]
+        : []),
+    ],
+    timestamp: new Date().toISOString(),
+  });
 
   let totalMessages = 0;
   let batchCount = 0;
@@ -252,11 +249,11 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
         resetFailures(tenantId);
 
-        if (messageId && isAlertsEnabled()) {
-          updateDiscordEmbed(messageId, {
+        if (messageId) {
+          void updateAlert(messageId, {
             title: '[Chat] Download Complete',
             description: tenantId + ' - No chat messages found for VOD ' + vodId,
-            status: 'warning', // Use warning instead of success to alert admins
+            status: 'warning',
             fields: [
               { name: 'Platform', value: platform, inline: true },
               { name: 'Total Messages', value: '0 (None found)', inline: false },
@@ -325,13 +322,13 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
     log.debug({ vodId, totalMessages, batchCount, finalOffset: lastOffset }, '[Chat] Download completed successfully');
 
-    if (messageId && isAlertsEnabled()) {
+    if (messageId) {
       const resumeIndicator = startOffset || lastSavedRecord?.content_offset_seconds ? ' [Resumed]' : '';
 
-      updateDiscordEmbed(messageId, {
+      void updateAlert(messageId, {
         title: '[Chat] Download Complete' + resumeIndicator,
         description: tenantId + ' - Successfully fetched ' + totalMessages.toLocaleString() + ' chat messages for VOD ' + vodId,
-        status: totalMessages > 0 ? 'success' : 'warning', // Warning if zero messages found
+        status: totalMessages > 0 ? 'success' : 'warning',
         fields: [
           { name: 'Platform', value: platform, inline: true },
           {
@@ -364,8 +361,8 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
     const details = extractErrorDetails(error);
     log.error({ vodId, platform, totalMessages, batchCount, ...details }, 'Chat download failed');
 
-    if (messageId && isAlertsEnabled()) {
-      updateDiscordEmbed(messageId, {
+    if (messageId) {
+      void updateAlert(messageId, {
         title: '[Chat] Download Failed',
         description: tenantId + ' - Error fetching chat messages for VOD ' + vodId,
         status: 'error',

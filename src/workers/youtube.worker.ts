@@ -1,20 +1,16 @@
 import { Processor, Job } from 'bullmq';
-import dayjs from 'dayjs';
-import timezone from 'dayjs/plugin/timezone';
-
-dayjs.extend(timezone);
+import dayjs from '../utils/dayjs.js';
 
 import type { YoutubeUploadJob, YoutubeUploadResult, YoutubeVodUploadJob, YoutubeGameUploadJob } from './jobs/queues.js';
 import { splitVideo, trimVideo, getDuration, deleteFile } from '../utils/ffmpeg.js';
 import { uploadVideo, linkParts } from '../services/youtube.js';
-import { sendRichAlert, updateDiscordEmbed, formatProgressMessage, resetFailures, isAlertsEnabled } from '../utils/discord-alerts.js';
+import { initRichAlert, updateAlert, formatProgressMessage, resetFailures } from '../utils/discord-alerts.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { toHHMMSS, capitalizePlatform } from '../utils/formatting.js';
 import { createYoutubeUploadProgressHandler } from '../utils/youtube-upload-progress.js';
 import { getJobContext } from './job-context.js';
-
-const YOUTUBE_MAX_DURATION = 43199; // YouTube hard limit: 12 hours - 1 second (720 minutes)
+import { YOUTUBE_MAX_DURATION } from '../constants.js';
 
 type TenantConfig = NonNullable<Awaited<ReturnType<typeof getJobContext>>['config']>;
 
@@ -90,51 +86,43 @@ async function processVodUpload(
     const totalParts = Math.ceil(duration / splitDuration);
 
     // Create splitting progress alert
-    let splitAlertMessageId: string | null = null;
-    if (isAlertsEnabled()) {
-      splitAlertMessageId = await sendRichAlert({
-        title: `📺 VOD Splitting in Progress`,
-        description: `${tenantId} - Preparing ${totalParts} parts...`,
-        status: 'warning',
-        fields: [
-          { name: 'VOD ID', value: vodId, inline: true },
-          { name: 'Total Duration', value: toHHMMSS(duration), inline: true },
-          { name: 'Parts Count', value: String(totalParts), inline: false },
-        ],
-        timestamp: new Date().toISOString(),
-      });
-    }
+    const splitAlertMessageId = await initRichAlert({
+      title: `📺 VOD Splitting in Progress`,
+      description: `${tenantId} - Preparing ${totalParts} parts...`,
+      status: 'warning',
+      fields: [
+        { name: 'VOD ID', value: vodId, inline: true },
+        { name: 'Total Duration', value: toHHMMSS(duration), inline: true },
+        { name: 'Parts Count', value: String(totalParts), inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+    });
 
     const parts = await splitVideo(filePath, duration, splitDuration, vodId, (percent: number) => {
-      if (splitAlertMessageId && isAlertsEnabled()) {
-        updateDiscordEmbed(splitAlertMessageId, {
-          title: `📺 Splitting VOD`,
-          description: `${tenantId} - Preparing video parts for upload`,
-          status: 'warning',
-          fields: [{ name: 'Progress', value: formatProgressMessage('VOD Splitting', tenantId, percent), inline: false }],
-          timestamp: new Date().toISOString(),
-          updatedTimestamp: new Date().toISOString(),
-        });
-      }
+      void updateAlert(splitAlertMessageId, {
+        title: `📺 Splitting VOD`,
+        description: `${tenantId} - Preparing video parts for upload`,
+        status: 'warning',
+        fields: [{ name: 'Progress', value: formatProgressMessage('VOD Splitting', tenantId, percent), inline: false }],
+        timestamp: new Date().toISOString(),
+        updatedTimestamp: new Date().toISOString(),
+      });
     });
 
     for (let i = 0; i < parts.length; i++) {
       const currentPartNum = i + 1;
 
-      let uploadAlertMessageId: string | null = null;
-      if (isAlertsEnabled()) {
-        uploadAlertMessageId = await sendRichAlert({
-          title: `📺 YouTube Upload (Part ${currentPartNum}/${totalParts})`,
-          description: `${tenantId} - Uploading video part to YouTube...`,
-          status: 'warning',
-          fields: [
-            { name: 'VOD ID', value: vodId, inline: true },
-            { name: 'Platform', value: platformName.toUpperCase(), inline: true },
-            { name: 'Part', value: `${currentPartNum} of ${totalParts}`, inline: false },
-          ],
-          timestamp: new Date().toISOString(),
-        });
-      }
+      const uploadAlertMessageId = await initRichAlert({
+        title: `📺 YouTube Upload (Part ${currentPartNum}/${totalParts})`,
+        description: `${tenantId} - Uploading video part to YouTube...`,
+        status: 'warning',
+        fields: [
+          { name: 'VOD ID', value: vodId, inline: true },
+          { name: 'Platform', value: platformName.toUpperCase(), inline: true },
+          { name: 'Part', value: `${currentPartNum} of ${totalParts}`, inline: false },
+        ],
+        timestamp: new Date().toISOString(),
+      });
 
       const partTitle = `${channelName} ${platformName} VOD - ${dateFormatted}${i > 0 ? ` PART ${i + 1}` : ''}`;
       const youtubeDescription = `Chat Replay: https://${domainName}/youtube/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube!.description || ''}`;
@@ -163,36 +151,31 @@ async function processVodUpload(
     }
 
     // Update splitting alert on completion
-    if (splitAlertMessageId && isAlertsEnabled()) {
-      updateDiscordEmbed(splitAlertMessageId, {
-        title: `✅ VOD Splitting Complete`,
-        description: `${tenantId} - Successfully split into ${totalParts} parts`,
-        status: 'success',
-        fields: [
-          { name: 'Total Duration', value: toHHMMSS(duration), inline: true },
-          { name: 'Parts Count', value: String(totalParts), inline: false },
-        ],
-        timestamp: new Date().toISOString(),
-        updatedTimestamp: new Date().toISOString(),
-      });
-    }
+    void updateAlert(splitAlertMessageId, {
+      title: `✅ VOD Splitting Complete`,
+      description: `${tenantId} - Successfully split into ${totalParts} parts`,
+      status: 'success',
+      fields: [
+        { name: 'Total Duration', value: toHHMMSS(duration), inline: true },
+        { name: 'Parts Count', value: String(totalParts), inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+      updatedTimestamp: new Date().toISOString(),
+    });
   } else {
     const vodTitle = `${channelName} ${platformName} VOD - ${dateFormatted}`;
     const youtubeDescription = `Chat Replay: https://${domainName}/youtube/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube!.description || ''}`;
 
-    let uploadAlertMessageId: string | null = null;
-    if (isAlertsEnabled()) {
-      uploadAlertMessageId = await sendRichAlert({
-        title: `📺 YouTube Upload Started`,
-        description: `${tenantId} - Uploading VOD to YouTube...`,
-        status: 'warning',
-        fields: [
-          { name: 'VOD ID', value: vodId, inline: true },
-          { name: 'Platform', value: platformName.toUpperCase(), inline: true },
-        ],
-        timestamp: new Date().toISOString(),
-      });
-    }
+    const uploadAlertMessageId = await initRichAlert({
+      title: `📺 YouTube Upload Started`,
+      description: `${tenantId} - Uploading VOD to YouTube...`,
+      status: 'warning',
+      fields: [
+        { name: 'VOD ID', value: vodId, inline: true },
+        { name: 'Platform', value: platformName.toUpperCase(), inline: true },
+      ],
+      timestamp: new Date().toISOString(),
+    });
 
     const result = await uploadVideo(
       tenantId,
@@ -295,19 +278,16 @@ async function processSingleGameUpload(
   const channelName = config.displayName || tenantId;
 
   // Send initial upload alert for single game uploads (non-split)
-  let uploadAlertMessageId: string | null = null;
-  if (isAlertsEnabled()) {
-    uploadAlertMessageId = await sendRichAlert({
-      title: `🎮 Game Upload Started`,
-      description: `${tenantId} - Uploading game clip to YouTube...`,
-      status: 'warning',
-      fields: [
-        { name: 'Game Name', value: job.chapterName, inline: true },
-        { name: 'VOD ID', value: vodId, inline: false },
-      ],
-      timestamp: new Date().toISOString(),
-    });
-  }
+  const uploadAlertMessageId = await initRichAlert({
+    title: `🎮 Game Upload Started`,
+    description: `${tenantId} - Uploading game clip to YouTube...`,
+    status: 'warning',
+    fields: [
+      { name: 'Game Name', value: job.chapterName, inline: true },
+      { name: 'VOD ID', value: vodId, inline: false },
+    ],
+    timestamp: new Date().toISOString(),
+  });
 
   const result = await uploadVideo(
     tenantId,
@@ -357,32 +337,27 @@ async function processSplitGameUpload(
   const totalParts = Math.ceil(trimmedDuration / YOUTUBE_MAX_DURATION);
 
   // Create splitting progress alert for game clips
-  let splitAlertMessageId: string | null = null;
-  if (isAlertsEnabled()) {
-    splitAlertMessageId = await sendRichAlert({
-      title: `✂️ Game Clip Splitting in Progress`,
-      description: `${tenantId} - Preparing ${totalParts} parts...`,
-      status: 'warning',
-      fields: [
-        { name: 'Game Name', value: job.chapterName, inline: true },
-        { name: 'Total Duration', value: toHHMMSS(trimmedDuration), inline: true },
-        { name: 'Parts Count', value: String(totalParts), inline: false },
-      ],
-      timestamp: new Date().toISOString(),
-    });
-  }
+  const splitAlertMessageId = await initRichAlert({
+    title: `✂️ Game Clip Splitting in Progress`,
+    description: `${tenantId} - Preparing ${totalParts} parts...`,
+    status: 'warning',
+    fields: [
+      { name: 'Game Name', value: job.chapterName, inline: true },
+      { name: 'Total Duration', value: toHHMMSS(trimmedDuration), inline: true },
+      { name: 'Parts Count', value: String(totalParts), inline: false },
+    ],
+    timestamp: new Date().toISOString(),
+  });
 
   const splitPaths = await splitVideo(trimmedPath, trimmedDuration, YOUTUBE_MAX_DURATION, `${vodId}-game`, (percent: number) => {
-    if (splitAlertMessageId && isAlertsEnabled()) {
-      updateDiscordEmbed(splitAlertMessageId, {
-        title: `✂️ Splitting Game Clip`,
-        description: `${tenantId} - Game clip exceeds YouTube max duration`,
-        status: 'warning',
-        fields: [{ name: 'Progress', value: formatProgressMessage('Game Splitting', tenantId, percent), inline: false }],
-        timestamp: new Date().toISOString(),
-        updatedTimestamp: new Date().toISOString(),
-      });
-    }
+    void updateAlert(splitAlertMessageId, {
+      title: `✂️ Splitting Game Clip`,
+      description: `${tenantId} - Game clip exceeds YouTube max duration`,
+      status: 'warning',
+      fields: [{ name: 'Progress', value: formatProgressMessage('Game Splitting', tenantId, percent), inline: false }],
+      timestamp: new Date().toISOString(),
+      updatedTimestamp: new Date().toISOString(),
+    });
   });
 
   const uploadedGameVideos: Array<{ id: string; part: number; startTime: number; endTime: number; gameId: string }> = [];
@@ -394,20 +369,17 @@ async function processSplitGameUpload(
 
     const partTitle = i > 0 ? `${job.title} PART ${i + 1}` : job.title;
 
-    let uploadAlertMessageId: string | null = null;
-    if (isAlertsEnabled()) {
-      uploadAlertMessageId = await sendRichAlert({
-        title: `🎮 Game Upload (Part ${currentPartNum}/${totalParts})`,
-        description: `${tenantId} - Uploading game clip part to YouTube...`,
-        status: 'warning',
-        fields: [
-          { name: 'Game Name', value: job.chapterName, inline: true },
-          { name: 'VOD ID', value: vodId, inline: true },
-          { name: 'Part', value: `${currentPartNum} of ${totalParts}`, inline: false },
-        ],
-        timestamp: new Date().toISOString(),
-      });
-    }
+    const uploadAlertMessageId = await initRichAlert({
+      title: `🎮 Game Upload (Part ${currentPartNum}/${totalParts})`,
+      description: `${tenantId} - Uploading game clip part to YouTube...`,
+      status: 'warning',
+      fields: [
+        { name: 'Game Name', value: job.chapterName, inline: true },
+        { name: 'VOD ID', value: vodId, inline: true },
+        { name: 'Part', value: `${currentPartNum} of ${totalParts}`, inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+    });
 
     let result;
     try {
@@ -454,19 +426,17 @@ async function processSplitGameUpload(
   }
 
   // Update splitting alert on completion
-  if (splitAlertMessageId && isAlertsEnabled()) {
-    updateDiscordEmbed(splitAlertMessageId, {
-      title: `✅ Game Clip Splitting Complete`,
-      description: `${tenantId} - Successfully split into ${totalParts} parts`,
-      status: 'success',
-      fields: [
-        { name: 'Total Duration', value: toHHMMSS(trimmedDuration), inline: true },
-        { name: 'Parts Count', value: String(totalParts), inline: false },
-      ],
-      timestamp: new Date().toISOString(),
-      updatedTimestamp: new Date().toISOString(),
-    });
-  }
+  void updateAlert(splitAlertMessageId, {
+    title: `✅ Game Clip Splitting Complete`,
+    description: `${tenantId} - Successfully split into ${totalParts} parts`,
+    status: 'success',
+    fields: [
+      { name: 'Total Duration', value: toHHMMSS(trimmedDuration), inline: true },
+      { name: 'Parts Count', value: String(totalParts), inline: false },
+    ],
+    timestamp: new Date().toISOString(),
+    updatedTimestamp: new Date().toISOString(),
+  });
 
   resetFailures(tenantId);
 

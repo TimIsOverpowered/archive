@@ -1,10 +1,5 @@
 import { Processor, Job } from 'bullmq';
-import dayjs from 'dayjs';
-import utcPlugin from 'dayjs/plugin/utc';
-import timezone from 'dayjs/plugin/timezone';
-
-dayjs.extend(utcPlugin);
-dayjs.extend(timezone);
+import dayjs from '../utils/dayjs.js';
 
 import type { DmcaProcessingJob, DmcaProcessingResult, YoutubeVodUploadJob } from './jobs/queues.js';
 import { getYoutubeUploadQueue } from './jobs/queues.js';

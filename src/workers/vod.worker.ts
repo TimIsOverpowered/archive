@@ -11,15 +11,12 @@ import { getKickParsedM3u8ForFfmpeg, getVod } from '../services/kick.js';
 import { getVodTokenSig } from '../services/twitch.js';
 import { getJobContext } from './job-context.js';
 import { queueYoutubeUploads } from './jobs/youtube.job.js';
+import { cleanupHlsFiles } from './vod/hls-cleanup.js';
 import fs from 'fs/promises';
-import path from 'path';
 import HLS from 'hls-parser';
+import type { StandardVodJob } from './jobs/queues.js';
 
-type StandardVodDownloadJobData = import('./jobs/queues.js').StandardVodJob;
-
-export { type StandardVodDownloadJobData };
-
-const vodProcessor: Processor<StandardVodDownloadJobData, unknown, string> = async (job: Job<StandardVodDownloadJobData, unknown, string>) => {
+const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job<StandardVodJob, unknown, string>) => {
   const { dbId, vodId, platform, tenantId, uploadMode, downloadMethod = 'hls' } = job.data;
   const log = createAutoLogger(tenantId);
 
@@ -147,7 +144,7 @@ async function downloadWithHls(
   log: ReturnType<typeof createAutoLogger>
 ): Promise<void> {
   const vodDir = getVodDirPath({ tenantId, vodId });
-  const m3u8Path = path.join(vodDir, `${vodId}.m3u8`);
+  const m3u8Path = `${vodDir}/${vodId}.m3u8`;
 
   try {
     await fs.mkdir(vodDir, { recursive: true });
@@ -229,26 +226,14 @@ async function downloadWithHls(
     }
 
     const finalMp4Exists = await fileExists(finalPath);
+    const shouldKeepHls = config?.settings.saveHLS ?? false;
 
-    if (finalMp4Exists) {
-      if (!config?.settings.saveHLS) {
-        try {
-          await fs.rm(vodDir, { recursive: true });
-          log.info({ vodId }, `Cleaned up temporary directory ${vodDir}`);
-        } catch (error) {
-          log.warn({ error: extractErrorDetails(error).message, vodId }, `Failed to clean up temporary directory`);
-        }
-      } else {
-        log.info({ vodId }, `HLS files preserved in ${vodDir} (saveHLS=true)`);
-      }
+    if (!finalMp4Exists) {
+      await cleanupHlsFiles(vodDir, shouldKeepHls, log);
+    } else if (!shouldKeepHls) {
+      await cleanupHlsFiles(vodDir, shouldKeepHls, log);
     } else {
-      try {
-        await fs.rm(vodDir, { recursive: true });
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-          log.warn({ error: extractErrorDetails(error).message, vodId }, `Cleanup failed`);
-        }
-      }
+      log.info({ vodId }, `HLS files preserved in ${vodDir} (saveHLS=true)`);
     }
   }
 }

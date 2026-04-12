@@ -4,13 +4,11 @@ import standardVodProcessor from './vod.worker.js';
 import chatProcessor from './chat.worker.js';
 import youtubeProcessor from './youtube.worker.js';
 import dmcaProcessor from './dmca.worker.js';
-import type { LiveDownloadJobData } from './live.worker.js';
-import type { StandardVodDownloadJobData } from './vod.worker.js';
-import { ChatDownloadJob, ChatDownloadResult, DmcaProcessingJob, DmcaProcessingResult, QUEUE_NAMES, YoutubeUploadJob, YoutubeUploadResult } from './jobs/queues.js';
+import { ChatDownloadJob, ChatDownloadResult, DmcaProcessingJob, DmcaProcessingResult, QUEUE_NAMES, YoutubeUploadJob, YoutubeUploadResult, LiveDownloadJob, StandardVodJob } from './jobs/queues.js';
 import { Job } from 'bullmq';
 
 export type WorkerName = 'vod_live' | 'vod_standard' | 'chat_download' | 'youtube_upload' | 'dmca_processing';
-export type AllJobData = LiveDownloadJobData | StandardVodDownloadJobData | ChatDownloadJob | YoutubeUploadJob | DmcaProcessingJob;
+export type AllJobData = LiveDownloadJob | StandardVodJob | ChatDownloadJob | YoutubeUploadJob | DmcaProcessingJob;
 
 export interface WorkerConfig<TData, TResult> {
   name: WorkerName;
@@ -27,13 +25,13 @@ function defineWorker<TData extends object, TResult>(def: WorkerConfig<TData, TR
 }
 
 export const WORKER_DEFINITIONS = [
-  defineWorker<LiveDownloadJobData, unknown>({
+  defineWorker<LiveDownloadJob, unknown>({
     name: 'vod_live',
     queueName: QUEUE_NAMES.VOD_LIVE,
     processor: liveProcessor,
     concurrency: 50,
   }),
-  defineWorker<StandardVodDownloadJobData, unknown>({
+  defineWorker<StandardVodJob, unknown>({
     name: 'vod_standard',
     queueName: QUEUE_NAMES.VOD_STANDARD,
     processor: standardVodProcessor,

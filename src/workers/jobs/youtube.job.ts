@@ -2,10 +2,7 @@ import { getTenantConfig } from '../../config/loader.js';
 import { getClient } from '../../db/client.js';
 import { getYoutubeUploadQueue } from './queues.js';
 import type { YoutubeVodUploadJob, YoutubeGameUploadJob } from './queues.js';
-import dayjs from 'dayjs';
-import timezone from 'dayjs/plugin/timezone';
-
-dayjs.extend(timezone);
+import dayjs from '../../utils/dayjs.js';
 
 // ============== VOD Job Creation ==============
 

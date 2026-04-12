@@ -1,11 +1,12 @@
 import Redis, { RedisOptions } from 'ioredis';
 import { logger } from '../utils/logger.js';
+import { REDIS_MAX_RETRIES, REDIS_RETRY_TIMEOUT_MS } from '../constants.js';
 
 // Eagerly created singleton ioredis instance for all BullMQ operations
 const redisOptions: RedisOptions = {
   maxRetriesPerRequest: null, // Required by BullMQ workers
   retryStrategy(times: number) {
-    if (times > 10) return null; // Give up after 10 attempts
+    if (times > REDIS_MAX_RETRIES) return null;
     const delay = Math.min(times * 500, 5000);
     logger.warn({ times, delay }, '[Workers Redis] Reconnection attempt');
     return delay;
@@ -15,7 +16,7 @@ const redisOptions: RedisOptions = {
 const redisInstance = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', redisOptions);
 
 // Wait for ready event with timeout (register BEFORE connect)
-const readyTimeout = 30000;
+const readyTimeout = REDIS_RETRY_TIMEOUT_MS;
 let readyResolved = false;
 
 const readyHandler = () => {
