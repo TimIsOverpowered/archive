@@ -12,13 +12,13 @@ export const BaseConfigSchema = z.object({
   }, 'ENCRYPTION_MASTER_KEY must be a valid 32-byte hex string'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
   DISABLE_REDIS_CACHE: z.preprocess((val) => String(val).toLowerCase() === 'true', z.boolean()).default(false),
-  STATS_CACHE_TTL: z.coerce.number().default(60),
 });
 
 // API-specific schema (extends base + API-only fields)
 export const ApiConfigSchema = BaseConfigSchema.extend({
   PORT: z.coerce.number().min(1).max(65535).default(3030),
   HOST: z.string().default('0.0.0.0'),
+  STATS_CACHE_TTL: z.coerce.number().int().positive().default(60),
 });
 
 // Workers-specific schema (extends base + workers-only fields)
@@ -76,7 +76,7 @@ export function getWorkersConfig(): WorkersConfig {
 }
 
 // Clear cache (used by both)
-export function clearConfigCache(): void {
+export function resetEnvConfig(): void {
   apiConfigCache = null;
   workersConfigCache = null;
 }
