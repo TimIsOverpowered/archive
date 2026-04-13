@@ -1,7 +1,6 @@
 import { navigateToUrl } from '../utils/puppeteer-manager.js';
 import { extractErrorDetails, createErrorContext } from '../utils/error.js';
 import { logger } from '../utils/logger.js';
-import { KickStreamStatus } from '../types/kick.js';
 import { sleep } from '../utils/delay.js';
 
 // Kick Live API constants
@@ -11,6 +10,26 @@ const KICK_PAGE_DELAY_MS = 2000;
 interface KickApiResponse {
   data?: Record<string, unknown>;
   error?: string;
+}
+
+export interface KickStreamStatus {
+  id: string;
+  session_title?: string | null;
+  created_at: string;
+  playback_url?: string | null;
+  viewers?: number | null;
+  slug?: string | null;
+  language?: string | null;
+  is_mature?: boolean | null;
+  category?: {
+    id: number;
+    name?: string | null;
+    slug?: string | null;
+  } | null;
+  thumbnail?: {
+    src?: string | null;
+    srcset?: string | null;
+  } | null;
 }
 
 /**

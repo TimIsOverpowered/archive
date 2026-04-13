@@ -1,3 +1,5 @@
+import { isValidPlatform } from '../../types/platforms.js';
+
 export const platformConstraintStrategy = {
   name: 'platform' as const,
   storage() {
@@ -16,6 +18,6 @@ export const platformConstraintStrategy = {
   },
   mustMatchWhenDerived: true,
   validate(value: string) {
-    return ['twitch', 'kick'].includes(value);
+    return isValidPlatform(value);
   },
 };

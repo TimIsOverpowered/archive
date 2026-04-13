@@ -8,12 +8,13 @@ import { createClient, getClient } from '../../db/client.js';
 import type { TenantConfig } from '../../config/types.js';
 import { getTwitchStreamStatus, getLatestTwitchVodObject, type TwitchStreamStatus } from '../../services/twitch/index.js';
 import { getKickStreamStatus, getLatestKickVodObject } from '../../services/kick-live.js';
-import type { KickStreamStatus } from '../../types/kick.js';
+import type { KickStreamStatus } from '../../services/kick-live.js';
 import { sendRichAlert } from '../../utils/discord-alerts.js';
-import { capitalizePlatform, formatDuration } from '../../utils/formatting.js';
+import { formatDuration } from '../../utils/formatting.js';
 import { extractErrorDetails, createErrorContext } from '../../utils/error.js';
+import type { Platform } from '../../types/platforms.js';
+import { capitalizePlatform } from '../../types/platforms.js';
 
-type PlatformType = 'twitch' | 'kick';
 type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
 
 const inFlightChecks = new Map<string, number>();
@@ -21,7 +22,7 @@ const inFlightChecks = new Map<string, number>();
 /**
  * Main polling function - called every 30 seconds per tenant/platform pair
  */
-export async function checkPlatformStatus(tenantId: string, platform: PlatformType, config: TenantConfig): Promise<void> {
+export async function checkPlatformStatus(tenantId: string, platform: Platform, config: TenantConfig): Promise<void> {
   const log = createAutoLogger(tenantId);
   const lockKey = `${tenantId}:${platform}`;
 
@@ -84,7 +85,7 @@ export async function checkPlatformStatus(tenantId: string, platform: PlatformTy
  * Handle Twitch-specific live detection logic - NO FALLBACK, only downloads after VOD object confirmed available
  */
 
-async function sendStreamLiveAlert(platform: PlatformType, vodId: string, title: string, username: string, displayName?: string): Promise<void> {
+async function sendStreamLiveAlert(platform: Platform, vodId: string, title: string, username: string, displayName?: string): Promise<void> {
   const streamerName = displayName || username;
 
   try {
@@ -105,7 +106,7 @@ async function sendStreamLiveAlert(platform: PlatformType, vodId: string, title:
   }
 }
 
-async function sendStreamOfflineAlert(platform: PlatformType, vodId: string, startedAt?: Date, username?: string, displayName?: string): Promise<void> {
+async function sendStreamOfflineAlert(platform: Platform, vodId: string, startedAt?: Date, username?: string, displayName?: string): Promise<void> {
   const streamerName = displayName || username;
 
   try {
@@ -132,7 +133,7 @@ async function sendStreamOfflineAlert(platform: PlatformType, vodId: string, sta
   }
 }
 
-async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string, platform: PlatformType, config: TenantConfig): Promise<void> {
+async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string, platform: Platform, config: TenantConfig): Promise<void> {
   const log = createAutoLogger(tenantId);
 
   if (!config.twitch?.enabled) return;
@@ -286,7 +287,7 @@ async function handleTwitchLiveCheck(prisma: StreamerDbClient, tenantId: string,
 /**
  * Handle Kick-specific live detection logic - NO FALLBACK, only downloads after video object confirmed available
  */
-async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, platform: PlatformType, config: TenantConfig): Promise<void> {
+async function handleKickLiveCheck(prisma: StreamerDbClient, tenantId: string, platform: Platform, config: TenantConfig): Promise<void> {
   const log = createAutoLogger(tenantId);
 
   if (!config.kick?.enabled) return;
@@ -486,7 +487,7 @@ async function validateVodPath(tenantId: string): Promise<{ valid: boolean }> {
 async function enqueueLiveHlsDownload(params: {
   dbId: number;
   vodId: string;
-  platform: PlatformType;
+  platform: Platform;
   tenantId: string;
   platformUserId: string;
   platformUsername?: string;
@@ -543,7 +544,7 @@ async function enqueueLiveHlsDownload(params: {
 /**
  * Start independent polling loop per tenant/platform pair (concurrent async execution)
  */
-export function startStreamDetectionLoop(tenantId: string, platform: PlatformType, config: TenantConfig): void {
+export function startStreamDetectionLoop(tenantId: string, platform: Platform, config: TenantConfig): void {
   const log = createAutoLogger(tenantId);
   log.info(`[${capitalizePlatform(platform)}]: Starting stream detection polling every 30 seconds`);
 

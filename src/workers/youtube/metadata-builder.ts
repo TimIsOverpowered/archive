@@ -1,5 +1,6 @@
 import dayjs from '../../utils/dayjs.js';
-import { capitalizePlatform } from '../../utils/formatting.js';
+import type { SourceType, UploadType } from '../../types/platforms.js';
+import { SOURCE_TYPES, UPLOAD_TYPES } from '../../types/platforms.js';
 
 export interface YoutubeMetadataOptions {
   channelName: string;
@@ -10,7 +11,7 @@ export interface YoutubeMetadataOptions {
   timezone: string;
   youtubeDescription?: string;
   part?: number;
-  type?: 'vod' | 'live' | 'game';
+  type?: SourceType | UploadType;
   gameName?: string;
   epNumber?: number;
 }
@@ -21,21 +22,21 @@ export interface YoutubeMetadata {
 }
 
 export function buildYoutubeMetadata(options: YoutubeMetadataOptions): YoutubeMetadata {
-  const { channelName, platform, vodDate, vodTitle, domainName, timezone, youtubeDescription, part, type = 'vod', gameName, epNumber } = options;
+  const { channelName, platform, vodDate, vodTitle, domainName, timezone, youtubeDescription, part, type = UPLOAD_TYPES.VOD, gameName, epNumber } = options;
 
-  const platformName = capitalizePlatform(platform).toUpperCase();
+  const platformName = platform.charAt(0).toUpperCase() + platform.slice(1).toUpperCase();
   const dateFormatted = dayjs(vodDate).tz(timezone).format('MMMM DD YYYY').toUpperCase();
 
   let title: string;
   let description: string;
 
-  if (type === 'game' && gameName) {
+  if (type === UPLOAD_TYPES.GAME && gameName) {
     title = `${channelName} plays ${gameName} EP ${epNumber ?? 1} - ${dateFormatted}`;
     description = `Chat Replay: https://${domainName}/games/${vodDate.toISOString().split('T')[0]}\nStream Title: ${vodTitle?.replace(/>|</gi, '') || ''}\n${youtubeDescription || ''}`;
   } else {
-    const baseTitle = `${channelName} ${platformName}${type === 'live' ? ' LIVE' : ''} VOD - ${dateFormatted}`;
+    const baseTitle = `${channelName} ${platformName}${type === SOURCE_TYPES.LIVE ? ' LIVE' : ''} VOD - ${dateFormatted}`;
     title = part ? `${baseTitle} PART ${part}` : baseTitle;
-    const replayPath = type === 'vod' || type === 'live' ? `youtube/${vodDate.toISOString().split('T')[0]}` : `games/${vodDate.toISOString().split('T')[0]}`;
+    const replayPath = type === UPLOAD_TYPES.VOD || type === SOURCE_TYPES.LIVE ? `youtube/${vodDate.toISOString().split('T')[0]}` : `games/${vodDate.toISOString().split('T')[0]}`;
     description = `Chat Replay: https://${domainName}/${replayPath}\nStream Title: ${vodTitle?.replace(/>|</gi, '') || ''}\n${youtubeDescription || ''}`;
   }
 
