@@ -127,6 +127,14 @@ export const youtubeJobOptions = {
   attempts: 5,
 };
 
+export const dmcaJobOptions = {
+  attempts: 60,
+  backoff: {
+    type: 'fixed' as const,
+    delay: 10 * 60 * 1000,
+  },
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const queueCache = new Map<string, Queue<any, any, string>>();
 
@@ -163,7 +171,7 @@ export function getYoutubeUploadQueue(): Queue<YoutubeUploadJob, YoutubeUploadJo
 }
 
 export function getDmcaProcessingQueue(): Queue<DmcaProcessingJob, DmcaProcessingJob, string> {
-  return getQueue(QUEUE_NAMES.DMCA_PROCESSING);
+  return getQueue(QUEUE_NAMES.DMCA_PROCESSING, dmcaJobOptions);
 }
 
 export interface JobLogger {

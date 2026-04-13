@@ -1,7 +1,7 @@
 import pLimit from 'p-limit';
-import { getWorkersConfig } from '../config/env.js';
 
-const limit = pLimit(getWorkersConfig().PUPPETEER_CONCURRENCY);
+const CONCURRENCY = parseInt(process.env.PUPPETEER_CONCURRENCY || '3', 10);
+const limit = pLimit(CONCURRENCY);
 
 export { limit };
 

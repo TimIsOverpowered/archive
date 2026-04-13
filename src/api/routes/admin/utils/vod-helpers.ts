@@ -156,42 +156,9 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
     uploadMode,
     downloadMethod,
   };
-  const job = await queue.add('standard_vod_download', jobData, { jobId: `download_${vodId}` });
+  await queue.add('standard_vod_download', jobData, { jobId: `download_${vodId}` });
 
-  // Poll job state until completed or failed (max 4 hours)
-  const maxWaitTime = 4 * 60 * 60 * 1000;
-  const startTime = Date.now();
-
-  while (Date.now() - startTime < maxWaitTime) {
-    const state = await job.getState();
-
-    if (state === 'completed') {
-      const result = job.returnvalue as unknown as { success: boolean } | undefined;
-      if (!result?.success) {
-        log.error({ vodId }, 'VOD download completed but returned unsuccessful result');
-        throw new Error(`VOD download completed but returned unsuccessful result for ${vodId}`);
-      }
-      break;
-    }
-
-    if (state === 'failed') {
-      const attempts = await job.attemptsMade;
-      log.error({ vodId, attempts }, 'VOD download failed');
-      throw new Error(`VOD download failed for ${vodId} after ${attempts} attempts`);
-    }
-
-    // Wait 5 seconds before checking again
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-  }
-
-  // If we exit the loop, check final state
-  const finalState = await job.getState();
-  if (finalState !== 'completed') {
-    log.error({ vodId, finalState }, 'VOD download timed out');
-    throw new Error(`VOD download timed out for ${vodId} after ${maxWaitTime / 1000 / 60} minutes`);
-  }
-
-  log.info({ vodId, filePath, type }, 'VOD download completed');
+  log.info({ vodId, filePath, type }, 'VOD download queued');
   return filePath;
 }
 
