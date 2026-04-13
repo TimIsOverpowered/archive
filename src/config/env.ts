@@ -12,6 +12,7 @@ export const BaseConfigSchema = z.object({
   }, 'ENCRYPTION_MASTER_KEY must be a valid 32-byte hex string'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
   DISABLE_REDIS_CACHE: z.preprocess((val) => String(val).toLowerCase() === 'true', z.boolean()).default(false),
+  PUPPETEER_CONCURRENCY: z.coerce.number().int().positive().default(3),
 });
 
 // API-specific schema (extends base + API-only fields)
