@@ -3,6 +3,9 @@ import { getClient } from '../../db/client.js';
 import { getYoutubeUploadQueue } from './queues.js';
 import type { YoutubeVodUploadJob, YoutubeGameUploadJob } from './queues.js';
 import dayjs from '../../utils/dayjs.js';
+import { childLogger } from '../../utils/logger.js';
+
+const log = childLogger({ module: 'youtube-job' });
 
 // ============== VOD Job Creation ==============
 
@@ -157,7 +160,11 @@ export async function enqueueVodUpload(job: YoutubeVodUploadJob): Promise<string
       deduplication: { id: jobId },
     });
     return addedJob.id ?? null;
-  } catch {
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (!msg.includes('deduplication')) {
+      log.error({ jobId, tenantId: job.tenantId, error: msg }, 'Failed to enqueue YouTube VOD upload');
+    }
     return null;
   }
 }
@@ -172,7 +179,11 @@ export async function enqueueGameUpload(job: YoutubeGameUploadJob): Promise<stri
       deduplication: { id: jobId },
     });
     return addedJob.id ?? null;
-  } catch {
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (!msg.includes('deduplication')) {
+      log.error({ jobId, tenantId: job.tenantId, error: msg }, 'Failed to enqueue YouTube game upload');
+    }
     return null;
   }
 }
@@ -208,26 +219,6 @@ export async function queueYoutubeGameUploadsForVod(tenantId: string, dbId: numb
   for (const job of jobs) {
     await enqueueGameUpload(job);
   }
-}
-
-// ============== Backward Compatibility ==============
-
-// DEPRECATED: Use queueYoutubeVodUpload or queueYoutubeGameUpload instead
-export async function triggerYoutubeUpload(
-  tenantId: string,
-  dbId: number,
-  vodId: string,
-  filePath: string,
-  _title: string,
-  _description: string,
-  type: 'vod' | 'game',
-  platform?: 'twitch' | 'kick',
-  _part?: number
-): Promise<string | null> {
-  if (type === 'vod' && platform) {
-    return queueYoutubeVodUpload(tenantId, dbId, vodId, filePath, platform);
-  }
-  return null;
 }
 
 // ============== Upload Queue Helpers ==============
