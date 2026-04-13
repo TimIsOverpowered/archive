@@ -8,12 +8,14 @@ import { getDuration } from '../../../../workers/vod/ffmpeg.js';
 import { getStandardVodQueue, type StandardVodJob } from '../../../../workers/jobs/queues.js';
 import { createAutoLogger } from '../../../../utils/auto-tenant-logger.js';
 import type { VodRecord } from '../../../../types/db.js';
+import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../../types/platforms.js';
+import { DOWNLOAD_METHODS } from '../../../../types/platforms.js';
 
 type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
 
 export interface VodCreateOptions {
   vodId: number;
-  platform: 'twitch' | 'kick';
+  platform: Platform;
   tenantId: string;
   title?: string | null;
   createdAt?: Date;
@@ -24,7 +26,7 @@ export interface VodCreateOptions {
 export interface QueueEmoteOptions {
   tenantId: string;
   vodId: number;
-  platform: 'twitch' | 'kick';
+  platform: Platform;
   platformId: string;
   log: FastifyRequest['log'];
 }
@@ -33,16 +35,16 @@ export interface EnsureVodDownloadOptions {
   tenantId: string;
   dbId: number;
   vodId: string;
-  platform: 'twitch' | 'kick';
-  type: 'live' | 'vod';
-  downloadMethod?: 'ffmpeg' | 'hls';
-  uploadMode?: 'vod' | 'all';
+  platform: Platform;
+  type: SourceType;
+  downloadMethod?: DownloadMethod;
+  uploadMode?: UploadMode;
 }
 
 /**
  * Fetches VOD record or returns null if not found
  */
-export async function findVodRecord(client: StreamerDbClient, vodId: string, platform: 'twitch' | 'kick'): Promise<VodRecord | null> {
+export async function findVodRecord(client: StreamerDbClient, vodId: string, platform: Platform): Promise<VodRecord | null> {
   try {
     return await client.vod.findUnique({ where: { platform_vod_id: { platform, vod_id: vodId } } });
   } catch {
@@ -77,7 +79,7 @@ export function parseTwitchDuration(durationStr: string): number {
 /**
  * Parses duration from various formats to seconds
  */
-export function parseDurationToSeconds(duration: number | string, platform?: 'twitch' | 'kick'): number {
+export function parseDurationToSeconds(duration: number | string, platform?: Platform): number {
   if (typeof duration === 'number') {
     return Number(duration);
   }
@@ -122,7 +124,7 @@ export async function queueEmoteFetch(options: QueueEmoteOptions): Promise<void>
  * @throws Error if download fails or configuration is missing
  */
 export async function ensureVodDownload(options: EnsureVodDownloadOptions): Promise<string> {
-  const { tenantId, dbId, vodId, platform, type, downloadMethod = 'hls', uploadMode } = options;
+  const { tenantId, dbId, vodId, platform, type, downloadMethod = DOWNLOAD_METHODS.HLS, uploadMode } = options;
   const log = createAutoLogger(tenantId);
 
   const config = getTenantConfig(tenantId);
@@ -165,7 +167,7 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
 /**
  * Checks if a VOD file needs to be downloaded (missing or duration mismatch).
  */
-async function checkIfDownloadNeeded(filePath: string, dbId: number, tenantId: string, platform: 'twitch' | 'kick', log: ReturnType<typeof createAutoLogger>): Promise<boolean> {
+async function checkIfDownloadNeeded(filePath: string, dbId: number, tenantId: string, platform: Platform, log: ReturnType<typeof createAutoLogger>): Promise<boolean> {
   const exists = await fileExists(filePath);
   if (!exists) {
     log.debug({ filePath }, 'File does not exist');
@@ -210,7 +212,7 @@ export async function ensureVodRecord(
   client: StreamerDbClient,
   tenantId: string,
   vodId: string,
-  platform: 'twitch' | 'kick',
+  platform: Platform,
   log: ReturnType<typeof createAutoLogger>
 ): Promise<VodRecord | null> {
   // Try to find existing VOD record

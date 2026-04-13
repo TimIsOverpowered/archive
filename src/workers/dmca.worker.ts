@@ -13,6 +13,7 @@ import { getVodFilePath, fileExists } from '../utils/path.js';
 import { getStandardVodQueue } from './jobs/queues.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { createDmcaWorkerAlerts } from './utils/alert-factories.js';
+import { SOURCE_TYPES } from '../types/platforms.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
   const { tenantId, dbId, vodId, receivedClaims, type, platform, part } = job.data;
@@ -37,7 +38,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
   }
 
   // For live streams, use stream_id; for archived, use vod_id
-  const fileIdentifier = type === 'live' ? vodRecord.stream_id || vodId : vodId;
+  const fileIdentifier = type === SOURCE_TYPES.LIVE ? vodRecord.stream_id || vodId : vodId;
 
   const filePath = getVodFilePath({ tenantId, vodId: fileIdentifier });
 

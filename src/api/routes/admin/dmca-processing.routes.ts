@@ -10,8 +10,10 @@ import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformCont
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error';
+import type { Platform, SourceType } from '../../../types/platforms.js';
+import { PLATFORMS, SOURCE_TYPES } from '../../../types/platforms.js';
 
-type VodRecord = { id: number; vod_id: string; platform: 'twitch' | 'kick' };
+type VodRecord = { id: number; vod_id: string; platform: Platform };
 
 interface DmcaClaim {
   type?: string;
@@ -29,8 +31,8 @@ type StrictDmcaClaims = Array<{
 interface DmcaRequestBody {
   vodId: string;
   claims: DmcaClaim[] | string;
-  platform: 'twitch' | 'kick';
-  type?: 'vod' | 'live';
+  platform: Platform;
+  type?: SourceType;
   partIndex?: number;
 }
 
@@ -77,7 +79,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
       dbId: vodRecord.id,
       vodId: String(vodRecord.vod_id),
       receivedClaims: claimsArray as StrictDmcaClaims,
-      type: body.type || 'vod',
+      type: body.type || SOURCE_TYPES.VOD,
       platform: body.platform,
     };
 
@@ -134,8 +136,8 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
             vodId: { type: 'string', description: 'Platform VOD ID' },
             claims: {},
             partIndex: { type: 'number' },
-            platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Source platform' },
-            type: { type: 'string', enum: ['vod', 'live'] },
+            platform: { type: 'string', enum: Object.values(PLATFORMS), description: 'Source platform' },
+            type: { type: 'string', enum: Object.values(SOURCE_TYPES) },
           },
           required: ['vodId', 'claims', 'platform'],
         },

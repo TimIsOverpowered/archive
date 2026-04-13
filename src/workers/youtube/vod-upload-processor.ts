@@ -8,6 +8,8 @@ import { getEffectiveSplitDuration } from './validation.js';
 import { buildYoutubeMetadata } from './metadata-builder.js';
 import { createYoutubeUploadProgressHandler as createVodUploadProgressHandler } from './youtube-upload-progress.js';
 import type { TenantConfig } from '../../config/types.js';
+import type { SourceType } from '../../types/platforms.js';
+import { UPLOAD_TYPES } from '../../types/platforms.js';
 
 export interface VodUploadContext {
   tenantId: string;
@@ -23,7 +25,7 @@ export interface VodUploadContext {
   };
   dmcaProcessed?: boolean;
   log: AppLogger;
-  type: 'vod' | 'live';
+  type: SourceType;
 }
 
 export interface VodUploadResult {
@@ -139,7 +141,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
     const onUploadProgress = uploadAlertMessageId
       ? createVodUploadProgressHandler({
           messageId: uploadAlertMessageId,
-          type: 'vod',
+          type: UPLOAD_TYPES.VOD,
           channelName,
           videoTitle: partTitle,
           part: currentPartNum,
@@ -207,7 +209,7 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
   const onUploadProgress = uploadAlertMessageId
     ? createVodUploadProgressHandler({
         messageId: uploadAlertMessageId,
-        type: 'vod',
+        type: UPLOAD_TYPES.VOD,
         channelName,
         videoTitle: vodTitle,
       })
@@ -222,7 +224,7 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
     data: {
       vod_id: dbId,
       upload_id: result.videoId,
-      type: 'vod',
+      type: UPLOAD_TYPES.VOD,
       part: 1,
       status: 'COMPLETED',
     },

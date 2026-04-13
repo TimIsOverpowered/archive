@@ -1,11 +1,12 @@
 import { Queue, QueueOptions, JobsOptions } from 'bullmq';
 import type { DMCAClaim } from '../../utils/dmca.js';
 import { redisInstance } from '../redis.js';
+import type { Platform, SourceType, UploadType, UploadMode, DownloadMethod } from '../../types/platforms.js';
 
 export interface LiveDownloadJob {
   dbId: number;
   vodId: string;
-  platform: 'twitch' | 'kick';
+  platform: Platform;
   tenantId: string;
   platformUserId: string;
   platformUsername?: string;
@@ -17,9 +18,9 @@ export interface StandardVodJob {
   tenantId: string;
   dbId: number;
   vodId: string;
-  platform: 'twitch' | 'kick';
-  downloadMethod?: 'ffmpeg' | 'hls';
-  uploadMode?: 'vod' | 'all';
+  platform: Platform;
+  downloadMethod?: DownloadMethod;
+  uploadMode?: UploadMode;
 }
 
 export interface ChatDownloadJob {
@@ -28,7 +29,7 @@ export interface ChatDownloadJob {
   platformUsername?: string;
   dbId: number;
   vodId: string;
-  platform: 'twitch' | 'kick';
+  platform: Platform;
   duration: number;
   startOffset?: number;
 }
@@ -38,8 +39,8 @@ export interface YoutubeVodUploadJob {
   dbId: number;
   vodId: string;
   filePath: string;
-  type: 'vod';
-  platform: 'twitch' | 'kick';
+  type: UploadType;
+  platform: Platform;
   dmcaProcessed?: boolean;
 }
 
@@ -48,8 +49,8 @@ export interface YoutubeGameUploadJob {
   dbId: number;
   vodId: string;
   filePath: string;
-  type: 'game';
-  platform: 'twitch' | 'kick';
+  type: UploadType;
+  platform: Platform;
   chapterId: number;
   chapterName: string;
   chapterStart: number;
@@ -66,8 +67,8 @@ export interface DmcaProcessingJob {
   dbId: number;
   vodId: string;
   receivedClaims: DMCAClaim[];
-  type: 'vod' | 'live';
-  platform: 'twitch' | 'kick';
+  type: SourceType;
+  platform: Platform;
   part?: number;
 }
 

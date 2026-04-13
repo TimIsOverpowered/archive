@@ -11,9 +11,11 @@ import { createVodWorkerAlerts } from './utils/alert-factories.js';
 import type { StandardVodJob } from './jobs/queues.js';
 import { downloadVodWithFfmpeg } from './vod/vod-download-strategies.js';
 import { getKickSourceUrl } from './vod/kick-vod-helper.js';
+import type { Platform } from '../types/platforms.js';
+import { DOWNLOAD_METHODS } from '../types/platforms.js';
 
 const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job<StandardVodJob, unknown, string>) => {
-  const { dbId, vodId, platform, tenantId, uploadMode, downloadMethod = 'hls' } = job.data;
+  const { dbId, vodId, platform, tenantId, uploadMode, downloadMethod = DOWNLOAD_METHODS.HLS } = job.data;
   const log = createAutoLogger(tenantId);
 
   log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[Standard VOD Worker] Starting job');
@@ -52,7 +54,7 @@ const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job
 };
 
 async function downloadVodWithHls(
-  platform: 'twitch' | 'kick',
+  platform: Platform,
   vodId: string,
   finalPath: string,
   tenantId: string,

@@ -1,17 +1,11 @@
 import type { StandardVodJob } from './queues.js';
 import { getStandardVodQueue } from './queues.js';
 import { childLogger } from '../../utils/logger.js';
+import type { Platform, DownloadMethod, UploadMode } from '../../types/platforms.js';
 
 const log = childLogger({ module: 'vod-job' });
 
-export async function triggerVodDownload(
-  tenantId: string,
-  dbId: number,
-  vodId: string,
-  platform: 'twitch' | 'kick',
-  downloadMethod?: 'ffmpeg' | 'hls',
-  uploadMode?: 'vod' | 'all'
-): Promise<string | null> {
+export async function triggerVodDownload(tenantId: string, dbId: number, vodId: string, platform: Platform, downloadMethod?: DownloadMethod, uploadMode?: UploadMode): Promise<string | null> {
   const jobId = `vod_${vodId}`;
   const job: StandardVodJob = {
     tenantId,

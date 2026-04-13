@@ -6,6 +6,7 @@ import { processVodUpload, linkVodPartsAfterDelay } from './youtube/vod-upload-p
 import { processGameUpload } from './youtube/game-upload-processor.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { resetFailures } from '../utils/discord-alerts.js';
+import { UPLOAD_TYPES } from '../types/platforms.js';
 
 const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async (job: Job<YoutubeUploadJob>) => {
   const { tenantId, dbId, vodId, type } = job.data;
@@ -19,9 +20,9 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
   try {
     if (type === 'vod') {
-      return await processVodUploadJob(job.data, config, db, log);
+      return await processVodUploadJob(job.data as YoutubeVodUploadJob, config, db, log);
     } else {
-      return await processGameUploadJob(job.data, config, db, log);
+      return await processGameUploadJob(job.data as YoutubeGameUploadJob, config, db, log);
     }
   } catch (error) {
     const errorMsg = handleWorkerError(error, log, { vodId, tenantId, dbId, jobId: job.id });
@@ -62,7 +63,7 @@ async function processVodUploadJob(
     },
     dmcaProcessed,
     log,
-    type: 'vod',
+    type: UPLOAD_TYPES.VOD,
   });
 
   for (const video of result.uploadedVideos) {
@@ -70,7 +71,7 @@ async function processVodUploadJob(
       data: {
         vod_id: dbId,
         upload_id: video.id,
-        type: 'vod',
+        type: UPLOAD_TYPES.VOD,
         part: video.part,
         status: 'COMPLETED',
       },

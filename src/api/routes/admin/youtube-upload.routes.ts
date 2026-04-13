@@ -4,6 +4,8 @@ import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { notFound, badRequest } from '../../../utils/http-error';
+import type { Platform, SourceType, DownloadMethod } from '../../../types/platforms.js';
+import { PLATFORMS, SOURCE_TYPES, DOWNLOAD_METHODS, UPLOAD_MODES } from '../../../types/platforms.js';
 
 interface ReUploadYoutubeParams {
   tenantId: string;
@@ -11,9 +13,9 @@ interface ReUploadYoutubeParams {
 
 interface ReUploadYoutubeBody {
   vodId: string;
-  platform: 'twitch' | 'kick';
-  downloadMethod?: 'ffmpeg' | 'hls';
-  type?: 'live' | 'vod';
+  platform: Platform;
+  downloadMethod?: DownloadMethod;
+  type?: SourceType;
 }
 
 export default async function youtubeUploadRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
@@ -35,9 +37,9 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
           type: 'object',
           properties: {
             vodId: { type: 'string', description: 'Platform VOD ID' },
-            platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Source platform' },
-            downloadMethod: { type: 'string', enum: ['ffmpeg', 'hls'], default: 'hls', description: 'Download method' },
-            type: { type: 'string', enum: ['live', 'vod'], default: 'vod', description: 'File type for checking' },
+            platform: { type: 'string', enum: Object.values(PLATFORMS), description: 'Source platform' },
+            downloadMethod: { type: 'string', enum: Object.values(DOWNLOAD_METHODS), default: DOWNLOAD_METHODS.HLS, description: 'Download method' },
+            type: { type: 'string', enum: Object.values(SOURCE_TYPES), default: SOURCE_TYPES.VOD, description: 'File type for checking' },
           },
           required: ['vodId', 'platform'],
         },
@@ -60,7 +62,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
       const VodQueueModule = await import('../../../workers/jobs/queues');
 
-      const fileIdentifier = type === 'live' ? vodRecord.stream_id || vodRecord.vod_id : vodRecord.vod_id;
+      const fileIdentifier = type === SOURCE_TYPES.LIVE ? vodRecord.stream_id || vodRecord.vod_id : vodRecord.vod_id;
 
       const downloadJob = {
         tenantId,
@@ -68,8 +70,8 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
         dbId: vodRecord.id,
         vodId: fileIdentifier,
         platform,
-        uploadMode: 'vod' as const,
-        downloadMethod: downloadMethod || 'hls',
+        uploadMode: UPLOAD_MODES.VOD,
+        downloadMethod: downloadMethod || DOWNLOAD_METHODS.HLS,
       };
 
       const downloadJobId = `download_${vodRecord.vod_id}`;

@@ -9,6 +9,8 @@ import type { VodData as TwitchVodData } from '../../../services/twitch/index.js
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error';
+import type { Platform } from '../../../types/platforms.js';
+import { PLATFORMS } from '../../../types/platforms.js';
 
 dayjs.extend(durationPlugin);
 
@@ -16,12 +18,12 @@ type RouteParams = { tenantId: string };
 
 interface ChaptersBody {
   vodId: string;
-  platform: 'twitch' | 'kick';
+  platform: Platform;
 }
 
 interface EmotesSaveBody {
   vodId: string;
-  platform: 'twitch' | 'kick';
+  platform: Platform;
 }
 
 interface ChapterGame {
@@ -60,7 +62,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
           type: 'object',
           properties: {
             vodId: { type: 'string', description: 'Platform VOD ID' },
-            platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Source platform' },
+            platform: { type: 'string', enum: Object.values(PLATFORMS), description: 'Source platform' },
           },
           required: ['vodId', 'platform'],
         },
@@ -215,7 +217,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
           type: 'object',
           properties: {
             vodId: { type: 'string', description: 'Platform VOD ID' },
-            platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Source platform' },
+            platform: { type: 'string', enum: Object.values(PLATFORMS), description: 'Source platform' },
           },
           required: ['vodId', 'platform'],
         },

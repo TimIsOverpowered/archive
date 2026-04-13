@@ -4,12 +4,14 @@ import { getYoutubeUploadQueue } from './queues.js';
 import type { YoutubeVodUploadJob, YoutubeGameUploadJob } from './queues.js';
 import dayjs from '../../utils/dayjs.js';
 import { childLogger } from '../../utils/logger.js';
+import type { Platform } from '../../types/platforms.js';
+import { UPLOAD_TYPES, UPLOAD_MODES } from '../../types/platforms.js';
 
 const log = childLogger({ module: 'youtube-job' });
 
 // ============== VOD Job Creation ==============
 
-export async function createVodUploadJob(tenantId: string, dbId: number, vodId: string, filePath: string, platform: 'twitch' | 'kick'): Promise<YoutubeVodUploadJob> {
+export async function createVodUploadJob(tenantId: string, dbId: number, vodId: string, filePath: string, platform: Platform): Promise<YoutubeVodUploadJob> {
   const config = getTenantConfig(tenantId);
   if (!config?.youtube?.upload) {
     throw new Error(`YouTube upload not enabled for tenant ${tenantId}`);
@@ -30,7 +32,7 @@ export async function createVodUploadJob(tenantId: string, dbId: number, vodId: 
     dbId,
     vodId,
     filePath,
-    type: 'vod',
+    type: UPLOAD_TYPES.VOD,
     platform,
   };
 }
@@ -42,7 +44,7 @@ export async function createGameUploadJob(
   dbId: number,
   vodId: string,
   filePath: string,
-  platform: 'twitch' | 'kick',
+  platform: Platform,
   chapter: { id: number; name: string; start: number; end: number; gameId?: string }
 ): Promise<YoutubeGameUploadJob> {
   const config = getTenantConfig(tenantId);
@@ -226,8 +228,8 @@ export interface QueueYoutubeUploadsOptions {
   dbId: number;
   vodId: string;
   filePath: string;
-  platform: 'twitch' | 'kick';
-  uploadMode?: 'vod' | 'all';
+  platform: Platform;
+  uploadMode?: import('../../types/platforms.js').UploadMode;
   config: ReturnType<typeof getTenantConfig>;
   log: {
     info: (ctx: Record<string, unknown>, msg: string) => void;
@@ -236,10 +238,10 @@ export interface QueueYoutubeUploadsOptions {
 }
 
 export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): Promise<void> {
-  const { tenantId, dbId, vodId, filePath, platform, uploadMode = 'vod', config, log } = options;
+  const { tenantId, dbId, vodId, filePath, platform, uploadMode = UPLOAD_MODES.VOD, config, log } = options;
 
   // VOD Upload
-  if ((uploadMode === 'vod' || uploadMode === 'all') && config?.youtube?.vodUpload) {
+  if ((uploadMode === UPLOAD_MODES.VOD || uploadMode === UPLOAD_MODES.ALL) && config?.youtube?.vodUpload) {
     try {
       await queueYoutubeVodUpload(tenantId, dbId, vodId, filePath, platform);
       log.info({ vodId }, 'Queued YouTube VOD upload');
@@ -249,7 +251,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
   }
 
   // Game Uploads
-  if (uploadMode === 'all' && config?.youtube?.perGameUpload) {
+  if (uploadMode === UPLOAD_MODES.ALL && config?.youtube?.perGameUpload) {
     try {
       await queueYoutubeGameUploadsForVod(tenantId, dbId, vodId, filePath, platform);
       log.info({ vodId }, 'Queued YouTube game uploads');

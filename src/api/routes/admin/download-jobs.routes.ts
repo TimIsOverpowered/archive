@@ -6,6 +6,8 @@ import { parseDurationToSeconds, queueEmoteFetch, ensureVodRecord, findVodRecord
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error';
+import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
+import { PLATFORMS, SOURCE_TYPES, DOWNLOAD_METHODS, UPLOAD_MODES } from '../../../types/platforms.js';
 
 interface ReDownloadVodParams {
   tenantId: string;
@@ -13,9 +15,9 @@ interface ReDownloadVodParams {
 
 interface ReDownloadVodBody {
   vodId: string;
-  platform: 'twitch' | 'kick';
-  downloadMethod?: 'ffmpeg' | 'hls';
-  type?: 'live' | 'vod';
+  platform: Platform;
+  downloadMethod?: DownloadMethod;
+  type?: SourceType;
 }
 
 export default async function downloadJobsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
@@ -27,7 +29,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
   // Main download endpoint - creates VOD record if missing, then queues download + emote + chat jobs + upload (Twitch/Kick)
   fastify.post<{
-    Body: { vodId: string; type?: 'live' | 'vod'; platform: 'twitch' | 'kick'; path?: string; uploadMode?: 'vod' | 'all'; downloadMethod?: 'ffmpeg' | 'hls' };
+    Body: { vodId: string; type?: SourceType; platform: Platform; path?: string; uploadMode?: UploadMode; downloadMethod?: DownloadMethod };
     Params: { tenantId: string };
   }>(
     '/upload',
@@ -40,10 +42,10 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           type: 'object',
           properties: {
             vodId: { type: 'string', minLength: 1, maxLength: 100 },
-            type: { type: 'string', enum: ['live', 'vod'], default: 'vod' },
-            platform: { type: 'string', enum: ['twitch', 'kick'] },
-            uploadMode: { type: 'string', enum: ['vod', 'all'], default: 'all' },
-            downloadMethod: { type: 'string', enum: ['ffmpeg', 'hls'], default: 'hls' },
+            type: { type: 'string', enum: Object.values(SOURCE_TYPES), default: SOURCE_TYPES.VOD },
+            platform: { type: 'string', enum: Object.values(PLATFORMS) },
+            uploadMode: { type: 'string', enum: Object.values(UPLOAD_MODES), default: UPLOAD_MODES.ALL },
+            downloadMethod: { type: 'string', enum: Object.values(DOWNLOAD_METHODS), default: DOWNLOAD_METHODS.HLS },
           },
           required: ['vodId', 'platform'],
         },
@@ -92,8 +94,8 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         dbId: vodRecord.id,
         vodId: fileIdentifier,
         platform,
-        uploadMode: request.body.uploadMode || 'all',
-        downloadMethod: request.body.downloadMethod || 'hls',
+        uploadMode: request.body.uploadMode || UPLOAD_MODES.ALL,
+        downloadMethod: request.body.downloadMethod || DOWNLOAD_METHODS.HLS,
       };
 
       const downloadJobId = `download_${vodRecord.vod_id}`;
@@ -137,9 +139,9 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           type: 'object',
           properties: {
             vodId: { type: 'string', description: 'Platform VOD ID' },
-            platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Source platform' },
-            downloadMethod: { type: 'string', enum: ['ffmpeg', 'hls'], default: 'hls', description: 'Download method' },
-            type: { type: 'string', enum: ['live', 'vod'], default: 'vod', description: 'File type for checking' },
+            platform: { type: 'string', enum: Object.values(PLATFORMS), description: 'Source platform' },
+            downloadMethod: { type: 'string', enum: Object.values(DOWNLOAD_METHODS), default: DOWNLOAD_METHODS.HLS, description: 'Download method' },
+            type: { type: 'string', enum: Object.values(SOURCE_TYPES), default: SOURCE_TYPES.VOD, description: 'File type for checking' },
           },
           required: ['vodId', 'platform'],
         },
@@ -158,7 +160,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
       const VodQueueModule = await import('../../../workers/jobs/queues');
 
-      const fileIdentifier = type === 'live' ? vodRecord.stream_id || vodRecord.vod_id : vodRecord.vod_id;
+      const fileIdentifier = type === SOURCE_TYPES.LIVE ? vodRecord.stream_id || vodRecord.vod_id : vodRecord.vod_id;
 
       const downloadJob = {
         tenantId,
@@ -166,7 +168,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         dbId: vodRecord.id,
         vodId: fileIdentifier,
         platform,
-        downloadMethod: downloadMethod || 'hls',
+        downloadMethod: downloadMethod || DOWNLOAD_METHODS.HLS,
       };
 
       const downloadJobId = `download_${vodRecord.vod_id}`;

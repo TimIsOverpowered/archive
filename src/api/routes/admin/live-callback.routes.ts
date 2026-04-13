@@ -10,12 +10,14 @@ import { fileExists } from '../../../utils/path.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound, badRequest } from '../../../utils/http-error';
+import type { Platform } from '../../../types/platforms.js';
+import { SOURCE_TYPES } from '../../../types/platforms.js';
 
 interface LiveCallbackBody {
   streamId: string;
   path: string;
   durationSecs?: number;
-  platform: 'twitch' | 'kick';
+  platform: Platform;
 }
 
 type LiveCallbackParams = { tenantId: string };
@@ -144,7 +146,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         filePath: request.body.path,
         title: vodRecord.title || `${platform.toUpperCase()} VOD`,
         description: config?.youtube.description || '',
-        type: 'live' as const,
+        type: SOURCE_TYPES.LIVE,
         platform,
       };
 

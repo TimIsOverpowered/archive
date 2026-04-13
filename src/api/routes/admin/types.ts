@@ -1,3 +1,5 @@
+import type { Platform, SourceType } from '../../../types/platforms.js';
+
 export interface VodStats {
   totalVods: number;
   completedDownloads: number;
@@ -10,7 +12,7 @@ export interface VodStats {
 export interface TenantInfo {
   id: string;
   displayName: string;
-  platformStats: Record<'twitch' | 'kick', VodStats>;
+  platformStats: Record<Platform, VodStats>;
   overallStats: VodStats;
 }
 
@@ -32,7 +34,7 @@ export interface CreateVodBody {
   title?: string;
   createdAt?: string;
   duration?: number;
-  platform?: 'twitch' | 'kick';
+  platform?: Platform;
 }
 
 // Download jobs types
@@ -42,20 +44,18 @@ export interface VodRecordBase {
   created_at: Date;
   duration: number;
   stream_id: string | null;
-  platform: 'twitch' | 'kick' | string; // Allow string for Prisma compatibility
+  platform: Platform | string; // Allow string for Prisma compatibility
 }
 
 export interface VODDownloadJobBody {
   vodId?: number;
-  type?: 'live' | 'vod';
-  platform?: 'twitch' | 'kick';
+  type?: SourceType;
+  platform?: Platform;
   path?: string;
 }
 
 export interface HLSDownloadBody {
   vodId: number;
-  platform?: 'twitch' | 'kick';
+  platform?: Platform;
   skipEmotes?: boolean;
 }
-
-export type Platform = 'twitch' | 'kick';
