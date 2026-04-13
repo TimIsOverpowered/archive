@@ -6,6 +6,7 @@ import chatProcessor from './chat.worker.js';
 import youtubeProcessor from './youtube.worker.js';
 import dmcaProcessor from './dmca.worker.js';
 import { ChatDownloadJob, ChatDownloadResult, DmcaProcessingJob, DmcaProcessingResult, QUEUE_NAMES, YoutubeUploadJob, YoutubeUploadResult, LiveDownloadJob, StandardVodJob } from './jobs/queues.js';
+import { getWorkersConfig } from '../config/env.js';
 
 export type WorkerName = 'vod_live' | 'vod_standard' | 'chat_download' | 'youtube_upload' | 'dmca_processing';
 export type AllJobData = LiveDownloadJob | StandardVodJob | ChatDownloadJob | YoutubeUploadJob | DmcaProcessingJob;
@@ -26,13 +27,13 @@ export const WORKER_DEFINITIONS = [
     name: 'vod_live',
     queueName: QUEUE_NAMES.VOD_LIVE,
     processor: liveProcessor,
-    concurrency: 50,
+    concurrency: getWorkersConfig().VOD_LIVE_CONCURRENCY,
   }),
   defineWorker<StandardVodJob, unknown>({
     name: 'vod_standard',
     queueName: QUEUE_NAMES.VOD_STANDARD,
     processor: standardVodProcessor,
-    concurrency: 10,
+    concurrency: getWorkersConfig().VOD_STANDARD_CONCURRENCY,
   }),
   defineWorker<ChatDownloadJob, ChatDownloadResult>({
     name: 'chat_download',
@@ -44,7 +45,7 @@ export const WORKER_DEFINITIONS = [
     name: 'youtube_upload',
     queueName: QUEUE_NAMES.YOUTUBE_UPLOAD,
     processor: youtubeProcessor,
-    concurrency: 3,
+    concurrency: getWorkersConfig().YOUTUBE_UPLOAD_CONCURRENCY,
   }),
   defineWorker<DmcaProcessingJob, DmcaProcessingResult>({
     name: 'dmca_processing',

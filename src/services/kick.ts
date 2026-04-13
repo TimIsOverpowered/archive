@@ -12,12 +12,9 @@ import { getTenantConfig } from '../config/loader.js';
 import { toHHMMSS } from '../utils/formatting.js';
 import { PrismaClient } from '../../generated/streamer/client.js';
 import { getKickStreamStatus } from './kick-live.js';
+import { KICK_API_TIMEOUT_MS, KICK_PAGE_DELAY_MS } from '../constants.js';
 
 dayjs.extend(durationPlugin);
-
-// Kick API constants
-const KICK_API_TIMEOUT_MS = 10000;
-const KICK_PAGE_DELAY_MS = 2000;
 
 const log = childLogger({ module: 'kick' });
 

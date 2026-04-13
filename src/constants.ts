@@ -16,3 +16,7 @@ export const HLS_SEGMENT_CONCURRENCY = 5;
 // Redis connection
 export const REDIS_RETRY_TIMEOUT_MS = 30000;
 export const REDIS_MAX_RETRIES = 10;
+
+// Kick API constants
+export const KICK_API_TIMEOUT_MS = 10000;
+export const KICK_PAGE_DELAY_MS = 2000;
