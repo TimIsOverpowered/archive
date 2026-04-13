@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { loadApiConfig } from './config/env.js';
 import { buildServer } from './api/server';
-import { closeAllClients } from './db/client';
+import { closeAllClients, startClientCleanup, stopClientCleanup } from './db/client';
 import { logger } from './utils/logger';
 import { closeRedisClient } from './api/plugins/redis.plugin';
 import { extractErrorDetails } from './utils/error.js';
@@ -24,6 +24,9 @@ async function start() {
 
     logger.info({ url: `http://${HOST}:${PORT}` }, 'Server started successfully');
     logger.info({ docs: `http://${HOST}:${PORT}/docs` }, 'Swagger documentation available');
+
+    startClientCleanup();
+    logger.info('DB client cleanup started');
 
     // Pre-fetch Cloudflare IP ranges (only if missing or expiring soon)
     try {
@@ -71,6 +74,10 @@ async function shutdown(signal: string) {
     // Close Redis client connection
     await closeRedisClient();
     logger.info('Redis connections closed');
+
+    // Stop DB client cleanup interval
+    stopClientCleanup();
+    logger.info('DB client cleanup stopped');
 
     // Close all Prisma DB clients
     await closeAllClients();

@@ -20,3 +20,8 @@ export const REDIS_MAX_RETRIES = 10;
 // Kick API constants
 export const KICK_API_TIMEOUT_MS = 10000;
 export const KICK_PAGE_DELAY_MS = 2000;
+
+// DB client manager constants
+export const DB_CLIENT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+export const DB_CLIENT_MAX_CLIENTS = 100;
+export const DB_CLIENT_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
