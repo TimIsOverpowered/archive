@@ -1,6 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
 import { loadTenantConfigs, getTenantConfig, clearConfigCache } from '../../config/loader';
-import { createClient } from '../../db/client';
 import { TenantConfig } from '../../config/types';
 import { logger } from '../../utils/logger';
 
@@ -10,18 +9,7 @@ const configPlugin: FastifyPluginAsync = async (fastify) => {
 
     const configs = await loadTenantConfigs();
 
-    logger.info({ count: configs.length, streamers: configs.map((c) => c.id) }, 'Streamer configs loaded');
-
-    // Initialize database clients for each streamer
-    for (const config of configs) {
-      try {
-        await createClient(config);
-        logger.info({ tenantId: config.id }, 'Database client initialized');
-      } catch (error) {
-        logger.error({ tenantId: config.id, error }, 'Failed to initialize database client');
-        throw error;
-      }
-    }
+    logger.info({ count: configs.length, streamers: configs.map((c) => c.id) }, 'Streamer configs loaded (DB clients will lazy-load on demand)');
 
     // Decorate fastify with config helpers
     fastify.decorate('getTenantConfig', (id: string): TenantConfig | undefined => {

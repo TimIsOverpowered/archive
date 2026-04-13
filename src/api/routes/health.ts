@@ -53,9 +53,10 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
       const streamers = [];
       for (const config of streamerConfigs) {
         const client = getClient(config.id);
-        let dbStatus = 'ok';
+        let dbStatus = 'uninitialized';
 
         if (client) {
+          dbStatus = 'ok';
           try {
             await client.$queryRaw`SELECT 1`;
           } catch {

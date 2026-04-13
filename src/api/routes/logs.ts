@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { getLogsByOffset, getLogsByCursor } from '../../services/logs.service';
-import { getClient } from '../../db/client';
+import { getClient, createClient } from '../../db/client';
 import { getTenantConfig } from '../../config/loader';
 import createRateLimitMiddleware from '../middleware/rate-limit';
 import { chatRateLimiter } from '../plugins/redis.plugin';
@@ -63,9 +63,13 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
         notFound('Streamer not found');
       }
 
-      const client = getClient(tenantId);
+      let client = getClient(tenantId);
       if (!client) {
-        serviceUnavailable('Database not available');
+        try {
+          client = await createClient(config);
+        } catch {
+          serviceUnavailable('Database not available');
+        }
       }
 
       let result;

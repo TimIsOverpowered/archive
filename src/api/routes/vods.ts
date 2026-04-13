@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { getVods, getVodById, getVodByPlatformId } from '../../services/vods.service';
-import { getClient } from '../../db/client';
+import { getClient, createClient } from '../../db/client';
 import { getTenantConfig } from '../../config/loader';
 import createRateLimitMiddleware from '../middleware/rate-limit';
 import { publicRateLimiter } from '../plugins/redis.plugin';
@@ -58,9 +58,13 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
         notFound('Streamer not found');
       }
 
-      const client = getClient(tenantId);
+      let client = getClient(tenantId);
       if (!client) {
-        serviceUnavailable('Database not available');
+        try {
+          client = await createClient(config);
+        } catch {
+          serviceUnavailable('Database not available');
+        }
       }
 
       const { vods, total } = await getVods(client, tenantId, query as never);
@@ -103,9 +107,13 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
         notFound('Streamer not found');
       }
 
-      const client = getClient(tenantId);
+      let client = getClient(tenantId);
       if (!client) {
-        serviceUnavailable('Database not available');
+        try {
+          client = await createClient(config);
+        } catch {
+          serviceUnavailable('Database not available');
+        }
       }
 
       const vodIdNum = Number(vodId);
@@ -153,9 +161,13 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
         notFound('Streamer not found');
       }
 
-      const client = getClient(tenantId);
+      let client = getClient(tenantId);
       if (!client) {
-        serviceUnavailable('Database not available');
+        try {
+          client = await createClient(config);
+        } catch {
+          serviceUnavailable('Database not available');
+        }
       }
 
       const vod = await getVodByPlatformId(client, tenantId, platform, platformVodId);
@@ -197,9 +209,13 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
         notFound('Streamer not found');
       }
 
-      const client = getClient(tenantId);
+      let client = getClient(tenantId);
       if (!client) {
-        serviceUnavailable('Database not available');
+        try {
+          client = await createClient(config);
+        } catch {
+          serviceUnavailable('Database not available');
+        }
       }
 
       const vod = await getVodByPlatformId(client, tenantId, platform, platformVodId);
