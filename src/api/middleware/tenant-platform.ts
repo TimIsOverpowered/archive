@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { getTenantConfig } from '../../config/loader';
-import { getClient } from '../../db/client.js';
+import { getClient, createClient } from '../../db/client.js';
+import { extractErrorDetails } from '../../utils/error.js';
 
 type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
 type TenantConfig = ReturnType<typeof getTenantConfig>;
@@ -52,16 +53,21 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
     });
   }
 
-  const client = getClient(tenantId);
+  let client = getClient(tenantId);
 
   if (!client) {
-    return reply.status(503).send({
-      error: {
-        message: 'Database not available',
-        code: 'SERVICE_UNAVAILABLE',
-        statusCode: 503,
-      },
-    });
+    try {
+      client = await createClient(config);
+    } catch (err) {
+      request.log.error({ tenantId, error: extractErrorDetails(err) }, 'Failed to initialize database client during request');
+      return reply.status(503).send({
+        error: {
+          message: 'Database not available',
+          code: 'SERVICE_UNAVAILABLE',
+          statusCode: 503,
+        },
+      });
+    }
   }
 
   (request as { tenant: TenantContext }).tenant = {
