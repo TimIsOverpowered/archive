@@ -25,6 +25,16 @@ export const SettingsSchema = z.object({
     .transform((p) => (p ? normalizePathForSchema(p) : undefined)),
 });
 
+export const YoutubeAuthSchema = z.object({
+  access_token: z.string().optional(),
+  refresh_token: z.string(),
+  expiry_date: z.number(),
+  scope: z.string().optional(),
+  token_type: z.string().optional(),
+});
+
+export type YoutubeAuthObject = z.infer<typeof YoutubeAuthSchema>;
+
 export const YoutubeSchema = z.object({
   public: z.boolean().default(true),
   upload: z.boolean().default(true),
@@ -38,12 +48,33 @@ export const YoutubeSchema = z.object({
   auth: z.string().default(''),
 });
 
+export const TwitchAuthSchema = z.object({
+  client_id: z.string(),
+  client_secret: z.string(),
+  access_token: z.string().optional(),
+  expiry_date: z.number().optional(),
+});
+
+export type TwitchAuthObject = z.infer<typeof TwitchAuthSchema>;
+
 export const TwitchSchema = z.object({
   enabled: z.boolean().default(false),
   mainPlatform: z.boolean().default(false),
-  auth: z.string().optional(),
-  username: z.string().optional(),
-  id: z.string().optional(),
+  auth: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((val) => val ?? undefined),
+  username: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((val) => val ?? undefined),
+  id: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((val) => val ?? undefined),
 });
 
 export const KickSchema = z.object({
