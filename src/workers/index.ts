@@ -165,6 +165,10 @@ async function bootstrap() {
 
     await startMonitorService();
 
+    const { startClientCleanup: startDbClientCleanup } = await import('../db/client.js');
+    startDbClientCleanup();
+    logger.info('DB client cleanup started');
+
     logger.info('All workers started successfully');
   } catch (error) {
     logger.error(extractErrorDetails(error), 'Failed to start workers');
@@ -182,7 +186,8 @@ function registerShutdownHandlers() {
       logger.info({ name }, 'Worker closed');
     }
 
-    const { closeAllClients } = await import('../db/client.js');
+    const { closeAllClients, stopClientCleanup } = await import('../db/client.js');
+    await stopClientCleanup();
     await closeAllClients();
     await closeWorkersRedis();
     clearConfigCache();
