@@ -1,24 +1,29 @@
-#!/usr/bin/env node
-
-// Load environment variables FIRST using side-effect import (hoisted by ESM)
 import 'dotenv/config';
-
 import { program } from 'commander';
 import fetch from 'node-fetch';
 import crypto from 'crypto';
 import http from 'http';
 import open from 'open';
 import readline from 'readline';
+import { z } from 'zod';
 import { metaClient } from '../src/db/meta-client.js';
 import { extractErrorDetails } from '../src/utils/error.js';
+import { YoutubeAuthSchema, YoutubeAuthObject, YoutubeSchema } from '../src/config/schemas.js';
+import type { Tenant } from '../prisma/generated/meta/index.js';
 
 program.name('auth-youtube').description('YouTube OAuth authentication CLI tool').version('1.0.0');
 
-interface Tenant {
-  id: string;
-  displayName: string;
-  youtube?: any;
-}
+const YoutubeTokenResponseSchema = z
+  .object({
+    access_token: z.string().optional(),
+    refresh_token: z.string().optional(),
+    expires_in: z.number().optional(),
+    expiresIn: z.number().optional(),
+    expiry_date: z.number().optional(),
+    scope: z.string().optional(),
+    token_type: z.string().optional(),
+  })
+  .passthrough();
 
 let callbackServer: http.Server | null = null;
 
@@ -102,10 +107,7 @@ function showManualPasteInstructions(authUrl: string, tenantId: string): void {
 
 async function getTenant(streamerIdOrName: string): Promise<Tenant | null> {
   try {
-    let tenant: Tenant | null = null;
-
-    // Try direct ID lookup first
-    tenant = await metaClient.tenant.findUnique({
+    const tenant = await metaClient.tenant.findUnique({
       where: { id: streamerIdOrName },
     });
 
@@ -114,9 +116,10 @@ async function getTenant(streamerIdOrName: string): Promise<Tenant | null> {
       return null;
     }
 
-    return tenant as Tenant;
+    return tenant;
   } catch (error: unknown) {
-    console.error('Error getting tenant:', typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : String(error));
+    const details = extractErrorDetails(error);
+    console.error('Error getting tenant:', details.message);
     return null;
   }
 }
@@ -292,7 +295,8 @@ async function completeOAuth(streamerId: string, expectedState: string, urlOrCod
       }),
     });
 
-    const tokenData: any = await response.json();
+    const rawData = await response.json();
+    const tokenData = YoutubeTokenResponseSchema.parse(rawData);
 
     if (!response.ok) {
       console.error('Token exchange failed:', tokenData);
@@ -315,9 +319,7 @@ async function completeOAuth(streamerId: string, expectedState: string, urlOrCod
           : undefined;
 
     // Build normalized auth object with absolute timestamp format used throughout codebase
-    const authObject: any = {
-      type: 'auth', // Keep for backward compatibility checks in storeAuthObject() line 279
-
+    const authObject: YoutubeAuthObject = {
       access_token: tokenData.access_token, // Required - current valid short-lived token
       refresh_token: tokenData.refresh_token || '', // Required - long-lived per-tenant unique value
 
@@ -338,7 +340,7 @@ async function completeOAuth(streamerId: string, expectedState: string, urlOrCod
     console.log(`Stream ID: ${streamerId}`);
     console.log('Token received. Storing encrypted authentication object in database...\n');
 
-    await storeAuthObject(streamerId, authObject as any);
+    await storeAuthObject(streamerId, authObject);
 
     return true; // Signal success to caller
   } catch (error) {
@@ -348,7 +350,7 @@ async function completeOAuth(streamerId: string, expectedState: string, urlOrCod
   }
 }
 
-async function storeAuthObject(tenantId: string, authObject: any): Promise<void> {
+async function storeAuthObject(tenantId: string, authObject: YoutubeAuthObject): Promise<void> {
   if (!process.env.META_DATABASE_URL) {
     throw new Error('META_DATABASE_URL is required for storing auth object');
   }
@@ -357,6 +359,9 @@ async function storeAuthObject(tenantId: string, authObject: any): Promise<void>
     // Import encryption utilities (lazy import to avoid circular deps)
     const { encryptScalar, decryptObject } = await import('../src/utils/encryption.js');
 
+    // Validate authObject before encryption
+    YoutubeAuthSchema.parse(authObject);
+
     // Get current tenant record
     const tenant = await metaClient.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) throw new Error(`Tenant not found in database: ${tenantId}`);
@@ -364,22 +369,22 @@ async function storeAuthObject(tenantId: string, authObject: any): Promise<void>
     console.log('Using encryption for auth object storage.');
 
     // Decrypt existing YouTube config to preserve settings while updating only .auth field
-    let youtubeConfig: any = {};
+    let youtubeConfig: Partial<z.infer<typeof YoutubeSchema>> = {};
 
-    const currentYoutubeValue = (tenant as any).youtube;
+    const currentYoutubeValue = tenant.youtube;
 
     if (currentYoutubeValue) {
       try {
         // Try decrypting the stored value first
-        const decryptedValue = decryptObject(currentYoutubeValue);
+        const decryptedValue = decryptObject(String(currentYoutubeValue));
 
         // If decryption succeeds, use it directly - should be an object with youtube config fields
         if (typeof decryptedValue === 'object' && decryptedValue !== null) {
           console.log('Preserving existing YouTube configuration...');
-          youtubeConfig = decryptedValue;
+          youtubeConfig = decryptedValue as Partial<z.infer<typeof YoutubeSchema>>;
 
           // Check if previous run stored only auth token as string instead of full config
-          const hasAuthFieldOnly = Object.keys(youtubeConfig).length > 0 && (youtubeConfig.type === 'auth' || youtubeConfig.refresh_token);
+          const hasAuthFieldOnly = Object.keys(youtubeConfig).length > 0 && ('type' in youtubeConfig || 'refresh_token' in youtubeConfig);
 
           if (!hasAuthFieldOnly) {
             console.log(`Preserved ${Object.keys(youtubeConfig).length} YouTube settings from database.`);
@@ -398,7 +403,7 @@ async function storeAuthObject(tenantId: string, authObject: any): Promise<void>
 
           if (typeof parsedJson === 'object') {
             console.log('Using existing YouTube config from database (unencrypted)...');
-            youtubeConfig = parsedJson;
+            youtubeConfig = parsedJson as Partial<z.infer<typeof YoutubeSchema>>;
           } else {
             console.warn(`Could not parse previous YouTube data. Starting with clean slate.`);
             youtubeConfig = {};
@@ -426,11 +431,13 @@ async function storeAuthObject(tenantId: string, authObject: any): Promise<void>
 
     console.log('\n=== Auth Object Stored Successfully ===\n');
   } catch (error: unknown) {
+    const details = extractErrorDetails(error);
     const isTenantNotFound = typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2025';
 
     if (isTenantNotFound) {
       throw new Error(`Tenant not found in database: ${tenantId}`);
     }
+    throw new Error(details.message);
   }
 }
 

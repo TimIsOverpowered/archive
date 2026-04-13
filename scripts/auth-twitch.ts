@@ -2,9 +2,11 @@
 
 import 'dotenv/config';
 import * as readline from 'readline';
+import { z } from 'zod';
 import { metaClient } from '../src/db/meta-client.js';
 import { encryptObject, validateEncryptionKey } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
+import { TwitchAuthSchema, TwitchAuthObject, TwitchSchema } from '../src/config/schemas.js';
 
 // Validate encryption key at startup
 if (!process.env.ENCRYPTION_MASTER_KEY || !validateEncryptionKey(process.env.ENCRYPTION_MASTER_KEY)) {
@@ -80,11 +82,11 @@ function promptHidden(question: string): Promise<string> {
   });
 }
 
-interface TwitchAuthResponse {
-  access_token: string;
-  expires_in: number;
-  token_type: string;
-}
+const TwitchTokenResponseSchema = z.object({
+  access_token: z.string(),
+  expires_in: z.number(),
+  token_type: z.string(),
+});
 
 async function main(): Promise<void> {
   let tenantIdToUpdate: string | null = null;
@@ -120,8 +122,9 @@ async function main(): Promise<void> {
     console.log(`\n✓ Tenant found!`);
 
     // Display current Twitch status
-    const hasTwitchAuth = (tenant as any).twitch?.auth;
-    const twitchEnabled = (tenant as any).twitch?.enabled || false;
+    const twitchParsed = TwitchSchema.safeParse(tenant.twitch);
+    const hasTwitchAuth = twitchParsed.success && twitchParsed.data.auth !== undefined;
+    const twitchEnabled = twitchParsed.success ? twitchParsed.data.enabled || false : false;
 
     if (hasTwitchAuth) {
       console.log(`\nCurrent Twitch Status: Enabled with auth configured`);
@@ -151,7 +154,7 @@ async function main(): Promise<void> {
     // Phase 3: Generate Access Token
     console.log('\n🔄 Generating access token via Twitch OAuth client credentials flow...');
 
-    let oauthResult: TwitchAuthResponse;
+    let oauthResult: z.infer<typeof TwitchTokenResponseSchema>;
     try {
       const response = await fetch('https://id.twitch.tv/oauth2/token', {
         method: 'POST',
@@ -170,7 +173,8 @@ async function main(): Promise<void> {
         throw new Error(`Twitch API returned ${response.status}: ${errorData}`);
       }
 
-      oauthResult = await response.json();
+      const rawData = await response.json();
+      oauthResult = TwitchTokenResponseSchema.parse(rawData);
       console.log('✓ Access token generated successfully!');
     } catch (error) {
       const details = extractErrorDetails(error);
@@ -183,12 +187,15 @@ async function main(): Promise<void> {
     // Phase 4: Build Auth Object & Encrypt
     const expiryDate = Date.now() + oauthResult.expires_in * 1000;
 
-    const twitchAuthObject = {
+    const twitchAuthObject: TwitchAuthObject = {
       client_id: clientId,
       client_secret: clientSecret,
       access_token: oauthResult.access_token,
       expiry_date: expiryDate,
     };
+
+    // Validate before encryption
+    TwitchAuthSchema.parse(twitchAuthObject);
 
     console.log('\nEncrypting credentials with AES-256-GCM...');
 
@@ -197,33 +204,36 @@ async function main(): Promise<void> {
     // Phase 5: Update Meta DB (preserve existing config)
     console.log(`Storing in meta database for tenant "${tenantId}"...\n`);
 
-    let updatedTwitchConfig: any;
+    let updatedTwitchConfig: z.infer<typeof TwitchSchema>;
 
-    if ((tenant as any).twitch) {
-      try {
-        const currentTwitch = JSON.parse(JSON.stringify((tenant as any).twitch));
+    if (tenant.twitch) {
+      const existing = TwitchSchema.safeParse(tenant.twitch);
 
-        // Preserve existing fields like username, id, etc. (if they exist unencrypted)
+      if (existing.success) {
+        // Preserve existing fields like username, id, etc.
         updatedTwitchConfig = {
           enabled: true,
-          username: currentTwitch.username || null,
-          id: currentTwitch.id || null,
+          mainPlatform: existing.data.mainPlatform || false,
+          username: existing.data.username ?? undefined,
+          id: existing.data.id ?? undefined,
           auth: encryptedTwitchAuth,
         };
-      } catch {
+      } else {
         // If parsing fails, start fresh with just the new auth
         updatedTwitchConfig = {
           enabled: true,
-          username: null,
-          id: null,
+          mainPlatform: false,
+          username: undefined,
+          id: undefined,
           auth: encryptedTwitchAuth,
         };
       }
     } else {
       updatedTwitchConfig = {
         enabled: true,
-        username: null,
-        id: null,
+        mainPlatform: false,
+        username: undefined,
+        id: undefined,
         auth: encryptedTwitchAuth,
       };
     }

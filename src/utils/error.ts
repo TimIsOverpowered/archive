@@ -2,6 +2,8 @@
  * Standardized error handling utilities for consistent error logging and processing across the codebase.
  */
 
+import { ZodError } from 'zod';
+
 export interface ErrorDetails {
   message: string;
   stack?: string;
@@ -12,6 +14,11 @@ export interface ErrorDetails {
  * Avoids casting to `any` which loses stack traces and structured data.
  */
 export function extractErrorDetails(error: unknown): ErrorDetails {
+  if (error instanceof ZodError) {
+    const message = error.issues.map((i) => `${i.path.join('.') || 'root'}: ${i.message}`).join(', ');
+    return { message: `Validation Error: ${message}`, stack: error.stack };
+  }
+
   if (error instanceof Error) {
     return { message: error.message, stack: error.stack };
   }
