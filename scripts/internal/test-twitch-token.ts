@@ -81,7 +81,7 @@ program
         console.log('Loading streamer configs from DB...');
         await configLoaderModule.loadTenantConfigs();
 
-        const twitchService = await import('../../src/services/twitch.js');
+        const twitchService = await import('../../src/services/twitch/index.js');
 
         try {
           const newToken = await twitchService.getAppAccessToken(tenantId);
@@ -139,7 +139,7 @@ program
         await configLoaderModule.loadTenantConfigs();
 
         try {
-          const accessToken = await import('../../src/services/twitch.js').then((m) => m.getAppAccessToken(tenantId));
+          const accessToken = await import('../../src/services/twitch/index.js').then((m) => m.getAppAccessToken(tenantId));
 
           if (!accessToken || accessToken === null) {
             console.error('❌ FAIL: Could not get access token');

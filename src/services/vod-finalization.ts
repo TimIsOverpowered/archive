@@ -1,6 +1,6 @@
 import type { PrismaClient } from '../../generated/streamer/client';
 import { finalizeKickChapters } from './kick.js';
-import { saveVodChapters as saveTwitchVodChapters } from './twitch.js';
+import { saveVodChapters as saveTwitchVodChapters } from './twitch/index.js';
 
 export interface FinalizeVodOptions {
   dbId: number;

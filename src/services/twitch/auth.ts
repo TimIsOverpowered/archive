@@ -1,12 +1,12 @@
-import { getTwitchCredentials } from '../utils/credentials.js';
-import { extractErrorDetails } from '../utils/error.js';
-import { getTenantConfig, updateTenantTwitchAuth } from '../config/loader.js';
-import { encryptObject, decryptObject } from '../utils/encryption.js';
-import { metaClient } from '../db/meta-client.js';
-import { childLogger } from '../utils/logger.js';
-import { request } from '../utils/http-client.js';
+import { getTwitchCredentials } from '../../utils/credentials.js';
+import { extractErrorDetails } from '../../utils/error.js';
+import { getTenantConfig, updateTenantTwitchAuth } from '../../config/loader.js';
+import { encryptObject, decryptObject } from '../../utils/encryption.js';
+import { metaClient } from '../../db/meta-client.js';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
+import { request } from '../../utils/http-client.js';
 
-const log = childLogger({ module: 'twitch-auth' });
+const log = createAutoLogger('twitch-auth');
 
 interface TwitchAuth {
   client_id: string;

@@ -1,7 +1,7 @@
 import type { PrismaClient } from '../../../generated/streamer/client.js';
 import type { AppLogger } from '../../utils/auto-tenant-logger.js';
 import { splitVideo, getDuration, deleteFile } from '../vod/ffmpeg.js';
-import { uploadVideo, linkParts } from '../../services/youtube.js';
+import { uploadVideo, linkParts } from '../../services/youtube/index.js';
 import { initRichAlert, updateAlert, formatProgressMessage } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 import { getEffectiveSplitDuration } from './validation.js';

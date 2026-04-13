@@ -1,8 +1,11 @@
-import { getAppAccessToken, VodData } from '../services/twitch.js';
-import { extractErrorDetails } from '../utils/error.js';
-import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
-import { logger } from '../utils/logger.js';
-import { request } from '../utils/http-client.js';
+import { getAppAccessToken } from './auth.js';
+import type { VodData } from './vod.js';
+import { extractErrorDetails } from '../../utils/error.js';
+import { getTwitchCredentials } from '../../utils/credentials.js';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
+import { request } from '../../utils/http-client.js';
+
+const log = createAutoLogger('twitch-live');
 
 export interface TwitchStreamStatus {
   id: string;
@@ -20,16 +23,13 @@ export interface TwitchStreamStatus {
   thumbnail_url?: string | null;
 }
 
-/**
- * Check if a Twitch user is currently live via Helix API
- */
 export async function getTwitchStreamStatus(userId: string, tenantId: string): Promise<TwitchStreamStatus | null> {
   try {
     const accessToken = await getAppAccessToken(tenantId);
-    const creds = getCreds(tenantId);
+    const creds = getTwitchCredentials(tenantId);
 
     if (!creds) {
-      logger.warn({ tenantId }, `[Twitch Live Check] No credentials configured for tenant ${tenantId}`);
+      log.warn({ tenantId }, `[Twitch Live Check] No credentials configured for tenant ${tenantId}`);
       return null;
     }
 
@@ -68,22 +68,18 @@ export async function getTwitchStreamStatus(userId: string, tenantId: string): P
     };
   } catch (error: unknown) {
     const { message } = extractErrorDetails(error);
-    logger.error({ userId, err: message }, `[Twitch Live Check] Failed to get stream status for user ${userId}`);
+    log.error({ userId, err: message }, `[Twitch Live Check] Failed to get stream status for user ${userId}`);
     throw error;
   }
 }
 
-/**
- * Immediate check for Twitch VOD object matching current stream (NON-BLOCKING)
- * Returns immediately with result or null if not ready yet
- */
 export async function getLatestTwitchVodObject(userId: string, expectedStreamId: string, tenantId: string): Promise<VodData | null> {
   try {
     const accessToken = await getAppAccessToken(tenantId);
-    const creds = getCreds(tenantId);
+    const creds = getTwitchCredentials(tenantId);
 
     if (!creds) {
-      logger.warn({ tenantId }, `[Twitch] No credentials configured for tenant ${tenantId}`);
+      log.warn({ tenantId }, `[Twitch] No credentials configured for tenant ${tenantId}`);
       return null;
     }
 
@@ -101,21 +97,21 @@ export async function getLatestTwitchVodObject(userId: string, expectedStreamId:
     });
 
     if (!data.data || data.data.length === 0) {
-      return null; // No VODs exist yet
+      return null;
     }
 
     const latestVod = data.data[0];
 
     if (latestVod.stream_id !== expectedStreamId || !latestVod.id) {
-      return null; // Wrong VOD or no ID yet - caller should retry later
+      return null;
     }
 
-    logger.info({ userId, stream_id: latestVod.stream_id, id: latestVod.id }, `[Twitch] VOD object ready! Match found: stream_id=${latestVod.stream_id}, vod_id=${latestVod.id}`);
+    log.info({ userId, stream_id: latestVod.stream_id, id: latestVod.id }, `[Twitch] VOD object ready! Match found: stream_id=${latestVod.stream_id}, vod_id=${latestVod.id}`);
 
     return latestVod;
   } catch (error: unknown) {
     const { message } = extractErrorDetails(error);
-    logger.error({ userId, err: message }, `[Twitch] Failed to get VOD object for user ${userId}`);
+    log.error({ userId, err: message }, `[Twitch] Failed to get VOD object for user ${userId}`);
     throw error;
   }
 }

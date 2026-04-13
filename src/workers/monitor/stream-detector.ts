@@ -6,7 +6,7 @@ import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { QUEUE_NAMES, type LiveDownloadJob, getLiveDownloadQueue, enqueueJobWithLogging } from '../../workers/jobs/queues.js';
 import { createClient, getClient } from '../../db/client.js';
 import type { TenantConfig } from '../../config/types.js';
-import { getTwitchStreamStatus, getLatestTwitchVodObject, type TwitchStreamStatus } from '../../services/twitch-live.js';
+import { getTwitchStreamStatus, getLatestTwitchVodObject, type TwitchStreamStatus } from '../../services/twitch/index.js';
 import { getKickStreamStatus, getLatestKickVodObject } from '../../services/kick-live.js';
 import type { KickStreamStatus } from '../../types/kick.js';
 import { sendRichAlert } from '../../utils/discord-alerts.js';

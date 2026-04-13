@@ -1,4 +1,4 @@
-import type { TwitchChatMessageNode } from '../../services/twitch.js';
+import type { TwitchChatMessageNode } from '../../services/twitch/index.js';
 import type { PrismaClient } from '../../../generated/streamer/client';
 
 /**

@@ -1,5 +1,5 @@
-import { request } from '../utils/http-client.js';
-import { getTwitchCredentials } from '../utils/credentials.js';
+import { request } from '../../utils/http-client.js';
+import { getTwitchCredentials } from '../../utils/credentials.js';
 
 const TWITCH_GQL_CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 

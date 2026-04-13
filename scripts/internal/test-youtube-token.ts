@@ -81,7 +81,7 @@ program
 
       if (options.forceRefresh && !options.checkOnly) {
         // Clear cache to force fresh read from DB after refresh
-        const youtubeServicePath = await import('../../src/services/youtube.js');
+        const youtubeServicePath = await import('../../src/services/youtube/index.js');
 
         console.log('\nForcing token refresh...');
 

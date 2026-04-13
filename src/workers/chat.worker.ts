@@ -1,6 +1,6 @@
 import { Processor, Job } from 'bullmq';
 import { sleep } from '../utils/delay.js';
-import { fetchComments, fetchNextComments, extractMessageData } from '../services/twitch.js';
+import { fetchComments, fetchNextComments, extractMessageData } from '../services/twitch/index.js';
 import { initRichAlert, resetFailures } from '../utils/discord-alerts.js';
 import type { ChatDownloadJob, ChatDownloadResult } from './jobs/queues.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
