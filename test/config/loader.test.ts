@@ -1,9 +1,10 @@
-import { expect } from 'chai';
+import { strict as assert } from 'node:assert';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import { loadApiConfig, getApiConfig, clearConfigCache } from './app-config.js';
 
 describe('API Config Loader', () => {
   let originalEnv: NodeJS.ProcessEnv;
-  const validKey = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'; // 64 hex chars = 32 bytes
+  const validKey = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
   beforeEach(() => {
     originalEnv = { ...process.env };
@@ -30,27 +31,27 @@ describe('API Config Loader', () => {
 
     it('should throw when REDIS_URL is missing', () => {
       delete process.env.REDIS_URL;
-      expect(() => loadApiConfig()).to.throw('REDIS_URL');
+      assert.throws(() => loadApiConfig(), /REDIS_URL/);
     });
 
     it('should throw when META_DATABASE_URL is missing', () => {
       process.env.REDIS_URL = 'redis://localhost';
       delete process.env.META_DATABASE_URL;
-      expect(() => loadApiConfig()).to.throw('META_DATABASE_URL');
+      assert.throws(() => loadApiConfig(), /META_DATABASE_URL/);
     });
 
     it('should throw when ENCRYPTION_MASTER_KEY is missing', () => {
       process.env.REDIS_URL = 'redis://localhost';
       process.env.META_DATABASE_URL = 'postgresql://meta';
       delete process.env.ENCRYPTION_MASTER_KEY;
-      expect(() => loadApiConfig()).to.throw('ENCRYPTION_MASTER_KEY');
+      assert.throws(() => loadApiConfig(), /ENCRYPTION_MASTER_KEY/);
     });
 
     it('should throw when ENCRYPTION_MASTER_KEY is invalid', () => {
       process.env.REDIS_URL = 'redis://localhost';
       process.env.META_DATABASE_URL = 'postgresql://meta';
       process.env.ENCRYPTION_MASTER_KEY = 'invalid';
-      expect(() => loadApiConfig()).to.throw('ENCRYPTION_MASTER_KEY');
+      assert.throws(() => loadApiConfig(), /ENCRYPTION_MASTER_KEY/);
     });
   });
 
@@ -60,37 +61,37 @@ describe('API Config Loader', () => {
     it('should apply default for NODE_ENV', () => {
       delete process.env.NODE_ENV;
       const config = loadApiConfig();
-      expect(config.NODE_ENV).to.equal('development');
+      assert.strictEqual(config.NODE_ENV, 'development');
     });
 
     it('should use provided NODE_ENV', () => {
       process.env.NODE_ENV = 'production';
       const config = loadApiConfig();
-      expect(config.NODE_ENV).to.equal('production');
+      assert.strictEqual(config.NODE_ENV, 'production');
     });
 
     it('should apply default for PORT', () => {
       delete process.env.PORT;
       const config = loadApiConfig();
-      expect(config.PORT).to.equal(3030);
+      assert.strictEqual(config.PORT, 3030);
     });
 
     it('should use provided PORT', () => {
       process.env.PORT = '8080';
       const config = loadApiConfig();
-      expect(config.PORT).to.equal(8080);
+      assert.strictEqual(config.PORT, 8080);
     });
 
     it('should apply default for LOG_LEVEL', () => {
       delete process.env.LOG_LEVEL;
       const config = loadApiConfig();
-      expect(config.LOG_LEVEL).to.equal('info');
+      assert.strictEqual(config.LOG_LEVEL, 'info');
     });
 
     it('should use provided LOG_LEVEL', () => {
       process.env.LOG_LEVEL = 'debug';
       const config = loadApiConfig();
-      expect(config.LOG_LEVEL).to.equal('debug');
+      assert.strictEqual(config.LOG_LEVEL, 'debug');
     });
   });
 
@@ -104,21 +105,21 @@ describe('API Config Loader', () => {
 
     it('should parse PORT as number', () => {
       const config = loadApiConfig();
-      expect(config.PORT).to.equal(3000);
-      expect(typeof config.PORT).to.equal('number');
+      assert.strictEqual(config.PORT, 3000);
+      assert.strictEqual(typeof config.PORT, 'number');
     });
 
     it('should parse DISABLE_REDIS_CACHE as boolean', () => {
       process.env.DISABLE_REDIS_CACHE = 'true';
       const config = loadApiConfig();
-      expect(config.DISABLE_REDIS_CACHE).to.be.true;
+      assert.strictEqual(config.DISABLE_REDIS_CACHE, true);
     });
 
     it('should keep string fields as strings', () => {
       const config = loadApiConfig();
-      expect(typeof config.NODE_ENV).to.equal('string');
-      expect(typeof config.REDIS_URL).to.equal('string');
-      expect(typeof config.HOST).to.equal('string');
+      assert.strictEqual(typeof config.NODE_ENV, 'string');
+      assert.strictEqual(typeof config.REDIS_URL, 'string');
+      assert.strictEqual(typeof config.HOST, 'string');
     });
   });
 
@@ -130,34 +131,34 @@ describe('API Config Loader', () => {
 
     it('should reject invalid PORT (non-numeric)', () => {
       process.env.PORT = 'not-a-number';
-      expect(() => loadApiConfig()).to.throw();
+      assert.throws(() => loadApiConfig());
     });
 
     it('should reject PORT out of range', () => {
       process.env.PORT = '99999';
-      expect(() => loadApiConfig()).to.throw('PORT');
+      assert.throws(() => loadApiConfig(), /PORT/);
     });
 
     it('should accept valid PORT at boundary', () => {
       process.env.PORT = '1';
       const config = loadApiConfig();
-      expect(config.PORT).to.equal(1);
+      assert.strictEqual(config.PORT, 1);
     });
 
     it('should accept valid PORT at upper boundary', () => {
       process.env.PORT = '65535';
       const config = loadApiConfig();
-      expect(config.PORT).to.equal(65535);
+      assert.strictEqual(config.PORT, 65535);
     });
 
     it('should reject invalid NODE_ENV', () => {
       process.env.NODE_ENV = 'invalid' as any;
-      expect(() => loadApiConfig()).to.throw();
+      assert.throws(() => loadApiConfig());
     });
 
     it('should reject invalid LOG_LEVEL', () => {
       process.env.LOG_LEVEL = 'invalid' as any;
-      expect(() => loadApiConfig()).to.throw();
+      assert.throws(() => loadApiConfig());
     });
   });
 
@@ -167,13 +168,13 @@ describe('API Config Loader', () => {
     it('should cache config after first load', () => {
       const config1 = loadApiConfig();
       const config2 = getApiConfig();
-      expect(config1).to.equal(config2);
+      assert.strictEqual(config1, config2);
     });
 
     it('should allow cache clear', () => {
       process.env.PORT = '9999';
       const config = loadApiConfig();
-      expect(config.PORT).to.equal(9999);
+      assert.strictEqual(config.PORT, 9999);
     });
   });
 });

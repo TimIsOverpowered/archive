@@ -1,4 +1,5 @@
-import { expect } from 'chai';
+import { strict as assert } from 'node:assert';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import { encrypt, decrypt, encryptScalar, decryptScalar, encryptObject, decryptObject, validateEncryptionKey } from '../../src/utils/encryption';
 
 describe('Encryption', () => {
@@ -7,7 +8,7 @@ describe('Encryption', () => {
   beforeEach(() => {
     process.env = {
       ...originalEnv,
-      ENCRYPTION_MASTER_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', // 32 bytes hex (64 chars)
+      ENCRYPTION_MASTER_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
     };
   });
 
@@ -17,27 +18,27 @@ describe('Encryption', () => {
 
   describe('validateEncryptionKey', () => {
     it('should validate correct 32-byte hex key', () => {
-      expect(validateEncryptionKey('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef')).to.be.true;
+      assert.strictEqual(validateEncryptionKey('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'), true);
     });
 
     it('should reject key that is too short', () => {
-      expect(validateEncryptionKey('0123456789abcdef')).to.be.false;
+      assert.strictEqual(validateEncryptionKey('0123456789abcdef'), false);
     });
 
     it('should reject key that is too long', () => {
-      expect(validateEncryptionKey('0123456789abcdef0123456789abcdef0123')).to.be.false;
+      assert.strictEqual(validateEncryptionKey('0123456789abcdef0123456789abcdef0123'), false);
     });
 
     it('should reject invalid hex characters', () => {
-      expect(validateEncryptionKey('0123456789abcdef0123456789abcdefg')).to.be.false;
+      assert.strictEqual(validateEncryptionKey('0123456789abcdef0123456789abcdefg'), false);
     });
 
     it('should reject key with correct length but invalid hex characters', () => {
-      expect(validateEncryptionKey('z'.repeat(64))).to.be.false;
+      assert.strictEqual(validateEncryptionKey('z'.repeat(64)), false);
     });
 
     it('should reject empty key', () => {
-      expect(validateEncryptionKey('')).to.be.false;
+      assert.strictEqual(validateEncryptionKey(''), false);
     });
   });
 
@@ -46,8 +47,8 @@ describe('Encryption', () => {
       const plaintext = 'sensitive data';
       const result = encrypt(plaintext);
 
-      expect(result).to.have.property('ciphertext');
-      expect(result.ciphertext).to.be.an('Uint8Array');
+      assert.ok('ciphertext' in result);
+      assert.ok(result.ciphertext instanceof Uint8Array);
     });
 
     it('should produce different ciphertext for same plaintext (due to random IV)', () => {
@@ -55,18 +56,18 @@ describe('Encryption', () => {
       const result1 = encrypt(plaintext);
       const result2 = encrypt(plaintext);
 
-      expect(result1.ciphertext).to.not.deep.equal(result2.ciphertext);
+      assert.notDeepStrictEqual(result1.ciphertext, result2.ciphertext);
     });
 
     it('should handle empty string', () => {
       const result = encrypt('');
-      expect(result.ciphertext).to.exist;
+      assert.ok(result.ciphertext);
     });
 
     it('should handle special characters', () => {
       const plaintext = 'special!@#$%^&*()chars';
       const result = encrypt(plaintext);
-      expect(result.ciphertext).to.exist;
+      assert.ok(result.ciphertext);
     });
   });
 
@@ -76,7 +77,7 @@ describe('Encryption', () => {
       const encrypted = encrypt(original);
       const decrypted = decrypt(encrypted.ciphertext);
 
-      expect(decrypted).to.equal(original);
+      assert.strictEqual(decrypted, original);
     });
 
     it('should handle encrypt-decrypt round-trip', () => {
@@ -85,7 +86,7 @@ describe('Encryption', () => {
       for (const testCase of testCases) {
         const encrypted = encrypt(testCase);
         const decrypted = decrypt(encrypted.ciphertext);
-        expect(decrypted).to.equal(testCase);
+        assert.strictEqual(decrypted, testCase);
       }
     });
 
@@ -95,7 +96,7 @@ describe('Encryption', () => {
       const tampered = new Uint8Array(encrypted.ciphertext);
       tampered[tampered.length - 1] = 0xff;
 
-      expect(() => decrypt(tampered)).to.throw();
+      assert.throws(() => decrypt(tampered));
     });
 
     it('should reject truncated ciphertext', () => {
@@ -103,7 +104,7 @@ describe('Encryption', () => {
       const encrypted = encrypt(original);
       const truncated = encrypted.ciphertext.slice(0, 10);
 
-      expect(() => decrypt(truncated)).to.throw();
+      assert.throws(() => decrypt(truncated));
     });
   });
 
@@ -113,13 +114,13 @@ describe('Encryption', () => {
       const encrypted = encryptScalar(original);
       const decrypted = decryptScalar(encrypted);
 
-      expect(decrypted).to.equal(original);
+      assert.strictEqual(decrypted, original);
     });
 
     it('should return base64 string', () => {
       const encrypted = encryptScalar('test');
-      expect(typeof encrypted).to.equal('string');
-      expect(encrypted).to.match(/^[A-Za-z0-9+/=]+$/);
+      assert.strictEqual(typeof encrypted, 'string');
+      assert.match(encrypted, /^[A-Za-z0-9+/=]+$/);
     });
   });
 
@@ -129,7 +130,7 @@ describe('Encryption', () => {
       const encrypted = encryptObject(original);
       const decrypted = decryptObject<typeof original>(encrypted);
 
-      expect(decrypted).to.deep.equal(original);
+      assert.deepStrictEqual(decrypted, original);
     });
 
     it('should handle nested objects', () => {
@@ -137,7 +138,7 @@ describe('Encryption', () => {
       const encrypted = encryptObject(original);
       const decrypted = decryptObject<typeof original>(encrypted);
 
-      expect(decrypted).to.deep.equal(original);
+      assert.deepStrictEqual(decrypted, original);
     });
   });
 });
