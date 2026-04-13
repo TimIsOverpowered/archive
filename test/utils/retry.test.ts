@@ -1,4 +1,5 @@
-import { expect } from 'chai';
+import { strict as assert } from 'node:assert';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import { retryWithBackoff } from '../../src/utils/retry';
 
 describe('Retry with Backoff', () => {
@@ -6,7 +7,7 @@ describe('Retry with Backoff', () => {
     it('should return result on first attempt', async () => {
       const result = await retryWithBackoff(async () => 'success', { attempts: 3, baseDelayMs: 10 });
 
-      expect(result).to.equal('success');
+      assert.strictEqual(result, 'success');
     });
   });
 
@@ -24,8 +25,8 @@ describe('Retry with Backoff', () => {
         { attempts: 3, baseDelayMs: 1, jitter: false }
       );
 
-      expect(attempts).to.equal(2);
-      expect(result).to.equal('success');
+      assert.strictEqual(attempts, 2);
+      assert.strictEqual(result, 'success');
     });
 
     it('should retry and succeed on third attempt', async () => {
@@ -41,8 +42,8 @@ describe('Retry with Backoff', () => {
         { attempts: 3, baseDelayMs: 1, jitter: false }
       );
 
-      expect(attempts).to.equal(3);
-      expect(result).to.equal('success');
+      assert.strictEqual(attempts, 3);
+      assert.strictEqual(result, 'success');
     });
   });
 
@@ -58,10 +59,10 @@ describe('Retry with Backoff', () => {
           },
           { attempts: 3, baseDelayMs: 1 }
         );
-        expect.fail('Should have thrown');
-      } catch (error: any) {
-        expect(error.message).to.equal('persistent failure');
-        expect(attempts).to.equal(3); // 3 attempts total
+        assert.fail('Should have thrown');
+      } catch (error) {
+        assert.strictEqual((error as Error).message, 'persistent failure');
+        assert.strictEqual(attempts, 3);
       }
     });
   });
@@ -82,8 +83,7 @@ describe('Retry with Backoff', () => {
         // Expected to fail
       }
 
-      // Verify it attempted all 5 times
-      expect(attempts).to.equal(5);
+      assert.strictEqual(attempts, 5);
     });
   });
 
@@ -103,10 +103,10 @@ describe('Retry with Backoff', () => {
             shouldRetry: (error) => (error as Error).message !== 'non-retryable',
           }
         );
-        expect.fail('Should have thrown');
-      } catch (error: any) {
-        expect(error.message).to.equal('non-retryable');
-        expect(attempts).to.equal(1); // No retries
+        assert.fail('Should have thrown');
+      } catch (error) {
+        assert.strictEqual((error as Error).message, 'non-retryable');
+        assert.strictEqual(attempts, 1);
       }
     });
 
@@ -125,8 +125,8 @@ describe('Retry with Backoff', () => {
         }
       );
 
-      expect(result).to.equal('success');
-      expect(attempts).to.equal(2);
+      assert.strictEqual(result, 'success');
+      assert.strictEqual(attempts, 2);
     });
   });
 
@@ -139,9 +139,9 @@ describe('Retry with Backoff', () => {
           },
           { attempts: 2, baseDelayMs: 1 }
         );
-        expect.fail('Should have thrown');
-      } catch (error: any) {
-        expect(error.message).to.equal('original error message');
+        assert.fail('Should have thrown');
+      } catch (error) {
+        assert.strictEqual((error as Error).message, 'original error message');
       }
     });
 
@@ -160,9 +160,9 @@ describe('Retry with Backoff', () => {
           },
           { attempts: 1, baseDelayMs: 1 }
         );
-        expect.fail('Should have thrown');
-      } catch (error: any) {
-        expect(error.name).to.equal('CustomError');
+        assert.fail('Should have thrown');
+      } catch (error) {
+        assert.strictEqual((error as CustomError).name, 'CustomError');
       }
     });
   });

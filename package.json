@@ -24,10 +24,10 @@
     "npm": ">=10.0.0"
   },
   "scripts": {
-    "test": "npm run lint && npm run mocha",
+    "test": "npm run lint && npm run test:node",
     "lint": "eslint \"src/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\"",
-    "mocha": "mocha",
+    "test:node": "node --test --import tsx --test-timeout 10000 --test-concurrency true \"test/**/*.test.ts\"",
     "build": "tsc",
     "dev": "cross-env NODE_ENV=development tsx watch src/index.ts",
     "start": "node dist/index.js",
@@ -49,9 +49,7 @@
     "logs:pm2": "pm2 logs --lines 100 --raw"
   },
   "standard": {
-    "env": [
-      "mocha"
-    ],
+    "env": [],
     "ignore": []
   },
   "dependencies": {
@@ -87,27 +85,22 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
-    "@types/chai": "^5.2.3",
     "@types/dotenv": "^8.2.3",
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/node": "^25.6.0",
     "@types/node-fetch": "^2.6.13",
-    "@types/sinon": "^21.0.1",
     "@typescript-eslint/eslint-plugin": "^8.58.1",
     "@typescript-eslint/parser": "^8.58.1",
-    "chai": "^6.2.2",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
     "dotenv": "^17.4.1",
     "eslint": "^10.2.0",
     "eslint-config-prettier": "^10.1.8",
-    "mocha": "^11.7.5",
     "nodemon": "^3.1.14",
     "open": "^11.0.0",
     "pm2": "^6.0.14",
     "prettier": "^3.8.2",
     "prisma": "^7.7.0",
-    "sinon": "^21.1.2",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.58.1",
