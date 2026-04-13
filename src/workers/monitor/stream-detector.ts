@@ -16,16 +16,32 @@ import { extractErrorDetails, createErrorContext } from '../../utils/error.js';
 type PlatformType = 'twitch' | 'kick';
 type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
 
+const inFlightChecks = new Map<string, number>();
+
 /**
  * Main polling function - called every 30 seconds per tenant/platform pair
  */
 export async function checkPlatformStatus(tenantId: string, platform: PlatformType, config: TenantConfig): Promise<void> {
   const log = createAutoLogger(tenantId);
+  const lockKey = `${tenantId}:${platform}`;
 
-  log.debug({ platform }, '[Monitor]: Polling platform status for streamer...');
-  log.debug({ vodDownload: config.settings?.vodDownload, platformEnabled: config[platform as 'twitch' | 'kick']?.enabled }, '[Monitor]: Config values');
+  const startTime = inFlightChecks.get(lockKey);
+  if (startTime) {
+    const elapsedMs = Date.now() - startTime;
+    if (elapsedMs > 60_000) {
+      log.warn({ lockKey, elapsedMs }, 'Poll has been in-flight for over 60 seconds, potential deadlock');
+    } else {
+      log.trace({ lockKey, elapsedMs }, 'Skipping poll, previous check still in flight');
+    }
+    return;
+  }
+
+  inFlightChecks.set(lockKey, Date.now());
 
   try {
+    log.debug({ platform }, '[Monitor]: Polling platform status for streamer...');
+    log.debug({ vodDownload: config.settings?.vodDownload, platformEnabled: config[platform as 'twitch' | 'kick']?.enabled }, '[Monitor]: Config values');
+
     const prisma = getClient(tenantId) || (await createClient(config));
 
     if (platform === 'twitch' && config.twitch?.enabled && config.settings.vodDownload) {
@@ -59,6 +75,8 @@ export async function checkPlatformStatus(tenantId: string, platform: PlatformTy
     } else {
       log.error({ platform, ...details }, `[${capitalizePlatform(platform)}] Error in stream status check`);
     }
+  } finally {
+    inFlightChecks.delete(lockKey);
   }
 }
 

@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import 'dotenv/config';
 import * as readline from 'readline';
 import { z } from 'zod';

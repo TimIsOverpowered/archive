@@ -3,6 +3,8 @@ import type { Browser, Page } from 'puppeteer';
 import type { PuppeteerExtraPlugin } from 'puppeteer-extra';
 import { extractErrorDetails } from './error.js';
 import { logger } from './logger.js';
+import { limit, getPuppeteerQueueStats } from './puppeteer-limiter.js';
+import { sleep, getRetryDelay } from './delay.js';
 
 const log = logger.child({ module: 'puppeteer-manager' });
 
@@ -86,108 +88,136 @@ export async function navigateToUrl<T = unknown>(url: string, options?: Navigate
   const browserData = await getBrowser();
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    // ... (Jitter/Backoff logic same as before)
+    const attemptResult: {
+      success?: boolean;
+      page?: Page;
+      data?: T;
+      status?: number;
+      error?: string;
+      code?: NavigationErrorCode;
+    } = {};
 
     let page: Page | null = null;
+    let pageToClose: Page | null = null;
+
+    const queueStats = getPuppeteerQueueStats();
+    if (queueStats.pending > 0) {
+      log.debug({ url, attempt, ...queueStats }, 'Puppeteer queue is backing up');
+    } else {
+      log.trace({ url, attempt, ...queueStats }, 'Queuing Puppeteer navigation');
+    }
 
     try {
-      page = await browserData.browser.newPage();
-      page.setDefaultNavigationTimeout(timeoutMs);
+      await limit(async () => {
+        page = await browserData.browser.newPage();
+        pageToClose = page;
+        page.setDefaultNavigationTimeout(timeoutMs);
 
-      // 1. Initial Navigation
-      const response = await page.goto(url, { waitUntil: 'networkidle2' });
-      const status = response?.status();
+        const response = await page.goto(url, { waitUntil: 'networkidle2' });
+        const status = response?.status();
 
-      if (status && status >= 400) {
-        await page.close();
-        return { success: false, error: `HTTP ${status}`, code: 'HTTP_ERROR' };
-      }
+        if (status && status >= 400) {
+          attemptResult.error = `HTTP ${status}`;
+          attemptResult.code = 'HTTP_ERROR';
+          await page.close();
+          return;
+        }
 
-      // 2. INLINE VALIDATION GATE
-      // We poll for the JSON content or a Captcha presence simultaneously
-      try {
-        await page.waitForFunction(
-          () => {
-            const text = document.body.innerText.trim();
-            const hasJson = text.startsWith('[') || text.startsWith('{');
-            const isBlocked = !!document.querySelector('#turnstile-wrapper') || document.title.includes('Just a moment');
+        try {
+          await page.waitForFunction(
+            () => {
+              const text = document.body.innerText.trim();
+              const hasJson = text.startsWith('[') || text.startsWith('{');
+              const isBlocked = !!document.querySelector('#turnstile-wrapper') || document.title.includes('Just a moment');
+              return hasJson || isBlocked;
+            },
+            { timeout: 10000 }
+          );
+        } catch (error) {
+          log.debug({ error: extractErrorDetails(error).message }, 'waitForFunction timed out');
+        }
 
-            // Return true if we found data OR if we are definitely blocked
-            return hasJson || isBlocked;
-          },
-          { timeout: 10000 }
-        );
-      } catch (error) {
-        log.debug({ error: extractErrorDetails(error).message }, 'waitForFunction timed out');
-      }
+        const pageState = await page.evaluate(() => {
+          const text = document.body.innerText.trim();
+          return {
+            hasJson: text.startsWith('[') || text.startsWith('{'),
+            isBlocked: !!document.querySelector('#turnstile-wrapper') || document.title.includes('Just a moment'),
+            content: text,
+          };
+        });
 
-      // 3. FINAL STATE CHECK
-      const pageState = await page.evaluate(() => {
-        const text = document.body.innerText.trim();
-        return {
-          hasJson: text.startsWith('[') || text.startsWith('{'),
-          isBlocked: !!document.querySelector('#turnstile-wrapper') || document.title.includes('Just a moment'),
-          content: text,
-        };
+        if (pageState.isBlocked) {
+          await page.close();
+          if (attempt === maxRetries) {
+            attemptResult.error = 'Cloudflare wall persists';
+            attemptResult.code = 'CAPTCHA_DETECTED';
+          }
+          return;
+        }
+
+        if (isJsonEndpoint && !pageState.hasJson) {
+          await page.close();
+          if (attempt === maxRetries) {
+            attemptResult.error = 'No JSON found in response';
+            attemptResult.code = 'INVALID_JSON_RESPONSE';
+          }
+          return;
+        }
+
+        let finalData: T | undefined;
+        if (isJsonEndpoint) {
+          try {
+            finalData = await response?.json();
+          } catch {
+            if (pageState.content.startsWith('{') || pageState.content.startsWith('[')) {
+              try {
+                finalData = JSON.parse(pageState.content);
+              } catch (parseError) {
+                log.debug({ error: extractErrorDetails(parseError).message }, 'Failed to parse innerText as JSON');
+              }
+            }
+
+            if (!finalData && pageState.content.length > 0) {
+              const preContent = await page.evaluate(() => document.querySelector('pre')?.textContent || '');
+
+              if (preContent.startsWith('{') || preContent.startsWith('[')) {
+                try {
+                  finalData = JSON.parse(preContent);
+                } catch (parseError) {
+                  log.debug({ error: extractErrorDetails(parseError).message }, 'Failed to parse <pre> content as JSON');
+                }
+              } else if (!finalData && pageState.content.length === 0) {
+                log.trace('No valid JSON found in response or DOM extraction failed');
+              }
+            }
+          }
+        }
+
+        attemptResult.success = true;
+        attemptResult.page = page;
+        attemptResult.data = finalData;
+        attemptResult.status = status;
       });
 
-      if (pageState.isBlocked) {
-        await page.close();
-        if (attempt === maxRetries) {
-          return { success: false, error: 'Cloudflare wall persists', code: 'CAPTCHA_DETECTED' };
-        }
-        continue; // Retry
+      if (attemptResult.error) {
+        return { success: false, error: attemptResult.error, code: attemptResult.code! };
       }
 
-      if (isJsonEndpoint && !pageState.hasJson) {
-        await page.close();
-        if (attempt === maxRetries) {
-          return { success: false, error: 'No JSON found in response', code: 'INVALID_JSON_RESPONSE' };
-        }
-        continue; // Retry
+      if (attemptResult.success) {
+        return { success: true, page: attemptResult.page!, data: attemptResult.data, status: attemptResult.status };
       }
-
-      // 4. DATA EXTRACTION
-      let finalData: T | undefined;
-      if (isJsonEndpoint) {
-        try {
-          finalData = await response?.json();
-        } catch {
-          // Direct parse failed - attempt DOM-based extraction
-
-          // First fallback: use already-extracted innerText from pageState.content
-          if (pageState.content.startsWith('{') || pageState.content.startsWith('[')) {
-            try {
-              finalData = JSON.parse(pageState.content);
-            } catch (parseError) {
-              log.debug({ error: extractErrorDetails(parseError).message }, 'Failed to parse innerText as JSON');
-            }
-          }
-
-          // Second fallback: specifically target <pre> tag content (Kick-style wrapping)
-          if (!finalData && pageState.content.length > 0) {
-            const preContent = await page.evaluate(() => document.querySelector('pre')?.textContent || '');
-
-            if (preContent.startsWith('{') || preContent.startsWith('[')) {
-              try {
-                finalData = JSON.parse(preContent);
-              } catch (parseError) {
-                log.debug({ error: extractErrorDetails(parseError).message }, 'Failed to parse <pre> content as JSON');
-              }
-            } else if (!finalData && pageState.content.length === 0) {
-              log.trace('No valid JSON found in response or DOM extraction failed');
-            }
-          }
-        }
-      }
-
-      return { success: true, page, data: finalData, status };
     } catch (error) {
       const details = extractErrorDetails(error);
-      if (page) await page.close();
+      if (pageToClose) await (pageToClose as Page).close();
       if (attempt === maxRetries) {
         return { success: false, error: details.message, code: 'NETWORK_ERROR' };
       }
+    }
+
+    if (attempt < maxRetries) {
+      const delayMs = getRetryDelay(attempt, 2000, 3, true);
+      log.trace({ attempt, delayMs }, 'Applying backoff delay before next retry');
+      await sleep(delayMs);
     }
   }
 
