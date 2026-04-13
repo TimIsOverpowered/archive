@@ -8,7 +8,9 @@ import { trimVideo as ffmpegTrim } from './vod/ffmpeg.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
 import { handleWorkerError } from './utils/error-handler.js';
-import { ensureVodDownload } from '../api/routes/admin/utils/vod-helpers.js';
+import { triggerVodDownload } from './jobs/vod.job.js';
+import { getVodFilePath, fileExists } from '../utils/path.js';
+import { getStandardVodQueue } from './jobs/queues.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { createDmcaWorkerAlerts } from './utils/alert-factories.js';
 
@@ -37,13 +39,20 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
   // For live streams, use stream_id; for archived, use vod_id
   const fileIdentifier = type === 'live' ? vodRecord.stream_id || vodId : vodId;
 
-  const videoPath = await ensureVodDownload({
-    tenantId,
-    dbId: vodRecord.id,
-    vodId: fileIdentifier,
-    platform,
-    type: job.data.type,
-  });
+  const filePath = getVodFilePath({ tenantId, vodId: fileIdentifier });
+
+  if (!(await fileExists(filePath))) {
+    const existingJob = await getStandardVodQueue().getJob(`vod_${fileIdentifier}`);
+    if (!existingJob) {
+      await triggerVodDownload(tenantId, vodRecord.id, fileIdentifier, platform);
+      log.info({ vodId: fileIdentifier }, 'VOD download queued, DMCA job will retry');
+    } else {
+      log.debug({ vodId: fileIdentifier, state: await existingJob.getState() }, 'VOD download already in progress');
+    }
+    throw new Error('VOD not yet downloaded, retrying');
+  }
+
+  const videoPath = filePath;
 
   const dmcaAlerts = createDmcaWorkerAlerts();
   const blockingClaimsCount = receivedClaims.filter(isBlockingPolicy).length;

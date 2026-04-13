@@ -33,6 +33,8 @@ const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) 
                 if (result && typeof result === 'object' && 'id' in result) {
                   vodId = Number((result as { id: unknown }).id);
                 }
+              } else if (operation === 'deleteMany' || operation === 'updateMany') {
+                logger.debug({ model, operation, tenantId }, 'Bulk Vod mutation — cache may need manual invalidation');
               }
             } else {
               if (operation === 'delete' || operation === 'update' || operation === 'upsert') {
@@ -209,6 +211,12 @@ class ClientManager {
     }
   }
 
+  reset(): void {
+    this.stopCleanup();
+    this.clients.clear();
+    this.creationLocks.clear();
+  }
+
   async closeAll(): Promise<void> {
     this.stopCleanup();
 
@@ -256,10 +264,5 @@ export function getClientCount(): number {
 }
 
 export function resetClientManager(): void {
-  clientManager['clients'].clear();
-  clientManager['creationLocks'].clear();
-  if (clientManager['cleanupIntervalId'] !== null) {
-    clearInterval(clientManager['cleanupIntervalId']);
-    clientManager['cleanupIntervalId'] = null;
-  }
+  clientManager.reset();
 }
