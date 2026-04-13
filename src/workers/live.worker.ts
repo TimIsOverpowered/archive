@@ -75,7 +75,15 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
       log.warn({ ...extractErrorDetails(error), vodId }, 'Failed to queue upload (non-fatal)');
     }
 
-    // 5. Cleanup HLS segments
+    try {
+      const { triggerChatDownload } = await import('./jobs/chat.job.js');
+      await triggerChatDownload(tenantId, platformUserId, dbId, vodId, platform, actualDuration ? Math.round(actualDuration) : 0, platformUsername);
+      log.info({ vodId }, 'Queued chat download job');
+    } catch (error) {
+      log.warn({ ...extractErrorDetails(error), vodId }, 'Failed to queue chat download (non-fatal)');
+    }
+
+    // 6. Cleanup HLS segments
     const shouldKeepHls = config.settings.saveHLS ?? false;
     await cleanupHlsFiles(downloadResult.outputDir, shouldKeepHls, log);
 

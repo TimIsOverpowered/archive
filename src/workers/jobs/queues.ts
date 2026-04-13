@@ -30,7 +30,6 @@ export interface ChatDownloadJob {
   vodId: string;
   platform: 'twitch' | 'kick';
   duration: number;
-  vodStartDate?: string;
   startOffset?: number;
 }
 
