@@ -42,6 +42,8 @@ module.exports = {
       instances: 1, // Single instance per app
       exec_mode: 'fork', // Standard process mode
 
+      kill_timeout: 10000, // Allow Puppeteer 10s to shutdown gracefully before PM2 force-kills
+
       merge_logs: true, // Combine stdout + stderr into single log file
 
       out_file: './logs/api-out.log', // Pretty-printed console output from pino-pretty transport
@@ -75,6 +77,8 @@ module.exports = {
       watch: false, // Disable file watching in production
       instances: 1,
       exec_mode: 'fork',
+
+      kill_timeout: 10000, // Allow Puppeteer 10s to shutdown gracefully before PM2 force-kills
 
       merge_logs: true, // Combine streams for cleaner log viewing
 

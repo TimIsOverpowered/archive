@@ -54,7 +54,6 @@ async function start() {
 async function shutdown(signal: string) {
   logger.info({ signal }, `Received ${signal}, starting graceful shutdown...`);
 
-  // Force exit after 30 seconds if graceful shutdown hangs
   const shutdownTimeout = setTimeout(() => {
     logger.error('Forced shutdown after 5 second timeout');
     process.exit(1);
@@ -67,6 +66,11 @@ async function shutdown(signal: string) {
   }
 
   try {
+    // Release Puppeteer browser if instantiated (no-op if null)
+    const { releaseBrowser } = await import('./utils/puppeteer-manager.js');
+    await releaseBrowser();
+    logger.info('Puppeteer browser released');
+
     // Close HTTP server (waits for in-flight requests)
     await server.close();
     logger.info('HTTP server closed');

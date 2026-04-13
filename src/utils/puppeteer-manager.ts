@@ -40,6 +40,7 @@ export interface MemoryStats {
 }
 
 let browserInstance: BrowserResult | null = null;
+let chromePid: number | null = null;
 const GLOBAL_NAV_TIMEOUT_MS = 5 * 60 * 1000;
 
 /**
@@ -68,6 +69,12 @@ export async function getBrowser(): Promise<{ browser: Browser }> {
     connectOption: { defaultViewport: null },
     plugins: [clickAndWaitPlugin()],
   });
+
+  chromePid = browserInstance.browser.process()?.pid ?? null;
+
+  if (chromePid === null) {
+    log.trace('Chromium PID not available (expected with puppeteer-real-browser connect())');
+  }
 
   return { browser: browserInstance.browser as unknown as Browser };
 }
@@ -213,12 +220,35 @@ export async function getFullMemoryStats(browser?: Browser): Promise<MemoryStats
 
 export async function releaseBrowser(): Promise<void> {
   if (!browserInstance) return;
+
+  const browser = browserInstance.browser as unknown as Browser;
+  const pid = chromePid;
+  const timeoutMs = parseInt(process.env.PUPPETEER_SHUTDOWN_TIMEOUT_MS || '5000', 10);
+
   try {
-    await (browserInstance.browser as unknown as Browser).close();
+    log.info({ pid }, 'Attempting graceful browser shutdown...');
+
+    await Promise.race([browser.close(), new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Browser close timed out')), timeoutMs))]);
+
+    log.info('Browser closed gracefully');
   } catch (error) {
     const details = extractErrorDetails(error);
-    log.warn({ details }, 'Failed to close browser instance during shutdown');
+    log.warn({ error: details.message, pid }, 'Graceful shutdown failed or timed out');
+
+    if (pid) {
+      try {
+        log.info({ pid }, 'Sending SIGKILL to browser process');
+        process.kill(pid, 'SIGKILL');
+      } catch (killError) {
+        log.debug({ pid, error: extractErrorDetails(killError).message }, 'Process already dead or cannot be killed');
+      }
+    }
   } finally {
     browserInstance = null;
+    chromePid = null;
   }
+}
+
+export function getChromePid(): number | null {
+  return chromePid;
 }
