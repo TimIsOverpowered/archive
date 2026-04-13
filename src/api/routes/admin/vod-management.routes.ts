@@ -8,6 +8,7 @@ import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest } from '../../../utils/http-error';
 import { findVodRecord } from './utils/vod-helpers';
+import { getApiConfig } from '../../../config/env.js';
 
 interface StatsParams {
   tenantId: string;
@@ -56,7 +57,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
     async (request) => {
       const { tenantId, client } = request.tenant!;
 
-      const stats = await getTenantStats(client, tenantId);
+      const stats = await getTenantStats(client, tenantId, getApiConfig().STATS_CACHE_TTL);
       return { data: stats };
     }
   );

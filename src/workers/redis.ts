@@ -15,26 +15,23 @@ const redisOptions: RedisOptions = {
 
 const redisInstance = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', redisOptions);
 
-// Wait for ready event with timeout (register BEFORE connect)
+// Wait for ready event with timeout
 const readyTimeout = REDIS_RETRY_TIMEOUT_MS;
-let readyResolved = false;
 
-const readyHandler = () => {
-  if (readyResolved) return;
-  readyResolved = true;
-  clearTimeout(timeoutId);
-  logger.info('[Workers Redis] Connection ready - BullMQ can now process jobs');
-};
-
-const timeoutId = setTimeout(() => {
-  redisInstance.off('ready', readyHandler);
-  const errorMsg = `Redis did not become ready after ${readyTimeout}ms`;
-  logger.fatal({ timeoutMs: readyTimeout }, errorMsg);
-}, readyTimeout);
-
-const readyPromise: Promise<void> = new Promise<void>((resolve, _) => {
-  redisInstance.on('ready', readyHandler);
-  resolve(); // Will be called by readyHandler
+const readyPromise: Promise<void> = new Promise<void>((resolve) => {
+  if (redisInstance.status === 'ready') {
+    resolve();
+    return;
+  }
+  const timeoutId = setTimeout(() => {
+    const errorMsg = `Redis did not become ready after ${readyTimeout}ms`;
+    logger.fatal({ timeoutMs: readyTimeout }, errorMsg);
+  }, readyTimeout);
+  redisInstance.once('ready', () => {
+    clearTimeout(timeoutId);
+    logger.info('[Workers Redis] Connection ready - BullMQ can now process jobs');
+    resolve();
+  });
 });
 
 // Connection event handlers using project logger

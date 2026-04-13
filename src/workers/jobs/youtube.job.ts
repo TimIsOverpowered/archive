@@ -139,9 +139,7 @@ export async function createGameUploadJobsForVod(tenantId: string, dbId: number,
       jobs.push(job);
     } catch (error) {
       // Skip restricted games or other errors
-      const { createAutoLogger } = await import('../../utils/auto-tenant-logger.js');
-      const log = createAutoLogger(tenantId);
-      log.warn({ chapter: chapter.name, error: (error as Error).message }, 'Skipping game upload job');
+      log.warn({ chapter: chapter.name, tenantId, error: (error as Error).message }, 'Skipping game upload job');
     }
   }
 
