@@ -4,6 +4,74 @@ import { TenantConfig } from '../config/types';
 import { logger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { DB_CLIENT_IDLE_TIMEOUT_MS, DB_CLIENT_MAX_CLIENTS, DB_CLIENT_CLEANUP_INTERVAL_MS } from '../constants.js';
+import { invalidateVodCache } from '../services/vod-cache.js';
+
+const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) =>
+  baseClient.$extends({
+    query: {
+      $allModels: {
+        async $allOperations({ model, operation, args, query }) {
+          const isMutation = ['create', 'update', 'upsert', 'delete', 'createMany', 'updateMany', 'deleteMany'].includes(operation);
+          const isRelevantModel = ['Vod', 'VodUpload', 'Emote', 'Chapter', 'Game'].includes(model);
+
+          if (!isMutation || !isRelevantModel) {
+            return query(args);
+          }
+
+          try {
+            const result = await query(args);
+
+            let vodId: number | null = null;
+
+            if (model === 'Vod') {
+              if (operation === 'delete' || operation === 'update' || operation === 'upsert') {
+                const where = (args as { where?: Record<string, unknown> }).where;
+                if (where && typeof where === 'object' && 'id' in where) {
+                  vodId = Number((where as { id: unknown }).id);
+                }
+              } else if (operation === 'create') {
+                if (result && typeof result === 'object' && 'id' in result) {
+                  vodId = Number((result as { id: unknown }).id);
+                }
+              }
+            } else {
+              if (operation === 'delete' || operation === 'update' || operation === 'upsert') {
+                const where = (args as { where?: Record<string, unknown> }).where;
+                if (where && typeof where === 'object' && 'vod_id' in where) {
+                  vodId = Number((where as { vod_id: unknown }).vod_id);
+                }
+              } else if (operation === 'create') {
+                const data = (args as { data?: Record<string, unknown> }).data;
+                if (data && typeof data === 'object' && 'vod_id' in data) {
+                  vodId = Number((data as { vod_id: unknown }).vod_id);
+                }
+              } else if (operation.includes('Many')) {
+                const data = (args as { data?: unknown[] }).data;
+                if (Array.isArray(data) && data.length > 0) {
+                  const firstItem = data[0] as Record<string, unknown>;
+                  if ('vod_id' in firstItem) {
+                    vodId = Number(firstItem.vod_id);
+                  }
+                }
+              }
+            }
+
+            if (vodId !== null && !isNaN(vodId)) {
+              invalidateVodCache(tenantId, vodId).catch((error) => {
+                logger.warn({ tenantId, vodId, error: extractErrorDetails(error) }, 'Cache invalidation failed');
+              });
+
+              logger.debug({ tenantId, vodId, model, operation }, 'VOD cache invalidated via extension');
+            }
+
+            return result;
+          } catch (error) {
+            throw error;
+          }
+        },
+      },
+    },
+  });
 
 interface ClientEntry {
   client: PrismaClient;
@@ -40,21 +108,26 @@ class ClientManager {
     }
 
     const creationPromise = (async (): Promise<PrismaClient> => {
-      let client: PrismaClient;
+      let extendedClient: PrismaClient;
       try {
         const connectionLimit = config.database.connectionLimit || 5;
         const urlWithParams = `${config.database.url}${config.database.url.includes('?') ? '&' : '?'}connection_limit=${connectionLimit}`;
         const adapter = new PrismaPg({ connectionString: urlWithParams });
-        client = new PrismaClient({ adapter });
-        await client.$connect();
+
+        // Create base client
+        const baseClient = new PrismaClient({ adapter });
+        await baseClient.$connect();
+
+        // Extend with cache invalidation - THIS IS THE CLIENT WE STORE
+        extendedClient = cacheInvalidationExtension(config.id, baseClient) as unknown as PrismaClient;
 
         this.clients.set(config.id, {
-          client,
+          client: extendedClient, // Store the extended client, not baseClient
           lastAccessedAt: Date.now(),
           createdAt: Date.now(),
         });
 
-        return client;
+        return extendedClient; // Return the extended client
       } finally {
         this.creationLocks.delete(config.id);
       }
