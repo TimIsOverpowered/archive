@@ -10,7 +10,7 @@ import { getTwitchStreamStatus, getLatestTwitchVodObject, type TwitchStreamStatu
 import { getKickStreamStatus, getLatestKickVodObject } from '../../services/kick-live.js';
 import type { KickStreamStatus } from '../../types/kick.js';
 import { sendRichAlert } from '../../utils/discord-alerts.js';
-import { formatDuration } from '../../utils/formatting.js';
+import { capitalizePlatform, formatDuration } from '../../utils/formatting.js';
 import { extractErrorDetails, createErrorContext } from '../../utils/error.js';
 
 type PlatformType = 'twitch' | 'kick';
@@ -53,11 +53,11 @@ export async function checkPlatformStatus(tenantId: string, platform: PlatformTy
     const details = extractErrorDetails(error);
 
     if (typeof error === 'object' && error !== null && 'response' in error) {
-      log.error({ platform, ...details }, `[Platform]: ${platform}] Error in stream status check`);
+      log.error({ platform, ...details }, `[${capitalizePlatform(platform)}] Error in stream status check`);
     } else if (typeof error === 'object' && error !== null && 'request' in error) {
-      log.error({ platform, ...details }, `[Platform]: ${platform}] Error in stream status check (no response)`);
+      log.error({ platform, ...details }, `[${capitalizePlatform(platform)}] Error in stream status check (no response)`);
     } else {
-      log.error({ platform, ...details }, `[Platform]: ${platform}] Error in stream status check`);
+      log.error({ platform, ...details }, `[${capitalizePlatform(platform)}] Error in stream status check`);
     }
   }
 }
@@ -72,7 +72,7 @@ async function sendStreamLiveAlert(platform: PlatformType, vodId: string, title:
   try {
     await sendRichAlert({
       title: '🔴 Stream Going Live',
-      description: `${platform.toUpperCase()} live stream detected for ${streamerName}`,
+      description: `${capitalizePlatform(platform)} live stream detected for ${streamerName}`,
       status: 'success',
       fields: [
         { name: 'Platform', value: platform, inline: true },
@@ -104,7 +104,7 @@ async function sendStreamOfflineAlert(platform: PlatformType, vodId: string, sta
 
     await sendRichAlert({
       title: '⚫ Stream Ended',
-      description: `${platform.toUpperCase()} stream has gone offline for ${streamerName}`,
+      description: `${capitalizePlatform(platform)} stream has gone offline for ${streamerName}`,
       status: 'warning',
       fields,
       timestamp: new Date().toISOString(),
@@ -527,7 +527,7 @@ async function enqueueLiveHlsDownload(params: {
  */
 export function startStreamDetectionLoop(tenantId: string, platform: PlatformType, config: TenantConfig): void {
   const log = createAutoLogger(tenantId);
-  log.info({ platform }, '[Platform]: Starting stream detection polling every 30 seconds');
+  log.info(`[${capitalizePlatform(platform)}]: Starting stream detection polling every 30 seconds`);
 
   // Run immediately on startup, then every 30s
   (async () => {
@@ -535,7 +535,7 @@ export function startStreamDetectionLoop(tenantId: string, platform: PlatformTyp
       await checkPlatformStatus(tenantId, platform, config);
     } catch (error: unknown) {
       const details = extractErrorDetails(error);
-      log.error({ err: details.message }, `[Platform]: ${platform}] Error in initial poll cycle`);
+      log.error({ err: details.message }, `[${capitalizePlatform(platform)}] Error in initial poll cycle`);
     }
   })();
 
@@ -545,7 +545,7 @@ export function startStreamDetectionLoop(tenantId: string, platform: PlatformTyp
     } catch (error: unknown) {
       // Prevent one failed poll from crashing the entire loop for this tenant/platform pair
       const details = extractErrorDetails(error);
-      log.error({ err: details.message }, `[Platform]: ${platform}] Error in polling cycle`);
+      log.error({ err: details.message }, `[${capitalizePlatform(platform)}] Error in polling cycle`);
     }
   }, 30_000);
 
@@ -558,5 +558,5 @@ export function startStreamDetectionLoop(tenantId: string, platform: PlatformTyp
   }
   globalObj.monitorIntervals.set(key, intervalId);
 
-  log.info({ platform, intervalId }, '[Platform]: Polling loop started');
+  log.info({ timeout: 30000 }, `[${capitalizePlatform(platform)}]: Polling loop started`);
 }
