@@ -1,5 +1,7 @@
 import { PrismaClient, UploadStatus } from '../../generated/streamer/client';
 import { withCache } from '../utils/cache.js';
+import { invalidateVodCache } from './vod-cache.js';
+import { VOD_DETAILS_CACHE_TTL, VOD_LIST_CACHE_TTL } from '../constants.js';
 
 interface VodResponse {
   id: number;
@@ -50,8 +52,6 @@ interface VodQuery {
   sort?: 'created_at' | 'duration' | 'uploaded_at';
   order?: 'asc' | 'desc';
 }
-
-const VODS_CACHE_TTL = 86400; // 24 hours
 
 export async function getVods(client: PrismaClient, tenantId: string, query: VodQuery): Promise<{ vods: VodResponse[]; total: number }> {
   const page = Math.max(1, query.page || 1);
@@ -153,7 +153,7 @@ export async function getVods(client: PrismaClient, tenantId: string, query: Vod
     total,
   };
 
-  return await withCache(cacheKey, VODS_CACHE_TTL, () => Promise.resolve(response));
+  return await withCache(cacheKey, VOD_LIST_CACHE_TTL, () => Promise.resolve(response));
 }
 
 export async function getVodById(client: PrismaClient, tenantId: string, vodId: number): Promise<VodResponse | null> {
@@ -202,7 +202,7 @@ export async function getVodById(client: PrismaClient, tenantId: string, vodId: 
 
   if (vod) {
     const response = vod as unknown as VodResponse;
-    return await withCache(cacheKey, VODS_CACHE_TTL, () => Promise.resolve(response));
+    return await withCache(cacheKey, VOD_DETAILS_CACHE_TTL, () => Promise.resolve(response));
   }
 
   return null;
@@ -255,8 +255,10 @@ export async function getVodByPlatformId(client: PrismaClient, tenantId: string,
 
   if (vod) {
     const response = vod as unknown as VodResponse;
-    return await withCache(cacheKey, VODS_CACHE_TTL, () => Promise.resolve(response));
+    return await withCache(cacheKey, VOD_DETAILS_CACHE_TTL, () => Promise.resolve(response));
   }
 
   return null;
 }
+
+export { invalidateVodCache };
