@@ -1,8 +1,6 @@
 import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
-import { extractErrorDetails, createErrorContext, throwOnHttpError } from '../utils/error.js';
-import { getTenantConfig as getConfig, updateTenantTwitchAuth } from '../config/loader.js';
-import { encryptObject, decryptObject } from '../utils/encryption.js';
-import { metaClient } from '../db/meta-client.js';
+import { extractErrorDetails, createErrorContext } from '../utils/error.js';
+import { getTenantConfig as getConfig } from '../config/loader.js';
 import { toHHMMSS } from '../utils/formatting.js';
 import { PrismaClient } from '../../generated/streamer/client.js';
 import { childLogger } from '../utils/logger.js';
@@ -10,10 +8,12 @@ import { stripTypename } from '../workers/chat/chat-helpers.js';
 import type { InputJsonValue } from '../../generated/streamer/internal/prismaNamespace.js';
 import { sendVodDownloadStarted, sendVodDownloadSuccess, sendVodDownloadFailed } from '../utils/discord-alerts.js';
 import { convertHlsToMp4, detectFmp4FromPlaylist } from '../workers/vod/ffmpeg.js';
+import { request } from '../utils/http-client.js';
+import { createTwitchClient } from './twitch-client.js';
+import { getAppAccessToken } from './twitch-auth.js';
+import { HttpError } from '../utils/http-error.js';
 
-// Twitch API constants
-// Other GQL Client-Id 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp';
-const TWITCH_GQL_CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
+export { getAppAccessToken } from './twitch-auth.js';
 
 export interface VodData {
   id: string;
@@ -34,140 +34,50 @@ export interface VodData {
   view_count: number;
   muted_segments?: Array<{ duration: number; offset: number }> | null;
 }
+
 interface VodTokenSig {
   value: string;
   signature: string;
 }
+
 const log = childLogger({ module: 'twitch' });
 
-export async function getAppAccessToken(tenantId: string): Promise<string> {
-  const creds = getCreds(tenantId);
-  if (!creds) {
-    throw new Error('Twitch credentials not configured');
-  }
-
-  // Check if stored token is still valid (expires > 1 hour from now)
-  if (creds.accessToken && creds.expiryDate) {
-    const oneHourFromNow = Date.now() + 60 * 60 * 1000;
-
-    if (creds.expiryDate > oneHourFromNow) {
-      return creds.accessToken;
-    }
-  }
-
-  // Fetch new token from Twitch API
-  const url = new URL('https://id.twitch.tv/oauth2/token');
-  url.searchParams.append('client_id', creds.clientId);
-  url.searchParams.append('client_secret', creds.clientSecret);
-  url.searchParams.append('grant_type', 'client_credentials');
-  const response = await fetch(url.toString(), {
-    method: 'POST',
-    signal: AbortSignal.timeout(10000),
-  });
-  throwOnHttpError(response, 'Twitch token');
-  const data = await response.json();
-  const { access_token, expires_in } = data;
-  const expiryDate = Date.now() + expires_in * 1000;
-
-  log.info({ tenantId, expires_in, expiry_date: expiryDate }, 'Fetched new Twitch access token');
-
-  // Update token in database (await to prevent race conditions)
-  try {
-    await updateTwitchTokenInDb(tenantId, access_token, expiryDate);
-  } catch (err) {
-    const { message } = extractErrorDetails(err);
-    log.warn({ tenantId, error: message }, 'Failed to update Twitch token in database');
-  }
-
-  return access_token;
+function getTwitchClient(tenantId: string) {
+  return createTwitchClient(tenantId, () => getAppAccessToken(tenantId));
 }
 
-async function updateTwitchTokenInDb(tenantId: string, newToken: string, expiryDate: number): Promise<void> {
-  const config = getConfig(tenantId);
-  if (!config?.twitch?.auth) {
-    return;
-  }
-
-  try {
-    const auth = decryptObject<{ client_id: string; client_secret: string; access_token?: string; expiry_date?: number }>(config.twitch.auth);
-
-    const updatedAuth = {
-      client_id: auth.client_id,
-      client_secret: auth.client_secret,
-      access_token: newToken,
-      expiry_date: expiryDate,
-    };
-
-    const encryptedAuth = encryptObject(updatedAuth);
-
-    await metaClient.tenant.update({
-      where: { id: tenantId },
-      data: {
-        twitch: {
-          ...config.twitch,
-          auth: encryptedAuth,
-        },
-      },
-    });
-
-    // Update in-memory config cache
-    updateTenantTwitchAuth(tenantId, encryptedAuth);
-
-    log.info({ tenantId, expiry_date: expiryDate }, 'Updated Twitch token');
-  } catch (err) {
-    const { message } = extractErrorDetails(err);
-    log.warn({ tenantId, error: message }, 'Failed to update Twitch token in database');
-  }
-}
 export async function getVodData(vodId: string, tenantId: string): Promise<VodData> {
-  const accessToken = await getAppAccessToken(tenantId);
-  const creds = getCreds(tenantId)!;
-  const url = new URL('https://api.twitch.tv/helix/videos');
-  url.searchParams.append('id', vodId);
-  const response = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Client-Id': creds.clientId,
-    },
-    signal: AbortSignal.timeout(10000),
-  });
-  throwOnHttpError(response, 'Twitch API');
-  const data = await response.json();
+  const client = getTwitchClient(tenantId);
+  const data = await client.helix.get<{ data: VodData[] }>(`/videos?id=${vodId}`);
+
   if (!data.data || data.data.length === 0) {
     throw new Error(`VOD ${vodId} not found`);
   }
   return data.data[0] as VodData;
 }
+
 export async function getVodTokenSig(vodId: string): Promise<VodTokenSig> {
-  const response = await fetch('https://gql.twitch.tv/gql', {
-    method: 'POST',
-    headers: {
-      Accept: '*/*',
-      'Client-Id': TWITCH_GQL_CLIENT_ID,
-      'Content-Type': 'text/plain;charset=UTF-8',
+  const client = getTwitchClient('gql-placeholder');
+
+  const data = await client.gql.post<{ data: { videoPlaybackAccessToken: VodTokenSig } }>({
+    operationName: 'PlaybackAccessToken',
+    variables: {
+      isLive: false,
+      login: '',
+      isVod: true,
+      vodID: vodId,
+      platform: 'web',
+      playerBackend: 'mediaplayer',
+      playerType: 'site',
     },
-    body: JSON.stringify({
-      operationName: 'PlaybackAccessToken',
-      variables: {
-        isLive: false,
-        login: '',
-        isVod: true,
-        vodID: vodId,
-        platform: 'web',
-        playerBackend: 'mediaplayer',
-        playerType: 'site',
+    extensions: {
+      persistedQuery: {
+        version: 1,
+        sha256Hash: '0828119ded1c13477966434e15800ff57ddacf13ba1911c129dc2200705b0712',
       },
-      extensions: {
-        persistedQuery: {
-          version: 1,
-          sha256Hash: '0828119ded1c13477966434e15800ff57ddacf13ba1911c129dc2200705b0712',
-        },
-      },
-    }),
-    signal: AbortSignal.timeout(10000),
+    },
   });
-  throwOnHttpError(response, 'Twitch token sig');
-  const data = await response.json();
+
   const token = data.data.videoPlaybackAccessToken;
   if (!token) {
     throw new Error('Failed to get VOD token');
@@ -177,142 +87,100 @@ export async function getVodTokenSig(vodId: string): Promise<VodTokenSig> {
     signature: token.signature,
   };
 }
+
 export async function getM3u8(vodId: string, token: string, sig: string): Promise<string> {
   const url = `https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h265,h264&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`;
-  const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
-  throwOnHttpError(response, 'Twitch M3U8');
-  return response.text();
+  return request(url, {
+    responseType: 'text',
+    timeoutMs: 30000,
+  });
 }
+
 export async function fetchComments(vodId: string, offset = 0): Promise<Record<string, unknown> | null> {
-  const response = await fetch('https://gql.twitch.tv/gql', {
-    method: 'POST',
-    headers: {
-      Accept: '*/*',
-      'Client-Id': TWITCH_GQL_CLIENT_ID,
-      'Content-Type': 'text/plain;charset=UTF-8',
+  const client = getTwitchClient('gql-placeholder');
+  const data = await client.gql.post<{ data?: { video?: Record<string, unknown> } }>({
+    operationName: 'VideoCommentsByOffsetOrCursor',
+    variables: {
+      videoID: vodId,
+      contentOffsetSeconds: offset,
     },
-    body: JSON.stringify({
-      operationName: 'VideoCommentsByOffsetOrCursor',
-      variables: {
-        videoID: vodId,
-        contentOffsetSeconds: offset,
+    extensions: {
+      persistedQuery: {
+        version: 1,
+        sha256Hash: 'b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a',
       },
-      extensions: {
-        persistedQuery: {
-          version: 1,
-          sha256Hash: 'b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a',
-        },
-      },
-    }),
-    signal: AbortSignal.timeout(10000),
+    },
   });
-  throwOnHttpError(response, 'Twitch comments');
-  const data = await response.json();
   return data.data?.video || null;
 }
+
 export async function fetchNextComments(vodId: string, cursor: string): Promise<Record<string, unknown> | null> {
-  const response = await fetch('https://gql.twitch.tv/gql', {
-    method: 'POST',
-    headers: {
-      Accept: '*/*',
-      'Client-Id': TWITCH_GQL_CLIENT_ID,
-      'Content-Type': 'text/plain;charset=UTF-8',
+  const client = getTwitchClient('gql-placeholder');
+  const data = await client.gql.post<{ data?: { video?: Record<string, unknown> } }>({
+    operationName: 'VideoCommentsByOffsetOrCursor',
+    variables: {
+      videoID: vodId,
+      cursor: cursor,
     },
-    body: JSON.stringify({
-      operationName: 'VideoCommentsByOffsetOrCursor',
-      variables: {
-        videoID: vodId,
-        cursor: cursor,
+    extensions: {
+      persistedQuery: {
+        version: 1,
+        sha256Hash: 'b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a',
       },
-      extensions: {
-        persistedQuery: {
-          version: 1,
-          sha256Hash: 'b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a',
-        },
-      },
-    }),
-    signal: AbortSignal.timeout(10000),
+    },
   });
-  throwOnHttpError(response, 'Twitch next comments');
-  const data = await response.json();
   return data.data?.video || null;
 }
+
 export async function getChapters(vodId: string): Promise<Record<string, unknown> | null> {
-  const response = await fetch('https://gql.twitch.tv/gql', {
-    method: 'POST',
-    headers: {
-      Accept: '*/*',
-      'Client-Id': TWITCH_GQL_CLIENT_ID,
-      'Content-Type': 'text/plain;charset=UTF-8',
+  const client = getTwitchClient('gql-placeholder');
+  const data = await client.gql.post<{ data?: Record<string, unknown> }>({
+    operationName: 'VideoPreviewCard__VideoMoments',
+    variables: {
+      videoId: vodId,
     },
-    body: JSON.stringify({
-      operationName: 'VideoPreviewCard__VideoMoments',
-      variables: {
-        videoId: vodId,
+    extensions: {
+      persistedQuery: {
+        version: 1,
+        sha256Hash: '7399051b2d46f528d5f0eedf8b0db8d485bb1bb4c0a2c6707be6f1290cdcb31a',
       },
-      extensions: {
-        persistedQuery: {
-          version: 1,
-          sha256Hash: '7399051b2d46f528d5f0eedf8b0db8d485bb1bb4c0a2c6707be6f1290cdcb31a',
-        },
-      },
-    }),
-    signal: AbortSignal.timeout(10000),
+    },
   });
-  throwOnHttpError(response, 'Twitch chapters');
-  const data = await response.json();
   return data?.data || null;
 }
+
 export async function getChapter(vodId: string): Promise<Record<string, unknown> | null> {
-  const response = await fetch('https://gql.twitch.tv/gql', {
-    method: 'POST',
-    headers: {
-      Accept: '*/*',
-      'Client-Id': TWITCH_GQL_CLIENT_ID,
-      'Content-Type': 'text/plain;charset=UTF-8',
+  const client = getTwitchClient('gql-placeholder');
+  const data = await client.gql.post<{ data?: { video?: Record<string, unknown> } }>({
+    operationName: 'NielsenContentMetadata',
+    variables: {
+      isCollectionContent: false,
+      isLiveContent: false,
+      isVODContent: true,
+      collectionID: '',
+      login: '',
+      vodID: vodId,
     },
-    body: JSON.stringify({
-      operationName: 'NielsenContentMetadata',
-      variables: {
-        isCollectionContent: false,
-        isLiveContent: false,
-        isVODContent: true,
-        collectionID: '',
-        login: '',
-        vodID: vodId,
+    extensions: {
+      persistedQuery: {
+        version: 1,
+        sha256Hash: '2dbf505ee929438369e68e72319d1106bb3c142e295332fac157c90638968586',
       },
-      extensions: {
-        persistedQuery: {
-          version: 1,
-          sha256Hash: '2dbf505ee929438369e68e72319d1106bb3c142e295332fac157c90638968586',
-        },
-      },
-    }),
-    signal: AbortSignal.timeout(10000),
+    },
   });
-  throwOnHttpError(response, 'Twitch chapter');
-  const data = await response.json();
   return data.data?.video || null;
 }
+
 export async function getGameData(gameId: string, tenantId: string): Promise<Record<string, unknown> | null> {
-  const accessToken = await getAppAccessToken(tenantId);
-  const creds = getCreds(tenantId)!;
-  const url = new URL('https://api.twitch.tv/helix/games');
-  url.searchParams.append('id', gameId);
-  const response = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Client-Id': creds.clientId,
-    },
-    signal: AbortSignal.timeout(10000),
-  });
-  throwOnHttpError(response, 'Twitch game data');
-  const data = await response.json();
+  const client = getTwitchClient(tenantId);
+  const data = await client.helix.get<{ data: Record<string, unknown>[] }>(`/games?id=${gameId}`);
+
   if (!data.data || data.data.length === 0) {
     return null;
   }
   return data.data[0];
 }
+
 export async function getChannelBadges(tenantId: string): Promise<Record<string, unknown> | null> {
   const creds = getCreds(tenantId);
   const config = getConfig(tenantId);
@@ -320,28 +188,30 @@ export async function getChannelBadges(tenantId: string): Promise<Record<string,
     log.warn(`Twitch credentials not configured for streamer ${tenantId}`);
     return null;
   }
+
   try {
-    const accessToken = await getAppAccessToken(tenantId);
-    if (!accessToken) throw new Error('Twitch OAuth access token unavailable');
-    const url = new URL(`https://api.twitch.tv/helix/chat/badges`);
-    url.searchParams.append('broadcaster_id', config.twitch.id.toString());
-    const response = await fetch(url.toString(), {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Client-Id': creds.clientId,
-      },
-      signal: AbortSignal.timeout(10000),
-    });
-    throwOnHttpError(response, 'Twitch badges');
-    const data = await response.json();
+    const client = getTwitchClient(tenantId);
+    const data = await client.helix.get<{ data?: Record<string, unknown> }>(`/chat/badges?broadcaster_id=${config.twitch.id}`);
+
     const badgesData = data?.data || null;
     if (!badgesData) {
-      log.warn(`No channel badges found for Twitch user ${config.twitch.id}`);
+      log.debug(`No channel badges found for Twitch user ${config.twitch.id}`);
     }
     return badgesData as Record<string, unknown>;
   } catch (error: unknown) {
+    if (error instanceof HttpError) {
+      if (error.statusCode === 404) {
+        log.debug({ tenantId }, 'Channel badges not found (404)');
+      } else if (error.statusCode >= 500) {
+        log.warn({ tenantId, statusCode: error.statusCode }, 'Twitch API unstable, skipping badges');
+      } else {
+        log.warn({ tenantId, statusCode: error.statusCode }, 'Failed to fetch channel badges');
+      }
+      return null;
+    }
+
     const { message } = extractErrorDetails(error);
-    log.error(`Failed to fetch channel badges for ${tenantId}: ${message}`);
+    log.error({ tenantId, error: message }, 'Failed to fetch channel badges');
     return null;
   }
 }
@@ -349,19 +219,25 @@ export async function getChannelBadges(tenantId: string): Promise<Record<string,
 export async function getGlobalBadges(tenantId: string): Promise<Record<string, unknown> | null> {
   const creds = getCreds(tenantId);
   if (!creds?.clientId) return null;
+
   try {
-    const accessToken = await getAppAccessToken(tenantId);
-    if (!accessToken) throw new Error('Twitch OAuth access token unavailable');
-    const response = await fetch('https://api.twitch.tv/helix/chat/badges/global', {
-      headers: { Authorization: `Bearer ${accessToken}`, 'Client-Id': creds.clientId },
-      signal: AbortSignal.timeout(10000),
-    });
-    throwOnHttpError(response, 'Twitch global badges');
-    const data = await response.json();
+    const client = getTwitchClient(tenantId);
+    const data = await client.helix.get<{ data?: Record<string, unknown> }>('/chat/badges/global');
     return (data?.data || null) as Record<string, unknown>;
   } catch (error: unknown) {
+    if (error instanceof HttpError) {
+      if (error.statusCode === 404) {
+        log.debug({ tenantId }, 'Global badges not found (404)');
+      } else if (error.statusCode >= 500) {
+        log.warn({ tenantId, statusCode: error.statusCode }, 'Twitch API unstable, skipping badges');
+      } else {
+        log.warn({ tenantId, statusCode: error.statusCode }, 'Failed to fetch global badges');
+      }
+      return null;
+    }
+
     const { message } = extractErrorDetails(error);
-    log.error(`Failed to fetch global badges for ${tenantId}: ${message}`);
+    log.error({ tenantId, error: message }, 'Failed to fetch global badges');
     return null;
   }
 }
@@ -420,10 +296,6 @@ export interface TwitchVideoCommentResponse {
   comments: TwitchCommentsConnection | null;
 }
 
-/**
- * Extracts message data from a Twitch chat node.
- * Cleans fragments and handles user badges.
- */
 export function extractMessageData(node: TwitchChatMessageNode | null | undefined): { message: InputJsonValue; userBadges?: InputJsonValue | undefined } {
   if (!node || !node.message) {
     return { message: { content: '', fragments: [] }, userBadges: undefined };
@@ -448,9 +320,6 @@ export function extractMessageData(node: TwitchChatMessageNode | null | undefine
   };
 }
 
-/**
- * Download Twitch VOD directly to MP4 using ffmpeg HLS streaming
- */
 export async function downloadVodAsMp4(vodId: string, tenantId: string): Promise<string | null> {
   const config = getConfig(tenantId);
 
@@ -461,14 +330,12 @@ export async function downloadVodAsMp4(vodId: string, tenantId: string): Promise
   let messageId: string | null = null;
 
   try {
-    // Get token/sig for authentication (reference line 1209-1214)
     const tokenSig = await getVodTokenSig(vodId);
 
     if (!tokenSig) {
       throw new Error(`Failed to get token/sig for ${vodId}`);
     }
 
-    // Build authenticated HLS URL (reference line 136-205 + hls-downloader.ts pattern with allow_source=true)
     const m3u8Url = `https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h264,hevc&playlist_include_framerate=true&nauthsig=${tokenSig.signature}&nauth=${tokenSig.value}`;
 
     const { getVodFilePath } = await import('../utils/path.js');
@@ -478,20 +345,16 @@ export async function downloadVodAsMp4(vodId: string, tenantId: string): Promise
     const streamerName = config.displayName || tenantId;
     messageId = await sendVodDownloadStarted('twitch', tenantId, vodId, streamerName);
 
-    // Fetch m3u8 playlist and detect fMP4 format (Twitch can use both .ts or fMP4)
-    const response = await fetch(m3u8Url);
-
-    throwOnHttpError(response, 'Twitch HLS playlist');
-
-    const m3u8Content = await response.text();
+    const m3u8Content = await request(m3u8Url, {
+      responseType: 'text',
+      timeoutMs: 30000,
+    });
     const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
 
-    // Download directly to MP4 using ffmpeg HLS streaming
     await convertHlsToMp4(m3u8Url, vodPath, { vodId, isFmp4 });
 
     log.info(`Downloaded ${vodId}.mp4`);
 
-    // Success alert
     await sendVodDownloadSuccess(messageId!, 'twitch', vodId, vodPath, streamerName);
 
     return vodPath;
@@ -501,7 +364,6 @@ export async function downloadVodAsMp4(vodId: string, tenantId: string): Promise
 
     log.error(`ffmpeg error occurred: ${errorMsg}`);
 
-    // Failure alert
     await sendVodDownloadFailed(messageId!, 'twitch', vodId, errorMsg, tenantId);
 
     throw error;
