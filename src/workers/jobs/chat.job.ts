@@ -29,10 +29,9 @@ export async function triggerChatDownload(
   vodId: string,
   platform: 'twitch' | 'kick',
   duration: number,
-  vodStartDate?: string,
   platformUsername?: string
 ): Promise<string | null> {
-  return enqueue({ tenantId, platformUserId, platformUsername, dbId, vodId, platform, duration, vodStartDate });
+  return enqueue({ tenantId, platformUserId, platformUsername, dbId, vodId, platform, duration });
 }
 
 export async function triggerChatAfterVod(vodJob: StandardVodJob): Promise<string | null> {
