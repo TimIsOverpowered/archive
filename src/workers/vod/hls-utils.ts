@@ -11,7 +11,7 @@ import type { ReadableStream as NodeWebStream } from 'node:stream/web';
 import pLimit from 'p-limit';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { fileExists } from '../../utils/path.js';
-import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch.js';
+import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch/index.js';
 import { retryWithBackoff } from '../../utils/retry.js';
 
 export type DownloadStrategy = { type: 'fetch'; signal?: AbortSignal } | { type: 'cycletls'; session: CycleTLSSession };

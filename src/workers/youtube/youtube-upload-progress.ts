@@ -1,4 +1,4 @@
-import type { UploadProgressCallbackData } from '../../services/youtube.js';
+import type { UploadProgressCallbackData } from '../../services/youtube/index.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { updateDiscordEmbed, isAlertsEnabled } from '../../utils/discord-alerts.js';
 

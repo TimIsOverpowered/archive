@@ -1,7 +1,7 @@
 import { FastifyRequest } from 'fastify';
 import { getTenantConfig } from '../../../../config/loader';
 import { getClient } from '../../../../db/client.js';
-import type { VodData as TwitchVodData } from '../../../../services/twitch.js';
+import type { VodData as TwitchVodData } from '../../../../services/twitch/index.js';
 import type { KickVod } from '../../../../services/kick.js';
 import { getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
 import { getDuration } from '../../../../workers/vod/ffmpeg.js';
