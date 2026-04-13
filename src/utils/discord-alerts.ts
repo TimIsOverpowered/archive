@@ -1,4 +1,5 @@
-import { extractErrorDetails, throwOnHttpError } from './error.js';
+import { extractErrorDetails } from './error.js';
+import { request } from './http-client.js';
 import { formatDuration } from './formatting.js';
 import { logger } from './logger.js';
 import { getTenantDisplayName } from '../config/loader.js';
@@ -96,18 +97,10 @@ export async function sendDiscordAlert(message: string): Promise<string | null> 
   }
 
   try {
-    const response = await fetch(`${webhookUrl}?wait=true`, {
+    const data = await request<{ id?: string }>(`${webhookUrl}?wait=true`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ content: message }),
-      signal: AbortSignal.timeout(10000),
+      body: { content: message },
     });
-
-    throwOnHttpError(response, 'Webhook');
-
-    const data = await response.json();
 
     if (data.id) {
       return data.id;
@@ -142,18 +135,10 @@ export async function sendRichAlert(data: RichEmbedData): Promise<string | null>
       payload.content = `<@&${data.mention}>`;
     }
 
-    const response = await fetch(`${webhookUrl}?wait=true`, {
+    const responseData = await request<{ id?: string }>(`${webhookUrl}?wait=true`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(10000),
+      body: payload,
     });
-
-    throwOnHttpError(response, 'Webhook');
-
-    const responseData = await response.json();
 
     if (responseData.id) {
       return responseData.id;
@@ -179,13 +164,9 @@ export async function updateDiscordEmbed(messageId: string, data: RichEmbedData)
     const updateUrl = getUpdateUrl(webhookUrl, messageId);
     const embed = constructEmbed(data);
 
-    await fetch(updateUrl, {
+    await request(updateUrl, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ embeds: [embed] }),
-      signal: AbortSignal.timeout(10000),
+      body: { embeds: [embed] },
     });
   } catch (err) {
     logger.error(extractErrorDetails(err), 'Failed to update Discord embed');
@@ -269,16 +250,10 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
   embed.footer = { text: 'Archive System' };
 
   try {
-    const response = await fetch(`${webhookUrl}?wait=true`, {
+    const responseData = await request<{ id?: string }>(`${webhookUrl}?wait=true`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ embeds: [embed] }),
-      signal: AbortSignal.timeout(10000),
+      body: { embeds: [embed] },
     });
-
-    throwOnHttpError(response, 'Webhook');
-
-    const responseData = await response.json();
     return responseData.id || null;
   } catch (err) {
     logger.error(extractErrorDetails(err), 'Failed to send stream alert');

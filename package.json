@@ -27,7 +27,7 @@
     "test": "npm run lint && npm run test:node",
     "lint": "eslint \"src/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\"",
-    "test:node": "node --test --import tsx --test-timeout 10000 --test-concurrency true \"test/**/*.test.ts\"",
+    "test:node": "cross-env META_DATABASE_URL=postgresql://test:test@localhost:5432/test node --test --import tsx --test-timeout 10000 --test-concurrency true \"test/**/*.test.ts\"",
     "build": "tsc",
     "dev": "cross-env NODE_ENV=development tsx watch src/index.ts",
     "start": "node dist/index.js",

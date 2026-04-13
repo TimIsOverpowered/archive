@@ -1,0 +1,159 @@
+import { retryWithBackoff } from './retry.js';
+import { extractErrorDetails } from './error.js';
+import { logger } from './logger.js';
+import { HttpError } from './http-error.js';
+
+export type ResponseType = 'json' | 'text' | 'blob' | 'arrayBuffer' | 'response';
+
+export interface RequestOptions<R extends ResponseType = 'json'> {
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  headers?: Record<string, string>;
+  body?: unknown;
+  timeoutMs?: number;
+  responseType?: R;
+  retryOptions?: {
+    attempts?: number;
+    baseDelayMs?: number;
+    maxDelayMs?: number;
+  };
+  logContext?: Record<string, unknown>;
+}
+
+export type RequestResult<T, R extends ResponseType> = R extends 'json' ? T : R extends 'text' ? string : R extends 'blob' ? Blob : R extends 'arrayBuffer' ? ArrayBuffer : Response;
+
+function scrubSensitiveParams(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    const sensitiveParams = ['nauth', 'nauthsig', 'access_token'];
+
+    for (const param of sensitiveParams) {
+      if (urlObj.searchParams.has(param)) {
+        urlObj.searchParams.set(param, '[REDACTED]');
+      }
+    }
+
+    return urlObj.toString();
+  } catch {
+    return url;
+  }
+}
+
+function prepareBodyAndHeaders(
+  body: unknown,
+  headers: Record<string, string>
+): {
+  body: BodyInit | undefined;
+  headers: Record<string, string>;
+} {
+  if (body === undefined || body === null) {
+    return { body: undefined, headers };
+  }
+
+  if (typeof body === 'object' && !ArrayBuffer.isView(body) && !(body instanceof ArrayBuffer) && !(body instanceof FormData) && !(body instanceof Blob)) {
+    return {
+      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json', ...headers },
+    };
+  }
+
+  return { body: body as BodyInit, headers };
+}
+
+function shouldRetry(error: unknown): boolean {
+  if (error instanceof HttpError) {
+    const { statusCode } = error;
+    if (statusCode === 429 || statusCode === 408 || (statusCode >= 500 && statusCode < 600)) {
+      return true;
+    }
+    return false;
+  }
+
+  if (error instanceof Error && error.name === 'AbortError') {
+    return true;
+  }
+
+  return false;
+}
+
+// Overloads for proper type inference
+export function request<T = unknown>(url: string | URL, options?: RequestOptions<'json'>): Promise<T>;
+export function request(url: string | URL, options: RequestOptions<'text'>): Promise<string>;
+export function request(url: string | URL, options: RequestOptions<'blob'>): Promise<Blob>;
+export function request(url: string | URL, options: RequestOptions<'arrayBuffer'>): Promise<ArrayBuffer>;
+export function request(url: string | URL, options: RequestOptions<'response'>): Promise<Response>;
+export async function request<T = unknown, R extends ResponseType = 'json'>(url: string | URL, options?: RequestOptions<R>): Promise<RequestResult<T, R>> {
+  const { method = 'GET', headers: customHeaders = {}, body, timeoutMs = 10000, responseType, retryOptions, logContext = {} } = options ?? {};
+
+  const actualResponseType = responseType ?? ('json' as R);
+
+  const urlStr = url.toString();
+  const scrubbedUrl = scrubSensitiveParams(urlStr);
+  const startTime = Date.now();
+
+  const { body: preparedBody, headers: finalHeaders } = prepareBodyAndHeaders(body, customHeaders);
+
+  logger.debug({ method, url: scrubbedUrl, ...logContext }, '[HTTP] START');
+
+  try {
+    const result = await retryWithBackoff(
+      async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+          const response = await fetch(urlStr, {
+            method,
+            headers: finalHeaders,
+            body: preparedBody,
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            throw new HttpError(response.status, `HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          let parsedData: unknown;
+          switch (actualResponseType) {
+            case 'json':
+              parsedData = await response.json();
+              break;
+            case 'text':
+              parsedData = await response.text();
+              break;
+            case 'blob':
+              parsedData = await response.blob();
+              break;
+            case 'arrayBuffer':
+              parsedData = await response.arrayBuffer();
+              break;
+            case 'response':
+              return response as RequestResult<T, R>;
+          }
+
+          return parsedData as RequestResult<T, R>;
+        } catch (error) {
+          clearTimeout(timeoutId);
+          throw error;
+        }
+      },
+      {
+        attempts: retryOptions?.attempts ?? 3,
+        baseDelayMs: retryOptions?.baseDelayMs ?? 1000,
+        maxDelayMs: retryOptions?.maxDelayMs ?? 30000,
+        shouldRetry,
+      }
+    );
+
+    const duration = Date.now() - startTime;
+    logger.debug({ method, url: scrubbedUrl, status: 'success', duration, ...logContext }, '[HTTP] COMPLETED');
+
+    return result;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    const { message } = extractErrorDetails(error);
+    logger.error({ method, url: scrubbedUrl, duration, error: message, ...logContext }, '[HTTP] FAILED');
+    throw error;
+  }
+}

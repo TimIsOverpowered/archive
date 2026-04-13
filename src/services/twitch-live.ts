@@ -1,7 +1,8 @@
 import { getAppAccessToken, VodData } from '../services/twitch.js';
-import { extractErrorDetails, throwOnHttpError } from '../utils/error.js';
+import { extractErrorDetails } from '../utils/error.js';
 import { getTwitchCredentials as getCreds } from '../utils/credentials.js';
 import { logger } from '../utils/logger.js';
+import { request } from '../utils/http-client.js';
 
 export interface TwitchStreamStatus {
   id: string;
@@ -35,18 +36,14 @@ export async function getTwitchStreamStatus(userId: string, tenantId: string): P
     const url = new URL('https://api.twitch.tv/helix/streams');
     url.searchParams.append('user_id', userId);
 
-    const response = await fetch(url.toString(), {
+    const data = await request<{ data: TwitchStreamStatus[] | null }>(url.toString(), {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Client-Id': creds.clientId,
       },
-      signal: AbortSignal.timeout(10000),
+      logContext: { userId, tenantId },
     });
-
-    throwOnHttpError(response, 'Twitch API');
-
-    const data = await response.json();
 
     if (!data.data || data.data.length === 0) {
       return null;
@@ -94,18 +91,14 @@ export async function getLatestTwitchVodObject(userId: string, expectedStreamId:
     url.searchParams.append('user_id', userId);
     url.searchParams.append('first', '1');
 
-    const response = await fetch(url.toString(), {
+    const data = await request<{ data: VodData[] | null }>(url.toString(), {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Client-Id': creds.clientId,
       },
-      signal: AbortSignal.timeout(10000),
+      logContext: { userId, tenantId },
     });
-
-    throwOnHttpError(response, 'Twitch API');
-
-    const data = await response.json();
 
     if (!data.data || data.data.length === 0) {
       return null; // No VODs exist yet
