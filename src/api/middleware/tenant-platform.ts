@@ -24,9 +24,10 @@ declare module 'fastify' {
 }
 
 /**
- * Generic tenant middleware - validates tenant exists and database is available
- * Use this for all routes that need tenant validation
- * Register in onRequest hook
+ * Generic tenant middleware - validates tenant exists and database is available.
+ * Safe for both public and admin routes (no auth checks).
+ * Use this for all routes that need tenant validation.
+ * Register in onRequest hook.
  */
 export async function tenantMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const tenantId = (request.params as { tenantId?: string }).tenantId;

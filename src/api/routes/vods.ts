@@ -1,10 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import { getVods, getVodById, getVodByPlatformId } from '../../services/vods.service';
-import { getClient, createClient } from '../../db/client';
-import { getTenantConfig } from '../../config/loader';
 import createRateLimitMiddleware from '../middleware/rate-limit';
 import { publicRateLimiter } from '../plugins/redis.plugin';
-import { notFound, serviceUnavailable } from '../../utils/http-error';
+import { notFound } from '../../utils/http-error';
+import { tenantMiddleware } from '../middleware/tenant-platform';
 
 interface VodRoutesOptions {
   prefix: string;
@@ -47,25 +46,11 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
           },
         },
       },
-      onRequest: rateLimitMiddleware,
+      onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const { tenantId } = request.params as { tenantId: string };
+      const { tenantId, client } = request.tenant;
       const query = request.query as Record<string, unknown>;
-
-      const config = getTenantConfig(tenantId);
-      if (!config) {
-        notFound('Streamer not found');
-      }
-
-      let client = getClient(tenantId);
-      if (!client) {
-        try {
-          client = await createClient(config);
-        } catch {
-          serviceUnavailable('Database not available');
-        }
-      }
 
       const { vods, total } = await getVods(client, tenantId, query as never);
       const page = Math.max(1, (query.page as number) || 1);
@@ -97,25 +82,11 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
           required: ['tenantId', 'vodId'],
         },
       },
-      onRequest: rateLimitMiddleware,
+      onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
       const { tenantId, vodId } = request.params as { tenantId: string; vodId: string };
-
-      const config = getTenantConfig(tenantId);
-      if (!config) {
-        notFound('Streamer not found');
-      }
-
-      let client = getClient(tenantId);
-      if (!client) {
-        try {
-          client = await createClient(config);
-        } catch {
-          serviceUnavailable('Database not available');
-        }
-      }
-
+      const { client } = request.tenant;
       const vodIdNum = Number(vodId);
 
       if (isNaN(vodIdNum) || vodIdNum < 0 || vodIdNum > 2147483647) {
@@ -151,24 +122,11 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
       constraints: {
         platform: 'twitch',
       },
-      onRequest: rateLimitMiddleware,
+      onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
       const { tenantId, platform, platformVodId } = request.params as { tenantId: string; platform: 'twitch' | 'kick'; platformVodId: string };
-
-      const config = getTenantConfig(tenantId);
-      if (!config) {
-        notFound('Streamer not found');
-      }
-
-      let client = getClient(tenantId);
-      if (!client) {
-        try {
-          client = await createClient(config);
-        } catch {
-          serviceUnavailable('Database not available');
-        }
-      }
+      const { client } = request.tenant;
 
       const vod = await getVodByPlatformId(client, tenantId, platform, platformVodId);
 
@@ -199,24 +157,11 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
       constraints: {
         platform: 'kick',
       },
-      onRequest: rateLimitMiddleware,
+      onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
       const { tenantId, platform, platformVodId } = request.params as { tenantId: string; platform: 'twitch' | 'kick'; platformVodId: string };
-
-      const config = getTenantConfig(tenantId);
-      if (!config) {
-        notFound('Streamer not found');
-      }
-
-      let client = getClient(tenantId);
-      if (!client) {
-        try {
-          client = await createClient(config);
-        } catch {
-          serviceUnavailable('Database not available');
-        }
-      }
+      const { client } = request.tenant;
 
       const vod = await getVodByPlatformId(client, tenantId, platform, platformVodId);
 

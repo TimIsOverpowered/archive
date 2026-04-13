@@ -1,10 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import { getLogsByOffset, getLogsByCursor } from '../../services/logs.service';
-import { getClient, createClient } from '../../db/client';
-import { getTenantConfig } from '../../config/loader';
 import createRateLimitMiddleware from '../middleware/rate-limit';
 import { chatRateLimiter } from '../plugins/redis.plugin';
-import { badRequest, notFound, serviceUnavailable } from '../../utils/http-error';
+import { badRequest } from '../../utils/http-error';
+import { tenantMiddleware } from '../middleware/tenant-platform';
 
 interface LogsRoutesOptions {
   prefix: string;
@@ -47,29 +46,16 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
           },
         },
       },
-      onRequest: rateLimitMiddleware,
+      onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
       const { tenantId, vodId } = request.params as { tenantId: string; vodId: string };
+      const { client } = request.tenant;
       const vodIdNum = Number(vodId);
       const { content_offset_seconds, cursor } = request.query as { content_offset_seconds?: number; cursor?: string };
 
       if (content_offset_seconds === undefined && !cursor) {
         badRequest('Missing required query parameter: content_offset_seconds or cursor');
-      }
-
-      const config = getTenantConfig(tenantId);
-      if (!config) {
-        notFound('Streamer not found');
-      }
-
-      let client = getClient(tenantId);
-      if (!client) {
-        try {
-          client = await createClient(config);
-        } catch {
-          serviceUnavailable('Database not available');
-        }
       }
 
       let result;
