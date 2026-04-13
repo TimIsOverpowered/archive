@@ -2,8 +2,6 @@ import { PrismaClient } from '../../generated/streamer/client';
 import { getTenantConfig, getConfigs } from '../config/loader';
 import { withCache } from '../utils/cache.js';
 
-const STATS_CACHE_TTL = parseInt(process.env.STATS_CACHE_TTL || '60', 10);
-
 interface TenantStats {
   tenant: {
     id: string;
@@ -36,7 +34,7 @@ interface TenantStats {
   };
 }
 
-export async function getTenantStats(client: PrismaClient, tenantId: string): Promise<TenantStats> {
+export async function getTenantStats(client: PrismaClient, tenantId: string, cacheTtl = 60): Promise<TenantStats> {
   const config = getTenantConfig(tenantId);
 
   if (!config) {
@@ -53,7 +51,7 @@ export async function getTenantStats(client: PrismaClient, tenantId: string): Pr
 
   const cacheKey = `stats:${tenantId}`;
 
-  return await withCache(cacheKey, STATS_CACHE_TTL, async () => {
+  return await withCache(cacheKey, cacheTtl, async () => {
     let dbStatus = 'connected';
     try {
       await client.$queryRaw`SELECT 1`;

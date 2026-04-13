@@ -116,7 +116,7 @@ export async function getWorkersHealth(): Promise<Record<string, WorkerHealthSta
       result[name] = {
         isRunning: isRunningVal,
         queueCounts: counts,
-        lastFailedJob: await getLastFailedJob(queue),
+        lastFailedJob: lastFailed,
         status,
       };
     } catch (error) {
