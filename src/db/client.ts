@@ -21,49 +21,110 @@ const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) 
           try {
             const result = await query(args);
 
-            let vodId: number | null = null;
+            const affectedVodIds: number[] = [];
 
             if (model === 'Vod') {
               if (operation === 'delete' || operation === 'update' || operation === 'upsert') {
                 const where = (args as { where?: Record<string, unknown> }).where;
                 if (where && typeof where === 'object' && 'id' in where) {
-                  vodId = Number((where as { id: unknown }).id);
+                  const idValue = (where as { id: unknown }).id;
+                  if (Array.isArray(idValue)) {
+                    affectedVodIds.push(...idValue.map((id) => Number(id)).filter((id) => !isNaN(id)));
+                  } else {
+                    const numId = Number(idValue);
+                    if (!isNaN(numId)) affectedVodIds.push(numId);
+                  }
                 }
               } else if (operation === 'create') {
                 if (result && typeof result === 'object' && 'id' in result) {
-                  vodId = Number((result as { id: unknown }).id);
+                  const numId = Number((result as { id: unknown }).id);
+                  if (!isNaN(numId)) affectedVodIds.push(numId);
+                }
+              } else if (operation === 'createMany') {
+                const data = (args as { data?: unknown[] }).data;
+                if (Array.isArray(data) && data.length > 0) {
+                  const extractedIds = data
+                    .filter((item): item is Record<string, unknown> => item != null && typeof item === 'object' && 'id' in (item as Record<string, unknown>))
+                    .map((item) => Number((item as { id: unknown }).id))
+                    .filter((id) => !isNaN(id));
+
+                  if (extractedIds.length === 0 && data.length > 0) {
+                    logger.debug({ tenantId, operation, recordCount: data.length }, 'Vod.createMany called without explicit IDs — cache invalidation skipped');
+                  }
+
+                  affectedVodIds.push(...extractedIds);
                 }
               } else if (operation === 'deleteMany' || operation === 'updateMany') {
-                logger.debug({ model, operation, tenantId }, 'Bulk Vod mutation — cache may need manual invalidation');
+                const where = (args as { where?: Record<string, unknown> }).where;
+                if (where && typeof where === 'object' && 'id' in where) {
+                  const idClause = (where as { id: unknown }).id;
+                  if (idClause && typeof idClause === 'object' && 'in' in idClause) {
+                    const idArray = idClause.in as unknown[];
+                    if (Array.isArray(idArray)) {
+                      affectedVodIds.push(...idArray.map((id) => Number(id)).filter((id) => !isNaN(id)));
+                    }
+                  } else if (typeof idClause !== 'object' && idClause !== null && idClause !== undefined) {
+                    const numId = Number(idClause);
+                    if (!isNaN(numId)) affectedVodIds.push(numId);
+                  }
+                }
               }
             } else {
               if (operation === 'delete' || operation === 'update' || operation === 'upsert') {
                 const where = (args as { where?: Record<string, unknown> }).where;
                 if (where && typeof where === 'object' && 'vod_id' in where) {
-                  vodId = Number((where as { vod_id: unknown }).vod_id);
+                  const vodIdClause = (where as { vod_id: unknown }).vod_id;
+                  if (vodIdClause && typeof vodIdClause === 'object' && 'in' in vodIdClause) {
+                    const idArray = vodIdClause.in as unknown[];
+                    if (Array.isArray(idArray)) {
+                      affectedVodIds.push(...idArray.map((id) => Number(id)).filter((id) => !isNaN(id)));
+                    }
+                  } else if (typeof vodIdClause !== 'object' && vodIdClause !== null && vodIdClause !== undefined) {
+                    const numId = Number(vodIdClause);
+                    if (!isNaN(numId)) affectedVodIds.push(numId);
+                  }
                 }
               } else if (operation === 'create') {
                 const data = (args as { data?: Record<string, unknown> }).data;
                 if (data && typeof data === 'object' && 'vod_id' in data) {
-                  vodId = Number((data as { vod_id: unknown }).vod_id);
+                  const numId = Number((data as { vod_id: unknown }).vod_id);
+                  if (!isNaN(numId)) affectedVodIds.push(numId);
                 }
-              } else if (operation.includes('Many')) {
+              } else if (operation === 'createMany') {
                 const data = (args as { data?: unknown[] }).data;
                 if (Array.isArray(data) && data.length > 0) {
-                  const firstItem = data[0] as Record<string, unknown>;
-                  if ('vod_id' in firstItem) {
-                    vodId = Number(firstItem.vod_id);
+                  affectedVodIds.push(
+                    ...data
+                      .filter((item): item is Record<string, unknown> => item != null && typeof item === 'object' && 'vod_id' in (item as Record<string, unknown>))
+                      .map((item) => Number((item as { vod_id: unknown }).vod_id))
+                      .filter((id) => !isNaN(id))
+                  );
+                }
+              } else if (operation === 'updateMany' || operation === 'deleteMany') {
+                const where = (args as { where?: Record<string, unknown> }).where;
+                if (where && typeof where === 'object' && 'vod_id' in where) {
+                  const vodIdClause = (where as { vod_id: unknown }).vod_id;
+                  if (vodIdClause && typeof vodIdClause === 'object' && 'in' in vodIdClause) {
+                    const idArray = vodIdClause.in as unknown[];
+                    if (Array.isArray(idArray)) {
+                      affectedVodIds.push(...idArray.map((id) => Number(id)).filter((id) => !isNaN(id)));
+                    }
+                  } else if (typeof vodIdClause !== 'object' && vodIdClause !== null && vodIdClause !== undefined) {
+                    const numId = Number(vodIdClause);
+                    if (!isNaN(numId)) affectedVodIds.push(numId);
                   }
                 }
               }
             }
 
-            if (vodId !== null && !isNaN(vodId)) {
-              invalidateVodCache(tenantId, vodId).catch((error) => {
-                logger.warn({ tenantId, vodId, error: extractErrorDetails(error) }, 'Cache invalidation failed');
+            const uniqueIds = [...new Set(affectedVodIds)].filter((id) => !isNaN(id));
+
+            for (const id of uniqueIds) {
+              invalidateVodCache(tenantId, id).catch((error) => {
+                logger.warn({ tenantId, vodId: id, error: extractErrorDetails(error) }, 'Cache invalidation failed');
               });
 
-              logger.debug({ tenantId, vodId, model, operation }, 'VOD cache invalidated via extension');
+              logger.debug({ tenantId, vodId: id, model, operation }, 'VOD cache invalidated via extension');
             }
 
             return result;
