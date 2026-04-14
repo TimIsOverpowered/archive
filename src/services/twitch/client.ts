@@ -63,3 +63,23 @@ export function createTwitchClient(tenantId: string, getAccessToken: () => Promi
     },
   };
 }
+
+export function createTwitchGqlClient(tenantId?: string): {
+  post: <T = unknown>(body: object) => Promise<T>;
+} {
+  return {
+    async post<T = unknown>(body: object): Promise<T> {
+      return request<T>('https://gql.twitch.tv/gql', {
+        method: 'POST',
+        headers: {
+          Accept: '*/*',
+          'Client-Id': TWITCH_GQL_CLIENT_ID,
+          'Content-Type': 'text/plain;charset=UTF-8',
+        },
+        body,
+        timeoutMs: 10000,
+        logContext: tenantId ? { tenantId } : undefined,
+      });
+    },
+  };
+}

@@ -1,4 +1,4 @@
-import { createTwitchClient } from './client.js';
+import { createTwitchClient, createTwitchGqlClient } from './client.js';
 import { getAppAccessToken } from './auth.js';
 
 export interface VodData {
@@ -40,10 +40,10 @@ export async function getVodData(vodId: string, tenantId: string): Promise<VodDa
   return data.data[0] as VodData;
 }
 
-export async function getVodTokenSig(vodId: string): Promise<VodTokenSig> {
-  const client = getTwitchClient('gql-placeholder');
+export async function getVodTokenSig(vodId: string, tenantId?: string): Promise<VodTokenSig> {
+  const client = createTwitchGqlClient(tenantId);
 
-  const data = await client.gql.post<{ data: { videoPlaybackAccessToken: VodTokenSig } }>({
+  const data = await client.post<{ data: { videoPlaybackAccessToken: VodTokenSig } }>({
     operationName: 'PlaybackAccessToken',
     variables: {
       isLive: false,
