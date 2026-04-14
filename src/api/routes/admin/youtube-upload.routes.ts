@@ -5,7 +5,7 @@ import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformCont
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { notFound, badRequest } from '../../../utils/http-error';
 import type { Platform, SourceType, DownloadMethod } from '../../../types/platforms.js';
-import { PLATFORMS, SOURCE_TYPES, DOWNLOAD_METHODS, UPLOAD_MODES } from '../../../types/platforms.js';
+import { SOURCE_TYPES, DOWNLOAD_METHODS, UPLOAD_MODES, PLATFORM_VALUES, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES_VALUES } from '../../../types/platforms.js';
 
 interface ReUploadYoutubeParams {
   tenantId: string;
@@ -37,9 +37,9 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
           type: 'object',
           properties: {
             vodId: { type: 'string', description: 'Platform VOD ID' },
-            platform: { type: 'string', enum: Object.values(PLATFORMS), description: 'Source platform' },
-            downloadMethod: { type: 'string', enum: Object.values(DOWNLOAD_METHODS), default: DOWNLOAD_METHODS.HLS, description: 'Download method' },
-            type: { type: 'string', enum: Object.values(SOURCE_TYPES), default: SOURCE_TYPES.VOD, description: 'File type for checking' },
+            platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Source platform' },
+            downloadMethod: { type: 'string', enum: DOWNLOAD_METHODS_VALUES, default: DOWNLOAD_METHODS.HLS, description: 'Download method' },
+            type: { type: 'string', enum: SOURCE_TYPES_VALUES, default: SOURCE_TYPES.VOD, description: 'File type for checking' },
           },
           required: ['vodId', 'platform'],
         },
@@ -62,13 +62,11 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
       const VodQueueModule = await import('../../../workers/jobs/queues');
 
-      const fileIdentifier = type === SOURCE_TYPES.LIVE ? vodRecord.stream_id || vodRecord.vod_id : vodRecord.vod_id;
-
       const downloadJob = {
         tenantId,
         platformUserId: tenantId,
         dbId: vodRecord.id,
-        vodId: fileIdentifier,
+        vodId: vodRecord.vod_id,
         platform,
         uploadMode: UPLOAD_MODES.VOD,
         downloadMethod: downloadMethod || DOWNLOAD_METHODS.HLS,

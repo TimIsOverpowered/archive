@@ -13,7 +13,7 @@ import { sendRichAlert } from '../../utils/discord-alerts.js';
 import { formatDuration } from '../../utils/formatting.js';
 import { extractErrorDetails, createErrorContext } from '../../utils/error.js';
 import type { Platform } from '../../types/platforms.js';
-import { capitalizePlatform } from '../../types/platforms.js';
+import { capitalizePlatform, PLATFORMS } from '../../types/platforms.js';
 
 type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
 
@@ -45,19 +45,19 @@ export async function checkPlatformStatus(tenantId: string, platform: Platform, 
 
     const prisma = getClient(tenantId) || (await createClient(config));
 
-    if (platform === 'twitch' && config.twitch?.enabled && config.settings.vodDownload) {
+    if (platform === PLATFORMS.TWITCH && config.twitch?.enabled && config.settings.vodDownload) {
       log.debug({ platform, vodDownload: config.settings.vodDownload }, '[Monitor]: Twitch monitoring enabled');
       await handleTwitchLiveCheck(prisma, tenantId, platform, config);
-    } else if (platform === 'kick' && config.kick?.enabled && config.settings.vodDownload) {
+    } else if (platform === PLATFORMS.KICK && config.kick?.enabled && config.settings.vodDownload) {
       log.debug({ platform, vodDownload: config.settings.vodDownload }, '[Monitor]: Kick monitoring enabled');
       await handleKickLiveCheck(prisma, tenantId, platform, config);
     } else {
       const reasons = [];
 
-      if (platform === 'twitch' && !config.twitch?.enabled) {
+      if (platform === PLATFORMS.TWITCH && !config.twitch?.enabled) {
         reasons.push('Twitch not enabled');
       }
-      if (platform === 'kick' && !config.kick?.enabled) {
+      if (platform === PLATFORMS.KICK && !config.kick?.enabled) {
         reasons.push(`${platform} not enabled`);
       }
       if (!config.settings.vodDownload) {
@@ -571,7 +571,7 @@ export function startStreamDetectionLoop(tenantId: string, platform: Platform, c
   // Store interval ID for potential cleanup on shutdown (can be expanded later)
   const key = `${tenantId}:${platform}`;
 
-  const globalObj = global as unknown as NodeJS.Global;
+  const globalObj = global as NodeJS.Global;
   if (!globalObj.monitorIntervals) {
     globalObj.monitorIntervals = new Map();
   }

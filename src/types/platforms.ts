@@ -21,6 +21,8 @@ export const PLATFORMS = {
 /** Platform identifier type derived from PLATFORMS object. */
 export type Platform = (typeof PLATFORMS)[keyof typeof PLATFORMS];
 
+export const PLATFORM_VALUES = Object.values(PLATFORMS);
+
 // ============================================================================
 // Source Type Constants
 // ============================================================================
@@ -37,6 +39,8 @@ export const SOURCE_TYPES = {
 /** Source type identifier derived from SOURCE_TYPES object. */
 export type SourceType = (typeof SOURCE_TYPES)[keyof typeof SOURCE_TYPES];
 
+export const SOURCE_TYPES_VALUES = Object.values(SOURCE_TYPES);
+
 // ============================================================================
 // Upload Type Constants
 // ============================================================================
@@ -46,12 +50,14 @@ export type SourceType = (typeof SOURCE_TYPES)[keyof typeof SOURCE_TYPES];
  * Separate from SourceType to prevent logic leakage between domains.
  */
 export const UPLOAD_TYPES = {
-  VOD: 'vod',
+  ...SOURCE_TYPES,
   GAME: 'game',
 } as const;
 
 /** Upload type identifier derived from UPLOAD_TYPES object. */
 export type UploadType = (typeof UPLOAD_TYPES)[keyof typeof UPLOAD_TYPES];
+
+export const UPLOAD_TYPE_VALUES = Object.values(UPLOAD_TYPES);
 
 // ============================================================================
 // Upload Mode Constants
@@ -70,6 +76,8 @@ export const UPLOAD_MODES = {
 /** Upload mode identifier derived from UPLOAD_MODES object. */
 export type UploadMode = (typeof UPLOAD_MODES)[keyof typeof UPLOAD_MODES];
 
+export const UPLOAD_MODE_VALUES = Object.values(UPLOAD_MODES);
+
 // ============================================================================
 // Download Method Constants
 // ============================================================================
@@ -87,33 +95,35 @@ export const DOWNLOAD_METHODS = {
 /** Download method identifier derived from DOWNLOAD_METHODS object. */
 export type DownloadMethod = (typeof DOWNLOAD_METHODS)[keyof typeof DOWNLOAD_METHODS];
 
+export const DOWNLOAD_METHODS_VALUES = Object.values(DOWNLOAD_METHODS);
+
 // ============================================================================
 // Type Guard Utilities
 // ============================================================================
 
 /** Validates if a string is a valid platform. */
 export function isValidPlatform(value: string): value is Platform {
-  return Object.values(PLATFORMS).includes(value as Platform);
+  return PLATFORM_VALUES.includes(value as Platform);
 }
 
 /** Validates if a string is a valid source type. */
 export function isValidSourceType(value: string): value is SourceType {
-  return Object.values(SOURCE_TYPES).includes(value as SourceType);
+  return SOURCE_TYPES_VALUES.includes(value as SourceType);
 }
 
 /** Validates if a string is a valid upload type. */
 export function isValidUploadType(value: string): value is UploadType {
-  return Object.values(UPLOAD_TYPES).includes(value as UploadType);
+  return UPLOAD_TYPE_VALUES.includes(value as UploadType);
 }
 
 /** Validates if a string is a valid upload mode. */
 export function isValidUploadMode(value: string): value is UploadMode {
-  return Object.values(UPLOAD_MODES).includes(value as UploadMode);
+  return UPLOAD_MODE_VALUES.includes(value as UploadMode);
 }
 
 /** Validates if a string is a valid download method. */
 export function isValidDownloadMethod(value: string): value is DownloadMethod {
-  return Object.values(DOWNLOAD_METHODS).includes(value as DownloadMethod);
+  return DOWNLOAD_METHODS_VALUES.includes(value as DownloadMethod);
 }
 
 // ============================================================================

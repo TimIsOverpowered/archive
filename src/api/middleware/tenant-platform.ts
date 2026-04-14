@@ -2,19 +2,19 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { getTenantConfig } from '../../config/loader';
 import { getClient, createClient } from '../../db/client.js';
 import { extractErrorDetails } from '../../utils/error.js';
-
-type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
-type TenantConfig = ReturnType<typeof getTenantConfig>;
+import type { TenantConfig } from '../../config/types';
+import type { PrismaClient } from '../../../generated/streamer/client';
+import type { Platform } from '../../types/platforms.js';
 
 export interface TenantContext {
   tenantId: string;
   config: TenantConfig;
-  client: StreamerDbClient;
-  platform?: 'twitch' | 'kick';
+  client: PrismaClient;
+  platform?: Platform;
 }
 
 export interface TenantPlatformContext extends TenantContext {
-  platform: 'twitch' | 'kick';
+  platform: Platform;
 }
 
 declare module 'fastify' {
@@ -84,7 +84,7 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
  * Register in preValidation hook
  */
 export async function platformValidationMiddleware(request: FastifyRequest, reply: FastifyReply) {
-  const requestPlatform = (request.body as { platform?: string }).platform as 'twitch' | 'kick';
+  const requestPlatform = (request.body as { platform?: string }).platform as Platform;
 
   if (!requestPlatform) {
     return reply.status(400).send({
@@ -96,7 +96,7 @@ export async function platformValidationMiddleware(request: FastifyRequest, repl
     });
   }
 
-  const config = (request.tenant as TenantContext)?.config;
+  const config = request.tenant?.config;
 
   if (!config) {
     return reply.status(500).send({

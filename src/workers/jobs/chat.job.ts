@@ -1,6 +1,7 @@
 import type { ChatDownloadJob, StandardVodJob } from './queues.js';
 import { getChatDownloadQueue } from './queues.js';
 import { childLogger } from '../../utils/logger.js';
+import { Platform, PLATFORMS } from '../../types/platforms.js';
 
 const log = childLogger({ module: 'chat-job' });
 
@@ -27,7 +28,7 @@ export async function triggerChatDownload(
   platformUserId: string,
   dbId: number,
   vodId: string,
-  platform: 'twitch' | 'kick',
+  platform: Platform,
   duration: number,
   platformUsername?: string
 ): Promise<string | null> {
@@ -35,7 +36,7 @@ export async function triggerChatDownload(
 }
 
 export async function triggerChatAfterVod(vodJob: StandardVodJob): Promise<string | null> {
-  if (vodJob.platform === 'kick') return null;
+  if (vodJob.platform === PLATFORMS.KICK) return null;
 
   return enqueue({
     tenantId: vodJob.tenantId,

@@ -1,7 +1,8 @@
 import { Queue, QueueOptions, JobsOptions } from 'bullmq';
 import type { DMCAClaim } from '../../utils/dmca.js';
 import { redisInstance } from '../redis.js';
-import type { Platform, SourceType, UploadType, UploadMode, DownloadMethod } from '../../types/platforms.js';
+import type { Platform, SourceType, UploadType, DownloadMethod } from '../../types/platforms.js';
+import { VodRecord } from '../../types/db.js';
 
 export interface LiveDownloadJob {
   dbId: number;
@@ -20,7 +21,6 @@ export interface StandardVodJob {
   vodId: string;
   platform: Platform;
   downloadMethod?: DownloadMethod;
-  uploadMode?: UploadMode;
 }
 
 export interface ChatDownloadJob {
@@ -42,6 +42,7 @@ export interface YoutubeVodUploadJob {
   type: UploadType;
   platform: Platform;
   dmcaProcessed?: boolean;
+  vodRecord: VodRecord;
 }
 
 export interface YoutubeGameUploadJob {

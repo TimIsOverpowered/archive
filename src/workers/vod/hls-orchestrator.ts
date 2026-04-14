@@ -12,11 +12,12 @@ import { downloadSegmentsParallel, fetchTwitchPlaylist, fetchKickPlaylist, type 
 import { sleep, getRetryDelay } from '../../utils/delay.js';
 import { convertHlsToMp4, detectFmp4FromPlaylist } from './ffmpeg.js';
 import { HLS_MAX_CONSECUTIVE_ERRORS, HLS_NO_CHANGE_THRESHOLD, HLS_POLL_INTERVAL_MS, HLS_SEGMENT_CONCURRENCY, HLS_SEGMENT_RETRY_ATTEMPTS } from '../../constants.js';
+import { PLATFORMS, type Platform } from '../../types/platforms.js';
 
 export interface HlsDownloadOptions {
   dbId: number;
   vodId: string;
-  platform: 'twitch' | 'kick';
+  platform: Platform;
   tenantId: string;
   platformUserId: string;
   platformUsername?: string;
@@ -52,7 +53,7 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
 
   const m3u8Path = pathMod.join(vodDir, `${vodId}.m3u8`);
 
-  const cycleTLS = platform === 'kick' ? createSession() : null;
+  const cycleTLS = platform === PLATFORMS.KICK ? createSession() : null;
   if (cycleTLS) log.info({ vodId }, 'CycleTLS session created');
 
   try {
@@ -107,7 +108,7 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
 
 interface LivePollingContext {
   vodId: string;
-  platform: 'twitch' | 'kick';
+  platform: Platform;
   tenantId: string;
   dbId: number;
   sourceUrl?: string;
@@ -163,7 +164,7 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
       const newSegments = segments.filter((seg) => !downloadedSegments.has(seg.uri));
 
       if (newSegments.length > 0) {
-        const strategy: DownloadStrategy = platform === 'kick' && ctx.cycleTLS ? { type: 'cycletls', session: ctx.cycleTLS } : { type: 'fetch' };
+        const strategy: DownloadStrategy = platform === PLATFORMS.KICK && ctx.cycleTLS ? { type: 'cycletls', session: ctx.cycleTLS } : { type: 'fetch' };
 
         await downloadSegmentsParallel(newSegments, ctx.vodDir, baseURL, strategy, concurrency, HLS_SEGMENT_RETRY_ATTEMPTS, log, () => ctx.onProgress?.(downloadedSegments.size));
 
@@ -172,7 +173,7 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
 
       consecutiveErrors = 0;
 
-      if (platform === 'kick') {
+      if (platform === PLATFORMS.KICK) {
         await updateChapterDuringDownload(ctx.dbId, vodId, ctx.tenantId, ctx.streamerClient);
       }
 
@@ -195,7 +196,7 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
 
 interface ArchivedVodContext {
   vodId: string;
-  platform: 'twitch' | 'kick';
+  platform: Platform;
   tenantId: string;
   sourceUrl?: string;
   vodDir: string;
@@ -228,20 +229,20 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
 
   log.debug({ vodId, count: segments.length }, `Found ${segments.length} segments to download`);
 
-  const strategy: DownloadStrategy = platform === 'kick' && cycleTLS ? { type: 'cycletls', session: cycleTLS } : { type: 'fetch' };
+  const strategy: DownloadStrategy = platform === PLATFORMS.KICK && cycleTLS ? { type: 'cycletls', session: cycleTLS } : { type: 'fetch' };
 
   await downloadSegmentsParallel(segments, vodDir, baseURL, strategy, concurrency, HLS_SEGMENT_RETRY_ATTEMPTS, log);
 }
 
 async function fetchPlaylist(ctx: LivePollingContext, retryCount: number) {
-  if (ctx.platform === 'twitch') {
+  if (ctx.platform === PLATFORMS.TWITCH) {
     return fetchTwitchPlaylist(ctx.vodId, ctx.log, retryCount, HLS_MAX_CONSECUTIVE_ERRORS, ctx.tenantId);
   }
   return fetchKickPlaylist(ctx.vodId, ctx.sourceUrl, ctx.log, retryCount, HLS_MAX_CONSECUTIVE_ERRORS, ctx.cycleTLS ?? undefined);
 }
 
 async function fetchPlaylistForArchived(ctx: ArchivedVodContext) {
-  if (ctx.platform === 'twitch') {
+  if (ctx.platform === PLATFORMS.TWITCH) {
     return fetchTwitchPlaylist(ctx.vodId, ctx.log, 0, HLS_MAX_CONSECUTIVE_ERRORS, ctx.tenantId);
   }
   return fetchKickPlaylist(ctx.vodId, ctx.sourceUrl, ctx.log, 0, HLS_MAX_CONSECUTIVE_ERRORS, ctx.cycleTLS ?? undefined);

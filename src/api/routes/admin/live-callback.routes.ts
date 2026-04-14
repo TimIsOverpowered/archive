@@ -1,17 +1,16 @@
 import type { FastifyInstance } from 'fastify';
-
 import fs from 'fs/promises';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
-import type { VodRecordBase } from './types';
-import { enqueueJobWithLogging } from '../../../workers/jobs/queues.js';
 import { fileExists } from '../../../utils/path.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound, badRequest } from '../../../utils/http-error';
 import type { Platform } from '../../../types/platforms.js';
-import { SOURCE_TYPES } from '../../../types/platforms.js';
+import { PLATFORM_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
+import { findStreamRecord } from './utils/vod-helpers';
+import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job';
 
 interface LiveCallbackBody {
   streamId: string;
@@ -50,7 +49,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
           streamId: { type: 'string', description: 'VOD/Stream ID' },
           path: { type: 'string', description: 'Local filesystem path to recorded MP4 file' },
           durationSecs: { type: 'number', description: 'Duration in seconds (optional)' },
-          platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Source platform' },
+          platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Source platform' },
         },
         required: ['streamId', 'path', 'platform'],
       },
@@ -67,7 +66,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         const exists = await fileExists(request.body.path);
 
         if (!exists) {
-          notFound(`File at ${request.body.path} does not exist`);
+          badRequest(`File at ${request.body.path} does not exist`);
         }
 
         const stats = await fs.stat(request.body.path);
@@ -86,31 +85,8 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
       // Look up VOD record by stream_id or id
       const streamIdNum = Number(request.body.streamId);
 
-      let vodRecord: VodRecordBase | null = await client.vod.findFirst({
-        where: {
-          OR: [{ id: streamIdNum }, { stream_id: request.body.streamId }],
-        },
-      });
-
-      if (!vodRecord) {
-        // VOD doesn't exist - create placeholder for live recording callback
-        log.warn(`No VOD record found for ${request.body.streamId}. Creating placeholder...`);
-
-        vodRecord = await client.vod.create({
-          data: {
-            id: streamIdNum,
-            vod_id: request.body.streamId,
-            platform,
-            title: `${platform.toUpperCase()} Live Recording`,
-            duration: request.body.durationSecs || 0,
-            stream_id: request.body.streamId,
-          },
-        });
-
-        log.info(`Created placeholder VOD ${request.body.streamId}`);
-      } else if (vodRecord.platform !== platform) {
-        log.warn(`Platform mismatch for VOD ${request.body.streamId}: expected=${platform}, actual=${vodRecord.platform}`);
-      }
+      const vodRecord = await findStreamRecord(client, request.body.streamId, platform);
+      if (!vodRecord) notFound(`VOD ${request.body.streamId} not found`);
 
       // Update duration if provided and different from current value
       if (request.body.durationSecs && vodRecord.duration !== request.body.durationSecs) {
@@ -125,55 +101,24 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         log.debug(`No duration update needed for VOD ${vodRecord.id}`);
       }
 
-      // Queue YouTube upload job for the pre-recorded MP4 file at `path`
-      const YoutubeQueueModule = await import('../../../workers/jobs/queues');
-
-      if (!config?.youtube?.liveUpload) {
-        log.warn(`YouTube live upload not enabled, skipping queue for ${request.body.streamId}`);
+      if (!config?.youtube?.upload) {
+        log.warn(`YouTube upload not enabled, skipping queue for ${request.body.streamId}`);
 
         return <{ data: LiveCallbackResponseData }>{
           data: {
-            message: 'YouTube live upload is disabled for this tenant. Recording processed but no upload queued.',
+            message: 'YouTube upload is disabled for this tenant. Recording processed but no upload queued.',
             vodId: streamIdNum,
             path: request.body.path,
           },
         };
       }
 
-      const youtubeJobData = {
-        tenantId,
-        vodId: String(streamIdNum),
-        filePath: request.body.path,
-        title: vodRecord.title || `${platform.toUpperCase()} VOD`,
-        description: config?.youtube.description || '',
-        type: SOURCE_TYPES.LIVE,
-        platform,
-      };
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const queue = YoutubeQueueModule.getYoutubeUploadQueue() as any;
-      const { jobId, isNew } = await enqueueJobWithLogging(
-        queue,
-        'youtube_upload',
-        youtubeJobData,
-        {
-          jobId: `youtube-live:${request.body.streamId}`,
-          deduplication: { id: `youtube-live:${request.body.streamId}` },
-        },
-        { info: log.info.bind(log), debug: log.debug.bind(log) },
-        'Queued YouTube upload job for live recording',
-        { vodId: request.body.streamId, path: request.body.path }
-      );
-
-      if (isNew) {
-        log.debug({ vodId: request.body.streamId, jobId }, 'Job was newly added to queue');
-      }
+      queueYoutubeUploads({ tenantId, dbId: vodRecord.id, vodId: vodRecord.vod_id, filePath: request.body.path, platform, config, log });
 
       return <{ data: LiveCallbackResponseData }>{
         data: {
           message: 'YouTube upload queued successfully',
           vodId: streamIdNum,
-          jobId,
           path: request.body.path,
         },
       };

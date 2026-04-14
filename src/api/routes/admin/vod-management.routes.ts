@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-
 import { getTenantStats } from '../../../services/tenants.service';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
@@ -9,6 +8,7 @@ import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest } from '../../../utils/http-error';
 import { findVodRecord } from './utils/vod-helpers';
 import { getApiConfig } from '../../../config/env.js';
+import { Platform, PLATFORM_VALUES } from '../../../types/platforms';
 
 interface StatsParams {
   tenantId: string;
@@ -21,14 +21,14 @@ interface DeleteVodParams {
 }
 interface DeleteVodBody {
   vodId: string;
-  platform: 'twitch' | 'kick';
+  platform: Platform;
 }
 interface CreateVodBody {
   vodId?: string;
   title?: string;
   createdAt?: string;
   duration?: number;
-  platform: 'twitch' | 'kick';
+  platform: Platform;
 }
 
 export default async function vodManagementRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
@@ -77,7 +77,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
             title: { type: 'string' },
             createdAt: { type: 'string' },
             duration: { type: 'number' },
-            platform: { type: 'string', enum: ['twitch', 'kick'] },
+            platform: { type: 'string', enum: PLATFORM_VALUES },
           },
         },
         security: [{ apiKey: [] }],
@@ -133,7 +133,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
           type: 'object',
           properties: {
             vodId: { type: 'string', description: 'Platform VOD ID' },
-            platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Source platform' },
+            platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Source platform' },
           },
           required: ['vodId', 'platform'],
         },

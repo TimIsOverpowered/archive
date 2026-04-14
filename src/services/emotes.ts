@@ -1,5 +1,6 @@
 import { logger } from '../utils/logger.js';
 import { Prisma } from '../../generated/streamer/client.js';
+import { Platform, PLATFORMS } from '../types/platforms.js';
 
 export interface EmoteData extends Prisma.JsonObject {
   id: string;
@@ -48,12 +49,12 @@ interface SevenTVUserResponse {
   }>;
 }
 
-export async function fetchAndSaveEmotes(tenantId: string, vodId: number, platform: 'twitch' | 'kick', platformId?: string): Promise<void> {
+export async function fetchAndSaveEmotes(tenantId: string, vodId: number, platform: Platform, platformId?: string): Promise<void> {
   let ffzEmotes: EmoteData[] = [];
   let bttvEmotes: EmoteData[] = [];
   let sevenTvEmotes: EmoteData[] = [];
 
-  if (platform === 'twitch' && platformId) {
+  if (platform === PLATFORMS.TWITCH && platformId) {
     try {
       const [ffzRes, bttvGlobalRes, bttvChannelRes, sevenTvRes] = await Promise.all([
         fetch(`https://api.frankerfacez.com/v1/room/id/${platformId}`, { signal: AbortSignal.timeout(5000) })
@@ -84,7 +85,7 @@ export async function fetchAndSaveEmotes(tenantId: string, vodId: number, platfo
     } catch {
       logger.error({ platform, platformId }, 'Failed to fetch Twitch emotes');
     }
-  } else if (platform === 'kick' && platformId) {
+  } else if (platform === PLATFORMS.KICK && platformId) {
     try {
       const sevenTvRes = await fetch(`https://7tv.io/v3/users/kick/${platformId}`, { signal: AbortSignal.timeout(5000) })
         .then((r) => (r.ok ? (r.json() as Promise<SevenTVUserResponse>) : {}))

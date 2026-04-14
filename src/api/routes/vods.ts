@@ -4,6 +4,7 @@ import createRateLimitMiddleware from '../middleware/rate-limit';
 import { publicRateLimiter } from '../plugins/redis.plugin';
 import { notFound } from '../../utils/http-error';
 import { tenantMiddleware } from '../middleware/tenant-platform';
+import { PLATFORM_VALUES } from '../../types/platforms';
 
 interface VodRoutesOptions {
   prefix: string;
@@ -34,7 +35,7 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
         query: {
           type: 'object',
           properties: {
-            platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Filter by source platform' },
+            platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Filter by source platform' },
             from: { type: 'string', format: 'date-time', description: 'Filter VODs after date (ISO)' },
             to: { type: 'string', format: 'date-time', description: 'Filter VODs before date (ISO)' },
             uploaded: { type: 'string', enum: ['youtube'], description: 'Only VODs with YouTube uploads' },
@@ -113,7 +114,7 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
           type: 'object',
           properties: {
             tenantId: { type: 'string', description: 'Tenant ID' },
-            platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Platform' },
+            platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Platform' },
             platformVodId: { type: 'string', description: 'Platform-specific VOD ID' },
           },
           required: ['tenantId', 'platform', 'platformVodId'],
@@ -148,7 +149,7 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
           type: 'object',
           properties: {
             tenantId: { type: 'string', description: 'Tenant ID' },
-            platform: { type: 'string', enum: ['twitch', 'kick'], description: 'Platform' },
+            platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Platform' },
             platformVodId: { type: 'string', description: 'Platform-specific VOD ID' },
           },
           required: ['tenantId', 'platform', 'platformVodId'],
