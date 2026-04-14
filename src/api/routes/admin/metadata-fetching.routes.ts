@@ -2,14 +2,13 @@ import type { FastifyInstance } from 'fastify';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
-import type { VodData as TwitchVodData } from '../../../services/twitch/index.js';
 import { saveVodChapters } from '../../../services/twitch/index.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { notFound } from '../../../utils/http-error';
+import { badRequest, notFound } from '../../../utils/http-error';
 import type { Platform } from '../../../types/platforms.js';
 import { PLATFORMS } from '../../../types/platforms.js';
-import { findVodRecord } from './utils/vod-helpers.js';
+import { findVodRecord, queueEmoteFetch } from './utils/vod-helpers.js';
 
 type RouteParams = { tenantId: string };
 
@@ -96,7 +95,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, client, platform } = request.tenant as TenantPlatformContext;
+      const { tenantId, client, platform, config } = request.tenant as TenantPlatformContext;
       const { vodId } = request.body;
       const log = createAutoLogger(tenantId);
 
@@ -104,28 +103,18 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
-      let channelId: string | undefined;
+      // Queue emote save job (fire-and-forget within request context)
+      const platformId = config?.[platform]?.id;
 
-      // Only supported for Twitch with stream_id available
-      if (platform === 'twitch' && vodRecord.stream_id) {
-        const twitch = await import('../../../services/twitch');
-        const vodData: TwitchVodData = await twitch.getVodData(vodId, tenantId);
+      if (!platformId) badRequest(`No platform ID available for ${platform} ${vodId}`);
 
-        channelId = vodData.user_id;
-
-        if (channelId) {
-          log.info(`Fetching emotes for channel ${channelId}`);
-
-          const EmoteModule = await import('../../../services/emotes');
-          await EmoteModule.fetchAndSaveEmotes(tenantId, vodRecord.id, platform, channelId);
-
-          log.info(`Successfully fetched and saved emotes`);
-        } else {
-          log.warn(`No channel ID available for Twitch VOD ${vodId}`);
-        }
-      } else if (platform !== 'twitch') {
-        log.info(`Emote fetching only supported for Twitch platform`);
-      }
+      await queueEmoteFetch({
+        tenantId,
+        vodId: vodRecord.id,
+        platform,
+        platformId,
+        log,
+      });
 
       return { data: { message: `Emote saving completed for ${vodId}`, vodId, platform } };
     }

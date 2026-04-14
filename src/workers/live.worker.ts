@@ -83,6 +83,13 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
       log.warn({ ...extractErrorDetails(error), vodId }, 'Failed to queue chat download (non-fatal)');
     }
 
+    try {
+      const { fetchAndSaveEmotes } = await import('../services/emotes.js');
+      fetchAndSaveEmotes(tenantId, dbId, platform, platformUserId);
+    } catch (error) {
+      log.warn({ ...extractErrorDetails(error), vodId }, 'Failed to save emotes (non-fatal)');
+    }
+
     // 6. Cleanup HLS segments
     const shouldKeepHls = config.settings.saveHLS ?? false;
     await cleanupHlsFiles(downloadResult.outputDir, shouldKeepHls, log);
