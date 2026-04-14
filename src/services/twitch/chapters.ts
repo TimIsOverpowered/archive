@@ -8,7 +8,7 @@ function getTwitchClient(tenantId: string) {
   return createTwitchClient(tenantId, () => import('./auth.js').then((m) => m.getAppAccessToken(tenantId)));
 }
 
-export async function getChapters(vodId: string, tenantId?: string): Promise<Record<string, unknown> | null> {
+export async function getChapters(vodId: string, tenantId?: string): Promise<unknown[] | null> {
   const client = createTwitchGqlClient(tenantId);
   const data = await client.post<{ data?: Record<string, unknown> }>({
     operationName: 'VideoPreviewCard__VideoMoments',
@@ -22,7 +22,9 @@ export async function getChapters(vodId: string, tenantId?: string): Promise<Rec
       },
     },
   });
-  return data?.data || null;
+  const video = (data?.data as Record<string, unknown> | undefined)?.video as Record<string, unknown> | undefined;
+  const moments = video?.moments as Record<string, unknown> | undefined;
+  return moments?.edges as unknown[] | null;
 }
 
 export async function getChapter(vodId: string, tenantId?: string): Promise<Record<string, unknown> | null> {
@@ -44,7 +46,7 @@ export async function getChapter(vodId: string, tenantId?: string): Promise<Reco
       },
     },
   });
-  return data.data?.video || null;
+  return data?.data?.video || null;
 }
 
 export async function getGameData(gameId: string, tenantId: string): Promise<Record<string, unknown> | null> {
@@ -64,13 +66,11 @@ export async function saveVodChapters(dbId: number, vodId: string, tenantId: str
       where: { vod_id: dbId },
     });
 
-    const chaptersData = await getChapters(vodId, tenantId);
-    if (!chaptersData) {
+    const chapters = await getChapters(vodId, tenantId);
+    if (!chapters) {
       logger.warn({ vodId }, 'No chapters data available from Twitch API');
       return 0;
     }
-
-    const chapters = Array.isArray(chaptersData) ? chaptersData : [chaptersData as unknown as Record<string, unknown>];
 
     if (chapters.length === 0) {
       const chapter = await getChapter(vodId, tenantId);
@@ -97,57 +97,59 @@ export async function saveVodChapters(dbId: number, vodId: string, tenantId: str
 
       logger.info({ dbId, vodId, game: typeof game.displayName === 'string' ? game.displayName : 'unknown' }, 'Created single chapter from game info');
       return 1;
-    }
+    } else if (chapters.length > 0) {
+      const chaptersToCreate = [];
 
-    const chaptersToCreate = [];
+      for (const ch of chapters) {
+        try {
+          const chapterObj = ch as Record<string, unknown>;
+          const node = (chapterObj.node as Record<string, unknown>) ?? {};
+          const details = (node.details as Record<string, unknown>) ?? {};
+          const game = details.game as Record<string, unknown> | undefined;
 
-    for (const ch of chapters) {
-      try {
-        const node = (ch.node as Record<string, unknown>) ?? {};
-        const details = (node.details as Record<string, unknown>) ?? {};
-        const game = details.game as Record<string, unknown> | undefined;
+          const positionMs = Number(node.positionMilliseconds ?? 0);
+          const durationMs = Number(node.durationMilliseconds ?? 0);
 
-        const positionMs = Number(node.positionMilliseconds ?? 0);
-        const durationMs = Number(node.durationMilliseconds ?? 0);
+          const gameId = typeof game?.id === 'string' ? game.id : null;
+          const gameName = typeof game?.displayName === 'string' ? game.displayName : null;
 
-        const gameId = typeof game?.id === 'string' ? game.id : null;
-        const gameName = typeof game?.displayName === 'string' ? game.displayName : null;
-
-        let gameImage: string | null = null;
-        if (gameId) {
-          const gameData = await getGameData(gameId, tenantId);
-          if (gameData && typeof gameData.box_art_url === 'string') {
-            gameImage = gameData.box_art_url.replace('{width}x{height}', '40x53');
+          let gameImage: string | null = null;
+          if (gameId) {
+            const gameData = await getGameData(gameId, tenantId);
+            if (gameData && typeof gameData.box_art_url === 'string') {
+              gameImage = gameData.box_art_url.replace('{width}x{height}', '40x53');
+            }
           }
+
+          const startSeconds = Math.floor(positionMs / 1000);
+          const endSeconds = durationMs === 0 ? finalDurationSeconds - startSeconds : Math.floor(durationMs / 1000);
+          const durationFormatted = toHHMMSS(startSeconds);
+
+          chaptersToCreate.push({
+            vod_id: dbId,
+            game_id: gameId,
+            name: gameName,
+            image: gameImage,
+            duration: durationFormatted,
+            start: startSeconds,
+            end: endSeconds,
+          });
+        } catch (error) {
+          logger.warn({ error: extractErrorDetails(error).message }, 'Failed to process chapter');
         }
-
-        const startSeconds = Math.floor(positionMs / 1000);
-        const endSeconds = durationMs === 0 ? finalDurationSeconds - startSeconds : Math.floor(durationMs / 1000);
-        const durationFormatted = toHHMMSS(startSeconds);
-
-        chaptersToCreate.push({
-          vod_id: dbId,
-          game_id: gameId,
-          name: gameName,
-          image: gameImage,
-          duration: durationFormatted,
-          start: startSeconds,
-          end: endSeconds,
-        });
-      } catch (error) {
-        logger.warn({ error: extractErrorDetails(error).message }, 'Failed to process chapter');
       }
+
+      if (chaptersToCreate.length > 0) {
+        await client.chapter.createMany({
+          data: chaptersToCreate,
+        });
+
+        logger.info({ dbId, vodId, chapterCount: chaptersToCreate.length }, 'Saved all chapters');
+      }
+
+      return chaptersToCreate.length;
     }
-
-    if (chaptersToCreate.length > 0) {
-      await client.chapter.createMany({
-        data: chaptersToCreate,
-      });
-
-      logger.info({ dbId, vodId, chapterCount: chaptersToCreate.length }, 'Saved all chapters');
-    }
-
-    return chaptersToCreate.length;
+    return 0;
   } catch (error) {
     logger.error({ error: extractErrorDetails(error).message, dbId, vodId }, 'Failed to save chapters');
     return 0;
