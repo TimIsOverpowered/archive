@@ -66,6 +66,10 @@ export async function saveVodChapters(dbId: number, vodId: string, tenantId: str
       return 0;
     }
 
+    await client.chapter.deleteMany({
+      where: { vod_id: dbId },
+    });
+
     const chaptersData = await getChapters(vod.vod_id, tenantId);
     if (!chaptersData) {
       logger.warn({ vodId }, 'No chapters data available from Twitch API');
@@ -85,11 +89,8 @@ export async function saveVodChapters(dbId: number, vodId: string, tenantId: str
       const gameId = typeof game.id === 'string' ? game.id : null;
       const gameData = gameId ? await getGameData(gameId, tenantId) : null;
 
-      await client.chapter.upsert({
-        where: {
-          vod_id_start: { vod_id: dbId, start: 0 },
-        },
-        create: {
+      await client.chapter.create({
+        data: {
           vod_id: dbId,
           game_id: gameId,
           name: typeof game.displayName === 'string' ? game.displayName : null,
@@ -98,21 +99,13 @@ export async function saveVodChapters(dbId: number, vodId: string, tenantId: str
           start: 0,
           end: finalDurationSeconds,
         },
-        update: {
-          game_id: gameId,
-          name: typeof game.displayName === 'string' ? game.displayName : null,
-          image: gameData && typeof gameData.box_art_url === 'string' ? gameData.box_art_url.replace('{width}x{height}', '40x53') : null,
-          duration: '00:00:00',
-          end: finalDurationSeconds,
-        },
       });
 
-      logger.info({ dbId, vodId, game: typeof game.displayName === 'string' ? game.displayName : 'unknown' }, 'Upserted single chapter from game info');
+      logger.info({ dbId, vodId, game: typeof game.displayName === 'string' ? game.displayName : 'unknown' }, 'Created single chapter from game info');
       return 1;
     }
 
-    const processedStartTimes: number[] = [];
-    let savedCount = 0;
+    const chaptersToCreate = [];
 
     for (const ch of chapters) {
       try {
@@ -138,44 +131,29 @@ export async function saveVodChapters(dbId: number, vodId: string, tenantId: str
         const endSeconds = durationMs === 0 ? finalDurationSeconds - startSeconds : Math.floor(durationMs / 1000);
         const durationFormatted = toHHMMSS(startSeconds);
 
-        await client.chapter.upsert({
-          where: { vod_id_start: { vod_id: dbId, start: startSeconds } },
-          create: {
-            vod_id: dbId,
-            game_id: gameId,
-            name: gameName,
-            image: gameImage,
-            duration: durationFormatted,
-            start: startSeconds,
-            end: endSeconds,
-          },
-          update: {
-            game_id: gameId,
-            name: gameName,
-            image: gameImage,
-            duration: durationFormatted,
-            end: endSeconds,
-          },
+        chaptersToCreate.push({
+          vod_id: dbId,
+          game_id: gameId,
+          name: gameName,
+          image: gameImage,
+          duration: durationFormatted,
+          start: startSeconds,
+          end: endSeconds,
         });
-
-        processedStartTimes.push(startSeconds);
-        savedCount++;
-        logger.debug({ startSeconds, gameName }, 'Upserted chapter');
       } catch (error) {
-        logger.warn({ error: extractErrorDetails(error).message }, 'Failed to save chapter');
+        logger.warn({ error: extractErrorDetails(error).message }, 'Failed to process chapter');
       }
     }
 
-    const deletedCount = await client.chapter.deleteMany({
-      where: {
-        vod_id: dbId,
-        start: { notIn: processedStartTimes },
-      },
-    });
+    if (chaptersToCreate.length > 0) {
+      await client.chapter.createMany({
+        data: chaptersToCreate,
+      });
 
-    logger.info({ dbId, vodId, saved: savedCount, deleted: deletedCount.count }, 'Saved chapters summary');
+      logger.info({ dbId, vodId, chapterCount: chaptersToCreate.length }, 'Saved all chapters');
+    }
 
-    return savedCount;
+    return chaptersToCreate.length;
   } catch (error) {
     logger.error({ error: extractErrorDetails(error).message, dbId, vodId }, 'Failed to save chapters');
     return 0;
