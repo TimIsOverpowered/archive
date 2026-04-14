@@ -60,17 +60,11 @@ export async function getGameData(gameId: string, tenantId: string): Promise<Rec
 export async function saveVodChapters(dbId: number, vodId: string, tenantId: string, finalDurationSeconds: number, client: PrismaClient): Promise<number> {
   const logger = createAutoLogger('twitch-chapters');
   try {
-    const vod = await client.vod.findUnique({ where: { id: dbId }, select: { vod_id: true } });
-    if (!vod) {
-      logger.warn({ dbId, vodId }, 'VOD not found');
-      return 0;
-    }
-
     await client.chapter.deleteMany({
       where: { vod_id: dbId },
     });
 
-    const chaptersData = await getChapters(vod.vod_id, tenantId);
+    const chaptersData = await getChapters(vodId, tenantId);
     if (!chaptersData) {
       logger.warn({ vodId }, 'No chapters data available from Twitch API');
       return 0;
@@ -79,7 +73,7 @@ export async function saveVodChapters(dbId: number, vodId: string, tenantId: str
     const chapters = Array.isArray(chaptersData) ? chaptersData : [chaptersData as unknown as Record<string, unknown>];
 
     if (chapters.length === 0) {
-      const chapter = await getChapter(vod.vod_id, tenantId);
+      const chapter = await getChapter(vodId, tenantId);
       if (!chapter || !chapter.game) {
         logger.warn({ vodId }, 'No game info available');
         return 0;
