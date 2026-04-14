@@ -1,17 +1,16 @@
 import { FastifyRequest } from 'fastify';
-import { getTenantConfig } from '../../../../config/loader';
 import { getClient } from '../../../../db/client.js';
-import type { VodData as TwitchVodData } from '../../../../services/twitch/index.js';
-import type { KickVod } from '../../../../services/kick.js';
+import { getVodData, type VodData as TwitchVodData } from '../../../../services/twitch/index.js';
+import { getVod, type KickVod } from '../../../../services/kick.js';
 import { getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
 import { getDuration } from '../../../../workers/vod/ffmpeg.js';
 import { getStandardVodQueue, type StandardVodJob } from '../../../../workers/jobs/queues.js';
-import { createAutoLogger } from '../../../../utils/auto-tenant-logger.js';
+import { AppLogger } from '../../../../utils/auto-tenant-logger.js';
 import type { VodRecord } from '../../../../types/db.js';
-import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../../types/platforms.js';
-import { DOWNLOAD_METHODS } from '../../../../types/platforms.js';
-
-type StreamerDbClient = NonNullable<ReturnType<typeof getClient>>;
+import type { Platform, SourceType, DownloadMethod } from '../../../../types/platforms.js';
+import { DOWNLOAD_METHODS, PLATFORMS, SOURCE_TYPES } from '../../../../types/platforms.js';
+import type { TenantConfig } from '../../../../config/types';
+import type { PrismaClient } from '../../../../../generated/streamer/client';
 
 export interface VodCreateOptions {
   vodId: number;
@@ -38,15 +37,27 @@ export interface EnsureVodDownloadOptions {
   platform: Platform;
   type: SourceType;
   downloadMethod?: DownloadMethod;
-  uploadMode?: UploadMode;
+  config: TenantConfig;
+  log: AppLogger;
 }
 
 /**
  * Fetches VOD record or returns null if not found
  */
-export async function findVodRecord(client: StreamerDbClient, vodId: string, platform: Platform): Promise<VodRecord | null> {
+export async function findVodRecord(client: PrismaClient, vodId: string, platform: Platform): Promise<VodRecord | null> {
   try {
     return await client.vod.findUnique({ where: { platform_vod_id: { platform, vod_id: vodId } } });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetches VOD record by stream_id or returns null if not found
+ */
+export async function findStreamRecord(client: PrismaClient, streamId: string, platform: Platform): Promise<VodRecord | null> {
+  try {
+    return await client.vod.findFirst({ where: { platform, stream_id: streamId } });
   } catch {
     return null;
   }
@@ -84,7 +95,7 @@ export function parseDurationToSeconds(duration: number | string, platform?: Pla
     return Number(duration);
   }
 
-  if (platform === 'twitch' && typeof duration === 'string') {
+  if (platform === PLATFORMS.TWITCH && typeof duration === 'string') {
     const [hrs, mins, secs] = String(duration).split(':').map(Number);
     return hrs * 3600 + mins * 60 + secs;
   }
@@ -124,21 +135,15 @@ export async function queueEmoteFetch(options: QueueEmoteOptions): Promise<void>
  * @throws Error if download fails or configuration is missing
  */
 export async function ensureVodDownload(options: EnsureVodDownloadOptions): Promise<string> {
-  const { tenantId, dbId, vodId, platform, type, downloadMethod = DOWNLOAD_METHODS.HLS, uploadMode } = options;
-  const log = createAutoLogger(tenantId);
+  const { config, tenantId, dbId, vodId, platform, type, downloadMethod = DOWNLOAD_METHODS.HLS, log } = options;
 
-  const config = getTenantConfig(tenantId);
-  if (!config) {
-    throw new Error(`Tenant ${tenantId} not found`);
-  }
-
-  const platformUserId = platform === 'twitch' ? config.twitch?.id : config.kick?.id;
+  const platformUserId = platform === PLATFORMS.TWITCH ? config.twitch?.id : config.kick?.id;
   if (!platformUserId) {
     throw new Error(`Platform ${platform} not configured for tenant ${tenantId}`);
   }
 
   // Determine file path based on type
-  const filePath = type === 'live' ? getLiveFilePath({ tenantId, streamId: vodId }) : getVodFilePath({ tenantId, vodId });
+  const filePath = type === SOURCE_TYPES.LIVE ? getLiveFilePath({ tenantId, streamId: vodId }) : getVodFilePath({ tenantId, vodId });
 
   const needsDownload = await checkIfDownloadNeeded(filePath, dbId, tenantId, platform, log);
 
@@ -155,7 +160,6 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
     dbId,
     vodId,
     platform,
-    uploadMode,
     downloadMethod,
   };
   await queue.add('standard_vod_download', jobData, { jobId: `download_${vodId}` });
@@ -167,7 +171,7 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
 /**
  * Checks if a VOD file needs to be downloaded (missing or duration mismatch).
  */
-async function checkIfDownloadNeeded(filePath: string, dbId: number, tenantId: string, platform: Platform, log: ReturnType<typeof createAutoLogger>): Promise<boolean> {
+async function checkIfDownloadNeeded(filePath: string, dbId: number, tenantId: string, platform: Platform, log: AppLogger): Promise<boolean> {
   const exists = await fileExists(filePath);
   if (!exists) {
     log.debug({ filePath }, 'File does not exist');
@@ -207,14 +211,7 @@ async function checkIfDownloadNeeded(filePath: string, dbId: number, tenantId: s
  * Ensures a VOD record exists in the database, creating it from platform API if needed
  * Returns null if VOD cannot be found or created
  */
-export async function ensureVodRecord(
-  config: ReturnType<typeof getTenantConfig>,
-  client: StreamerDbClient,
-  tenantId: string,
-  vodId: string,
-  platform: Platform,
-  log: ReturnType<typeof createAutoLogger>
-): Promise<VodRecord | null> {
+export async function ensureVodRecord(config: TenantConfig, client: PrismaClient, tenantId: string, vodId: string, platform: Platform, log: AppLogger): Promise<VodRecord | null> {
   // Try to find existing VOD record
   const rawVodRecord = await findVodRecord(client, vodId, platform);
 
@@ -228,9 +225,8 @@ export async function ensureVodRecord(
 
   let vodRecord: VodRecord;
 
-  if (platform === 'twitch') {
-    const twitch = await import('../../../../services/twitch');
-    const vodMetadata: TwitchVodData = await twitch.getVodData(vodId, tenantId);
+  if (platform === PLATFORMS.TWITCH) {
+    const vodMetadata: TwitchVodData = await getVodData(vodId, tenantId);
 
     if (vodMetadata.user_id !== config?.twitch?.id) {
       return null;
@@ -256,14 +252,12 @@ export async function ensureVodRecord(
     })) as VodRecord;
 
     log.info(`Created Twitch VOD ${vodId} with user_id=${vodMetadata.user_id}`);
-  } else if (platform === 'kick') {
-    const kick = await import('../../../../services/kick');
-
+  } else if (platform === PLATFORMS.KICK) {
     if (!config?.kick?.username) {
       return null;
     }
 
-    const vodMetadata: KickVod = await kick.getVod(config.kick.username, vodId);
+    const vodMetadata: KickVod = await getVod(config.kick.username, vodId);
 
     log.info(`Fetched Kick VOD ${vodId} from channel ${config.kick.username}`);
 

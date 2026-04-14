@@ -4,7 +4,7 @@ import { getYoutubeUploadQueue } from './queues.js';
 import type { YoutubeVodUploadJob, YoutubeGameUploadJob } from './queues.js';
 import dayjs from '../../utils/dayjs.js';
 import { childLogger } from '../../utils/logger.js';
-import type { Platform } from '../../types/platforms.js';
+import type { Platform, UploadMode } from '../../types/platforms.js';
 import { UPLOAD_TYPES, UPLOAD_MODES } from '../../types/platforms.js';
 
 const log = childLogger({ module: 'youtube-job' });
@@ -33,6 +33,7 @@ export async function createVodUploadJob(tenantId: string, dbId: number, vodId: 
     vodId,
     filePath,
     type: UPLOAD_TYPES.VOD,
+    vodRecord: vodRecord,
     platform,
   };
 }
@@ -110,7 +111,7 @@ export async function createGameUploadJob(
 
 // ============== Bulk Game Job Creation ==============
 
-export async function createGameUploadJobsForVod(tenantId: string, dbId: number, vodId: string, filePath: string, platform: 'twitch' | 'kick'): Promise<YoutubeGameUploadJob[]> {
+export async function createGameUploadJobsForVod(tenantId: string, dbId: number, vodId: string, filePath: string, platform: Platform): Promise<YoutubeGameUploadJob[]> {
   const config = getTenantConfig(tenantId);
   if (!config?.youtube?.perGameUpload) {
     return [];
@@ -190,12 +191,12 @@ export async function enqueueGameUpload(job: YoutubeGameUploadJob): Promise<stri
 
 // ============== Queue Triggers ==============
 
-export async function queueYoutubeVodUpload(tenantId: string, dbId: number, vodId: string, filePath: string, platform: 'twitch' | 'kick'): Promise<string | null> {
+export async function queueYoutubeVodUpload(tenantId: string, dbId: number, vodId: string, filePath: string, platform: Platform): Promise<string | null> {
   const job = await createVodUploadJob(tenantId, dbId, vodId, filePath, platform);
   return enqueueVodUpload(job);
 }
 
-export async function queueYoutubeGameUpload(tenantId: string, dbId: number, vodId: string, filePath: string, platform: 'twitch' | 'kick', chapterId: number): Promise<string | null> {
+export async function queueYoutubeGameUpload(tenantId: string, dbId: number, vodId: string, filePath: string, platform: Platform, chapterId: number): Promise<string | null> {
   const client = getClient(tenantId);
   if (!client) return null;
 
@@ -213,7 +214,7 @@ export async function queueYoutubeGameUpload(tenantId: string, dbId: number, vod
   return enqueueGameUpload(job);
 }
 
-export async function queueYoutubeGameUploadsForVod(tenantId: string, dbId: number, vodId: string, filePath: string, platform: 'twitch' | 'kick'): Promise<void> {
+export async function queueYoutubeGameUploadsForVod(tenantId: string, dbId: number, vodId: string, filePath: string, platform: Platform): Promise<void> {
   const jobs = await createGameUploadJobsForVod(tenantId, dbId, vodId, filePath, platform);
 
   for (const job of jobs) {
@@ -229,7 +230,7 @@ export interface QueueYoutubeUploadsOptions {
   vodId: string;
   filePath: string;
   platform: Platform;
-  uploadMode?: import('../../types/platforms.js').UploadMode;
+  uploadMode?: UploadMode;
   config: ReturnType<typeof getTenantConfig>;
   log: {
     info: (ctx: Record<string, unknown>, msg: string) => void;
@@ -238,7 +239,7 @@ export interface QueueYoutubeUploadsOptions {
 }
 
 export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): Promise<void> {
-  const { tenantId, dbId, vodId, filePath, platform, uploadMode = UPLOAD_MODES.VOD, config, log } = options;
+  const { tenantId, dbId, vodId, filePath, platform, uploadMode = UPLOAD_MODES.ALL, config, log } = options;
 
   // VOD Upload
   if ((uploadMode === UPLOAD_MODES.VOD || uploadMode === UPLOAD_MODES.ALL) && config?.youtube?.vodUpload) {

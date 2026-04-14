@@ -7,7 +7,7 @@ import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
-import { PLATFORMS, SOURCE_TYPES, DOWNLOAD_METHODS, UPLOAD_MODES } from '../../../types/platforms.js';
+import { SOURCE_TYPES, DOWNLOAD_METHODS, UPLOAD_MODES, PLATFORM_VALUES, UPLOAD_MODE_VALUES, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES_VALUES } from '../../../types/platforms.js';
 
 interface ReDownloadVodParams {
   tenantId: string;
@@ -42,10 +42,10 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           type: 'object',
           properties: {
             vodId: { type: 'string', minLength: 1, maxLength: 100 },
-            type: { type: 'string', enum: Object.values(SOURCE_TYPES), default: SOURCE_TYPES.VOD },
-            platform: { type: 'string', enum: Object.values(PLATFORMS) },
-            uploadMode: { type: 'string', enum: Object.values(UPLOAD_MODES), default: UPLOAD_MODES.ALL },
-            downloadMethod: { type: 'string', enum: Object.values(DOWNLOAD_METHODS), default: DOWNLOAD_METHODS.HLS },
+            type: { type: 'string', enum: SOURCE_TYPES_VALUES, default: SOURCE_TYPES.VOD },
+            platform: { type: 'string', enum: PLATFORM_VALUES },
+            uploadMode: { type: 'string', enum: UPLOAD_MODE_VALUES, default: UPLOAD_MODES.ALL },
+            downloadMethod: { type: 'string', enum: DOWNLOAD_METHODS_VALUES, default: DOWNLOAD_METHODS.HLS },
           },
           required: ['vodId', 'platform'],
         },
@@ -83,7 +83,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       const type = request.body.type;
 
       // For live streams, use stream_id; for archived, use vod_id
-      const fileIdentifier = type === 'live' ? vodRecord.stream_id || vodRecord.vod_id : vodRecord.vod_id;
+      const fileIdentifier = type === SOURCE_TYPES.LIVE ? vodRecord.stream_id || vodRecord.vod_id : vodRecord.vod_id;
 
       // Queue download job (fire-and-forget)
       const VodQueueModule = await import('../../../workers/jobs/queues');
@@ -139,9 +139,9 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           type: 'object',
           properties: {
             vodId: { type: 'string', description: 'Platform VOD ID' },
-            platform: { type: 'string', enum: Object.values(PLATFORMS), description: 'Source platform' },
-            downloadMethod: { type: 'string', enum: Object.values(DOWNLOAD_METHODS), default: DOWNLOAD_METHODS.HLS, description: 'Download method' },
-            type: { type: 'string', enum: Object.values(SOURCE_TYPES), default: SOURCE_TYPES.VOD, description: 'File type for checking' },
+            platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Source platform' },
+            downloadMethod: { type: 'string', enum: DOWNLOAD_METHODS_VALUES, default: DOWNLOAD_METHODS.HLS, description: 'Download method' },
+            type: { type: 'string', enum: SOURCE_TYPES_VALUES, default: SOURCE_TYPES.VOD, description: 'File type for checking' },
           },
           required: ['vodId', 'platform'],
         },

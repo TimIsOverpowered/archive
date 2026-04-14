@@ -84,9 +84,9 @@ export function extractMessageData(node: TwitchChatMessageNode | null | undefine
   };
 }
 
-export async function fetchComments(vodId: string, offset = 0, tenantId?: string): Promise<Record<string, unknown> | null> {
+export async function fetchComments(vodId: string, offset = 0, tenantId?: string): Promise<TwitchVideoCommentResponse | null> {
   const client = getTwitchGqlClient(tenantId);
-  const data = await client.post<{ data?: { video?: Record<string, unknown> } }>({
+  const data = await client.post<{ data?: { video?: TwitchVideoCommentResponse } }>({
     operationName: 'VideoCommentsByOffsetOrCursor',
     variables: {
       videoID: vodId,
@@ -102,9 +102,9 @@ export async function fetchComments(vodId: string, offset = 0, tenantId?: string
   return data.data?.video || null;
 }
 
-export async function fetchNextComments(vodId: string, cursor: string, tenantId?: string): Promise<Record<string, unknown> | null> {
+export async function fetchNextComments(vodId: string, cursor: string, tenantId?: string): Promise<TwitchVideoCommentResponse | null> {
   const client = getTwitchGqlClient(tenantId);
-  const data = await client.post<{ data?: { video?: Record<string, unknown> } }>({
+  const data = await client.post<{ data?: { video?: TwitchVideoCommentResponse } }>({
     operationName: 'VideoCommentsByOffsetOrCursor',
     variables: {
       videoID: vodId,

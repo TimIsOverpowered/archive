@@ -1,6 +1,5 @@
 import type { DmcaProcessingJob } from '../../../workers/jobs/queues.js';
 import { enqueueJobWithLogging } from '../../../workers/jobs/queues.js';
-
 import { FastifyInstance } from 'fastify';
 import { getTenantConfig } from '../../../config/loader';
 import { getClient } from '../../../db/client.js';
@@ -11,7 +10,7 @@ import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error';
 import type { Platform, SourceType } from '../../../types/platforms.js';
-import { PLATFORMS, SOURCE_TYPES } from '../../../types/platforms.js';
+import { PLATFORM_VALUES, SOURCE_TYPES, SOURCE_TYPES_VALUES } from '../../../types/platforms.js';
 
 type VodRecord = { id: number; vod_id: string; platform: Platform };
 
@@ -136,8 +135,8 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
             vodId: { type: 'string', description: 'Platform VOD ID' },
             claims: {},
             partIndex: { type: 'number' },
-            platform: { type: 'string', enum: Object.values(PLATFORMS), description: 'Source platform' },
-            type: { type: 'string', enum: Object.values(SOURCE_TYPES) },
+            platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Source platform' },
+            type: { type: 'string', enum: SOURCE_TYPES_VALUES },
           },
           required: ['vodId', 'claims', 'platform'],
         },

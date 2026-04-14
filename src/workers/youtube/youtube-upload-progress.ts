@@ -31,7 +31,7 @@ export function createYoutubeUploadProgressHandler({
 
     switch (progress.milestone) {
       case 'starting': {
-        const titlePrefix = type === UPLOAD_TYPES.VOD ? '📺 Uploading VOD' : '🎮 Uploading Game Clip';
+        const titlePrefix = type === UPLOAD_TYPES.VOD ? '📺 Uploading VOD' : '🎮 Uploading Game';
         const title = type === UPLOAD_TYPES.VOD ? `${titlePrefix}${partSuffix}` : `${titlePrefix}${partSuffix}`;
         const videoField = videoTitle ? { name: 'Video', value: videoTitle.substring(0, 150), inline: false } : undefined;
         const gameField = gameName ? { name: 'Game', value: gameName.substring(0, 150), inline: true } : undefined;
@@ -52,7 +52,7 @@ export function createYoutubeUploadProgressHandler({
       }
 
       case 'processing_metadata': {
-        const titlePrefix = type === UPLOAD_TYPES.VOD ? '🔄 Processing VOD' : '🔄 Processing Game Clip';
+        const titlePrefix = type === UPLOAD_TYPES.VOD ? '🔄 Processing VOD' : '🔄 Processing Game';
         const title = type === UPLOAD_TYPES.VOD ? `${titlePrefix}${partSuffix}` : `${titlePrefix}${partSuffix}`;
 
         const fields: Array<{ name: string; value: string; inline: boolean }> = [{ name: 'Video ID', value: progress.videoId || '', inline: false }];

@@ -3,17 +3,18 @@ import { getVod, getKickParsedM3u8ForFfmpeg } from '../../services/kick.js';
 import { convertHlsToMp4 } from './ffmpeg.js';
 import type { AppLogger } from '../../utils/auto-tenant-logger.js';
 import type { TenantConfig } from '../../config/types.js';
+import { PLATFORMS, type Platform } from '../../types/platforms.js';
 
 export interface VodDownloadResult {
   finalPath: string;
 }
 
-export async function downloadVodWithFfmpeg(platform: 'twitch' | 'kick', vodId: string, finalPath: string, config: TenantConfig, log: AppLogger): Promise<VodDownloadResult> {
+export async function downloadVodWithFfmpeg(platform: Platform, vodId: string, finalPath: string, config: TenantConfig, log: AppLogger): Promise<VodDownloadResult> {
   log.info({ vodId, platform, method: 'ffmpeg' }, `Starting ffmpeg download for ${vodId}`);
 
-  if (platform === 'kick') {
+  if (platform === PLATFORMS.KICK) {
     await downloadKickVodWithFfmpeg(vodId, finalPath, config, log);
-  } else if (platform === 'twitch') {
+  } else if (platform === PLATFORMS.TWITCH) {
     await downloadTwitchVodWithFfmpeg(vodId, finalPath, log, config.id);
   } else {
     throw new Error(`Unsupported platform: ${platform}`);

@@ -7,7 +7,7 @@ import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest, notFound } from '../../../utils/http-error';
 import type { Platform } from '../../../types/platforms.js';
-import { PLATFORMS } from '../../../types/platforms.js';
+import { PLATFORM_VALUES } from '../../../types/platforms.js';
 import { findVodRecord, queueEmoteFetch } from './utils/vod-helpers.js';
 
 type RouteParams = { tenantId: string };
@@ -41,7 +41,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
           type: 'object',
           properties: {
             vodId: { type: 'string', description: 'Platform VOD ID' },
-            platform: { type: 'string', enum: Object.values(PLATFORMS), description: 'Source platform' },
+            platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Source platform' },
           },
           required: ['vodId', 'platform'],
         },
@@ -85,7 +85,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
           type: 'object',
           properties: {
             vodId: { type: 'string', description: 'Platform VOD ID' },
-            platform: { type: 'string', enum: Object.values(PLATFORMS), description: 'Source platform' },
+            platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Source platform' },
           },
           required: ['vodId', 'platform'],
         },

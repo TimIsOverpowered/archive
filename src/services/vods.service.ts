@@ -2,10 +2,11 @@ import { PrismaClient, UploadStatus } from '../../generated/streamer/client';
 import { withCache } from '../utils/cache.js';
 import { invalidateVodCache } from './vod-cache.js';
 import { VOD_DETAILS_CACHE_TTL, VOD_LIST_CACHE_TTL } from '../constants.js';
+import { Platform } from '../types/platforms';
 
 interface VodResponse {
   id: number;
-  platform: string;
+  platform: Platform;
   title: string | null;
   duration: number;
   created_at: Date;
@@ -42,7 +43,7 @@ interface VodResponse {
 }
 
 interface VodQuery {
-  platform?: 'twitch' | 'kick';
+  platform?: Platform;
   from?: string;
   to?: string;
   uploaded?: 'youtube';
@@ -149,7 +150,7 @@ export async function getVods(client: PrismaClient, tenantId: string, query: Vod
   const resultVods = hasMore ? vods.slice(0, limit) : vods;
 
   const response = {
-    vods: resultVods as unknown as VodResponse[],
+    vods: resultVods as VodResponse[],
     total,
   };
 
@@ -201,14 +202,14 @@ export async function getVodById(client: PrismaClient, tenantId: string, vodId: 
   });
 
   if (vod) {
-    const response = vod as unknown as VodResponse;
+    const response = vod as VodResponse;
     return await withCache(cacheKey, VOD_DETAILS_CACHE_TTL, () => Promise.resolve(response));
   }
 
   return null;
 }
 
-export async function getVodByPlatformId(client: PrismaClient, tenantId: string, platform: 'twitch' | 'kick', platformVodId: string): Promise<VodResponse | null> {
+export async function getVodByPlatformId(client: PrismaClient, tenantId: string, platform: Platform, platformVodId: string): Promise<VodResponse | null> {
   const cacheKey = `vod:platform:${tenantId}:${platform}:${platformVodId}`;
 
   const vod = await client.vod.findFirst({
@@ -254,7 +255,7 @@ export async function getVodByPlatformId(client: PrismaClient, tenantId: string,
   });
 
   if (vod) {
-    const response = vod as unknown as VodResponse;
+    const response = vod as VodResponse;
     return await withCache(cacheKey, VOD_DETAILS_CACHE_TTL, () => Promise.resolve(response));
   }
 

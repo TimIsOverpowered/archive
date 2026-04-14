@@ -3,7 +3,6 @@ import { getVodFilePath } from '../utils/path.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
-import { queueYoutubeUploads } from './jobs/youtube.job.js';
 import { cleanupHlsFiles } from './vod/hls-cleanup.js';
 import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { handleWorkerError } from './utils/error-handler.js';
@@ -12,10 +11,10 @@ import type { StandardVodJob } from './jobs/queues.js';
 import { downloadVodWithFfmpeg } from './vod/vod-download-strategies.js';
 import { getKickSourceUrl } from './vod/kick-vod-helper.js';
 import type { Platform } from '../types/platforms.js';
-import { DOWNLOAD_METHODS } from '../types/platforms.js';
+import { DOWNLOAD_METHODS, PLATFORMS } from '../types/platforms.js';
 
 const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job<StandardVodJob, unknown, string>) => {
-  const { dbId, vodId, platform, tenantId, uploadMode, downloadMethod = DOWNLOAD_METHODS.HLS } = job.data;
+  const { dbId, vodId, platform, tenantId, downloadMethod = DOWNLOAD_METHODS.HLS } = job.data;
   const log = createAutoLogger(tenantId);
 
   log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[Standard VOD Worker] Starting job');
@@ -40,8 +39,6 @@ const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job
 
     await updateAlert(messageId, alerts.complete(vodId, platform, finalPath));
 
-    await queueYoutubeUploads({ tenantId, dbId, vodId, filePath: finalPath, uploadMode, platform, config, log });
-
     log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[Standard VOD Worker] Job completed successfully');
     return { success: true, finalPath };
   } catch (error) {
@@ -61,7 +58,7 @@ async function downloadVodWithHls(
   config: NonNullable<Awaited<ReturnType<typeof getJobContext>>['config']>,
   log: ReturnType<typeof createAutoLogger>
 ): Promise<void> {
-  const sourceUrl = platform === 'kick' ? await getKickSourceUrl(config, vodId) : undefined;
+  const sourceUrl = platform === PLATFORMS.KICK ? await getKickSourceUrl(config, vodId) : undefined;
 
   const result = await downloadHlsStream({
     dbId: 0,

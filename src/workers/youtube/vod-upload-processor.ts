@@ -10,6 +10,7 @@ import { createYoutubeUploadProgressHandler as createVodUploadProgressHandler } 
 import type { TenantConfig } from '../../config/types.js';
 import type { SourceType } from '../../types/platforms.js';
 import { UPLOAD_TYPES } from '../../types/platforms.js';
+import type { VodRecord } from '../../types/db.js';
 
 export interface VodUploadContext {
   tenantId: string;
@@ -18,11 +19,7 @@ export interface VodUploadContext {
   filePath: string;
   db: PrismaClient;
   config: TenantConfig;
-  vodRecord: {
-    platform: string;
-    created_at: Date;
-    title: string | null;
-  };
+  vodRecord: VodRecord;
   dmcaProcessed?: boolean;
   log: AppLogger;
   type: SourceType;
@@ -42,7 +39,6 @@ export async function processVodUpload(ctx: VodUploadContext): Promise<VodUpload
   const duration = (await getDuration(filePath)) ?? 0;
 
   const platformName = vodRecord.platform;
-  const vodStreamTitle = vodRecord.title?.replace(/>|</gi, '') || '';
 
   const needsSplitting = duration > splitDuration;
 
@@ -55,7 +51,7 @@ export async function processVodUpload(ctx: VodUploadContext): Promise<VodUpload
       domainName,
       privacyStatus,
       platformName,
-      vodStreamTitle,
+      vodRecord,
     });
   } else {
     return await processSingleVodUpload({
@@ -64,7 +60,6 @@ export async function processVodUpload(ctx: VodUploadContext): Promise<VodUpload
       domainName,
       privacyStatus,
       platformName,
-      vodStreamTitle,
     });
   }
 }
@@ -76,12 +71,10 @@ interface SplitVodUploadContext extends VodUploadContext {
   domainName: string;
   privacyStatus: string;
   platformName: string;
-  vodStreamTitle: string;
 }
 
 async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUploadResult> {
-  const { tenantId, vodId, filePath, duration, splitDuration, channelName, domainName, privacyStatus, platformName, vodStreamTitle, config, log } = ctx;
-  const type = ctx.type;
+  const { tenantId, vodId, filePath, duration, splitDuration, channelName, domainName, privacyStatus, platformName, config, log, vodRecord, type } = ctx;
   const totalParts = Math.ceil(duration / splitDuration);
 
   log.info({ duration, parts: totalParts }, 'VOD exceeds YouTube split duration, auto-splitting');
@@ -117,8 +110,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
     const { title: partTitle, description: youtubeDescription } = buildYoutubeMetadata({
       channelName,
       platform: platformName,
-      vodDate: ctx.vodRecord.created_at,
-      vodTitle: vodStreamTitle,
+      vodRecord: vodRecord,
       domainName,
       timezone: config.settings?.timezone || 'UTC',
       youtubeDescription: config.youtube!.description,
@@ -178,17 +170,16 @@ interface SingleVodUploadContext extends VodUploadContext {
   domainName: string;
   privacyStatus: string;
   platformName: string;
-  vodStreamTitle: string;
 }
 
 async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodUploadResult> {
-  const { tenantId, vodId, filePath, channelName, domainName, privacyStatus, platformName, vodStreamTitle, config, type, dbId, db, dmcaProcessed } = ctx;
+  const { tenantId, vodId, filePath, channelName, domainName, privacyStatus, platformName, config, type, dbId, db, dmcaProcessed, vodRecord } = ctx;
 
-  const { title: vodTitle, description: youtubeDescription } = buildYoutubeMetadata({
+  const title = vodRecord.title?.replace(/>|</gi, '') || '';
+  const { description: youtubeDescription } = buildYoutubeMetadata({
     channelName,
     platform: platformName,
-    vodDate: ctx.vodRecord.created_at,
-    vodTitle: vodStreamTitle,
+    vodRecord,
     domainName,
     timezone: config.settings?.timezone || 'UTC',
     youtubeDescription: config.youtube!.description,
@@ -211,11 +202,11 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
         messageId: uploadAlertMessageId,
         type: UPLOAD_TYPES.VOD,
         channelName,
-        videoTitle: vodTitle,
+        videoTitle: title,
       })
     : () => {};
 
-  const result = await uploadVideo(tenantId, channelName, filePath, vodTitle, youtubeDescription, privacyStatus as 'public' | 'unlisted' | 'private', onUploadProgress);
+  const result = await uploadVideo(tenantId, channelName, filePath, title, youtubeDescription, privacyStatus as 'public' | 'unlisted' | 'private', onUploadProgress);
 
   const uploadedVideos = [{ id: result.videoId, part: 1 }];
 

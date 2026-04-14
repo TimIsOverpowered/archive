@@ -21,7 +21,3 @@ export function toHHMMSS(seconds: number): string {
   const { hrs, mins, secs } = parseDuration(seconds);
   return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
-
-export function capitalizePlatform(platform: string): string {
-  return platform.charAt(0).toUpperCase() + platform.slice(1);
-}
