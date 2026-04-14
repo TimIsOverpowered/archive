@@ -57,23 +57,19 @@ export async function getGameData(gameId: string, tenantId: string): Promise<Rec
   return data.data[0];
 }
 
-export async function saveVodChapters(dbId: number, vodId: string, tenantId: string, finalDurationSeconds: number, client: PrismaClient): Promise<void> {
+export async function saveVodChapters(dbId: number, vodId: string, tenantId: string, finalDurationSeconds: number, client: PrismaClient): Promise<number> {
   const logger = createAutoLogger('twitch-chapters');
   try {
     const vod = await client.vod.findUnique({ where: { id: dbId }, select: { vod_id: true } });
     if (!vod) {
       logger.warn({ dbId, vodId }, 'VOD not found');
-      return;
+      return 0;
     }
-
-    await client.chapter.deleteMany({
-      where: { vod_id: dbId },
-    });
 
     const chaptersData = await getChapters(vod.vod_id, tenantId);
     if (!chaptersData) {
       logger.warn({ vodId }, 'No chapters data available from Twitch API');
-      return;
+      return 0;
     }
 
     const chapters = Array.isArray(chaptersData) ? chaptersData : [chaptersData as unknown as Record<string, unknown>];
@@ -82,15 +78,18 @@ export async function saveVodChapters(dbId: number, vodId: string, tenantId: str
       const chapter = await getChapter(vod.vod_id, tenantId);
       if (!chapter || !chapter.game) {
         logger.warn({ vodId }, 'No game info available');
-        return;
+        return 0;
       }
 
       const game = chapter.game as Record<string, unknown>;
       const gameId = typeof game.id === 'string' ? game.id : null;
       const gameData = gameId ? await getGameData(gameId, tenantId) : null;
 
-      await client.chapter.create({
-        data: {
+      await client.chapter.upsert({
+        where: {
+          vod_id_start: { vod_id: dbId, start: 0 },
+        },
+        create: {
           vod_id: dbId,
           game_id: gameId,
           name: typeof game.displayName === 'string' ? game.displayName : null,
@@ -99,41 +98,86 @@ export async function saveVodChapters(dbId: number, vodId: string, tenantId: str
           start: 0,
           end: finalDurationSeconds,
         },
+        update: {
+          game_id: gameId,
+          name: typeof game.displayName === 'string' ? game.displayName : null,
+          image: gameData && typeof gameData.box_art_url === 'string' ? gameData.box_art_url.replace('{width}x{height}', '40x53') : null,
+          duration: '00:00:00',
+          end: finalDurationSeconds,
+        },
       });
 
-      logger.info({ dbId, vodId, game: typeof game.displayName === 'string' ? game.displayName : 'unknown' }, 'Created single chapter from game info');
-      return;
+      logger.info({ dbId, vodId, game: typeof game.displayName === 'string' ? game.displayName : 'unknown' }, 'Upserted single chapter from game info');
+      return 1;
     }
 
-    const chaptersToCreate = chapters.map((ch: Record<string, unknown>) => {
-      const node = (ch.node as Record<string, unknown>) ?? {};
-      const details = (node.details as Record<string, unknown>) ?? {};
-      const game = details.game as Record<string, unknown> | undefined;
+    const processedStartTimes: number[] = [];
+    let savedCount = 0;
 
-      const positionMs = Number(node.positionMilliseconds ?? 0);
-      const durationMs = Number(node.durationMilliseconds ?? 0);
+    for (const ch of chapters) {
+      try {
+        const node = (ch.node as Record<string, unknown>) ?? {};
+        const details = (node.details as Record<string, unknown>) ?? {};
+        const game = details.game as Record<string, unknown> | undefined;
 
-      const gameId = typeof game?.id === 'string' ? (game.id as string) : null;
-      const gameName = typeof game?.displayName === 'string' ? (game.displayName as string) : null;
-      const gameImage = typeof game?.boxArtURL === 'string' ? (game.boxArtURL as string) : null;
+        const positionMs = Number(node.positionMilliseconds ?? 0);
+        const durationMs = Number(node.durationMilliseconds ?? 0);
 
-      return {
+        const gameId = typeof game?.id === 'string' ? game.id : null;
+        const gameName = typeof game?.displayName === 'string' ? game.displayName : null;
+
+        let gameImage: string | null = null;
+        if (gameId) {
+          const gameData = await getGameData(gameId, tenantId);
+          if (gameData && typeof gameData.box_art_url === 'string') {
+            gameImage = gameData.box_art_url.replace('{width}x{height}', '40x53');
+          }
+        }
+
+        const startSeconds = Math.floor(positionMs / 1000);
+        const endSeconds = durationMs === 0 ? finalDurationSeconds - startSeconds : Math.floor(durationMs / 1000);
+        const durationFormatted = toHHMMSS(startSeconds);
+
+        await client.chapter.upsert({
+          where: { vod_id_start: { vod_id: dbId, start: startSeconds } },
+          create: {
+            vod_id: dbId,
+            game_id: gameId,
+            name: gameName,
+            image: gameImage,
+            duration: durationFormatted,
+            start: startSeconds,
+            end: endSeconds,
+          },
+          update: {
+            game_id: gameId,
+            name: gameName,
+            image: gameImage,
+            duration: durationFormatted,
+            end: endSeconds,
+          },
+        });
+
+        processedStartTimes.push(startSeconds);
+        savedCount++;
+        logger.debug({ startSeconds, gameName }, 'Upserted chapter');
+      } catch (error) {
+        logger.warn({ error: extractErrorDetails(error).message }, 'Failed to save chapter');
+      }
+    }
+
+    const deletedCount = await client.chapter.deleteMany({
+      where: {
         vod_id: dbId,
-        game_id: gameId,
-        name: gameName,
-        image: gameImage,
-        duration: toHHMMSS(Math.floor(positionMs / 1000)),
-        start: Math.floor(positionMs / 1000),
-        end: durationMs === 0 ? finalDurationSeconds - Math.floor(positionMs / 1000) : Math.floor(durationMs / 1000),
-      };
+        start: { notIn: processedStartTimes },
+      },
     });
 
-    await client.chapter.createMany({
-      data: chaptersToCreate,
-    });
+    logger.info({ dbId, vodId, saved: savedCount, deleted: deletedCount.count }, 'Saved chapters summary');
 
-    logger.info({ dbId, vodId, chapterCount: chaptersToCreate.length }, 'Saved all chapters');
+    return savedCount;
   } catch (error) {
     logger.error({ error: extractErrorDetails(error).message, dbId, vodId }, 'Failed to save chapters');
+    return 0;
   }
 }

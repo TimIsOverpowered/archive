@@ -286,6 +286,21 @@ export async function updateChapterDuringDownload(dbId: number, vodId: string, t
       }
     }
 
+    const existingChapter = await streamerClient.chapter.findUnique({
+      where: {
+        vod_id_start: { vod_id: dbId, start: currentTimeSeconds },
+      },
+    });
+
+    if (existingChapter) {
+      await streamerClient.chapter.update({
+        where: { id: existingChapter.id },
+        data: { end: currentTimeSeconds },
+      });
+      log.debug({ vodId, chapterId: existingChapter.id, start: currentTimeSeconds }, 'Chapter already exists, updated end time');
+      return;
+    }
+
     const duration = lastChapter ? toHHMMSS(currentTimeSeconds - lastChapter.start) : '00:00:00';
 
     await streamerClient.chapter.create({
@@ -295,11 +310,11 @@ export async function updateChapterDuringDownload(dbId: number, vodId: string, t
         name: category.name,
         image: bannerImage,
         duration: duration,
-        start: lastChapter ? lastChapter.start : 0,
+        start: currentTimeSeconds,
       },
     });
 
-    log.info({ dbId, vodId, categoryId: category.id, categoryName: category.name, startTime: lastChapter?.start || 0 }, 'Created new chapter');
+    log.debug({ dbId, vodId, categoryId: category.id, categoryName: category.name, startTime: currentTimeSeconds }, 'Created new chapter');
   } catch (error) {
     log.error(createErrorContext(error, { dbId, vodId }), 'Failed to update chapter');
   }
