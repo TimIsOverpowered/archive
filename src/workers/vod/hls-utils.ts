@@ -142,8 +142,14 @@ export async function cleanupOrphanedTmpFiles(vodDir: string, log: ReturnType<ty
   }
 }
 
-export async function fetchTwitchPlaylist(vodId: string, log: ReturnType<typeof createAutoLogger>, retryCount: number, maxRetryBeforeEndDetection: number): Promise<FetchPlaylistResult | null> {
-  const tokenSig = await getVodTokenSig(vodId);
+export async function fetchTwitchPlaylist(
+  vodId: string,
+  log: ReturnType<typeof createAutoLogger>,
+  retryCount: number,
+  maxRetryBeforeEndDetection: number,
+  tenantId?: string
+): Promise<FetchPlaylistResult | null> {
+  const tokenSig = await getVodTokenSig(vodId, tenantId);
 
   try {
     const masterPlaylistContent = await getTwitchM3u8(String(vodId), tokenSig.value, tokenSig.signature);

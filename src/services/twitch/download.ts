@@ -17,7 +17,7 @@ export async function downloadVodAsMp4(vodId: string, tenantId: string): Promise
   let messageId: string | null = null;
 
   try {
-    const tokenSig = await getVodTokenSig(vodId);
+    const tokenSig = await getVodTokenSig(vodId, tenantId);
 
     if (!tokenSig) {
       throw new Error(`Failed to get token/sig for ${vodId}`);

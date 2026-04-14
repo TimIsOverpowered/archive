@@ -14,7 +14,7 @@ export async function downloadVodWithFfmpeg(platform: 'twitch' | 'kick', vodId: 
   if (platform === 'kick') {
     await downloadKickVodWithFfmpeg(vodId, finalPath, config, log);
   } else if (platform === 'twitch') {
-    await downloadTwitchVodWithFfmpeg(vodId, finalPath, log);
+    await downloadTwitchVodWithFfmpeg(vodId, finalPath, log, config.id);
   } else {
     throw new Error(`Unsupported platform: ${platform}`);
   }
@@ -45,8 +45,8 @@ async function downloadKickVodWithFfmpeg(vodId: string, finalPath: string, confi
   await convertHlsToMp4(m3u8Url, finalPath, { vodId, isFmp4: false });
 }
 
-async function downloadTwitchVodWithFfmpeg(vodId: string, finalPath: string, _log: AppLogger): Promise<void> {
-  const tokenSig = await getVodTokenSig(vodId);
+async function downloadTwitchVodWithFfmpeg(vodId: string, finalPath: string, _log: AppLogger, tenantId?: string): Promise<void> {
+  const tokenSig = await getVodTokenSig(vodId, tenantId);
 
   if (!tokenSig) {
     throw new Error(`Failed to get token/sig for ${vodId}`);

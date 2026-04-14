@@ -1,5 +1,5 @@
 import type { PrismaClient } from '../../../generated/streamer/client.js';
-import { createTwitchClient } from './client.js';
+import { createTwitchClient, createTwitchGqlClient } from './client.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { toHHMMSS } from '../../utils/formatting.js';
@@ -8,9 +8,9 @@ function getTwitchClient(tenantId: string) {
   return createTwitchClient(tenantId, () => import('./auth.js').then((m) => m.getAppAccessToken(tenantId)));
 }
 
-export async function getChapters(vodId: string): Promise<Record<string, unknown> | null> {
-  const client = getTwitchClient('gql-placeholder');
-  const data = await client.gql.post<{ data?: Record<string, unknown> }>({
+export async function getChapters(vodId: string, tenantId?: string): Promise<Record<string, unknown> | null> {
+  const client = createTwitchGqlClient(tenantId);
+  const data = await client.post<{ data?: Record<string, unknown> }>({
     operationName: 'VideoPreviewCard__VideoMoments',
     variables: {
       videoId: vodId,
@@ -25,9 +25,9 @@ export async function getChapters(vodId: string): Promise<Record<string, unknown
   return data?.data || null;
 }
 
-export async function getChapter(vodId: string): Promise<Record<string, unknown> | null> {
-  const client = getTwitchClient('gql-placeholder');
-  const data = await client.gql.post<{ data?: { video?: Record<string, unknown> } }>({
+export async function getChapter(vodId: string, tenantId?: string): Promise<Record<string, unknown> | null> {
+  const client = createTwitchGqlClient(tenantId);
+  const data = await client.post<{ data?: { video?: Record<string, unknown> } }>({
     operationName: 'NielsenContentMetadata',
     variables: {
       isCollectionContent: false,
@@ -70,7 +70,7 @@ export async function saveVodChapters(dbId: number, vodId: string, tenantId: str
       where: { vod_id: dbId },
     });
 
-    const chaptersData = await getChapters(vod.vod_id);
+    const chaptersData = await getChapters(vod.vod_id, tenantId);
     if (!chaptersData) {
       logger.warn({ vodId }, 'No chapters data available from Twitch API');
       return;
@@ -79,7 +79,7 @@ export async function saveVodChapters(dbId: number, vodId: string, tenantId: str
     const chapters = Array.isArray(chaptersData) ? chaptersData : [chaptersData as unknown as Record<string, unknown>];
 
     if (chapters.length === 0) {
-      const chapter = await getChapter(vod.vod_id);
+      const chapter = await getChapter(vod.vod_id, tenantId);
       if (!chapter || !chapter.game) {
         logger.warn({ vodId }, 'No game info available');
         return;

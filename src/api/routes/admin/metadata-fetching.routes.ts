@@ -94,7 +94,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
       try {
         const twitch = await import('../../../services/twitch');
-        const rawChapters = (await twitch.getChapters(vodId)) as ChapterEdge[] | null;
+        const rawChapters = (await twitch.getChapters(vodId, tenantId)) as ChapterEdge[] | null;
         chapterEdges = rawChapters || [];
       } catch {
         log.warn(`Failed to fetch chapter data from Twitch API`);

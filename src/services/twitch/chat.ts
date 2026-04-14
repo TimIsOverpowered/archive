@@ -1,9 +1,9 @@
 import type { InputJsonValue } from '../../../generated/streamer/internal/prismaNamespace.js';
-import { createTwitchClient } from './client.js';
+import { createTwitchGqlClient } from './client.js';
 import { stripTypename } from '../../workers/chat/chat-helpers.js';
 
-function getTwitchClient(tenantId: string) {
-  return createTwitchClient(tenantId, () => import('./auth.js').then((m) => m.getAppAccessToken(tenantId)));
+function getTwitchGqlClient(tenantId?: string) {
+  return createTwitchGqlClient(tenantId);
 }
 
 export interface TwitchEmoteFragment {
@@ -84,9 +84,9 @@ export function extractMessageData(node: TwitchChatMessageNode | null | undefine
   };
 }
 
-export async function fetchComments(vodId: string, offset = 0): Promise<Record<string, unknown> | null> {
-  const client = getTwitchClient('gql-placeholder');
-  const data = await client.gql.post<{ data?: { video?: Record<string, unknown> } }>({
+export async function fetchComments(vodId: string, offset = 0, tenantId?: string): Promise<Record<string, unknown> | null> {
+  const client = getTwitchGqlClient(tenantId);
+  const data = await client.post<{ data?: { video?: Record<string, unknown> } }>({
     operationName: 'VideoCommentsByOffsetOrCursor',
     variables: {
       videoID: vodId,
@@ -102,9 +102,9 @@ export async function fetchComments(vodId: string, offset = 0): Promise<Record<s
   return data.data?.video || null;
 }
 
-export async function fetchNextComments(vodId: string, cursor: string): Promise<Record<string, unknown> | null> {
-  const client = getTwitchClient('gql-placeholder');
-  const data = await client.gql.post<{ data?: { video?: Record<string, unknown> } }>({
+export async function fetchNextComments(vodId: string, cursor: string, tenantId?: string): Promise<Record<string, unknown> | null> {
+  const client = getTwitchGqlClient(tenantId);
+  const data = await client.post<{ data?: { video?: Record<string, unknown> } }>({
     operationName: 'VideoCommentsByOffsetOrCursor',
     variables: {
       videoID: vodId,

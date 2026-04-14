@@ -235,14 +235,14 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
 
 async function fetchPlaylist(ctx: LivePollingContext, retryCount: number) {
   if (ctx.platform === 'twitch') {
-    return fetchTwitchPlaylist(ctx.vodId, ctx.log, retryCount, HLS_MAX_CONSECUTIVE_ERRORS);
+    return fetchTwitchPlaylist(ctx.vodId, ctx.log, retryCount, HLS_MAX_CONSECUTIVE_ERRORS, ctx.tenantId);
   }
   return fetchKickPlaylist(ctx.vodId, ctx.sourceUrl, ctx.log, retryCount, HLS_MAX_CONSECUTIVE_ERRORS, ctx.cycleTLS ?? undefined);
 }
 
 async function fetchPlaylistForArchived(ctx: ArchivedVodContext) {
   if (ctx.platform === 'twitch') {
-    return fetchTwitchPlaylist(ctx.vodId, ctx.log, 0, HLS_MAX_CONSECUTIVE_ERRORS);
+    return fetchTwitchPlaylist(ctx.vodId, ctx.log, 0, HLS_MAX_CONSECUTIVE_ERRORS, ctx.tenantId);
   }
   return fetchKickPlaylist(ctx.vodId, ctx.sourceUrl, ctx.log, 0, HLS_MAX_CONSECUTIVE_ERRORS, ctx.cycleTLS ?? undefined);
 }
