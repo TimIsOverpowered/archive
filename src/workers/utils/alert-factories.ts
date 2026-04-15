@@ -129,6 +129,7 @@ export interface ChatWorkerAlerts {
   init: (tenantId: string, vodId: string, platform: Platform, isResume: boolean, offset?: number) => RichEmbedData;
   progress: (tenantId: string, vodId: string, offset: number, batchNumber: number, messagesInBatch: number, totalMessages: number, duration: number) => RichEmbedData;
   complete: (tenantId: string, vodId: string, platform: Platform, totalMessages: number, batchCount: number, startOffset?: number) => RichEmbedData;
+  alreadyComplete: (tenantId: string, vodId: string, platform: Platform, totalMessages: number, lastOffset: number) => RichEmbedData;
   noMessages: (tenantId: string, vodId: string, platform: Platform, offset: number) => RichEmbedData;
   error: (tenantId: string, vodId: string, platform: Platform, totalMessages: number, errorMsg: string) => RichEmbedData;
 }
@@ -164,6 +165,18 @@ export function createChatWorkerAlerts(): ChatWorkerAlerts {
         updatedTimestamp: new Date().toISOString(),
       };
     },
+
+    alreadyComplete: (tenantId, vodId, platform, totalMessages, lastOffset) => ({
+      title: '💬 Chat Download Already Complete',
+      description: `${tenantId} - Chat download for ${vodId} is already complete`,
+      status: 'success',
+      fields: [
+        { name: 'Platform', value: capitalizePlatform(platform), inline: true },
+        { name: 'Total Messages', value: String(totalMessages), inline: true },
+        { name: 'Last Offset', value: `${lastOffset.toFixed(2)}s`, inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+    }),
 
     complete: (tenantId, vodId, platform, totalMessages, batchCount, startOffset) => ({
       title: '💬 Chat Download Complete',
