@@ -1,4 +1,4 @@
-import { PrismaClient, UploadStatus } from '../../generated/streamer/client';
+import { Prisma, PrismaClient, UploadStatus } from '../../generated/streamer/client';
 import { withCache } from '../utils/cache.js';
 import { invalidateVodCache } from './vod-cache.js';
 import { VOD_DETAILS_CACHE_TTL, VOD_LIST_CACHE_TTL } from '../constants.js';
@@ -13,6 +13,11 @@ interface VodResponse {
   updated_at: Date;
   is_live: boolean;
   started_at: Date | null;
+  emotes?: {
+    ffz_emotes: Prisma.JsonValue;
+    bttv_emotes: Prisma.JsonValue;
+    seventv_emotes: Prisma.JsonValue;
+  };
   vod_uploads?: Array<{
     upload_id: string;
     type: string | null;
@@ -20,7 +25,7 @@ interface VodResponse {
     part: number;
     status: UploadStatus;
     thumbnail_url: string | null;
-    created_at: Date;
+    created_at?: Date;
   }>;
   chapters?: Array<{
     name: string | null;
@@ -165,6 +170,13 @@ export async function getVodById(client: PrismaClient, tenantId: string, vodId: 
       id: vodId,
     },
     include: {
+      emotes: {
+        select: {
+          bttv_emotes: true,
+          ffz_emotes: true,
+          seventv_emotes: true,
+        },
+      },
       vod_uploads: {
         select: {
           upload_id: true,
@@ -173,7 +185,6 @@ export async function getVodById(client: PrismaClient, tenantId: string, vodId: 
           part: true,
           status: true,
           thumbnail_url: true,
-          created_at: true,
         },
       },
       chapters: {
@@ -218,6 +229,13 @@ export async function getVodByPlatformId(client: PrismaClient, tenantId: string,
       vod_id: platformVodId,
     },
     include: {
+      emotes: {
+        select: {
+          bttv_emotes: true,
+          ffz_emotes: true,
+          seventv_emotes: true,
+        },
+      },
       vod_uploads: {
         select: {
           upload_id: true,
@@ -226,7 +244,6 @@ export async function getVodByPlatformId(client: PrismaClient, tenantId: string,
           part: true,
           status: true,
           thumbnail_url: true,
-          created_at: true,
         },
       },
       chapters: {

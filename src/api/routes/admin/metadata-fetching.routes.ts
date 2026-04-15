@@ -75,7 +75,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
   // Fetch and save emote metadata for a VOD
   fastify.post<{ Params: RouteParams; Body: EmotesSaveBody }>(
-    '/vods/emotes/save',
+    '/vods/emotes',
     {
       schema: {
         tags: ['Admin'],
