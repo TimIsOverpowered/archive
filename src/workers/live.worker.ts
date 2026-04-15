@@ -23,7 +23,8 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
 
   log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[Live Worker] Starting job');
 
-  const { config, db: streamerClient } = await getJobContext(tenantId);
+  const ctx = await getJobContext(tenantId);
+  const { config } = ctx;
   if (!config?.settings.vodPath) throw new Error(`VOD path not configured for ${tenantId}`);
 
   const streamerName = config.displayName || tenantId;
@@ -40,10 +41,10 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
 
     // 2. Download (includes conversion)
     const downloadResult = await downloadHlsStream({
+      ctx,
       dbId,
       vodId,
       platform,
-      tenantId,
       platformUserId,
       platformUsername,
       startedAt,
@@ -65,13 +66,13 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
     // 3. Update DB
     const finalMp4Path = downloadResult.finalMp4Path;
     const actualDuration = await getDuration(finalMp4Path);
-    await finalizeVod({ dbId, vodId, platform, tenantId, durationSeconds: actualDuration ? Math.round(actualDuration) : null, streamerClient });
+    await finalizeVod({ ctx, dbId, vodId, platform, durationSeconds: actualDuration ? Math.round(actualDuration) : null });
 
     await updateAlert(messageId, alerts.complete(vodId, actualDuration ? Math.round(actualDuration) : undefined));
 
     // 4. Queue upload (non-fatal)
     try {
-      await queueYoutubeUploads({ tenantId, dbId, vodId, filePath: finalMp4Path, platform, config, log });
+      await queueYoutubeUploads({ ctx, dbId, vodId, filePath: finalMp4Path, platform, log });
     } catch (error) {
       log.warn({ ...extractErrorDetails(error), vodId }, 'Failed to queue upload (non-fatal)');
     }
@@ -84,7 +85,7 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
     }
 
     try {
-      fetchAndSaveEmotes(tenantId, dbId, platform, platformUserId, streamerClient);
+      await fetchAndSaveEmotes(ctx, dbId, platform, platformUserId);
       log.info({ vodId }, 'Queued emote save');
     } catch (error) {
       log.warn({ ...extractErrorDetails(error), vodId }, 'Failed to save emotes (non-fatal)');

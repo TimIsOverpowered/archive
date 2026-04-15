@@ -2,8 +2,6 @@ import fsPromises from 'fs/promises';
 import pathMod from 'path';
 import HLS from 'hls-parser';
 import { extractErrorDetails } from '../../utils/error.js';
-import { getTenantConfig } from '../../config/loader.js';
-import { getClient } from '../../db/client.js';
 import { getVodDirPath, getVodFilePath } from '../../utils/path.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
@@ -13,12 +11,13 @@ import { sleep, getRetryDelay } from '../../utils/delay.js';
 import { convertHlsToMp4, detectFmp4FromPlaylist } from './ffmpeg.js';
 import { HLS_MAX_CONSECUTIVE_ERRORS, HLS_NO_CHANGE_THRESHOLD, HLS_POLL_INTERVAL_MS, HLS_SEGMENT_CONCURRENCY, HLS_SEGMENT_RETRY_ATTEMPTS } from '../../constants.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
+import { TenantContext } from '../../types/context.js';
 
 export interface HlsDownloadOptions {
+  ctx: TenantContext;
   dbId: number;
   vodId: string;
   platform: Platform;
-  tenantId: string;
   platformUserId: string;
   platformUsername?: string;
   startedAt?: string;
@@ -36,13 +35,10 @@ export interface HlsDownloadResult {
 }
 
 export async function downloadHlsStream(options: HlsDownloadOptions): Promise<HlsDownloadResult> {
-  const { dbId, vodId, platform, tenantId, startedAt, sourceUrl, isLive = false, onProgress } = options;
+  const { ctx, dbId, vodId, platform, startedAt, sourceUrl, isLive = false, onProgress } = options;
+  const { config, tenantId } = ctx;
   const log = createAutoLogger(tenantId);
 
-  const streamerClient = getClient(tenantId);
-  if (!streamerClient) throw new Error(`DB client not available for ${tenantId}`);
-
-  const config = getTenantConfig(tenantId);
   if (!config?.settings.vodPath) throw new Error(`VOD path not configured for ${tenantId}`);
 
   const concurrency = HLS_SEGMENT_CONCURRENCY;
@@ -59,25 +55,24 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
   try {
     if (isLive) {
       await runLivePollingLoop({
+        ctx,
         vodId,
         platform,
-        tenantId,
         dbId,
         sourceUrl,
         startedAt,
         vodDir,
         m3u8Path,
         cycleTLS,
-        streamerClient,
         log,
         concurrency,
         onProgress,
       });
     } else {
       await downloadArchivedVod({
+        ctx,
         vodId,
         platform,
-        tenantId,
         sourceUrl,
         vodDir,
         m3u8Path,
@@ -107,16 +102,15 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
 }
 
 interface LivePollingContext {
+  ctx: TenantContext;
   vodId: string;
   platform: Platform;
-  tenantId: string;
   dbId: number;
   sourceUrl?: string;
   startedAt?: string;
   vodDir: string;
   m3u8Path: string;
   cycleTLS: CycleTLSSession | null;
-  streamerClient: NonNullable<ReturnType<typeof getClient>>;
   log: ReturnType<typeof createAutoLogger>;
   onProgress?: (segmentsDownloaded: number) => void;
   concurrency: number;
@@ -174,7 +168,7 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
       consecutiveErrors = 0;
 
       if (platform === PLATFORMS.KICK) {
-        await updateChapterDuringDownload(ctx.dbId, vodId, ctx.tenantId, ctx.streamerClient);
+        await updateChapterDuringDownload(ctx.ctx, ctx.dbId, vodId);
       }
 
       await sleep(HLS_POLL_INTERVAL_MS);
@@ -195,9 +189,9 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
 }
 
 interface ArchivedVodContext {
+  ctx: TenantContext;
   vodId: string;
   platform: Platform;
-  tenantId: string;
   sourceUrl?: string;
   vodDir: string;
   m3u8Path: string;
@@ -210,7 +204,7 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
 
   const concurrency = HLS_SEGMENT_CONCURRENCY;
 
-  const playlist = await fetchPlaylistForArchived(ctx);
+  const playlist = await fetchPlaylistForArchived(ctx as ArchivedVodContext & { ctx?: TenantContext });
 
   if (!playlist) {
     throw new Error(`Failed to fetch HLS playlist for ${vodId}`);
@@ -235,15 +229,18 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
 }
 
 async function fetchPlaylist(ctx: LivePollingContext, retryCount: number) {
+  const tenantId = ctx.ctx.tenantId;
   if (ctx.platform === PLATFORMS.TWITCH) {
-    return fetchTwitchPlaylist(ctx.vodId, ctx.log, retryCount, HLS_MAX_CONSECUTIVE_ERRORS, ctx.tenantId);
+    return fetchTwitchPlaylist(ctx.vodId, ctx.log, retryCount, HLS_MAX_CONSECUTIVE_ERRORS, tenantId);
   }
   return fetchKickPlaylist(ctx.vodId, ctx.sourceUrl, ctx.log, retryCount, HLS_MAX_CONSECUTIVE_ERRORS, ctx.cycleTLS ?? undefined);
 }
 
-async function fetchPlaylistForArchived(ctx: ArchivedVodContext) {
+async function fetchPlaylistForArchived(ctx: ArchivedVodContext & { ctx?: TenantContext }) {
+  const tenantId = ctx.ctx?.tenantId;
+  if (!tenantId) throw new Error('tenantId required for archived vod download');
   if (ctx.platform === PLATFORMS.TWITCH) {
-    return fetchTwitchPlaylist(ctx.vodId, ctx.log, 0, HLS_MAX_CONSECUTIVE_ERRORS, ctx.tenantId);
+    return fetchTwitchPlaylist(ctx.vodId, ctx.log, 0, HLS_MAX_CONSECUTIVE_ERRORS, tenantId);
   }
   return fetchKickPlaylist(ctx.vodId, ctx.sourceUrl, ctx.log, 0, HLS_MAX_CONSECUTIVE_ERRORS, ctx.cycleTLS ?? undefined);
 }

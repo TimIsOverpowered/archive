@@ -1,8 +1,6 @@
 import type { DmcaProcessingJob } from '../../../workers/jobs/queues.js';
 import { enqueueJobWithLogging, getDmcaProcessingQueue } from '../../../workers/jobs/queues.js';
 import { FastifyInstance } from 'fastify';
-import { getTenantConfig } from '../../../config/loader';
-import { getClient } from '../../../db/client.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
@@ -11,6 +9,8 @@ import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error';
 import type { Platform, SourceType } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, SOURCE_TYPES, SOURCE_TYPES_VALUES } from '../../../types/platforms.js';
+import { PrismaClient } from '../../../../generated/streamer/client.js';
+import { findVodRecord } from './utils/vod-helpers.js';
 
 type VodRecord = { id: number; vod_id: string; platform: Platform };
 
@@ -49,23 +49,8 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
   /**
    * Shared DMCA processing logic - handles both full VOD and specific part processing
    */
-  async function processDmcaRequest(
-    config: NonNullable<ReturnType<typeof getTenantConfig>>,
-    client: NonNullable<ReturnType<typeof getClient>>,
-    tenantId: string,
-    body: DmcaRequestBody,
-    log: ReturnType<typeof createAutoLogger>
-  ): Promise<ProcessDmcaResponse> {
-    let vodRecord: VodRecord | null = null;
-
-    try {
-      const dbResult = await client.vod.findUnique({ where: { platform_vod_id: { vod_id: body.vodId, platform: body.platform } } });
-      if (dbResult) {
-        vodRecord = dbResult as VodRecord;
-      }
-    } catch {
-      // VOD not found or error looking up
-    }
+  async function processDmcaRequest(client: PrismaClient, tenantId: string, body: DmcaRequestBody, log: ReturnType<typeof createAutoLogger>): Promise<ProcessDmcaResponse> {
+    const vodRecord = await findVodRecord(client, body.vodId, body.platform);
 
     if (!vodRecord) notFound('VOD not found');
 
@@ -144,10 +129,10 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, config, client, platform } = request.tenant as TenantPlatformContext;
+      const { tenantId, db, platform } = request.tenant as TenantPlatformContext;
       const log = createAutoLogger(tenantId);
 
-      return await processDmcaRequest(config!, client, tenantId, { ...request.body, platform }, log);
+      return await processDmcaRequest(db, tenantId, { ...request.body, platform }, log);
     }
   );
 

@@ -6,11 +6,11 @@ import durationPlugin from 'dayjs/plugin/duration';
 import { extractErrorDetails, createErrorContext } from '../utils/error.js';
 import { sleep } from '../utils/delay.js';
 import { childLogger } from '../utils/logger.js';
-import { getTenantConfig } from '../config/loader.js';
 import { toHHMMSS } from '../utils/formatting.js';
-import { PrismaClient } from '../../generated/streamer/client.js';
 import { getKickStreamStatus } from './kick-live.js';
 import { KICK_API_TIMEOUT_MS, KICK_PAGE_DELAY_MS } from '../constants.js';
+import { TenantContext } from '../types/context.js';
+import { withDbRetry } from '../db/client.js';
 
 dayjs.extend(durationPlugin);
 
@@ -203,9 +203,9 @@ export async function getKickCategoryInfo(slug: string): Promise<Record<string, 
   }
 }
 
-export async function updateChapterDuringDownload(dbId: number, vodId: string, tenantId: string, streamerClient: PrismaClient): Promise<void> {
+export async function updateChapterDuringDownload(ctx: TenantContext, dbId: number, vodId: string): Promise<void> {
   try {
-    const config = getTenantConfig(tenantId);
+    const { config } = ctx;
     const username = config?.kick?.username;
     if (!username) {
       log.warn({ dbId, vodId }, 'Kick username not configured');
@@ -221,100 +221,104 @@ export async function updateChapterDuringDownload(dbId: number, vodId: string, t
     const { category, created_at } = streamData;
     const currentTimeSeconds = Math.round((Date.now() - new Date(created_at).getTime()) / 1000);
 
-    const lastChapter = await streamerClient.chapter.findFirst({
-      where: { vod_id: dbId },
-      orderBy: { start: 'desc' },
-    });
-
-    if (lastChapter && lastChapter.game_id === String(category.id)) {
-      await streamerClient.chapter.update({
-        where: { id: lastChapter.id },
-        data: { end: currentTimeSeconds },
+    await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+      const lastChapter = await db.chapter.findFirst({
+        where: { vod_id: dbId },
+        orderBy: { start: 'desc' },
       });
 
-      log.debug({ vodId, chapterId: lastChapter.id, currentTime: currentTimeSeconds }, 'Updated chapter end time');
-      return;
-    }
+      if (lastChapter && lastChapter.game_id === String(category.id)) {
+        await db.chapter.update({
+          where: { id: lastChapter.id },
+          data: { end: currentTimeSeconds },
+        });
 
-    if (lastChapter) {
-      await streamerClient.chapter.update({
-        where: { id: lastChapter.id },
-        data: { end: currentTimeSeconds },
-      });
-      log.debug({ vodId, chapterId: lastChapter.id }, 'Closed previous chapter');
-    }
-
-    let bannerImage: string | null = null;
-    if (category.slug) {
-      try {
-        const categoryInfo = await getKickCategoryInfo(category.slug);
-        if (categoryInfo && typeof categoryInfo.banner === 'object' && categoryInfo.banner !== null) {
-          bannerImage = (categoryInfo.banner as Record<string, unknown>).src as string | null;
-        }
-      } catch (error) {
-        log.warn({ vodId, error: extractErrorDetails(error).message }, 'Failed to fetch category info');
+        log.debug({ vodId, chapterId: lastChapter.id, currentTime: currentTimeSeconds }, 'Updated chapter end time');
+        return;
       }
-    }
 
-    const existingChapter = await streamerClient.chapter.findUnique({
-      where: {
-        vod_id_start: { vod_id: dbId, start: currentTimeSeconds },
-      },
-    });
+      if (lastChapter) {
+        await db.chapter.update({
+          where: { id: lastChapter.id },
+          data: { end: currentTimeSeconds },
+        });
+        log.debug({ vodId, chapterId: lastChapter.id }, 'Closed previous chapter');
+      }
 
-    if (existingChapter) {
-      await streamerClient.chapter.update({
-        where: { id: existingChapter.id },
-        data: { end: currentTimeSeconds },
+      let bannerImage: string | null = null;
+      if (category.slug) {
+        try {
+          const categoryInfo = await getKickCategoryInfo(category.slug);
+          if (categoryInfo && typeof categoryInfo.banner === 'object' && categoryInfo.banner !== null) {
+            bannerImage = (categoryInfo.banner as Record<string, unknown>).src as string | null;
+          }
+        } catch (error) {
+          log.warn({ vodId, error: extractErrorDetails(error).message }, 'Failed to fetch category info');
+        }
+      }
+
+      const existingChapter = await db.chapter.findUnique({
+        where: {
+          vod_id_start: { vod_id: dbId, start: currentTimeSeconds },
+        },
       });
-      log.debug({ vodId, chapterId: existingChapter.id, start: currentTimeSeconds }, 'Chapter already exists, updated end time');
-      return;
-    }
 
-    const duration = lastChapter ? toHHMMSS(currentTimeSeconds - lastChapter.start) : '00:00:00';
+      if (existingChapter) {
+        await db.chapter.update({
+          where: { id: existingChapter.id },
+          data: { end: currentTimeSeconds },
+        });
+        log.debug({ vodId, chapterId: existingChapter.id, start: currentTimeSeconds }, 'Chapter already exists, updated end time');
+        return;
+      }
 
-    await streamerClient.chapter.create({
-      data: {
-        vod_id: dbId,
-        game_id: String(category.id),
-        name: category.name,
-        image: bannerImage,
-        duration: duration,
-        start: currentTimeSeconds,
-      },
+      const duration = lastChapter ? toHHMMSS(currentTimeSeconds - lastChapter.start) : '00:00:00';
+
+      await db.chapter.create({
+        data: {
+          vod_id: dbId,
+          game_id: String(category.id),
+          name: category.name,
+          image: bannerImage,
+          duration: duration,
+          start: currentTimeSeconds,
+        },
+      });
+
+      log.debug({ dbId, vodId, categoryId: category.id, categoryName: category.name, startTime: currentTimeSeconds }, 'Created new chapter');
     });
-
-    log.debug({ dbId, vodId, categoryId: category.id, categoryName: category.name, startTime: currentTimeSeconds }, 'Created new chapter');
   } catch (error) {
     log.error(createErrorContext(error, { dbId, vodId }), 'Failed to update chapter');
   }
 }
 
-export async function finalizeKickChapters(dbId: number, vodId: string, finalDurationSeconds: number, streamerClient: PrismaClient): Promise<void> {
+export async function finalizeKickChapters(ctx: TenantContext, dbId: number, vodId: string, finalDurationSeconds: number): Promise<void> {
   try {
-    const incompleteChapter = await streamerClient.chapter.findFirst({
-      where: {
-        vod_id: dbId,
-        end: null,
-      },
-      orderBy: { start: 'desc' },
-    });
-
-    if (incompleteChapter) {
-      const endDuration = finalDurationSeconds - incompleteChapter.start;
-
-      await streamerClient.chapter.update({
-        where: { id: incompleteChapter.id },
-        data: {
-          end: endDuration,
-          duration: toHHMMSS(endDuration),
+    await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+      const incompleteChapter = await db.chapter.findFirst({
+        where: {
+          vod_id: dbId,
+          end: null,
         },
+        orderBy: { start: 'desc' },
       });
 
-      log.info({ vodId, chapterId: incompleteChapter.id, finalDuration: endDuration }, 'Finalized last chapter');
-    } else {
-      log.debug({ vodId }, 'No incomplete chapters to finalize');
-    }
+      if (incompleteChapter) {
+        const endDuration = finalDurationSeconds - incompleteChapter.start;
+
+        await db.chapter.update({
+          where: { id: incompleteChapter.id },
+          data: {
+            end: endDuration,
+            duration: toHHMMSS(endDuration),
+          },
+        });
+
+        log.info({ vodId, chapterId: incompleteChapter.id, finalDuration: endDuration }, 'Finalized last chapter');
+      } else {
+        log.debug({ vodId }, 'No incomplete chapters to finalize');
+      }
+    });
   } catch (error) {
     log.error(createErrorContext(error, { vodId }), 'Failed to finalize chapters');
   }

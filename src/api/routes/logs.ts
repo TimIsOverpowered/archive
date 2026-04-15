@@ -50,7 +50,7 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
     },
     async (request) => {
       const { tenantId, vodId } = request.params as { tenantId: string; vodId: string };
-      const { client } = request.tenant;
+      const { db } = request.tenant;
       const vodIdNum = Number(vodId);
       const { content_offset_seconds, cursor } = request.query as { content_offset_seconds?: number; cursor?: string };
 
@@ -61,9 +61,9 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
       let result;
 
       if (cursor) {
-        result = await getLogsByCursor(client, tenantId, vodIdNum, cursor);
+        result = await getLogsByCursor(db, tenantId, vodIdNum, cursor);
       } else if (content_offset_seconds !== undefined && !isNaN(content_offset_seconds)) {
-        result = await getLogsByOffset(client, tenantId, vodIdNum, content_offset_seconds);
+        result = await getLogsByOffset(db, tenantId, vodIdNum, content_offset_seconds);
       } else {
         badRequest('Invalid content_offset_seconds value');
       }

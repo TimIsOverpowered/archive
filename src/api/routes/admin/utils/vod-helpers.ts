@@ -232,7 +232,7 @@ export async function ensureVodRecord(config: TenantConfig, client: PrismaClient
 
     log.info(`Created Twitch VOD ${vodId} with user_id=${vodMetadata.user_id}`);
 
-    await saveVodChapters(vodRecord.id, vodRecord.vod_id, config.id, vodRecord.duration, client);
+    await saveVodChapters({ tenantId, config, db: client }, vodRecord.id, vodRecord.vod_id, vodRecord.duration);
   } else if (platform === PLATFORMS.KICK) {
     if (!config?.kick?.username) {
       return null;

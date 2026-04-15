@@ -57,11 +57,11 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, config, client, platform } = request.tenant as TenantPlatformContext;
+      const { tenantId, config, db, platform } = request.tenant as TenantPlatformContext;
       const log = createAutoLogger(tenantId);
 
       // Ensure VOD record exists or create it from platform API metadata
-      const vodRecord = await ensureVodRecord(config, client, tenantId, request.body.vodId, platform, log);
+      const vodRecord = await ensureVodRecord(config, db, tenantId, request.body.vodId, platform, log);
 
       if (!vodRecord) {
         notFound(`VOD ${request.body.vodId} not found on ${platform}`);
@@ -71,7 +71,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       const platformId = config?.[platform]?.id;
 
       if (platformId) {
-        await fetchAndSaveEmotes(tenantId, vodRecord.id, platform, platformId, client);
+        await fetchAndSaveEmotes(request.tenant as TenantPlatformContext, vodRecord.id, platform, platformId);
       } else {
         log.warn(`No platform ID available for emote fetching on VOD ${request.body.vodId}`);
       }
@@ -145,10 +145,10 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, client, platform } = request.tenant as TenantPlatformContext;
+      const { tenantId, db, platform } = request.tenant as TenantPlatformContext;
       const { vodId, downloadMethod, type } = request.body;
 
-      const vodRecord = await findVodRecord(client, vodId, platform);
+      const vodRecord = await findVodRecord(db, vodId, platform);
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 

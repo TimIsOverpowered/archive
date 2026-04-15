@@ -55,9 +55,9 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const { tenantId, client } = request.tenant!;
+      const { tenantId, db } = request.tenant!;
 
-      const stats = await getTenantStats(client, tenantId, getApiConfig().STATS_CACHE_TTL);
+      const stats = await getTenantStats(db, tenantId, getApiConfig().STATS_CACHE_TTL);
       return { data: stats };
     }
   );
@@ -86,7 +86,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, client, platform } = request.tenant as TenantPlatformContext;
+      const { tenantId, db, platform } = request.tenant as TenantPlatformContext;
       const body = request.body;
       const log = createAutoLogger(tenantId);
 
@@ -95,13 +95,13 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
         badRequest('vodId is required');
       }
 
-      const vodRecord = await findVodRecord(client, body.vodId, platform);
+      const vodRecord = await findVodRecord(db, body.vodId, platform);
 
       if (vodRecord) {
         return { data: { message: `${body.vodId} already exists!`, vodId: body.vodId } };
       }
 
-      const newVod = await client.vod.create({
+      const newVod = await db.vod.create({
         data: {
           vod_id: body.vodId,
           title: body.title || null,
@@ -143,11 +143,11 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, client, platform } = request.tenant as TenantPlatformContext;
+      const { tenantId, db, platform } = request.tenant as TenantPlatformContext;
       const { vodId } = request.body;
       const log = createAutoLogger(tenantId);
 
-      await client.vod.delete({ where: { platform_vod_id: { vod_id: vodId, platform } } });
+      await db.vod.delete({ where: { platform_vod_id: { vod_id: vodId, platform } } });
 
       log.info(`Deleted VOD ${vodId} (${platform}) and all related data (cascade)`);
 

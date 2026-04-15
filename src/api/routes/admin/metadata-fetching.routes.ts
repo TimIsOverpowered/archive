@@ -51,10 +51,10 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, client, platform } = request.tenant as TenantPlatformContext;
+      const { db, platform } = request.tenant as TenantPlatformContext;
       const { vodId } = request.body;
 
-      const vodRecord = await findVodRecord(client, vodId, platform);
+      const vodRecord = await findVodRecord(db, vodId, platform);
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
@@ -63,7 +63,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       }
 
       const durationSeconds = vodRecord.duration ? parseInt(vodRecord.duration.toString()) : 0;
-      const savedCount = await saveVodChapters(vodRecord.id, vodId, tenantId, durationSeconds, client);
+      const savedCount = await saveVodChapters(request.tenant as TenantPlatformContext, vodRecord.id, vodId, durationSeconds);
 
       if (savedCount === 0) {
         return { data: { message: `No chapters found for ${vodId}`, vodId, count: 0 } };
@@ -95,10 +95,10 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, client, platform, config } = request.tenant as TenantPlatformContext;
+      const { db, platform, config } = request.tenant as TenantPlatformContext;
       const { vodId } = request.body;
 
-      const vodRecord = await findVodRecord(client, vodId, platform);
+      const vodRecord = await findVodRecord(db, vodId, platform);
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
@@ -107,7 +107,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
       if (!platformId) badRequest(`No platform ID available for ${platform} ${vodId}`);
 
-      await fetchAndSaveEmotes(tenantId, vodRecord.id, platform, platformId, client);
+      await fetchAndSaveEmotes(request.tenant as TenantPlatformContext, vodRecord.id, platform, platformId);
 
       return { data: { message: `Emote saving completed for ${vodId}`, vodId, platform } };
     }

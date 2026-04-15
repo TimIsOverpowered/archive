@@ -51,12 +51,12 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, config, client, platform } = request.tenant as TenantPlatformContext;
+      const { tenantId, config, db, platform } = request.tenant as TenantPlatformContext;
       const { vodId, downloadMethod } = request.body;
 
       if (!config?.youtube) badRequest('YouTube integration not configured for this tenant');
 
-      const vodRecord = await findVodRecord(client, vodId, platform);
+      const vodRecord = await findVodRecord(db, vodId, platform);
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 

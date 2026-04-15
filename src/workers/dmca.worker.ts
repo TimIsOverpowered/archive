@@ -134,7 +134,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
 
     log.info({ vodId, part }, 'Queuing YouTube upload');
 
-    const jobId = await queueYoutubeVodUpload(tenantId, dbId, vodId, processedPath, platform as Platform);
+    const jobId = await queueYoutubeVodUpload({ tenantId, config, db }, dbId, vodId, processedPath, platform as Platform);
 
     if (!jobId) {
       throw new Error('Failed to queue YouTube upload job');

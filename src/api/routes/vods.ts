@@ -50,10 +50,10 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const { tenantId, client } = request.tenant;
+      const { tenantId, db } = request.tenant;
       const query = request.query as Record<string, unknown>;
 
-      const { vods, total } = await getVods(client, tenantId, query as never);
+      const { vods, total } = await getVods(db, tenantId, query as never);
       const page = Math.max(1, (query.page as number) || 1);
       const limit = Math.min(100, Math.max(1, (query.limit as number) || 20));
 
@@ -87,14 +87,14 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
     },
     async (request) => {
       const { tenantId, vodId } = request.params as { tenantId: string; vodId: string };
-      const { client } = request.tenant;
+      const { db } = request.tenant;
       const vodIdNum = Number(vodId);
 
       if (isNaN(vodIdNum) || vodIdNum < 0 || vodIdNum > 2147483647) {
         notFound('VOD not found');
       }
 
-      const vod = await getVodById(client, tenantId, vodIdNum);
+      const vod = await getVodById(db, tenantId, vodIdNum);
 
       if (!vod) {
         notFound('VOD not found');
@@ -124,9 +124,9 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
     },
     async (request) => {
       const { tenantId, platform, platformVodId } = request.params as { tenantId: string; platform: Platform; platformVodId: string };
-      const { client } = request.tenant;
+      const { db } = request.tenant;
 
-      const vod = await getVodByPlatformId(client, tenantId, platform, platformVodId);
+      const vod = await getVodByPlatformId(db, tenantId, platform, platformVodId);
 
       if (!vod) {
         notFound('VOD not found');
