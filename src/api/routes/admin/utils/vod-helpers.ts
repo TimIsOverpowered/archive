@@ -11,6 +11,9 @@ import type { Platform, SourceType, DownloadMethod } from '../../../../types/pla
 import { DOWNLOAD_METHODS, PLATFORMS, SOURCE_TYPES } from '../../../../types/platforms.js';
 import type { TenantConfig } from '../../../../config/types';
 import type { PrismaClient } from '../../../../../generated/streamer/client';
+import { fetchAndSaveEmotes } from '../../../../services/emotes.js';
+import { TenantContext } from '../../../middleware/tenant-platform.js';
+import { parsePTDuration } from '../../../../utils/formatting.js';
 
 export interface VodCreateOptions {
   vodId: number;
@@ -61,50 +64,6 @@ export async function findStreamRecord(client: PrismaClient, streamId: string, p
   } catch {
     return null;
   }
-}
-
-/**
- * Parses Twitch ISO duration format "PT2H3M15S" to seconds
- */
-export function parseTwitchDuration(durationStr: string): number {
-  let durStr = String(durationStr).replace('PT', '');
-  let hours = 0;
-  let minutes = 0;
-  let secs = 0;
-
-  if (durStr.includes('H')) {
-    [hours] = durStr.split('H').map(Number);
-    durStr = durStr.replace(`${Math.floor(hours)}H`, '');
-  }
-  if (durStr.includes('M')) {
-    const mParts = durStr.split('M');
-    minutes = parseInt(mParts[0]);
-    secs = parseFloat(mParts[1].replace('S', ''));
-  } else if (durStr.endsWith('S')) {
-    secs = parseFloat(durStr.replace('S', ''));
-  }
-
-  return hours * 3600 + minutes * 60 + Math.floor(secs);
-}
-
-/**
- * Parses duration from various formats to seconds
- */
-export function parseDurationToSeconds(duration: number | string, platform?: Platform): number {
-  if (typeof duration === 'number') {
-    return Number(duration);
-  }
-
-  if (platform === PLATFORMS.TWITCH && typeof duration === 'string') {
-    const [hrs, mins, secs] = String(duration).split(':').map(Number);
-    return hrs * 3600 + mins * 60 + secs;
-  }
-
-  if (typeof duration === 'string' && !isNaN(parseInt(duration))) {
-    return parseInt(duration);
-  }
-
-  return 0;
 }
 
 /**
@@ -175,7 +134,7 @@ async function checkIfDownloadNeeded(filePath: string, dbId: number, tenantId: s
     return true;
   }
 
-  const expectedDuration = parseDurationToSeconds(vodRecord.duration, platform);
+  const expectedDuration = vodRecord.duration;
   const diff = Math.abs(actualDuration - expectedDuration);
 
   if (diff > 1) {
@@ -190,9 +149,11 @@ async function checkIfDownloadNeeded(filePath: string, dbId: number, tenantId: s
  * Ensures a VOD record exists in the database, creating it from platform API if needed
  * Returns null if VOD cannot be found or created
  */
-export async function ensureVodRecord(config: TenantConfig, client: PrismaClient, tenantId: string, vodId: string, platform: Platform, log: AppLogger): Promise<VodRecord | null> {
+export async function ensureVodRecord(ctx: TenantContext, vodId: string, platform: Platform, log: AppLogger): Promise<VodRecord | null> {
+  const { db, tenantId, config } = ctx;
+
   // Try to find existing VOD record
-  const rawVodRecord = await findVodRecord(client, vodId, platform);
+  const rawVodRecord = await findVodRecord(db, vodId, platform);
 
   if (rawVodRecord) {
     log.info(`Using existing VOD record for ${vodId}`);
@@ -211,20 +172,14 @@ export async function ensureVodRecord(config: TenantConfig, client: PrismaClient
       return null;
     }
 
-    const durationStr = String(vodMetadata.duration);
-    const durationParts: string[] = durationStr.replace('PT', '').split(/[HMS]/);
-    let totalSeconds = 0;
+    const duration = parsePTDuration(vodMetadata.duration);
 
-    if (durationParts.length >= 3 && !isNaN(parseInt(durationParts[1]))) {
-      totalSeconds += parseInt(durationParts[0] || '0') * 3600 + parseInt(durationParts[1]) * 60 + parseInt(durationParts[2]);
-    }
-
-    vodRecord = (await client.vod.create({
+    vodRecord = (await db.vod.create({
       data: {
         vod_id: vodId,
         title: vodMetadata.title || null,
         created_at: new Date(vodMetadata.created_at),
-        duration: totalSeconds,
+        duration,
         stream_id: vodMetadata.stream_id || null,
         platform,
       },
@@ -232,7 +187,10 @@ export async function ensureVodRecord(config: TenantConfig, client: PrismaClient
 
     log.info(`Created Twitch VOD ${vodId} with user_id=${vodMetadata.user_id}`);
 
-    await saveVodChapters({ tenantId, config, db: client }, vodRecord.id, vodRecord.vod_id, vodRecord.duration);
+    await saveVodChapters(ctx, vodRecord.id, vodRecord.vod_id, vodRecord.duration);
+    if (config?.[platform]?.id) {
+      await fetchAndSaveEmotes(ctx, vodRecord.id, platform, config?.[platform]?.id);
+    }
   } else if (platform === PLATFORMS.KICK) {
     if (!config?.kick?.username) {
       return null;
@@ -242,7 +200,7 @@ export async function ensureVodRecord(config: TenantConfig, client: PrismaClient
 
     log.info(`Fetched Kick VOD ${vodId} from channel ${config.kick.username}`);
 
-    vodRecord = (await client.vod.create({
+    vodRecord = (await db.vod.create({
       data: {
         vod_id: vodId,
         title: vodMetadata.session_title,
