@@ -41,7 +41,7 @@ export async function checkPlatformStatus(tenantId: string, platform: Platform, 
 
   try {
     log.debug({ platform }, '[Monitor]: Polling platform status for streamer...');
-    log.debug({ vodDownload: config.settings?.vodDownload, platformEnabled: config[platform as 'twitch' | 'kick']?.enabled }, '[Monitor]: Config values');
+    log.debug({ vodDownload: config.settings?.vodDownload, platformEnabled: config[platform]?.enabled }, '[Monitor]: Config values');
 
     const prisma = getClient(tenantId) || (await createClient(config));
 

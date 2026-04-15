@@ -4,7 +4,7 @@ import { getClient, createClient } from '../../db/client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import type { TenantConfig } from '../../config/types';
 import type { PrismaClient } from '../../../generated/streamer/client';
-import type { Platform } from '../../types/platforms.js';
+import { PLATFORMS, type Platform } from '../../types/platforms.js';
 
 export interface TenantContext {
   tenantId: string;
@@ -108,7 +108,7 @@ export async function platformValidationMiddleware(request: FastifyRequest, repl
     });
   }
 
-  if (requestPlatform === 'twitch' && !config.twitch?.enabled) {
+  if (requestPlatform === PLATFORMS.TWITCH && !config.twitch?.enabled) {
     return reply.status(400).send({
       error: {
         message: 'Twitch is not enabled for this tenant',
@@ -118,7 +118,7 @@ export async function platformValidationMiddleware(request: FastifyRequest, repl
     });
   }
 
-  if (requestPlatform === 'kick' && !config.kick?.enabled) {
+  if (requestPlatform === PLATFORMS.KICK && !config.kick?.enabled) {
     return reply.status(400).send({
       error: {
         message: 'Kick is not enabled for this tenant',

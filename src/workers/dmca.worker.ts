@@ -13,6 +13,7 @@ import { getVodFilePath, fileExists } from '../utils/path.js';
 import { getStandardVodQueue } from './jobs/queues.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { createDmcaWorkerAlerts } from './utils/alert-factories.js';
+import type { Platform } from '../types/platforms.js';
 import { SOURCE_TYPES } from '../types/platforms.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
@@ -133,7 +134,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
 
     log.info({ vodId, part }, 'Queuing YouTube upload');
 
-    const jobId = await queueYoutubeVodUpload(tenantId, dbId, vodId, processedPath, platform as 'twitch' | 'kick');
+    const jobId = await queueYoutubeVodUpload(tenantId, dbId, vodId, processedPath, platform as Platform);
 
     if (!jobId) {
       throw new Error('Failed to queue YouTube upload job');

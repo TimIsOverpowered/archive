@@ -8,6 +8,7 @@ import { getJobContext } from './utils/job-context.js';
 import { CHAT_BATCH_SIZE, CHAT_RATE_LIMIT_MS } from '../constants.js';
 import { extractEdges, calculateResumeOffset } from './chat/chat-helpers.js';
 import type { ChatMessageCreateInput } from './chat/chat-types.js';
+import { PLATFORMS } from '../types/platforms.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { flushChatBatch } from './chat/chat-batch-processor.js';
 import { createChatWorkerAlerts } from './utils/alert-factories.js';
@@ -19,7 +20,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
   log.debug({ jobId: job.id, tenantId, dbId, vodId, platform, duration, startOffset }, '[Chat] Job received');
 
-  if (platform !== 'twitch') {
+  if (platform !== PLATFORMS.TWITCH) {
     log.info({ platform }, 'Chat download deferred for non-Twitch platform');
     return { success: true, skipped: true };
   }

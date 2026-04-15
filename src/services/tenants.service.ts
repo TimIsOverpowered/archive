@@ -1,6 +1,7 @@
 import { PrismaClient } from '../../generated/streamer/client';
 import { getTenantConfig, getConfigs } from '../config/loader';
 import { withCache } from '../utils/cache.js';
+import { PLATFORMS } from '../types/platforms.js';
 
 interface TenantStats {
   tenant: {
@@ -42,8 +43,8 @@ export async function getTenantStats(client: PrismaClient, tenantId: string, cac
   }
 
   const platforms: string[] = [];
-  if (config.twitch?.enabled) platforms.push('twitch');
-  if (config.kick?.enabled) platforms.push('kick');
+  if (config.twitch?.enabled) platforms.push(PLATFORMS.TWITCH);
+  if (config.kick?.enabled) platforms.push(PLATFORMS.KICK);
 
   const thisMonthStart = new Date();
   thisMonthStart.setDate(1);

@@ -7,7 +7,7 @@ import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest, notFound } from '../../../utils/http-error';
 import type { Platform } from '../../../types/platforms.js';
-import { PLATFORM_VALUES } from '../../../types/platforms.js';
+import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
 import { findVodRecord, queueEmoteFetch } from './utils/vod-helpers.js';
 
 type RouteParams = { tenantId: string };
@@ -58,7 +58,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
-      if (platform !== 'twitch') {
+      if (platform !== PLATFORMS.TWITCH) {
         return { data: { message: `Chapter fetching only supported for Twitch VODs`, vodId, platform } };
       }
 

@@ -4,7 +4,7 @@ import createRateLimitMiddleware from '../middleware/rate-limit';
 import { publicRateLimiter } from '../plugins/redis.plugin';
 import { notFound } from '../../utils/http-error';
 import { tenantMiddleware } from '../middleware/tenant-platform';
-import { PLATFORM_VALUES } from '../../types/platforms';
+import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
 
 interface VodRoutesOptions {
   prefix: string;
@@ -120,48 +120,10 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
           required: ['tenantId', 'platform', 'platformVodId'],
         },
       },
-      constraints: {
-        platform: 'twitch',
-      },
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const { tenantId, platform, platformVodId } = request.params as { tenantId: string; platform: 'twitch' | 'kick'; platformVodId: string };
-      const { client } = request.tenant;
-
-      const vod = await getVodByPlatformId(client, tenantId, platform, platformVodId);
-
-      if (!vod) {
-        notFound('VOD not found');
-      }
-
-      return { data: vod };
-    }
-  );
-
-  fastify.get(
-    '/:tenantId/vods/:platform/:platformVodId',
-    {
-      schema: {
-        tags: ['VODs'],
-        description: 'Get a single VOD by platform-specific ID',
-        params: {
-          type: 'object',
-          properties: {
-            tenantId: { type: 'string', description: 'Tenant ID' },
-            platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Platform' },
-            platformVodId: { type: 'string', description: 'Platform-specific VOD ID' },
-          },
-          required: ['tenantId', 'platform', 'platformVodId'],
-        },
-      },
-      constraints: {
-        platform: 'kick',
-      },
-      onRequest: [rateLimitMiddleware, tenantMiddleware],
-    },
-    async (request) => {
-      const { tenantId, platform, platformVodId } = request.params as { tenantId: string; platform: 'twitch' | 'kick'; platformVodId: string };
+      const { tenantId, platform, platformVodId } = request.params as { tenantId: string; platform: Platform; platformVodId: string };
       const { client } = request.tenant;
 
       const vod = await getVodByPlatformId(client, tenantId, platform, platformVodId);
