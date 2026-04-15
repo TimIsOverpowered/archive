@@ -2,6 +2,7 @@ import { loadTenantConfigs } from '../../config/loader.js';
 import { startStreamDetectionLoop } from './stream-detector.js';
 import { logger } from '../../utils/logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
+import { PLATFORMS } from '../../types/platforms.js';
 
 /**
  * Main entry point - loads ALL tenant configs and starts concurrent monitoring loops
@@ -23,11 +24,11 @@ export async function startMonitorService(): Promise<void> {
       // Start independent loop per platform - mainPlatform flag is ONLY for YouTube game uploads, NOT stream detection
 
       if (config.twitch?.enabled && config.twitch.username) {
-        startStreamDetectionLoop(config.id, 'twitch', config);
+        startStreamDetectionLoop(config.id, PLATFORMS.TWITCH, config);
       }
 
       if (config.kick?.enabled && config.kick.username) {
-        startStreamDetectionLoop(config.id, 'kick', config);
+        startStreamDetectionLoop(config.id, PLATFORMS.KICK, config);
       }
     }
 

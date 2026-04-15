@@ -8,7 +8,7 @@ import { getEffectiveSplitDuration } from './validation.js';
 import { buildYoutubeMetadata } from './metadata-builder.js';
 import { createYoutubeUploadProgressHandler as createVodUploadProgressHandler } from './youtube-upload-progress.js';
 import type { TenantConfig } from '../../config/types.js';
-import type { SourceType } from '../../types/platforms.js';
+import type { SourceType, Platform } from '../../types/platforms.js';
 import { UPLOAD_TYPES } from '../../types/platforms.js';
 import type { VodRecord } from '../../types/db.js';
 
@@ -38,7 +38,7 @@ export async function processVodUpload(ctx: VodUploadContext): Promise<VodUpload
   const splitDuration = getEffectiveSplitDuration(config.youtube!.splitDuration);
   const duration = (await getDuration(filePath)) ?? 0;
 
-  const platformName = vodRecord.platform;
+  const platformName = vodRecord.platform as Platform;
 
   const needsSplitting = duration > splitDuration;
 
@@ -70,7 +70,7 @@ interface SplitVodUploadContext extends VodUploadContext {
   channelName: string;
   domainName: string;
   privacyStatus: string;
-  platformName: string;
+  platformName: Platform;
 }
 
 async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUploadResult> {
@@ -169,7 +169,7 @@ interface SingleVodUploadContext extends VodUploadContext {
   channelName: string;
   domainName: string;
   privacyStatus: string;
-  platformName: string;
+  platformName: Platform;
 }
 
 async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodUploadResult> {

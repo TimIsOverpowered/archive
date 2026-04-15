@@ -66,7 +66,7 @@ export function createVodWorkerAlerts(): VodWorkerAlerts {
 // ============================================================================
 
 export interface LiveWorkerAlerts {
-  init: (vodId: string, platform: 'twitch' | 'kick', streamerName: string, startedAt?: string) => RichEmbedData;
+  init: (vodId: string, platform: Platform, streamerName: string, startedAt?: string) => RichEmbedData;
   progress: (vodId: string, segmentsDownloaded: number) => RichEmbedData;
   converting: (vodId: string, segmentCount: number) => RichEmbedData;
   complete: (vodId: string, duration?: number) => RichEmbedData;
