@@ -51,7 +51,7 @@ interface SevenTVUserResponse {
   }>;
 }
 
-export async function fetchAndSaveEmotes(ctx: TenantContext, vodId: number, platform: Platform, platformId?: string): Promise<void> {
+export async function fetchAndSaveEmotes(ctx: TenantContext, vodId: number, platform: Platform, platformId: string): Promise<void> {
   let ffzEmotes: EmoteData[] = [];
   let bttvEmotes: EmoteData[] = [];
   let sevenTvEmotes: EmoteData[] = [];

@@ -1,14 +1,13 @@
 import { FastifyInstance } from 'fastify';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
-import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
-import { parseDurationToSeconds, ensureVodRecord, findVodRecord } from './utils/vod-helpers';
+import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext, TenantContext } from '../../middleware/tenant-platform';
+import { ensureVodRecord, findVodRecord } from './utils/vod-helpers';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
 import { SOURCE_TYPES, DOWNLOAD_METHODS, UPLOAD_MODES, PLATFORM_VALUES, UPLOAD_MODE_VALUES, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES_VALUES } from '../../../types/platforms.js';
-import { fetchAndSaveEmotes } from '../../../services/emotes';
 import { getStandardVodQueue, getChatDownloadQueue } from '../../../workers/jobs/queues.js';
 
 interface ReDownloadVodParams {
@@ -61,19 +60,10 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       const log = createAutoLogger(tenantId);
 
       // Ensure VOD record exists or create it from platform API metadata
-      const vodRecord = await ensureVodRecord(config, db, tenantId, request.body.vodId, platform, log);
+      const vodRecord = await ensureVodRecord(request.tenant as TenantContext, request.body.vodId, platform, log);
 
       if (!vodRecord) {
         notFound(`VOD ${request.body.vodId} not found on ${platform}`);
-      }
-
-      // Queue emote save job (fire-and-forget within request context)
-      const platformId = config?.[platform]?.id;
-
-      if (platformId) {
-        await fetchAndSaveEmotes(request.tenant as TenantPlatformContext, vodRecord.id, platform, platformId);
-      } else {
-        log.warn(`No platform ID available for emote fetching on VOD ${request.body.vodId}`);
       }
 
       const type = request.body.type;
@@ -98,12 +88,9 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
       log.info({ vodId: vodRecord.vod_id, downloadJobId }, 'VOD download queued, YouTube upload will be triggered after completion');
 
-      // Queue chat download job
-      const durationSeconds = parseDurationToSeconds(vodRecord.duration, platform);
-
       void getChatDownloadQueue().add(
         'chat_download',
-        { tenantId: tenantId, platformUserId: tenantId, dbId: vodRecord.id, vodId: vodRecord.vod_id, platform, duration: durationSeconds },
+        { tenantId: tenantId, platformUserId: tenantId, dbId: vodRecord.id, vodId: vodRecord.vod_id, platform, duration: vodRecord.duration },
         { jobId: `chat_${vodRecord.vod_id}` }
       );
 
