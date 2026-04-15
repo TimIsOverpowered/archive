@@ -14,7 +14,6 @@ export { getChapters, getChapter, getGameData, saveVodChapters } from './chapter
 export {
   fetchComments,
   fetchNextComments,
-  extractMessageData,
   type TwitchEmoteFragment,
   type TwitchBadgeSetItem,
   type TwitchUserBadgesArray,

@@ -1,12 +1,12 @@
 import { Processor, Job } from 'bullmq';
 import { sleep } from '../utils/delay.js';
-import { fetchComments, fetchNextComments, extractMessageData } from '../services/twitch/index.js';
+import { fetchComments, fetchNextComments } from '../services/twitch/index.js';
 import { initRichAlert, resetFailures } from '../utils/discord-alerts.js';
 import type { ChatDownloadJob, ChatDownloadResult } from './jobs/queues.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
 import { CHAT_BATCH_SIZE, CHAT_RATE_LIMIT_MS } from '../constants.js';
-import { extractEdges, calculateResumeOffset } from './chat/chat-helpers.js';
+import { extractEdges, calculateResumeOffset, extractMessageData } from './chat/chat-helpers.js';
 import type { ChatMessageCreateInput } from './chat/chat-types.js';
 import { PLATFORMS } from '../types/platforms.js';
 import { handleWorkerError } from './utils/error-handler.js';
@@ -51,14 +51,9 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
     while (true) {
       if (!rawPage || typeof rawPage !== 'object') break;
 
-      let commentsObj: Record<string, unknown>;
+      const commentsObj = rawPage.comments;
 
-      if ('comments' in rawPage && typeof rawPage.comments === 'object') {
-        const c = (rawPage as { comments?: object }).comments;
-        commentsObj = Array.isArray(c) ? {} : ((c ?? {}) as Record<string, unknown>);
-      } else {
-        break;
-      }
+      if (!commentsObj) throw `No Comments Object found`;
 
       const edges = extractEdges(commentsObj);
 
@@ -71,7 +66,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
       for (const edge of edges) {
         const node = edge.node;
-        if (!node || !('id' in node)) continue;
+        if (!node) continue;
 
         const { message, userBadges } = extractMessageData(node);
         const offsetSeconds = 'contentOffsetSeconds' in node ? (node.contentOffsetSeconds ?? 0) : 0;
@@ -114,7 +109,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
       lastCursor = pageCursor;
       await sleep(CHAT_RATE_LIMIT_MS);
-      rawPage = await fetchNextComments(String(vodId), pageCursor, tenantId);
+      rawPage = await fetchNextComments(vodId, pageCursor, tenantId);
     }
 
     if (batchBuffer.length > 0) {

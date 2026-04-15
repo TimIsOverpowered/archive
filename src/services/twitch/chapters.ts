@@ -1,4 +1,4 @@
-import { createTwitchClient, createTwitchGqlClient } from './client.js';
+import { createTwitchClient, createTwitchGqlClient, BACKUP_TWITCH_GQL_CLIENT_ID } from './client.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { toHHMMSS } from '../../utils/formatting.js';
@@ -10,7 +10,7 @@ function getTwitchClient(tenantId: string) {
 }
 
 export async function getChapters(vodId: string, tenantId?: string): Promise<unknown[] | null> {
-  const client = createTwitchGqlClient(tenantId);
+  const client = createTwitchGqlClient(tenantId, BACKUP_TWITCH_GQL_CLIENT_ID);
   const data = await client.post<{ data?: Record<string, unknown> }>({
     operationName: 'VideoPreviewCard__VideoMoments',
     variables: {

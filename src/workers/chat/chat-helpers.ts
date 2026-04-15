@@ -1,5 +1,6 @@
-import type { TwitchChatMessageNode } from '../../services/twitch/index.js';
+import type { TwitchChatEdge, TwitchChatMessageNode, TwitchCommentsConnection } from '../../services/twitch/index.js';
 import type { PrismaClient } from '../../../generated/streamer/client';
+import { InputJsonValue } from '../../../generated/streamer/internal/prismaNamespace.js';
 
 /**
  * Removes __typename fields from GraphQL response objects recursively.
@@ -26,14 +27,14 @@ export function stripTypename(obj: unknown): unknown {
  * Extracts edges from GraphQL pagination response.
  * Type-safe extraction that filters valid edges at runtime.
  */
-export function extractEdges(commentsObj: Record<string, unknown>): Array<{ node: TwitchChatMessageNode | null | undefined; cursor: string | null }> {
+export function extractEdges(commentsObj: TwitchCommentsConnection): Array<{ node: TwitchChatMessageNode | null | undefined; cursor: string | null }> {
   const rawEdges = commentsObj.edges;
 
   if (!Array.isArray(rawEdges)) {
     return [];
   }
 
-  return rawEdges.filter((item): item is { node: TwitchChatMessageNode | null | undefined; cursor: string | null } => item !== null && typeof item === 'object' && 'node' in item && 'cursor' in item);
+  return rawEdges.filter((item): item is TwitchChatEdge => item !== null && typeof item === 'object' && 'node' in item && 'cursor' in item);
 }
 
 /**
@@ -57,4 +58,28 @@ export async function calculateResumeOffset(db: PrismaClient, vodId: number, man
 
   const resumeOffset = parseFloat(lastSavedRecord.content_offset_seconds.toString());
   return { offset: resumeOffset, hasExistingData: true };
+}
+
+export function extractMessageData(node: TwitchChatMessageNode | null | undefined): { message: InputJsonValue; userBadges?: InputJsonValue } {
+  if (!node || !node.message) {
+    return { message: { content: '', fragments: [] }, userBadges: undefined };
+  }
+
+  const rawFragments = node.message.fragments || [];
+  const cleanFragments = stripTypename(rawFragments);
+  const badgesRaw = node.message.userBadges ?? null;
+
+  return {
+    message: {
+      content: (Array.isArray(cleanFragments) ? cleanFragments : [])
+        .map((f: unknown) => {
+          if (typeof f !== 'object' || f === null) return '';
+          const text = (f as Record<string, unknown>).text;
+          return String(text ?? '');
+        })
+        .join(''),
+      fragments: Array.isArray(cleanFragments) ? cleanFragments.map((frag) => ({ ...frag })) : [],
+    },
+    userBadges: badgesRaw && typeof stripTypename(badgesRaw) === 'object' ? (stripTypename(badgesRaw) as InputJsonValue) : undefined,
+  };
 }

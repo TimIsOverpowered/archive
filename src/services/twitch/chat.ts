@@ -1,6 +1,4 @@
-import type { InputJsonValue } from '../../../generated/streamer/internal/prismaNamespace.js';
-import { createTwitchGqlClient } from './client.js';
-import { stripTypename } from '../../workers/chat/chat-helpers.js';
+import { createTwitchGqlClient, BACKUP_TWITCH_GQL_CLIENT_ID } from './client.js';
 
 function getTwitchGqlClient(tenantId?: string) {
   return createTwitchGqlClient(tenantId);
@@ -60,30 +58,6 @@ export interface TwitchVideoCommentResponse {
   comments: TwitchCommentsConnection | null;
 }
 
-export function extractMessageData(node: TwitchChatMessageNode | null | undefined): { message: InputJsonValue; userBadges?: InputJsonValue | undefined } {
-  if (!node || !node.message) {
-    return { message: { content: '', fragments: [] }, userBadges: undefined };
-  }
-
-  const rawFragments = node.message.fragments || [];
-  const cleanFragments = stripTypename(rawFragments);
-  const badgesRaw = node.message.userBadges ?? null;
-
-  return {
-    message: {
-      content: (Array.isArray(cleanFragments) ? cleanFragments : [])
-        .map((f: unknown) => {
-          if (typeof f !== 'object' || f === null) return '';
-          const text = (f as Record<string, unknown>).text;
-          return String(text ?? '');
-        })
-        .join(''),
-      fragments: Array.isArray(cleanFragments) ? cleanFragments.map((frag) => ({ ...frag })) : [],
-    },
-    userBadges: badgesRaw && typeof stripTypename(badgesRaw) === 'object' ? (stripTypename(badgesRaw) as InputJsonValue) : undefined,
-  };
-}
-
 export async function fetchComments(vodId: string, offset = 0, tenantId?: string): Promise<TwitchVideoCommentResponse | null> {
   const client = getTwitchGqlClient(tenantId);
   const data = await client.post<{ data?: { video?: TwitchVideoCommentResponse } }>({
@@ -103,7 +77,7 @@ export async function fetchComments(vodId: string, offset = 0, tenantId?: string
 }
 
 export async function fetchNextComments(vodId: string, cursor: string, tenantId?: string): Promise<TwitchVideoCommentResponse | null> {
-  const client = getTwitchGqlClient(tenantId);
+  const client = createTwitchGqlClient(tenantId, BACKUP_TWITCH_GQL_CLIENT_ID);
   const data = await client.post<{ data?: { video?: TwitchVideoCommentResponse } }>({
     operationName: 'VideoCommentsByOffsetOrCursor',
     variables: {
