@@ -83,7 +83,7 @@ export async function getLogsByOffset(client: PrismaClient, tenantId: string, vo
 
   if (!DISABLE_CACHE && redisClient) {
     try {
-      const cached = await (redisClient as unknown as { getBuffer: (key: string) => Promise<Buffer | null> }).getBuffer(cacheKey);
+      const cached = await redisClient.getBuffer(cacheKey);
       if (cached) {
         logger.debug({ vodId, bucket }, '[CACHE HIT] bucket');
         const data = (await decompressChatData(cached)) as { comments: ChatMessage[]; cursor?: string };
@@ -152,7 +152,7 @@ export async function getLogsByCursor(client: PrismaClient, tenantId: string, vo
 
   if (!DISABLE_CACHE && redisClient) {
     try {
-      const cached = await (redisClient as unknown as { getBuffer: (key: string) => Promise<Buffer | null> }).getBuffer(cacheKey);
+      const cached = await redisClient.getBuffer(cacheKey);
       if (cached) {
         logger.debug({ vodId }, '[CACHE HIT] cursor');
 
