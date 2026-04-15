@@ -66,7 +66,7 @@ export async function getBrowser(): Promise<{ browser: Browser }> {
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
     customConfig: {
       chromeFlags: [`--js-flags=--max-old-space-size=${memoryLimit}`],
-    } as unknown as object,
+    } as object,
     turnstile: true,
     connectOption: { defaultViewport: null },
     plugins: [clickAndWaitPlugin()],

@@ -62,7 +62,7 @@ export default async function adminApiKeyMiddleware(request: FastifyRequest, rep
     });
   }
 
-  (request as unknown as { admin: AdminContext }).admin = {
+  (request as { admin: AdminContext }).admin = {
     adminId: admin.id,
     username: admin.username,
   };
