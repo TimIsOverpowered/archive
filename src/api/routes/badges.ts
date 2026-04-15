@@ -1,9 +1,9 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import Redis from 'ioredis';
 import { getTenantConfig } from '../../config/loader';
-
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { notFound } from '../../utils/http-error';
+import { getChannelBadges, getGlobalBadges } from '../../services/twitch';
 
 interface BadgesRoutesOptions {
   prefix: string;
@@ -44,10 +44,8 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
       }
 
       // Fetch from Twitch API on cache miss
-      const twitch = await import('../../services/twitch');
-
       try {
-        const [channelBadges, globalBadges] = await Promise.all([twitch.getChannelBadges(tenantId).catch(() => null), twitch.getGlobalBadges(tenantId).catch(() => null)]);
+        const [channelBadges, globalBadges] = await Promise.all([getChannelBadges(tenantId).catch(() => null), getGlobalBadges(tenantId).catch(() => null)]);
 
         const badgesData = { channel: channelBadges || null, global: globalBadges || null };
 

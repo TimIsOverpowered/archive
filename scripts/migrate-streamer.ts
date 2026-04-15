@@ -4,8 +4,10 @@ import { PrismaClient } from '../prisma/generated/meta/index.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 import readline from 'readline';
 import { extractErrorDetails } from '../src/utils/error.js';
-
-const { decryptScalar } = await import('../src/utils/encryption');
+import { decryptScalar } from '../src/utils/encryption.js';
+import pg from 'pg';
+import os from 'os';
+import { execSync } from 'child_process';
 
 const META_DB_URL = process.env.META_DATABASE_URL;
 if (!META_DB_URL) {
@@ -461,8 +463,6 @@ const main = async () => {
   let poolEnded = false;
 
   try {
-    const pg = await import('pg');
-    const os = await import('os');
     const availableMemoryMB = Math.floor(os.freemem() / 1024 / 1024);
     const suggestedWorkers = Math.min(chatWorkers, Math.floor(availableMemoryMB / 200), 8);
     const actualWorkerCount = Math.max(1, suggestedWorkers);
@@ -824,7 +824,6 @@ const main = async () => {
             console.log('📌 Baseline Prisma migration...\n');
             process.env.DATABASE_URL = dbUrl;
             try {
-              const { execSync } = await import('child_process');
               execSync('npx prisma migrate resolve --applied 20260406073608_init', {
                 stdio: 'inherit',
                 env: process.env,

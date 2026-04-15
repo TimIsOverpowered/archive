@@ -3,6 +3,9 @@ import 'dotenv/config';
 import { program } from 'commander';
 import { metaClient } from '../../src/db/meta-client.js';
 import { extractErrorDetails } from '../../src/utils/error.js';
+import { decryptScalar, decryptObject } from '../../src/utils/encryption.js';
+import { loadTenantConfigs } from '../../src/config/loader.js';
+import { validateYoutubeToken } from '../../src/services/youtube/index.js';
 
 interface YoutubeAuth {
   access_token?: string;
@@ -13,15 +16,13 @@ interface YoutubeAuth {
 }
 
 async function decryptYoutubeAuth(encryptedValue: any): Promise<YoutubeAuth | null> {
-  const encryptionModule = await import('../../src/utils/encryption.js');
-
   // Auth is stored as encrypted JSON string (using encryptScalar on the JSON)
   try {
-    const decryptedString = encryptionModule.decryptScalar(encryptedValue);
+    const decryptedString = decryptScalar(encryptedValue);
     return typeof decryptedString === 'string' ? JSON.parse(decryptedString) : null;
   } catch (_e) {
     // Fallback: if it's already an encrypted object, use decryptObject
-    return encryptionModule.decryptObject<YoutubeAuth>(encryptedValue);
+    return decryptObject<YoutubeAuth>(encryptedValue);
   }
 }
 
@@ -81,21 +82,19 @@ program
 
       if (options.forceRefresh && !options.checkOnly) {
         // Clear cache to force fresh read from DB after refresh
-        const youtubeServicePath = await import('../../src/services/youtube/index.js');
 
         console.log('\nForcing token refresh...');
 
         try {
           // Load configs first to populate cache for youtube service (critical!)
-          const configLoaderModule = await import('../../src/config/loader.js');
           console.log('Loading streamer configs from DB...');
-          await configLoaderModule.loadTenantConfigs();
+          await loadTenantConfigs();
 
           // Use getAccessToken which will trigger the tokens event and persist changes
           if (decrypted.refresh_token) {
             console.log('✅ Refresh token available - attempting API refresh via validateYoutubeToken()');
 
-            const isValid = await youtubeServicePath.validateYoutubeToken(tenantId);
+            const isValid = await validateYoutubeToken(tenantId);
 
             if (!isValid) {
               console.error('❌ Token validation failed');

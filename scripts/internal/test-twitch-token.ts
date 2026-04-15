@@ -4,6 +4,9 @@ import { program } from 'commander';
 import { metaClient } from '../../src/db/meta-client.js';
 import { extractErrorDetails } from '../../src/utils/error.js';
 import { decryptObject } from '../../src/utils/encryption.js';
+import { loadTenantConfigs, getConfigs } from '../../src/config/loader.js';
+import { getAppAccessToken } from '../../src/services/twitch/index.js';
+import { getTwitchCredentials } from '../../src/utils/credentials.js';
 
 interface TwitchAuth {
   client_id: string;
@@ -77,14 +80,11 @@ program
       if (options.forceRefresh) {
         console.log('\nForcing token refresh...');
 
-        const configLoaderModule = await import('../../src/config/loader.js');
         console.log('Loading streamer configs from DB...');
-        await configLoaderModule.loadTenantConfigs();
-
-        const twitchService = await import('../../src/services/twitch/index.js');
+        await loadTenantConfigs();
 
         try {
-          const newToken = await twitchService.getAppAccessToken(tenantId);
+          const newToken = await getAppAccessToken(tenantId);
           console.log('✅ Token refreshed successfully!');
           console.log(`   New token: ${newToken.substring(0, 20)}...${newToken.slice(-10)}`);
 
@@ -135,18 +135,17 @@ program
       } else if (options.validateToken) {
         console.log('\nValidating current token...');
 
-        const configLoaderModule = await import('../../src/config/loader.js');
-        await configLoaderModule.loadTenantConfigs();
+        await loadTenantConfigs();
 
         try {
-          const accessToken = await import('../../src/services/twitch/index.js').then((m) => m.getAppAccessToken(tenantId));
+          const accessToken = await getAppAccessToken(tenantId);
 
           if (!accessToken || accessToken === null) {
             console.error('❌ FAIL: Could not get access token');
             process.exit(1);
           }
 
-          const creds = await import('../../src/utils/credentials.js').then((m) => m.getTwitchCredentials(tenantId));
+          const creds = getTwitchCredentials(tenantId);
 
           if (!creds || !creds.clientId) {
             console.error('❌ FAIL: Could not retrieve credentials');

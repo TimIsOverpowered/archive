@@ -3,6 +3,10 @@ import 'dotenv/config';
 import { PrismaClient } from '../../prisma/generated/meta/index.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { extractErrorDetails } from '../../src/utils/error.js';
+import readline from 'readline';
+import { decryptScalar } from '../../src/utils/encryption.js';
+import pg from 'pg';
+import os from 'os';
 
 const META_DB_URL = process.env.META_DATABASE_URL;
 if (!META_DB_URL) {
@@ -66,7 +70,6 @@ function parseArgs() {
 }
 
 async function prompt(question: string): Promise<string> {
-  const readline = await import('readline');
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
     rl.question(`${question} `, (answer) => {
@@ -218,7 +221,6 @@ async function main() {
       process.exit(1);
     }
 
-    const { decryptScalar } = await import('../../src/utils/encryption.js');
     try {
       dbUrl = decryptScalar(tenant.databaseUrl as string);
     } catch (decryptError) {
@@ -233,8 +235,6 @@ async function main() {
   }
 
   try {
-    const pg = await import('pg');
-    const os = await import('os');
     const availableMemoryMB = Math.floor(os.freemem() / 1024 / 1024);
     const workerCount = Math.max(1, Math.min(args.workers, Math.floor(availableMemoryMB / 200), 8));
 

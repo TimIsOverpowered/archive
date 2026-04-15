@@ -10,6 +10,7 @@
 import 'dotenv/config';
 import { program } from 'commander';
 import { metaClient } from '../../src/db/meta-client.js';
+import { decryptScalar, decryptObject } from '../../src/utils/encryption.js';
 
 interface DecryptionResult {
   raw: string | null;
@@ -31,15 +32,13 @@ async function decryptField(value: string | null): Promise<DecryptionResult> {
     }
 
     if (!parsedValue && process.env.ENCRYPTION_MASTER_KEY) {
-      const encryptionModule = await import('../../src/utils/encryption.js');
-
       // Try decryptScalar first (for fields like apiKey that are simple strings)
       try {
-        result.decrypted = encryptionModule.decryptScalar(value);
+        result.decrypted = decryptScalar(value);
       } catch (scalarError: any) {
         // If scalar fails, try decryptObject for complex objects
         try {
-          result.decrypted = encryptionModule.decryptObject(value);
+          result.decrypted = decryptObject(value);
         } catch (e: any) {
           console.error(`⚠️  Failed to decrypt field: ${e.message}`);
         }

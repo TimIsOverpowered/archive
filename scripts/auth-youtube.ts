@@ -10,6 +10,7 @@ import { metaClient } from '../src/db/meta-client.js';
 import { extractErrorDetails } from '../src/utils/error.js';
 import { YoutubeAuthSchema, YoutubeAuthObject, YoutubeSchema } from '../src/config/schemas.js';
 import type { Tenant } from '../prisma/generated/meta/index.js';
+import { encryptScalar, decryptObject } from '../src/utils/encryption.js';
 
 program.name('auth-youtube').description('YouTube OAuth authentication CLI tool').version('1.0.0');
 
@@ -356,9 +357,6 @@ async function storeAuthObject(tenantId: string, authObject: YoutubeAuthObject):
   }
 
   try {
-    // Import encryption utilities (lazy import to avoid circular deps)
-    const { encryptScalar, decryptObject } = await import('../src/utils/encryption.js');
-
     // Validate authObject before encryption
     YoutubeAuthSchema.parse(authObject);
 
