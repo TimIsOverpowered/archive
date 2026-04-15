@@ -21,6 +21,7 @@ interface ChaptersBody {
 interface SaveBody {
   vodId: string;
   platform: Platform;
+  forceRerun?: boolean;
 }
 
 export default async function metadataFetchingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
@@ -127,6 +128,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
           properties: {
             vodId: { type: 'string', description: 'Platform VOD ID' },
             platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Source platform' },
+            forceRerun: { type: 'boolean', description: 'Force re-download even if already complete', default: false },
           },
           required: ['vodId', 'platform'],
         },
@@ -137,7 +139,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
     },
     async (request) => {
       const { db, platform, config, tenantId } = request.tenant as TenantPlatformContext;
-      const { vodId } = request.body;
+      const { vodId, forceRerun = false } = request.body;
 
       const vodRecord = await findVodRecord(db, vodId, platform);
 
@@ -148,7 +150,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
       if (!platformId) badRequest(`No platform ID available for ${platform} ${vodId}`);
 
-      const jobId = await triggerChatDownload(tenantId, platformId, vodRecord.id, vodId, platform, Math.round(vodRecord.duration), config?.[platform]?.username);
+      const jobId = await triggerChatDownload(tenantId, platformId, vodRecord.id, vodId, platform, Math.round(vodRecord.duration), config?.[platform]?.username, forceRerun);
 
       return { data: { message: `Queueing chat job ${vodId}`, vodId, platform, jobId } };
     }

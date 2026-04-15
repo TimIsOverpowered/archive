@@ -41,7 +41,7 @@ export function extractEdges(commentsObj: TwitchCommentsConnection): Array<{ nod
  * Calculates the effective resume offset for chat download.
  * If no manual startOffset is provided, checks for existing chat data and resumes from the last saved offset.
  */
-export async function calculateResumeOffset(db: PrismaClient, vodId: number, manualStartOffset?: number): Promise<{ offset: number; hasExistingData: boolean }> {
+export async function calculateResumeOffset(db: PrismaClient, vodId: number, manualStartOffset?: number): Promise<{ offset: number; hasExistingData: boolean; lastMessageId?: string }> {
   if (manualStartOffset) {
     return { offset: manualStartOffset, hasExistingData: false };
   }
@@ -49,7 +49,7 @@ export async function calculateResumeOffset(db: PrismaClient, vodId: number, man
   const lastSavedRecord = await db.chatMessage.findFirst({
     where: { vod_id: vodId },
     orderBy: { content_offset_seconds: 'desc' },
-    select: { content_offset_seconds: true },
+    select: { id: true, content_offset_seconds: true },
   });
 
   if (!lastSavedRecord?.content_offset_seconds) {
@@ -57,7 +57,7 @@ export async function calculateResumeOffset(db: PrismaClient, vodId: number, man
   }
 
   const resumeOffset = parseFloat(lastSavedRecord.content_offset_seconds.toString());
-  return { offset: resumeOffset, hasExistingData: true };
+  return { offset: resumeOffset, hasExistingData: true, lastMessageId: lastSavedRecord.id };
 }
 
 export function extractMessageData(node: TwitchChatMessageNode | null | undefined): { message: InputJsonValue; userBadges?: InputJsonValue } {

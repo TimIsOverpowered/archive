@@ -32,6 +32,7 @@ export interface ChatDownloadJob {
   platform: Platform;
   duration: number;
   startOffset?: number;
+  forceRerun?: boolean;
 }
 
 export interface YoutubeVodUploadJob {

@@ -15,10 +15,10 @@ import { createChatWorkerAlerts } from './utils/alert-factories.js';
 import { updateAlert } from '../utils/discord-alerts.js';
 
 const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job: Job<ChatDownloadJob>): Promise<ChatDownloadResult> => {
-  const { tenantId, dbId, vodId, platform, duration, startOffset } = job.data;
+  const { tenantId, dbId, vodId, platform, duration, startOffset, forceRerun } = job.data;
   const log = createAutoLogger(tenantId);
 
-  log.debug({ jobId: job.id, tenantId, dbId, vodId, platform, duration, startOffset }, '[Chat] Job received');
+  log.debug({ jobId: job.id, tenantId, dbId, vodId, platform, duration, startOffset, forceRerun }, '[Chat] Job received');
 
   if (platform !== PLATFORMS.TWITCH) {
     log.info({ platform }, 'Chat download deferred for non-Twitch platform');
@@ -27,7 +27,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
   const { db } = await getJobContext(tenantId);
 
-  const { offset: effectiveOffset, hasExistingData } = await calculateResumeOffset(db, dbId, startOffset);
+  const { offset: effectiveOffset, hasExistingData, lastMessageId } = await calculateResumeOffset(db, dbId, startOffset);
 
   log.debug({ vodId, startOffset, effectiveOffset, hasExistingData }, '[Chat] Resume check completed');
 
@@ -45,6 +45,29 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
 
     let rawPage = await fetchComments(vodId, effectiveOffset, tenantId);
     log.debug({ vodId, effectiveOffset }, '[Chat] Initial comments fetch completed');
+
+    if (hasExistingData && !startOffset && !forceRerun) {
+      if (effectiveOffset >= duration) {
+        const totalMessages = await db.chatMessage.count({ where: { vod_id: dbId } });
+        log.info({ vodId, effectiveOffset, duration, totalMessages }, 'Chat download already complete (offset exceeds duration)');
+        resetFailures(tenantId);
+        void updateAlert(messageId, chatAlerts.alreadyComplete(tenantId, vodId, platform, totalMessages, effectiveOffset));
+        return { success: true, totalMessages, skipped: true };
+      }
+
+      if (lastMessageId && rawPage && rawPage.comments) {
+        const edges = extractEdges(rawPage.comments);
+        const lastFetchedMessageId = edges[edges.length - 1]?.node?.id;
+
+        if (lastFetchedMessageId === lastMessageId) {
+          const totalMessages = await db.chatMessage.count({ where: { vod_id: dbId } });
+          log.info({ vodId, lastMessageId, totalMessages }, 'Chat download already complete');
+          resetFailures(tenantId);
+          void updateAlert(messageId, chatAlerts.alreadyComplete(tenantId, vodId, platform, totalMessages, effectiveOffset));
+          return { success: true, totalMessages, skipped: true };
+        }
+      }
+    }
 
     let lastCursor: string | null = null;
 
