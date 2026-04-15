@@ -4,14 +4,13 @@ import { sendDiscordAlert, trackFailure, resetFailures } from '../utils/discord-
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { logger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
+import { getConfigs } from '../config/loader';
+import { validateYoutubeToken } from '../services/youtube';
 
 const MAX_FAILURES = 3;
 
 export async function checkTokenHealth(): Promise<void> {
-  const loaderModule = await import('../config/loader');
-  if (!loaderModule.getConfigs) return;
-
-  const streamerConfigs: ConfigType[] = loaderModule.getConfigs();
+  const streamerConfigs: ConfigType[] = getConfigs();
 
   for (const config of streamerConfigs) {
     const tenantId = String(config.id);
@@ -35,15 +34,11 @@ export async function checkTokenHealth(): Promise<void> {
 
     if (config.youtube?.auth) {
       try {
-        const youtubeModule = await import('../services/youtube');
-
         // Use lightweight validation instead of forcing token refresh
-        if ('validateYoutubeToken' in youtubeModule && typeof youtubeModule.validateYoutubeToken === 'function') {
-          if (await youtubeModule.validateYoutubeToken(tenantId)) {
-            resetFailures(`${tenantId}:youtube`);
-          } else if (trackFailure(`${tenantId}:youtube`, MAX_FAILURES)) {
-            await sendDiscordAlert(`🚨 YouTube token health check failed for ${tenantId} after ${MAX_FAILURES} attempts`);
-          }
+        if (await validateYoutubeToken(tenantId)) {
+          resetFailures(`${tenantId}:youtube`);
+        } else if (trackFailure(`${tenantId}:youtube`, MAX_FAILURES)) {
+          await sendDiscordAlert(`🚨 YouTube token health check failed for ${tenantId} after ${MAX_FAILURES} attempts`);
         }
       } catch (err: unknown) {
         const { message } = extractErrorDetails(err);
