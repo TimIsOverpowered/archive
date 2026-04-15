@@ -2,6 +2,7 @@ import path from 'path';
 import fsPromises from 'fs/promises';
 import { extractErrorDetails } from './error.js';
 import { childLogger } from './logger.js';
+import { TenantConfig } from '../config/types.js';
 
 const log = childLogger({ module: 'path' });
 
@@ -41,25 +42,13 @@ export async function deleteFileIfExists(filePath: string): Promise<void> {
   }
 }
 
-import { getTenantConfig } from '../config/loader.js';
-
-export interface VodFilePathOptions {
-  tenantId: string;
+export interface vodPathOptions {
+  config: TenantConfig;
   vodId: string;
 }
 
-export interface VodDirPathOptions {
-  tenantId: string;
-  vodId: string;
-}
-
-export interface LiveFilePathOptions {
-  tenantId: string;
-  streamId: string;
-}
-
-export interface LiveDirPathOptions {
-  tenantId: string;
+export interface LivePathOptions {
+  config: TenantConfig;
   streamId: string;
 }
 
@@ -67,58 +56,54 @@ export interface LiveDirPathOptions {
  * Gets the file path for an archived VOD.
  * Path: {vodPath}/{tenantId}/{vodId}.mp4
  */
-export function getVodFilePath(options: VodFilePathOptions): string {
-  const { tenantId, vodId } = options;
-  const config = getTenantConfig(tenantId);
+export function getVodFilePath(options: vodPathOptions): string {
+  const { config, vodId } = options;
 
   if (!config?.settings.vodPath) {
-    throw new Error(`VOD path not configured for tenant ${tenantId}`);
+    throw new Error(`VOD path not configured for tenant ${config.id}`);
   }
 
-  return path.join(config.settings.vodPath, tenantId, `${vodId}.mp4`);
+  return path.join(config.settings.vodPath, config.id, `${vodId}.mp4`);
 }
 
 /**
  * Gets the directory path for an archived VOD.
  * Path: {vodPath}/{tenantId}/{vodId}
  */
-export function getVodDirPath(options: VodDirPathOptions): string {
-  const { tenantId, vodId } = options;
-  const config = getTenantConfig(tenantId);
+export function getVodDirPath(options: vodPathOptions): string {
+  const { config, vodId } = options;
 
   if (!config?.settings.vodPath) {
-    throw new Error(`VOD path not configured for tenant ${tenantId}`);
+    throw new Error(`VOD path not configured for tenant ${config.id}`);
   }
 
-  return path.join(config.settings.vodPath, tenantId, vodId);
+  return path.join(config.settings.vodPath, config.id, vodId);
 }
 
 /**
  * Gets the file path for a live VOD.
  * Path: {livePath}/{tenantId}/{streamId}/{streamId}.mp4
  */
-export function getLiveFilePath(options: LiveFilePathOptions): string {
-  const { tenantId, streamId } = options;
-  const config = getTenantConfig(tenantId);
+export function getLiveFilePath(options: LivePathOptions): string {
+  const { config, streamId } = options;
 
   if (!config?.settings.livePath) {
-    throw new Error(`Live path not configured for tenant ${tenantId}`);
+    throw new Error(`Live path not configured for tenant ${config.id}`);
   }
 
-  return path.join(config.settings.livePath, tenantId, streamId, `${streamId}.mp4`);
+  return path.join(config.settings.livePath, config.id, streamId, `${streamId}.mp4`);
 }
 
 /**
  * Gets the directory path for a live VOD.
  * Path: {livePath}/{tenantId}/{streamId}
  */
-export function getLiveDirPath(options: LiveDirPathOptions): string {
-  const { tenantId, streamId } = options;
-  const config = getTenantConfig(tenantId);
+export function getLiveDirPath(options: LivePathOptions): string {
+  const { config, streamId } = options;
 
   if (!config?.settings.livePath) {
-    throw new Error(`Live path not configured for tenant ${tenantId}`);
+    throw new Error(`Live path not configured for tenant ${config.id}`);
   }
 
-  return path.join(config.settings.livePath, tenantId, streamId);
+  return path.join(config.settings.livePath, config.id, streamId);
 }

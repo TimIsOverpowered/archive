@@ -40,7 +40,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
   // For live streams, use stream_id; for archived, use vod_id
   const fileIdentifier = type === SOURCE_TYPES.LIVE ? vodRecord.stream_id || vodId : vodId;
 
-  const filePath = getVodFilePath({ tenantId, vodId: fileIdentifier });
+  const filePath = getVodFilePath({ config, vodId: fileIdentifier });
 
   if (!(await fileExists(filePath))) {
     const existingJob = await getStandardVodQueue().getJob(`vod_${fileIdentifier}`);

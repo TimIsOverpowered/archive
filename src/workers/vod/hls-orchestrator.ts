@@ -47,8 +47,8 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
 
   const concurrency = HLS_SEGMENT_CONCURRENCY;
 
-  const vodDir = getVodDirPath({ tenantId, vodId });
-  const finalMp4Path = getVodFilePath({ tenantId, vodId });
+  const vodDir = getVodDirPath({ config, vodId });
+  const finalMp4Path = getVodFilePath({ config, vodId });
   await fsPromises.mkdir(vodDir, { recursive: true });
 
   const m3u8Path = pathMod.join(vodDir, `${vodId}.m3u8`);

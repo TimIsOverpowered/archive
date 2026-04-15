@@ -8,7 +8,7 @@ import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound, badRequest } from '../../../utils/http-error';
 import type { Platform } from '../../../types/platforms.js';
-import { PLATFORM_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
+import { PLATFORM_VALUES } from '../../../types/platforms.js';
 import { findStreamRecord } from './utils/vod-helpers';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job';
 

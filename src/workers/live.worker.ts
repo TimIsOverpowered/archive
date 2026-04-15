@@ -32,7 +32,7 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
 
   try {
     // 1. Prepare directory
-    const vodDirPath = getVodDirPath({ tenantId, vodId });
+    const vodDirPath = getVodDirPath({ config, vodId });
     if (await fileExists(vodDirPath)) {
       await cleanupOrphanedTmpFiles(vodDirPath, log);
     }

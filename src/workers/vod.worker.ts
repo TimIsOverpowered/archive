@@ -3,15 +3,11 @@ import { getVodFilePath } from '../utils/path.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
-import { cleanupHlsFiles } from './vod/hls-cleanup.js';
-import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { createVodWorkerAlerts } from './utils/alert-factories.js';
 import type { StandardVodJob } from './jobs/queues.js';
-import { downloadVodWithFfmpeg } from './vod/vod-download-strategies.js';
-import { getKickSourceUrl } from './vod/kick-vod-helper.js';
-import type { Platform } from '../types/platforms.js';
-import { DOWNLOAD_METHODS, PLATFORMS } from '../types/platforms.js';
+import { downloadVodWithFfmpeg, downloadVodWithHls } from './vod/vod-download-strategies.js';
+import { DOWNLOAD_METHODS } from '../types/platforms.js';
 
 const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job<StandardVodJob, unknown, string>) => {
   const { dbId, vodId, platform, tenantId, downloadMethod = DOWNLOAD_METHODS.HLS } = job.data;
@@ -22,7 +18,7 @@ const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job
   const { config } = await getJobContext(tenantId);
   if (!config?.settings.vodPath) throw new Error(`VOD path not configured for ${tenantId}`);
 
-  const finalPath = getVodFilePath({ tenantId, vodId });
+  const finalPath = getVodFilePath({ config, vodId });
   const streamerName = config.displayName || tenantId;
   const alerts = createVodWorkerAlerts();
 
@@ -49,33 +45,5 @@ const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job
     throw error;
   }
 };
-
-async function downloadVodWithHls(
-  platform: Platform,
-  vodId: string,
-  finalPath: string,
-  tenantId: string,
-  config: NonNullable<Awaited<ReturnType<typeof getJobContext>>['config']>,
-  log: ReturnType<typeof createAutoLogger>
-): Promise<void> {
-  const sourceUrl = platform === PLATFORMS.KICK ? await getKickSourceUrl(config, vodId) : undefined;
-
-  const result = await downloadHlsStream({
-    dbId: 0,
-    vodId,
-    platform,
-    tenantId,
-    platformUserId: '',
-    sourceUrl,
-    isLive: false,
-  });
-
-  if (result.finalMp4Path !== finalPath) {
-    log.warn({ expected: finalPath, actual: result.finalMp4Path }, 'MP4 path mismatch');
-  }
-
-  const shouldKeepHls = config?.settings.saveHLS ?? false;
-  await cleanupHlsFiles(result.outputDir, shouldKeepHls, log);
-}
 
 export default vodProcessor;
