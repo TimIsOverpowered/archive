@@ -16,7 +16,7 @@ export interface VodUploadContext {
   tenantId: string;
   dbId: number;
   vodId: string;
-  filePath: string;
+  filePath?: string;
   db: PrismaClient;
   config: TenantConfig;
   vodRecord: VodRecord;
@@ -32,11 +32,16 @@ export interface VodUploadResult {
 
 export async function processVodUpload(ctx: VodUploadContext): Promise<VodUploadResult> {
   const { tenantId, filePath, config, vodRecord } = ctx;
+
+  if (!filePath) {
+    throw new Error('File path is required for VOD upload');
+  }
+
   const channelName = config.displayName || tenantId;
   const domainName = config.settings?.domainName || 'localhost';
   const privacyStatus = config.youtube!.public ? 'public' : 'unlisted';
   const splitDuration = getEffectiveSplitDuration(config.youtube!.splitDuration);
-  const duration = (await getDuration(filePath)) ?? 0;
+  const duration = (await getDuration(filePath)) ?? vodRecord.duration;
 
   const platformName = vodRecord.platform as Platform;
 
@@ -75,6 +80,11 @@ interface SplitVodUploadContext extends VodUploadContext {
 
 async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUploadResult> {
   const { tenantId, vodId, filePath, duration, splitDuration, channelName, domainName, privacyStatus, platformName, config, log, vodRecord, type } = ctx;
+
+  if (!filePath) {
+    throw new Error('File path is required for VOD upload');
+  }
+
   const totalParts = Math.ceil(duration / splitDuration);
 
   log.info({ duration, parts: totalParts }, 'VOD exceeds YouTube split duration, auto-splitting');
@@ -174,6 +184,10 @@ interface SingleVodUploadContext extends VodUploadContext {
 
 async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodUploadResult> {
   const { tenantId, vodId, filePath, channelName, domainName, privacyStatus, platformName, config, type, dbId, db, dmcaProcessed, vodRecord } = ctx;
+
+  if (!filePath) {
+    throw new Error('File path is required for VOD upload');
+  }
 
   const title = vodRecord.title?.replace(/>|</gi, '') || '';
   const { description: youtubeDescription } = buildYoutubeMetadata({

@@ -5,7 +5,7 @@ import { WorkerConfig } from './worker-definitions.js';
 import type { Redis } from 'ioredis';
 
 export function createWorker<TData extends object, TResult>(config: WorkerConfig<TData, TResult> & { connection: Redis }): Worker<TData, TResult> {
-  const { name, queueName, processor, connection, concurrency = 3 } = config;
+  const { name, queueName, processor, connection, concurrency = 1 } = config;
 
   const worker = new Worker<TData, TResult>(queueName, processor, {
     connection,

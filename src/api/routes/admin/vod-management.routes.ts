@@ -5,7 +5,7 @@ import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { badRequest } from '../../../utils/http-error';
+import { badRequest, notFound } from '../../../utils/http-error';
 import { findVodRecord } from './utils/vod-helpers';
 import { getApiConfig } from '../../../config/env.js';
 import { Platform, PLATFORM_VALUES } from '../../../types/platforms';
@@ -24,7 +24,7 @@ interface DeleteVodBody {
   platform: Platform;
 }
 interface CreateVodBody {
-  vodId?: string;
+  vodId: string;
   title?: string;
   createdAt?: string;
   duration?: number;
@@ -87,31 +87,31 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
     },
     async (request) => {
       const { tenantId, db, platform } = request.tenant as TenantPlatformContext;
-      const body = request.body;
+      const { vodId, title, createdAt, duration } = request.body;
       const log = createAutoLogger(tenantId);
 
       // Validate vodId is provided
-      if (!body.vodId) {
+      if (!vodId) {
         badRequest('vodId is required');
       }
 
-      const vodRecord = await findVodRecord(db, body.vodId, platform);
+      const vodRecord = await findVodRecord(db, vodId, platform);
 
       if (vodRecord) {
-        return { data: { message: `${body.vodId} already exists!`, vodId: body.vodId } };
+        return { data: { message: `${vodId} already exists!`, vodId: vodId } };
       }
 
       const newVod = await db.vod.create({
         data: {
-          vod_id: body.vodId,
-          title: body.title || null,
-          created_at: body.createdAt ? new Date(body.createdAt) : undefined,
-          duration: Number(body.duration) || 0,
-          platform: body.platform,
+          vod_id: vodId,
+          title: title || null,
+          created_at: createdAt ? new Date(createdAt) : new Date(),
+          duration: Number(duration) || 0,
+          platform: platform,
         },
       });
 
-      log.info(`Created VOD ${body.vodId}`);
+      log.info(`Created VOD ${vodId}`);
 
       return { data: { message: `${newVod.id} created!`, vodId: newVod.id } };
     }
@@ -146,6 +146,10 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       const { tenantId, db, platform } = request.tenant as TenantPlatformContext;
       const { vodId } = request.body;
       const log = createAutoLogger(tenantId);
+
+      const vodRecord = findVodRecord(db, vodId, platform);
+
+      if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
       await db.vod.delete({ where: { platform_vod_id: { vod_id: vodId, platform } } });
 

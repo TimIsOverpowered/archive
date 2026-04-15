@@ -70,6 +70,14 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
 
     await updateAlert(messageId, alerts.complete(vodId, actualDuration ? Math.round(actualDuration) : undefined));
 
+    // 4. Save Emotes
+    try {
+      await fetchAndSaveEmotes(ctx, dbId, platform, platformUserId);
+      log.info({ vodId }, 'Queued emote save');
+    } catch (error) {
+      log.warn({ ...extractErrorDetails(error), vodId }, 'Failed to save emotes (non-fatal)');
+    }
+
     // 4. Queue upload (non-fatal)
     try {
       await queueYoutubeUploads({ ctx, dbId, vodId, filePath: finalMp4Path, platform, log });
@@ -82,13 +90,6 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
       log.info({ vodId }, 'Queued chat download job');
     } catch (error) {
       log.warn({ ...extractErrorDetails(error), vodId }, 'Failed to queue chat download (non-fatal)');
-    }
-
-    try {
-      await fetchAndSaveEmotes(ctx, dbId, platform, platformUserId);
-      log.info({ vodId }, 'Queued emote save');
-    } catch (error) {
-      log.warn({ ...extractErrorDetails(error), vodId }, 'Failed to save emotes (non-fatal)');
     }
 
     // 6. Cleanup HLS segments

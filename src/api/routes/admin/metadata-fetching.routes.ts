@@ -9,6 +9,7 @@ import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
 import { findVodRecord } from './utils/vod-helpers.js';
 import { fetchAndSaveEmotes } from '../../../services/emotes';
+import { triggerChatDownload } from '../../../workers/jobs/chat.job';
 
 type RouteParams = { tenantId: string };
 
@@ -17,7 +18,7 @@ interface ChaptersBody {
   platform: Platform;
 }
 
-interface EmotesSaveBody {
+interface SaveBody {
   vodId: string;
   platform: Platform;
 }
@@ -74,7 +75,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
   );
 
   // Fetch and save emote metadata for a VOD
-  fastify.post<{ Params: RouteParams; Body: EmotesSaveBody }>(
+  fastify.post<{ Params: RouteParams; Body: SaveBody }>(
     '/vods/emotes',
     {
       schema: {
@@ -110,6 +111,46 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       await fetchAndSaveEmotes(request.tenant as TenantPlatformContext, vodRecord.id, platform, platformId);
 
       return { data: { message: `Emote saving completed for ${vodId}`, vodId, platform } };
+    }
+  );
+
+  // Fetch and save emote metadata for a VOD
+  fastify.post<{ Params: RouteParams; Body: SaveBody }>(
+    '/vods/chat',
+    {
+      schema: {
+        tags: ['Admin'],
+        description: 'Fetch and save chat data for a VOD',
+        params: { type: 'object', properties: { tenantId: { type: 'string', description: 'Tenant ID' } }, required: ['tenantId'] },
+        body: {
+          type: 'object',
+          properties: {
+            vodId: { type: 'string', description: 'Platform VOD ID' },
+            platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Source platform' },
+          },
+          required: ['vodId', 'platform'],
+        },
+        security: [{ apiKey: [] }],
+      },
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      preValidation: [platformValidationMiddleware],
+    },
+    async (request) => {
+      const { db, platform, config, tenantId } = request.tenant as TenantPlatformContext;
+      const { vodId } = request.body;
+
+      const vodRecord = await findVodRecord(db, vodId, platform);
+
+      if (!vodRecord) notFound(`VOD ${vodId} not found`);
+
+      // Queue emote save job (fire-and-forget within request context)
+      const platformId = config?.[platform]?.id;
+
+      if (!platformId) badRequest(`No platform ID available for ${platform} ${vodId}`);
+
+      const jobId = await triggerChatDownload(tenantId, platformId, vodRecord.id, vodId, platform, Math.round(vodRecord.duration), config?.[platform]?.username);
+
+      return { data: { message: `Queueing chat job ${vodId}`, vodId, platform, jobId } };
     }
   );
 

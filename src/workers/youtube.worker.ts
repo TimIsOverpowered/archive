@@ -12,8 +12,24 @@ import { PrismaClient } from '../../generated/streamer/client.js';
 
 const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async (job: Job<YoutubeUploadJob>) => {
   const { tenantId, dbId, vodId, type } = job.data;
+  let filePath = job.data.filePath;
 
   const log = createAutoLogger(String(tenantId));
+
+  // If filePath is not set, try to get it from the download job result (FlowProducer child)
+  if (!filePath) {
+    const childResults = await job.getChildrenValues();
+    const downloadResult = Object.values(childResults)[0] as { finalPath?: string };
+
+    if (!downloadResult?.finalPath) {
+      throw new Error(`File path not available for vodId=${vodId}, jobId=${job.id}: download job may have failed or not completed`);
+    }
+
+    filePath = downloadResult.finalPath;
+    job.data.filePath = filePath;
+    log.debug({ vodId, filePath, jobId: job.id }, 'Retrieved filePath from download job result');
+  }
+
   const { config, db } = await getJobContext(tenantId);
 
   if (!config || !config.youtube) {
@@ -22,9 +38,9 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
   try {
     if (type === UPLOAD_TYPES.VOD) {
-      return await processVodUploadJob(job.data as YoutubeVodUploadJob, config, db, log);
+      return await processVodUploadJob({ ...job.data, filePath: filePath! } as YoutubeVodUploadJob & { filePath: string }, config, db, log);
     } else {
-      return await processGameUploadJob(job.data as YoutubeGameUploadJob, config, db, log);
+      return await processGameUploadJob({ ...job.data, filePath: filePath! } as YoutubeGameUploadJob & { filePath: string }, config, db, log);
     }
   } catch (error) {
     const errorMsg = handleWorkerError(error, log, { vodId, tenantId, dbId, jobId: job.id });
@@ -40,7 +56,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
   }
 };
 
-async function processVodUploadJob(job: YoutubeVodUploadJob, config: TenantConfig, db: PrismaClient, log: AppLogger): Promise<YoutubeUploadResult> {
+async function processVodUploadJob(job: YoutubeVodUploadJob & { filePath: string }, config: TenantConfig, db: PrismaClient, log: AppLogger): Promise<YoutubeUploadResult> {
   const { tenantId, dbId, vodId, filePath, dmcaProcessed, vodRecord } = job;
 
   const result = await processVodUpload({
@@ -73,7 +89,7 @@ async function processVodUploadJob(job: YoutubeVodUploadJob, config: TenantConfi
   return { success: true, videos: result.uploadedVideos };
 }
 
-async function processGameUploadJob(job: YoutubeGameUploadJob, config: TenantConfig, db: PrismaClient, log: AppLogger): Promise<YoutubeUploadResult> {
+async function processGameUploadJob(job: YoutubeGameUploadJob & { filePath: string }, config: TenantConfig, db: PrismaClient, log: AppLogger): Promise<YoutubeUploadResult> {
   const { tenantId, dbId, vodId, filePath, platform, chapterName, chapterStart, chapterEnd, chapterGameId, title, description } = job;
 
   if (platform === PLATFORMS.TWITCH && !config.twitch?.mainPlatform) {
