@@ -526,6 +526,8 @@ async function enqueueLiveHlsDownload(params: {
         attempts: 10,
         backoff: { type: 'exponential' as const, delay: 5000 },
         deduplication: { id: `live_hls_${params.vodId}` },
+        removeOnComplete: true,
+        removeOnFail: true,
       },
       { info: log.info.bind(log), debug: log.debug.bind(log) },
       `[Monitor] Live HLS download job enqueued successfully`,
