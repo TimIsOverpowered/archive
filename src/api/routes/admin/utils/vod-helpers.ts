@@ -1,6 +1,6 @@
 import { FastifyRequest } from 'fastify';
 import { getClient } from '../../../../db/client.js';
-import { getVodData, type VodData as TwitchVodData } from '../../../../services/twitch/index.js';
+import { getVodData, saveVodChapters, type VodData as TwitchVodData } from '../../../../services/twitch/index.js';
 import { getVod as getKickVod } from '../../../../services/kick.js';
 import { getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
 import { getDuration } from '../../../../workers/vod/ffmpeg.js';
@@ -105,27 +105,6 @@ export function parseDurationToSeconds(duration: number | string, platform?: Pla
   }
 
   return 0;
-}
-
-/**
- * Queues emote fetch job with proper error handling
- */
-export async function queueEmoteFetch(options: QueueEmoteOptions): Promise<void> {
-  const { tenantId, vodId, platform, platformId, log } = options;
-
-  void import('../../../../services/emotes')
-    .then(({ fetchAndSaveEmotes }) =>
-      fetchAndSaveEmotes(tenantId, vodId, platform, platformId).catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        log.error(`[${vodId}] Emote save failed: ${msg}`);
-      })
-    )
-    .catch((err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      log.error(`[${vodId}] Emote save failed: ${msg}`);
-    });
-
-  log.info(`[${tenantId}] Queued async emote fetch for ${vodId} (platform=${platform}) (platformId=${platformId})`);
 }
 
 /**
@@ -252,6 +231,8 @@ export async function ensureVodRecord(config: TenantConfig, client: PrismaClient
     })) as VodRecord;
 
     log.info(`Created Twitch VOD ${vodId} with user_id=${vodMetadata.user_id}`);
+
+    await saveVodChapters(vodRecord.id, vodRecord.vod_id, config.id, vodRecord.duration, client);
   } else if (platform === PLATFORMS.KICK) {
     if (!config?.kick?.username) {
       return null;

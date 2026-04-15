@@ -8,7 +8,8 @@ import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest, notFound } from '../../../utils/http-error';
 import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
-import { findVodRecord, queueEmoteFetch } from './utils/vod-helpers.js';
+import { findVodRecord } from './utils/vod-helpers.js';
+import { fetchAndSaveEmotes } from '../../../services/emotes';
 
 type RouteParams = { tenantId: string };
 
@@ -108,13 +109,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
       if (!platformId) badRequest(`No platform ID available for ${platform} ${vodId}`);
 
-      await queueEmoteFetch({
-        tenantId,
-        vodId: vodRecord.id,
-        platform,
-        platformId,
-        log,
-      });
+      await fetchAndSaveEmotes(tenantId, vodRecord.id, platform, platformId);
 
       return { data: { message: `Emote saving completed for ${vodId}`, vodId, platform } };
     }

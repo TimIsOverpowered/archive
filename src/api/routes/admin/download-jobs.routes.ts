@@ -2,12 +2,13 @@ import { FastifyInstance } from 'fastify';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
-import { parseDurationToSeconds, queueEmoteFetch, ensureVodRecord, findVodRecord } from './utils/vod-helpers';
+import { parseDurationToSeconds, ensureVodRecord, findVodRecord } from './utils/vod-helpers';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
 import { SOURCE_TYPES, DOWNLOAD_METHODS, UPLOAD_MODES, PLATFORM_VALUES, UPLOAD_MODE_VALUES, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES_VALUES } from '../../../types/platforms.js';
+import { fetchAndSaveEmotes } from '../../../services/emotes';
 
 interface ReDownloadVodParams {
   tenantId: string;
@@ -69,13 +70,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       const platformId = config?.[platform]?.id;
 
       if (platformId) {
-        await queueEmoteFetch({
-          tenantId,
-          vodId: vodRecord.id,
-          platform,
-          platformId,
-          log,
-        });
+        await fetchAndSaveEmotes(tenantId, vodRecord.id, platform, platformId);
       } else {
         log.warn(`No platform ID available for emote fetching on VOD ${request.body.vodId}`);
       }
