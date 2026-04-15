@@ -17,6 +17,7 @@ export interface RequestOptions<R extends ResponseType = 'json'> {
     maxDelayMs?: number;
   };
   logContext?: Record<string, unknown>;
+  signal?: AbortSignal;
 }
 
 export type RequestResult<T, R extends ResponseType> = R extends 'json' ? T : R extends 'text' ? string : R extends 'blob' ? Blob : R extends 'arrayBuffer' ? ArrayBuffer : Response;
@@ -97,46 +98,40 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(url:
   try {
     const result = await retryWithBackoff(
       async () => {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        const signals: AbortSignal[] = [AbortSignal.timeout(timeoutMs)];
+        if (options?.signal) signals.push(options.signal);
+        const combinedSignal = AbortSignal.any(signals);
 
-        try {
-          const response = await fetch(urlStr, {
-            method,
-            headers: finalHeaders,
-            body: preparedBody,
-            signal: controller.signal,
-          });
+        const response = await fetch(urlStr, {
+          method,
+          headers: finalHeaders,
+          body: preparedBody,
+          signal: combinedSignal,
+        });
 
-          clearTimeout(timeoutId);
-
-          if (!response.ok) {
-            throw new HttpError(response.status, `HTTP ${response.status}: ${response.statusText}`);
-          }
-
-          let parsedData: unknown;
-          switch (actualResponseType) {
-            case 'json':
-              parsedData = await response.json();
-              break;
-            case 'text':
-              parsedData = await response.text();
-              break;
-            case 'blob':
-              parsedData = await response.blob();
-              break;
-            case 'arrayBuffer':
-              parsedData = await response.arrayBuffer();
-              break;
-            case 'response':
-              return response as RequestResult<T, R>;
-          }
-
-          return parsedData as RequestResult<T, R>;
-        } catch (error) {
-          clearTimeout(timeoutId);
-          throw error;
+        if (!response.ok) {
+          throw new HttpError(response.status, `HTTP ${response.status}: ${response.statusText}`);
         }
+
+        let parsedData: unknown;
+        switch (actualResponseType) {
+          case 'json':
+            parsedData = await response.json();
+            break;
+          case 'text':
+            parsedData = await response.text();
+            break;
+          case 'blob':
+            parsedData = await response.blob();
+            break;
+          case 'arrayBuffer':
+            parsedData = await response.arrayBuffer();
+            break;
+          case 'response':
+            return response as RequestResult<T, R>;
+        }
+
+        return parsedData as RequestResult<T, R>;
       },
       {
         attempts: retryOptions?.attempts ?? 3,
@@ -156,4 +151,19 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(url:
     logger.error({ method, url: scrubbedUrl, duration, error: message, ...logContext }, '[HTTP] FAILED');
     throw error;
   }
+}
+
+export function safeRequest<T = unknown>(url: string | URL, defaultValue: T, options?: RequestOptions<'json'>): Promise<T>;
+export function safeRequest(url: string | URL, defaultValue: string, options?: RequestOptions<'text'>): Promise<string>;
+export function safeRequest(url: string | URL, defaultValue: Blob, options?: RequestOptions<'blob'>): Promise<Blob>;
+export function safeRequest(url: string | URL, defaultValue: ArrayBuffer, options?: RequestOptions<'arrayBuffer'>): Promise<ArrayBuffer>;
+export function safeRequest(url: string | URL, defaultValue: Response, options?: RequestOptions<'response'>): Promise<Response>;
+export function safeRequest(url: string | URL, defaultValue: unknown, options?: RequestOptions<ResponseType>): Promise<unknown> {
+  return (async () => {
+    try {
+      return await request(url, options as RequestOptions<'json'> | undefined);
+    } catch {
+      return defaultValue;
+    }
+  })();
 }
