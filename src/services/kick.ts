@@ -5,8 +5,6 @@ import dayjs from 'dayjs';
 import durationPlugin from 'dayjs/plugin/duration';
 import { extractErrorDetails, createErrorContext } from '../utils/error.js';
 import { sleep } from '../utils/delay.js';
-import { sendVodDownloadStarted, sendVodDownloadSuccess, sendVodDownloadFailed } from '../utils/discord-alerts.js';
-import { convertHlsToMp4 } from '../workers/vod/ffmpeg.js';
 import { childLogger } from '../utils/logger.js';
 import { getTenantConfig } from '../config/loader.js';
 import { toHHMMSS } from '../utils/formatting.js';
@@ -41,25 +39,59 @@ function getKickParsedM3u8(m3u8: string, baseURL: string): string | null {
 }
 
 export interface KickVod {
-  id: string;
-  slug?: string | null;
-  channel_id?: number | null;
-  session_title?: string | null;
-  duration?: number | null;
-  views?: number | null;
-  published_at?: string | null;
+  id: number;
+  slug: string | null;
+  channel_id: number;
   created_at: string;
-  source?: string | null;
-  is_live?: boolean | null;
-  start_time?: string | null;
-  language?: string | null;
-  is_mature?: boolean | null;
-  viewer_count?: number | null;
-  tags?: string[] | null;
-  thumbnail?: {
-    src?: string | null;
-    srcset?: string | null;
+  session_title: string | null;
+  is_live: boolean;
+  risk_level_id: number | null;
+  start_time: string | null;
+  source: string | null;
+  twitch_channel: string | null;
+  duration: number;
+  language: string | null;
+  is_mature: boolean;
+  viewer_count: number | null;
+  tags: string[] | null;
+  thumbnail: {
+    src: string | null;
+    srcset: string | null;
   } | null;
+  views: number | null;
+  video: {
+    id: number;
+    live_stream_id: number;
+    slug: string | null;
+    thumb: string | null;
+    s3: string | null;
+    trading_platform_id: number | null;
+    created_at: string;
+    updated_at: string;
+    uuid: string;
+    views: number;
+    deleted_at: string | null;
+    is_pruned: boolean;
+    is_private: boolean;
+    status: string;
+  } | null;
+  categories: Array<{
+    id: number;
+    category_id: number;
+    name: string;
+    slug: string;
+    tags: string[];
+    description: string | null;
+    deleted_at: string | null;
+    is_mature: boolean;
+    is_promoted: boolean;
+    viewers: number;
+    is_fallback: boolean;
+    banner: {
+      responsive: string | null;
+      url: string | null;
+    } | null;
+  }> | null;
 }
 
 export async function getVod(channelName: string, vodId: string): Promise<KickVod> {
@@ -77,13 +109,13 @@ export async function getVod(channelName: string, vodId: string): Promise<KickVo
     await sleep(KICK_PAGE_DELAY_MS);
 
     // Use extracted data from navigator if available
-    let dataArray: unknown[] | undefined;
+    let dataArray: KickVod[] | undefined;
     if ('data' in result && Array.isArray(result.data)) {
-      dataArray = result.data as unknown[];
+      dataArray = result.data as KickVod[];
     } else {
       const content = await page.content();
       try {
-        dataArray = JSON.parse(content);
+        dataArray = JSON.parse(content) as KickVod[];
       } catch (error) {
         log.error(createErrorContext(error, { channelName }), `Failed to parse videos API for VOD ${vodId}`);
         throw new Error(`VOD ${vodId} not found`);
@@ -94,78 +126,18 @@ export async function getVod(channelName: string, vodId: string): Promise<KickVo
       throw new Error(`VOD ${vodId} not found`);
     }
 
-    const video = dataArray.find((v): v is Record<string, unknown> & { id: string | number } => {
+    const video = dataArray.find((v): v is KickVod => {
       if (!v || typeof v !== 'object') return false;
-      return String((v as { id?: string | number }).id ?? '') === vodId;
+      return v.id === Number(vodId);
     });
 
     if (!video) {
       throw new Error(`VOD ${vodId} not found`);
     }
 
-    return {
-      id: String(video.id),
-      slug: (video.slug as string) ?? null,
-      session_title: (video.session_title as string) ?? null,
-      duration: video.duration ? Number(video.duration) : null,
-      created_at: String(video.createdAt || ''),
-      source: (video.source as string) ?? null,
-    };
+    return video;
   } finally {
     await page.close();
-  }
-}
-
-/**
- * Download Kick VOD directly to MP4 using ffmpeg HLS streaming
- */
-export async function downloadMP4(tenantId: string, vod: KickVod): Promise<string | null> {
-  if (!vod.source) {
-    throw new Error('VOD source URL not available');
-  }
-
-  const config = getTenantConfig(tenantId);
-
-  if (!config?.settings.vodPath) {
-    throw new Error(`No vodPath configured for streamer ${tenantId}`);
-  }
-
-  let messageId: string | null = null;
-
-  try {
-    // Fetch and parse HLS playlist to get direct media URL
-    const m3u8Url = await getKickParsedM3u8ForFfmpeg(vod.source);
-
-    if (!m3u8Url) {
-      throw new Error('Failed to parse Kick HLS playlist');
-    }
-
-    const { getVodFilePath } = await import('../utils/path.js');
-
-    const vodPath = getVodFilePath({ tenantId, vodId: vod.id });
-
-    const streamerName = config.displayName || tenantId;
-    messageId = await sendVodDownloadStarted('kick', tenantId, vod.id, streamerName);
-
-    // Download directly to MP4 using ffmpeg HLS streaming
-    await convertHlsToMp4(m3u8Url, vodPath, { vodId: vod.id, isFmp4: false });
-
-    log.info(`Downloaded ${vod.id}.mp4`);
-
-    // Success alert
-    await sendVodDownloadSuccess(messageId!, 'kick', vod.id, vodPath, streamerName);
-
-    return vodPath;
-  } catch (error) {
-    const details = extractErrorDetails(error);
-    const errorMsg = details.message.substring(0, 500);
-
-    log.error(`ffmpeg error occurred: ${errorMsg}`);
-
-    // Failure alert
-    await sendVodDownloadFailed(messageId!, 'kick', vod.id, errorMsg, tenantId);
-
-    throw error;
   }
 }
 
@@ -202,8 +174,6 @@ export async function getKickParsedM3u8ForFfmpeg(sourceUrl: string): Promise<str
     await session.close(); // Always clean up CycleTLS session
   }
 }
-
-export default downloadMP4;
 
 export async function getKickCategoryInfo(slug: string): Promise<Record<string, unknown> | null> {
   try {

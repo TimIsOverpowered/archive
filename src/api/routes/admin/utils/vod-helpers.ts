@@ -1,7 +1,7 @@
 import { FastifyRequest } from 'fastify';
 import { getClient } from '../../../../db/client.js';
 import { getVodData, type VodData as TwitchVodData } from '../../../../services/twitch/index.js';
-import { getVod, type KickVod } from '../../../../services/kick.js';
+import { getVod as getKickVod } from '../../../../services/kick.js';
 import { getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
 import { getDuration } from '../../../../workers/vod/ffmpeg.js';
 import { getStandardVodQueue, type StandardVodJob } from '../../../../workers/jobs/queues.js';
@@ -143,7 +143,7 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
   }
 
   // Determine file path based on type
-  const filePath = type === SOURCE_TYPES.LIVE ? getLiveFilePath({ tenantId, streamId: vodId }) : getVodFilePath({ tenantId, vodId });
+  const filePath = type === SOURCE_TYPES.LIVE ? getLiveFilePath({ config, streamId: vodId }) : getVodFilePath({ config, vodId });
 
   const needsDownload = await checkIfDownloadNeeded(filePath, dbId, tenantId, platform, log);
 
@@ -257,14 +257,14 @@ export async function ensureVodRecord(config: TenantConfig, client: PrismaClient
       return null;
     }
 
-    const vodMetadata: KickVod = await getVod(config.kick.username, vodId);
+    const vodMetadata = await getKickVod(config.kick.username, vodId);
 
     log.info(`Fetched Kick VOD ${vodId} from channel ${config.kick.username}`);
 
     vodRecord = (await client.vod.create({
       data: {
         vod_id: vodId,
-        title: vodMetadata.session_title || null,
+        title: vodMetadata.session_title,
         created_at: new Date(vodMetadata.created_at),
         duration: Math.floor(Number(vodMetadata.duration) / 1000),
         stream_id: `${vodMetadata.id}`,

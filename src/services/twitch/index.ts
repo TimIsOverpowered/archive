@@ -29,8 +29,5 @@ export {
 // Badges
 export { getChannelBadges, getGlobalBadges } from './badges.js';
 
-// Download
-export { downloadVodAsMp4 } from './download.js';
-
 // Live
 export { getTwitchStreamStatus, getLatestTwitchVodObject, type TwitchStreamStatus } from './live.js';
