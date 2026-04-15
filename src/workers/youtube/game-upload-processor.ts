@@ -32,6 +32,10 @@ export type GameUploadResult =
 export async function processGameUpload(ctx: GameUploadContext): Promise<GameUploadResult> {
   const { filePath, chapterStart, chapterEnd } = ctx;
 
+  if (!filePath) {
+    throw new Error('File path is required for game upload');
+  }
+
   const trimmedPath = await trimVideo(filePath, chapterStart, chapterEnd, `${ctx.vodId}-${ctx.chapterName}`);
   const trimmedDuration = (await getDuration(trimmedPath)) ?? 0;
 

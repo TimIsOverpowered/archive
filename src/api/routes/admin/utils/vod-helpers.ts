@@ -13,6 +13,7 @@ import { fetchAndSaveEmotes } from '../../../../services/emotes.js';
 import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { parsePTDuration } from '../../../../utils/formatting.js';
 import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
+import { triggerChatDownload } from '../../../../workers/jobs/chat.job.js';
 
 export interface VodCreateOptions {
   vodId: number;
@@ -183,8 +184,10 @@ export async function ensureVodRecord(ctx: TenantPlatformContext, vodId: string,
     log.info(`Created Twitch VOD ${vodId} with user_id=${vodMetadata.user_id}`);
 
     await saveVodChapters(ctx, vodRecord.id, vodRecord.vod_id, vodRecord.duration);
-    if (config?.[platform]?.id) {
-      await fetchAndSaveEmotes(ctx, vodRecord.id, platform, config?.[platform]?.id);
+    const platformUserId = config?.[platform]?.id;
+    if (platformUserId) {
+      await fetchAndSaveEmotes(ctx, vodRecord.id, platform, platformUserId);
+      triggerChatDownload(tenantId, platformUserId, vodRecord.id, vodId, platform, Math.round(vodRecord.duration), config?.[platform]?.username);
     }
   } else if (platform === PLATFORMS.KICK) {
     if (!config?.kick?.username) {

@@ -3,11 +3,12 @@ import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
-import { notFound, badRequest } from '../../../utils/http-error';
-import type { Platform, SourceType, DownloadMethod } from '../../../types/platforms.js';
-import { SOURCE_TYPES, DOWNLOAD_METHODS, UPLOAD_MODES, PLATFORM_VALUES, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES_VALUES } from '../../../types/platforms.js';
-import { findVodRecord } from './utils/vod-helpers.js';
-import { getStandardVodQueue } from '../../../workers/jobs/queues.js';
+import { notFound } from '../../../utils/http-error';
+import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
+import { SOURCE_TYPES, DOWNLOAD_METHODS, PLATFORM_VALUES, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES_VALUES, UPLOAD_MODE_VALUES, UPLOAD_MODES } from '../../../types/platforms.js';
+import { ensureVodDownload, findVodRecord } from './utils/vod-helpers.js';
+import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job';
+import { createAutoLogger } from '../../../utils/auto-tenant-logger';
 
 interface ReUploadYoutubeParams {
   tenantId: string;
@@ -17,7 +18,8 @@ interface ReUploadYoutubeBody {
   vodId: string;
   platform: Platform;
   downloadMethod?: DownloadMethod;
-  type?: SourceType;
+  uploadMode?: UploadMode;
+  type: SourceType;
 }
 
 export default async function youtubeUploadRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
@@ -41,6 +43,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
             vodId: { type: 'string', description: 'Platform VOD ID' },
             platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Source platform' },
             downloadMethod: { type: 'string', enum: DOWNLOAD_METHODS_VALUES, default: DOWNLOAD_METHODS.HLS, description: 'Download method' },
+            uploadMode: { type: 'string', enum: UPLOAD_MODE_VALUES, default: UPLOAD_MODES.ALL },
             type: { type: 'string', enum: SOURCE_TYPES_VALUES, default: SOURCE_TYPES.VOD, description: 'File type for checking' },
           },
           required: ['vodId', 'platform'],
@@ -51,30 +54,51 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, config, db, platform } = request.tenant as TenantPlatformContext;
-      const { vodId, downloadMethod } = request.body;
+      const { tenantId, platform, db } = request.tenant as TenantPlatformContext;
+      const { vodId, type, downloadMethod, uploadMode } = request.body;
+      const log = createAutoLogger(tenantId);
 
-      if (!config?.youtube) badRequest('YouTube integration not configured for this tenant');
-
+      // Ensure VOD record exists or create it from platform API metadata
       const vodRecord = await findVodRecord(db, vodId, platform);
 
-      if (!vodRecord) notFound(`VOD ${vodId} not found`);
+      if (!vodRecord) {
+        notFound(`VOD ${vodId} not found on ${platform}`);
+      }
 
-      const downloadJob = {
-        tenantId,
-        platformUserId: tenantId,
-        dbId: vodRecord.id,
-        vodId: vodRecord.vod_id,
+      const dbId = vodRecord.id;
+
+      // Ensure vod download
+      const { jobId, filePath } = await ensureVodDownload({ ctx: request.tenant as TenantPlatformContext, dbId, vodId, type, downloadMethod, log });
+
+      // Queue Youtube upload
+      await queueYoutubeUploads({
+        ctx: request.tenant as TenantPlatformContext,
+        dbId,
+        vodId,
+        filePath,
         platform,
-        uploadMode: UPLOAD_MODES.VOD,
-        downloadMethod: downloadMethod || DOWNLOAD_METHODS.HLS,
-      };
+        uploadMode,
+        downloadJobId: jobId ?? undefined,
+        log,
+      });
 
-      const downloadJobId = `download_${vodRecord.vod_id}`;
-
-      void getStandardVodQueue().add('standard_vod_download', downloadJob, { jobId: downloadJobId });
-
-      return { data: { message: 'VOD download queued, YouTube upload will be triggered after completion', dbId: vodRecord.id, vodId: vodRecord.vod_id, downloadJobId } };
+      if (jobId) {
+        return {
+          data: {
+            message: 'VOD download queued, YouTube upload will be triggered after completion',
+            dbId: vodRecord.id,
+            vodId: vodRecord.vod_id,
+            jobId,
+          },
+        };
+      } else {
+        return {
+          data: {
+            message: 'Youtube upload queued!',
+            filePath,
+          },
+        };
+      }
     }
   );
 

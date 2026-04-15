@@ -9,6 +9,7 @@ import { badRequest, notFound } from '../../../utils/http-error';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
 import { SOURCE_TYPES, DOWNLOAD_METHODS, UPLOAD_MODES, PLATFORM_VALUES, UPLOAD_MODE_VALUES, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES_VALUES } from '../../../types/platforms.js';
 import { triggerChatDownload } from '../../../workers/jobs/chat.job';
+import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job';
 
 interface Params {
   tenantId: string;
@@ -62,7 +63,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
     },
     async (request) => {
       const { tenantId, platform } = request.tenant as TenantPlatformContext;
-      const { vodId, type, downloadMethod } = request.body;
+      const { vodId, type, downloadMethod, uploadMode } = request.body;
       const log = createAutoLogger(tenantId);
 
       // Ensure VOD record exists or create it from platform API metadata
@@ -77,11 +78,17 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       // Ensure vod download
       const { jobId, filePath } = await ensureVodDownload({ ctx: request.tenant as TenantPlatformContext, dbId, vodId, type, downloadMethod, log });
 
-      // Queue Chat download
-      const chatJobId = `chat_${vodRecord.vod_id}`;
-
       // Queue Youtube upload
-      const youtubeJobId = `youtube_${vodRecord.vod_id}`;
+      await queueYoutubeUploads({
+        ctx: request.tenant as TenantPlatformContext,
+        dbId,
+        vodId,
+        filePath,
+        platform,
+        uploadMode,
+        downloadJobId: jobId ?? undefined,
+        log,
+      });
 
       if (jobId) {
         return {
@@ -90,8 +97,6 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
             dbId: vodRecord.id,
             vodId: vodRecord.vod_id,
             jobId,
-            chatJobId,
-            youtubeJobId,
           },
         };
       } else {
@@ -99,8 +104,6 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           data: {
             message: 'Youtube upload queued!',
             filePath,
-            chatJobId,
-            youtubeJobId,
           },
         };
       }
@@ -131,7 +134,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, platform, db, config } = request.tenant as TenantPlatformContext;
+      const { tenantId, platform, db } = request.tenant as TenantPlatformContext;
       const { vodId, type, downloadMethod } = request.body;
       const log = createAutoLogger(tenantId);
 
@@ -147,14 +150,6 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       // Ensure vod download
       const { jobId, filePath } = await ensureVodDownload({ ctx: request.tenant as TenantPlatformContext, dbId, vodId, type, downloadMethod, log });
 
-      const platformConfig = config?.[platform];
-
-      let chatJobId;
-      if (platformConfig?.id) {
-        // Queue Chat Download
-        chatJobId = await triggerChatDownload(tenantId, platformConfig.id, dbId, vodId, platform, vodRecord.duration, platformConfig?.username);
-      }
-
       if (jobId) {
         return {
           data: {
@@ -162,7 +157,6 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
             dbId,
             vodId,
             jobId,
-            chatJobId,
           },
         };
       } else {

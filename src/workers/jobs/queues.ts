@@ -38,7 +38,7 @@ export interface YoutubeVodUploadJob {
   tenantId: string;
   dbId: number;
   vodId: string;
-  filePath: string;
+  filePath?: string;
   type: UploadType;
   platform: Platform;
   dmcaProcessed?: boolean;
@@ -49,7 +49,7 @@ export interface YoutubeGameUploadJob {
   tenantId: string;
   dbId: number;
   vodId: string;
-  filePath: string;
+  filePath?: string;
   type: UploadType;
   platform: Platform;
   chapterId: number;
