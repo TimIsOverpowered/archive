@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { extractErrorDetails } from '../utils/error.js';
 import { Worker, Queue, BaseJobOptions } from 'bullmq';
 import { loadTenantConfigs, clearConfigCache } from '../config/loader.js';
-import { QUEUE_NAMES, getQueue } from './jobs/queues.js';
+import { QUEUE_NAMES, getQueue, closeQueues } from './jobs/queues.js';
 import { redisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
 import { startTokenHealthCron } from '../cron/token-health.js';
 import { startMonitorService, stopMonitorService } from './monitor/index.js';
@@ -185,6 +185,8 @@ function registerShutdownHandlers() {
       await worker.close(true);
       logger.info({ name }, 'Worker closed');
     }
+
+    await closeQueues();
 
     const { closeAllClients, stopClientCleanup } = await import('../db/client.js');
     await stopClientCleanup();

@@ -1,4 +1,4 @@
-import { Queue, QueueOptions, JobsOptions } from 'bullmq';
+import { Queue, QueueOptions, JobsOptions, FlowProducer } from 'bullmq';
 import type { DMCAClaim } from '../../utils/dmca.js';
 import { redisInstance } from '../redis.js';
 import type { Platform, SourceType, UploadType, DownloadMethod } from '../../types/platforms.js';
@@ -142,6 +142,10 @@ export const dmcaJobOptions = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const queueCache = new Map<string, Queue<any, any, string>>();
 
+export const flowProducer = new FlowProducer({
+  connection: redisInstance,
+});
+
 export function getQueue<TData = unknown, TFinishedData = unknown>(name: string, jobOptions?: QueueOptions['defaultJobOptions']): Queue<TData, TFinishedData, string> {
   const cacheKey = `${name}:${JSON.stringify(jobOptions)}`;
 
@@ -215,6 +219,7 @@ export async function closeQueues(): Promise<void> {
     await queue.close();
   }
   queueCache.clear();
+  await flowProducer.close();
   // Don't quit redis here - it's managed by workers/redis.ts
   // The redis instance is shared and should only be closed during worker shutdown
 }
