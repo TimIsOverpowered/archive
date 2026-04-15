@@ -4,16 +4,15 @@ import { getVodData, saveVodChapters, type VodData as TwitchVodData } from '../.
 import { getVod as getKickVod } from '../../../../services/kick.js';
 import { getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
 import { getDuration } from '../../../../workers/vod/ffmpeg.js';
-import { getStandardVodQueue, type StandardVodJob } from '../../../../workers/jobs/queues.js';
 import { AppLogger } from '../../../../utils/auto-tenant-logger.js';
 import type { VodRecord } from '../../../../types/db.js';
 import type { Platform, SourceType, DownloadMethod } from '../../../../types/platforms.js';
 import { DOWNLOAD_METHODS, PLATFORMS, SOURCE_TYPES } from '../../../../types/platforms.js';
-import type { TenantConfig } from '../../../../config/types';
 import type { PrismaClient } from '../../../../../generated/streamer/client';
 import { fetchAndSaveEmotes } from '../../../../services/emotes.js';
-import { TenantContext } from '../../../middleware/tenant-platform.js';
+import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { parsePTDuration } from '../../../../utils/formatting.js';
+import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
 
 export interface VodCreateOptions {
   vodId: number;
@@ -34,14 +33,17 @@ export interface QueueEmoteOptions {
 }
 
 export interface EnsureVodDownloadOptions {
-  tenantId: string;
+  ctx: TenantPlatformContext;
   dbId: number;
   vodId: string;
-  platform: Platform;
   type: SourceType;
   downloadMethod?: DownloadMethod;
-  config: TenantConfig;
   log: AppLogger;
+}
+
+export interface EnsureVodDownloadResponse {
+  filePath?: string;
+  jobId: string | null;
 }
 
 /**
@@ -72,8 +74,9 @@ export async function findStreamRecord(client: PrismaClient, streamId: string, p
  * @returns filePath - Absolute path to the validated MP4 file
  * @throws Error if download fails or configuration is missing
  */
-export async function ensureVodDownload(options: EnsureVodDownloadOptions): Promise<string> {
-  const { config, tenantId, dbId, vodId, platform, type, downloadMethod = DOWNLOAD_METHODS.HLS, log } = options;
+export async function ensureVodDownload(options: EnsureVodDownloadOptions): Promise<EnsureVodDownloadResponse> {
+  const { ctx, dbId, vodId, type, downloadMethod = DOWNLOAD_METHODS.HLS, log } = options;
+  const { tenantId, platform, config } = ctx;
 
   const platformUserId = platform === PLATFORMS.TWITCH ? config.twitch?.id : config.kick?.id;
   if (!platformUserId) {
@@ -87,23 +90,15 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
 
   if (!needsDownload) {
     log.debug({ vodId, filePath, type }, 'VOD file already exists and is valid');
-    return filePath;
+    return { filePath, jobId: null };
   }
 
   log.info({ vodId, filePath, type }, 'Queuing VOD download');
 
-  const queue = getStandardVodQueue();
-  const jobData: StandardVodJob = {
-    tenantId,
-    dbId,
-    vodId,
-    platform,
-    downloadMethod,
-  };
-  await queue.add('standard_vod_download', jobData, { jobId: `download_${vodId}` });
+  const jobId = await triggerVodDownload(tenantId, dbId, vodId, platform, downloadMethod);
 
-  log.info({ vodId, filePath, type }, 'VOD download queued');
-  return filePath;
+  log.info({ jobId, vodId, filePath, type }, 'VOD download queued');
+  return { filePath, jobId };
 }
 
 /**
@@ -149,8 +144,8 @@ async function checkIfDownloadNeeded(filePath: string, dbId: number, tenantId: s
  * Ensures a VOD record exists in the database, creating it from platform API if needed
  * Returns null if VOD cannot be found or created
  */
-export async function ensureVodRecord(ctx: TenantContext, vodId: string, platform: Platform, log: AppLogger): Promise<VodRecord | null> {
-  const { db, tenantId, config } = ctx;
+export async function ensureVodRecord(ctx: TenantPlatformContext, vodId: string, log: AppLogger): Promise<VodRecord | null> {
+  const { db, tenantId, config, platform } = ctx;
 
   // Try to find existing VOD record
   const rawVodRecord = await findVodRecord(db, vodId, platform);

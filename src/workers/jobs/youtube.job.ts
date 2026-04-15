@@ -154,6 +154,8 @@ export async function enqueueVodUpload(job: YoutubeVodUploadJob): Promise<string
     const addedJob = await queue.add('youtube_upload', job, {
       jobId,
       deduplication: { id: jobId },
+      removeOnComplete: true,
+      removeOnFail: true,
     });
     return addedJob.id ?? null;
   } catch (error) {
@@ -173,6 +175,8 @@ export async function enqueueGameUpload(job: YoutubeGameUploadJob): Promise<stri
     const addedJob = await queue.add('youtube_upload', job, {
       jobId,
       deduplication: { id: jobId },
+      removeOnComplete: true,
+      removeOnFail: true,
     });
     return addedJob.id ?? null;
   } catch (error) {

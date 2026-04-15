@@ -122,6 +122,8 @@ export const QUEUE_NAMES = {
 export const defaultJobOptions = {
   attempts: 3,
   backoff: { type: 'exponential' as const, delay: 5000 },
+  removeOnComplete: true,
+  removeOnFail: true,
 };
 
 export const youtubeJobOptions = {

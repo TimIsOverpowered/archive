@@ -11,6 +11,8 @@ async function enqueue(job: ChatDownloadJob): Promise<string | null> {
     const added = await getChatDownloadQueue().add('chat_download', job, {
       jobId,
       deduplication: { id: jobId },
+      removeOnComplete: true,
+      removeOnFail: true,
     });
     return added.id ?? null;
   } catch (error) {

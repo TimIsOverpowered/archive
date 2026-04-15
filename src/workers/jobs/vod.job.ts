@@ -19,6 +19,8 @@ export async function triggerVodDownload(tenantId: string, dbId: number, vodId: 
     const added = await getStandardVodQueue().add('standard_vod_download', job, {
       jobId,
       deduplication: { id: jobId },
+      removeOnComplete: true,
+      removeOnFail: true,
     });
     return added.id ?? null;
   } catch (error) {
