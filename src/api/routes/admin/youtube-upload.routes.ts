@@ -6,6 +6,8 @@ import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { notFound, badRequest } from '../../../utils/http-error';
 import type { Platform, SourceType, DownloadMethod } from '../../../types/platforms.js';
 import { SOURCE_TYPES, DOWNLOAD_METHODS, UPLOAD_MODES, PLATFORM_VALUES, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES_VALUES } from '../../../types/platforms.js';
+import { findVodRecord } from './utils/vod-helpers.js';
+import { getStandardVodQueue } from '../../../workers/jobs/queues.js';
 
 interface ReUploadYoutubeParams {
   tenantId: string;
@@ -50,17 +52,13 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
     },
     async (request) => {
       const { tenantId, config, client, platform } = request.tenant as TenantPlatformContext;
-      const { vodId, downloadMethod, type } = request.body;
+      const { vodId, downloadMethod } = request.body;
 
       if (!config?.youtube) badRequest('YouTube integration not configured for this tenant');
-
-      const { findVodRecord } = await import('./utils/vod-helpers.js');
 
       const vodRecord = await findVodRecord(client, vodId, platform);
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
-
-      const VodQueueModule = await import('../../../workers/jobs/queues');
 
       const downloadJob = {
         tenantId,
@@ -74,7 +72,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
       const downloadJobId = `download_${vodRecord.vod_id}`;
 
-      void VodQueueModule.getStandardVodQueue().add('standard_vod_download', downloadJob, { jobId: downloadJobId });
+      void getStandardVodQueue().add('standard_vod_download', downloadJob, { jobId: downloadJobId });
 
       return { data: { message: 'VOD download queued, YouTube upload will be triggered after completion', dbId: vodRecord.id, vodId: vodRecord.vod_id, downloadJobId } };
     }

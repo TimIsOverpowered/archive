@@ -1,5 +1,5 @@
 import type { DmcaProcessingJob } from '../../../workers/jobs/queues.js';
-import { enqueueJobWithLogging } from '../../../workers/jobs/queues.js';
+import { enqueueJobWithLogging, getDmcaProcessingQueue } from '../../../workers/jobs/queues.js';
 import { FastifyInstance } from 'fastify';
 import { getTenantConfig } from '../../../config/loader';
 import { getClient } from '../../../db/client.js';
@@ -91,12 +91,10 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
       log.info(`DMCA processing job queued for full VOD ${body.vodId}`);
     }
 
-    const DmcaQueueModule = await import('../../../workers/jobs/queues.js');
-
     // Queue the DMCA processing job (handles both full and part processing in worker)
     const jobId = body.partIndex !== undefined ? `dmca_${body.vodId}_p${body.partIndex}` : `dmca_${body.vodId}`;
     const { jobId: actualJobId, isNew } = await enqueueJobWithLogging(
-      DmcaQueueModule.getDmcaProcessingQueue(),
+      getDmcaProcessingQueue(),
       'dmca_processing',
       dmcaJobData,
       {

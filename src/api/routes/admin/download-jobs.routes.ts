@@ -9,6 +9,7 @@ import { notFound } from '../../../utils/http-error';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
 import { SOURCE_TYPES, DOWNLOAD_METHODS, UPLOAD_MODES, PLATFORM_VALUES, UPLOAD_MODE_VALUES, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES_VALUES } from '../../../types/platforms.js';
 import { fetchAndSaveEmotes } from '../../../services/emotes';
+import { getStandardVodQueue, getChatDownloadQueue } from '../../../workers/jobs/queues.js';
 
 interface ReDownloadVodParams {
   tenantId: string;
@@ -70,7 +71,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       const platformId = config?.[platform]?.id;
 
       if (platformId) {
-        await fetchAndSaveEmotes(tenantId, vodRecord.id, platform, platformId);
+        await fetchAndSaveEmotes(tenantId, vodRecord.id, platform, platformId, client);
       } else {
         log.warn(`No platform ID available for emote fetching on VOD ${request.body.vodId}`);
       }
@@ -81,8 +82,6 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       const fileIdentifier = type === SOURCE_TYPES.LIVE ? vodRecord.stream_id || vodRecord.vod_id : vodRecord.vod_id;
 
       // Queue download job (fire-and-forget)
-      const VodQueueModule = await import('../../../workers/jobs/queues');
-
       const downloadJob = {
         tenantId,
         platformUserId: tenantId,
@@ -95,14 +94,14 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
       const downloadJobId = `download_${vodRecord.vod_id}`;
 
-      void VodQueueModule.getStandardVodQueue().add('standard_vod_download', downloadJob, { jobId: downloadJobId });
+      void getStandardVodQueue().add('standard_vod_download', downloadJob, { jobId: downloadJobId });
 
       log.info({ vodId: vodRecord.vod_id, downloadJobId }, 'VOD download queued, YouTube upload will be triggered after completion');
 
       // Queue chat download job
       const durationSeconds = parseDurationToSeconds(vodRecord.duration, platform);
 
-      void VodQueueModule.getChatDownloadQueue().add(
+      void getChatDownloadQueue().add(
         'chat_download',
         { tenantId: tenantId, platformUserId: tenantId, dbId: vodRecord.id, vodId: vodRecord.vod_id, platform, duration: durationSeconds },
         { jobId: `chat_${vodRecord.vod_id}` }
@@ -153,8 +152,6 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
-      const VodQueueModule = await import('../../../workers/jobs/queues');
-
       const fileIdentifier = type === SOURCE_TYPES.LIVE ? vodRecord.stream_id || vodRecord.vod_id : vodRecord.vod_id;
 
       const downloadJob = {
@@ -168,7 +165,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
       const downloadJobId = `download_${vodRecord.vod_id}`;
 
-      void VodQueueModule.getStandardVodQueue().add('standard_vod_download', downloadJob, { jobId: downloadJobId });
+      void getStandardVodQueue().add('standard_vod_download', downloadJob, { jobId: downloadJobId });
 
       return { data: { message: 'VOD download queued', dbId: vodRecord.id, vodId: vodRecord.vod_id, downloadJobId } };
     }

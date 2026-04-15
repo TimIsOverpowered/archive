@@ -6,7 +6,6 @@ import { fileExists, getVodDirPath } from '../utils/path.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-
 import { getJobContext } from './utils/job-context.js';
 import { finalizeVod } from '../services/vod-finalization.js';
 import { queueYoutubeUploads } from './jobs/youtube.job.js';
@@ -15,6 +14,8 @@ import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { createLiveWorkerAlerts } from './utils/alert-factories.js';
 import type { LiveDownloadJob } from './jobs/queues.js';
+import { triggerChatDownload } from './jobs/chat.job.js';
+import { fetchAndSaveEmotes } from '../services/emotes.js';
 
 const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: Job<LiveDownloadJob, unknown, string>) => {
   const { dbId, vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl } = job.data;
@@ -76,7 +77,6 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
     }
 
     try {
-      const { triggerChatDownload } = await import('./jobs/chat.job.js');
       await triggerChatDownload(tenantId, platformUserId, dbId, vodId, platform, actualDuration ? Math.round(actualDuration) : 0, platformUsername);
       log.info({ vodId }, 'Queued chat download job');
     } catch (error) {
@@ -84,8 +84,8 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
     }
 
     try {
-      const { fetchAndSaveEmotes } = await import('../services/emotes.js');
-      fetchAndSaveEmotes(tenantId, dbId, platform, platformUserId);
+      fetchAndSaveEmotes(tenantId, dbId, platform, platformUserId, streamerClient);
+      log.info({ vodId }, 'Queued emote save');
     } catch (error) {
       log.warn({ ...extractErrorDetails(error), vodId }, 'Failed to save emotes (non-fatal)');
     }
