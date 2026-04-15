@@ -8,7 +8,6 @@ import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest, notFound } from '../../../utils/http-error';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
 import { SOURCE_TYPES, DOWNLOAD_METHODS, UPLOAD_MODES, PLATFORM_VALUES, UPLOAD_MODE_VALUES, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES_VALUES } from '../../../types/platforms.js';
-import { triggerChatDownload } from '../../../workers/jobs/chat.job';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job';
 
 interface Params {
