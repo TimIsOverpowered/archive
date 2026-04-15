@@ -47,7 +47,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
     log.debug({ vodId, effectiveOffset }, '[Chat] Initial comments fetch completed');
 
     if (hasExistingData && !startOffset && !forceRerun) {
-      if (effectiveOffset >= duration) {
+      if (duration !== 0 && effectiveOffset >= duration) {
         const totalMessages = await db.chatMessage.count({ where: { vod_id: dbId } });
         log.info({ vodId, effectiveOffset, duration, totalMessages }, 'Chat download already complete (offset exceeds duration)');
         resetFailures(tenantId);
