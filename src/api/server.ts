@@ -9,7 +9,6 @@ import configPlugin from './plugins/config.plugin';
 import createTenantLoggerMiddleware from './middleware/tenant-logger';
 import { extractErrorDetails } from '../utils/error.js';
 import { logger } from '../utils/logger.js';
-import { platformConstraintStrategy } from './constraints/platform.constraint.js';
 
 export async function buildServer() {
   const fastify = Fastify({
@@ -19,9 +18,6 @@ export async function buildServer() {
     trustProxy: true,
     routerOptions: {
       ignoreTrailingSlash: true,
-      constraints: {
-        platform: platformConstraintStrategy as never,
-      },
     },
   });
 
