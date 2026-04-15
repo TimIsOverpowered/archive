@@ -5,7 +5,7 @@ import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
-import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
+import { AppLogger, createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error';
 import type { Platform, SourceType } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, SOURCE_TYPES, SOURCE_TYPES_VALUES } from '../../../types/platforms.js';
@@ -47,7 +47,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
   /**
    * Shared DMCA processing logic - handles both full VOD and specific part processing
    */
-  async function processDmcaRequest(client: PrismaClient, tenantId: string, body: DmcaRequestBody, log: ReturnType<typeof createAutoLogger>): Promise<ProcessDmcaResponse> {
+  async function processDmcaRequest(client: PrismaClient, tenantId: string, body: DmcaRequestBody, log: AppLogger): Promise<ProcessDmcaResponse> {
     const vodRecord = await findVodRecord(client, body.vodId, body.platform);
 
     if (!vodRecord) notFound('VOD not found');
