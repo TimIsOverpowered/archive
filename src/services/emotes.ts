@@ -8,7 +8,7 @@ import { safeRequest } from '../utils/http-client.js';
 export interface EmoteData extends Prisma.JsonObject {
   id: string;
   code: string;
-  flags?: string[];
+  flags?: number;
 }
 
 export interface VodEmotes {
@@ -44,11 +44,11 @@ interface BTTVChannelResponse {
   }>;
 }
 
-interface SevenTVUserResponse {
+interface SevenTVResponse {
   emotes?: Array<{
     id: string;
     name: string;
-    flags?: string[];
+    flags: number;
   }>;
 }
 
@@ -58,11 +58,12 @@ export async function fetchAndSaveEmotes(ctx: TenantContext, vodId: number, plat
   let sevenTvEmotes: EmoteData[] = [];
 
   if (platform === PLATFORMS.TWITCH && platformId) {
-    const [ffzRes, bttvGlobalRes, bttvChannelRes, sevenTvRes] = await Promise.all([
+    const [ffzRes, bttvGlobalRes, bttvChannelRes, sevenTvRes, sevenTvGlobalRes] = await Promise.all([
       safeRequest<FFZResponse>(`https://api.frankerfacez.com/v1/room/id/${platformId}`, {}, { timeoutMs: 5000 }),
       safeRequest<BTTVGlobalResponse>('https://api.betterttv.net/3/cached/emotes/global', { emotes: [] }, { timeoutMs: 5000 }),
       safeRequest<BTTVChannelResponse>(`https://api.betterttv.net/3/cached/users/twitch/${platformId}`, { channelEmotes: [] }, { timeoutMs: 5000 }),
-      safeRequest<SevenTVUserResponse>(`https://7tv.io/v3/users/twitch/${platformId}`, { emotes: [] }, { timeoutMs: 5000 }),
+      safeRequest<SevenTVResponse>(`https://7tv.io/v3/users/twitch/${platformId}`, { emotes: [] }, { timeoutMs: 5000 }),
+      safeRequest<SevenTVResponse>(`https://7tv.io/v3/emote-sets/global`, { emotes: [] }, { timeoutMs: 5000 }),
     ]);
 
     ffzEmotes = ((ffzRes as FFZResponse).channels?.[platformId]?.emotes || []).map((e) => ({ id: String(e.id), code: e.code })) || [];
@@ -72,13 +73,22 @@ export async function fetchAndSaveEmotes(ctx: TenantContext, vodId: number, plat
       ...(((bttvChannelRes as BTTVChannelResponse).channelEmotes || [])?.map(({ id, code }) => ({ id, code })) || []),
     ];
 
-    sevenTvEmotes = ((sevenTvRes as SevenTVUserResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
+    sevenTvEmotes = [
+      ...((sevenTvGlobalRes as SevenTVResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags })),
+      ...((sevenTvRes as SevenTVResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags })),
+    ];
   } else if (platform === PLATFORMS.KICK && platformId) {
-    const sevenTvRes = await safeRequest<SevenTVUserResponse>(`https://7tv.io/v3/users/kick/${platformId}`, { emotes: [] }, { timeoutMs: 5000 });
+    const [sevenTvRes, sevenTvGlobalRes] = await Promise.all([
+      safeRequest<SevenTVResponse>(`https://7tv.io/v3/users/twitch/${platformId}`, { emotes: [] }, { timeoutMs: 5000 }),
+      safeRequest<SevenTVResponse>(`https://7tv.io/v3/emote-sets/global`, { emotes: [] }, { timeoutMs: 5000 }),
+    ]);
 
     ffzEmotes = [];
     bttvEmotes = [];
-    sevenTvEmotes = ((sevenTvRes as SevenTVUserResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
+    sevenTvEmotes = [
+      ...((sevenTvGlobalRes as SevenTVResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags })),
+      ...((sevenTvRes as SevenTVResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags })),
+    ];
   }
 
   if (ffzEmotes.length === 0 && bttvEmotes.length === 0 && sevenTvEmotes.length === 0) {
