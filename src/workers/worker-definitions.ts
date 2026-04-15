@@ -16,6 +16,7 @@ export interface WorkerConfig<TData extends object = object, TResult = unknown> 
   queueName: string;
   processor: Processor<TData, TResult, string>;
   concurrency?: number;
+  useWorkerThreads?: boolean;
 }
 
 function defineWorker<TData extends object, TResult>(def: WorkerConfig<TData, TResult>): WorkerConfig<object, unknown> {
@@ -28,29 +29,34 @@ export const WORKER_DEFINITIONS = [
     queueName: QUEUE_NAMES.VOD_LIVE,
     processor: liveProcessor,
     concurrency: getWorkersConfig().VOD_LIVE_CONCURRENCY,
+    useWorkerThreads: true,
   }),
   defineWorker<StandardVodJob, unknown>({
     name: 'vod_standard',
     queueName: QUEUE_NAMES.VOD_STANDARD,
     processor: standardVodProcessor,
     concurrency: getWorkersConfig().VOD_STANDARD_CONCURRENCY,
+    useWorkerThreads: true,
   }),
   defineWorker<ChatDownloadJob, ChatDownloadResult>({
     name: 'chat_download',
     queueName: QUEUE_NAMES.CHAT_DOWNLOAD,
     processor: chatProcessor,
     concurrency: 3,
+    useWorkerThreads: true,
   }),
   defineWorker<YoutubeUploadJob, YoutubeUploadResult>({
     name: 'youtube_upload',
     queueName: QUEUE_NAMES.YOUTUBE_UPLOAD,
     processor: youtubeProcessor,
     concurrency: getWorkersConfig().YOUTUBE_UPLOAD_CONCURRENCY,
+    useWorkerThreads: true,
   }),
   defineWorker<DmcaProcessingJob, DmcaProcessingResult>({
     name: 'dmca_processing',
     queueName: QUEUE_NAMES.DMCA_PROCESSING,
     processor: dmcaProcessor,
     concurrency: 1,
+    useWorkerThreads: true,
   }),
 ] as readonly WorkerConfig<object, unknown>[];
