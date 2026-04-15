@@ -12,8 +12,6 @@ import { PLATFORM_VALUES, SOURCE_TYPES, SOURCE_TYPES_VALUES } from '../../../typ
 import { PrismaClient } from '../../../../generated/streamer/client.js';
 import { findVodRecord } from './utils/vod-helpers.js';
 
-type VodRecord = { id: number; vod_id: string; platform: Platform };
-
 interface DmcaClaim {
   type?: string;
   reason?: string;
