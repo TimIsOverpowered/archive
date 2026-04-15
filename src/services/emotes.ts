@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger.js';
-import { Prisma } from '../../generated/streamer/client.js';
+import { Prisma, type PrismaClient } from '../../generated/streamer/client.js';
 import { Platform, PLATFORMS } from '../types/platforms.js';
 
 export interface EmoteData extends Prisma.JsonObject {
@@ -49,7 +49,7 @@ interface SevenTVUserResponse {
   }>;
 }
 
-export async function fetchAndSaveEmotes(tenantId: string, vodId: number, platform: Platform, platformId?: string): Promise<void> {
+export async function fetchAndSaveEmotes(tenantId: string, vodId: number, platform: Platform, platformId?: string, db?: PrismaClient): Promise<void> {
   let ffzEmotes: EmoteData[] = [];
   let bttvEmotes: EmoteData[] = [];
   let sevenTvEmotes: EmoteData[] = [];
@@ -103,6 +103,11 @@ export async function fetchAndSaveEmotes(tenantId: string, vodId: number, platfo
     return;
   }
 
+  if (!db) {
+    logger.error({ tenantId }, 'Database client not provided');
+    return;
+  }
+
   const emoteData: VodEmotes = {
     vodId,
     ffz_emotes: ffzEmotes,
@@ -111,14 +116,6 @@ export async function fetchAndSaveEmotes(tenantId: string, vodId: number, platfo
   };
 
   try {
-    const { getClient } = await import('../db/client');
-    const db = getClient(tenantId);
-
-    if (!db) {
-      logger.error({ tenantId }, 'Database client not available for streamer');
-      return;
-    }
-
     await db.emote.upsert({
       where: { vod_id: vodId },
       create: {

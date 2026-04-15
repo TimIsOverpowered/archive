@@ -4,7 +4,6 @@ import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
 import { saveVodChapters } from '../../../services/twitch/index.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
-import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest, notFound } from '../../../utils/http-error';
 import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
@@ -98,7 +97,6 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
     async (request) => {
       const { tenantId, client, platform, config } = request.tenant as TenantPlatformContext;
       const { vodId } = request.body;
-      const log = createAutoLogger(tenantId);
 
       const vodRecord = await findVodRecord(client, vodId, platform);
 
@@ -109,7 +107,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
       if (!platformId) badRequest(`No platform ID available for ${platform} ${vodId}`);
 
-      await fetchAndSaveEmotes(tenantId, vodRecord.id, platform, platformId);
+      await fetchAndSaveEmotes(tenantId, vodRecord.id, platform, platformId, client);
 
       return { data: { message: `Emote saving completed for ${vodId}`, vodId, platform } };
     }

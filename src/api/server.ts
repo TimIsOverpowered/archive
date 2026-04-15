@@ -9,6 +9,11 @@ import configPlugin from './plugins/config.plugin';
 import createTenantLoggerMiddleware from './middleware/tenant-logger';
 import { extractErrorDetails } from '../utils/error.js';
 import { logger } from '../utils/logger.js';
+import healthRoutes from './routes/health.js';
+import vodsRoutes from './routes/vods.js';
+import logsRoutes from './routes/logs.js';
+import badgesRoutes from './routes/badges.js';
+import { globalAdminRoutes, default as adminRoutes } from './routes/admin/index.js';
 
 export async function buildServer() {
   const fastify = Fastify({
@@ -119,36 +124,29 @@ export async function buildServer() {
 
   // Register public routes
   await fastify.register(async (instance) => {
-    const healthRoutes = await import('./routes/health');
-    const vodsRoutes = await import('./routes/vods');
-    const logsRoutes = await import('./routes/logs');
-    const badgesRoutes = await import('./routes/badges');
-
-    await instance.register(healthRoutes.default, { prefix: '/api/v1' });
+    await instance.register(healthRoutes, { prefix: '/api/v1' });
 
     // Register VODs and logs under same prefix to avoid duplicate OPTIONS handlers
     await instance.register(
       async (vodInstance) => {
-        await vodInstance.register(vodsRoutes.default, { prefix: '' });
-        await vodInstance.register(logsRoutes.default, { prefix: '' });
+        await vodInstance.register(vodsRoutes, { prefix: '' });
+        await vodInstance.register(logsRoutes, { prefix: '' });
       },
       { prefix: '/api/v1/' }
     );
 
     // Register badges route under /api/v1/:id/badges/twitch
-    await instance.register(badgesRoutes.default, { prefix: '/api/v1' });
+    await instance.register(badgesRoutes, { prefix: '/api/v1' });
   });
 
   // Register global admin routes (no tenantId required)
   await fastify.register(async (instance) => {
-    const { globalAdminRoutes } = await import('./routes/admin');
     await instance.register(globalAdminRoutes, { prefix: '/api/v1/admin' });
   });
 
   // Register tenant-scoped admin routes
   await fastify.register(async (instance) => {
-    const adminRoutes = await import('./routes/admin');
-    await instance.register(adminRoutes.default, { prefix: '/api/v1/:tenantId/admin' });
+    await instance.register(adminRoutes, { prefix: '/api/v1/:tenantId/admin' });
   });
 
   return fastify;
