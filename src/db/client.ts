@@ -5,6 +5,7 @@ import { logger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { DB_CLIENT_IDLE_TIMEOUT_MS, DB_CLIENT_MAX_CLIENTS, DB_CLIENT_CLEANUP_INTERVAL_MS } from '../constants.js';
 import { invalidateVodCache } from '../services/vod-cache.js';
+import { sleep } from '../utils/delay.js';
 
 const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) =>
   baseClient.$extends({
@@ -326,4 +327,100 @@ export function getClientCount(): number {
 
 export function resetClientManager(): void {
   clientManager.reset();
+}
+
+/**
+ * Check if client is still valid (not evicted due to idle timeout)
+ */
+export function isClientValid(tenantId: string): boolean {
+  const entry = clientManager['clients'].get(tenantId);
+  if (!entry) return false;
+
+  const now = Date.now();
+  const isIdle = now - entry.lastAccessedAt > DB_CLIENT_IDLE_TIMEOUT_MS;
+  return !isIdle;
+}
+
+/**
+ * Touch client to prevent eviction during long-running operations
+ */
+export function touchClient(tenantId: string): boolean {
+  const entry = clientManager['clients'].get(tenantId);
+  if (entry) {
+    entry.lastAccessedAt = Date.now();
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Detect connection errors from Prisma/PostgreSQL
+ */
+export function isConnectionError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  const code = (error as { code?: string }).code;
+
+  if (code) {
+    return ['57P01', '08006', '08007', '08001', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE'].includes(code);
+  }
+
+  return (
+    msg.includes('terminated unexpectedly') ||
+    msg.includes('connection closed') ||
+    msg.includes('connection lost') ||
+    msg.includes('ETIMEDOUT') ||
+    msg.includes('ECONNRESET') ||
+    msg.includes('The socket has been closed') ||
+    msg.includes('client network socket closed')
+  );
+}
+
+/**
+ * Ensure client is valid, recreate if evicted or invalid
+ */
+export async function ensureClient(tenantId: string, config: TenantConfig): Promise<PrismaClient> {
+  let client = getClient(tenantId);
+
+  if (!client || !isClientValid(tenantId)) {
+    client = await createClient(config);
+  } else {
+    touchClient(tenantId);
+  }
+
+  return client;
+}
+
+/**
+ * Wrap DB operation with automatic retry on connection failure
+ */
+export async function withDbRetry<T>(tenantId: string, config: TenantConfig, operation: (db: PrismaClient) => Promise<T>, options: { maxRetries?: number; retryDelayMs?: number } = {}): Promise<T> {
+  const { maxRetries = 2, retryDelayMs = 1000 } = options;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const client = await ensureClient(tenantId, config);
+      return await operation(client);
+    } catch (error) {
+      const isConnError = isConnectionError(error);
+
+      if (!isConnError) {
+        throw error;
+      }
+
+      if (attempt === maxRetries) {
+        logger.error({ tenantId, attempt, error: extractErrorDetails(error) }, 'DB operation failed after max retries');
+        throw error;
+      }
+
+      logger.error({ tenantId, attempt, error: extractErrorDetails(error) }, 'DB connection error, retrying...');
+
+      await closeClient(tenantId).catch((err) => {
+        logger.debug({ tenantId, error: extractErrorDetails(err) }, 'Failed to close invalid client');
+      });
+
+      await sleep(retryDelayMs);
+    }
+  }
+
+  throw new Error('Unreachable: DB operation failed');
 }

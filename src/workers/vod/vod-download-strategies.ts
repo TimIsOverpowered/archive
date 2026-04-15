@@ -9,6 +9,7 @@ import { sendVodDownloadFailed, sendVodDownloadStarted, sendVodDownloadSuccess }
 import { extractErrorDetails } from '../../utils/error.js';
 import { downloadHlsStream } from './hls-orchestrator.js';
 import { cleanupHlsFiles } from './hls-cleanup.js';
+import type { PrismaClient as PC } from '../../../generated/streamer/client.js';
 
 export interface VodDownloadResult {
   finalPath: string;
@@ -139,10 +140,10 @@ export async function downloadVodWithHls(platform: Platform, vodId: string, fina
   }
 
   const result = await downloadHlsStream({
+    ctx: { tenantId, config, db: {} as PC },
     dbId: 0,
     vodId,
     platform,
-    tenantId,
     platformUserId: '',
     sourceUrl,
     isLive: false,

@@ -1,15 +1,11 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { getTenantConfig } from '../../config/loader';
-import { getClient, createClient } from '../../db/client.js';
+import { ensureClient } from '../../db/client.js';
 import { extractErrorDetails } from '../../utils/error.js';
-import type { TenantConfig } from '../../config/types';
-import type { PrismaClient } from '../../../generated/streamer/client';
+import { TenantContext as BaseTenantContext } from '../../types/context.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
 
-export interface TenantContext {
-  tenantId: string;
-  config: TenantConfig;
-  client: PrismaClient;
+export interface TenantContext extends BaseTenantContext {
   platform?: Platform;
 }
 
@@ -54,27 +50,24 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
     });
   }
 
-  let client = getClient(tenantId);
-
-  if (!client) {
-    try {
-      client = await createClient(config);
-    } catch (err) {
-      request.log.error({ tenantId, error: extractErrorDetails(err) }, 'Failed to initialize database client during request');
-      return reply.status(503).send({
-        error: {
-          message: 'Database not available',
-          code: 'SERVICE_UNAVAILABLE',
-          statusCode: 503,
-        },
-      });
-    }
+  let client;
+  try {
+    client = await ensureClient(tenantId, config);
+  } catch (err) {
+    request.log.error({ tenantId, error: extractErrorDetails(err) }, 'Failed to initialize database client during request');
+    return reply.status(503).send({
+      error: {
+        message: 'Database not available',
+        code: 'SERVICE_UNAVAILABLE',
+        statusCode: 503,
+      },
+    });
   }
 
   (request as { tenant: TenantContext }).tenant = {
     tenantId,
     config,
-    client,
+    db: client,
   };
 }
 

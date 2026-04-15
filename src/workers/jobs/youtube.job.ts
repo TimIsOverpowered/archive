@@ -1,28 +1,26 @@
-import { getTenantConfig } from '../../config/loader.js';
-import { getClient } from '../../db/client.js';
 import { getYoutubeUploadQueue } from './queues.js';
 import type { YoutubeVodUploadJob, YoutubeGameUploadJob } from './queues.js';
 import dayjs from '../../utils/dayjs.js';
 import { childLogger } from '../../utils/logger.js';
 import type { Platform, UploadMode } from '../../types/platforms.js';
 import { UPLOAD_TYPES, UPLOAD_MODES } from '../../types/platforms.js';
+import { TenantContext } from '../../types/context.js';
+import { withDbRetry } from '../../db/client.js';
 
 const log = childLogger({ module: 'youtube-job' });
 
 // ============== VOD Job Creation ==============
 
-export async function createVodUploadJob(tenantId: string, dbId: number, vodId: string, filePath: string, platform: Platform): Promise<YoutubeVodUploadJob> {
-  const config = getTenantConfig(tenantId);
+export async function createVodUploadJob(ctx: TenantContext, dbId: number, vodId: string, filePath: string, platform: Platform): Promise<YoutubeVodUploadJob> {
+  const { config, tenantId } = ctx;
   if (!config?.youtube?.upload) {
     throw new Error(`YouTube upload not enabled for tenant ${tenantId}`);
   }
 
-  const client = getClient(tenantId);
-  if (!client) {
-    throw new Error(`Database client not available for tenant ${tenantId}`);
-  }
+  const vodRecord = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+    return db.vod.findUnique({ where: { id: dbId } });
+  });
 
-  const vodRecord = await client.vod.findUnique({ where: { id: dbId } });
   if (!vodRecord) {
     throw new Error(`VOD record not found for dbId ${dbId}`);
   }
@@ -41,24 +39,22 @@ export async function createVodUploadJob(tenantId: string, dbId: number, vodId: 
 // ============== Game Job Creation ==============
 
 export async function createGameUploadJob(
-  tenantId: string,
+  ctx: TenantContext,
   dbId: number,
   vodId: string,
   filePath: string,
   platform: Platform,
   chapter: { id: number; name: string; start: number; end: number; gameId?: string }
 ): Promise<YoutubeGameUploadJob> {
-  const config = getTenantConfig(tenantId);
+  const { config, tenantId } = ctx;
   if (!config?.youtube?.upload) {
     throw new Error(`YouTube upload not enabled for tenant ${tenantId}`);
   }
 
-  const client = getClient(tenantId);
-  if (!client) {
-    throw new Error(`Database client not available for tenant ${tenantId}`);
-  }
+  const vodRecord = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+    return db.vod.findUnique({ where: { id: dbId } });
+  });
 
-  const vodRecord = await client.vod.findUnique({ where: { id: dbId } });
   if (!vodRecord) {
     throw new Error(`VOD record not found for dbId ${dbId}`);
   }
@@ -69,11 +65,13 @@ export async function createGameUploadJob(
   }
 
   // Calculate EP number (global count across all VODs)
-  const gameCount = await client.game.count({
-    where: {
-      game_name: chapter.name,
-      vod_id: { not: dbId },
-    },
+  const gameCount = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+    return db.game.count({
+      where: {
+        game_name: chapter.name,
+        vod_id: { not: dbId },
+      },
+    });
   });
   const epNumber = gameCount + 1;
 
@@ -111,28 +109,25 @@ export async function createGameUploadJob(
 
 // ============== Bulk Game Job Creation ==============
 
-export async function createGameUploadJobsForVod(tenantId: string, dbId: number, vodId: string, filePath: string, platform: Platform): Promise<YoutubeGameUploadJob[]> {
-  const config = getTenantConfig(tenantId);
+export async function createGameUploadJobsForVod(ctx: TenantContext, dbId: number, vodId: string, filePath: string, platform: Platform): Promise<YoutubeGameUploadJob[]> {
+  const { config, tenantId } = ctx;
   if (!config?.youtube?.perGameUpload) {
     return [];
   }
 
-  const client = getClient(tenantId);
-  if (!client) {
-    return [];
-  }
-
   // Fetch all chapters for this VOD
-  const chapters = await client.chapter.findMany({
-    where: { vod_id: dbId },
-    orderBy: { start: 'asc' },
+  const chapters = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+    return db.chapter.findMany({
+      where: { vod_id: dbId },
+      orderBy: { start: 'asc' },
+    });
   });
 
   const jobs: YoutubeGameUploadJob[] = [];
 
   for (const chapter of chapters) {
     try {
-      const job = await createGameUploadJob(tenantId, dbId, vodId, filePath, platform, {
+      const job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, {
         id: chapter.id,
         name: chapter.name || '',
         start: chapter.start ?? 0,
@@ -191,19 +186,19 @@ export async function enqueueGameUpload(job: YoutubeGameUploadJob): Promise<stri
 
 // ============== Queue Triggers ==============
 
-export async function queueYoutubeVodUpload(tenantId: string, dbId: number, vodId: string, filePath: string, platform: Platform): Promise<string | null> {
-  const job = await createVodUploadJob(tenantId, dbId, vodId, filePath, platform);
+export async function queueYoutubeVodUpload(ctx: TenantContext, dbId: number, vodId: string, filePath: string, platform: Platform): Promise<string | null> {
+  const job = await createVodUploadJob(ctx, dbId, vodId, filePath, platform);
   return enqueueVodUpload(job);
 }
 
-export async function queueYoutubeGameUpload(tenantId: string, dbId: number, vodId: string, filePath: string, platform: Platform, chapterId: number): Promise<string | null> {
-  const client = getClient(tenantId);
-  if (!client) return null;
+export async function queueYoutubeGameUpload(ctx: TenantContext, dbId: number, vodId: string, filePath: string, platform: Platform, chapterId: number): Promise<string | null> {
+  const chapter = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+    return db.chapter.findUnique({ where: { id: chapterId } });
+  });
 
-  const chapter = await client.chapter.findUnique({ where: { id: chapterId } });
   if (!chapter) return null;
 
-  const job = await createGameUploadJob(tenantId, dbId, vodId, filePath, platform, {
+  const job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, {
     id: chapter.id,
     name: chapter.name || '',
     start: chapter.start ?? 0,
@@ -214,8 +209,8 @@ export async function queueYoutubeGameUpload(tenantId: string, dbId: number, vod
   return enqueueGameUpload(job);
 }
 
-export async function queueYoutubeGameUploadsForVod(tenantId: string, dbId: number, vodId: string, filePath: string, platform: Platform): Promise<void> {
-  const jobs = await createGameUploadJobsForVod(tenantId, dbId, vodId, filePath, platform);
+export async function queueYoutubeGameUploadsForVod(ctx: TenantContext, dbId: number, vodId: string, filePath: string, platform: Platform): Promise<void> {
+  const jobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform);
 
   for (const job of jobs) {
     await enqueueGameUpload(job);
@@ -225,13 +220,12 @@ export async function queueYoutubeGameUploadsForVod(tenantId: string, dbId: numb
 // ============== Upload Queue Helpers ==============
 
 export interface QueueYoutubeUploadsOptions {
-  tenantId: string;
+  ctx: TenantContext;
   dbId: number;
   vodId: string;
   filePath: string;
   platform: Platform;
   uploadMode?: UploadMode;
-  config: ReturnType<typeof getTenantConfig>;
   log: {
     info: (ctx: Record<string, unknown>, msg: string) => void;
     warn: (ctx: Record<string, unknown>, msg: string) => void;
@@ -239,12 +233,13 @@ export interface QueueYoutubeUploadsOptions {
 }
 
 export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): Promise<void> {
-  const { tenantId, dbId, vodId, filePath, platform, uploadMode = UPLOAD_MODES.ALL, config, log } = options;
+  const { ctx, dbId, vodId, filePath, platform, uploadMode = UPLOAD_MODES.ALL, log } = options;
+  const { config } = ctx;
 
   // VOD Upload
   if ((uploadMode === UPLOAD_MODES.VOD || uploadMode === UPLOAD_MODES.ALL) && config?.youtube?.vodUpload) {
     try {
-      await queueYoutubeVodUpload(tenantId, dbId, vodId, filePath, platform);
+      await queueYoutubeVodUpload(ctx, dbId, vodId, filePath, platform);
       log.info({ vodId }, 'Queued YouTube VOD upload');
     } catch (error) {
       log.warn({ error: (error as Error).message, vodId }, 'Failed to queue YouTube VOD upload');
@@ -254,7 +249,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
   // Game Uploads
   if (uploadMode === UPLOAD_MODES.ALL && config?.youtube?.perGameUpload) {
     try {
-      await queueYoutubeGameUploadsForVod(tenantId, dbId, vodId, filePath, platform);
+      await queueYoutubeGameUploadsForVod(ctx, dbId, vodId, filePath, platform);
       log.info({ vodId }, 'Queued YouTube game uploads');
     } catch (error) {
       log.warn({ error: (error as Error).message, vodId }, 'Failed to queue YouTube game uploads');

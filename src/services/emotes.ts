@@ -1,6 +1,8 @@
 import { logger } from '../utils/logger.js';
-import { Prisma, type PrismaClient } from '../../generated/streamer/client.js';
+import { Prisma } from '../../generated/streamer/client.js';
 import { Platform, PLATFORMS } from '../types/platforms.js';
+import { TenantContext } from '../types/context.js';
+import { withDbRetry } from '../db/client.js';
 
 export interface EmoteData extends Prisma.JsonObject {
   id: string;
@@ -49,7 +51,7 @@ interface SevenTVUserResponse {
   }>;
 }
 
-export async function fetchAndSaveEmotes(tenantId: string, vodId: number, platform: Platform, platformId?: string, db?: PrismaClient): Promise<void> {
+export async function fetchAndSaveEmotes(ctx: TenantContext, vodId: number, platform: Platform, platformId?: string): Promise<void> {
   let ffzEmotes: EmoteData[] = [];
   let bttvEmotes: EmoteData[] = [];
   let sevenTvEmotes: EmoteData[] = [];
@@ -103,11 +105,6 @@ export async function fetchAndSaveEmotes(tenantId: string, vodId: number, platfo
     return;
   }
 
-  if (!db) {
-    logger.error({ tenantId }, 'Database client not provided');
-    return;
-  }
-
   const emoteData: VodEmotes = {
     vodId,
     ffz_emotes: ffzEmotes,
@@ -116,19 +113,21 @@ export async function fetchAndSaveEmotes(tenantId: string, vodId: number, platfo
   };
 
   try {
-    await db.emote.upsert({
-      where: { vod_id: vodId },
-      create: {
-        vod_id: vodId,
-        ffz_emotes: emoteData.ffz_emotes as EmoteData[],
-        bttv_emotes: emoteData.bttv_emotes as EmoteData[],
-        seventv_emotes: emoteData.seventv_emotes as EmoteData[],
-      },
-      update: {
-        ffz_emotes: emoteData.ffz_emotes as EmoteData[],
-        bttv_emotes: emoteData.bttv_emotes as EmoteData[],
-        seventv_emotes: emoteData.seventv_emotes as EmoteData[],
-      },
+    await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+      await db.emote.upsert({
+        where: { vod_id: vodId },
+        create: {
+          vod_id: vodId,
+          ffz_emotes: emoteData.ffz_emotes as EmoteData[],
+          bttv_emotes: emoteData.bttv_emotes as EmoteData[],
+          seventv_emotes: emoteData.seventv_emotes as EmoteData[],
+        },
+        update: {
+          ffz_emotes: emoteData.ffz_emotes as EmoteData[],
+          bttv_emotes: emoteData.bttv_emotes as EmoteData[],
+          seventv_emotes: emoteData.seventv_emotes as EmoteData[],
+        },
+      });
     });
   } catch {
     logger.error({ vodId }, 'Failed to save emotes');

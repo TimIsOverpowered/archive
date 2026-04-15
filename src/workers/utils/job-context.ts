@@ -1,5 +1,5 @@
 import { getTenantConfig } from '../../config/loader.js';
-import { getClient, createClient } from '../../db/client.js';
+import { ensureClient } from '../../db/client.js';
 import type { TenantConfig } from '../../config/types.js';
 import type { PrismaClient } from '../../../generated/streamer/client.js';
 
@@ -16,10 +16,7 @@ export async function getJobContext(tenantId: string): Promise<JobContext> {
     throw new Error(`Config not found for tenant ${tenantId}`);
   }
 
-  let db = getClient(tenantId);
-  if (!db) {
-    db = await createClient(config);
-  }
+  const db = await ensureClient(tenantId, config);
 
   return { config, db, tenantId };
 }

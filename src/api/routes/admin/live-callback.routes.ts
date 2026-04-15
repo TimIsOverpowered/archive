@@ -58,7 +58,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
     onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
     preValidation: [platformValidationMiddleware],
     handler: async (request) => {
-      const { tenantId, config, client, platform } = request.tenant as TenantPlatformContext;
+      const { tenantId, config, db, platform } = request.tenant as TenantPlatformContext;
       const log = createAutoLogger(tenantId);
 
       // Validate file path exists and is accessible
@@ -85,12 +85,12 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
       // Look up VOD record by stream_id or id
       const streamIdNum = Number(request.body.streamId);
 
-      const vodRecord = await findStreamRecord(client, request.body.streamId, platform);
+      const vodRecord = await findStreamRecord(db, request.body.streamId, platform);
       if (!vodRecord) notFound(`VOD ${request.body.streamId} not found`);
 
       // Update duration if provided and different from current value
       if (request.body.durationSecs && vodRecord.duration !== request.body.durationSecs) {
-        await client.vod.update({
+        await db.vod.update({
           where: { id: vodRecord.id },
           data: { duration: request.body.durationSecs },
         });
@@ -113,7 +113,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         };
       }
 
-      queueYoutubeUploads({ tenantId, dbId: vodRecord.id, vodId: vodRecord.vod_id, filePath: request.body.path, platform, config, log });
+      queueYoutubeUploads({ ctx: request.tenant as TenantPlatformContext, dbId: vodRecord.id, vodId: vodRecord.vod_id, filePath: request.body.path, platform, log });
 
       return <{ data: LiveCallbackResponseData }>{
         data: {
