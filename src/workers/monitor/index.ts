@@ -49,8 +49,8 @@ export async function stopMonitorService(): Promise<void> {
   logger.info('[Monitor] Received shutdown signal. Cleaning up...');
 
   // Clear all monitor intervals (now type-safe via src/types/global.d.ts)
-  const globalObj = global as unknown as NodeJS.Global;
-  const intervals: Map<string, ReturnType<typeof setInterval>> | undefined = globalObj.monitorIntervals;
+  const globalObj = global as NodeJS.Global;
+  const intervals: Map<string, NodeJS.Timeout> | undefined = globalObj.monitorIntervals;
 
   if (intervals) {
     for (const [key, intervalId] of intervals.entries()) {
