@@ -3,6 +3,7 @@ import { Prisma } from '../../generated/streamer/client.js';
 import { Platform, PLATFORMS } from '../types/platforms.js';
 import { TenantContext } from '../types/context.js';
 import { withDbRetry } from '../db/client.js';
+import { safeRequest } from '../utils/http-client.js';
 
 export interface EmoteData extends Prisma.JsonObject {
   id: string;
@@ -57,48 +58,27 @@ export async function fetchAndSaveEmotes(ctx: TenantContext, vodId: number, plat
   let sevenTvEmotes: EmoteData[] = [];
 
   if (platform === PLATFORMS.TWITCH && platformId) {
-    try {
-      const [ffzRes, bttvGlobalRes, bttvChannelRes, sevenTvRes] = await Promise.all([
-        fetch(`https://api.frankerfacez.com/v1/room/id/${platformId}`, { signal: AbortSignal.timeout(5000) })
-          .then((r) => (r.ok ? (r.json() as Promise<FFZResponse>) : {}))
-          .catch(() => ({})),
+    const [ffzRes, bttvGlobalRes, bttvChannelRes, sevenTvRes] = await Promise.all([
+      safeRequest<FFZResponse>(`https://api.frankerfacez.com/v1/room/id/${platformId}`, {}, { timeoutMs: 5000 }),
+      safeRequest<BTTVGlobalResponse>('https://api.betterttv.net/3/cached/emotes/global', { emotes: [] }, { timeoutMs: 5000 }),
+      safeRequest<BTTVChannelResponse>(`https://api.betterttv.net/3/cached/users/twitch/${platformId}`, { channelEmotes: [] }, { timeoutMs: 5000 }),
+      safeRequest<SevenTVUserResponse>(`https://7tv.io/v3/users/twitch/${platformId}`, { emotes: [] }, { timeoutMs: 5000 }),
+    ]);
 
-        fetch('https://api.betterttv.net/3/cached/emotes/global', { signal: AbortSignal.timeout(5000) })
-          .then((r) => (r.ok ? (r.json() as Promise<BTTVGlobalResponse>) : { emotes: [] }))
-          .catch(() => ({ emotes: [] })),
+    ffzEmotes = ((ffzRes as FFZResponse).channels?.[platformId]?.emotes || []).map((e) => ({ id: String(e.id), code: e.code })) || [];
 
-        fetch(`https://api.betterttv.net/3/cached/users/twitch/${platformId}`, { signal: AbortSignal.timeout(5000) })
-          .then((r) => (r.ok ? (r.json() as Promise<BTTVChannelResponse>) : {}))
-          .catch(() => ({ channelEmotes: [] })),
+    bttvEmotes = [
+      ...(bttvGlobalRes.emotes || []).map(({ id, code }) => ({ id, code })),
+      ...(((bttvChannelRes as BTTVChannelResponse).channelEmotes || [])?.map(({ id, code }) => ({ id, code })) || []),
+    ];
 
-        fetch(`https://7tv.io/v3/users/twitch/${platformId}`, { signal: AbortSignal.timeout(5000) })
-          .then((r) => (r.ok ? (r.json() as Promise<SevenTVUserResponse>) : {}))
-          .catch(() => ({ emotes: [] })),
-      ]);
-
-      ffzEmotes = ((ffzRes as FFZResponse).channels?.[platformId]?.emotes || []).map((e) => ({ id: String(e.id), code: e.code })) || [];
-
-      bttvEmotes = [
-        ...(bttvGlobalRes.emotes || []).map(({ id, code }) => ({ id, code })),
-        ...(((bttvChannelRes as BTTVChannelResponse).channelEmotes || [])?.map(({ id, code }) => ({ id, code })) || []),
-      ];
-
-      sevenTvEmotes = ((sevenTvRes as SevenTVUserResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
-    } catch {
-      logger.error({ platform, platformId }, 'Failed to fetch Twitch emotes');
-    }
+    sevenTvEmotes = ((sevenTvRes as SevenTVUserResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
   } else if (platform === PLATFORMS.KICK && platformId) {
-    try {
-      const sevenTvRes = await fetch(`https://7tv.io/v3/users/kick/${platformId}`, { signal: AbortSignal.timeout(5000) })
-        .then((r) => (r.ok ? (r.json() as Promise<SevenTVUserResponse>) : {}))
-        .catch(() => ({ emotes: [] }));
+    const sevenTvRes = await safeRequest<SevenTVUserResponse>(`https://7tv.io/v3/users/kick/${platformId}`, { emotes: [] }, { timeoutMs: 5000 });
 
-      ffzEmotes = [];
-      bttvEmotes = [];
-      sevenTvEmotes = ((sevenTvRes as SevenTVUserResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
-    } catch {
-      logger.error({ platform, platformId }, 'Failed to fetch Kick emotes');
-    }
+    ffzEmotes = [];
+    bttvEmotes = [];
+    sevenTvEmotes = ((sevenTvRes as SevenTVUserResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
   }
 
   if (ffzEmotes.length === 0 && bttvEmotes.length === 0 && sevenTvEmotes.length === 0) {

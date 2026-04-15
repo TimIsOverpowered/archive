@@ -1,6 +1,7 @@
 import ipaddr from 'ipaddr.js';
 import { redisClient } from '../api/plugins/redis.plugin';
 import { logger } from './logger';
+import { request } from './http-client.js';
 
 const CF_IP_RANGES_KEY = 'cloudflare:ip_ranges';
 const CF_IP_RANGES_TTL = 86400 * 7; // 7 days
@@ -23,7 +24,7 @@ export interface CloudflareCacheInfo {
 
 /** Fetch Cloudflare IP ranges from official source */
 export async function fetchCloudflareIpRanges(): Promise<CloudflareIpRanges> {
-  const [v4Response, v6Response] = await Promise.all([fetch(CF_IP_V4_URL).then((r) => r.text()), fetch(CF_IP_V6_URL).then((r) => r.text())]);
+  const [v4Response, v6Response] = await Promise.all([request(CF_IP_V4_URL, { responseType: 'text' }), request(CF_IP_V6_URL, { responseType: 'text' })]);
 
   return {
     v4: v4Response

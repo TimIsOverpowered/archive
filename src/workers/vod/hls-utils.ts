@@ -1,5 +1,5 @@
 import fsPromises from 'fs/promises';
-import { extractErrorDetails, createErrorContext, throwOnHttpError } from '../../utils/error.js';
+import { extractErrorDetails, createErrorContext } from '../../utils/error.js';
 import fs from 'fs';
 import pathMod from 'path';
 import HLS from 'hls-parser';
@@ -12,7 +12,7 @@ import pLimit from 'p-limit';
 import { AppLogger } from '../../utils/auto-tenant-logger.js';
 import { fileExists } from '../../utils/path.js';
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch/index.js';
-import { retryWithBackoff } from '../../utils/retry.js';
+import { request } from '../../utils/http-client.js';
 
 export type DownloadStrategy = { type: 'fetch'; signal?: AbortSignal } | { type: 'cycletls'; session: CycleTLSSession };
 
@@ -61,36 +61,28 @@ export async function downloadSegmentsParallel(
       }
 
       try {
-        await retryWithBackoff(
-          async () => {
-            if (isAborted()) {
-              throw new Error('Aborted');
-            }
-            await limit(async () => {
-              if (strategy.type === 'fetch') {
-                const response = await fetch(`${baseURL}/${segment.uri}`, { signal: strategy.signal });
-                throwOnHttpError(response, 'Download segment');
-
-                const writer = fs.createWriteStream(tempPath);
-                const nodeWebStream = response.body as NodeWebStream<Uint8Array>;
-                await pipeline(Readable.fromWeb(nodeWebStream), writer);
-              } else {
-                await strategy.session.streamToFile(`${baseURL}/${segment.uri}`, tempPath);
-              }
-            });
-          },
-          {
-            attempts: retryAttempts,
-            baseDelayMs: 1000,
-            maxDelayMs: 30000,
-            jitter: true,
-            shouldRetry: (error) => {
-              if (isAborted()) return false;
-              const msg = error instanceof Error ? error.message : String(error);
-              return msg !== 'Aborted';
-            },
+        await limit(async () => {
+          if (isAborted()) {
+            throw new Error('Aborted');
           }
-        );
+
+          if (strategy.type === 'fetch') {
+            const response = await request(`${baseURL}/${segment.uri}`, {
+              responseType: 'response',
+              signal: strategy.signal,
+              timeoutMs: 30000,
+              retryOptions: {
+                attempts: retryAttempts,
+              },
+            });
+
+            const writer = fs.createWriteStream(tempPath);
+            const nodeWebStream = response.body as NodeWebStream<Uint8Array>;
+            await pipeline(Readable.fromWeb(nodeWebStream), writer);
+          } else {
+            await strategy.session.streamToFile(`${baseURL}/${segment.uri}`, tempPath);
+          }
+        });
 
         await fsPromises.rename(tempPath, outputPath);
         completedCount++;
@@ -181,15 +173,13 @@ export async function fetchTwitchPlaylist(vodId: string, log: AppLogger, retryCo
     if (!bestVariantUrl.startsWith('http')) {
       baseURL = masterPlaylistContent.substring(0, masterPlaylistContent.lastIndexOf('/'));
 
-      const response1 = await fetch(bestVariantUrl.includes('/') ? bestVariantUrl : `${baseURL}/${bestVariantUrl}`);
-      if (!response1.ok) throw new Error(`Fetch failed with status ${response1.status}`);
-      variantM3u8String = await response1.text();
+      variantM3u8String = await request(bestVariantUrl.includes('/') ? bestVariantUrl : `${baseURL}/${bestVariantUrl}`, {
+        responseType: 'text',
+      });
     } else {
       baseURL = bestVariantUrl.substring(0, bestVariantUrl.lastIndexOf('/'));
 
-      const response2 = await fetch(bestVariantUrl);
-      if (!response2.ok) throw new Error(`Fetch failed with status ${response2.status}`);
-      variantM3u8String = await response2.text();
+      variantM3u8String = await request(bestVariantUrl, { responseType: 'text' });
     }
 
     return { variantM3u8String, baseURL };
