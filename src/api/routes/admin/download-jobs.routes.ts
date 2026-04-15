@@ -8,6 +8,7 @@ import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest, notFound } from '../../../utils/http-error';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
 import { SOURCE_TYPES, DOWNLOAD_METHODS, UPLOAD_MODES, PLATFORM_VALUES, UPLOAD_MODE_VALUES, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES_VALUES } from '../../../types/platforms.js';
+import { triggerChatDownload } from '../../../workers/jobs/chat.job';
 
 interface Params {
   tenantId: string;
@@ -130,7 +131,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, platform, db } = request.tenant as TenantPlatformContext;
+      const { tenantId, platform, db, config } = request.tenant as TenantPlatformContext;
       const { vodId, type, downloadMethod } = request.body;
       const log = createAutoLogger(tenantId);
 
@@ -146,13 +147,22 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       // Ensure vod download
       const { jobId, filePath } = await ensureVodDownload({ ctx: request.tenant as TenantPlatformContext, dbId, vodId, type, downloadMethod, log });
 
+      const platformConfig = config?.[platform];
+
+      let chatJobId;
+      if (platformConfig?.id) {
+        // Queue Chat Download
+        chatJobId = await triggerChatDownload(tenantId, platformConfig.id, dbId, vodId, platform, vodRecord.duration, platformConfig?.username);
+      }
+
       if (jobId) {
         return {
           data: {
             message: 'VOD download queued!',
-            dbId: vodRecord.id,
-            vodId: vodRecord.vod_id,
+            dbId,
+            vodId,
             jobId,
+            chatJobId,
           },
         };
       } else {

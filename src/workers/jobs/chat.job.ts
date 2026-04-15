@@ -1,4 +1,4 @@
-import type { ChatDownloadJob, StandardVodJob } from './queues.js';
+import type { ChatDownloadJob } from './queues.js';
 import { getChatDownloadQueue } from './queues.js';
 import { childLogger } from '../../utils/logger.js';
 import { Platform, PLATFORMS } from '../../types/platforms.js';
@@ -34,17 +34,6 @@ export async function triggerChatDownload(
   duration: number,
   platformUsername?: string
 ): Promise<string | null> {
+  if (platform === PLATFORMS.KICK) return null;
   return enqueue({ tenantId, platformUserId, platformUsername, dbId, vodId, platform, duration });
-}
-
-export async function triggerChatAfterVod(vodJob: StandardVodJob): Promise<string | null> {
-  if (vodJob.platform === PLATFORMS.KICK) return null;
-
-  return enqueue({
-    tenantId: vodJob.tenantId,
-    dbId: vodJob.dbId,
-    vodId: vodJob.vodId,
-    platform: vodJob.platform,
-    duration: 0,
-  });
 }

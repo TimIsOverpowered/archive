@@ -43,7 +43,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
   try {
     log.info({ vodId, effectiveOffset }, 'Starting chat download');
 
-    let rawPage = await fetchComments(String(vodId), effectiveOffset, tenantId);
+    let rawPage = await fetchComments(vodId, effectiveOffset, tenantId);
     log.debug({ vodId, effectiveOffset }, '[Chat] Initial comments fetch completed');
 
     let lastCursor: string | null = null;
