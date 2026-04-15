@@ -4,9 +4,11 @@ import { getJobContext } from './utils/job-context.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { processVodUpload, linkVodPartsAfterDelay } from './youtube/vod-upload-processor.js';
 import { processGameUpload } from './youtube/game-upload-processor.js';
-import { createAutoLogger } from '../utils/auto-tenant-logger.js';
+import { AppLogger, createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { resetFailures } from '../utils/discord-alerts.js';
 import { PLATFORMS, UPLOAD_TYPES } from '../types/platforms.js';
+import { TenantConfig } from '../config/types.js';
+import { PrismaClient } from '../../generated/streamer/client.js';
 
 const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async (job: Job<YoutubeUploadJob>) => {
   const { tenantId, dbId, vodId, type } = job.data;
@@ -38,12 +40,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
   }
 };
 
-async function processVodUploadJob(
-  job: YoutubeVodUploadJob,
-  config: NonNullable<Awaited<ReturnType<typeof getJobContext>>['config']>,
-  db: Awaited<ReturnType<typeof getJobContext>>['db'],
-  log: ReturnType<typeof createAutoLogger>
-): Promise<YoutubeUploadResult> {
+async function processVodUploadJob(job: YoutubeVodUploadJob, config: TenantConfig, db: PrismaClient, log: AppLogger): Promise<YoutubeUploadResult> {
   const { tenantId, dbId, vodId, filePath, dmcaProcessed, vodRecord } = job;
 
   const result = await processVodUpload({
@@ -76,12 +73,7 @@ async function processVodUploadJob(
   return { success: true, videos: result.uploadedVideos };
 }
 
-async function processGameUploadJob(
-  job: YoutubeGameUploadJob,
-  config: NonNullable<Awaited<ReturnType<typeof getJobContext>>['config']>,
-  db: Awaited<ReturnType<typeof getJobContext>>['db'],
-  log: ReturnType<typeof createAutoLogger>
-): Promise<YoutubeUploadResult> {
+async function processGameUploadJob(job: YoutubeGameUploadJob, config: TenantConfig, db: PrismaClient, log: AppLogger): Promise<YoutubeUploadResult> {
   const { tenantId, dbId, vodId, filePath, platform, chapterName, chapterStart, chapterEnd, chapterGameId, title, description } = job;
 
   if (platform === PLATFORMS.TWITCH && !config.twitch?.mainPlatform) {

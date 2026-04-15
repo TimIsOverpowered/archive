@@ -3,7 +3,7 @@ import pathMod from 'path';
 import HLS from 'hls-parser';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getVodDirPath, getVodFilePath } from '../../utils/path.js';
-import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
+import { AppLogger, createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
 import { updateChapterDuringDownload } from '../../services/kick.js';
 import { downloadSegmentsParallel, fetchTwitchPlaylist, fetchKickPlaylist, type DownloadStrategy } from './hls-utils.js';
@@ -111,7 +111,7 @@ interface LivePollingContext {
   vodDir: string;
   m3u8Path: string;
   cycleTLS: CycleTLSSession | null;
-  log: ReturnType<typeof createAutoLogger>;
+  log: AppLogger;
   onProgress?: (segmentsDownloaded: number) => void;
   concurrency: number;
 }
@@ -196,7 +196,7 @@ interface ArchivedVodContext {
   vodDir: string;
   m3u8Path: string;
   cycleTLS: CycleTLSSession | null;
-  log: ReturnType<typeof createAutoLogger>;
+  log: AppLogger;
 }
 
 async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {

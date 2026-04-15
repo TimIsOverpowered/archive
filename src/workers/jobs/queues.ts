@@ -9,7 +9,7 @@ export interface LiveDownloadJob {
   vodId: string;
   platform: Platform;
   tenantId: string;
-  platformUserId?: string;
+  platformUserId: string;
   platformUsername?: string;
   startedAt?: string;
   sourceUrl?: string;

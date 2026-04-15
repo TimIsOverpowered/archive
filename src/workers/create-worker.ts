@@ -1,4 +1,3 @@
-// workers/createWorker.ts
 import { Worker, BaseJobOptions } from 'bullmq';
 import { logger } from '../utils/logger.js';
 import { registerWorker } from './index.js';
