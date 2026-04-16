@@ -10,7 +10,6 @@ import { getJobContext } from './utils/job-context.js';
 import { finalizeVod } from '../services/vod-finalization.js';
 import { queueYoutubeUploads, type YoutubeUploadJobResult } from './jobs/youtube.job.js';
 import { type LiveCompletionData } from './utils/alert-factories.js';
-
 import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { createLiveWorkerAlerts } from './utils/alert-factories.js';
@@ -91,7 +90,7 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
 
     // 6. Queue upload (non-fatal)
     try {
-      youtubeResult = await queueYoutubeUploads({ ctx, dbId, vodId, filePath: finalMp4Path, platform, log });
+      youtubeResult = await queueYoutubeUploads({ ctx, dbId, vodId, filePath: finalMp4Path, platform });
       if (youtubeResult.vodJobId || youtubeResult.gameJobIds.length > 0) {
         await updateAlert(messageId, alerts.uploadQueued(vodId));
       }
