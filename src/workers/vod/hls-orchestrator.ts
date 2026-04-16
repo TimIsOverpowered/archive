@@ -9,6 +9,7 @@ import { updateChapterDuringDownload } from '../../services/kick.js';
 import { downloadSegmentsParallel, fetchTwitchPlaylist, fetchKickPlaylist, type DownloadStrategy } from './hls-utils.js';
 import { sleep, getRetryDelay } from '../../utils/delay.js';
 import { convertHlsToMp4, detectFmp4FromPlaylist } from './ffmpeg.js';
+import { cleanupHlsFiles } from './hls-cleanup.js';
 import { HLS_MAX_CONSECUTIVE_ERRORS, HLS_NO_CHANGE_THRESHOLD, HLS_POLL_INTERVAL_MS, HLS_SEGMENT_CONCURRENCY, HLS_SEGMENT_RETRY_ATTEMPTS } from '../../constants.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { TenantContext } from '../../types/context.js';
@@ -91,6 +92,14 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
     const segmentCount = files.filter((f) => f.endsWith('.mp4') || f.endsWith('.ts')).length;
 
     log.info({ vodId, platform, segmentCount }, 'HLS download and conversion complete');
+
+    const shouldKeepHls = config.settings.saveHLS ?? false;
+    if (shouldKeepHls) {
+      log.info({ vodId }, 'Preserving HLS files (saveHLS=true)');
+    } else {
+      log.info({ vodId }, 'Cleaning up HLS files');
+    }
+    await cleanupHlsFiles(vodDir, shouldKeepHls, log);
 
     return { success: true, m3u8Path, outputDir: vodDir, segmentCount, finalMp4Path };
   } finally {

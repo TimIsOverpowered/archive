@@ -1,5 +1,4 @@
 import { Processor, Job } from 'bullmq';
-
 import type { DmcaProcessingJob, DmcaProcessingResult } from './jobs/queues.js';
 import { queueYoutubeVodUpload } from './jobs/youtube.job.js';
 import type { DMCAClaim } from '../utils/dmca.js';
@@ -46,7 +45,14 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
   if (!(await fileExists(filePath))) {
     const existingJob = await getStandardVodQueue().getJob(`vod_${fileIdentifier}`);
     if (!existingJob) {
-      await triggerVodDownload(tenantId, vodRecord.id, fileIdentifier, platform);
+      const platformUserId = config?.[platform]?.id;
+      const platformUsername = config?.[platform]?.username;
+
+      if (!platformUserId || !platformUsername) {
+        throw new Error(`Platform ${platform} not configured for tenant ${tenantId}`);
+      }
+
+      await triggerVodDownload(tenantId, vodRecord.id, fileIdentifier, platform, platformUserId, platformUsername);
       log.info({ vodId: fileIdentifier }, 'VOD download queued, DMCA job will retry');
     } else {
       log.debug({ vodId: fileIdentifier, state: await existingJob.getState() }, 'VOD download already in progress');

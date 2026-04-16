@@ -7,9 +7,6 @@ import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { request } from '../../utils/http-client.js';
 import { sendVodDownloadFailed, sendVodDownloadStarted, sendVodDownloadSuccess } from '../../utils/discord-alerts.js';
 import { extractErrorDetails } from '../../utils/error.js';
-import { downloadHlsStream } from './hls-orchestrator.js';
-import { cleanupHlsFiles } from './hls-cleanup.js';
-import type { PrismaClient as PC } from '../../../generated/streamer/client.js';
 
 export interface VodDownloadResult {
   finalPath: string;
@@ -118,41 +115,4 @@ async function downloadTwitchVodWithFfmpeg(vodId: string, finalPath: string, con
 
     throw error;
   }
-}
-
-export async function downloadVodWithHls(platform: Platform, vodId: string, finalPath: string, tenantId: string, config: TenantConfig, log: AppLogger): Promise<void> {
-  const username = config?.kick?.username;
-
-  if (!username) {
-    throw new Error('Kick username not configured for streamer');
-  }
-
-  const vodMetadata = await getKickVod(username, vodId);
-
-  if (!vodMetadata?.source) {
-    throw new Error('VOD source URL not available');
-  }
-
-  const sourceUrl = await getKickParsedM3u8ForFfmpeg(vodMetadata.source);
-
-  if (!sourceUrl) {
-    throw new Error('Failed to parse Kick HLS playlist');
-  }
-
-  const result = await downloadHlsStream({
-    ctx: { tenantId, config, db: {} as PC },
-    dbId: 0,
-    vodId,
-    platform,
-    platformUserId: '',
-    sourceUrl,
-    isLive: false,
-  });
-
-  if (result.finalMp4Path !== finalPath) {
-    log.warn({ expected: finalPath, actual: result.finalMp4Path }, 'MP4 path mismatch');
-  }
-
-  const shouldKeepHls = config?.settings.saveHLS ?? false;
-  await cleanupHlsFiles(result.outputDir, shouldKeepHls, log);
 }

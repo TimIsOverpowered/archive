@@ -9,7 +9,7 @@ import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
 import { finalizeVod } from '../services/vod-finalization.js';
 import { queueYoutubeUploads } from './jobs/youtube.job.js';
-import { cleanupHlsFiles } from './vod/hls-cleanup.js';
+
 import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { createLiveWorkerAlerts } from './utils/alert-factories.js';
@@ -56,8 +56,8 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
     });
 
     await updateAlert(messageId, {
-      title: `[Live] Converting ${vodId}`,
-      description: 'Download complete. Converting...',
+      title: `[Live] Finalizing ${vodId}`,
+      description: 'Download complete. Finalizing...',
       status: 'warning',
       fields: [{ name: 'Segments', value: String(downloadResult.segmentCount), inline: true }],
       timestamp: new Date().toISOString(),
@@ -91,10 +91,6 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
     } catch (error) {
       log.warn({ ...extractErrorDetails(error), vodId }, 'Failed to queue chat download (non-fatal)');
     }
-
-    // 6. Cleanup HLS segments
-    const shouldKeepHls = config.settings.saveHLS ?? false;
-    await cleanupHlsFiles(downloadResult.outputDir, shouldKeepHls, log);
 
     log.info({ jobId: job.id, vodId }, '[Live Worker] Job completed successfully');
     return { success: true };

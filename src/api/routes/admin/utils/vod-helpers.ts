@@ -79,8 +79,9 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
   const { ctx, dbId, vodId, type, downloadMethod = DOWNLOAD_METHODS.HLS, log } = options;
   const { tenantId, platform, config } = ctx;
 
-  const platformUserId = platform === PLATFORMS.TWITCH ? config.twitch?.id : config.kick?.id;
-  if (!platformUserId) {
+  const platformUserId = config?.[platform]?.id;
+  const platformUsername = config?.[platform]?.username;
+  if (!platformUserId || !platformUsername) {
     throw new Error(`Platform ${platform} not configured for tenant ${tenantId}`);
   }
 
@@ -96,7 +97,7 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
 
   log.info({ vodId, filePath, type }, 'Queuing VOD download');
 
-  const jobId = await triggerVodDownload(tenantId, dbId, vodId, platform, downloadMethod);
+  const jobId = await triggerVodDownload(tenantId, dbId, vodId, platform, platformUserId, platformUsername, downloadMethod);
 
   log.info({ jobId, vodId, filePath, type }, 'VOD download queued');
   return { filePath, jobId };
