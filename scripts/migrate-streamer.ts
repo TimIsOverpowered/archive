@@ -135,7 +135,7 @@ async function migrateChatWorker(
           ids.push(row.id);
           vodIds.push(newVodId);
           displayNames.push(row.display_name);
-          offsets.push(row.content_offset_seconds);
+          offsets.push(Math.round(Number(row.content_offset_seconds)));
           colors.push(row.user_color);
           createdAts.push(row.createdAt);
           messages.push(row.message ? JSON.stringify(row.message) : null);
@@ -150,7 +150,7 @@ async function migrateChatWorker(
           `INSERT INTO "chat_messages_new"
            (id, vod_id, display_name, content_offset_seconds, user_color, created_at, message, user_badges)
            SELECT id, vod_id, display_name, content_offset_seconds, user_color, created_at, message, user_badges
-           FROM UNNEST($1::uuid[], $2::int[], $3::text[], $4::decimal[], $5::text[], $6::timestamptz[], $7::jsonb[], $8::jsonb[])
+           FROM UNNEST($1::uuid[], $2::int[], $3::text[], $4::int[], $5::text[], $6::timestamptz[], $7::jsonb[], $8::jsonb[])
            AS t(id, vod_id, display_name, content_offset_seconds, user_color, created_at, message, user_badges)
            ON CONFLICT (id) DO NOTHING`,
           [ids, vodIds, displayNames, offsets, colors, createdAts, messages, badges]
@@ -352,7 +352,7 @@ const createNormalizedSchema = async (client: any) => {
       "id" UUID NOT NULL,
       "vod_id" INTEGER NOT NULL,
       "display_name" TEXT,
-      "content_offset_seconds" DECIMAL NOT NULL,
+      "content_offset_seconds" INTEGER NOT NULL,
       "user_color" TEXT,
       "created_at" TIMESTAMPTZ(6) NOT NULL,
       "message" JSONB,

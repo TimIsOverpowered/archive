@@ -96,7 +96,7 @@ model ChatMessage {
   id                     String    @id(map: "chat_messages_pkey") @db.Uuid
   vod_id                 Int
   display_name           String?
-  content_offset_seconds Decimal   @db.Decimal
+  content_offset_seconds Int
   user_color             String?
   createdAt              DateTime @map("created_at") @db.Timestamptz(6)
   message                Json?

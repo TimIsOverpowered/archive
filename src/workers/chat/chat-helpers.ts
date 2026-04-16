@@ -56,7 +56,7 @@ export async function calculateResumeOffset(db: PrismaClient, vodId: number, man
     return { offset: 0, hasExistingData: false };
   }
 
-  const resumeOffset = parseFloat(lastSavedRecord.content_offset_seconds.toString());
+  const resumeOffset = lastSavedRecord.content_offset_seconds;
   return { offset: resumeOffset, hasExistingData: true, lastMessageId: lastSavedRecord.id };
 }
 
