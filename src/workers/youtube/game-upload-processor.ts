@@ -1,12 +1,13 @@
 import type { PrismaClient } from '../../../generated/streamer/client.js';
 import type { AppLogger } from '../../utils/auto-tenant-logger.js';
-import { trimVideo, splitVideo, getDuration, deleteFile } from '../vod/ffmpeg.js';
+import { trimVideo, splitVideo, getDuration } from '../utils/ffmpeg.js';
 import { uploadVideo } from '../../services/youtube/index.js';
 import { initRichAlert, updateAlert, formatProgressMessage } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 import { createYoutubeUploadProgressHandler as createGameUploadProgressHandler } from './youtube-upload-progress.js';
 import { YOUTUBE_MAX_DURATION } from '../../constants.js';
 import type { TenantConfig } from '../../config/types.js';
+import { deleteFileIfExists } from '../../utils/path.js';
 
 export interface GameUploadContext {
   tenantId: string;
@@ -88,7 +89,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     },
   });
 
-  await deleteFile(trimmedPath);
+  await deleteFileIfExists(trimmedPath);
 
   return { success: true, videoId: result.videoId, gameId: String(createdGameRecord.id) };
 }
@@ -177,7 +178,7 @@ async function processSplitGameUpload(ctx: GameUploadContext, trimmedPath: strin
     });
 
     if (!config.settings.saveMP4) {
-      await deleteFile(splitPaths[i]);
+      await deleteFileIfExists(splitPaths[i]);
     }
   }
 

@@ -1,7 +1,7 @@
 import ffmpeg from 'fluent-ffmpeg';
-import { extractErrorDetails } from './error.js';
-import { deleteFileIfExists } from './path.js';
-import { childLogger } from './logger.js';
+import { extractErrorDetails } from '../../utils/error.js';
+import { deleteFileIfExists } from '../../utils/path.js';
+import { childLogger } from '../../utils/logger.js';
 
 const log = childLogger({ module: 'dmca' });
 

@@ -1,6 +1,6 @@
 import type { PrismaClient } from '../../../generated/streamer/client.js';
 import type { AppLogger } from '../../utils/auto-tenant-logger.js';
-import { splitVideo, getDuration, deleteFile } from '../vod/ffmpeg.js';
+import { splitVideo, getDuration } from '../utils/ffmpeg.js';
 import { uploadVideo, linkParts } from '../../services/youtube/index.js';
 import { initRichAlert, updateAlert, formatProgressMessage } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
@@ -11,6 +11,7 @@ import type { TenantConfig } from '../../config/types.js';
 import type { SourceType, Platform } from '../../types/platforms.js';
 import { UPLOAD_TYPES } from '../../types/platforms.js';
 import type { VodRecord } from '../../types/db.js';
+import { deleteFileIfExists } from '../../utils/path.js';
 
 export interface VodUploadContext {
   tenantId: string;
@@ -156,7 +157,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
     uploadedVideos.push({ id: result.videoId, part: i + 1 });
 
     if (!config.settings.saveMP4) {
-      await deleteFile(parts[i]);
+      await deleteFileIfExists(parts[i]);
     }
   }
 
@@ -236,7 +237,7 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
   });
 
   if (!config.settings.saveMP4 || dmcaProcessed === true) {
-    await deleteFile(filePath);
+    await deleteFileIfExists(filePath);
   }
 
   return { uploadedVideos, needsPartLinking: false };

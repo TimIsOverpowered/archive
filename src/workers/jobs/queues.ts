@@ -1,5 +1,5 @@
 import { Queue, QueueOptions, JobsOptions, FlowProducer } from 'bullmq';
-import type { DMCAClaim } from '../../utils/dmca.js';
+import type { DMCAClaim } from '../dmca/dmca.js';
 import { redisInstance } from '../redis.js';
 import type { Platform, SourceType, UploadType, DownloadMethod } from '../../types/platforms.js';
 import { VodRecord } from '../../types/db.js';

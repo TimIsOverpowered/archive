@@ -1,5 +1,4 @@
 import ffmpeg from 'fluent-ffmpeg';
-import fs from 'fs/promises';
 import path from 'path';
 import { childLogger } from '../../utils/logger.js';
 
@@ -174,15 +173,4 @@ export async function convertHlsToMp4(source: string, outputPath: string, option
       .on('end', () => resolve())
       .saveToFile(outputPath);
   });
-}
-
-export async function deleteFile(filePath: string): Promise<void> {
-  try {
-    await fs.unlink(filePath);
-  } catch (err) {
-    const error = err as NodeJS.ErrnoException;
-    if (error.code !== 'ENOENT') {
-      throw err;
-    }
-  }
 }
