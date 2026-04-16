@@ -13,6 +13,7 @@ import { cleanupHlsFiles } from './hls-cleanup.js';
 import { HLS_MAX_CONSECUTIVE_ERRORS, HLS_NO_CHANGE_THRESHOLD, HLS_POLL_INTERVAL_MS, HLS_SEGMENT_CONCURRENCY, HLS_SEGMENT_RETRY_ATTEMPTS } from '../../constants.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { TenantContext } from '../../types/context.js';
+import { updateVodDurationDuringDownload } from './duration-updater.js';
 
 export interface HlsDownloadOptions {
   ctx: TenantContext;
@@ -179,6 +180,9 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
       if (platform === PLATFORMS.KICK) {
         await updateChapterDuringDownload(ctx.ctx, ctx.dbId, vodId);
       }
+
+      // Fire-and-forget duration update
+      void updateVodDurationDuringDownload(ctx.ctx, ctx.dbId, vodId, platform, ctx.m3u8Path, variantM3u8String);
 
       await sleep(HLS_POLL_INTERVAL_MS);
     } catch (error) {
