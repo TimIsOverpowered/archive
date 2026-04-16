@@ -10,7 +10,7 @@ import { getTwitchStreamStatus, getLatestTwitchVodObject, type TwitchStreamStatu
 import { getKickStreamStatus, getLatestKickVodObject } from '../../services/kick-live.js';
 import type { KickStreamStatus } from '../../services/kick-live.js';
 import { sendRichAlert } from '../../utils/discord-alerts.js';
-import { humanizeDuration } from '../../utils/formatting.js';
+import { toHHMMSS } from '../../utils/formatting.js';
 import { extractErrorDetails, createErrorContext } from '../../utils/error.js';
 import type { Platform } from '../../types/platforms.js';
 import { capitalizePlatform, PLATFORMS } from '../../types/platforms.js';
@@ -118,7 +118,7 @@ async function sendStreamOfflineAlert(platform: Platform, vodId: string, started
 
     if (startedAt) {
       const durationSeconds = Math.floor((Date.now() - startedAt.getTime()) / 1000);
-      fields.push({ name: 'Duration', value: humanizeDuration(durationSeconds), inline: true });
+      fields.push({ name: 'Duration', value: toHHMMSS(durationSeconds), inline: true });
     }
 
     await sendRichAlert({
