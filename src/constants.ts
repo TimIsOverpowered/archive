@@ -23,7 +23,7 @@ export const KICK_PAGE_DELAY_MS = 2000;
 
 // DB client manager constants
 export const DB_CLIENT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
-export const DB_CLIENT_MAX_CLIENTS = 100;
+export const DB_CLIENT_MAX_CLIENTS = 10;
 export const DB_CLIENT_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
 // Cache TTLs (in seconds)
