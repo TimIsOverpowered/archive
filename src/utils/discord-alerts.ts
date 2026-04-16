@@ -1,6 +1,6 @@
 import { extractErrorDetails } from './error.js';
 import { request } from './http-client.js';
-import { formatDuration } from './formatting.js';
+import { humanizeDuration } from './formatting.js';
 import { logger } from './logger.js';
 import { getTenantDisplayName } from '../config/loader.js';
 import { capitalizePlatform, Platform } from '../types/platforms.js';
@@ -237,7 +237,7 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
   ];
 
   if (data.durationSeconds) {
-    fields.push({ name: 'Duration', value: formatDuration(data.durationSeconds), inline: true });
+    fields.push({ name: 'Duration', value: humanizeDuration(data.durationSeconds), inline: true });
   }
 
   const embedData = {

@@ -6,6 +6,7 @@ import { extractErrorDetails } from '../../src/utils/error.js';
 import { decryptScalar, decryptObject } from '../../src/utils/encryption.js';
 import { loadTenantConfigs } from '../../src/config/loader.js';
 import { validateYoutubeToken } from '../../src/services/youtube/index.js';
+import { humanizeDuration } from '../../src/utils/formatting.js';
 
 interface YoutubeAuth {
   access_token?: string;
@@ -167,7 +168,7 @@ function displayTokenState(auth: YoutubeAuth, label: string, verbose = false) {
     if (remainingSecs < 60) {
       statusText = `EXPIRED (${expiresAt})`;
     } else {
-      statusText = `${formatDuration(remainingSecs)} remaining (Expires: ${expiresAt})`;
+      statusText = `${humanizeDuration(remainingSecs)} remaining (Expires: ${expiresAt})`;
     }
   }
 
@@ -229,14 +230,4 @@ function displayTokenState(auth: YoutubeAuth, label: string, verbose = false) {
   }
 
   return statusText.includes('EXPIRED') || (!auth.access_token && !auth.refresh_token) || (expiryDate !== null ? typeof expiryDate === 'number' && expiryDate < 10000000 : false);
-}
-
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${Math.floor(seconds)}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ${minutes % 60}m`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ${hours % 24}h`;
 }
