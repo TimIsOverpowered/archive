@@ -13,15 +13,15 @@ export async function invalidateVodCache(tenantId: string, vodId: number): Promi
   try {
     await redisClient.unlink(`vod:${tenantId}:${vodIdStr}`);
 
-    const stream = redisClient.scanStream({
-      match: `vods:${tenantId}:*`,
-      count: 100,
-    });
+    const keysToDelete: string[] = [`vod:${tenantId}:${vodIdStr}`];
 
+    const stream = redisClient.scanStream({ match: `vods:${tenantId}:*`, count: 100 });
     for await (const keys of stream) {
-      for (const key of keys) {
-        await redisClient.unlink(key);
-      }
+      keysToDelete.push(...keys);
+    }
+
+    if (keysToDelete.length > 0) {
+      await redisClient.unlink(...keysToDelete); // single round trip
     }
 
     if (redisConnectionFailed) {

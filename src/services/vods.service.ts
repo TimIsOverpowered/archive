@@ -85,23 +85,11 @@ export async function getVods(client: PrismaClient, tenantId: string, query: Vod
   }
 
   if (query.game) {
-    const gameLower = query.game.toLowerCase();
-    const games = await client.game.findMany({
-      where: {
-        game_name: {
-          contains: gameLower,
-          mode: 'insensitive',
-        },
+    where.games = {
+      some: {
+        game_name: { contains: query.game, mode: 'insensitive' },
       },
-      select: { id: true },
-    });
-
-    const gameVodIds = games.map((g) => g.id);
-    if (gameVodIds.length > 0) {
-      where.id = { in: gameVodIds };
-    } else {
-      return { vods: [], total: 0 };
-    }
+    };
   }
 
   const [vods, total] = await Promise.all([
