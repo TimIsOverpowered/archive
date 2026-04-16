@@ -4,7 +4,7 @@ import { TenantConfig } from '../config/types';
 import { logger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { DB_CLIENT_IDLE_TIMEOUT_MS, DB_CLIENT_MAX_CLIENTS, DB_CLIENT_CLEANUP_INTERVAL_MS } from '../constants.js';
-import { invalidateVodCache } from '../services/vod-cache.js';
+import { invalidateVodCache, invalidateTenantVodListCache, invalidateEmoteCache } from '../services/vod-cache.js';
 import { sleep } from '../utils/delay.js';
 
 const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) =>
@@ -13,7 +13,7 @@ const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) 
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
           const isMutation = ['create', 'update', 'upsert', 'delete', 'createMany', 'updateMany', 'deleteMany'].includes(operation);
-          const isRelevantModel = ['Vod', 'VodUpload', 'Emote', 'Chapter', 'Game'].includes(model);
+          const isRelevantModel = ['Vod', 'VodUpload', 'Chapter', 'Game'].includes(model);
 
           if (!isMutation || !isRelevantModel) {
             return query(args);
@@ -50,7 +50,7 @@ const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) 
                     .filter((id) => !isNaN(id));
 
                   if (extractedIds.length === 0 && data.length > 0) {
-                    logger.debug({ tenantId, operation, recordCount: data.length }, 'Vod.createMany called without explicit IDs — cache invalidation skipped');
+                    logger.debug({ tenantId, operation, recordCount: data.length }, 'Vod.createMany called without explicit IDs — tenant list cache will be invalidated instead');
                   }
 
                   affectedVodIds.push(...extractedIds);
@@ -67,6 +67,31 @@ const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) 
                   } else if (typeof idClause !== 'object' && idClause !== null && idClause !== undefined) {
                     const numId = Number(idClause);
                     if (!isNaN(numId)) affectedVodIds.push(numId);
+                  }
+                }
+              }
+            } else if (model === 'Emote') {
+              if (operation === 'delete' || operation === 'update' || operation === 'upsert') {
+                const where = (args as { where?: Record<string, unknown> }).where;
+                if (where && typeof where === 'object' && 'vod_id' in where) {
+                  const vodIdClause = (where as { vod_id: unknown }).vod_id;
+                  if (typeof vodIdClause !== 'object' && vodIdClause !== null && vodIdClause !== undefined) {
+                    const numId = Number(vodIdClause);
+                    if (!isNaN(numId)) {
+                      invalidateEmoteCache(tenantId, numId).catch((error) => {
+                        logger.warn({ tenantId, vodId: numId, error: extractErrorDetails(error) }, 'Emote cache invalidation failed');
+                      });
+                    }
+                  }
+                }
+              } else if (operation === 'create') {
+                const data = (args as { data?: Record<string, unknown> }).data;
+                if (data && typeof data === 'object' && 'vod_id' in data) {
+                  const numId = Number((data as { vod_id: unknown }).vod_id);
+                  if (!isNaN(numId)) {
+                    invalidateEmoteCache(tenantId, numId).catch((error) => {
+                      logger.warn({ tenantId, vodId: numId, error: extractErrorDetails(error) }, 'Emote cache invalidation failed');
+                    });
                   }
                 }
               }
@@ -127,6 +152,11 @@ const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) 
 
               logger.debug({ tenantId, vodId: id, model, operation }, 'VOD cache invalidated via extension');
             }
+
+            // Always invalidate tenant-level list cache for any mutation on relevant models
+            await invalidateTenantVodListCache(tenantId).catch((error) => {
+              logger.warn({ tenantId, error: extractErrorDetails(error) }, 'Tenant list cache invalidation failed');
+            });
 
             return result;
           } catch (error) {
