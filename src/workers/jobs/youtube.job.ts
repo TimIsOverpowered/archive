@@ -341,20 +341,31 @@ export interface QueueYoutubeUploadsOptions {
   };
 }
 
+export interface YoutubeUploadJobResult {
+  vodJobId: string | null;
+  gameJobIds: string[];
+}
+
 /**
  * Queues YouTube VOD and/or game uploads based on configuration and upload mode.
  * @param options - Queue options including context, file path, and upload mode
  * @returns Promise that resolves when all applicable uploads are queued
  */
-export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): Promise<void> {
+export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): Promise<YoutubeUploadJobResult> {
   const { ctx, dbId, vodId, filePath, platform, uploadMode = UPLOAD_MODES.ALL, downloadJobId, log } = options;
   const { config } = ctx;
+
+  const result: YoutubeUploadJobResult = {
+    vodJobId: null,
+    gameJobIds: [],
+  };
 
   // VOD Upload
   if ((uploadMode === UPLOAD_MODES.VOD || uploadMode === UPLOAD_MODES.ALL) && config?.youtube?.vodUpload) {
     try {
-      await queueYoutubeVodUpload(ctx, dbId, vodId, filePath, platform, downloadJobId);
-      log.info({ vodId, chained: !!downloadJobId }, 'Queued YouTube VOD upload');
+      const vodJobId = await queueYoutubeVodUpload(ctx, dbId, vodId, filePath, platform, downloadJobId);
+      result.vodJobId = vodJobId;
+      log.info({ vodId, chained: !!downloadJobId, vodJobId }, 'Queued YouTube VOD upload');
     } catch (error) {
       log.warn({ error: (error as Error).message, vodId }, 'Failed to queue YouTube VOD upload');
     }
@@ -363,10 +374,20 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
   // Game Uploads
   if (uploadMode === UPLOAD_MODES.ALL && config?.youtube?.perGameUpload) {
     try {
-      await queueYoutubeGameUploadsForVod(ctx, dbId, vodId, filePath, platform, downloadJobId);
-      log.info({ vodId, chained: !!downloadJobId }, 'Queued YouTube game uploads');
+      const jobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform);
+
+      for (const job of jobs) {
+        const gameJobId = await enqueueGameUpload(job, downloadJobId);
+        if (gameJobId) {
+          result.gameJobIds.push(gameJobId);
+        }
+      }
+
+      log.info({ vodId, chained: !!downloadJobId, gameJobsCount: result.gameJobIds.length }, 'Queued YouTube game uploads');
     } catch (error) {
       log.warn({ error: (error as Error).message, vodId }, 'Failed to queue YouTube game uploads');
     }
   }
+
+  return result;
 }
