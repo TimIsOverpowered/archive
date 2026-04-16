@@ -29,3 +29,4 @@ export const DB_CLIENT_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 // Cache TTLs (in seconds)
 export const VOD_DETAILS_CACHE_TTL = 3600; // 1 hour for individual VODs
 export const VOD_LIST_CACHE_TTL = 900; // 15 minutes for list queries
+export const EMOTE_CACHE_TTL = 86400; // 1 day for emotes

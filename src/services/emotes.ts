@@ -1,9 +1,12 @@
 import { logger } from '../utils/logger.js';
-import { Prisma } from '../../generated/streamer/client.js';
+import { Prisma, PrismaClient } from '../../generated/streamer/client.js';
 import { Platform, PLATFORMS } from '../types/platforms.js';
 import { TenantContext } from '../types/context.js';
 import { withDbRetry } from '../db/client.js';
 import { safeRequest } from '../utils/http-client.js';
+import { redisClient } from '../api/plugins/redis.plugin.js';
+import { compressChatData, decompressChatData } from '../utils/compression.js';
+import { EMOTE_CACHE_TTL } from '../constants.js';
 
 export interface EmoteData extends Prisma.JsonObject {
   id: string;
@@ -122,4 +125,52 @@ export async function fetchAndSaveEmotes(ctx: TenantContext, vodId: number, plat
   } catch {
     logger.error({ vodId }, 'Failed to save emotes');
   }
+}
+
+export async function getEmotesByVodId(client: PrismaClient, tenantId: string, vodId: number): Promise<VodEmotes | null> {
+  const cacheKey = `emotes:${tenantId}:${vodId}`;
+
+  if (redisClient && process.env.DISABLE_REDIS_CACHE !== 'true') {
+    try {
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        return (await decompressChatData(cached as unknown as Buffer)) as VodEmotes;
+      }
+    } catch (err) {
+      logger.warn({ err, cacheKey }, 'Emote cache read failed, falling back to DB');
+    }
+  }
+
+  const emote = await client.emote.findUnique({
+    where: { vod_id: vodId },
+    include: {
+      vod: {
+        select: {
+          id: true,
+        },
+      },
+    },
+  });
+
+  if (!emote || !emote.vod) {
+    return null;
+  }
+
+  const result: VodEmotes = {
+    vodId: emote.vod_id,
+    ffz_emotes: emote.ffz_emotes as EmoteData[],
+    bttv_emotes: emote.bttv_emotes as EmoteData[],
+    seventv_emotes: emote.seventv_emotes as EmoteData[],
+  };
+
+  if (redisClient && process.env.DISABLE_REDIS_CACHE !== 'true') {
+    try {
+      const compressed = await compressChatData(result);
+      await redisClient.set(cacheKey, compressed as Buffer, 'EX', EMOTE_CACHE_TTL);
+    } catch (err) {
+      logger.warn({ err, cacheKey }, 'Emote cache write failed');
+    }
+  }
+
+  return result;
 }

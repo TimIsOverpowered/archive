@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { getVods, getVodById, getVodByPlatformId } from '../../services/vods.service';
+import { getEmotesByVodId } from '../../services/emotes.js';
 import createRateLimitMiddleware from '../middleware/rate-limit';
 import { publicRateLimiter } from '../plugins/redis.plugin';
 import { notFound } from '../../utils/http-error';
@@ -133,6 +134,48 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
       }
 
       return { data: vod };
+    }
+  );
+
+  fastify.get(
+    '/:tenantId/vods/:vodId/emotes',
+    {
+      schema: {
+        tags: ['VODs'],
+        description: 'Get emotes for a specific VOD (used for chat replay)',
+        params: {
+          type: 'object',
+          properties: {
+            tenantId: { type: 'string', description: 'Tenant ID' },
+            vodId: { type: 'string', description: 'VOD ID' },
+          },
+          required: ['tenantId', 'vodId'],
+        },
+      },
+      onRequest: [rateLimitMiddleware, tenantMiddleware],
+    },
+    async (request) => {
+      const { tenantId, vodId } = request.params as { tenantId: string; vodId: string };
+      const { db } = request.tenant;
+      const vodIdNum = Number(vodId);
+
+      if (isNaN(vodIdNum) || vodIdNum < 0 || vodIdNum > 2147483647) {
+        notFound('VOD not found');
+      }
+
+      const vod = await getVodById(db, tenantId, vodIdNum);
+
+      if (!vod) {
+        notFound('VOD not found');
+      }
+
+      const emotes = await getEmotesByVodId(db, tenantId, vodIdNum);
+
+      if (!emotes) {
+        notFound('Emotes not found for this VOD');
+      }
+
+      return { data: emotes };
     }
   );
 }
