@@ -20,6 +20,9 @@ export interface StandardVodJob {
   dbId: number;
   vodId: string;
   platform: Platform;
+  platformUserId: string;
+  platformUsername: string;
+  sourceUrl?: string;
   downloadMethod?: DownloadMethod;
 }
 
