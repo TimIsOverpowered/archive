@@ -1,8 +1,8 @@
 import { FastifyInstance } from 'fastify';
-import downloadJobsRoutes from './download-jobs.routes';
+import downloadJobsRoutes from './download.routes';
 import youtubeUploadRoutes from './youtube-upload.routes';
-import dmcaProcessingRoutes from './dmca-processing.routes';
-import metadataFetchingRoutes from './metadata-fetching.routes';
+import dmcaProcessingRoutes from './dmca.routes';
+import metadataFetchingRoutes from './metadata.routes';
 import liveCallbackRoutes from './live-callback.routes';
 import vodManagementRoutes from './vod-management.routes';
 
