@@ -47,6 +47,7 @@ export interface YoutubeVodUploadJob {
   platform: Platform;
   dmcaProcessed?: boolean;
   vodRecord: VodRecord;
+  part?: number;
 }
 
 export interface YoutubeGameUploadJob {
@@ -75,6 +76,7 @@ export interface DmcaProcessingJob {
   type: SourceType;
   platform: Platform;
   part?: number;
+  filePath?: string;
 }
 
 export interface ChatDownloadResult {
@@ -136,12 +138,14 @@ export const youtubeJobOptions = {
 };
 
 export const dmcaJobOptions = {
-  attempts: 60,
+  attempts: 3,
   backoff: {
-    type: 'fixed' as const,
-    delay: 10 * 60 * 1000,
+    type: 'exponential' as const,
+    delay: 5000,
   },
-};
+  removeOnComplete: true,
+  removeOnFail: true,
+} as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const queueCache = new Map<string, Queue<any, any, string>>();

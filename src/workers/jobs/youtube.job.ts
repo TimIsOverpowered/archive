@@ -11,7 +11,7 @@ const log = childLogger({ module: 'youtube-job' });
 
 // ============== VOD Job Creation ==============
 
-export async function createVodUploadJob(ctx: TenantContext, dbId: number, vodId: string, filePath: string | undefined, platform: Platform): Promise<YoutubeVodUploadJob> {
+export async function createVodUploadJob(ctx: TenantContext, dbId: number, vodId: string, filePath: string | undefined, platform: Platform, part?: number): Promise<YoutubeVodUploadJob> {
   const { config, tenantId } = ctx;
   if (!config?.youtube?.upload) {
     throw new Error(`YouTube upload not enabled for tenant ${tenantId}`);
@@ -33,6 +33,7 @@ export async function createVodUploadJob(ctx: TenantContext, dbId: number, vodId
     type: UPLOAD_TYPES.VOD,
     vodRecord: vodRecord,
     platform,
+    part: part ?? 1,
   };
 }
 
@@ -257,8 +258,16 @@ export async function enqueueGameUpload(job: YoutubeGameUploadJob, downloadJobId
  * @param downloadJobId - Optional: chains upload to wait for download
  * @returns The job ID if successfully enqueued, null otherwise
  */
-export async function queueYoutubeVodUpload(ctx: TenantContext, dbId: number, vodId: string, filePath: string | undefined, platform: Platform, downloadJobId?: string): Promise<string | null> {
-  const job = await createVodUploadJob(ctx, dbId, vodId, filePath, platform);
+export async function queueYoutubeVodUpload(
+  ctx: TenantContext,
+  dbId: number,
+  vodId: string,
+  filePath: string | undefined,
+  platform: Platform,
+  downloadJobId?: string,
+  part?: number
+): Promise<string | null> {
+  const job = await createVodUploadJob(ctx, dbId, vodId, filePath, platform, part);
   return enqueueVodUpload(job, downloadJobId);
 }
 

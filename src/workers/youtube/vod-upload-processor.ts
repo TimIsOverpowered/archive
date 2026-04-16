@@ -24,6 +24,7 @@ export interface VodUploadContext {
   dmcaProcessed?: boolean;
   log: AppLogger;
   type: SourceType;
+  part?: number;
 }
 
 export interface VodUploadResult {
@@ -184,7 +185,7 @@ interface SingleVodUploadContext extends VodUploadContext {
 }
 
 async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodUploadResult> {
-  const { tenantId, vodId, filePath, channelName, domainName, privacyStatus, platformName, config, type, dbId, db, dmcaProcessed, vodRecord } = ctx;
+  const { tenantId, vodId, filePath, channelName, domainName, privacyStatus, platformName, config, type, dbId, db, dmcaProcessed, vodRecord, part } = ctx;
 
   if (!filePath) {
     throw new Error('File path is required for VOD upload');
@@ -223,7 +224,8 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
 
   const result = await uploadVideo(tenantId, channelName, filePath, title, youtubeDescription, privacyStatus as 'public' | 'unlisted' | 'private', onUploadProgress);
 
-  const uploadedVideos = [{ id: result.videoId, part: 1 }];
+  const uploadPart = part ?? 1;
+  const uploadedVideos = [{ id: result.videoId, part: uploadPart }];
 
   // Save to database
   await db.vodUpload.create({
@@ -231,7 +233,7 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
       vod_id: dbId,
       upload_id: result.videoId,
       type: UPLOAD_TYPES.VOD,
-      part: 1,
+      part: uploadPart,
       status: 'COMPLETED',
     },
   });

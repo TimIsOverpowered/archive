@@ -23,7 +23,7 @@ CREATE TABLE "vod_uploads" (
     "upload_id" TEXT NOT NULL,
     "type" TEXT,
     "duration" INTEGER NOT NULL DEFAULT 0,
-    "part" INTEGER NOT NULL DEFAULT 0,
+    "part" INTEGER NOT NULL DEFAULT 1,
     "status" "UploadStatus" NOT NULL DEFAULT 'PENDING',
     "thumbnail_url" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

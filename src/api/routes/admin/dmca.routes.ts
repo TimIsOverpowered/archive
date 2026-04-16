@@ -1,16 +1,14 @@
-import type { DmcaProcessingJob } from '../../../workers/jobs/queues.js';
-import { enqueueJobWithLogging, getDmcaProcessingQueue } from '../../../workers/jobs/queues.js';
 import { FastifyInstance } from 'fastify';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin.js';
-import { AppLogger, createAutoLogger } from '../../../utils/auto-tenant-logger.js';
+import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error.js';
-import type { Platform, SourceType } from '../../../types/platforms.js';
-import { PLATFORM_VALUES, SOURCE_TYPES, SOURCE_TYPES_VALUES } from '../../../types/platforms.js';
-import { PrismaClient } from '../../../../generated/streamer/client.js';
-import { findVodRecord } from './utils/vod-helpers.js';
+import type { Platform, SourceType, DownloadMethod } from '../../../types/platforms.js';
+import { PLATFORM_VALUES, SOURCE_TYPES, SOURCE_TYPES_VALUES, DOWNLOAD_METHODS_VALUES, DOWNLOAD_METHODS } from '../../../types/platforms.js';
+import { findVodRecord, ensureVodDownload } from './utils/vod-helpers.js';
+import { queueDmcaProcessing } from '../../../workers/jobs/dmca.job.js';
 
 interface DmcaClaim {
   type?: string;
@@ -19,22 +17,13 @@ interface DmcaClaim {
   [key: string]: unknown;
 }
 
-type StrictDmcaClaims = Array<{
-  type: 'CLAIM_TYPE_AUDIO' | 'CLAIM_TYPE_VISUAL' | 'CLAIM_TYPE_AUDIOVISUAL';
-  claimPolicy: { primaryPolicy: { policyType: string } };
-  matchDetails: { longestMatchStartTimeSeconds: number; longestMatchDurationSeconds: string };
-}>;
-
 interface DmcaRequestBody {
   vodId: string;
   claims: DmcaClaim[] | string;
   platform: Platform;
   type?: SourceType;
-  partIndex?: number;
-}
-
-interface ProcessDmcaResponse {
-  data: { message: string; vodId: number; part?: number };
+  part?: number;
+  downloadMethod?: DownloadMethod;
 }
 
 export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
@@ -44,80 +33,32 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
 
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
 
-  /**
-   * Shared DMCA processing logic - handles both full VOD and specific part processing
-   */
-  async function processDmcaRequest(client: PrismaClient, tenantId: string, body: DmcaRequestBody, log: AppLogger): Promise<ProcessDmcaResponse> {
-    const vodRecord = await findVodRecord(client, body.vodId, body.platform);
-
-    if (!vodRecord) notFound('VOD not found');
-
-    // Parse claims from various formats (array or JSON string)
-    const claimsArray: DmcaClaim[] = Array.isArray(body.claims) ? body.claims : JSON.parse(typeof body.claims === 'string' ? body.claims : JSON.stringify(body.claims));
-
-    // Cast at boundary to match strict queue type definition
-    const dmcaJobData: Omit<DmcaProcessingJob, 'receivedClaims'> & { receivedClaims: StrictDmcaClaims } = {
-      tenantId,
-      dbId: vodRecord.id,
-      vodId: String(vodRecord.vod_id),
-      receivedClaims: claimsArray as StrictDmcaClaims,
-      type: body.type || SOURCE_TYPES.VOD,
-      platform: body.platform,
-    };
-
-    // Only add part field if partIndex is explicitly provided and valid
-    if (body.partIndex !== undefined && body.partIndex !== null) {
-      dmcaJobData.part = Number(body.partIndex) + 1; // Convert to 1-indexed for worker
-
-      log.info(`DMCA processing job queued for ${body.vodId} Part ${Number(body.partIndex) + 1}`);
-    } else {
-      log.info(`DMCA processing job queued for full VOD ${body.vodId}`);
-    }
-
-    // Queue the DMCA processing job (handles both full and part processing in worker)
-    const jobId = body.partIndex !== undefined ? `dmca_${body.vodId}_p${body.partIndex}` : `dmca_${body.vodId}`;
-    const { jobId: actualJobId, isNew } = await enqueueJobWithLogging(
-      getDmcaProcessingQueue(),
-      'dmca_processing',
-      dmcaJobData,
-      {
-        jobId,
-        deduplication: { id: jobId },
-      },
-      { info: log.info.bind(log), debug: log.debug.bind(log) },
-      'DMCA processing job queued',
-      { vodId: body.vodId, part: body.partIndex !== undefined ? Number(body.partIndex) + 1 : undefined }
-    );
-
-    if (isNew) {
-      log.debug({ vodId: body.vodId, jobId: actualJobId }, 'Job was newly added to queue');
-    }
-
-    return {
-      data: {
-        message: body.partIndex !== undefined ? `DMCA part processing started` : 'DMCA processing started',
-        vodId: vodRecord.id,
-        ...(body.partIndex !== undefined && { part: Number(body.partIndex) + 1 }),
-      },
-    };
-  }
-
-  // Main DMCA endpoint - process claims for full VOD or specific part
+  // Main DMCA endpoint - ensure VOD download, then queue DMCA processing
   fastify.post<{ Body: DmcaRequestBody; Params: { tenantId: string } }>(
     '/dmca',
     {
       schema: {
         tags: ['Admin'],
-        description: 'Process DMCA claims for a VOD (or specific part if provided) - mutes audio or applies blackout, then queues YouTube upload',
+        description: 'Ensure VOD download, then queue DMCA processing (mutes audio/blackouts video based on claims). If part is provided, only that part is processed and uploaded.',
         params: { type: 'object', properties: { tenantId: { type: 'string', description: 'Tenant ID' } }, required: ['tenantId'] },
         body: {
           type: 'object',
           properties: {
             vodId: { type: 'string', description: 'Platform VOD ID' },
-            claims: {},
-            partIndex: { type: 'number' },
+            claims: { description: 'DMCA claims array or JSON string' },
+            part: {
+              type: 'number',
+              minimum: 1,
+              description: 'Optional part number (1-indexed) to process only a specific part of the VOD',
+            },
             platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Source platform' },
             type: { type: 'string', enum: SOURCE_TYPES_VALUES },
+            downloadMethod: {
+              type: 'string',
+              enum: DOWNLOAD_METHODS_VALUES,
+              default: DOWNLOAD_METHODS.HLS,
+              description: 'Download method for VOD',
+            },
           },
           required: ['vodId', 'claims', 'platform'],
         },
@@ -128,9 +69,70 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
     },
     async (request) => {
       const { tenantId, db, platform } = request.tenant as TenantPlatformContext;
+      const { vodId, claims, type = SOURCE_TYPES.VOD, part, downloadMethod = DOWNLOAD_METHODS.HLS } = request.body;
       const log = createAutoLogger(tenantId);
 
-      return await processDmcaRequest(db, tenantId, { ...request.body, platform }, log);
+      // Step 1: Ensure VOD record exists
+      const vodRecord = await findVodRecord(db, vodId, platform);
+      if (!vodRecord) notFound('VOD not found');
+
+      // Step 2: Ensure VOD download (like /upload does)
+      const { jobId: downloadJobId, filePath } = await ensureVodDownload({
+        ctx: request.tenant as TenantPlatformContext,
+        dbId: vodRecord.id,
+        vodId,
+        type,
+        downloadMethod,
+        log,
+      });
+
+      // Step 3: Parse claims (lenient - no validation)
+      const claimsArray = Array.isArray(claims) ? claims : JSON.parse(typeof claims === 'string' ? claims : JSON.stringify(claims));
+
+      // Step 4: Queue DMCA processing (chained to download if needed)
+      const dmcaJobId = await queueDmcaProcessing({
+        tenantId,
+        dbId: vodRecord.id,
+        vodId: String(vodRecord.vod_id),
+        claims: claimsArray,
+        type,
+        platform,
+        part,
+        downloadJobId: downloadJobId ?? undefined,
+      });
+
+      if (!dmcaJobId) {
+        throw new Error('Failed to queue DMCA processing job');
+      }
+
+      // Step 5: Return appropriate response
+      if (downloadJobId) {
+        const context = { vodId, downloadJobId, dmcaJobId, part, claimsCount: claimsArray.length };
+        log.info(context, 'VOD download queued, DMCA processing will be triggered after completion');
+        return {
+          data: {
+            message: 'VOD download queued, DMCA processing will be triggered after completion',
+            dbId: vodRecord.id,
+            vodId: vodRecord.vod_id,
+            downloadJobId,
+            dmcaJobId,
+            ...(part !== undefined && { part }),
+          },
+        };
+      } else {
+        const context = { vodId, dmcaJobId, filePath, part, claimsCount: claimsArray.length };
+        log.info(context, 'DMCA processing queued');
+        return {
+          data: {
+            message: 'DMCA processing queued!',
+            dbId: vodRecord.id,
+            vodId: vodRecord.vod_id,
+            dmcaJobId,
+            filePath,
+            ...(part !== undefined && { part }),
+          },
+        };
+      }
     }
   );
 

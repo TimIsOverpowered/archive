@@ -33,7 +33,7 @@ model VodUpload {
   upload_id     String       @id
   type          String?
   duration      Int          @default(0)
-  part          Int          @default(0)
+  part          Int          @default(1)
   status        UploadStatus @default(PENDING)
   thumbnail_url String?
   created_at    DateTime     @default(now())

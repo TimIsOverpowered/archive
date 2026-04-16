@@ -7,16 +7,13 @@ import { trimVideo as ffmpegTrim } from './utils/ffmpeg.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
 import { handleWorkerError } from './utils/error-handler.js';
-import { triggerVodDownload } from './jobs/vod.job.js';
-import { getVodFilePath, fileExists } from '../utils/path.js';
-import { getStandardVodQueue } from './jobs/queues.js';
+import { fileExists } from '../utils/path.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { createDmcaWorkerAlerts } from './utils/alert-factories.js';
 import type { Platform } from '../types/platforms.js';
-import { SOURCE_TYPES } from '../types/platforms.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
-  const { tenantId, dbId, vodId, receivedClaims, type, platform, part } = job.data;
+  const { tenantId, dbId, vodId, receivedClaims, platform, part, filePath: providedFilePath } = job.data;
   const log = createAutoLogger(String(tenantId));
 
   if (!receivedClaims || receivedClaims.length === 0) {
@@ -37,33 +34,46 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     throw new Error(`VOD not found in database for streamer ${tenantId}`);
   }
 
-  // For live streams, use stream_id; for archived, use vod_id
-  const fileIdentifier = type === SOURCE_TYPES.LIVE ? vodRecord.stream_id || vodId : vodId;
+  // Determine file path
+  let filePath: string;
 
-  const filePath = getVodFilePath({ config, vodId: fileIdentifier });
+  if (providedFilePath) {
+    // File path provided by route (file already exists)
+    filePath = providedFilePath;
+    log.info({ vodId, filePath, part }, 'DMCA processing started (file exists)');
+  } else {
+    // Retrieve file path from download job result (FlowProducer child)
+    const childResults = await job.getChildrenValues();
+    const downloadResult = Object.values(childResults)[0] as { finalPath?: string };
 
-  if (!(await fileExists(filePath))) {
-    const existingJob = await getStandardVodQueue().getJob(`vod_${fileIdentifier}`);
-    if (!existingJob) {
-      const platformUserId = config?.[platform]?.id;
-      const platformUsername = config?.[platform]?.username;
-
-      if (!platformUserId || !platformUsername) {
-        throw new Error(`Platform ${platform} not configured for tenant ${tenantId}`);
-      }
-
-      await triggerVodDownload(tenantId, vodRecord.id, fileIdentifier, platform, platformUserId, platformUsername);
-      log.info({ vodId: fileIdentifier }, 'VOD download queued, DMCA job will retry');
-    } else {
-      log.debug({ vodId: fileIdentifier, state: await existingJob.getState() }, 'VOD download already in progress');
+    if (!downloadResult?.finalPath) {
+      throw new Error(`File path not available for vodId=${vodId}, jobId=${job.id}: ` + `download job may have failed or not completed. Child results: ${JSON.stringify(childResults)}`);
     }
-    throw new Error('VOD not yet downloaded, retrying');
+
+    filePath = downloadResult.finalPath;
+    log.info({ vodId, filePath, part, jobId: job.id }, 'DMCA processing started (file path from download job)');
   }
 
-  const videoPath = filePath;
+  // Verify file exists (safety check)
+  if (!(await fileExists(filePath))) {
+    throw new Error(`VOD file not found at ${filePath}. Download may have failed or file was deleted.`);
+  }
+
+  // Log processing start with full context
+  const blockingClaimsCount = receivedClaims.filter(isBlockingPolicy).length;
+  log.info(
+    {
+      vodId,
+      filePath,
+      part,
+      claimsCount: receivedClaims.length,
+      blockingClaimsCount,
+      jobId: job.id,
+    },
+    'Starting DMCA processing'
+  );
 
   const dmcaAlerts = createDmcaWorkerAlerts();
-  const blockingClaimsCount = receivedClaims.filter(isBlockingPolicy).length;
   const messageId = await initRichAlert(dmcaAlerts.processing(vodId, blockingClaimsCount, part));
 
   const blockingClaims = receivedClaims.filter(isBlockingPolicy);
@@ -75,7 +85,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     return { success: true, message: 'No action needed' };
   }
 
-  let processedPath = videoPath;
+  let processedPath = filePath;
   const tempFiles: string[] = [];
 
   try {
@@ -85,7 +95,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
 
       log.info({ vodId, part }, 'Extracting part from VOD');
 
-      processedPath = await ffmpegTrim(videoPath, startOffset, startOffset + splitDuration, `${vodId}-part-${part}`, () => {});
+      processedPath = await ffmpegTrim(filePath, startOffset, startOffset + splitDuration, `${vodId}-part-${part}`, () => {});
     }
 
     const audioClaims = blockingClaims.filter((claim) => claim.type === 'CLAIM_TYPE_AUDIO');
