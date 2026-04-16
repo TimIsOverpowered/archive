@@ -8,6 +8,15 @@ import type { RichEmbedData } from '../../utils/discord-alerts.js';
 import { createProgressBar } from '../../utils/discord-alerts.js';
 import { capitalizePlatform, Platform } from '../../types/platforms.js';
 
+export interface LiveCompletionData {
+  emotesSaved: boolean;
+  chatJobId: string | null;
+  youtubeVodJobId: string | null;
+  youtubeGameJobIds: string[];
+  segmentCount: number;
+  finalPath: string;
+}
+
 // ============================================================================
 // VOD Worker Alerts
 // ============================================================================
@@ -69,7 +78,10 @@ export interface LiveWorkerAlerts {
   init: (vodId: string, platform: Platform, streamerName: string, startedAt?: string) => RichEmbedData;
   progress: (vodId: string, segmentsDownloaded: number) => RichEmbedData;
   converting: (vodId: string, segmentCount: number) => RichEmbedData;
-  complete: (vodId: string, duration?: number) => RichEmbedData;
+  emotesSaved: (vodId: string) => RichEmbedData;
+  chatQueued: (vodId: string) => RichEmbedData;
+  uploadQueued: (vodId: string) => RichEmbedData;
+  complete: (vodId: string, duration?: number, completionData?: LiveCompletionData) => RichEmbedData;
   error: (vodId: string, errorMsg: string) => RichEmbedData;
 }
 
@@ -103,13 +115,68 @@ export function createLiveWorkerAlerts(): LiveWorkerAlerts {
       timestamp: new Date().toISOString(),
     }),
 
-    complete: (vodId, duration) => ({
-      title: `[Live] ${vodId} Complete`,
-      description: 'Successfully processed',
+    emotesSaved: (vodId) => ({
+      title: `[Live] ${vodId} Emotes Saved`,
+      description: 'Emote data successfully saved',
       status: 'success',
-      fields: [{ name: 'Duration', value: duration ? formatDuration(duration) : 'Unknown', inline: true }],
+      fields: [],
       timestamp: new Date().toISOString(),
     }),
+
+    chatQueued: (vodId) => ({
+      title: `[Live] ${vodId} Chat Download Queued`,
+      description: 'Chat download job has been queued',
+      status: 'warning',
+      fields: [],
+      timestamp: new Date().toISOString(),
+    }),
+
+    uploadQueued: (vodId) => ({
+      title: `[Live] ${vodId} Upload Queued`,
+      description: 'YouTube upload has been queued',
+      status: 'warning',
+      fields: [],
+      timestamp: new Date().toISOString(),
+    }),
+
+    complete: (vodId, duration, completionData) => {
+      const fields: Array<{ name: string; value: string; inline: boolean }> = [];
+
+      fields.push({ name: 'Duration', value: duration ? formatDuration(duration) : 'Unknown', inline: true });
+
+      if (completionData) {
+        if (completionData.emotesSaved) {
+          fields.push({ name: 'Emotes', value: '✅ Saved', inline: true });
+        }
+
+        if (completionData.chatJobId) {
+          fields.push({ name: 'Chat Job', value: completionData.chatJobId, inline: false });
+        }
+
+        if (completionData.youtubeVodJobId) {
+          fields.push({ name: 'VOD Upload Job', value: completionData.youtubeVodJobId, inline: false });
+        }
+
+        if (completionData.youtubeGameJobIds.length > 0) {
+          fields.push({
+            name: 'Game Upload Jobs',
+            value: completionData.youtubeGameJobIds.join(', '),
+            inline: false,
+          });
+        }
+
+        fields.push({ name: 'Segments', value: String(completionData.segmentCount), inline: true });
+        fields.push({ name: 'Output', value: completionData.finalPath, inline: false });
+      }
+
+      return {
+        title: `[Live] ${vodId} Complete`,
+        description: 'Successfully processed',
+        status: 'success',
+        fields,
+        timestamp: new Date().toISOString(),
+      };
+    },
 
     error: (vodId, errorMsg) => ({
       title: `[Live] ${vodId} FAILED`,
