@@ -113,7 +113,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         };
       }
 
-      queueYoutubeUploads({ ctx: request.tenant as TenantPlatformContext, dbId: vodRecord.id, vodId: vodRecord.vod_id, filePath: request.body.path, platform, log });
+      queueYoutubeUploads({ ctx: request.tenant as TenantPlatformContext, dbId: vodRecord.id, vodId: vodRecord.vod_id, filePath: request.body.path, platform });
 
       return <{ data: LiveCallbackResponseData }>{
         data: {

@@ -344,10 +344,6 @@ export interface QueueYoutubeUploadsOptions {
    * download completion. If undefined, uploads are queued immediately (file exists).
    */
   downloadJobId?: string;
-  log: {
-    info: (ctx: Record<string, unknown>, msg: string) => void;
-    warn: (ctx: Record<string, unknown>, msg: string) => void;
-  };
 }
 
 export interface YoutubeUploadJobResult {
@@ -361,7 +357,7 @@ export interface YoutubeUploadJobResult {
  * @returns Promise that resolves when all applicable uploads are queued
  */
 export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): Promise<YoutubeUploadJobResult> {
-  const { ctx, dbId, vodId, filePath, platform, uploadMode = UPLOAD_MODES.ALL, downloadJobId, log } = options;
+  const { ctx, dbId, vodId, filePath, platform, uploadMode = UPLOAD_MODES.ALL, downloadJobId } = options;
   const { config } = ctx;
 
   const result: YoutubeUploadJobResult = {

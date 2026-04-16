@@ -79,7 +79,6 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
         platform,
         uploadMode,
         downloadJobId: jobId ?? undefined,
-        log,
       });
 
       if (jobId) {

@@ -86,7 +86,6 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         platform,
         uploadMode,
         downloadJobId: jobId ?? undefined,
-        log,
       });
 
       if (jobId) {
