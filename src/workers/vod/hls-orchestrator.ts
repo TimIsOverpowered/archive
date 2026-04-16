@@ -8,7 +8,7 @@ import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
 import { updateChapterDuringDownload } from '../../services/kick.js';
 import { downloadSegmentsParallel, fetchTwitchPlaylist, fetchKickPlaylist, type DownloadStrategy } from './hls-utils.js';
 import { sleep, getRetryDelay } from '../../utils/delay.js';
-import { convertHlsToMp4, detectFmp4FromPlaylist } from './ffmpeg.js';
+import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
 import { cleanupHlsFiles } from './hls-cleanup.js';
 import { HLS_MAX_CONSECUTIVE_ERRORS, HLS_NO_CHANGE_THRESHOLD, HLS_POLL_INTERVAL_MS, HLS_SEGMENT_CONCURRENCY, HLS_SEGMENT_RETRY_ATTEMPTS } from '../../constants.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';

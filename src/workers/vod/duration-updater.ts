@@ -2,7 +2,7 @@ import { withDbRetry } from '../../db/client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
-import { getDuration } from './ffmpeg.js';
+import { getDuration } from '../utils/ffmpeg.js';
 import type { TenantContext } from '../../types/context.js';
 
 const log = childLogger({ module: 'duration-updater' });

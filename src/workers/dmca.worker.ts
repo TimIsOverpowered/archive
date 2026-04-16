@@ -1,9 +1,9 @@
 import { Processor, Job } from 'bullmq';
 import type { DmcaProcessingJob, DmcaProcessingResult } from './jobs/queues.js';
 import { queueYoutubeVodUpload } from './jobs/youtube.job.js';
-import type { DMCAClaim } from '../utils/dmca.js';
-import { isBlockingPolicy, buildMuteFilters, muteAudioSections, blackoutVideoSections, cleanupTempFiles, BlackoutSection } from '../utils/dmca.js';
-import { trimVideo as ffmpegTrim } from './vod/ffmpeg.js';
+import type { DMCAClaim } from './dmca/dmca.js';
+import { isBlockingPolicy, buildMuteFilters, muteAudioSections, blackoutVideoSections, cleanupTempFiles, BlackoutSection } from './dmca/dmca.js';
+import { trimVideo as ffmpegTrim } from './utils/ffmpeg.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
 import { handleWorkerError } from './utils/error-handler.js';
