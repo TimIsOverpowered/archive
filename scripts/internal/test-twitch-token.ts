@@ -7,6 +7,7 @@ import { decryptObject } from '../../src/utils/encryption.js';
 import { loadTenantConfigs, getConfigs } from '../../src/config/loader.js';
 import { getAppAccessToken } from '../../src/services/twitch/index.js';
 import { getTwitchCredentials } from '../../src/utils/credentials.js';
+import { humanizeDuration } from '../../src/utils/formatting.js';
 
 interface TwitchAuth {
   client_id: string;
@@ -268,10 +269,10 @@ function displayTokenState(auth: TwitchAuth, label: string, verbose = false): bo
       console.log(`\nToken Status: EXPIRED (${expiresAt}) ❌`);
       hasIssues = true;
     } else if (remainingSecs < 60) {
-      console.log(`\nToken Status: EXPIRING SOON (${formatDuration(remainingSecs)} remaining) ⚠️`);
+      console.log(`\nToken Status: EXPIRING SOON (${humanizeDuration(remainingSecs)} remaining) ⚠️`);
       hasIssues = true;
     } else {
-      console.log(`\nToken Status: VALID (${formatDuration(remainingSecs)} remaining) ✅`);
+      console.log(`\nToken Status: VALID (${humanizeDuration(remainingSecs)} remaining) ✅`);
       console.log(`Expires: ${expiresAt}`);
     }
 
@@ -316,15 +317,4 @@ function displayTokenState(auth: TwitchAuth, label: string, verbose = false): bo
   }
 
   return hasIssues;
-}
-
-function formatDuration(seconds: number): string {
-  if (seconds < 0) return 'EXPIRED';
-  if (seconds < 60) return `${Math.floor(seconds)}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ${minutes % 60}m`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ${hours % 24}h`;
 }

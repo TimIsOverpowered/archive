@@ -1,8 +1,6 @@
 import HLS from 'hls-parser';
 import { createSession } from '../utils/cycletls.js';
 import { navigateToUrl } from '../utils/puppeteer-manager.js';
-import dayjs from 'dayjs';
-import durationPlugin from 'dayjs/plugin/duration';
 import { extractErrorDetails, createErrorContext } from '../utils/error.js';
 import { sleep } from '../utils/delay.js';
 import { childLogger } from '../utils/logger.js';
@@ -11,8 +9,6 @@ import { getKickStreamStatus } from './kick-live.js';
 import { KICK_API_TIMEOUT_MS, KICK_PAGE_DELAY_MS } from '../constants.js';
 import { TenantContext } from '../types/context.js';
 import { withDbRetry } from '../db/client.js';
-
-dayjs.extend(durationPlugin);
 
 const log = childLogger({ module: 'kick' });
 

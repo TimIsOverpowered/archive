@@ -3,7 +3,7 @@
  * Each factory provides init, progress, complete, and error alert builders.
  */
 
-import { formatDuration } from '../../utils/formatting.js';
+import { humanizeDuration } from '../../utils/formatting.js';
 import type { RichEmbedData } from '../../utils/discord-alerts.js';
 import { createProgressBar } from '../../utils/discord-alerts.js';
 import { capitalizePlatform, Platform } from '../../types/platforms.js';
@@ -142,7 +142,7 @@ export function createLiveWorkerAlerts(): LiveWorkerAlerts {
     complete: (vodId, duration, completionData) => {
       const fields: Array<{ name: string; value: string; inline: boolean }> = [];
 
-      fields.push({ name: 'Duration', value: duration ? formatDuration(duration) : 'Unknown', inline: true });
+      fields.push({ name: 'Duration', value: duration ? humanizeDuration(duration) : 'Unknown', inline: true });
 
       if (completionData) {
         if (completionData.emotesSaved) {
@@ -307,7 +307,7 @@ export function createYoutubeWorkerAlerts(): YoutubeWorkerAlerts {
       status: 'warning',
       fields: [
         { name: 'VOD ID', value: vodId, inline: true },
-        { name: 'Total Duration', value: formatDuration(duration), inline: true },
+        { name: 'Total Duration', value: humanizeDuration(duration), inline: true },
         { name: 'Parts Count', value: String(totalParts), inline: false },
       ],
       timestamp: new Date().toISOString(),

@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import createRateLimitMiddleware from '../../middleware/rate-limit';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key';
 import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
-import { ensureVodDownload, ensureVodRecord, findVodRecord, refreshVodRecord } from './utils/vod-helpers';
+import { ensureVodDownload, ensureVodRecord, findVodRecord } from './utils/vod-helpers';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest, notFound } from '../../../utils/http-error';
@@ -145,12 +145,6 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       }
 
       const dbId = vodRecord.id;
-
-      // Refresh metadata if duration is 0
-      if (vodRecord.duration === 0) {
-        log.info({ dbId, vodId }, 'VOD duration is 0, refreshing metadata before download');
-        await refreshVodRecord(request.tenant as TenantPlatformContext, vodId, log);
-      }
 
       // Ensure vod download
       const { jobId, filePath } = await ensureVodDownload({ ctx: request.tenant as TenantPlatformContext, dbId, vodId, type, downloadMethod, log });
