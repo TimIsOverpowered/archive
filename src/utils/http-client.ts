@@ -93,8 +93,6 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(url:
 
   const { body: preparedBody, headers: finalHeaders } = prepareBodyAndHeaders(body, customHeaders);
 
-  logger.debug({ method, url: scrubbedUrl, ...logContext }, '[HTTP] START');
-
   try {
     const result = await retryWithBackoff(
       async () => {
@@ -140,9 +138,6 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(url:
         shouldRetry,
       }
     );
-
-    const duration = Date.now() - startTime;
-    logger.debug({ method, url: scrubbedUrl, status: 'success', duration, ...logContext }, '[HTTP] COMPLETED');
 
     return result;
   } catch (error) {
