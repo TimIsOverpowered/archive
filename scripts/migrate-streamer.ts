@@ -303,7 +303,7 @@ const createNormalizedSchema = async (client: any) => {
       "upload_id" TEXT NOT NULL,
       "type" TEXT,
       "duration" INTEGER DEFAULT 0 NOT NULL,
-      "part" INTEGER DEFAULT 0 NOT NULL,
+      "part" INTEGER DEFAULT 1 NOT NULL,
       "status" "UploadStatus" DEFAULT 'PENDING' NOT NULL,
       "thumbnail_url" TEXT,
       "created_at" TIMESTAMPTZ(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -577,7 +577,7 @@ const main = async () => {
             for (const upload of vod.youtube) {
               const uploadId = `${legacyVodId}-${upload.id}`;
               const uploadDuration = Math.round(Number(upload.duration) || 0);
-              const part = Number(upload.part) || 0;
+              const part = Number(upload.part) || 1;
 
               await schemaClient.query(
                 `INSERT INTO "vod_uploads" (vod_id, upload_id, type, duration, part, status, thumbnail_url)
