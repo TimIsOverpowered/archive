@@ -98,7 +98,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job
           id: node.id,
           vod_id: dbId,
           display_name: ('commenter' in node && node.commenter?.displayName) || null,
-          content_offset_seconds: String(offsetSeconds),
+          content_offset_seconds: Math.round(offsetSeconds),
           createdAt: 'createdAt' in node && node.createdAt ? new Date(node.createdAt as string) : new Date(),
           message,
           user_badges: userBadges,

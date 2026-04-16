@@ -78,7 +78,7 @@ CREATE TABLE "chat_messages" (
     "id" UUID NOT NULL,
     "vod_id" INTEGER NOT NULL,
     "display_name" TEXT,
-    "content_offset_seconds" DECIMAL NOT NULL,
+    "content_offset_seconds" INTEGER NOT NULL,
     "user_color" TEXT,
     "created_at" TIMESTAMPTZ(6) NOT NULL,
     "message" JSONB,

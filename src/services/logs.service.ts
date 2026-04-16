@@ -111,7 +111,7 @@ export async function getLogsByOffset(client: PrismaClient, tenantId: string, vo
     id: msg.id,
     vod_id: msg.vod_id,
     display_name: msg.display_name,
-    content_offset_seconds: Number(msg.content_offset_seconds),
+    content_offset_seconds: msg.content_offset_seconds,
     message: msg.message,
     user_badges: msg.user_badges,
     user_color: msg.user_color,
@@ -125,7 +125,7 @@ export async function getLogsByOffset(client: PrismaClient, tenantId: string, vo
       throw new Error(`Missing createdAt on message ${lastMsg.id}`);
     }
     const cursorData: CursorData = {
-      offset: Number(lastMsg.content_offset_seconds),
+      offset: lastMsg.content_offset_seconds,
       createdAt: lastMsg.createdAt.toISOString(),
       id: lastMsg.id,
     };
@@ -203,7 +203,7 @@ export async function getLogsByCursor(client: PrismaClient, tenantId: string, vo
     id: msg.id,
     vod_id: msg.vod_id,
     display_name: msg.display_name,
-    content_offset_seconds: Number(msg.content_offset_seconds),
+    content_offset_seconds: msg.content_offset_seconds,
     message: msg.message,
     user_badges: msg.user_badges,
     user_color: msg.user_color,
@@ -217,7 +217,7 @@ export async function getLogsByCursor(client: PrismaClient, tenantId: string, vo
       throw new Error(`Missing createdAt on message ${lastMsg.id}`);
     }
     const cursorData: CursorData = {
-      offset: Number(lastMsg.content_offset_seconds),
+      offset: lastMsg.content_offset_seconds,
       createdAt: lastMsg.createdAt.toISOString(),
       id: lastMsg.id,
     };
