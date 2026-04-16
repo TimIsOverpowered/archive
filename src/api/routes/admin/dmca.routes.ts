@@ -1,12 +1,12 @@
 import type { DmcaProcessingJob } from '../../../workers/jobs/queues.js';
 import { enqueueJobWithLogging, getDmcaProcessingQueue } from '../../../workers/jobs/queues.js';
 import { FastifyInstance } from 'fastify';
-import createRateLimitMiddleware from '../../middleware/rate-limit';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key';
-import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
-import { adminRateLimiter } from '../../plugins/redis.plugin';
+import createRateLimitMiddleware from '../../middleware/rate-limit.js';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
+import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform.js';
+import { adminRateLimiter } from '../../plugins/redis.plugin.js';
 import { AppLogger, createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { notFound } from '../../../utils/http-error';
+import { notFound } from '../../../utils/http-error.js';
 import type { Platform, SourceType } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, SOURCE_TYPES, SOURCE_TYPES_VALUES } from '../../../types/platforms.js';
 import { PrismaClient } from '../../../../generated/streamer/client.js';
