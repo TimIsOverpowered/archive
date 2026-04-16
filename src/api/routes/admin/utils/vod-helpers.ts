@@ -48,6 +48,23 @@ export interface EnsureVodDownloadResponse {
 }
 
 /**
+ * Validates and extracts platform configuration from context
+ * Returns null if platform is not configured for tenant
+ */
+function validatePlatformConfig(ctx: TenantPlatformContext, platform: Platform): { platformUserId: string; platformUsername: string } | null {
+  const config = ctx.config?.[platform];
+
+  const platformUserId = config?.id;
+  const platformUsername = config?.username;
+
+  if (!platformUserId || !platformUsername) {
+    return null;
+  }
+
+  return { platformUserId, platformUsername };
+}
+
+/**
  * Fetches VOD record or returns null if not found
  */
 export async function findVodRecord(client: PrismaClient, vodId: string, platform: Platform): Promise<VodRecord | null> {
@@ -77,16 +94,23 @@ export async function findStreamRecord(client: PrismaClient, streamId: string, p
  */
 export async function ensureVodDownload(options: EnsureVodDownloadOptions): Promise<EnsureVodDownloadResponse> {
   const { ctx, dbId, vodId, type, downloadMethod = DOWNLOAD_METHODS.HLS, log } = options;
-  const { tenantId, platform, config } = ctx;
+  const { tenantId, platform, config, db } = ctx;
 
-  const platformUserId = config?.[platform]?.id;
-  const platformUsername = config?.[platform]?.username;
-  if (!platformUserId || !platformUsername) {
+  const platformConfig = validatePlatformConfig(ctx, platform);
+  if (!platformConfig) {
     throw new Error(`Platform ${platform} not configured for tenant ${tenantId}`);
   }
+  const { platformUserId, platformUsername } = platformConfig;
 
   // Determine file path based on type
   const filePath = type === SOURCE_TYPES.LIVE ? getLiveFilePath({ config, streamId: vodId }) : getVodFilePath({ config, vodId });
+
+  // Check if VOD record needs metadata refresh (duration = 0)
+  const vodRecord = await db.vod.findUnique({ where: { id: dbId } });
+  if (vodRecord && vodRecord.duration === 0) {
+    log.info({ dbId, vodId }, 'VOD duration is 0, refreshing metadata before download check');
+    await refreshVodRecord(ctx, vodId, log);
+  }
 
   const needsDownload = await checkIfDownloadNeeded(filePath, dbId, tenantId, platform, log);
 
@@ -149,6 +173,12 @@ async function checkIfDownloadNeeded(filePath: string, dbId: number, tenantId: s
 export async function ensureVodRecord(ctx: TenantPlatformContext, vodId: string, log: AppLogger): Promise<VodRecord | null> {
   const { db, tenantId, config, platform } = ctx;
 
+  const platformConfig = validatePlatformConfig(ctx, platform);
+  if (!platformConfig) {
+    return null;
+  }
+  const { platformUserId, platformUsername } = platformConfig;
+
   // Try to find existing VOD record
   const rawVodRecord = await findVodRecord(db, vodId, platform);
 
@@ -185,19 +215,12 @@ export async function ensureVodRecord(ctx: TenantPlatformContext, vodId: string,
     log.info(`Created Twitch VOD ${vodId} with user_id=${vodMetadata.user_id}`);
 
     await saveVodChapters(ctx, vodRecord.id, vodRecord.vod_id, vodRecord.duration);
-    const platformUserId = config?.[platform]?.id;
-    if (platformUserId) {
-      await fetchAndSaveEmotes(ctx, vodRecord.id, platform, platformUserId);
-      triggerChatDownload(tenantId, platformUserId, vodRecord.id, vodId, platform, Math.round(vodRecord.duration), config?.[platform]?.username);
-    }
+    await fetchAndSaveEmotes(ctx, vodRecord.id, platform, platformUserId);
+    triggerChatDownload(tenantId, platformUserId, vodRecord.id, vodId, platform, Math.round(vodRecord.duration), config?.[platform]?.username);
   } else if (platform === PLATFORMS.KICK) {
-    if (!config?.kick?.username) {
-      return null;
-    }
+    const vodMetadata = await getKickVod(platformUsername, vodId);
 
-    const vodMetadata = await getKickVod(config.kick.username, vodId);
-
-    log.info(`Fetched Kick VOD ${vodId} from channel ${config.kick.username}`);
+    log.info(`Fetched Kick VOD ${vodId} from channel ${platformUsername}`);
 
     vodRecord = (await db.vod.create({
       data: {
@@ -216,4 +239,79 @@ export async function ensureVodRecord(ctx: TenantPlatformContext, vodId: string,
   }
 
   return vodRecord;
+}
+
+/**
+ * Refreshes VOD record metadata from platform API
+ * Returns null if VOD cannot be found or refreshed
+ */
+export async function refreshVodRecord(ctx: TenantPlatformContext, vodId: string, log: AppLogger): Promise<VodRecord | null> {
+  const { db, tenantId, platform } = ctx;
+
+  const platformConfig = validatePlatformConfig(ctx, platform);
+  if (!platformConfig) {
+    log.warn({ tenantId, platform }, `Platform ${platform} not configured for tenant ${tenantId}`);
+    return null;
+  }
+  const { platformUserId, platformUsername } = platformConfig;
+
+  // Find existing VOD record
+  const existingRecord = await findVodRecord(db, vodId, platform);
+
+  if (!existingRecord) {
+    log.warn({ vodId, platform }, 'Cannot refresh: VOD record does not exist');
+    return null;
+  }
+
+  log.info(`Refreshing VOD ${vodId} metadata from platform ${platform}`);
+
+  if (platform === PLATFORMS.TWITCH) {
+    const vodMetadata: TwitchVodData = await getVodData(vodId, tenantId);
+
+    const duration = parsePTDuration(vodMetadata.duration);
+
+    const updatedRecord = (await db.vod.update({
+      where: { platform_vod_id: { platform, vod_id: vodId } },
+      data: {
+        vod_id: vodId,
+        title: vodMetadata.title || null,
+        created_at: new Date(vodMetadata.created_at),
+        duration,
+        stream_id: vodMetadata.stream_id || null,
+        platform,
+      },
+    })) as VodRecord;
+
+    log.info(`Refreshed Twitch VOD ${vodId} with duration=${duration}s`);
+
+    // Re-trigger chapters, emotes, and chat download
+    await saveVodChapters(ctx, updatedRecord.id, updatedRecord.vod_id, updatedRecord.duration);
+    await fetchAndSaveEmotes(ctx, updatedRecord.id, platform, platformUserId);
+    triggerChatDownload(tenantId, platformUserId, updatedRecord.id, vodId, platform, Math.round(updatedRecord.duration), platformUsername);
+
+    return updatedRecord;
+  } else if (platform === PLATFORMS.KICK) {
+    const vodMetadata = await getKickVod(platformUsername, vodId);
+
+    log.info(`Fetched Kick VOD ${vodId} from channel ${platformUsername}`);
+
+    const updatedRecord = (await db.vod.update({
+      where: { platform_vod_id: { platform, vod_id: vodId } },
+      data: {
+        vod_id: vodId,
+        title: vodMetadata.session_title,
+        created_at: new Date(vodMetadata.created_at),
+        duration: Math.floor(Number(vodMetadata.duration) / 1000),
+        stream_id: `${vodMetadata.id}`,
+        platform,
+      },
+    })) as VodRecord;
+
+    log.info(`Refreshed Kick VOD ${vodId} with duration=${Number(vodMetadata.duration)}ms`);
+
+    return updatedRecord;
+  } else {
+    log.warn({ platform }, 'Unsupported platform');
+    return null;
+  }
 }
