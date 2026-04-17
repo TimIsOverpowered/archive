@@ -57,13 +57,12 @@ export async function getWorkersHealth(): Promise<Record<string, WorkerHealthSta
   for (const name of workers.keys()) {
     const queue = getQueue(name);
     try {
-      if (!workers.get(name)) continue;
-
       const counts = await queue.getJobCounts();
       const lastFailed = await getLastFailedJob(queue);
 
       const workerInstance = workers.get(name);
-      const isRunningVal = typeof workerInstance?.isRunning === 'function' ? workerInstance.isRunning() : !!(workerInstance?.isRunning ?? false);
+      if (!workerInstance) continue;
+      const isRunningVal = workerInstance.isRunning();
 
       let status: 'healthy' | 'warning' | 'error' = 'healthy';
 
