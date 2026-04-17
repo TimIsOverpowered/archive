@@ -5,7 +5,7 @@ import { metaClient } from '../../src/db/meta-client.js';
 import { extractErrorDetails } from '../../src/utils/error.js';
 import { decryptScalar, decryptObject } from '../../src/utils/encryption.js';
 import { loadTenantConfigs } from '../../src/config/loader.js';
-import { validateYoutubeToken } from '../../src/services/youtube/index.js';
+import { createYoutubeClient } from '../../src/services/youtube/client.js';
 import { humanizeDuration } from '../../src/utils/formatting.js';
 
 interface YoutubeAuth {
@@ -91,20 +91,15 @@ program
           console.log('Loading streamer configs from DB...');
           await loadTenantConfigs();
 
-          // Use getAccessToken which will trigger the tokens event and persist changes
+          // Use createYoutubeClient which will validate/refresh tokens internally
           if (decrypted.refresh_token) {
-            console.log('✅ Refresh token available - attempting API refresh via validateYoutubeToken()');
+            console.log('✅ Refresh token available - attempting API refresh via createYoutubeClient()');
 
-            const isValid = await validateYoutubeToken(tenantId);
+            await createYoutubeClient(tenantId);
 
-            if (!isValid) {
-              console.error('❌ Token validation failed');
-              process.exit(1);
-            }
+            console.log('✅ Token validated/refreshed successfully!');
 
-            console.log('✅ Token refreshed successfully!');
-
-            // Wait for async DB persistence to complete (tokens event handler is synchronous but uses async/await internally)
+            // Wait for async DB persistence to complete
             await new Promise((resolve) => setTimeout(resolve, 500));
           } else {
             console.error('No refresh token found - cannot force refresh');

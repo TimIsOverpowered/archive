@@ -117,30 +117,15 @@ async function updateYoutubeTokenInDb(tenantId: string, newAccessToken: string, 
   }
 }
 
-async function getValidYoutubeToken(tenantId: string): Promise<string> {
+async function refreshToken(
+  tenantId: string,
+  creds: DecryptedYoutubeCreds
+): Promise<{
+  accessToken: string;
+  expiryDate: number;
+  refreshToken: string;
+}> {
   const logger = createAutoLogger('youtube-auth');
-  const creds = getYoutubeCredentials(tenantId);
-  if (!creds) {
-    throw new Error(`YouTube credentials not configured for ${tenantId}`);
-  }
-
-  const config = getTenantConfig(tenantId);
-  if (!config?.youtube?.auth) {
-    throw new Error(`YouTube auth not configured for ${tenantId}`);
-  }
-
-  if (creds.accessToken) {
-    try {
-      const authObj = decryptObject<AuthObject>(config.youtube.auth);
-      const expiryDate = authObj.expiry_date;
-
-      if (expiryDate && expiryDate > Date.now() + 60_000) {
-        return creds.accessToken;
-      }
-    } catch {
-      // Ignore - will refresh below
-    }
-  }
 
   logger.info({ tenantId }, 'YouTube token expired or missing, refreshing');
 
@@ -168,7 +153,11 @@ async function getValidYoutubeToken(tenantId: string): Promise<string> {
 
     logger.info({ tenantId, expiry_date: credentials.expiry_date }, 'YouTube token refreshed');
 
-    return credentials.access_token;
+    return {
+      accessToken: credentials.access_token,
+      expiryDate: credentials.expiry_date,
+      refreshToken: credentials.refresh_token || creds.refreshToken,
+    };
   } catch (error: unknown) {
     const details = extractErrorDetails(error);
 
@@ -180,26 +169,50 @@ async function getValidYoutubeToken(tenantId: string): Promise<string> {
   }
 }
 
-export async function validateYoutubeToken(tenantId: string): Promise<boolean> {
+export async function getYoutubeAuth(tenantId: string): Promise<{
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+  accessToken: string;
+}> {
+  const logger = createAutoLogger('youtube-auth');
   const creds = getYoutubeCredentials(tenantId);
-  if (!creds || !creds.accessToken) return false;
 
-  const config = getTenantConfig(tenantId);
-  if (!config?.youtube?.auth) return false;
-
-  try {
-    const authObj = decryptObject<AuthObject>(config.youtube.auth);
-    const expiryDate = authObj.expiry_date;
-
-    if (expiryDate && expiryDate > Date.now() + 60_000) {
-      return true;
-    }
-
-    return false;
-  } catch {
-    return false;
+  if (!creds) {
+    throw new Error(`YouTube credentials not configured for ${tenantId}`);
   }
+
+  if (creds.accessToken) {
+    try {
+      const config = getTenantConfig(tenantId);
+      if (!config?.youtube?.auth) throw new Error('YouTube auth not configured');
+
+      const authObj = decryptObject<AuthObject>(config.youtube.auth);
+      const expiryDate = authObj.expiry_date;
+
+      if (expiryDate && expiryDate > Date.now() + 60_000) {
+        logger.info({ tenantId }, 'Using cached YouTube access token');
+        return {
+          clientId: creds.clientId,
+          clientSecret: creds.clientSecret,
+          refreshToken: creds.refreshToken,
+          accessToken: creds.accessToken,
+        };
+      }
+    } catch {
+      // Ignore - will refresh below
+    }
+  }
+
+  const refreshed = await refreshToken(tenantId, creds);
+
+  return {
+    clientId: creds.clientId,
+    clientSecret: creds.clientSecret,
+    refreshToken: refreshed.refreshToken,
+    accessToken: refreshed.accessToken,
+  };
 }
 
-export { getValidYoutubeToken, getYoutubeCredentials, updateYoutubeTokenInDb, REDIRECT_URI };
+export { getYoutubeCredentials, updateYoutubeTokenInDb, REDIRECT_URI };
 export type { AuthObject, DecryptedYoutubeCreds };
