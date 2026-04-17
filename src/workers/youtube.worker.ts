@@ -1,5 +1,5 @@
 import { Processor, Job } from 'bullmq';
-import type { YoutubeUploadJob, YoutubeUploadResult, YoutubeVodUploadJob, YoutubeGameUploadJob } from './jobs/queues.js';
+import type { YoutubeUploadJob, YoutubeUploadResult, YoutubeVodUploadJob, YoutubeGameUploadJob, YoutubeUploadVodResult } from './jobs/queues.js';
 import { getJobContext } from './utils/job-context.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { processVodUpload, linkVodPartsAfterDelay } from './youtube/vod-upload-processor.js';
@@ -13,23 +13,24 @@ import { TenantConfig } from '../config/types.js';
 import { PrismaClient } from '../../generated/streamer/client.js';
 
 const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async (job: Job<YoutubeUploadJob>) => {
-  const { tenantId, dbId, vodId, type } = job.data;
-  let filePath = job.data.filePath;
+  const { tenantId, dbId, vodId, type, filePath } = job.data;
 
   const log = createAutoLogger(String(tenantId));
+  const startTime = Date.now();
+  const jobId = job.id;
 
-  // If filePath is not set, try to get it from the download job result (FlowProducer child)
-  if (!filePath) {
+  let actualFilePath = filePath;
+
+  if (!actualFilePath) {
     const childResults = await job.getChildrenValues();
     const downloadResult = Object.values(childResults)[0] as { finalPath?: string };
 
     if (!downloadResult?.finalPath) {
-      throw new Error(`File path not available for vodId=${vodId}, jobId=${job.id}: download job may have failed or not completed`);
+      throw new Error(`File path not available for vodId=${vodId}, jobId=${jobId}: download job may have failed or not completed`);
     }
 
-    filePath = downloadResult.finalPath;
-    job.data.filePath = filePath;
-    log.debug({ vodId, filePath, jobId: job.id }, 'Retrieved filePath from download job result');
+    actualFilePath = downloadResult.finalPath;
+    log.debug({ vodId, filePath: actualFilePath, jobId }, 'Retrieved filePath from download job result');
   }
 
   const { config, db } = await getJobContext(tenantId);
@@ -38,21 +39,51 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
     throw new Error(`YouTube not configured for tenant ${tenantId}`);
   }
 
+  let fileSize: number | undefined;
+  try {
+    const fs = await import('fs');
+    const stats = fs.statSync(actualFilePath);
+    fileSize = stats.size;
+  } catch {
+    log.warn({ vodId, filePath: actualFilePath }, 'Could not get file size');
+  }
+
+  const state = await job.getState();
+  log.info({ vodId, jobId, type, part: (job.data as YoutubeVodUploadJob).part, fileSize, filePath: actualFilePath, state, attemptsMade: job.attemptsMade }, '[youtube-upload] Job started');
+
   try {
     if (type === UPLOAD_TYPES.VOD) {
-      return await processVodUploadJob({ ...job.data, filePath: filePath! } as YoutubeVodUploadJob & { filePath: string }, config, db, log);
+      const vodResult = await processVodUploadJob({ ...job.data, filePath: actualFilePath } as YoutubeVodUploadJob & { filePath: string }, config, db, log);
+      const duration = Date.now() - startTime;
+      log.info({ vodId, jobId, duration, uploadedVideosCount: (vodResult as YoutubeUploadVodResult).videos?.length }, '[youtube-upload] Job completed successfully');
+      return vodResult;
     } else {
-      return await processGameUploadJob({ ...job.data, filePath: filePath! } as YoutubeGameUploadJob & { filePath: string }, config, db, log);
+      const result = await processGameUploadJob({ ...job.data, filePath: actualFilePath } as YoutubeGameUploadJob & { filePath: string }, config, db, log);
+      const duration = Date.now() - startTime;
+      log.info({ vodId, jobId, duration }, '[youtube-upload] Game upload completed successfully');
+      return result;
     }
   } catch (error) {
-    const errorMsg = handleWorkerError(error, log, { vodId, tenantId, dbId, jobId: job.id });
+    const duration = Date.now() - startTime;
+    const stateAtFailure = await job.getState();
+
+    const errorMsg = handleWorkerError(error, log, {
+      vodId,
+      tenantId,
+      dbId,
+      jobId,
+      duration,
+      stateAtFailure,
+      attemptsMade: job.attemptsMade,
+      filePath: actualFilePath,
+    });
 
     await db.vodUpload.updateMany({
       where: { vod_id: dbId },
       data: { status: 'FAILED' },
     });
 
-    log.warn({ vodId, errorMsg }, 'YouTube upload job failed');
+    log.error({ vodId, jobId, duration, stateAtFailure, errorMsg }, '[youtube-upload] Job failed');
 
     throw error;
   }

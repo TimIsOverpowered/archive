@@ -2,7 +2,7 @@ import type { PrismaClient } from '../../../generated/streamer/client.js';
 import type { AppLogger } from '../../utils/logger.js';
 import { trimVideo, splitVideo, getDuration } from '../utils/ffmpeg.js';
 import { uploadVideo } from '../../services/youtube/index.js';
-import { initRichAlert, updateAlert, formatProgressMessage } from '../../utils/discord-alerts.js';
+import { initRichAlert, updateAlert, createProgressBar } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 import { createYoutubeUploadProgressHandler as createGameUploadProgressHandler } from './youtube-upload-progress.js';
 import { YOUTUBE_MAX_DURATION } from '../../constants.js';
@@ -115,7 +115,7 @@ async function processSplitGameUpload(ctx: GameUploadContext, trimmedPath: strin
       title: `✂️ Splitting Game Clip`,
       description: `${tenantId} - Game clip exceeds YouTube max duration`,
       status: 'warning',
-      fields: [{ name: 'Progress', value: formatProgressMessage('Game Splitting', tenantId, percent), inline: false }],
+      fields: [{ name: 'Progress', value: createProgressBar(percent), inline: false }],
       timestamp: new Date().toISOString(),
       updatedTimestamp: new Date().toISOString(),
     });
