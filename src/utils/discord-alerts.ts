@@ -17,6 +17,8 @@ export interface RichEmbedData {
   timestamp?: string;
   updatedTimestamp?: string;
   mention?: 'everyone' | 'here' | string;
+  thumbnailUrl?: string;
+  url?: string;
 }
 
 interface DiscordEmbed {
@@ -26,6 +28,8 @@ interface DiscordEmbed {
   fields: Array<{ name: string; value: string; inline: boolean }>;
   timestamp?: string;
   footer?: { text: string };
+  thumbnail?: { url: string };
+  url?: string;
 }
 
 export interface StreamAlertData {
@@ -68,6 +72,14 @@ function constructEmbed(data: RichEmbedData): DiscordEmbed {
 
   if (data.description) {
     embed.description = data.description;
+  }
+
+  if (data.thumbnailUrl) {
+    embed.thumbnail = { url: data.thumbnailUrl };
+  }
+
+  if (data.url) {
+    embed.url = data.url;
   }
 
   if (data.updatedTimestamp) {

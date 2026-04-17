@@ -52,6 +52,7 @@ export async function processGameUpload(ctx: GameUploadContext): Promise<GameUpl
 async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: string): Promise<GameUploadResult> {
   const { tenantId, dbId, chapterStart, chapterEnd, chapterGameId, title, description, db, chapterName, vodId, config } = ctx;
   const channelName = config.displayName || tenantId;
+  const duration = chapterEnd - chapterStart;
 
   const uploadAlertMessageId = await initRichAlert({
     title: '🎮 Game Upload Started',
@@ -70,10 +71,12 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
         type: 'game',
         channelName,
         gameName: chapterName,
+        videoTitle: title,
+        privacyStatus: 'public',
       })
     : () => {};
 
-  const result = await uploadVideo(tenantId, channelName, trimmedPath, title, description, 'public', onUploadProgress);
+  const result = await uploadVideo(tenantId, channelName, trimmedPath, title, description, 'public', onUploadProgress, duration);
 
   const createdGameRecord = await db.game.create({
     data: {
@@ -127,6 +130,7 @@ async function processSplitGameUpload(ctx: GameUploadContext, trimmedPath: strin
     const currentPartNum = i + 1;
     const startTime = i * YOUTUBE_MAX_DURATION;
     const endTime = Math.min(startTime + YOUTUBE_MAX_DURATION, trimmedDuration);
+    const partDuration = endTime - startTime;
     const partTitle = i > 0 ? `${title} PART ${i + 1}` : title;
 
     const uploadAlertMessageId = await initRichAlert({
@@ -150,10 +154,11 @@ async function processSplitGameUpload(ctx: GameUploadContext, trimmedPath: strin
           videoTitle: partTitle,
           part: currentPartNum,
           totalParts,
+          privacyStatus: 'public',
         })
       : () => {};
 
-    const result = await uploadVideo(tenantId, config.displayName || tenantId, splitPaths[i], partTitle, description, 'public', onUploadProgress);
+    const result = await uploadVideo(tenantId, config.displayName || tenantId, splitPaths[i], partTitle, description, 'public', onUploadProgress, partDuration);
 
     const createdGameRecord = await db.game.create({
       data: {

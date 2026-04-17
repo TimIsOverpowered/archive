@@ -123,6 +123,8 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
   for (let i = 0; i < parts.length; i++) {
     const currentPartNum = i + 1;
 
+    const partDuration = i === parts.length - 1 ? duration - i * splitDuration : splitDuration;
+
     const { title: partTitle, description: youtubeDescription } = buildYoutubeMetadata({
       channelName,
       platform: platformName,
@@ -154,10 +156,11 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
           videoTitle: partTitle,
           part: currentPartNum,
           totalParts,
+          privacyStatus: privacyStatus as 'public' | 'unlisted' | 'private',
         })
       : () => {};
 
-    const result = await uploadVideo(tenantId, channelName, parts[i], partTitle, youtubeDescription, privacyStatus as 'public' | 'unlisted' | 'private', onUploadProgress);
+    const result = await uploadVideo(tenantId, channelName, parts[i], partTitle, youtubeDescription, privacyStatus as 'public' | 'unlisted' | 'private', onUploadProgress, partDuration);
 
     uploadedVideos.push({ id: result.videoId, part: i + 1 });
 
@@ -171,7 +174,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
     fields: [
       { name: 'VOD ID', value: vodId, inline: true },
       { name: 'Total Duration', value: toHHMMSS(duration), inline: true },
-      { name: 'Parts Created', value: `${totalParts} parts (${toHHMMSS(splitDuration)} each)`, inline: false },
+      { name: 'Parts Created', value: `${totalParts} parts`, inline: false },
     ],
     timestamp: new Date().toISOString(),
     updatedTimestamp: new Date().toISOString(),
@@ -216,16 +219,19 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
     timestamp: new Date().toISOString(),
   });
 
+  const duration = (await getDuration(filePath)) ?? vodRecord.duration;
+
   const onUploadProgress = uploadAlertMessageId
     ? createVodUploadProgressHandler({
         messageId: uploadAlertMessageId,
         type: UPLOAD_TYPES.VOD,
         channelName,
         videoTitle: title,
+        privacyStatus: privacyStatus as 'public' | 'unlisted' | 'private',
       })
     : () => {};
 
-  const result = await uploadVideo(tenantId, channelName, filePath, title, youtubeDescription, privacyStatus as 'public' | 'unlisted' | 'private', onUploadProgress);
+  const result = await uploadVideo(tenantId, channelName, filePath, title, youtubeDescription, privacyStatus as 'public' | 'unlisted' | 'private', onUploadProgress, duration);
 
   const uploadPart = part ?? 1;
   const uploadedVideos = [{ id: result.videoId, part: uploadPart }];

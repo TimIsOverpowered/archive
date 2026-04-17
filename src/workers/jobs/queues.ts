@@ -43,7 +43,7 @@ export interface YoutubeVodUploadJob {
   dbId: number;
   vodId: string;
   filePath?: string;
-  type: UploadType;
+  type: SourceType;
   platform: Platform;
   dmcaProcessed?: boolean;
   vodRecord: VodRecord;

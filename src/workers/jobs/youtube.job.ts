@@ -2,8 +2,8 @@ import { flowProducer, getStandardVodQueue, getYoutubeUploadQueue } from './queu
 import type { YoutubeVodUploadJob, YoutubeGameUploadJob } from './queues.js';
 import dayjs from '../../utils/dayjs.js';
 import { childLogger } from '../../utils/logger.js';
-import type { Platform, UploadMode } from '../../types/platforms.js';
-import { UPLOAD_TYPES, UPLOAD_MODES } from '../../types/platforms.js';
+import type { Platform, SourceType, UploadMode } from '../../types/platforms.js';
+import { UPLOAD_MODES } from '../../types/platforms.js';
 import { TenantContext } from '../../types/context.js';
 import { withDbRetry } from '../../db/client.js';
 
@@ -11,7 +11,15 @@ const log = childLogger({ module: 'youtube-job' });
 
 // ============== VOD Job Creation ==============
 
-export async function createVodUploadJob(ctx: TenantContext, dbId: number, vodId: string, filePath: string | undefined, platform: Platform, part?: number): Promise<YoutubeVodUploadJob> {
+export async function createVodUploadJob(
+  ctx: TenantContext,
+  dbId: number,
+  vodId: string,
+  filePath: string | undefined,
+  platform: Platform,
+  type: SourceType,
+  part?: number
+): Promise<YoutubeVodUploadJob> {
   const { config, tenantId } = ctx;
   if (!config?.youtube?.upload) {
     throw new Error(`YouTube upload not enabled for tenant ${tenantId}`);
@@ -30,8 +38,8 @@ export async function createVodUploadJob(ctx: TenantContext, dbId: number, vodId
     dbId,
     vodId,
     filePath,
-    type: UPLOAD_TYPES.VOD,
-    vodRecord: vodRecord,
+    type,
+    vodRecord,
     platform,
     part: part ?? 1,
   };
@@ -264,10 +272,11 @@ export async function queueYoutubeVodUpload(
   vodId: string,
   filePath: string | undefined,
   platform: Platform,
+  type: SourceType,
   downloadJobId?: string,
   part?: number
 ): Promise<string | null> {
-  const job = await createVodUploadJob(ctx, dbId, vodId, filePath, platform, part);
+  const job = await createVodUploadJob(ctx, dbId, vodId, filePath, platform, type, part);
   return enqueueVodUpload(job, downloadJobId);
 }
 
@@ -344,6 +353,7 @@ export interface QueueYoutubeUploadsOptions {
    * download completion. If undefined, uploads are queued immediately (file exists).
    */
   downloadJobId?: string;
+  type: SourceType;
 }
 
 export interface YoutubeUploadJobResult {
@@ -357,7 +367,7 @@ export interface YoutubeUploadJobResult {
  * @returns Promise that resolves when all applicable uploads are queued
  */
 export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): Promise<YoutubeUploadJobResult> {
-  const { ctx, dbId, vodId, filePath, platform, uploadMode = UPLOAD_MODES.ALL, downloadJobId } = options;
+  const { ctx, dbId, vodId, filePath, platform, uploadMode = UPLOAD_MODES.ALL, downloadJobId, type } = options;
   const { config } = ctx;
 
   const result: YoutubeUploadJobResult = {
@@ -368,7 +378,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
   // VOD Upload
   if ((uploadMode === UPLOAD_MODES.VOD || uploadMode === UPLOAD_MODES.ALL) && config?.youtube?.vodUpload) {
     try {
-      const vodJobId = await queueYoutubeVodUpload(ctx, dbId, vodId, filePath, platform, downloadJobId);
+      const vodJobId = await queueYoutubeVodUpload(ctx, dbId, vodId, filePath, platform, type, downloadJobId);
       result.vodJobId = vodJobId;
       log.info({ vodId, chained: !!downloadJobId, vodJobId }, 'Queued YouTube VOD upload');
     } catch (error) {
