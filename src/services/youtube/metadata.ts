@@ -1,11 +1,9 @@
-import { getValidYoutubeToken } from './auth.js';
-import { createYoutubeClient } from './api.js';
+import { createYoutubeClient } from './client.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 
 export async function linkParts(tenantId: string, videoIds: { id: string; part: number }[]): Promise<void> {
   const logger = createAutoLogger('youtube-metadata');
-  const accessToken = await getValidYoutubeToken(tenantId);
-  const youtube = createYoutubeClient(accessToken);
+  const youtube = await createYoutubeClient(tenantId);
 
   const sortedParts = [...videoIds].sort((a, b) => a.part - b.part);
 

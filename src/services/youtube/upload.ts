@@ -1,6 +1,5 @@
 import fs from 'fs';
-import { createYoutubeClient } from './api.js';
-import { getValidYoutubeToken } from './auth.js';
+import { createYoutubeClient } from './client.js';
 import { sleep } from '../../utils/delay.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
@@ -30,8 +29,7 @@ export async function uploadVideo(
   }
 
   try {
-    const accessToken = await getValidYoutubeToken(tenantId);
-    const youtube = createYoutubeClient(accessToken);
+    const youtube = await createYoutubeClient(tenantId);
 
     logger.info(`[YouTube] Starting upload for ${displayName}: ${title}`);
 

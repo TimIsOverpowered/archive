@@ -5,7 +5,6 @@ import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { logger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { getConfigs } from '../config/loader';
-import { validateYoutubeToken } from '../services/youtube';
 
 const MAX_FAILURES = 3;
 
@@ -28,24 +27,6 @@ export async function checkTokenHealth(): Promise<void> {
 
         if (trackFailure(`${tenantId}:twitch`, MAX_FAILURES)) {
           await sendDiscordAlert(`🚨 Twitch token health check failed for ${tenantId} after ${MAX_FAILURES} attempts`);
-        }
-      }
-    }
-
-    if (config.youtube?.auth) {
-      try {
-        // Use lightweight validation instead of forcing token refresh
-        if (await validateYoutubeToken(tenantId)) {
-          resetFailures(`${tenantId}:youtube`);
-        } else if (trackFailure(`${tenantId}:youtube`, MAX_FAILURES)) {
-          await sendDiscordAlert(`🚨 YouTube token health check failed for ${tenantId} after ${MAX_FAILURES} attempts`);
-        }
-      } catch (err: unknown) {
-        const { message } = extractErrorDetails(err);
-        log.error({ error: message, platform: 'YouTube' }, `Token health check error for ${tenantId}`);
-
-        if (trackFailure(`${tenantId}:youtube`, MAX_FAILURES)) {
-          await sendDiscordAlert(`🚨 YouTube token health check failed for ${tenantId} after ${MAX_FAILURES} attempts`);
         }
       }
     }
