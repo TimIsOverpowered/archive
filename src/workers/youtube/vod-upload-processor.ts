@@ -157,9 +157,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
 
     uploadedVideos.push({ id: result.videoId, part: i + 1 });
 
-    if (!config.settings.saveMP4) {
-      await deleteFileIfExists(parts[i]);
-    }
+    await deleteFileIfExists(parts[i]);
   }
 
   void updateAlert(splitAlertMessageId, {
