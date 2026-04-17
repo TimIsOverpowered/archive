@@ -113,12 +113,22 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
         };
       }
 
-      queueYoutubeUploads({ ctx: request.tenant as TenantPlatformContext, dbId: vodRecord.id, vodId: vodRecord.vod_id, filePath: request.body.path, platform, type: SOURCE_TYPES.LIVE });
+      const { gameJobIds, vodJobId } = await queueYoutubeUploads({
+        ctx: request.tenant as TenantPlatformContext,
+        dbId: vodRecord.id,
+        vodId: vodRecord.vod_id,
+        filePath: request.body.path,
+        platform,
+        type: SOURCE_TYPES.LIVE,
+      });
 
       return <{ data: LiveCallbackResponseData }>{
         data: {
           message: 'YouTube upload queued successfully',
-          vodId: streamIdNum,
+          vodId: vodRecord.id,
+          streamId: streamIdNum,
+          gameJobIds,
+          vodJobId,
           path: request.body.path,
         },
       };
