@@ -12,7 +12,16 @@ import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
 
 const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job<StandardVodJob, unknown, string>) => {
-  const { dbId, vodId, platform, tenantId, downloadMethod = DOWNLOAD_METHODS.HLS, platformUserId, platformUsername, sourceUrl } = job.data;
+  const {
+    dbId,
+    vodId,
+    platform,
+    tenantId,
+    downloadMethod = DOWNLOAD_METHODS.HLS,
+    platformUserId,
+    platformUsername,
+    sourceUrl,
+  } = job.data;
   const log = createAutoLogger(tenantId);
 
   log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[Standard VOD Worker] Starting job');

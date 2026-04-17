@@ -55,7 +55,12 @@ interface SevenTVResponse {
   }>;
 }
 
-export async function fetchAndSaveEmotes(ctx: TenantContext, vodId: number, platform: Platform, platformId: string): Promise<void> {
+export async function fetchAndSaveEmotes(
+  ctx: TenantContext,
+  vodId: number,
+  platform: Platform,
+  platformId: string
+): Promise<void> {
   let ffzEmotes: EmoteData[] = [];
   let bttvEmotes: EmoteData[] = [];
   let sevenTvEmotes: EmoteData[] = [];
@@ -63,13 +68,23 @@ export async function fetchAndSaveEmotes(ctx: TenantContext, vodId: number, plat
   if (platform === PLATFORMS.TWITCH && platformId) {
     const [ffzRes, bttvGlobalRes, bttvChannelRes, sevenTvRes, sevenTvGlobalRes] = await Promise.all([
       safeRequest<FFZResponse>(`https://api.frankerfacez.com/v1/room/id/${platformId}`, {}, { timeoutMs: 5000 }),
-      safeRequest<BTTVGlobalResponse>('https://api.betterttv.net/3/cached/emotes/global', { emotes: [] }, { timeoutMs: 5000 }),
-      safeRequest<BTTVChannelResponse>(`https://api.betterttv.net/3/cached/users/twitch/${platformId}`, { channelEmotes: [] }, { timeoutMs: 5000 }),
+      safeRequest<BTTVGlobalResponse>(
+        'https://api.betterttv.net/3/cached/emotes/global',
+        { emotes: [] },
+        { timeoutMs: 5000 }
+      ),
+      safeRequest<BTTVChannelResponse>(
+        `https://api.betterttv.net/3/cached/users/twitch/${platformId}`,
+        { channelEmotes: [] },
+        { timeoutMs: 5000 }
+      ),
       safeRequest<SevenTVResponse>(`https://7tv.io/v3/users/twitch/${platformId}`, { emotes: [] }, { timeoutMs: 5000 }),
       safeRequest<SevenTVResponse>(`https://7tv.io/v3/emote-sets/global`, { emotes: [] }, { timeoutMs: 5000 }),
     ]);
 
-    ffzEmotes = ((ffzRes as FFZResponse).channels?.[platformId]?.emotes || []).map((e) => ({ id: String(e.id), code: e.code })) || [];
+    ffzEmotes =
+      ((ffzRes as FFZResponse).channels?.[platformId]?.emotes || []).map((e) => ({ id: String(e.id), code: e.code })) ||
+      [];
 
     bttvEmotes = [
       ...(bttvGlobalRes.emotes || []).map(({ id, code }) => ({ id, code })),
@@ -127,7 +142,11 @@ export async function fetchAndSaveEmotes(ctx: TenantContext, vodId: number, plat
   }
 }
 
-export async function getEmotesByVodId(client: PrismaClient, tenantId: string, vodId: number): Promise<VodEmotes | null> {
+export async function getEmotesByVodId(
+  client: PrismaClient,
+  tenantId: string,
+  vodId: number
+): Promise<VodEmotes | null> {
   const cacheKey = `emotes:${tenantId}:${vodId}`;
 
   if (redisClient && process.env.DISABLE_REDIS_CACHE !== 'true') {

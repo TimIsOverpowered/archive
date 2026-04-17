@@ -24,7 +24,10 @@ export interface CloudflareCacheInfo {
 
 /** Fetch Cloudflare IP ranges from official source */
 export async function fetchCloudflareIpRanges(): Promise<CloudflareIpRanges> {
-  const [v4Response, v6Response] = await Promise.all([request(CF_IP_V4_URL, { responseType: 'text' }), request(CF_IP_V6_URL, { responseType: 'text' })]);
+  const [v4Response, v6Response] = await Promise.all([
+    request(CF_IP_V4_URL, { responseType: 'text' }),
+    request(CF_IP_V6_URL, { responseType: 'text' }),
+  ]);
 
   return {
     v4: v4Response
@@ -95,7 +98,11 @@ export function isFromCloudflare(ip: string, ranges?: CloudflareIpRanges): boole
 }
 
 /** Validate request is actually from Cloudflare */
-export async function validateCloudflareRequest(request: { headers: Record<string, string | string[] | undefined>; raw: { socket?: { remoteAddress?: string } }; url?: string }): Promise<boolean> {
+export async function validateCloudflareRequest(request: {
+  headers: Record<string, string | string[] | undefined>;
+  raw: { socket?: { remoteAddress?: string } };
+  url?: string;
+}): Promise<boolean> {
   if (process.env.NODE_ENV !== 'production') {
     return true;
   }

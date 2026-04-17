@@ -38,7 +38,11 @@ export function buildMuteFilters(claims: DMCAClaim[]): string[] {
   return muteSection;
 }
 
-export async function muteAudioSections(videoPath: string, filters: string[], outputPath: string): Promise<string | null> {
+export async function muteAudioSections(
+  videoPath: string,
+  filters: string[],
+  outputPath: string
+): Promise<string | null> {
   return new Promise((resolve) => {
     const ffmpegProcess = ffmpeg(videoPath);
 
@@ -71,7 +75,11 @@ export interface BlackoutSection {
  * Applies multiple video blackouts in a single FFmpeg pass using overlay filters.
  * This is significantly more efficient than the old concat-based approach as it only reads/writes once.
  */
-export async function blackoutVideoSections(videoPath: string, vodId: string, sections: BlackoutSection[]): Promise<string | null> {
+export async function blackoutVideoSections(
+  videoPath: string,
+  vodId: string,
+  sections: BlackoutSection[]
+): Promise<string | null> {
   if (sections.length === 0) return videoPath;
 
   const outputPath = `${vodId}-blackouted.mp4`;

@@ -27,21 +27,29 @@ export function stripTypename(obj: unknown): unknown {
  * Extracts edges from GraphQL pagination response.
  * Type-safe extraction that filters valid edges at runtime.
  */
-export function extractEdges(commentsObj: TwitchCommentsConnection): Array<{ node: TwitchChatMessageNode | null | undefined; cursor: string | null }> {
+export function extractEdges(
+  commentsObj: TwitchCommentsConnection
+): Array<{ node: TwitchChatMessageNode | null | undefined; cursor: string | null }> {
   const rawEdges = commentsObj.edges;
 
   if (!Array.isArray(rawEdges)) {
     return [];
   }
 
-  return rawEdges.filter((item): item is TwitchChatEdge => item !== null && typeof item === 'object' && 'node' in item && 'cursor' in item);
+  return rawEdges.filter(
+    (item): item is TwitchChatEdge => item !== null && typeof item === 'object' && 'node' in item && 'cursor' in item
+  );
 }
 
 /**
  * Calculates the effective resume offset for chat download.
  * If no manual startOffset is provided, checks for existing chat data and resumes from the last saved offset.
  */
-export async function calculateResumeOffset(db: PrismaClient, vodId: number, manualStartOffset?: number): Promise<{ offset: number; hasExistingData: boolean; lastMessageId?: string }> {
+export async function calculateResumeOffset(
+  db: PrismaClient,
+  vodId: number,
+  manualStartOffset?: number
+): Promise<{ offset: number; hasExistingData: boolean; lastMessageId?: string }> {
   if (manualStartOffset) {
     return { offset: manualStartOffset, hasExistingData: false };
   }
@@ -60,7 +68,10 @@ export async function calculateResumeOffset(db: PrismaClient, vodId: number, man
   return { offset: resumeOffset, hasExistingData: true, lastMessageId: lastSavedRecord.id };
 }
 
-export function extractMessageData(node: TwitchChatMessageNode | null | undefined): { message: InputJsonValue; userBadges?: InputJsonValue } {
+export function extractMessageData(node: TwitchChatMessageNode | null | undefined): {
+  message: InputJsonValue;
+  userBadges?: InputJsonValue;
+} {
   if (!node || !node.message) {
     return { message: { content: '', fragments: [] }, userBadges: undefined };
   }
@@ -80,6 +91,9 @@ export function extractMessageData(node: TwitchChatMessageNode | null | undefine
         .join(''),
       fragments: Array.isArray(cleanFragments) ? cleanFragments.map((frag) => ({ ...frag })) : [],
     },
-    userBadges: badgesRaw && typeof stripTypename(badgesRaw) === 'object' ? (stripTypename(badgesRaw) as InputJsonValue) : undefined,
+    userBadges:
+      badgesRaw && typeof stripTypename(badgesRaw) === 'object'
+        ? (stripTypename(badgesRaw) as InputJsonValue)
+        : undefined,
   };
 }

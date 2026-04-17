@@ -57,7 +57,12 @@ export async function getGameData(gameId: string, tenantId: string): Promise<Rec
   return data.data[0];
 }
 
-export async function saveVodChapters(ctx: TenantContext, dbId: number, vodId: string, finalDurationSeconds: number): Promise<number> {
+export async function saveVodChapters(
+  ctx: TenantContext,
+  dbId: number,
+  vodId: string,
+  finalDurationSeconds: number
+): Promise<number> {
   const { tenantId } = ctx;
   const logger = createAutoLogger('twitch-chapters');
   try {
@@ -88,14 +93,20 @@ export async function saveVodChapters(ctx: TenantContext, dbId: number, vodId: s
             vod_id: dbId,
             game_id: gameId,
             name: typeof game.displayName === 'string' ? game.displayName : null,
-            image: gameData && typeof gameData.box_art_url === 'string' ? gameData.box_art_url.replace('{width}x{height}', '40x53') : null,
+            image:
+              gameData && typeof gameData.box_art_url === 'string'
+                ? gameData.box_art_url.replace('{width}x{height}', '40x53')
+                : null,
             duration: '00:00:00',
             start: 0,
             end: finalDurationSeconds,
           },
         });
 
-        logger.info({ dbId, vodId, game: typeof game.displayName === 'string' ? game.displayName : 'unknown' }, 'Created single chapter from game info');
+        logger.info(
+          { dbId, vodId, game: typeof game.displayName === 'string' ? game.displayName : 'unknown' },
+          'Created single chapter from game info'
+        );
         return;
       } else if (chapters.length > 0) {
         const chaptersToCreate = [];

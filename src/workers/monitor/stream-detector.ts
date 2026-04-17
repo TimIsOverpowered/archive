@@ -2,7 +2,12 @@ import fs from 'fs/promises';
 import path from 'path';
 import { getTenantConfig } from '../../config/loader.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { QUEUE_NAMES, type LiveDownloadJob, getLiveDownloadQueue, enqueueJobWithLogging } from '../../workers/jobs/queues.js';
+import {
+  QUEUE_NAMES,
+  type LiveDownloadJob,
+  getLiveDownloadQueue,
+  enqueueJobWithLogging,
+} from '../../workers/jobs/queues.js';
 import { createClient, getClient } from '../../db/client.js';
 import type { TenantConfig } from '../../config/types.js';
 import { extractErrorDetails } from '../../utils/error.js';
@@ -34,12 +39,18 @@ export async function checkPlatformStatus(tenantId: string, platform: Platform, 
 
   try {
     log.debug({ platform }, '[Monitor]: Polling platform status for streamer...');
-    log.debug({ vodDownload: config.settings?.vodDownload, platformEnabled: config[platform]?.enabled }, '[Monitor]: Config values');
+    log.debug(
+      { vodDownload: config.settings?.vodDownload, platformEnabled: config[platform]?.enabled },
+      '[Monitor]: Config values'
+    );
 
     const prisma = getClient(tenantId) || (await createClient(config));
 
     if (config.settings.vodDownload && config[platform]?.enabled) {
-      log.debug({ platform, vodDownload: config.settings.vodDownload }, `[${capitalizePlatform(platform)}]: Monitoring enabled`);
+      log.debug(
+        { platform, vodDownload: config.settings.vodDownload },
+        `[${capitalizePlatform(platform)}]: Monitoring enabled`
+      );
       await handlePlatformLiveCheck(prisma, tenantId, platform, config);
     } else {
       const reasons = [];
@@ -59,7 +70,10 @@ export async function checkPlatformStatus(tenantId: string, platform: Platform, 
     if (typeof error === 'object' && error !== null && 'response' in error) {
       log.error({ platform, ...details }, `[${capitalizePlatform(platform)}] Error in stream status check`);
     } else if (typeof error === 'object' && error !== null && 'request' in error) {
-      log.error({ platform, ...details }, `[${capitalizePlatform(platform)}] Error in stream status check (no response)`);
+      log.error(
+        { platform, ...details },
+        `[${capitalizePlatform(platform)}] Error in stream status check (no response)`
+      );
     } else {
       log.error({ platform, ...details }, `[${capitalizePlatform(platform)}] Error in stream status check`);
     }
@@ -94,12 +108,18 @@ async function validateVodPath(tenantId: string): Promise<{ valid: boolean }> {
         return { valid: true };
       } catch (mkdirError) {
         const details = extractErrorDetails(mkdirError);
-        log.error({ tenantId, vodPath: testSubdir, error: details.message }, `[Monitor] Cannot write to VOD path - directory creation failed`);
+        log.error(
+          { tenantId, vodPath: testSubdir, error: details.message },
+          `[Monitor] Cannot write to VOD path - directory creation failed`
+        );
         return { valid: false };
       }
     } catch (accessError) {
       const details = extractErrorDetails(accessError);
-      log.error({ tenantId, vodPath: vodDirBase, error: details.message }, `[Monitor] VOD path not accessible - check permissions`);
+      log.error(
+        { tenantId, vodPath: vodDirBase, error: details.message },
+        `[Monitor] VOD path not accessible - check permissions`
+      );
       return { valid: false };
     }
   } catch (error) {
@@ -126,14 +146,20 @@ export async function enqueueLiveHlsDownload(params: {
 
   const validationResult = await validateVodPath(params.tenantId);
   if (!validationResult.valid) {
-    log.error({ vodId: params.vodId, platform: params.platform }, `[Monitor] Aborting download queue - VOD path validation failed`);
+    log.error(
+      { vodId: params.vodId, platform: params.platform },
+      `[Monitor] Aborting download queue - VOD path validation failed`
+    );
     return;
   }
 
   const queue = getLiveDownloadQueue();
 
   try {
-    log.debug({ vodId: params.vodId, platform: params.platform, tenantId: params.tenantId }, `[Monitor] Attempting to enqueue Live HLS download job`);
+    log.debug(
+      { vodId: params.vodId, platform: params.platform, tenantId: params.tenantId },
+      `[Monitor] Attempting to enqueue Live HLS download job`
+    );
 
     const { jobId, isNew } = await enqueueJobWithLogging(
       queue,

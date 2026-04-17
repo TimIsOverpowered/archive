@@ -8,7 +8,13 @@ interface RateLimitOptions {
 }
 
 function getClientIp(request: FastifyRequest): string {
-  return (request.headers['cf-connecting-ip'] as string) ?? (request.headers['x-real-ip'] as string) ?? (request.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ?? request.ip ?? 'unknown';
+  return (
+    (request.headers['cf-connecting-ip'] as string) ??
+    (request.headers['x-real-ip'] as string) ??
+    (request.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ??
+    request.ip ??
+    'unknown'
+  );
 }
 
 export default function createRateLimitMiddleware(options: RateLimitOptions) {

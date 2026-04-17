@@ -57,7 +57,11 @@ export const VodQuerySchema = z.object({
 
 export type VodQuery = z.infer<typeof VodQuerySchema>;
 
-export async function getVods(client: PrismaClient, tenantId: string, query: VodQuery): Promise<{ vods: VodResponse[]; total: number }> {
+export async function getVods(
+  client: PrismaClient,
+  tenantId: string,
+  query: VodQuery
+): Promise<{ vods: VodResponse[]; total: number }> {
   const page = Math.max(1, query.page || 1);
   const limit = Math.min(100, Math.max(1, query.limit || 20));
   const offset = (page - 1) * limit;
@@ -199,7 +203,12 @@ export async function getVodById(client: PrismaClient, tenantId: string, vodId: 
   return null;
 }
 
-export async function getVodByPlatformId(client: PrismaClient, tenantId: string, platform: Platform, platformVodId: string): Promise<VodResponse | null> {
+export async function getVodByPlatformId(
+  client: PrismaClient,
+  tenantId: string,
+  platform: Platform,
+  platformVodId: string
+): Promise<VodResponse | null> {
   const cacheKey = `vod:platform:${tenantId}:${platform}:${platformVodId}`;
 
   const vod = await client.vod.findFirst({

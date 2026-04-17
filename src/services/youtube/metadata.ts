@@ -3,7 +3,13 @@ import dayjs from '../../utils/dayjs.js';
 import { createYoutubeClient } from './client.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 
-export async function saveChaptersAndLinkParts(tenantId: string, dbId: number, uploadedVideos: { id: string; part: number }[], splitDuration: number, db: PrismaClient): Promise<void> {
+export async function saveChaptersAndLinkParts(
+  tenantId: string,
+  dbId: number,
+  uploadedVideos: { id: string; part: number }[],
+  splitDuration: number,
+  db: PrismaClient
+): Promise<void> {
   const logger = createAutoLogger('youtube-metadata');
   const youtube = await createYoutubeClient(tenantId);
 
@@ -100,7 +106,11 @@ function buildChapterTimestampsForPart(chapters: Chapter[], partNum: number, spl
   return result.trim();
 }
 
-function buildPartNavigationLinks(sortedParts: { id: string; part: number }[], currentIndex: number, currentVideoId: string): string {
+function buildPartNavigationLinks(
+  sortedParts: { id: string; part: number }[],
+  currentIndex: number,
+  currentVideoId: string
+): string {
   let result = '';
 
   for (let i = 0; i < sortedParts.length; i++) {

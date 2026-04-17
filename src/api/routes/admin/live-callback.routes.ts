@@ -2,7 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import fs from 'fs/promises';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform.js';
+import {
+  tenantMiddleware,
+  platformValidationMiddleware,
+  type TenantPlatformContext,
+} from '../../middleware/tenant-platform.js';
 import { fileExists } from '../../../utils/path.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
@@ -42,7 +46,11 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
     schema: {
       tags: ['Admin'],
       description: 'Callback from external recorder when live HLS download/merge completes. Queues YouTube upload.',
-      params: { type: 'object', properties: { tenantId: { type: 'string', description: 'Tenant ID' } }, required: ['tenantId'] },
+      params: {
+        type: 'object',
+        properties: { tenantId: { type: 'string', description: 'Tenant ID' } },
+        required: ['tenantId'],
+      },
       body: {
         type: 'object',
         properties: {

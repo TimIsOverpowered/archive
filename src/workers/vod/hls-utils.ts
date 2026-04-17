@@ -40,7 +40,10 @@ export async function downloadSegmentsParallel(
   let completedCount = 0;
   const totalSegments = segments.length;
 
-  log.debug({ count: totalSegments, concurrency, retryAttempts, strategy: strategy.type }, `Starting parallel segment download`);
+  log.debug(
+    { count: totalSegments, concurrency, retryAttempts, strategy: strategy.type },
+    `Starting parallel segment download`
+  );
 
   const isAborted = () => (strategy.type === 'fetch' ? strategy.signal?.aborted : strategy.session.closed);
 
@@ -134,7 +137,13 @@ export async function cleanupOrphanedTmpFiles(vodDir: string, log: AppLogger): P
   }
 }
 
-export async function fetchTwitchPlaylist(vodId: string, log: AppLogger, retryCount: number, maxRetryBeforeEndDetection: number, tenantId?: string): Promise<FetchPlaylistResult | null> {
+export async function fetchTwitchPlaylist(
+  vodId: string,
+  log: AppLogger,
+  retryCount: number,
+  maxRetryBeforeEndDetection: number,
+  tenantId?: string
+): Promise<FetchPlaylistResult | null> {
   const tokenSig = await getVodTokenSig(vodId, tenantId);
 
   try {
@@ -173,9 +182,12 @@ export async function fetchTwitchPlaylist(vodId: string, log: AppLogger, retryCo
     if (!bestVariantUrl.startsWith('http')) {
       baseURL = masterPlaylistContent.substring(0, masterPlaylistContent.lastIndexOf('/'));
 
-      variantM3u8String = await request(bestVariantUrl.includes('/') ? bestVariantUrl : `${baseURL}/${bestVariantUrl}`, {
-        responseType: 'text',
-      });
+      variantM3u8String = await request(
+        bestVariantUrl.includes('/') ? bestVariantUrl : `${baseURL}/${bestVariantUrl}`,
+        {
+          responseType: 'text',
+        }
+      );
     } else {
       baseURL = bestVariantUrl.substring(0, bestVariantUrl.lastIndexOf('/'));
 

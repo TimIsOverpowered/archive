@@ -73,7 +73,11 @@ export async function getTwitchStreamStatus(userId: string, tenantId: string): P
   }
 }
 
-export async function getLatestTwitchVodObject(userId: string, expectedStreamId: string, tenantId: string): Promise<VodData | null> {
+export async function getLatestTwitchVodObject(
+  userId: string,
+  expectedStreamId: string,
+  tenantId: string
+): Promise<VodData | null> {
   try {
     const accessToken = await getAppAccessToken(tenantId);
     const creds = getTwitchCredentials(tenantId);
@@ -106,7 +110,10 @@ export async function getLatestTwitchVodObject(userId: string, expectedStreamId:
       return null;
     }
 
-    log.info({ userId, stream_id: latestVod.stream_id, id: latestVod.id }, `[Twitch] VOD object ready! Match found: stream_id=${latestVod.stream_id}, vod_id=${latestVod.id}`);
+    log.info(
+      { userId, stream_id: latestVod.stream_id, id: latestVod.id },
+      `[Twitch] VOD object ready! Match found: stream_id=${latestVod.stream_id}, vod_id=${latestVod.id}`
+    );
 
     return latestVod;
   } catch (error: unknown) {

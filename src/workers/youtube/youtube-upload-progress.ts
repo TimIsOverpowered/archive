@@ -58,13 +58,18 @@ export function createYoutubeUploadProgressHandler({
     if (!messageId || !isAlertsEnabled()) return;
 
     const partSuffix = part !== undefined && totalParts !== undefined ? ` Part ${part}/${totalParts}` : '';
-    const partField = part !== undefined && totalParts !== undefined ? { name: 'Part', value: `${part}/${totalParts}`, inline: true } : undefined;
+    const partField =
+      part !== undefined && totalParts !== undefined
+        ? { name: 'Part', value: `${part}/${totalParts}`, inline: true }
+        : undefined;
 
     switch (progress.milestone) {
       case 'starting': {
         const titlePrefix = type === UPLOAD_TYPES.VOD ? '📺 Uploading VOD' : '🎮 Uploading Game';
         const title = `${titlePrefix}${partSuffix}`;
-        const videoField = videoTitle ? { name: 'Video', value: videoTitle.substring(0, 150), inline: false } : undefined;
+        const videoField = videoTitle
+          ? { name: 'Video', value: videoTitle.substring(0, 150), inline: false }
+          : undefined;
         const gameField = gameName ? { name: 'Game', value: gameName.substring(0, 150), inline: true } : undefined;
 
         const fields: Array<{ name: string; value: string; inline: boolean }> = [];
@@ -134,7 +139,9 @@ export function createYoutubeUploadProgressHandler({
         const titlePrefix = type === UPLOAD_TYPES.VOD ? '🔄 Processing VOD' : '🔄 Processing Game';
         const title = `${titlePrefix}${partSuffix}`;
 
-        const fields: Array<{ name: string; value: string; inline: boolean }> = [{ name: 'Video ID', value: progress.videoId || '', inline: false }];
+        const fields: Array<{ name: string; value: string; inline: boolean }> = [
+          { name: 'Video ID', value: progress.videoId || '', inline: false },
+        ];
         if (partField) fields.push(partField);
 
         await updateDiscordEmbed(messageId, {
@@ -186,7 +193,9 @@ export function createYoutubeUploadProgressHandler({
         if (progress.errorDetails) {
           const errorMsg = extractErrorDetails(progress.errorDetails).message;
 
-          const fields: Array<{ name: string; value: string; inline: boolean }> = [{ name: 'Error', value: errorMsg.substring(0, 500), inline: false }];
+          const fields: Array<{ name: string; value: string; inline: boolean }> = [
+            { name: 'Error', value: errorMsg.substring(0, 500), inline: false },
+          ];
           if (partField) fields.push(partField);
 
           await updateDiscordEmbed(messageId, {

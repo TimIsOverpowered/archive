@@ -11,7 +11,14 @@ const log = childLogger({ module: 'duration-updater' });
  * Fire-and-forget duration updater for live HLS downloads.
  * Never throws - all errors are caught and logged internally.
  */
-export async function updateVodDurationDuringDownload(ctx: TenantContext, dbId: number, vodId: string, platform: Platform, m3u8Path?: string, m3u8Content?: string): Promise<void> {
+export async function updateVodDurationDuringDownload(
+  ctx: TenantContext,
+  dbId: number,
+  vodId: string,
+  platform: Platform,
+  m3u8Path?: string,
+  m3u8Content?: string
+): Promise<void> {
   try {
     let duration: number | null = null;
 

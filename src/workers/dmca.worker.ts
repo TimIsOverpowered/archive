@@ -2,7 +2,14 @@ import { Processor, Job } from 'bullmq';
 import type { DmcaProcessingJob, DmcaProcessingResult } from './jobs/queues.js';
 import { queueYoutubeVodUpload } from './jobs/youtube.job.js';
 import type { DMCAClaim } from './dmca/dmca.js';
-import { isBlockingPolicy, buildMuteFilters, muteAudioSections, blackoutVideoSections, cleanupTempFiles, BlackoutSection } from './dmca/dmca.js';
+import {
+  isBlockingPolicy,
+  buildMuteFilters,
+  muteAudioSections,
+  blackoutVideoSections,
+  cleanupTempFiles,
+  BlackoutSection,
+} from './dmca/dmca.js';
 import { trimVideo as ffmpegTrim } from './utils/ffmpeg.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
@@ -47,7 +54,10 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     const downloadResult = Object.values(childResults)[0] as { finalPath?: string };
 
     if (!downloadResult?.finalPath) {
-      throw new Error(`File path not available for vodId=${vodId}, jobId=${job.id}: ` + `download job may have failed or not completed. Child results: ${JSON.stringify(childResults)}`);
+      throw new Error(
+        `File path not available for vodId=${vodId}, jobId=${job.id}: ` +
+          `download job may have failed or not completed. Child results: ${JSON.stringify(childResults)}`
+      );
     }
 
     filePath = downloadResult.finalPath;
@@ -95,11 +105,19 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
 
       log.info({ vodId, part }, 'Extracting part from VOD');
 
-      processedPath = await ffmpegTrim(filePath, startOffset, startOffset + splitDuration, `${vodId}-part-${part}`, () => {});
+      processedPath = await ffmpegTrim(
+        filePath,
+        startOffset,
+        startOffset + splitDuration,
+        `${vodId}-part-${part}`,
+        () => {}
+      );
     }
 
     const audioClaims = blockingClaims.filter((claim) => claim.type === 'CLAIM_TYPE_AUDIO');
-    const visualClaims = blockingClaims.filter((claim) => claim.type === 'CLAIM_TYPE_VISUAL' || claim.type === 'CLAIM_TYPE_AUDIOVISUAL');
+    const visualClaims = blockingClaims.filter(
+      (claim) => claim.type === 'CLAIM_TYPE_VISUAL' || claim.type === 'CLAIM_TYPE_AUDIOVISUAL'
+    );
 
     let intermediateMutedPath: string | null = null;
 
@@ -150,7 +168,16 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
 
     log.info({ vodId, part }, 'Queuing YouTube upload');
 
-    const jobId = await queueYoutubeVodUpload({ tenantId, config, db }, dbId, vodId, processedPath, platform as Platform, 'vod', undefined, part);
+    const jobId = await queueYoutubeVodUpload(
+      { tenantId, config, db },
+      dbId,
+      vodId,
+      processedPath,
+      platform as Platform,
+      'vod',
+      undefined,
+      part
+    );
 
     if (!jobId) {
       throw new Error('Failed to queue YouTube upload job');

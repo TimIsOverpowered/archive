@@ -139,11 +139,17 @@ const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, opti
     const errorMessage = details.message;
 
     if (isProduction) {
-      logger.fatal({ error: errorMessage }, 'Failed to connect to Redis - server cannot start in production without Redis');
+      logger.fatal(
+        { error: errorMessage },
+        'Failed to connect to Redis - server cannot start in production without Redis'
+      );
       throw error;
     }
 
-    logger.warn({ error: errorMessage }, 'Redis connection failed - running without Redis (rate limiting and caching disabled)');
+    logger.warn(
+      { error: errorMessage },
+      'Redis connection failed - running without Redis (rate limiting and caching disabled)'
+    );
   }
 };
 

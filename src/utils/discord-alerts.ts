@@ -236,7 +236,8 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
     success: 'Upload Completed Successfully',
   };
 
-  const embedStatus: AlertStatus = data.alertType === 'success' ? 'success' : data.alertType === 'failure' ? 'error' : 'warning';
+  const embedStatus: AlertStatus =
+    data.alertType === 'success' ? 'success' : data.alertType === 'failure' ? 'error' : 'warning';
 
   const fields: Array<{ name: string; value: string; inline?: boolean }> = [
     { name: 'Platform', value: capitalizePlatform(data.platform), inline: true },
@@ -276,7 +277,12 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
 /**
  * Send a VOD download started alert
  */
-export async function sendVodDownloadStarted(platform: Platform, tenantId: string, vodId: string, streamerName?: string): Promise<string | null> {
+export async function sendVodDownloadStarted(
+  platform: Platform,
+  tenantId: string,
+  vodId: string,
+  streamerName?: string
+): Promise<string | null> {
   if (!isAlertsEnabled()) return null;
 
   const name = streamerName || getTenantDisplayName(tenantId);
@@ -297,7 +303,13 @@ export async function sendVodDownloadStarted(platform: Platform, tenantId: strin
 /**
  * Send a VOD download success alert
  */
-export async function sendVodDownloadSuccess(messageId: string, platform: Platform, vodId: string, vodPath: string, _streamerName?: string): Promise<void> {
+export async function sendVodDownloadSuccess(
+  messageId: string,
+  platform: Platform,
+  vodId: string,
+  vodPath: string,
+  _streamerName?: string
+): Promise<void> {
   if (!isAlertsEnabled()) return;
 
   const platformName = capitalizePlatform(platform);
@@ -322,7 +334,13 @@ export async function sendVodDownloadSuccess(messageId: string, platform: Platfo
 /**
  * Update Discord alert with FFmpeg conversion progress (throttled to 25% intervals)
  */
-export async function updateFfmpegProgress(messageId: string, platform: Platform, vodId: string, percent: number, streamerName: string): Promise<void> {
+export async function updateFfmpegProgress(
+  messageId: string,
+  platform: Platform,
+  vodId: string,
+  percent: number,
+  streamerName: string
+): Promise<void> {
   if (!isAlertsEnabled()) return;
 
   const threshold = Math.floor(percent / 25) * 25;
@@ -351,7 +369,13 @@ export async function updateFfmpegProgress(messageId: string, platform: Platform
 /**
  * Send a VOD download failed alert
  */
-export async function sendVodDownloadFailed(messageId: string, platform: Platform, vodId: string, error: string, _tenantId?: string): Promise<void> {
+export async function sendVodDownloadFailed(
+  messageId: string,
+  platform: Platform,
+  vodId: string,
+  error: string,
+  _tenantId?: string
+): Promise<void> {
   if (!isAlertsEnabled()) return;
 
   const platformName = capitalizePlatform(platform);

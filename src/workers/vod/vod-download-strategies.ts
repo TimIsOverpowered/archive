@@ -5,14 +5,25 @@ import type { AppLogger } from '../../utils/logger.js';
 import type { TenantConfig } from '../../config/types.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { request } from '../../utils/http-client.js';
-import { sendVodDownloadFailed, sendVodDownloadStarted, sendVodDownloadSuccess, updateFfmpegProgress } from '../../utils/discord-alerts.js';
+import {
+  sendVodDownloadFailed,
+  sendVodDownloadStarted,
+  sendVodDownloadSuccess,
+  updateFfmpegProgress,
+} from '../../utils/discord-alerts.js';
 import { extractErrorDetails } from '../../utils/error.js';
 
 export interface VodDownloadResult {
   finalPath: string;
 }
 
-export async function downloadVodWithFfmpeg(platform: Platform, vodId: string, finalPath: string, config: TenantConfig, log: AppLogger): Promise<VodDownloadResult> {
+export async function downloadVodWithFfmpeg(
+  platform: Platform,
+  vodId: string,
+  finalPath: string,
+  config: TenantConfig,
+  log: AppLogger
+): Promise<VodDownloadResult> {
   log.info({ vodId, platform, method: 'ffmpeg' }, `Starting ffmpeg download for ${vodId}`);
 
   if (platform === PLATFORMS.KICK) {
@@ -27,7 +38,12 @@ export async function downloadVodWithFfmpeg(platform: Platform, vodId: string, f
   return { finalPath };
 }
 
-async function downloadKickVodWithFfmpeg(vodId: string, finalPath: string, config: TenantConfig, log: AppLogger): Promise<void> {
+async function downloadKickVodWithFfmpeg(
+  vodId: string,
+  finalPath: string,
+  config: TenantConfig,
+  log: AppLogger
+): Promise<void> {
   const username = config?.kick?.username;
 
   if (!username) {
@@ -80,7 +96,12 @@ async function downloadKickVodWithFfmpeg(vodId: string, finalPath: string, confi
   }
 }
 
-async function downloadTwitchVodWithFfmpeg(vodId: string, finalPath: string, config: TenantConfig, log: AppLogger): Promise<void> {
+async function downloadTwitchVodWithFfmpeg(
+  vodId: string,
+  finalPath: string,
+  config: TenantConfig,
+  log: AppLogger
+): Promise<void> {
   const tenantId = config.id;
   if (!config?.settings.vodPath) {
     throw new Error(`No vodPath configured for streamer ${tenantId}`);

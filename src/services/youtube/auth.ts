@@ -64,9 +64,13 @@ function getYoutubeCredentials(tenantId: string): DecryptedYoutubeCreds | null {
         const timeUntilExpiry = authObj.expiry_date - now;
 
         if (timeUntilExpiry < 0) {
-          logger.info(`[YouTube] Cached access token expired ${Math.abs(timeUntilExpiry / 1000).toFixed(0)}s ago, will refresh on next API call`);
+          logger.info(
+            `[YouTube] Cached access token expired ${Math.abs(timeUntilExpiry / 1000).toFixed(0)}s ago, will refresh on next API call`
+          );
         } else {
-          logger.info(`[YouTube] Access token expiring in ${(timeUntilExpiry / 1000).toFixed(0)}s (<60s buffer), forcing refresh for safety`);
+          logger.info(
+            `[YouTube] Access token expiring in ${(timeUntilExpiry / 1000).toFixed(0)}s (<60s buffer), forcing refresh for safety`
+          );
         }
       }
     } else if (authObj.access_token) {
@@ -82,7 +86,12 @@ function getYoutubeCredentials(tenantId: string): DecryptedYoutubeCreds | null {
   }
 }
 
-async function updateYoutubeTokenInDb(tenantId: string, newAccessToken: string, newExpiryDate: number, refreshToken: string): Promise<void> {
+async function updateYoutubeTokenInDb(
+  tenantId: string,
+  newAccessToken: string,
+  newExpiryDate: number,
+  refreshToken: string
+): Promise<void> {
   const logger = createAutoLogger('youtube-auth');
   const config = getTenantConfig(tenantId);
   if (!config?.youtube?.auth) {
@@ -144,7 +153,12 @@ async function refreshToken(
 
     if (credentials.refresh_token) {
       try {
-        await updateYoutubeTokenInDb(tenantId, credentials.access_token, credentials.expiry_date, credentials.refresh_token);
+        await updateYoutubeTokenInDb(
+          tenantId,
+          credentials.access_token,
+          credentials.expiry_date,
+          credentials.refresh_token
+        );
       } catch (err) {
         const { message } = extractErrorDetails(err);
         logger.warn({ tenantId, error: message }, 'Failed to update YouTube token in database');
@@ -162,7 +176,9 @@ async function refreshToken(
     const details = extractErrorDetails(error);
 
     if (details.message.includes('invalid_grant') || details.message.includes('token_expired')) {
-      throw new Error(`YouTube token refresh failed for ${tenantId} - re-authentication required. Original error: ${details.message}`);
+      throw new Error(
+        `YouTube token refresh failed for ${tenantId} - re-authentication required. Original error: ${details.message}`
+      );
     }
 
     throw error;

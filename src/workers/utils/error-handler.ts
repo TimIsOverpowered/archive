@@ -31,7 +31,12 @@ const DEFAULT_OPTIONS: Required<WorkerErrorHandlerOptions> = {
  * @param options - Handler options
  * @returns Formatted error message ready for alerts
  */
-export function handleWorkerError(error: unknown, log: AppLogger, context: WorkerErrorContext = {}, options: WorkerErrorHandlerOptions = {}): string {
+export function handleWorkerError(
+  error: unknown,
+  log: AppLogger,
+  context: WorkerErrorContext = {},
+  options: WorkerErrorHandlerOptions = {}
+): string {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const details = extractErrorDetails(error);
   const errorMsg = details.message.substring(0, opts.maxMessageLength);

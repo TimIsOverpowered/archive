@@ -23,7 +23,11 @@ export class ProgressStream extends stream.Transform {
     this.onProgress = onProgress;
   }
 
-  _transform(chunk: Buffer | string, encoding: BufferEncoding, callback: (error?: Error | null, data?: Buffer | string) => void): void {
+  _transform(
+    chunk: Buffer | string,
+    encoding: BufferEncoding,
+    callback: (error?: Error | null, data?: Buffer | string) => void
+  ): void {
     const byteLength = Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(chunk, encoding);
     this.bytesUploaded += byteLength;
 

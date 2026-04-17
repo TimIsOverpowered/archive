@@ -103,7 +103,8 @@ export async function getTenantStats(client: PrismaClient, tenantId: string, cac
     });
     const lastUploadDate = lastUploadDateResult.length > 0 ? lastUploadDateResult[0].created_at : null;
 
-    const uploadSuccessRate = totalUploadsResult > 0 ? Math.round((completedUploads / totalUploadsResult) * 1000) / 10 : 0;
+    const uploadSuccessRate =
+      totalUploadsResult > 0 ? Math.round((completedUploads / totalUploadsResult) * 1000) / 10 : 0;
 
     const uniqueGames = new Set(uniqueGamesCount.map((g) => g.game_id));
 

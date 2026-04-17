@@ -26,6 +26,7 @@
   "scripts": {
     "test": "npm run lint && npm run test:node",
     "lint": "eslint \"src/**/*.ts\" --fix",
+    "fix:": "npm run format && npm run lint",
     "format": "prettier --write \"src/**/*.ts\"",
     "test:node": "node --test --import tsx --test-timeout 10000 --test-concurrency true \"test/**/*.test.ts\"",
     "build": "tsc",
