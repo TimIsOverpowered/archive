@@ -7,6 +7,7 @@ import { closeRedisClient } from './api/plugins/redis.plugin';
 import { extractErrorDetails } from './utils/error.js';
 import { startCloudflareIpRangesCron } from './cron/cloudflare-ip-ranges.js';
 import { getCachedRangeInfo, getCloudflareIpRanges } from './utils/cloudflare-ip-validator.js';
+import { releaseBrowser } from './utils/puppeteer-manager.js';
 
 const config = loadApiConfig();
 const PORT = config.PORT;
@@ -67,7 +68,6 @@ async function shutdown(signal: string) {
 
   try {
     // Release Puppeteer browser if instantiated (no-op if null)
-    const { releaseBrowser } = await import('./utils/puppeteer-manager.js');
     await releaseBrowser();
     logger.info('Puppeteer browser released');
 

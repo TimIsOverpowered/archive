@@ -10,6 +10,7 @@ import { logger as baseLogger } from '../utils/logger.js';
 import { AllJobData, WORKER_DEFINITIONS, WorkerName } from './worker-definitions.js';
 import { createWorker } from './create-worker.js';
 import { loadWorkersConfig } from '../config/env.js';
+import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/client.js';
 
 const logger = baseLogger;
 const workerConfig = loadWorkersConfig();
@@ -165,8 +166,7 @@ async function bootstrap() {
 
     await startMonitorService();
 
-    const { startClientCleanup: startDbClientCleanup } = await import('../db/client.js');
-    startDbClientCleanup();
+    startClientCleanup();
     logger.info('DB client cleanup started');
 
     logger.info('All workers started successfully');
@@ -188,7 +188,6 @@ function registerShutdownHandlers() {
 
     await closeQueues();
 
-    const { closeAllClients, stopClientCleanup } = await import('../db/client.js');
     await stopClientCleanup();
     await closeAllClients();
     await closeWorkersRedis();

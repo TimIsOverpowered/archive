@@ -3,6 +3,7 @@ import { startStreamDetectionLoop } from './stream-detector.js';
 import { logger } from '../../utils/logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { PLATFORMS } from '../../types/platforms.js';
+import { releaseBrowser } from '../../utils/puppeteer-manager.js';
 
 /**
  * Main entry point - loads ALL tenant configs and starts concurrent monitoring loops
@@ -63,7 +64,6 @@ export async function stopMonitorService(): Promise<void> {
 
   // Close Kick Puppeteer browser instance if it exists
   try {
-    const { releaseBrowser } = await import('../../utils/puppeteer-manager.js');
     await releaseBrowser();
     logger.info('[Monitor] Released puppeteer browser instance');
   } catch (err) {
