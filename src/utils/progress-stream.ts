@@ -14,8 +14,8 @@ export class ProgressStream extends stream.Transform {
     this.onProgress = onProgress;
   }
 
-  _transform(chunk: Buffer | string, encoding: string, callback: (error?: Error | null, data?: any) => void): void {
-    const byteLength = Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(chunk);
+  _transform(chunk: Buffer | string, encoding: BufferEncoding, callback: (error?: Error | null, data?: Buffer | string) => void): void {
+    const byteLength = Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(chunk, encoding);
     this.bytesUploaded += byteLength;
 
     const percent = Math.min(Math.round((this.bytesUploaded / this.fileSize) * 100), 100);
