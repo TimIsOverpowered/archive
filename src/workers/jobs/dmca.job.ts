@@ -1,4 +1,4 @@
-import { flowProducer, getDmcaProcessingQueue, getStandardVodQueue, dmcaJobOptions } from './queues.js';
+import { defaultJobOptions, flowProducer, getDmcaProcessingQueue, getStandardVodQueue } from './queues.js';
 import type { DmcaProcessingJob } from './queues.js';
 import { childLogger } from '../../utils/logger.js';
 import type { Platform, SourceType } from '../../types/platforms.js';
@@ -42,7 +42,7 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
         opts: {
           jobId,
           deduplication: { id: jobId },
-          ...dmcaJobOptions,
+          ...defaultJobOptions,
         },
         children: [
           {
@@ -61,7 +61,7 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
     const addedJob = await getDmcaProcessingQueue().add('dmca_processing', job, {
       jobId,
       deduplication: { id: jobId },
-      ...dmcaJobOptions,
+      ...defaultJobOptions,
     });
 
     const resultJobId = addedJob.id ?? null;

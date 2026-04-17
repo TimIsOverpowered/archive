@@ -126,26 +126,11 @@ export const QUEUE_NAMES = {
 } as const;
 
 export const defaultJobOptions = {
-  attempts: 3,
+  attempts: 2,
   backoff: { type: 'exponential' as const, delay: 5000 },
   removeOnComplete: true,
   removeOnFail: true,
 };
-
-export const youtubeJobOptions = {
-  ...defaultJobOptions,
-  attempts: 5,
-};
-
-export const dmcaJobOptions = {
-  attempts: 3,
-  backoff: {
-    type: 'exponential' as const,
-    delay: 5000,
-  },
-  removeOnComplete: true,
-  removeOnFail: true,
-} as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const queueCache = new Map<string, Queue<any, any, string>>();
@@ -183,11 +168,11 @@ export function getChatDownloadQueue(): Queue<ChatDownloadJob, ChatDownloadJob, 
 }
 
 export function getYoutubeUploadQueue(): Queue<YoutubeUploadJob, YoutubeUploadJob, string> {
-  return getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD, youtubeJobOptions);
+  return getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD);
 }
 
 export function getDmcaProcessingQueue(): Queue<DmcaProcessingJob, DmcaProcessingJob, string> {
-  return getQueue(QUEUE_NAMES.DMCA_PROCESSING, dmcaJobOptions);
+  return getQueue(QUEUE_NAMES.DMCA_PROCESSING);
 }
 
 export interface JobLogger {
