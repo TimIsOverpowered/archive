@@ -29,7 +29,9 @@ export function extractErrorDetails(error: unknown): ErrorDetails {
 
   if (error && typeof error === 'object' && !Array.isArray(error)) {
     const props = Object.getOwnPropertyNames(error);
-    const errorMessage = props.includes('message') ? String((error as Record<string, unknown>).message) : JSON.stringify(error, props);
+    const errorMessage = props.includes('message')
+      ? String((error as Record<string, unknown>).message)
+      : JSON.stringify(error, props);
     return { message: errorMessage };
   }
 
@@ -44,7 +46,10 @@ export function extractErrorDetails(error: unknown): ErrorDetails {
  * @param additionalContext - Optional additional context to include in the log object
  * @returns A log context object with the error message
  */
-export function createErrorContext(error: unknown, additionalContext?: Record<string, unknown>): { error: string } & Record<string, unknown> {
+export function createErrorContext(
+  error: unknown,
+  additionalContext?: Record<string, unknown>
+): { error: string } & Record<string, unknown> {
   const details = extractErrorDetails(error);
   const context = { ...additionalContext, error: details.message };
   return context as { error: string } & Record<string, unknown>;

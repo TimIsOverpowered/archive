@@ -66,7 +66,11 @@ export async function getWorkersHealth(): Promise<Record<string, WorkerHealthSta
 
       let status: 'healthy' | 'warning' | 'error' = 'healthy';
 
-      if (lastFailed?.attemptsMade !== undefined && lastFailed.maxAttempts > 0 && lastFailed.attemptsMade >= lastFailed.maxAttempts) {
+      if (
+        lastFailed?.attemptsMade !== undefined &&
+        lastFailed.maxAttempts > 0 &&
+        lastFailed.attemptsMade >= lastFailed.maxAttempts
+      ) {
         status = 'error';
       } else if ((counts.failed ?? 0) > 0 || (counts.paused ?? 0) > 0) {
         status = 'warning';

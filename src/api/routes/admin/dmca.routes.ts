@@ -1,12 +1,22 @@
 import { FastifyInstance } from 'fastify';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform.js';
+import {
+  tenantMiddleware,
+  platformValidationMiddleware,
+  type TenantPlatformContext,
+} from '../../middleware/tenant-platform.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod } from '../../../types/platforms.js';
-import { PLATFORM_VALUES, SOURCE_TYPES, SOURCE_TYPES_VALUES, DOWNLOAD_METHODS_VALUES, DOWNLOAD_METHODS } from '../../../types/platforms.js';
+import {
+  PLATFORM_VALUES,
+  SOURCE_TYPES,
+  SOURCE_TYPES_VALUES,
+  DOWNLOAD_METHODS_VALUES,
+  DOWNLOAD_METHODS,
+} from '../../../types/platforms.js';
 import { findVodRecord, ensureVodDownload } from './utils/vod-helpers.js';
 import { queueDmcaProcessing } from '../../../workers/jobs/dmca.job.js';
 
@@ -39,8 +49,13 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
     {
       schema: {
         tags: ['Admin'],
-        description: 'Ensure VOD download, then queue DMCA processing (mutes audio/blackouts video based on claims). If part is provided, only that part is processed and uploaded.',
-        params: { type: 'object', properties: { tenantId: { type: 'string', description: 'Tenant ID' } }, required: ['tenantId'] },
+        description:
+          'Ensure VOD download, then queue DMCA processing (mutes audio/blackouts video based on claims). If part is provided, only that part is processed and uploaded.',
+        params: {
+          type: 'object',
+          properties: { tenantId: { type: 'string', description: 'Tenant ID' } },
+          required: ['tenantId'],
+        },
         body: {
           type: 'object',
           properties: {
@@ -87,7 +102,9 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
       });
 
       // Step 3: Parse claims (lenient - no validation)
-      const claimsArray = Array.isArray(claims) ? claims : JSON.parse(typeof claims === 'string' ? claims : JSON.stringify(claims));
+      const claimsArray = Array.isArray(claims)
+        ? claims
+        : JSON.parse(typeof claims === 'string' ? claims : JSON.stringify(claims));
 
       // Step 4: Queue DMCA processing (chained to download if needed)
       const dmcaJobId = await queueDmcaProcessing({

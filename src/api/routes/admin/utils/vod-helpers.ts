@@ -49,7 +49,10 @@ export interface EnsureVodDownloadResponse {
  * Validates and extracts platform configuration from context
  * Returns null if platform is not configured for tenant
  */
-function validatePlatformConfig(ctx: TenantPlatformContext, platform: Platform): { platformUserId: string; platformUsername: string } | null {
+function validatePlatformConfig(
+  ctx: TenantPlatformContext,
+  platform: Platform
+): { platformUserId: string; platformUsername: string } | null {
   const config = ctx.config?.[platform];
 
   const platformUserId = config?.id;
@@ -65,7 +68,11 @@ function validatePlatformConfig(ctx: TenantPlatformContext, platform: Platform):
 /**
  * Fetches VOD record or returns null if not found
  */
-export async function findVodRecord(client: PrismaClient, vodId: string, platform: Platform): Promise<VodRecord | null> {
+export async function findVodRecord(
+  client: PrismaClient,
+  vodId: string,
+  platform: Platform
+): Promise<VodRecord | null> {
   try {
     return await client.vod.findUnique({ where: { platform_vod_id: { platform, vod_id: vodId } } });
   } catch {
@@ -76,7 +83,11 @@ export async function findVodRecord(client: PrismaClient, vodId: string, platfor
 /**
  * Fetches VOD record by stream_id or returns null if not found
  */
-export async function findStreamRecord(client: PrismaClient, streamId: string, platform: Platform): Promise<VodRecord | null> {
+export async function findStreamRecord(
+  client: PrismaClient,
+  streamId: string,
+  platform: Platform
+): Promise<VodRecord | null> {
   try {
     return await client.vod.findFirst({ where: { platform, stream_id: streamId } });
   } catch {
@@ -99,7 +110,8 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
   const { platformUserId, platformUsername } = platformConfig;
 
   // Determine file path based on type
-  const filePath = type === SOURCE_TYPES.LIVE ? getLiveFilePath({ config, streamId: vodId }) : getVodFilePath({ config, vodId });
+  const filePath =
+    type === SOURCE_TYPES.LIVE ? getLiveFilePath({ config, streamId: vodId }) : getVodFilePath({ config, vodId });
 
   // Check if VOD record needs metadata refresh (duration = 0)
   let vodRecord = await db.vod.findUnique({ where: { id: dbId } });
@@ -119,7 +131,15 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
 
   log.info({ vodId, filePath, type }, 'Queuing VOD download');
 
-  const jobId = await triggerVodDownload(tenantId, dbId, vodId, platform, platformUserId, platformUsername, downloadMethod);
+  const jobId = await triggerVodDownload(
+    tenantId,
+    dbId,
+    vodId,
+    platform,
+    platformUserId,
+    platformUsername,
+    downloadMethod
+  );
 
   log.info({ jobId, vodId, filePath, type }, 'VOD download queued');
   return { filePath, jobId };
@@ -128,7 +148,12 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
 /**
  * Checks if a VOD file needs to be downloaded (missing or duration mismatch).
  */
-async function checkIfDownloadNeeded(filePath: string, dbId: number, vodRecord: VodRecord, log: AppLogger): Promise<boolean> {
+async function checkIfDownloadNeeded(
+  filePath: string,
+  dbId: number,
+  vodRecord: VodRecord,
+  log: AppLogger
+): Promise<boolean> {
   const exists = await fileExists(filePath);
   if (!exists) {
     log.debug({ filePath }, 'File does not exist');
@@ -156,7 +181,11 @@ async function checkIfDownloadNeeded(filePath: string, dbId: number, vodRecord: 
  * Ensures a VOD record exists in the database, creating it from platform API if needed
  * Returns null if VOD cannot be found or created
  */
-export async function ensureVodRecord(ctx: TenantPlatformContext, vodId: string, log: AppLogger): Promise<VodRecord | null> {
+export async function ensureVodRecord(
+  ctx: TenantPlatformContext,
+  vodId: string,
+  log: AppLogger
+): Promise<VodRecord | null> {
   const { db, tenantId, config, platform } = ctx;
 
   const platformConfig = validatePlatformConfig(ctx, platform);
@@ -194,7 +223,15 @@ export async function ensureVodRecord(ctx: TenantPlatformContext, vodId: string,
   if (platform === 'twitch') {
     await saveVodChapters(ctx, vodRecord.id, vodRecord.vod_id, vodRecord.duration);
     await fetchAndSaveEmotes(ctx, vodRecord.id, platform, platformUserId);
-    triggerChatDownload(tenantId, platformUserId, vodRecord.id, vodId, platform, Math.round(vodRecord.duration), config?.[platform]?.username);
+    triggerChatDownload(
+      tenantId,
+      platformUserId,
+      vodRecord.id,
+      vodId,
+      platform,
+      Math.round(vodRecord.duration),
+      config?.[platform]?.username
+    );
   }
 
   log.info({ vodId, platform, duration: vodRecord.duration }, 'VOD record created');
@@ -206,7 +243,14 @@ export async function ensureVodRecord(ctx: TenantPlatformContext, vodId: string,
  * Refreshes VOD record metadata from platform API
  * Returns null if VOD cannot be found or refreshed
  */
-export async function refreshVodRecord(ctx: TenantPlatformContext, vodId: string, dbId: number, platformUserId: string, platformUsername: string, log: AppLogger): Promise<VodRecord | null> {
+export async function refreshVodRecord(
+  ctx: TenantPlatformContext,
+  vodId: string,
+  dbId: number,
+  platformUserId: string,
+  platformUsername: string,
+  log: AppLogger
+): Promise<VodRecord | null> {
   const { db, tenantId, platform } = ctx;
 
   const strategy = getStrategy(platform);
@@ -233,7 +277,15 @@ export async function refreshVodRecord(ctx: TenantPlatformContext, vodId: string
   if (platform === 'twitch') {
     await saveVodChapters(ctx, updatedRecord.id, updatedRecord.vod_id, updatedRecord.duration);
     await fetchAndSaveEmotes(ctx, updatedRecord.id, platform, platformUserId);
-    triggerChatDownload(tenantId, platformUserId, updatedRecord.id, vodId, platform, Math.round(updatedRecord.duration), platformUsername);
+    triggerChatDownload(
+      tenantId,
+      platformUserId,
+      updatedRecord.id,
+      vodId,
+      platform,
+      Math.round(updatedRecord.duration),
+      platformUsername
+    );
   }
 
   return updatedRecord;

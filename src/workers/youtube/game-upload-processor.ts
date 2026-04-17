@@ -50,7 +50,19 @@ export async function processGameUpload(ctx: GameUploadContext): Promise<GameUpl
 }
 
 async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: string): Promise<GameUploadResult> {
-  const { tenantId, dbId, chapterStart, chapterEnd, chapterGameId, title, description, db, chapterName, vodId, config } = ctx;
+  const {
+    tenantId,
+    dbId,
+    chapterStart,
+    chapterEnd,
+    chapterGameId,
+    title,
+    description,
+    db,
+    chapterName,
+    vodId,
+    config,
+  } = ctx;
   const channelName = config.displayName || tenantId;
   const duration = chapterEnd - chapterStart;
 
@@ -76,7 +88,16 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
       })
     : () => {};
 
-  const result = await uploadVideo(tenantId, channelName, trimmedPath, title, description, 'public', onUploadProgress, duration);
+  const result = await uploadVideo(
+    tenantId,
+    channelName,
+    trimmedPath,
+    title,
+    description,
+    'public',
+    onUploadProgress,
+    duration
+  );
 
   const createdGameRecord = await db.game.create({
     data: {
@@ -97,7 +118,11 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
   return { success: true, videoId: result.videoId, gameId: String(createdGameRecord.id) };
 }
 
-async function processSplitGameUpload(ctx: GameUploadContext, trimmedPath: string, trimmedDuration: number): Promise<GameUploadResult> {
+async function processSplitGameUpload(
+  ctx: GameUploadContext,
+  trimmedPath: string,
+  trimmedDuration: number
+): Promise<GameUploadResult> {
   const { tenantId, dbId, chapterStart, chapterGameId, chapterName, title, description, config, db, vodId } = ctx;
   const totalParts = Math.ceil(trimmedDuration / YOUTUBE_MAX_DURATION);
 
@@ -113,18 +138,25 @@ async function processSplitGameUpload(ctx: GameUploadContext, trimmedPath: strin
     timestamp: new Date().toISOString(),
   });
 
-  const splitPaths = await splitVideo(trimmedPath, trimmedDuration, YOUTUBE_MAX_DURATION, `${vodId}-game`, (percent: number) => {
-    void updateAlert(splitAlertMessageId, {
-      title: `✂️ Splitting Game Clip`,
-      description: `${tenantId} - Game clip exceeds YouTube max duration`,
-      status: 'warning',
-      fields: [{ name: 'Progress', value: createProgressBar(percent), inline: false }],
-      timestamp: new Date().toISOString(),
-      updatedTimestamp: new Date().toISOString(),
-    });
-  });
+  const splitPaths = await splitVideo(
+    trimmedPath,
+    trimmedDuration,
+    YOUTUBE_MAX_DURATION,
+    `${vodId}-game`,
+    (percent: number) => {
+      void updateAlert(splitAlertMessageId, {
+        title: `✂️ Splitting Game Clip`,
+        description: `${tenantId} - Game clip exceeds YouTube max duration`,
+        status: 'warning',
+        fields: [{ name: 'Progress', value: createProgressBar(percent), inline: false }],
+        timestamp: new Date().toISOString(),
+        updatedTimestamp: new Date().toISOString(),
+      });
+    }
+  );
 
-  const uploadedGameVideos: Array<{ id: string; part: number; startTime: number; endTime: number; gameId: string }> = [];
+  const uploadedGameVideos: Array<{ id: string; part: number; startTime: number; endTime: number; gameId: string }> =
+    [];
 
   for (let i = 0; i < totalParts; i++) {
     const currentPartNum = i + 1;
@@ -158,7 +190,16 @@ async function processSplitGameUpload(ctx: GameUploadContext, trimmedPath: strin
         })
       : () => {};
 
-    const result = await uploadVideo(tenantId, config.displayName || tenantId, splitPaths[i], partTitle, description, 'public', onUploadProgress, partDuration);
+    const result = await uploadVideo(
+      tenantId,
+      config.displayName || tenantId,
+      splitPaths[i],
+      partTitle,
+      description,
+      'public',
+      onUploadProgress,
+      partDuration
+    );
 
     const createdGameRecord = await db.game.create({
       data: {

@@ -27,7 +27,10 @@ export async function flushChatBatch(options: FlushBatchOptions): Promise<FlushB
     return { totalMessages, batchCount };
   }
 
-  await retryWithBackoff(() => db.chatMessage.createMany({ data: buffer, skipDuplicates: true }), { attempts: CHAT_MAX_RETRIES, baseDelayMs: CHAT_RETRY_DELAY_MS });
+  await retryWithBackoff(() => db.chatMessage.createMany({ data: buffer, skipDuplicates: true }), {
+    attempts: CHAT_MAX_RETRIES,
+    baseDelayMs: CHAT_RETRY_DELAY_MS,
+  });
 
   const newTotalMessages = totalMessages + buffer.length;
   const newBatchCount = batchCount + 1;

@@ -10,7 +10,13 @@ const log = logger.child({ module: 'puppeteer-manager' });
 
 type BrowserResult = Awaited<ReturnType<typeof connect>>;
 
-export type NavigationErrorCode = 'NAVIGATION_TIMEOUT' | 'CAPTCHA_DETECTED' | 'INVALID_JSON_RESPONSE' | 'HTTP_ERROR' | 'NETWORK_ERROR' | 'MAX_RETRIES_EXCEEDED';
+export type NavigationErrorCode =
+  | 'NAVIGATION_TIMEOUT'
+  | 'CAPTCHA_DETECTED'
+  | 'INVALID_JSON_RESPONSE'
+  | 'HTTP_ERROR'
+  | 'NETWORK_ERROR'
+  | 'MAX_RETRIES_EXCEEDED';
 
 interface FailureResult {
   success: false;
@@ -123,7 +129,8 @@ export async function navigateToUrl<T = unknown>(url: string, options?: Navigate
             () => {
               const text = document.body.innerText.trim();
               const hasJson = text.startsWith('[') || text.startsWith('{');
-              const isBlocked = !!document.querySelector('#turnstile-wrapper') || document.title.includes('Just a moment');
+              const isBlocked =
+                !!document.querySelector('#turnstile-wrapper') || document.title.includes('Just a moment');
               return hasJson || isBlocked;
             },
             { timeout: 10000 }
@@ -179,7 +186,10 @@ export async function navigateToUrl<T = unknown>(url: string, options?: Navigate
                 try {
                   finalData = JSON.parse(preContent);
                 } catch (parseError) {
-                  log.debug({ error: extractErrorDetails(parseError).message }, 'Failed to parse <pre> content as JSON');
+                  log.debug(
+                    { error: extractErrorDetails(parseError).message },
+                    'Failed to parse <pre> content as JSON'
+                  );
                 }
               } else if (!finalData && pageState.content.length === 0) {
                 log.trace('No valid JSON found in response or DOM extraction failed');
@@ -253,7 +263,10 @@ export async function releaseBrowser(): Promise<void> {
   try {
     log.info({ pid }, 'Attempting graceful browser shutdown...');
 
-    await Promise.race([browser.close(), new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Browser close timed out')), timeoutMs))]);
+    await Promise.race([
+      browser.close(),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Browser close timed out')), timeoutMs)),
+    ]);
 
     log.info('Browser closed gracefully');
   } catch (error) {

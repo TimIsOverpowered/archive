@@ -17,7 +17,11 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
       schema: {
         tags: ['Badges'],
         description: 'Get Twitch badges for a channel (global + subscriber)',
-        params: { type: 'object', properties: { tenantId: { type: 'string', description: 'Tenant ID' } }, required: ['tenantId'] },
+        params: {
+          type: 'object',
+          properties: { tenantId: { type: 'string', description: 'Tenant ID' } },
+          required: ['tenantId'],
+        },
       },
     },
     async (request: FastifyRequest<{ Params: { tenantId: string }; Body?: unknown }>): Promise<unknown> => {
@@ -45,7 +49,10 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
 
       // Fetch from Twitch API on cache miss
       try {
-        const [channelBadges, globalBadges] = await Promise.all([getChannelBadges(tenantId).catch(() => null), getGlobalBadges(tenantId).catch(() => null)]);
+        const [channelBadges, globalBadges] = await Promise.all([
+          getChannelBadges(tenantId).catch(() => null),
+          getGlobalBadges(tenantId).catch(() => null),
+        ]);
 
         const badgesData = { channel: channelBadges || null, global: globalBadges || null };
 

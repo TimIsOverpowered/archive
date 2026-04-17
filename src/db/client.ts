@@ -12,7 +12,15 @@ const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) 
     query: {
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
-          const isMutation = ['create', 'update', 'upsert', 'delete', 'createMany', 'updateMany', 'deleteMany'].includes(operation);
+          const isMutation = [
+            'create',
+            'update',
+            'upsert',
+            'delete',
+            'createMany',
+            'updateMany',
+            'deleteMany',
+          ].includes(operation);
           const isRelevantModel = ['Vod', 'VodUpload', 'Chapter', 'Game'].includes(model);
 
           if (!isMutation || !isRelevantModel) {
@@ -45,12 +53,18 @@ const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) 
                 const data = (args as { data?: unknown[] }).data;
                 if (Array.isArray(data) && data.length > 0) {
                   const extractedIds = data
-                    .filter((item): item is Record<string, unknown> => item != null && typeof item === 'object' && 'id' in (item as Record<string, unknown>))
+                    .filter(
+                      (item): item is Record<string, unknown> =>
+                        item != null && typeof item === 'object' && 'id' in (item as Record<string, unknown>)
+                    )
                     .map((item) => Number((item as { id: unknown }).id))
                     .filter((id) => !isNaN(id));
 
                   if (extractedIds.length === 0 && data.length > 0) {
-                    logger.debug({ tenantId, operation, recordCount: data.length }, 'Vod.createMany called without explicit IDs — tenant list cache will be invalidated instead');
+                    logger.debug(
+                      { tenantId, operation, recordCount: data.length },
+                      'Vod.createMany called without explicit IDs — tenant list cache will be invalidated instead'
+                    );
                   }
 
                   affectedVodIds.push(...extractedIds);
@@ -79,7 +93,10 @@ const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) 
                     const numId = Number(vodIdClause);
                     if (!isNaN(numId)) {
                       invalidateEmoteCache(tenantId, numId).catch((error) => {
-                        logger.warn({ tenantId, vodId: numId, error: extractErrorDetails(error) }, 'Emote cache invalidation failed');
+                        logger.warn(
+                          { tenantId, vodId: numId, error: extractErrorDetails(error) },
+                          'Emote cache invalidation failed'
+                        );
                       });
                     }
                   }
@@ -90,7 +107,10 @@ const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) 
                   const numId = Number((data as { vod_id: unknown }).vod_id);
                   if (!isNaN(numId)) {
                     invalidateEmoteCache(tenantId, numId).catch((error) => {
-                      logger.warn({ tenantId, vodId: numId, error: extractErrorDetails(error) }, 'Emote cache invalidation failed');
+                      logger.warn(
+                        { tenantId, vodId: numId, error: extractErrorDetails(error) },
+                        'Emote cache invalidation failed'
+                      );
                     });
                   }
                 }
@@ -121,7 +141,10 @@ const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) 
                 if (Array.isArray(data) && data.length > 0) {
                   affectedVodIds.push(
                     ...data
-                      .filter((item): item is Record<string, unknown> => item != null && typeof item === 'object' && 'vod_id' in (item as Record<string, unknown>))
+                      .filter(
+                        (item): item is Record<string, unknown> =>
+                          item != null && typeof item === 'object' && 'vod_id' in (item as Record<string, unknown>)
+                      )
                       .map((item) => Number((item as { vod_id: unknown }).vod_id))
                       .filter((id) => !isNaN(id))
                   );
@@ -423,7 +446,12 @@ export async function ensureClient(tenantId: string, config: TenantConfig): Prom
 /**
  * Wrap DB operation with automatic retry on connection failure
  */
-export async function withDbRetry<T>(tenantId: string, config: TenantConfig, operation: (db: PrismaClient) => Promise<T>, options: { maxRetries?: number; retryDelayMs?: number } = {}): Promise<T> {
+export async function withDbRetry<T>(
+  tenantId: string,
+  config: TenantConfig,
+  operation: (db: PrismaClient) => Promise<T>,
+  options: { maxRetries?: number; retryDelayMs?: number } = {}
+): Promise<T> {
   const { maxRetries = 2, retryDelayMs = 1000 } = options;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {

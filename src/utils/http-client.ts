@@ -20,7 +20,15 @@ export interface RequestOptions<R extends ResponseType = 'json'> {
   signal?: AbortSignal;
 }
 
-export type RequestResult<T, R extends ResponseType> = R extends 'json' ? T : R extends 'text' ? string : R extends 'blob' ? Blob : R extends 'arrayBuffer' ? ArrayBuffer : Response;
+export type RequestResult<T, R extends ResponseType> = R extends 'json'
+  ? T
+  : R extends 'text'
+    ? string
+    : R extends 'blob'
+      ? Blob
+      : R extends 'arrayBuffer'
+        ? ArrayBuffer
+        : Response;
 
 function scrubSensitiveParams(url: string): string {
   try {
@@ -50,7 +58,13 @@ function prepareBodyAndHeaders(
     return { body: undefined, headers };
   }
 
-  if (typeof body === 'object' && !ArrayBuffer.isView(body) && !(body instanceof ArrayBuffer) && !(body instanceof FormData) && !(body instanceof Blob)) {
+  if (
+    typeof body === 'object' &&
+    !ArrayBuffer.isView(body) &&
+    !(body instanceof ArrayBuffer) &&
+    !(body instanceof FormData) &&
+    !(body instanceof Blob)
+  ) {
     return {
       body: JSON.stringify(body),
       headers: { 'Content-Type': 'application/json', ...headers },
@@ -82,8 +96,19 @@ export function request(url: string | URL, options: RequestOptions<'text'>): Pro
 export function request(url: string | URL, options: RequestOptions<'blob'>): Promise<Blob>;
 export function request(url: string | URL, options: RequestOptions<'arrayBuffer'>): Promise<ArrayBuffer>;
 export function request(url: string | URL, options: RequestOptions<'response'>): Promise<Response>;
-export async function request<T = unknown, R extends ResponseType = 'json'>(url: string | URL, options?: RequestOptions<R>): Promise<RequestResult<T, R>> {
-  const { method = 'GET', headers: customHeaders = {}, body, timeoutMs = 10000, responseType, retryOptions, logContext = {} } = options ?? {};
+export async function request<T = unknown, R extends ResponseType = 'json'>(
+  url: string | URL,
+  options?: RequestOptions<R>
+): Promise<RequestResult<T, R>> {
+  const {
+    method = 'GET',
+    headers: customHeaders = {},
+    body,
+    timeoutMs = 10000,
+    responseType,
+    retryOptions,
+    logContext = {},
+  } = options ?? {};
 
   const actualResponseType = responseType ?? ('json' as R);
 
@@ -148,12 +173,28 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(url:
   }
 }
 
-export function safeRequest<T = unknown>(url: string | URL, defaultValue: T, options?: RequestOptions<'json'>): Promise<T>;
+export function safeRequest<T = unknown>(
+  url: string | URL,
+  defaultValue: T,
+  options?: RequestOptions<'json'>
+): Promise<T>;
 export function safeRequest(url: string | URL, defaultValue: string, options?: RequestOptions<'text'>): Promise<string>;
 export function safeRequest(url: string | URL, defaultValue: Blob, options?: RequestOptions<'blob'>): Promise<Blob>;
-export function safeRequest(url: string | URL, defaultValue: ArrayBuffer, options?: RequestOptions<'arrayBuffer'>): Promise<ArrayBuffer>;
-export function safeRequest(url: string | URL, defaultValue: Response, options?: RequestOptions<'response'>): Promise<Response>;
-export function safeRequest(url: string | URL, defaultValue: unknown, options?: RequestOptions<ResponseType>): Promise<unknown> {
+export function safeRequest(
+  url: string | URL,
+  defaultValue: ArrayBuffer,
+  options?: RequestOptions<'arrayBuffer'>
+): Promise<ArrayBuffer>;
+export function safeRequest(
+  url: string | URL,
+  defaultValue: Response,
+  options?: RequestOptions<'response'>
+): Promise<Response>;
+export function safeRequest(
+  url: string | URL,
+  defaultValue: unknown,
+  options?: RequestOptions<ResponseType>
+): Promise<unknown> {
   return (async () => {
     try {
       return await request(url, options as RequestOptions<'json'> | undefined);

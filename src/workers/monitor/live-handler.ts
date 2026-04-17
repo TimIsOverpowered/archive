@@ -8,7 +8,12 @@ import { sendStreamOfflineAlert, sendStreamLiveAlert } from './alert-helpers.js'
 
 type StreamerDbClient = PrismaClient;
 
-export async function handlePlatformLiveCheck(prisma: StreamerDbClient, tenantId: string, platform: Platform, config: TenantConfig): Promise<void> {
+export async function handlePlatformLiveCheck(
+  prisma: StreamerDbClient,
+  tenantId: string,
+  platform: Platform,
+  config: TenantConfig
+): Promise<void> {
   const log = createAutoLogger(tenantId);
 
   const strategy = getStrategy(platform);
@@ -41,10 +46,26 @@ export async function handlePlatformLiveCheck(prisma: StreamerDbClient, tenantId
     return;
   }
 
-  await handleLiveStream(prisma, streamStatus, platform, platformUserId, platformUsername, config, strategy as NonNullable<ReturnType<typeof getStrategy>>, tenantId, log);
+  await handleLiveStream(
+    prisma,
+    streamStatus,
+    platform,
+    platformUserId,
+    platformUsername,
+    config,
+    strategy as NonNullable<ReturnType<typeof getStrategy>>,
+    tenantId,
+    log
+  );
 }
 
-async function handleOfflineStream(prisma: PrismaClient, platform: Platform, username: string | undefined, displayName: string | undefined, log: ReturnType<typeof createAutoLogger>): Promise<void> {
+async function handleOfflineStream(
+  prisma: PrismaClient,
+  platform: Platform,
+  username: string | undefined,
+  displayName: string | undefined,
+  log: ReturnType<typeof createAutoLogger>
+): Promise<void> {
   log.debug({ username }, '[Monitor]: Streamer is OFFLINE');
 
   const activeLiveVod = await prisma.vod.findFirst({
@@ -59,7 +80,13 @@ async function handleOfflineStream(prisma: PrismaClient, platform: Platform, use
       data: { is_live: false },
     });
 
-    await sendStreamOfflineAlert(platform, activeLiveVod.vod_id, activeLiveVod.started_at ?? undefined, username || undefined, displayName);
+    await sendStreamOfflineAlert(
+      platform,
+      activeLiveVod.vod_id,
+      activeLiveVod.started_at ?? undefined,
+      username || undefined,
+      displayName
+    );
   } else {
     log.debug('[Monitor]: No active live VOD to update for offline stream');
   }
@@ -76,19 +103,41 @@ async function handleLiveStream(
   tenantId: string,
   log: ReturnType<typeof createAutoLogger>
 ): Promise<void> {
-  log.debug({ streamId: streamStatus.id, title: streamStatus.title, startedAt: streamStatus.startedAt }, '[Monitor]: Stream is LIVE');
+  log.debug(
+    { streamId: streamStatus.id, title: streamStatus.title, startedAt: streamStatus.startedAt },
+    '[Monitor]: Stream is LIVE'
+  );
 
   const existingVod = await prisma.vod.findFirst({
     where: { stream_id: streamStatus.id, platform },
   });
 
   if (!existingVod) {
-    await handleNewLiveStream(prisma, streamStatus, platform, platformUserId, platformUsername, config, strategy, tenantId, log);
+    await handleNewLiveStream(
+      prisma,
+      streamStatus,
+      platform,
+      platformUserId,
+      platformUsername,
+      config,
+      strategy,
+      tenantId,
+      log
+    );
     return;
   }
 
   if (!existingVod.is_live) {
-    await handleExistingVodBecameLive(prisma, existingVod, streamStatus, platform, platformUserId, platformUsername, tenantId, log);
+    await handleExistingVodBecameLive(
+      prisma,
+      existingVod,
+      streamStatus,
+      platform,
+      platformUserId,
+      platformUsername,
+      tenantId,
+      log
+    );
     return;
   }
 
@@ -137,7 +186,10 @@ async function handleNewLiveStream(
     return;
   }
 
-  log.info({ vodId: vodMetadata.id, startedAt: streamStatus.startedAt }, '[Monitor]: Creating VOD record for live stream');
+  log.info(
+    { vodId: vodMetadata.id, startedAt: streamStatus.startedAt },
+    '[Monitor]: Creating VOD record for live stream'
+  );
 
   const createdVod = await prisma.vod.create({
     data: {

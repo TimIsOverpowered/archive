@@ -21,7 +21,9 @@ export async function waitForWorkersReady(workerInstances: Worker[]): Promise<vo
   await Promise.all(readyPromises);
 }
 
-export function createWorker<TData extends object, TResult>(config: WorkerConfig<TData, TResult> & { connection: Redis }): Worker<TData, TResult> {
+export function createWorker<TData extends object, TResult>(
+  config: WorkerConfig<TData, TResult> & { connection: Redis }
+): Worker<TData, TResult> {
   const { name, queueName, processor, connection, concurrency = 1, useWorkerThreads = false } = config;
 
   const worker = new Worker<TData, TResult>(queueName, processor, {
@@ -32,12 +34,18 @@ export function createWorker<TData extends object, TResult>(config: WorkerConfig
 
   worker.on('active', (job) => {
     if (!job) return;
-    logger.info({ jobId: String(job.id), ...extractJobMeta(job.data as Record<string, unknown>), attemptsMade: job.attemptsMade }, `[${name}] job started`);
+    logger.info(
+      { jobId: String(job.id), ...extractJobMeta(job.data as Record<string, unknown>), attemptsMade: job.attemptsMade },
+      `[${name}] job started`
+    );
   });
 
   worker.on('completed', (job) => {
     if (!job) return;
-    logger.info({ jobId: String(job.id), ...extractJobMeta(job.data as Record<string, unknown>) }, `[${name}] job completed`);
+    logger.info(
+      { jobId: String(job.id), ...extractJobMeta(job.data as Record<string, unknown>) },
+      `[${name}] job completed`
+    );
   });
 
   worker.on('failed', (job, err) => {

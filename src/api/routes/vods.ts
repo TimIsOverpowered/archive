@@ -123,7 +123,11 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const { tenantId, platform, platformVodId } = request.params as { tenantId: string; platform: Platform; platformVodId: string };
+      const { tenantId, platform, platformVodId } = request.params as {
+        tenantId: string;
+        platform: Platform;
+        platformVodId: string;
+      };
       const { db } = request.tenant;
 
       const vod = await getVodByPlatformId(db, tenantId, platform, platformVodId);

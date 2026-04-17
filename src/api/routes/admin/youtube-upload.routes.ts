@@ -1,11 +1,23 @@
 import { FastifyInstance } from 'fastify';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform.js';
+import {
+  tenantMiddleware,
+  platformValidationMiddleware,
+  type TenantPlatformContext,
+} from '../../middleware/tenant-platform.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin.js';
 import { notFound } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
-import { SOURCE_TYPES, DOWNLOAD_METHODS, PLATFORM_VALUES, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES_VALUES, UPLOAD_MODE_VALUES, UPLOAD_MODES } from '../../../types/platforms.js';
+import {
+  SOURCE_TYPES,
+  DOWNLOAD_METHODS,
+  PLATFORM_VALUES,
+  DOWNLOAD_METHODS_VALUES,
+  SOURCE_TYPES_VALUES,
+  UPLOAD_MODE_VALUES,
+  UPLOAD_MODES,
+} from '../../../types/platforms.js';
 import { ensureVodDownload, findVodRecord } from './utils/vod-helpers.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
@@ -36,15 +48,29 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       schema: {
         tags: ['Admin'],
         description: 'Manually trigger YouTube re-upload for a VOD',
-        params: { type: 'object', properties: { tenantId: { type: 'string', description: 'Tenant ID' } }, required: ['tenantId'] },
+        params: {
+          type: 'object',
+          properties: { tenantId: { type: 'string', description: 'Tenant ID' } },
+          required: ['tenantId'],
+        },
         body: {
           type: 'object',
           properties: {
             vodId: { type: 'string', description: 'Platform VOD ID' },
             platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Source platform' },
-            downloadMethod: { type: 'string', enum: DOWNLOAD_METHODS_VALUES, default: DOWNLOAD_METHODS.HLS, description: 'Download method' },
+            downloadMethod: {
+              type: 'string',
+              enum: DOWNLOAD_METHODS_VALUES,
+              default: DOWNLOAD_METHODS.HLS,
+              description: 'Download method',
+            },
             uploadMode: { type: 'string', enum: UPLOAD_MODE_VALUES, default: UPLOAD_MODES.ALL },
-            type: { type: 'string', enum: SOURCE_TYPES_VALUES, default: SOURCE_TYPES.VOD, description: 'File type for checking' },
+            type: {
+              type: 'string',
+              enum: SOURCE_TYPES_VALUES,
+              default: SOURCE_TYPES.VOD,
+              description: 'File type for checking',
+            },
           },
           required: ['vodId', 'platform'],
         },
@@ -68,7 +94,14 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       const dbId = vodRecord.id;
 
       // Ensure vod download
-      const { jobId, filePath } = await ensureVodDownload({ ctx: request.tenant as TenantPlatformContext, dbId, vodId, type, downloadMethod, log });
+      const { jobId, filePath } = await ensureVodDownload({
+        ctx: request.tenant as TenantPlatformContext,
+        dbId,
+        vodId,
+        type,
+        downloadMethod,
+        log,
+      });
 
       // Queue Youtube upload
       await queueYoutubeUploads({

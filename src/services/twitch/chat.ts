@@ -58,7 +58,11 @@ export interface TwitchVideoCommentResponse {
   comments: TwitchCommentsConnection | null;
 }
 
-export async function fetchComments(vodId: string, offset = 0, tenantId?: string): Promise<TwitchVideoCommentResponse | null> {
+export async function fetchComments(
+  vodId: string,
+  offset = 0,
+  tenantId?: string
+): Promise<TwitchVideoCommentResponse | null> {
   const client = getTwitchGqlClient(tenantId);
   const data = await client.post<{ data?: { video?: TwitchVideoCommentResponse } }>({
     operationName: 'VideoCommentsByOffsetOrCursor',
@@ -76,7 +80,11 @@ export async function fetchComments(vodId: string, offset = 0, tenantId?: string
   return data.data?.video || null;
 }
 
-export async function fetchNextComments(vodId: string, cursor: string, tenantId?: string): Promise<TwitchVideoCommentResponse | null> {
+export async function fetchNextComments(
+  vodId: string,
+  cursor: string,
+  tenantId?: string
+): Promise<TwitchVideoCommentResponse | null> {
   const client = createTwitchGqlClient(tenantId, BACKUP_TWITCH_GQL_CLIENT_ID);
   const data = await client.post<{ data?: { video?: TwitchVideoCommentResponse } }>({
     operationName: 'VideoCommentsByOffsetOrCursor',

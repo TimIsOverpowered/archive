@@ -44,7 +44,10 @@ export function detectFmp4FromPlaylist(m3u8Content: string): boolean {
 
     // Check segment extensions (.mp4 or .m4s but not .ts)
     const hasFmp4Segments = mediaPlaylist.segments.some(
-      (seg) => seg?.uri?.endsWith('.mp4') || seg?.uri?.endsWith('.m4s') || (!seg?.uri?.endsWith('.ts') && (seg.uri?.includes('fMP4') || seg.uri?.includes('init')))
+      (seg) =>
+        seg?.uri?.endsWith('.mp4') ||
+        seg?.uri?.endsWith('.m4s') ||
+        (!seg?.uri?.endsWith('.ts') && (seg.uri?.includes('fMP4') || seg.uri?.includes('init')))
     );
 
     return hasFmp4Segments;
@@ -53,7 +56,13 @@ export function detectFmp4FromPlaylist(m3u8Content: string): boolean {
   }
 }
 
-export async function splitVideo(filePath: string, duration: number, splitDuration: number, vodId: string, onProgress?: (percent: number, part: number) => void): Promise<string[]> {
+export async function splitVideo(
+  filePath: string,
+  duration: number,
+  splitDuration: number,
+  vodId: string,
+  onProgress?: (percent: number, part: number) => void
+): Promise<string[]> {
   const outputDir = path.dirname(filePath);
   const parts: string[] = [];
   const totalParts = Math.ceil(duration / splitDuration);
@@ -86,7 +95,13 @@ export async function splitVideo(filePath: string, duration: number, splitDurati
   return parts;
 }
 
-export async function trimVideo(filePath: string, start: number, end: number, vodId: string, onProgress?: (percent: number) => void): Promise<string> {
+export async function trimVideo(
+  filePath: string,
+  start: number,
+  end: number,
+  vodId: string,
+  onProgress?: (percent: number) => void
+): Promise<string> {
   const outputDir = path.dirname(filePath);
   const duration = end - start;
   const outputFile = path.join(outputDir, `${vodId}-${start}-${end}.mp4`);

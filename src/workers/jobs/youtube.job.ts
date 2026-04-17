@@ -118,7 +118,13 @@ export async function createGameUploadJob(
 
 // ============== Bulk Game Job Creation ==============
 
-export async function createGameUploadJobsForVod(ctx: TenantContext, dbId: number, vodId: string, filePath: string | undefined, platform: Platform): Promise<YoutubeGameUploadJob[]> {
+export async function createGameUploadJobsForVod(
+  ctx: TenantContext,
+  dbId: number,
+  vodId: string,
+  filePath: string | undefined,
+  platform: Platform
+): Promise<YoutubeGameUploadJob[]> {
   const { config, tenantId } = ctx;
   if (!config?.youtube?.perGameUpload) {
     return [];
@@ -328,7 +334,14 @@ export async function queueYoutubeGameUpload(
  * @param downloadJobId - Optional: chains all uploads to wait for download
  * @returns Promise that resolves when all jobs are enqueued
  */
-export async function queueYoutubeGameUploadsForVod(ctx: TenantContext, dbId: number, vodId: string, filePath: string | undefined, platform: Platform, downloadJobId?: string): Promise<void> {
+export async function queueYoutubeGameUploadsForVod(
+  ctx: TenantContext,
+  dbId: number,
+  vodId: string,
+  filePath: string | undefined,
+  platform: Platform,
+  downloadJobId?: string
+): Promise<void> {
   const jobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform);
 
   for (const job of jobs) {
@@ -398,7 +411,10 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
         }
       }
 
-      log.info({ vodId, chained: !!downloadJobId, gameJobsCount: result.gameJobIds.length }, 'Queued YouTube game uploads');
+      log.info(
+        { vodId, chained: !!downloadJobId, gameJobsCount: result.gameJobIds.length },
+        'Queued YouTube game uploads'
+      );
     } catch (error) {
       log.warn({ error: (error as Error).message, vodId }, 'Failed to queue YouTube game uploads');
     }

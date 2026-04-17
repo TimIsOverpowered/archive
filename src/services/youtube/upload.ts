@@ -43,7 +43,10 @@ export async function uploadVideo(
     const fileSize = fs.statSync(filePath).size;
     const fileName = filePath.split('/').pop() || filePath;
 
-    logger.info({ tenantId, title, fileSize, fileName, privacyStatus }, `[YouTube] Starting upload for ${displayName}: ${title}`);
+    logger.info(
+      { tenantId, title, fileSize, fileName, privacyStatus },
+      `[YouTube] Starting upload for ${displayName}: ${title}`
+    );
 
     const progressStream = new ProgressStream(fileSize, (progressData) => {
       if (onProgress) {
@@ -86,7 +89,10 @@ export async function uploadVideo(
       await onProgress({ milestone: 'success', videoId, thumbnailUrl, videoDuration, privacyStatus });
     }
 
-    logger.info({ tenantId, videoId, totalDuration: Date.now() - uploadStartTime }, '[YouTube] Upload completed successfully');
+    logger.info(
+      { tenantId, videoId, totalDuration: Date.now() - uploadStartTime },
+      '[YouTube] Upload completed successfully'
+    );
 
     return { videoId, thumbnailUrl };
   } catch (err) {

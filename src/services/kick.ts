@@ -264,7 +264,10 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
           where: { id: existingChapter.id },
           data: { end: currentTimeSeconds },
         });
-        log.debug({ vodId, chapterId: existingChapter.id, start: currentTimeSeconds }, 'Chapter already exists, updated end time');
+        log.debug(
+          { vodId, chapterId: existingChapter.id, start: currentTimeSeconds },
+          'Chapter already exists, updated end time'
+        );
         return;
       }
 
@@ -281,14 +284,22 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
         },
       });
 
-      log.debug({ dbId, vodId, categoryId: category.id, categoryName: category.name, startTime: currentTimeSeconds }, 'Created new chapter');
+      log.debug(
+        { dbId, vodId, categoryId: category.id, categoryName: category.name, startTime: currentTimeSeconds },
+        'Created new chapter'
+      );
     });
   } catch (error) {
     log.error(createErrorContext(error, { dbId, vodId }), 'Failed to update chapter');
   }
 }
 
-export async function finalizeKickChapters(ctx: TenantContext, dbId: number, vodId: string, finalDurationSeconds: number): Promise<void> {
+export async function finalizeKickChapters(
+  ctx: TenantContext,
+  dbId: number,
+  vodId: string,
+  finalDurationSeconds: number
+): Promise<void> {
   try {
     await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
       const incompleteChapter = await db.chapter.findFirst({

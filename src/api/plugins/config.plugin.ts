@@ -9,7 +9,10 @@ const configPlugin: FastifyPluginAsync = async (fastify) => {
 
     const configs = await loadTenantConfigs();
 
-    logger.info({ count: configs.length, streamers: configs.map((c) => c.id) }, 'Streamer configs loaded (DB clients will lazy-load on demand)');
+    logger.info(
+      { count: configs.length, streamers: configs.map((c) => c.id) },
+      'Streamer configs loaded (DB clients will lazy-load on demand)'
+    );
 
     // Decorate fastify with config helpers
     fastify.decorate('getTenantConfig', (id: string): TenantConfig | undefined => {

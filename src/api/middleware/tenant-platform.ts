@@ -54,7 +54,10 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
   try {
     client = await ensureClient(tenantId, config);
   } catch (err) {
-    request.log.error({ tenantId, error: extractErrorDetails(err) }, 'Failed to initialize database client during request');
+    request.log.error(
+      { tenantId, error: extractErrorDetails(err) },
+      'Failed to initialize database client during request'
+    );
     return reply.status(503).send({
       error: {
         message: 'Database not available',

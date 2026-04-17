@@ -17,7 +17,9 @@ export async function getChannelBadges(tenantId: string): Promise<Record<string,
 
   try {
     const client = getTwitchClient(tenantId);
-    const data = await client.helix.get<{ data?: Record<string, unknown> }>(`/chat/badges?broadcaster_id=${config.twitch.id}`);
+    const data = await client.helix.get<{ data?: Record<string, unknown> }>(
+      `/chat/badges?broadcaster_id=${config.twitch.id}`
+    );
 
     const badgesData = data?.data || null;
     if (!badgesData) {

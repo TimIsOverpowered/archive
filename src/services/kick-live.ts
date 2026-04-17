@@ -81,7 +81,10 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
 
     // Check for API error/blocked responses
     if ('error' in response && typeof response.error === 'string') {
-      logger.warn({ username, error: response.error }, `[Kick] API request blocked or errored for ${username}: "${response.error}"`);
+      logger.warn(
+        { username, error: response.error },
+        `[Kick] API request blocked or errored for ${username}: "${response.error}"`
+      );
       await page.close();
       return null;
     }
@@ -97,7 +100,10 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
     const streamId = String(data.id ?? '');
 
     if (!streamId) {
-      logger.debug({ username, availableKeys: Object.keys(data), idField: data.id }, `[Kick] Channel ${username} is offline (no livestream id in data)`);
+      logger.debug(
+        { username, availableKeys: Object.keys(data), idField: data.id },
+        `[Kick] Channel ${username} is offline (no livestream id in data)`
+      );
       await page.close();
       return null;
     }
@@ -105,7 +111,8 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
     // Safe extraction with type guards
     const sessionTitle = typeof data.session_title === 'string' ? data.session_title : '';
     const createdAt = typeof data.created_at === 'string' ? data.created_at : '';
-    const playbackUrl = typeof data.playback_url === 'string' && data.playback_url ? (data.playback_url as string) : undefined;
+    const playbackUrl =
+      typeof data.playback_url === 'string' && data.playback_url ? (data.playback_url as string) : undefined;
     const viewers = typeof data.viewers === 'number' ? (data.viewers as number) : undefined;
     const slug = typeof data.slug === 'string' && data.slug ? (data.slug as string) : undefined;
     const language = typeof data.language === 'string' && data.language ? (data.language as string) : undefined;
@@ -143,7 +150,10 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
       thumbnail: thumbnail,
     };
 
-    logger.debug({ username }, `[Kick] Live stream detected for ${username}: ID=${streamData.id}, Title="${streamData.session_title}"`);
+    logger.debug(
+      { username },
+      `[Kick] Live stream detected for ${username}: ID=${streamData.id}, Title="${streamData.session_title}"`
+    );
 
     await page.close();
     return streamData;
@@ -157,7 +167,10 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
 /**
  * Immediate check for Kick VOD/video object matching current stream (NON-BLOCKING)
  */
-export async function getLatestKickVodObject(username: string, expectedStreamId: string): Promise<{ id: string; title?: string; source?: string } | null> {
+export async function getLatestKickVodObject(
+  username: string,
+  expectedStreamId: string
+): Promise<{ id: string; title?: string; source?: string } | null> {
   try {
     const videosUrl = `https://kick.com/api/v2/channels/${username}/videos`;
 
@@ -216,7 +229,10 @@ export async function getLatestKickVodObject(username: string, expectedStreamId:
 
     const vod = vodObject as Record<string, unknown>;
 
-    logger.debug({ username, expectedStreamId }, `[Kick] Video object ready! ID=${expectedStreamId}, Title="${vod.session_title || vod.title}"`);
+    logger.debug(
+      { username, expectedStreamId },
+      `[Kick] Video object ready! ID=${expectedStreamId}, Title="${vod.session_title || vod.title}"`
+    );
 
     await page.close();
 

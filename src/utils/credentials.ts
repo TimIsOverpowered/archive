@@ -37,7 +37,12 @@ export function getTwitchCredentials(tenantId: string): TwitchCredentials | null
       return null;
     }
 
-    return { clientId: auth.client_id, clientSecret: auth.client_secret, accessToken: auth.access_token, expiryDate: auth.expiry_date };
+    return {
+      clientId: auth.client_id,
+      clientSecret: auth.client_secret,
+      accessToken: auth.access_token,
+      expiryDate: auth.expiry_date,
+    };
   } catch {
     return null;
   }

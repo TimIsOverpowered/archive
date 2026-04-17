@@ -54,7 +54,10 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
       });
 
       const resultJobId = flow.job.id ?? null;
-      log.info({ vodId, jobId: resultJobId, part, chained: true, claimsCount: claims.length }, 'DMCA processing job queued (chained to download)');
+      log.info(
+        { vodId, jobId: resultJobId, part, chained: true, claimsCount: claims.length },
+        'DMCA processing job queued (chained to download)'
+      );
       return resultJobId;
     }
 
@@ -65,7 +68,10 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
     });
 
     const resultJobId = addedJob.id ?? null;
-    log.info({ vodId, jobId: resultJobId, part, chained: false, claimsCount: claims.length }, 'DMCA processing job queued (file exists)');
+    log.info(
+      { vodId, jobId: resultJobId, part, chained: false, claimsCount: claims.length },
+      'DMCA processing job queued (file exists)'
+    );
     return resultJobId;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);

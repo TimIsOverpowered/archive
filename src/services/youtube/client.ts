@@ -24,7 +24,12 @@ export async function createYoutubeClient(tenantId: string): Promise<youtube_v3.
         },
         'YouTube token auto-refreshed during api call'
       );
-      await updateYoutubeTokenInDb(tenantId, credentials.access_token, credentials.expiry_date, credentials.refresh_token);
+      await updateYoutubeTokenInDb(
+        tenantId,
+        credentials.access_token,
+        credentials.expiry_date,
+        credentials.refresh_token
+      );
     }
   });
 

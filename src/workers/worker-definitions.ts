@@ -5,7 +5,17 @@ import standardVodProcessor from './vod.worker.js';
 import chatProcessor from './chat.worker.js';
 import youtubeProcessor from './youtube.worker.js';
 import dmcaProcessor from './dmca.worker.js';
-import { ChatDownloadJob, ChatDownloadResult, DmcaProcessingJob, DmcaProcessingResult, QUEUE_NAMES, YoutubeUploadJob, YoutubeUploadResult, LiveDownloadJob, StandardVodJob } from './jobs/queues.js';
+import {
+  ChatDownloadJob,
+  ChatDownloadResult,
+  DmcaProcessingJob,
+  DmcaProcessingResult,
+  QUEUE_NAMES,
+  YoutubeUploadJob,
+  YoutubeUploadResult,
+  LiveDownloadJob,
+  StandardVodJob,
+} from './jobs/queues.js';
 import { getWorkersConfig } from '../config/env.js';
 
 export type WorkerName = 'vod_live' | 'vod_standard' | 'chat_download' | 'youtube_upload' | 'dmca_processing';

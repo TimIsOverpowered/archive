@@ -32,10 +32,16 @@ export async function checkPuppeteerHealth(browserInstance?: Browser): Promise<P
     // Three-tier logic based on memory usage
     if (memStats.totalRssMb > limitMb) {
       cachedStatus = { status: 'high_memory', stats: memStats };
-      logger.error({ ...memStats, limitMb }, '[Puppeteer Health] CRITICAL: Hard memory limit exceeded - immediate restart required');
+      logger.error(
+        { ...memStats, limitMb },
+        '[Puppeteer Health] CRITICAL: Hard memory limit exceeded - immediate restart required'
+      );
     } else if (memStats.totalRssMb > softLimitMb) {
       cachedStatus = { status: 'elevated', stats: memStats };
-      logger.warn({ ...memStats, softLimitMb, limitMb }, '[Puppeteer Health] Elevated memory usage - consider restart before next task');
+      logger.warn(
+        { ...memStats, softLimitMb, limitMb },
+        '[Puppeteer Health] Elevated memory usage - consider restart before next task'
+      );
     } else {
       cachedStatus = { status: 'ok', stats: memStats };
     }
@@ -47,10 +53,16 @@ export async function checkPuppeteerHealth(browserInstance?: Browser): Promise<P
 
     // Check if this is a disconnection error requiring browser reset
     const errorMsg = String(details.message || '').toLowerCase();
-    const isDisconnectionError = errorMsg.includes('target closed') || errorMsg.includes('browser disconnected') || errorMsg.includes('protocol error');
+    const isDisconnectionError =
+      errorMsg.includes('target closed') ||
+      errorMsg.includes('browser disconnected') ||
+      errorMsg.includes('protocol error');
 
     if (isDisconnectionError) {
-      logger.error({ ...details, requiresRestart: true }, '[Puppeteer Health] Browser process dead - releasing instance for restart');
+      logger.error(
+        { ...details, requiresRestart: true },
+        '[Puppeteer Health] Browser process dead - releasing instance for restart'
+      );
 
       // Clear the zombie browser globally to force fresh initialization on next getBrowser() call
       await releaseBrowser();

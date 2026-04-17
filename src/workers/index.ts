@@ -19,7 +19,13 @@ async function clearAllJobsOnStartup() {
 
   logger.warn('[Queues] CLEAR_QUEUES_ON_STARTUP=true — all queued jobs will be permanently deleted');
 
-  const queues = [getQueue(QUEUE_NAMES.VOD_LIVE), getQueue(QUEUE_NAMES.VOD_STANDARD), getQueue(QUEUE_NAMES.CHAT_DOWNLOAD), getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD), getQueue(QUEUE_NAMES.DMCA_PROCESSING)];
+  const queues = [
+    getQueue(QUEUE_NAMES.VOD_LIVE),
+    getQueue(QUEUE_NAMES.VOD_STANDARD),
+    getQueue(QUEUE_NAMES.CHAT_DOWNLOAD),
+    getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD),
+    getQueue(QUEUE_NAMES.DMCA_PROCESSING),
+  ];
 
   await Promise.allSettled(queues.map((queue) => queue.obliterate({ force: true })));
 

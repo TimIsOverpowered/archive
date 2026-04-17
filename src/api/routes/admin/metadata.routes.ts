@@ -1,7 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform.js';
+import {
+  tenantMiddleware,
+  platformValidationMiddleware,
+  type TenantPlatformContext,
+} from '../../middleware/tenant-platform.js';
 import { saveVodChapters } from '../../../services/twitch/index.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin.js';
 import { badRequest, notFound } from '../../../utils/http-error.js';
@@ -38,7 +42,11 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       schema: {
         tags: ['Admin'],
         description: 'Fetch and save game chapters from Twitch API (Twitch only)',
-        params: { type: 'object', properties: { tenantId: { type: 'string', description: 'Tenant ID' } }, required: ['tenantId'] },
+        params: {
+          type: 'object',
+          properties: { tenantId: { type: 'string', description: 'Tenant ID' } },
+          required: ['tenantId'],
+        },
         body: {
           type: 'object',
           properties: {
@@ -65,7 +73,12 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       }
 
       const durationSeconds = vodRecord.duration ? parseInt(vodRecord.duration.toString()) : 0;
-      const savedCount = await saveVodChapters(request.tenant as TenantPlatformContext, vodRecord.id, vodId, durationSeconds);
+      const savedCount = await saveVodChapters(
+        request.tenant as TenantPlatformContext,
+        vodRecord.id,
+        vodId,
+        durationSeconds
+      );
 
       if (savedCount === 0) {
         return { data: { message: `No chapters found for ${vodId}`, vodId, count: 0 } };
@@ -82,7 +95,11 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       schema: {
         tags: ['Admin'],
         description: 'Fetch and save emote metadata for a VOD',
-        params: { type: 'object', properties: { tenantId: { type: 'string', description: 'Tenant ID' } }, required: ['tenantId'] },
+        params: {
+          type: 'object',
+          properties: { tenantId: { type: 'string', description: 'Tenant ID' } },
+          required: ['tenantId'],
+        },
         body: {
           type: 'object',
           properties: {
@@ -122,7 +139,11 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       schema: {
         tags: ['Admin'],
         description: 'Fetch and save chat data for a VOD',
-        params: { type: 'object', properties: { tenantId: { type: 'string', description: 'Tenant ID' } }, required: ['tenantId'] },
+        params: {
+          type: 'object',
+          properties: { tenantId: { type: 'string', description: 'Tenant ID' } },
+          required: ['tenantId'],
+        },
         body: {
           type: 'object',
           properties: {
@@ -150,7 +171,16 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
       if (!platformId) badRequest(`No platform ID available for ${platform} ${vodId}`);
 
-      const jobId = await triggerChatDownload(tenantId, platformId, vodRecord.id, vodId, platform, Math.round(vodRecord.duration), config?.[platform]?.username, forceRerun);
+      const jobId = await triggerChatDownload(
+        tenantId,
+        platformId,
+        vodRecord.id,
+        vodId,
+        platform,
+        Math.round(vodRecord.duration),
+        config?.[platform]?.username,
+        forceRerun
+      );
 
       return { data: { message: `Queueing chat job ${vodId}`, vodId, platform, jobId } };
     }

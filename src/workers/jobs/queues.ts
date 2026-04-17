@@ -106,7 +106,11 @@ export interface YoutubeUploadSkippedResult {
   skipped: boolean;
 }
 
-export type YoutubeUploadResult = YoutubeUploadVodResult | YoutubeUploadGameResult | YoutubeUploadSplitGameResult | YoutubeUploadSkippedResult;
+export type YoutubeUploadResult =
+  | YoutubeUploadVodResult
+  | YoutubeUploadGameResult
+  | YoutubeUploadSplitGameResult
+  | YoutubeUploadSkippedResult;
 
 export interface DmcaProcessingSuccessResult {
   success: true;
@@ -139,7 +143,10 @@ export const flowProducer = new FlowProducer({
   connection: redisInstance,
 });
 
-export function getQueue<TData = unknown, TFinishedData = unknown>(name: string, jobOptions?: QueueOptions['defaultJobOptions']): Queue<TData, TFinishedData, string> {
+export function getQueue<TData = unknown, TFinishedData = unknown>(
+  name: string,
+  jobOptions?: QueueOptions['defaultJobOptions']
+): Queue<TData, TFinishedData, string> {
   const cacheKey = `${name}:${JSON.stringify(jobOptions)}`;
 
   if (queueCache.has(cacheKey)) {

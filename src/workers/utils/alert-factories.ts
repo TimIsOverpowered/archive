@@ -194,23 +194,54 @@ export function createLiveWorkerAlerts(): LiveWorkerAlerts {
 
 export interface ChatWorkerAlerts {
   init: (tenantId: string, vodId: string, platform: Platform, isResume: boolean, offset?: number) => RichEmbedData;
-  progress: (tenantId: string, vodId: string, offset: number, batchNumber: number, messagesInBatch: number, totalMessages: number, duration: number) => RichEmbedData;
-  complete: (tenantId: string, vodId: string, platform: Platform, totalMessages: number, batchCount: number, startOffset?: number) => RichEmbedData;
-  alreadyComplete: (tenantId: string, vodId: string, platform: Platform, totalMessages: number, lastOffset: number) => RichEmbedData;
+  progress: (
+    tenantId: string,
+    vodId: string,
+    offset: number,
+    batchNumber: number,
+    messagesInBatch: number,
+    totalMessages: number,
+    duration: number
+  ) => RichEmbedData;
+  complete: (
+    tenantId: string,
+    vodId: string,
+    platform: Platform,
+    totalMessages: number,
+    batchCount: number,
+    startOffset?: number
+  ) => RichEmbedData;
+  alreadyComplete: (
+    tenantId: string,
+    vodId: string,
+    platform: Platform,
+    totalMessages: number,
+    lastOffset: number
+  ) => RichEmbedData;
   noMessages: (tenantId: string, vodId: string, platform: Platform, offset: number) => RichEmbedData;
-  error: (tenantId: string, vodId: string, platform: Platform, totalMessages: number, errorMsg: string) => RichEmbedData;
+  error: (
+    tenantId: string,
+    vodId: string,
+    platform: Platform,
+    totalMessages: number,
+    errorMsg: string
+  ) => RichEmbedData;
 }
 
 export function createChatWorkerAlerts(): ChatWorkerAlerts {
   return {
     init: (tenantId, vodId, platform, isResume, offset) => ({
       title: isResume ? `💬 Chat Download Resumed` : `💬 Chat Download Started`,
-      description: isResume ? `${tenantId} - Continuing from offset ${offset?.toFixed(2) ?? 0}s` : `${tenantId} - Fetching chat messages for ${vodId}`,
+      description: isResume
+        ? `${tenantId} - Continuing from offset ${offset?.toFixed(2) ?? 0}s`
+        : `${tenantId} - Fetching chat messages for ${vodId}`,
       status: 'warning',
       fields: [
         { name: 'Platform', value: capitalizePlatform(platform), inline: true },
         { name: 'VOD ID', value: String(vodId), inline: false },
-        ...(offset ? [{ name: isResume ? 'Resume Offset' : 'Start Offset', value: `${offset.toFixed(2)}s`, inline: true }] : []),
+        ...(offset
+          ? [{ name: isResume ? 'Resume Offset' : 'Start Offset', value: `${offset.toFixed(2)}s`, inline: true }]
+          : []),
       ],
       timestamp: new Date().toISOString(),
     }),
@@ -253,7 +284,15 @@ export function createChatWorkerAlerts(): ChatWorkerAlerts {
         { name: 'Platform', value: capitalizePlatform(platform), inline: true },
         { name: 'Total Messages', value: String(totalMessages), inline: true },
         { name: 'Total Batches', value: String(batchCount), inline: true },
-        ...(startOffset ? [{ name: startOffset ? 'Resume Point' : 'Auto-Resumed From', value: `${startOffset.toFixed(2)}s → Final offset reached`, inline: false }] : []),
+        ...(startOffset
+          ? [
+              {
+                name: startOffset ? 'Resume Point' : 'Auto-Resumed From',
+                value: `${startOffset.toFixed(2)}s → Final offset reached`,
+                inline: false,
+              },
+            ]
+          : []),
       ],
       timestamp: new Date().toISOString(),
       updatedTimestamp: new Date().toISOString(),
@@ -333,7 +372,10 @@ export function createYoutubeWorkerAlerts(): YoutubeWorkerAlerts {
       title: `✅ YouTube Upload Complete`,
       description: parts ? `Successfully uploaded ${parts} parts for ${vodId}` : `Successfully uploaded ${vodId}`,
       status: 'success',
-      fields: [{ name: 'Video ID(s)', value: videoIds.slice(0, 3).join(', '), inline: false }, ...(parts ? [{ name: 'Total Parts', value: String(parts), inline: true }] : [])],
+      fields: [
+        { name: 'Video ID(s)', value: videoIds.slice(0, 3).join(', '), inline: false },
+        ...(parts ? [{ name: 'Total Parts', value: String(parts), inline: true }] : []),
+      ],
       timestamp: new Date().toISOString(),
     }),
 

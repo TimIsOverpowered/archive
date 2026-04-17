@@ -18,7 +18,9 @@ import { triggerChatDownload } from './jobs/chat.job.js';
 import { fetchAndSaveEmotes } from '../services/emotes.js';
 import { SOURCE_TYPES } from '../types/platforms.js';
 
-const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: Job<LiveDownloadJob, unknown, string>) => {
+const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (
+  job: Job<LiveDownloadJob, unknown, string>
+) => {
   const { dbId, vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl } = job.data;
   const log = createAutoLogger(tenantId);
 
@@ -63,7 +65,13 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
     // 3. Update DB
     const finalMp4Path = downloadResult.finalMp4Path;
     const actualDuration = await getDuration(finalMp4Path);
-    await finalizeVod({ ctx, dbId, vodId, platform, durationSeconds: actualDuration ? Math.round(actualDuration) : null });
+    await finalizeVod({
+      ctx,
+      dbId,
+      vodId,
+      platform,
+      durationSeconds: actualDuration ? Math.round(actualDuration) : null,
+    });
 
     // Track completion data
     let emotesSaved = false;
@@ -82,7 +90,15 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
 
     // 5. Queue chat download (non-fatal)
     try {
-      chatJobId = await triggerChatDownload(tenantId, platformUserId, dbId, vodId, platform, actualDuration ? Math.round(actualDuration) : 0, platformUsername);
+      chatJobId = await triggerChatDownload(
+        tenantId,
+        platformUserId,
+        dbId,
+        vodId,
+        platform,
+        actualDuration ? Math.round(actualDuration) : 0,
+        platformUsername
+      );
       if (chatJobId) {
         await updateAlert(messageId, alerts.chatQueued(vodId));
       }
@@ -93,7 +109,14 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
 
     // 6. Queue upload (non-fatal)
     try {
-      youtubeResult = await queueYoutubeUploads({ ctx, dbId, vodId, filePath: finalMp4Path, platform, type: SOURCE_TYPES.VOD });
+      youtubeResult = await queueYoutubeUploads({
+        ctx,
+        dbId,
+        vodId,
+        filePath: finalMp4Path,
+        platform,
+        type: SOURCE_TYPES.VOD,
+      });
       if (youtubeResult.vodJobId || youtubeResult.gameJobIds.length > 0) {
         await updateAlert(messageId, alerts.uploadQueued(vodId));
       }
@@ -111,7 +134,10 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
       finalPath: finalMp4Path,
     };
 
-    await updateAlert(messageId, alerts.complete(vodId, actualDuration ? Math.round(actualDuration) : undefined, completionData));
+    await updateAlert(
+      messageId,
+      alerts.complete(vodId, actualDuration ? Math.round(actualDuration) : undefined, completionData)
+    );
 
     log.info({ jobId: job.id, vodId }, '[Live Worker] Job completed successfully');
     return { success: true };

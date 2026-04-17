@@ -81,7 +81,21 @@ interface SplitVodUploadContext extends VodUploadContext {
 }
 
 async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUploadResult> {
-  const { tenantId, vodId, filePath, duration, splitDuration, channelName, domainName, privacyStatus, platformName, config, log, vodRecord, type } = ctx;
+  const {
+    tenantId,
+    vodId,
+    filePath,
+    duration,
+    splitDuration,
+    channelName,
+    domainName,
+    privacyStatus,
+    platformName,
+    config,
+    log,
+    vodRecord,
+    type,
+  } = ctx;
 
   if (!filePath) {
     throw new Error('File path is required for VOD upload');
@@ -160,7 +174,16 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
         })
       : () => {};
 
-    const result = await uploadVideo(tenantId, channelName, parts[i], partTitle, youtubeDescription, privacyStatus as 'public' | 'unlisted' | 'private', onUploadProgress, partDuration);
+    const result = await uploadVideo(
+      tenantId,
+      channelName,
+      parts[i],
+      partTitle,
+      youtubeDescription,
+      privacyStatus as 'public' | 'unlisted' | 'private',
+      onUploadProgress,
+      partDuration
+    );
 
     uploadedVideos.push({ id: result.videoId, part: i + 1 });
 
@@ -191,7 +214,22 @@ interface SingleVodUploadContext extends VodUploadContext {
 }
 
 async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodUploadResult> {
-  const { tenantId, vodId, filePath, channelName, domainName, privacyStatus, platformName, config, type, dbId, db, dmcaProcessed, vodRecord, part } = ctx;
+  const {
+    tenantId,
+    vodId,
+    filePath,
+    channelName,
+    domainName,
+    privacyStatus,
+    platformName,
+    config,
+    type,
+    dbId,
+    db,
+    dmcaProcessed,
+    vodRecord,
+    part,
+  } = ctx;
 
   if (!filePath) {
     throw new Error('File path is required for VOD upload');
@@ -231,7 +269,16 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
       })
     : () => {};
 
-  const result = await uploadVideo(tenantId, channelName, filePath, title, youtubeDescription, privacyStatus as 'public' | 'unlisted' | 'private', onUploadProgress, duration);
+  const result = await uploadVideo(
+    tenantId,
+    channelName,
+    filePath,
+    title,
+    youtubeDescription,
+    privacyStatus as 'public' | 'unlisted' | 'private',
+    onUploadProgress,
+    duration
+  );
 
   const uploadPart = part ?? 1;
   const uploadedVideos = [{ id: result.videoId, part: uploadPart }];
@@ -254,7 +301,13 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
   return { uploadedVideos, needsPartLinking: false };
 }
 
-export async function linkVodPartsAfterDelay(tenantId: string, dbId: number, uploadedVideos: Array<{ id: string; part: number }>, splitDuration: number, db: PrismaClient): Promise<void> {
+export async function linkVodPartsAfterDelay(
+  tenantId: string,
+  dbId: number,
+  uploadedVideos: Array<{ id: string; part: number }>,
+  splitDuration: number,
+  db: PrismaClient
+): Promise<void> {
   if (uploadedVideos.length > 0) {
     setTimeout(async () => {
       await saveChaptersAndLinkParts(tenantId, dbId, uploadedVideos, splitDuration, db);
