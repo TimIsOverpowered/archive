@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { PrismaClient, UploadStatus } from '../../generated/streamer/client';
 import { withCache } from '../utils/cache.js';
 import { invalidateVodCache } from './vod-cache.js';
@@ -42,17 +43,19 @@ interface VodResponse {
   }>;
 }
 
-interface VodQuery {
-  platform?: Platform;
-  from?: string;
-  to?: string;
-  uploaded?: 'youtube';
-  game?: string;
-  page?: number;
-  limit?: number;
-  sort?: 'created_at' | 'duration' | 'uploaded_at';
-  order?: 'asc' | 'desc';
-}
+export const VodQuerySchema = z.object({
+  platform: z.enum(['twitch', 'kick']).optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+  uploaded: z.literal('youtube').optional(),
+  game: z.string().optional(),
+  page: z.number().int().min(1).default(1),
+  limit: z.number().int().min(1).max(100).default(20),
+  sort: z.enum(['created_at', 'duration', 'uploaded_at']).default('created_at'),
+  order: z.enum(['asc', 'desc']).default('desc'),
+});
+
+export type VodQuery = z.infer<typeof VodQuerySchema>;
 
 export async function getVods(client: PrismaClient, tenantId: string, query: VodQuery): Promise<{ vods: VodResponse[]; total: number }> {
   const page = Math.max(1, query.page || 1);
