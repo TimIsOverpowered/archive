@@ -3,12 +3,14 @@ import { createYoutubeClient } from './client.js';
 import { sleep } from '../../utils/delay.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
+import { ProgressStream } from '../../utils/progress-stream.js';
 
 export interface UploadProgressCallbackData {
-  milestone: 'starting' | 'processing_metadata' | 'success' | 'error';
+  milestone: 'starting' | 'uploading' | 'processing_metadata' | 'success' | 'error';
   videoId?: string;
   thumbnailUrl?: string;
   errorDetails?: Error;
+  percent?: number;
 }
 
 export type YoutubeUploadProgress = (data: UploadProgressCallbackData) => void | Promise<void>;
@@ -33,13 +35,23 @@ export async function uploadVideo(
 
     logger.info(`[YouTube] Starting upload for ${displayName}: ${title}`);
 
+    const fileSize = fs.statSync(filePath).size;
+
+    const progressStream = new ProgressStream(fileSize, (percent) => {
+      if (onProgress) {
+        void onProgress({ milestone: 'uploading', percent });
+      }
+    });
+    const readStream = fs.createReadStream(filePath);
+    readStream.pipe(progressStream);
+
     const response = await youtube.videos.insert({
       part: ['id', 'snippet', 'status'],
       requestBody: {
         snippet: { title, description, categoryId: '20' },
         status: { privacyStatus },
       },
-      media: { body: fs.createReadStream(filePath) },
+      media: { body: progressStream },
     });
 
     const videoId = response.data?.id;
