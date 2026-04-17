@@ -132,7 +132,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
       domainName,
       timezone: config.settings?.timezone || 'UTC',
       youtubeDescription: config.youtube!.description,
-      part: i > 0 ? i + 1 : undefined,
+      part: totalParts > 1 ? currentPartNum : undefined,
       type,
     });
 
