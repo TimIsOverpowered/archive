@@ -31,7 +31,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
   // Manually trigger YouTube re-upload for a VOD
   fastify.post<{ Params: ReUploadYoutubeParams; Body: ReUploadYoutubeBody }>(
-    '/vods/re-upload-youtube',
+    '/vods/re-upload',
     {
       schema: {
         tags: ['Admin'],
