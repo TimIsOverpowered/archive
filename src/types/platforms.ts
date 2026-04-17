@@ -50,7 +50,7 @@ export const SOURCE_TYPES_VALUES = Object.values(SOURCE_TYPES);
  * Separate from SourceType to prevent logic leakage between domains.
  */
 export const UPLOAD_TYPES = {
-  ...SOURCE_TYPES,
+  VOD: 'vod',
   GAME: 'game',
 } as const;
 

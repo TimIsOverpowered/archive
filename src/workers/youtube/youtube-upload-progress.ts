@@ -3,6 +3,7 @@ import { extractErrorDetails } from '../../utils/error.js';
 import { updateDiscordEmbed, isAlertsEnabled, createProgressBar } from '../../utils/discord-alerts.js';
 import type { UploadType } from '../../types/platforms.js';
 import { UPLOAD_TYPES } from '../../types/platforms.js';
+import { toHHMMSS } from '../../utils/formatting.js';
 
 interface UploadProgressOptions {
   messageId: string | null;
@@ -12,6 +13,7 @@ interface UploadProgressOptions {
   gameName?: string;
   part?: number;
   totalParts?: number;
+  privacyStatus?: 'public' | 'unlisted' | 'private';
 }
 
 function formatBytes(bytes: number): string {
@@ -149,10 +151,23 @@ export function createYoutubeUploadProgressHandler({
         const titlePrefix = type === UPLOAD_TYPES.VOD ? '✅ VOD Upload Complete' : '✅ Game Upload Complete';
         const title = `${titlePrefix}${partSuffix}`;
 
-        const fields: Array<{ name: string; value: string; inline: boolean }> = [
-          { name: '', value: progress.thumbnailUrl || '', inline: false },
-          { name: 'Video ID', value: (progress.videoId || '').substring(0, 12) + '...', inline: false },
-        ];
+        const youtubeVideoUrl = progress.videoId ? `https://www.youtube.com/watch?v=${progress.videoId}` : '';
+
+        const fields: Array<{ name: string; value: string; inline: boolean }> = [];
+
+        if (progress.videoDuration !== undefined) {
+          fields.push({ name: 'Duration', value: toHHMMSS(progress.videoDuration), inline: true });
+        }
+
+        if (videoTitle) {
+          fields.push({ name: 'Title', value: videoTitle.substring(0, 256), inline: false });
+        }
+
+        if (progress.privacyStatus) {
+          const privacyLabel = progress.privacyStatus.charAt(0).toUpperCase() + progress.privacyStatus.slice(1);
+          fields.push({ name: 'Privacy', value: privacyLabel, inline: true });
+        }
+
         if (partField) fields.push(partField);
 
         await updateDiscordEmbed(messageId, {
@@ -160,6 +175,8 @@ export function createYoutubeUploadProgressHandler({
           description: `${channelName} - Successfully uploaded to YouTube!`,
           status: 'success',
           fields,
+          thumbnailUrl: progress.thumbnailUrl,
+          url: youtubeVideoUrl,
           timestamp: new Date().toISOString(),
         });
         break;

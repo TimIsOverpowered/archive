@@ -16,6 +16,7 @@ import { createLiveWorkerAlerts } from './utils/alert-factories.js';
 import type { LiveDownloadJob } from './jobs/queues.js';
 import { triggerChatDownload } from './jobs/chat.job.js';
 import { fetchAndSaveEmotes } from '../services/emotes.js';
+import { SOURCE_TYPES } from '../types/platforms.js';
 
 const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: Job<LiveDownloadJob, unknown, string>) => {
   const { dbId, vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl } = job.data;
@@ -92,7 +93,7 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
 
     // 6. Queue upload (non-fatal)
     try {
-      youtubeResult = await queueYoutubeUploads({ ctx, dbId, vodId, filePath: finalMp4Path, platform });
+      youtubeResult = await queueYoutubeUploads({ ctx, dbId, vodId, filePath: finalMp4Path, platform, type: SOURCE_TYPES.VOD });
       if (youtubeResult.vodJobId || youtubeResult.gameJobIds.length > 0) {
         await updateAlert(messageId, alerts.uploadQueued(vodId));
       }

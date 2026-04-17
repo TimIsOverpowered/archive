@@ -90,7 +90,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 };
 
 async function processVodUploadJob(job: YoutubeVodUploadJob & { filePath: string }, config: TenantConfig, db: PrismaClient, log: AppLogger): Promise<YoutubeUploadResult> {
-  const { tenantId, dbId, vodId, filePath, dmcaProcessed, vodRecord, part } = job;
+  const { tenantId, dbId, vodId, filePath, dmcaProcessed, vodRecord, part, type } = job;
 
   const result = await processVodUpload({
     tenantId,
@@ -102,7 +102,7 @@ async function processVodUploadJob(job: YoutubeVodUploadJob & { filePath: string
     vodRecord,
     dmcaProcessed,
     log,
-    type: UPLOAD_TYPES.VOD,
+    type,
     part,
   });
 
@@ -111,7 +111,7 @@ async function processVodUploadJob(job: YoutubeVodUploadJob & { filePath: string
       data: {
         vod_id: dbId,
         upload_id: video.id,
-        type: UPLOAD_TYPES.VOD,
+        type,
         part: video.part,
         status: 'COMPLETED',
       },

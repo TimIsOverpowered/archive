@@ -1,6 +1,5 @@
 import fs from 'fs';
 import { createYoutubeClient } from './client.js';
-import { sleep } from '../../utils/delay.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { ProgressStream } from '../../utils/progress-stream.js';
@@ -15,6 +14,8 @@ export interface UploadProgressCallbackData {
   totalBytes?: number;
   uploadSpeedBps?: number;
   etaSeconds?: number;
+  videoDuration?: number;
+  privacyStatus?: string;
 }
 
 export type YoutubeUploadProgress = (data: UploadProgressCallbackData) => void | Promise<void>;
@@ -26,7 +27,8 @@ export async function uploadVideo(
   title: string,
   description: string,
   privacyStatus: 'public' | 'unlisted' | 'private',
-  onProgress?: YoutubeUploadProgress
+  onProgress?: YoutubeUploadProgress,
+  videoDuration?: number
 ): Promise<{ videoId: string; thumbnailUrl: string }> {
   const logger = createAutoLogger('youtube-upload');
   const uploadStartTime = Date.now();
@@ -81,7 +83,7 @@ export async function uploadVideo(
     thumbnailUrl = thumbs?.high?.url || thumbs?.medium?.url || '';
 
     if (onProgress) {
-      await onProgress({ milestone: 'success', videoId, thumbnailUrl });
+      await onProgress({ milestone: 'success', videoId, thumbnailUrl, videoDuration, privacyStatus });
     }
 
     logger.info({ tenantId, videoId, totalDuration: Date.now() - uploadStartTime }, '[YouTube] Upload completed successfully');

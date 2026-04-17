@@ -1,6 +1,6 @@
 import dayjs from '../../utils/dayjs.js';
-import type { Platform, SourceType, UploadType } from '../../types/platforms.js';
-import { capitalizePlatform, SOURCE_TYPES, UPLOAD_TYPES } from '../../types/platforms.js';
+import type { Platform, SourceType } from '../../types/platforms.js';
+import { capitalizePlatform, SOURCE_TYPES } from '../../types/platforms.js';
 import type { VodRecord } from '../../types/db.js';
 
 export interface YoutubeMetadataOptions {
@@ -10,7 +10,7 @@ export interface YoutubeMetadataOptions {
   timezone: string;
   youtubeDescription?: string;
   part?: number;
-  type?: SourceType | UploadType;
+  type: SourceType;
   gameName?: string;
   epNumber?: number;
   vodRecord: VodRecord;
@@ -22,7 +22,7 @@ export interface YoutubeMetadata {
 }
 
 export function buildYoutubeMetadata(options: YoutubeMetadataOptions): YoutubeMetadata {
-  const { channelName, platform, vodRecord, domainName, timezone, youtubeDescription, part, type = UPLOAD_TYPES.VOD } = options;
+  const { channelName, platform, vodRecord, domainName, timezone, youtubeDescription, part, type } = options;
 
   const platformName = capitalizePlatform(platform);
   const dateFormatted = dayjs(vodRecord.created_at).tz(timezone).format('MMMM DD YYYY').toUpperCase();
