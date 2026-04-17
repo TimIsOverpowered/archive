@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { PrismaClient, UploadStatus } from '../../generated/streamer/client';
+import { PrismaClient, UploadStatus } from '../../generated/streamer/client.js';
 import { withCache } from '../utils/cache.js';
 import { invalidateVodCache } from './vod-cache.js';
 import { VOD_DETAILS_CACHE_TTL, VOD_LIST_CACHE_TTL } from '../constants.js';
-import { Platform } from '../types/platforms';
+import { Platform } from '../types/platforms.js';
 
 interface VodResponse {
   id: number;

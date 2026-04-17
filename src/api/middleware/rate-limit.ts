@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
-import { validateCloudflareRequest } from '../../utils/cloudflare-ip-validator';
+import { validateCloudflareRequest } from '../../utils/cloudflare-ip-validator.js';
 
 interface RateLimitOptions {
   limiter: RateLimiterRedis;

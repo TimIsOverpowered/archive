@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { getAllTenants } from '../../../services/tenants.service';
-import createRateLimitMiddleware from '../../middleware/rate-limit';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key';
+import createRateLimitMiddleware from '../../middleware/rate-limit.js';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import { adminRateLimiter } from '../../plugins/redis.plugin';
 
 export default async function globalAdminRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {

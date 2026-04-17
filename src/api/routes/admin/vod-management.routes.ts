@@ -1,14 +1,14 @@
 import { FastifyInstance } from 'fastify';
-import { getTenantStats } from '../../../services/tenants.service';
-import createRateLimitMiddleware from '../../middleware/rate-limit';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key';
-import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
-import { adminRateLimiter } from '../../plugins/redis.plugin';
+import { getTenantStats } from '../../../services/tenants.service.js';
+import createRateLimitMiddleware from '../../middleware/rate-limit.js';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
+import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform.js';
+import { adminRateLimiter } from '../../plugins/redis.plugin.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { badRequest, notFound } from '../../../utils/http-error';
-import { findVodRecord } from './utils/vod-helpers';
+import { badRequest, notFound } from '../../../utils/http-error.js';
+import { findVodRecord } from './utils/vod-helpers.js';
 import { getApiConfig } from '../../../config/env.js';
-import { Platform, PLATFORM_VALUES } from '../../../types/platforms';
+import { Platform, PLATFORM_VALUES } from '../../../types/platforms.js';
 
 interface StatsParams {
   tenantId: string;

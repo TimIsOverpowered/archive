@@ -1,10 +1,10 @@
-import { getAppAccessToken } from '../services/twitch';
-import type { TenantConfig as ConfigType } from '../config/types';
+import { getAppAccessToken } from '../services/twitch/index.js';
+import type { TenantConfig as ConfigType } from '../config/types.js';
 import { sendDiscordAlert, trackFailure, resetFailures } from '../utils/discord-alerts.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { logger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
-import { getConfigs } from '../config/loader';
+import { getConfigs } from '../config/loader.js';
 
 const MAX_FAILURES = 3;
 

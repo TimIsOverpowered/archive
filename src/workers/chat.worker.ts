@@ -1,7 +1,7 @@
 import { Processor, Job } from 'bullmq';
 import { sleep } from '../utils/delay.js';
 import { fetchComments, fetchNextComments } from '../services/twitch/index.js';
-import { initRichAlert, resetFailures } from '../utils/discord-alerts.js';
+import { initRichAlert, resetFailures, updateAlert  } from '../utils/discord-alerts.js';
 import type { ChatDownloadJob, ChatDownloadResult } from './jobs/queues.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
@@ -12,7 +12,6 @@ import { PLATFORMS } from '../types/platforms.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { flushChatBatch } from './chat/chat-batch-processor.js';
 import { createChatWorkerAlerts } from './utils/alert-factories.js';
-import { updateAlert } from '../utils/discord-alerts.js';
 
 const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job: Job<ChatDownloadJob>): Promise<ChatDownloadResult> => {
   const { tenantId, dbId, vodId, platform, duration, startOffset, forceRerun } = job.data;

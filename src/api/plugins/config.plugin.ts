@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
-import { loadTenantConfigs, getTenantConfig, clearConfigCache } from '../../config/loader';
-import { TenantConfig } from '../../config/types';
-import { logger } from '../../utils/logger';
+import { loadTenantConfigs, getTenantConfig, clearConfigCache } from '../../config/loader.js';
+import { TenantConfig } from '../../config/types.js';
+import { logger } from '../../utils/logger.js';
 
 const configPlugin: FastifyPluginAsync = async (fastify) => {
   try {

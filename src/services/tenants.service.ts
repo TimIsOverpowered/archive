@@ -1,5 +1,5 @@
-import { PrismaClient } from '../../generated/streamer/client';
-import { getTenantConfig, getConfigs } from '../config/loader';
+import { PrismaClient } from '../../generated/streamer/client.js';
+import { getTenantConfig, getConfigs } from '../config/loader.js';
 import { withCache } from '../utils/cache.js';
 import { PLATFORMS } from '../types/platforms.js';
 

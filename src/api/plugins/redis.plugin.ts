@@ -1,6 +1,6 @@
 import Redis from 'ioredis';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
-import { logger } from '../../utils/logger';
+import { logger } from '../../utils/logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import type { FastifyPluginAsync } from 'fastify';
 

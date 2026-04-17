@@ -1,15 +1,18 @@
 import 'dotenv/config';
 import { loadApiConfig } from './config/env.js';
-import { buildServer } from './api/server';
-import { closeAllClients, startClientCleanup, stopClientCleanup } from './db/client';
-import { logger } from './utils/logger';
-import { closeRedisClient } from './api/plugins/redis.plugin';
+import { buildServer } from './api/server.js';
+import { closeAllClients, startClientCleanup, stopClientCleanup } from './db/client.js';
+import { logger } from './utils/logger.js';
+import { closeRedisClient } from './api/plugins/redis.plugin.js';
 import { extractErrorDetails } from './utils/error.js';
 import { startCloudflareIpRangesCron } from './cron/cloudflare-ip-ranges.js';
 import { getCachedRangeInfo, getCloudflareIpRanges } from './utils/cloudflare-ip-validator.js';
 import { releaseBrowser } from './utils/puppeteer-manager.js';
+import { registerPlatformStrategies } from './services/platforms/index.js';
 
 const config = loadApiConfig();
+
+registerPlatformStrategies();
 const PORT = config.PORT;
 const HOST = config.HOST;
 

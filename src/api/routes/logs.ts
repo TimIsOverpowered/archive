@@ -1,9 +1,9 @@
 import { FastifyInstance } from 'fastify';
-import { getLogsByOffset, getLogsByCursor } from '../../services/logs.service';
-import createRateLimitMiddleware from '../middleware/rate-limit';
-import { chatRateLimiter } from '../plugins/redis.plugin';
-import { badRequest } from '../../utils/http-error';
-import { tenantMiddleware } from '../middleware/tenant-platform';
+import { getLogsByOffset, getLogsByCursor } from '../../services/logs.service.js';
+import createRateLimitMiddleware from '../middleware/rate-limit.js';
+import { chatRateLimiter } from '../plugins/redis.plugin.js';
+import { badRequest } from '../../utils/http-error.js';
+import { tenantMiddleware } from '../middleware/tenant-platform.js';
 
 interface LogsRoutesOptions {
   prefix: string;

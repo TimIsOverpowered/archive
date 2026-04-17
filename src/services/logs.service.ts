@@ -1,8 +1,8 @@
-import { PrismaClient } from '../../generated/streamer/client';
-import { redisClient } from '../api/plugins/redis.plugin';
-import { compressChatData, decompressChatData } from '../utils/compression';
+import { PrismaClient } from '../../generated/streamer/client.js';
+import { redisClient } from '../api/plugins/redis.plugin.js';
+import { compressChatData, decompressChatData } from '../utils/compression.js';
 import { logger } from '../utils/logger.js';
-import { badRequest } from '../utils/http-error';
+import { badRequest } from '../utils/http-error.js';
 
 const PAGE_SIZE = 200;
 const DEFAULT_BUCKET_SIZE = 120;
