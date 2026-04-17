@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import { extractErrorDetails } from '../../utils/error.js';
-import type { AppLogger } from '../../utils/auto-tenant-logger.js';
+import type { AppLogger } from '../../utils/logger.js';
 
 /**
  * Cleans up HLS temporary files after successful conversion.

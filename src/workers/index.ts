@@ -5,13 +5,12 @@ import { QUEUE_NAMES, getQueue, closeQueues } from './jobs/queues.js';
 import { redisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
 import { startTokenHealthCron } from '../cron/token-health.js';
 import { startMonitorService, stopMonitorService } from './monitor/index.js';
-import { logger as baseLogger } from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 import { WORKER_DEFINITIONS } from './worker-definitions.js';
 import { createWorker, waitForWorkersReady, workers } from './create-worker.js';
 import { loadWorkersConfig } from '../config/env.js';
 import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/client.js';
 
-const logger = baseLogger;
 const workerConfig = loadWorkersConfig();
 
 async function clearAllJobsOnStartup() {

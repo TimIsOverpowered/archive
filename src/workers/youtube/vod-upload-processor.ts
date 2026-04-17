@@ -1,5 +1,5 @@
 import type { PrismaClient } from '../../../generated/streamer/client.js';
-import type { AppLogger } from '../../utils/auto-tenant-logger.js';
+import type { AppLogger } from '../../utils/logger.js';
 import { splitVideo, getDuration } from '../utils/ffmpeg.js';
 import { uploadVideo, linkParts } from '../../services/youtube/index.js';
 import { initRichAlert, updateAlert, formatProgressMessage } from '../../utils/discord-alerts.js';
