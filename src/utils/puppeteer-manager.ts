@@ -1,6 +1,6 @@
 import { connect } from 'puppeteer-real-browser';
 import type { Browser, Page } from 'puppeteer';
-import type { PuppeteerExtraPlugin } from 'puppeteer-extra';
+import clickAndWaitPlugin from 'puppeteer-extra-plugin-click-and-wait';
 import { extractErrorDetails } from './error.js';
 import { logger } from './logger.js';
 import { limit, getPuppeteerQueueStats } from './puppeteer-limiter.js';
@@ -55,11 +55,6 @@ export async function getBrowser(): Promise<{ browser: Browser }> {
   }
 
   const memoryLimit = parseInt(process.env.PUPPETEER_MEMORY_LIMIT_MB || '512', 10);
-
-  const pluginMod = (await import('puppeteer-extra-plugin-click-and-wait')) as {
-    default: () => PuppeteerExtraPlugin;
-  };
-  const clickAndWaitPlugin = pluginMod.default;
 
   browserInstance = await connect({
     headless: 'auto' as unknown as boolean,
