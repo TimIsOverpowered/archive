@@ -175,6 +175,7 @@ export async function updateDiscordEmbed(messageId: string, data: RichEmbedData)
 }
 
 const failureCounts = new Map<string, number>();
+const lastFfmpegProgressByMessage = new Map<string, number>();
 
 export function trackFailure(tenantId: string, maxBeforeAlert: number = 3): boolean {
   const currentCount = (failureCounts.get(tenantId) || 0) + 1;
@@ -302,6 +303,39 @@ export async function sendVodDownloadSuccess(messageId: string, platform: Platfo
     fields: [
       { name: 'VOD ID', value: `\`${vodId}\``, inline: false },
       { name: 'Output Path', value: vodPath, inline: false },
+    ],
+    timestamp: new Date().toISOString(),
+    updatedTimestamp: new Date().toISOString(),
+  });
+}
+
+// ============================================================================
+// FFmpeg Progress Alert Functions
+// ============================================================================
+
+/**
+ * Update Discord alert with FFmpeg conversion progress (throttled to 25% intervals)
+ */
+export async function updateFfmpegProgress(messageId: string, platform: Platform, vodId: string, percent: number, streamerName: string): Promise<void> {
+  if (!isAlertsEnabled()) return;
+
+  const threshold = Math.floor(percent / 25) * 25;
+  const lastReported = lastFfmpegProgressByMessage.get(messageId) ?? -1;
+
+  if (threshold <= lastReported) return;
+
+  lastFfmpegProgressByMessage.set(messageId, threshold);
+
+  const platformName = capitalizePlatform(platform);
+
+  await updateDiscordEmbed(messageId, {
+    title: `🔄 ${platformName} VOD Converting`,
+    description: `${vodId} conversion in progress for ${streamerName}`,
+    status: 'warning',
+    fields: [
+      { name: 'VOD ID', value: `\`${vodId}\``, inline: false },
+      { name: 'Streamer', value: streamerName },
+      { name: 'Progress', value: createProgressBar(threshold), inline: false },
     ],
     timestamp: new Date().toISOString(),
     updatedTimestamp: new Date().toISOString(),

@@ -50,6 +50,8 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (job: J
       startedAt,
       sourceUrl,
       isLive: true,
+      discordMessageId: messageId || undefined,
+      streamerName,
       onProgress: (segmentsDownloaded) => {
         void updateAlert(messageId, alerts.progress(vodId, segmentsDownloaded));
       },
