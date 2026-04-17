@@ -7,4 +7,4 @@ export type { YoutubeClient } from './client.js';
 export { uploadVideo } from './upload.js';
 export type { UploadProgressCallbackData, YoutubeUploadProgress } from './upload.js';
 
-export { linkParts } from './metadata.js';
+export { saveChaptersAndLinkParts } from './metadata.js';

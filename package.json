@@ -31,7 +31,7 @@
     "build": "tsc",
     "dev": "cross-env NODE_ENV=development tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "all": "concurrently \"npm run api\" \"npm run workers\"",
+    "all": "concurrently --names api,workers \"npm run api\" \"npm run workers\"",
     "api": "cross-env NODE_ENV=development tsx src/index.ts",
     "workers": "cross-env NODE_ENV=development tsx src/workers/index.ts",
     "auth:youtube": "tsx scripts/auth-youtube.ts",

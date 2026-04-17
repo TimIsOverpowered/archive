@@ -1,7 +1,7 @@
 import type { PrismaClient } from '../../../generated/streamer/client.js';
 import type { AppLogger } from '../../utils/logger.js';
 import { splitVideo, getDuration } from '../utils/ffmpeg.js';
-import { uploadVideo, linkParts } from '../../services/youtube/index.js';
+import { uploadVideo, saveChaptersAndLinkParts } from '../../services/youtube/index.js';
 import { initRichAlert, updateAlert, formatProgressMessage } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 import { getEffectiveSplitDuration } from './validation.js';
@@ -245,10 +245,10 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
   return { uploadedVideos, needsPartLinking: false };
 }
 
-export async function linkVodPartsAfterDelay(tenantId: string, uploadedVideos: Array<{ id: string; part: number }>): Promise<void> {
-  if (uploadedVideos.length > 1) {
-    setTimeout(() => {
-      void linkParts(tenantId, uploadedVideos);
+export async function linkVodPartsAfterDelay(tenantId: string, dbId: number, uploadedVideos: Array<{ id: string; part: number }>, splitDuration: number, db: PrismaClient): Promise<void> {
+  if (uploadedVideos.length > 0) {
+    setTimeout(async () => {
+      await saveChaptersAndLinkParts(tenantId, dbId, uploadedVideos, splitDuration, db);
     }, 60000);
   }
 }

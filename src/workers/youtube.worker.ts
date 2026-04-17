@@ -3,6 +3,7 @@ import type { YoutubeUploadJob, YoutubeUploadResult, YoutubeVodUploadJob, Youtub
 import { getJobContext } from './utils/job-context.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { processVodUpload, linkVodPartsAfterDelay } from './youtube/vod-upload-processor.js';
+import { getEffectiveSplitDuration } from './youtube/validation.js';
 import { processGameUpload } from './youtube/game-upload-processor.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import type { AppLogger } from '../utils/logger.js';
@@ -86,7 +87,8 @@ async function processVodUploadJob(job: YoutubeVodUploadJob & { filePath: string
     });
   }
 
-  await linkVodPartsAfterDelay(tenantId, result.uploadedVideos);
+  const splitDuration = getEffectiveSplitDuration(config.youtube!.splitDuration);
+  await linkVodPartsAfterDelay(tenantId, dbId, result.uploadedVideos, splitDuration, db);
 
   return { success: true, videos: result.uploadedVideos };
 }
