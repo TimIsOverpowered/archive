@@ -1,14 +1,14 @@
 import 'dotenv/config';
 import { extractErrorDetails } from '../utils/error.js';
-import { Worker, Queue, BaseJobOptions } from 'bullmq';
+import { Queue, BaseJobOptions } from 'bullmq';
 import { loadTenantConfigs, clearConfigCache } from '../config/loader.js';
 import { QUEUE_NAMES, getQueue, closeQueues } from './jobs/queues.js';
 import { redisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
 import { startTokenHealthCron } from '../cron/token-health.js';
 import { startMonitorService, stopMonitorService } from './monitor/index.js';
 import { logger as baseLogger } from '../utils/logger.js';
-import { AllJobData, WORKER_DEFINITIONS, WorkerName } from './worker-definitions.js';
-import { createWorker } from './create-worker.js';
+import { AllJobData, WORKER_DEFINITIONS } from './worker-definitions.js';
+import { createWorker, waitForWorkersReady, workers } from './create-worker.js';
 import { loadWorkersConfig } from '../config/env.js';
 import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/client.js';
 
@@ -29,12 +29,6 @@ export interface WorkerHealthStatus {
   queueCounts: Record<string, number>;
   lastFailedJob: LastFailedJob | null;
   status: 'healthy' | 'warning' | 'error';
-}
-
-const workers = new Map<WorkerName, Worker<Record<string, unknown>, unknown>>();
-
-export function registerWorker(name: WorkerName, worker: Worker<Record<string, unknown>, unknown>) {
-  workers.set(name, worker);
 }
 
 async function clearAllJobsOnStartup() {
@@ -135,18 +129,6 @@ export async function getWorkersHealth(): Promise<Record<string, WorkerHealthSta
   }
 
   return result;
-}
-
-async function waitForWorkersReady(workers: Worker[]): Promise<void> {
-  const readyPromises = workers.map((worker) => {
-    if (worker.isRunning()) return Promise.resolve();
-
-    return new Promise<void>((resolve) => {
-      worker.once('ready', () => resolve());
-    });
-  });
-
-  await Promise.all(readyPromises);
 }
 
 async function bootstrap() {
