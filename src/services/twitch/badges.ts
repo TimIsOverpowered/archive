@@ -1,4 +1,4 @@
-import { createTwitchClient } from './client.js';
+import { getTwitchClient } from './auth.js';
 import { getTwitchCredentials } from '../../utils/credentials.js';
 import { getTenantConfig } from '../../config/loader.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
@@ -6,10 +6,6 @@ import { extractErrorDetails } from '../../utils/error.js';
 import { HttpError } from '../../utils/http-error.js';
 
 const log = createAutoLogger('twitch-badges');
-
-function getTwitchClient(tenantId: string) {
-  return createTwitchClient(tenantId, () => import('./auth.js').then((m) => m.getAppAccessToken(tenantId)));
-}
 
 export async function getChannelBadges(tenantId: string): Promise<Record<string, unknown> | null> {
   const creds = getTwitchCredentials(tenantId);

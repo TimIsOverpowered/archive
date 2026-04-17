@@ -1,6 +1,5 @@
 import 'dotenv/config';
 import { program } from 'commander';
-import fetch from 'node-fetch';
 import crypto from 'crypto';
 import http from 'http';
 import open from 'open';
@@ -24,7 +23,7 @@ const YoutubeTokenResponseSchema = z
     scope: z.string().optional(),
     token_type: z.string().optional(),
   })
-  .passthrough();
+  .loose();
 
 let callbackServer: http.Server | null = null;
 

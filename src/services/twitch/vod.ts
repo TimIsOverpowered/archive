@@ -1,5 +1,6 @@
-import { createTwitchClient, createTwitchGqlClient } from './client.js';
-import { getAppAccessToken } from './auth.js';
+import { getTwitchClient } from './auth.js';
+import { createTwitchGqlClient } from './client.js';
+import { request } from '../../utils/http-client.js';
 
 export interface VodData {
   id: string;
@@ -24,10 +25,6 @@ export interface VodData {
 interface VodTokenSig {
   value: string;
   signature: string;
-}
-
-function getTwitchClient(tenantId: string) {
-  return createTwitchClient(tenantId, () => getAppAccessToken(tenantId));
 }
 
 export async function getVodData(vodId: string, tenantId: string): Promise<VodData> {
@@ -75,7 +72,6 @@ export async function getVodTokenSig(vodId: string, tenantId?: string): Promise<
 export async function getM3u8(vodId: string, token: string, sig: string): Promise<string> {
   const url = `https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h265,h264&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`;
 
-  const { request } = await import('../../utils/http-client.js');
   return request(url, {
     responseType: 'text',
     timeoutMs: 30000,
