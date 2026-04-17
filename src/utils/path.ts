@@ -42,7 +42,7 @@ export async function deleteFileIfExists(filePath: string): Promise<void> {
   }
 }
 
-export interface vodPathOptions {
+export interface VodPathOptions {
   config: TenantConfig;
   vodId: string;
 }
@@ -56,7 +56,7 @@ export interface LivePathOptions {
  * Gets the file path for an archived VOD.
  * Path: {vodPath}/{tenantId}/{vodId}.mp4
  */
-export function getVodFilePath(options: vodPathOptions): string {
+export function getVodFilePath(options: VodPathOptions): string {
   const { config, vodId } = options;
 
   if (!config?.settings.vodPath) {
@@ -70,7 +70,7 @@ export function getVodFilePath(options: vodPathOptions): string {
  * Gets the directory path for an archived VOD.
  * Path: {vodPath}/{tenantId}/{vodId}
  */
-export function getVodDirPath(options: vodPathOptions): string {
+export function getVodDirPath(options: VodPathOptions): string {
   const { config, vodId } = options;
 
   if (!config?.settings.vodPath) {
