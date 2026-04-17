@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import 'dotenv/config';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -65,14 +63,14 @@ interface RawConfig {
   kick?: KickConfig;
   youtube?: YoutubeConfig;
   channel?: string;
-  domainName?: string;
-  vodPath?: string;
-  livePath?: string;
-  timezone?: string;
-  chatDownload?: boolean;
-  vodDownload?: boolean;
-  saveHLS?: boolean;
-  saveMP4?: boolean;
+  domainName: string;
+  vodPath: string;
+  livePath: string;
+  timezone: string;
+  chatDownload: boolean;
+  vodDownload: boolean;
+  saveHLS: boolean;
+  saveMP4: boolean;
 }
 
 function processTwitch(config: TwitchConfig | undefined) {
@@ -131,16 +129,16 @@ function processKick(config: KickConfig | undefined) {
 }
 
 function processSettings(raw: RawConfig) {
-  const settings: Record<string, unknown> = {};
-
-  if (raw.domainName) settings.domain_name = raw.domainName;
-  if (raw.vodPath) settings.vodPath = raw.vodPath;
-  if (raw.livePath) settings.livePath = raw.livePath;
-  if (raw.timezone) settings.timezone = raw.timezone;
-  if (raw.chatDownload !== undefined) settings.chatDownload = raw.chatDownload;
-  if (raw.vodDownload !== undefined) settings.vodDownload = raw.vodDownload;
-  if (raw.saveHLS !== undefined) settings.saveHLS = raw.saveHLS;
-  if (raw.saveMP4 !== undefined) settings.saveMP4 = raw.saveMP4;
+  const settings: SettingsConfig = {
+    domainName: raw.domainName,
+    vodPath: raw.vodPath,
+    livePath: raw.livePath,
+    timezone: raw.timezone,
+    chatDownload: raw.chatDownload,
+    vodDownload: raw.vodDownload,
+    saveHLS: raw.saveHLS,
+    saveMP4: raw.saveMP4,
+  };
 
   return settings;
 }
@@ -168,7 +166,6 @@ async function importConfig(channelName: string, dbUrl: string): Promise<void> {
   }
 
   const configPath = path.join(__dirname, '..', 'config', `config.json.${channelName}`);
-  const defaultPath = path.join(__dirname, '..', 'config', `default.json.${channelName}`);
 
   if (!fs.existsSync(configPath)) {
     console.log(`Skipping ${channelName}: config file not found`);
@@ -190,7 +187,7 @@ async function importConfig(channelName: string, dbUrl: string): Promise<void> {
     id: channelName,
     displayName: displayName,
     databaseUrl: encryptedDbUrl,
-    settings: settings as Record<string, string | boolean | number>,
+    settings: settings as SettingsConfig,
   };
 
   if (twitch) createData.twitch = twitch;
