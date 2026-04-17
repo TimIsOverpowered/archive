@@ -1,14 +1,14 @@
 import { FastifyInstance } from 'fastify';
-import createRateLimitMiddleware from '../../middleware/rate-limit';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key';
-import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
-import { adminRateLimiter } from '../../plugins/redis.plugin';
-import { notFound } from '../../../utils/http-error';
+import createRateLimitMiddleware from '../../middleware/rate-limit.js';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
+import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform.js';
+import { adminRateLimiter } from '../../plugins/redis.plugin.js';
+import { notFound } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
 import { SOURCE_TYPES, DOWNLOAD_METHODS, PLATFORM_VALUES, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES_VALUES, UPLOAD_MODE_VALUES, UPLOAD_MODES } from '../../../types/platforms.js';
 import { ensureVodDownload, findVodRecord } from './utils/vod-helpers.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job';
-import { createAutoLogger } from '../../../utils/auto-tenant-logger';
+import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 
 interface ReUploadYoutubeParams {
   tenantId: string;

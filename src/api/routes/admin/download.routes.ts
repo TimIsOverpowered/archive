@@ -1,11 +1,11 @@
 import { FastifyInstance } from 'fastify';
-import createRateLimitMiddleware from '../../middleware/rate-limit';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key';
-import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
-import { ensureVodDownload, ensureVodRecord, findVodRecord } from './utils/vod-helpers';
-import { adminRateLimiter } from '../../plugins/redis.plugin';
+import createRateLimitMiddleware from '../../middleware/rate-limit.js';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
+import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform.js';
+import { ensureVodDownload, ensureVodRecord, findVodRecord } from './utils/vod-helpers.js';
+import { adminRateLimiter } from '../../plugins/redis.plugin.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { badRequest, notFound } from '../../../utils/http-error';
+import { badRequest, notFound } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
 import { SOURCE_TYPES, DOWNLOAD_METHODS, UPLOAD_MODES, PLATFORM_VALUES, UPLOAD_MODE_VALUES, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES_VALUES } from '../../../types/platforms.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job';

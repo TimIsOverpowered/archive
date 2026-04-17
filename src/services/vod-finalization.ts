@@ -1,4 +1,4 @@
-import { PLATFORMS, Platform } from '../types/platforms';
+import { PLATFORMS, Platform } from '../types/platforms.js';
 import { finalizeKickChapters } from './kick.js';
 import { saveVodChapters as saveTwitchVodChapters } from './twitch/index.js';
 import { TenantContext } from '../types/context.js';

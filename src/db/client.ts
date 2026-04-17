@@ -1,6 +1,6 @@
-import { PrismaClient } from '../../generated/streamer/client';
+import { PrismaClient } from '../../generated/streamer/client.js';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { TenantConfig } from '../config/types';
+import { TenantConfig } from '../config/types.js';
 import { logger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { DB_CLIENT_IDLE_TIMEOUT_MS, DB_CLIENT_MAX_CLIENTS, DB_CLIENT_CLEANUP_INTERVAL_MS } from '../constants.js';

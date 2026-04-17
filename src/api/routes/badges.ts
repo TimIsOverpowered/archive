@@ -1,9 +1,9 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import Redis from 'ioredis';
-import { getTenantConfig } from '../../config/loader';
+import { getTenantConfig } from '../../config/loader.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { notFound } from '../../utils/http-error';
-import { getChannelBadges, getGlobalBadges } from '../../services/twitch';
+import { notFound } from '../../utils/http-error.js';
+import { getChannelBadges, getGlobalBadges } from '../../services/twitch/index.js';
 
 interface BadgesRoutesOptions {
   prefix: string;

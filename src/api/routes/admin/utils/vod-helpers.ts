@@ -1,18 +1,17 @@
 import { FastifyRequest } from 'fastify';
-import { getVodData, saveVodChapters, type VodData as TwitchVodData } from '../../../../services/twitch/index.js';
-import { getVod as getKickVod } from '../../../../services/kick.js';
+import { saveVodChapters } from '../../../../services/twitch/index.js';
 import { getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
 import { getDuration } from '../../../../workers/utils/ffmpeg.js';
 import { type AppLogger } from '../../../../utils/logger.js';
 import type { VodRecord } from '../../../../types/db.js';
 import type { Platform, SourceType, DownloadMethod } from '../../../../types/platforms.js';
-import { DOWNLOAD_METHODS, PLATFORMS, SOURCE_TYPES } from '../../../../types/platforms.js';
+import { DOWNLOAD_METHODS, SOURCE_TYPES } from '../../../../types/platforms.js';
 import type { PrismaClient } from '../../../../../generated/streamer/client';
 import { fetchAndSaveEmotes } from '../../../../services/emotes.js';
 import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
-import { parseTwitchDuration } from '../../../../utils/formatting.js';
 import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
 import { triggerChatDownload } from '../../../../workers/jobs/chat.job.js';
+import { getStrategy } from '../../../../services/platforms/index.js';
 
 export interface VodCreateOptions {
   vodId: number;
@@ -164,7 +163,7 @@ export async function ensureVodRecord(ctx: TenantPlatformContext, vodId: string,
   if (!platformConfig) {
     return null;
   }
-  const { platformUserId, platformUsername } = platformConfig;
+  const { platformUserId } = platformConfig;
 
   // Try to find existing VOD record
   const rawVodRecord = await findVodRecord(db, vodId, platform);
@@ -174,56 +173,31 @@ export async function ensureVodRecord(ctx: TenantPlatformContext, vodId: string,
     return rawVodRecord;
   }
 
-  // Create new VOD record by fetching metadata from platform API
+  const strategy = getStrategy(platform);
+  if (!strategy) {
+    log.warn({ platform }, 'Unsupported platform');
+    return null;
+  }
+
+  const vodMetadata = await strategy.fetchVodMetadata(vodId, ctx);
+  if (!vodMetadata) {
+    log.warn({ vodId, platform }, 'Failed to fetch VOD metadata');
+    return null;
+  }
+
   log.info(`Creating new VOD ${vodId} for platform ${platform}`);
 
-  let vodRecord: VodRecord;
+  const vodRecord = (await db.vod.create({
+    data: strategy.createVodData(vodMetadata),
+  })) as VodRecord;
 
-  if (platform === PLATFORMS.TWITCH) {
-    const vodMetadata: TwitchVodData = await getVodData(vodId, tenantId);
-
-    if (vodMetadata.user_id !== config?.twitch?.id) {
-      return null;
-    }
-
-    const duration = parseTwitchDuration(vodMetadata.duration);
-
-    vodRecord = (await db.vod.create({
-      data: {
-        vod_id: vodId,
-        title: vodMetadata.title || null,
-        created_at: new Date(vodMetadata.created_at),
-        duration,
-        stream_id: vodMetadata.stream_id || null,
-        platform,
-      },
-    })) as VodRecord;
-
-    log.info(`Created Twitch VOD ${vodId} with user_id=${vodMetadata.user_id}`);
-
+  if (platform === 'twitch') {
     await saveVodChapters(ctx, vodRecord.id, vodRecord.vod_id, vodRecord.duration);
     await fetchAndSaveEmotes(ctx, vodRecord.id, platform, platformUserId);
     triggerChatDownload(tenantId, platformUserId, vodRecord.id, vodId, platform, Math.round(vodRecord.duration), config?.[platform]?.username);
-  } else if (platform === PLATFORMS.KICK) {
-    const vodMetadata = await getKickVod(platformUsername, vodId);
-
-    log.info(`Fetched Kick VOD ${vodId} from channel ${platformUsername}`);
-
-    vodRecord = (await db.vod.create({
-      data: {
-        vod_id: vodId,
-        title: vodMetadata.session_title,
-        created_at: new Date(vodMetadata.created_at),
-        duration: Math.floor(Number(vodMetadata.duration) / 1000),
-        stream_id: `${vodMetadata.id}`,
-        platform,
-      },
-    })) as VodRecord;
-
-    log.info(`Created Kick VOD ${vodId} with duration=${Number(vodMetadata.duration)}ms`);
-  } else {
-    return null;
   }
+
+  log.info({ vodId, platform, duration: vodRecord.duration }, 'VOD record created');
 
   return vodRecord;
 }
@@ -235,55 +209,32 @@ export async function ensureVodRecord(ctx: TenantPlatformContext, vodId: string,
 export async function refreshVodRecord(ctx: TenantPlatformContext, vodId: string, dbId: number, platformUserId: string, platformUsername: string, log: AppLogger): Promise<VodRecord | null> {
   const { db, tenantId, platform } = ctx;
 
-  log.info(`Refreshing VOD ${vodId} metadata from platform ${platform}`);
-
-  if (platform === PLATFORMS.TWITCH) {
-    const vodMetadata: TwitchVodData = await getVodData(vodId, tenantId);
-
-    const duration = parseTwitchDuration(vodMetadata.duration);
-
-    const updatedRecord = await db.vod.update({
-      where: { id: dbId },
-      data: {
-        vod_id: vodId,
-        title: vodMetadata.title || null,
-        created_at: new Date(vodMetadata.created_at),
-        duration,
-        stream_id: vodMetadata.stream_id || null,
-        platform,
-      },
-    });
-
-    log.info(`Refreshed Twitch VOD ${vodId} with duration=${duration}s`);
-
-    // Re-trigger chapters, emotes, and chat download
-    await saveVodChapters(ctx, updatedRecord.id, updatedRecord.vod_id, updatedRecord.duration);
-    await fetchAndSaveEmotes(ctx, updatedRecord.id, platform, platformUserId);
-    triggerChatDownload(tenantId, platformUserId, updatedRecord.id, vodId, platform, Math.round(updatedRecord.duration), platformUsername);
-
-    return updatedRecord;
-  } else if (platform === PLATFORMS.KICK) {
-    const vodMetadata = await getKickVod(platformUsername, vodId);
-
-    log.info(`Fetched Kick VOD ${vodId} from channel ${platformUsername}`);
-
-    const updatedRecord = (await db.vod.update({
-      where: { id: dbId },
-      data: {
-        vod_id: vodId,
-        title: vodMetadata.session_title,
-        created_at: new Date(vodMetadata.created_at),
-        duration: Math.floor(Number(vodMetadata.duration) / 1000),
-        stream_id: `${vodMetadata.id}`,
-        platform,
-      },
-    })) as VodRecord;
-
-    log.info(`Refreshed Kick VOD ${vodId} with duration=${Number(vodMetadata.duration)}ms`);
-
-    return updatedRecord;
-  } else {
+  const strategy = getStrategy(platform);
+  if (!strategy) {
     log.warn({ platform }, 'Unsupported platform');
     return null;
   }
+
+  log.info(`Refreshing VOD ${vodId} metadata from platform ${platform}`);
+
+  const vodMetadata = await strategy.fetchVodMetadata(vodId, ctx);
+  if (!vodMetadata) {
+    log.warn({ vodId, platform }, 'Failed to fetch VOD metadata');
+    return null;
+  }
+
+  const updatedRecord = (await db.vod.update({
+    where: { id: dbId },
+    data: strategy.updateVodData(vodMetadata),
+  })) as VodRecord;
+
+  log.info({ vodId, platform, duration: updatedRecord.duration }, 'VOD metadata refreshed');
+
+  if (platform === 'twitch') {
+    await saveVodChapters(ctx, updatedRecord.id, updatedRecord.vod_id, updatedRecord.duration);
+    await fetchAndSaveEmotes(ctx, updatedRecord.id, platform, platformUserId);
+    triggerChatDownload(tenantId, platformUserId, updatedRecord.id, vodId, platform, Math.round(updatedRecord.duration), platformUsername);
+  }
+
+  return updatedRecord;
 }

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import path from 'path';
-import { YOUTUBE_MAX_DURATION } from '../constants';
+import { YOUTUBE_MAX_DURATION } from '../constants.js';
 
 function normalizePathForSchema(basePath?: string): string | undefined {
   if (!basePath) return basePath;

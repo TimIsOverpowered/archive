@@ -10,6 +10,7 @@ import { WORKER_DEFINITIONS } from './worker-definitions.js';
 import { createWorker, waitForWorkersReady, workers } from './create-worker.js';
 import { loadWorkersConfig } from '../config/env.js';
 import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/client.js';
+import { registerPlatformStrategies } from '../services/platforms/index.js';
 
 const workerConfig = loadWorkersConfig();
 
@@ -29,6 +30,7 @@ async function bootstrap() {
   logger.info(`Starting worker process (NODE_ENV: ${workerConfig.NODE_ENV})`);
 
   try {
+    registerPlatformStrategies();
     await loadTenantConfigs();
     await waitForRedisReady;
     startTokenHealthCron();

@@ -1,7 +1,7 @@
-import { metaClient } from '../db/meta-client';
-import { decryptScalar } from '../utils/encryption';
-import { SettingsSchema, YoutubeSchema, TwitchSchema, KickSchema } from './schemas';
-import { TenantConfig } from './types';
+import { metaClient } from '../db/meta-client.js';
+import { decryptScalar } from '../utils/encryption.js';
+import { SettingsSchema, YoutubeSchema, TwitchSchema, KickSchema } from './schemas.js';
+import { TenantConfig } from './types.js';
 import type { JsonObject } from '@prisma/client/runtime/client';
 
 const configCache = new Map<string, TenantConfig>();

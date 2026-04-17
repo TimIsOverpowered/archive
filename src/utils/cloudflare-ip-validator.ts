@@ -1,6 +1,6 @@
 import ipaddr from 'ipaddr.js';
 import { redisClient } from '../api/plugins/redis.plugin';
-import { logger } from './logger';
+import { logger } from './logger.js';
 import { request } from './http-client.js';
 
 const CF_IP_RANGES_KEY = 'cloudflare:ip_ranges';

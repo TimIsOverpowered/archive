@@ -1,15 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import fs from 'fs/promises';
-import createRateLimitMiddleware from '../../middleware/rate-limit';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key';
-import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
+import createRateLimitMiddleware from '../../middleware/rate-limit.js';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
+import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform.js';
 import { fileExists } from '../../../utils/path.js';
-import { adminRateLimiter } from '../../plugins/redis.plugin';
+import { adminRateLimiter } from '../../plugins/redis.plugin.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { notFound, badRequest } from '../../../utils/http-error';
+import { notFound, badRequest } from '../../../utils/http-error.js';
 import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
-import { findStreamRecord } from './utils/vod-helpers';
+import { findStreamRecord } from './utils/vod-helpers.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job';
 
 interface LiveCallbackBody {

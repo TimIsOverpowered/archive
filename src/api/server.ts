@@ -6,7 +6,7 @@ import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
 import redisPlugin from './plugins/redis.plugin';
 import configPlugin from './plugins/config.plugin';
-import createTenantLoggerMiddleware from './middleware/tenant-logger';
+import createTenantLoggerMiddleware from './middleware/tenant-logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { logger } from '../utils/logger.js';
 import healthRoutes from './routes/health.js';

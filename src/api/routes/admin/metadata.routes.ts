@@ -1,14 +1,14 @@
 import type { FastifyInstance } from 'fastify';
-import createRateLimitMiddleware from '../../middleware/rate-limit';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key';
-import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform';
+import createRateLimitMiddleware from '../../middleware/rate-limit.js';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
+import { tenantMiddleware, platformValidationMiddleware, type TenantPlatformContext } from '../../middleware/tenant-platform.js';
 import { saveVodChapters } from '../../../services/twitch/index.js';
-import { adminRateLimiter } from '../../plugins/redis.plugin';
-import { badRequest, notFound } from '../../../utils/http-error';
+import { adminRateLimiter } from '../../plugins/redis.plugin.js';
+import { badRequest, notFound } from '../../../utils/http-error.js';
 import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
 import { findVodRecord } from './utils/vod-helpers.js';
-import { fetchAndSaveEmotes } from '../../../services/emotes';
+import { fetchAndSaveEmotes } from '../../../services/emotes.js';
 import { triggerChatDownload } from '../../../workers/jobs/chat.job';
 
 type RouteParams = { tenantId: string };

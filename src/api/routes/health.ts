@@ -1,10 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import Redis from 'ioredis';
-import { loadTenantConfigs } from '../../config/loader';
-import { getClient } from '../../db/client';
-import { checkPuppeteerHealth } from '../../utils/puppeteer-health';
-import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator';
-import healthCheckMiddleware from '../middleware/health-check';
+import { loadTenantConfigs } from '../../config/loader.js';
+import { getClient } from '../../db/client.js';
+import { checkPuppeteerHealth } from '../../utils/puppeteer-health.js';
+import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator.js';
+import healthCheckMiddleware from '../middleware/health-check.js';
 import { getRedisStatus } from '../plugins/redis.plugin';
 
 interface HealthRouteOptions {
