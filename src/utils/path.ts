@@ -59,7 +59,7 @@ export interface LivePathOptions {
 export function getVodFilePath(options: VodPathOptions): string {
   const { config, vodId } = options;
 
-  if (!config?.settings.vodPath) {
+  if (!config.settings.vodPath) {
     throw new Error(`VOD path not configured for tenant ${config.id}`);
   }
 
@@ -73,7 +73,7 @@ export function getVodFilePath(options: VodPathOptions): string {
 export function getVodDirPath(options: VodPathOptions): string {
   const { config, vodId } = options;
 
-  if (!config?.settings.vodPath) {
+  if (!config.settings.vodPath) {
     throw new Error(`VOD path not configured for tenant ${config.id}`);
   }
 
@@ -87,7 +87,7 @@ export function getVodDirPath(options: VodPathOptions): string {
 export function getLiveFilePath(options: LivePathOptions): string {
   const { config, streamId } = options;
 
-  if (!config?.settings.livePath) {
+  if (!config.settings.livePath) {
     throw new Error(`Live path not configured for tenant ${config.id}`);
   }
 
@@ -101,7 +101,7 @@ export function getLiveFilePath(options: LivePathOptions): string {
 export function getLiveDirPath(options: LivePathOptions): string {
   const { config, streamId } = options;
 
-  if (!config?.settings.livePath) {
+  if (!config.settings.livePath) {
     throw new Error(`Live path not configured for tenant ${config.id}`);
   }
 
