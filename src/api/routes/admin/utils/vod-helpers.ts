@@ -3,7 +3,7 @@ import { getVodData, saveVodChapters, type VodData as TwitchVodData } from '../.
 import { getVod as getKickVod } from '../../../../services/kick.js';
 import { getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
 import { getDuration } from '../../../../workers/utils/ffmpeg.js';
-import { AppLogger } from '../../../../utils/auto-tenant-logger.js';
+import { type AppLogger } from '../../../../utils/logger.js';
 import type { VodRecord } from '../../../../types/db.js';
 import type { Platform, SourceType, DownloadMethod } from '../../../../types/platforms.js';
 import { DOWNLOAD_METHODS, PLATFORMS, SOURCE_TYPES } from '../../../../types/platforms.js';

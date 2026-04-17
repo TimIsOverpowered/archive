@@ -1,5 +1,5 @@
 import { extractErrorDetails } from '../../utils/error.js';
-import type { AppLogger } from '../../utils/auto-tenant-logger.js';
+import type { AppLogger } from '../../utils/logger.js';
 import type { Platform } from '../../types/platforms.js';
 
 export interface WorkerErrorContext {

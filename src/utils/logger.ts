@@ -3,6 +3,8 @@ import pretty from 'pino-pretty';
 
 const logLevel = process.env.LOG_LEVEL || 'info';
 
+export type AppLogger = typeof logger;
+
 export const logger = pino(
   {
     level: logLevel,

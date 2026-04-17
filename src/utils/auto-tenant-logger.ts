@@ -1,19 +1,17 @@
 import type { LogFn } from 'pino';
 import { getTenantDisplayName } from '../config/loader.js';
-import { logger as baseLogger } from './logger.js';
-
-export type AppLogger = typeof baseLogger;
+import { type AppLogger, logger } from './logger.js';
 
 // Define a specific call signature for the wrapper to satisfy ESLint
 type InternalLogCall = (arg1: unknown, ...args: unknown[]) => void;
 
 export function createAutoLogger(tenantId?: string | null): AppLogger {
   if (!tenantId) {
-    return baseLogger;
+    return logger;
   }
 
   const displayName = getTenantDisplayName(tenantId);
-  const childLog = baseLogger.child({ tenant: displayName });
+  const childLog = logger.child({ tenant: displayName });
 
   const prefix = (msg: string): string => {
     if (msg.match(/^\w+:/) || msg.startsWith(`[${displayName}]`)) {

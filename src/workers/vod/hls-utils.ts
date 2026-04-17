@@ -9,7 +9,7 @@ import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
 import { sleep } from '../../utils/delay.js';
 import type { ReadableStream as NodeWebStream } from 'node:stream/web';
 import pLimit from 'p-limit';
-import { AppLogger } from '../../utils/auto-tenant-logger.js';
+import type { AppLogger } from '../../utils/logger.js';
 import { fileExists } from '../../utils/path.js';
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch/index.js';
 import { request } from '../../utils/http-client.js';

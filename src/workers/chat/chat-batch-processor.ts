@@ -1,6 +1,6 @@
 import type { PrismaClient } from '../../../generated/streamer/client';
 import type { ChatMessageCreateInput } from './chat-types.js';
-import type { AppLogger } from '../../utils/auto-tenant-logger.js';
+import type { AppLogger } from '../../utils/logger.js';
 import { retryWithBackoff } from '../../utils/retry.js';
 import { CHAT_MAX_RETRIES, CHAT_RETRY_DELAY_MS } from '../../constants.js';
 
