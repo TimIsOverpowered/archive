@@ -34,9 +34,9 @@ export async function uploadVideo(
     logger.info(`[YouTube] Starting upload for ${displayName}: ${title}`);
 
     const response = await youtube.videos.insert({
-      part: ['snippet', 'status'],
+      part: ['id', 'snippet', 'status'],
       requestBody: {
-        snippet: { title, description },
+        snippet: { title, description, categoryId: '20' },
         status: { privacyStatus },
       },
       media: { body: fs.createReadStream(filePath) },
@@ -52,8 +52,7 @@ export async function uploadVideo(
     await sleep(3000);
 
     let thumbnailUrl = '';
-    const meta = await youtube.videos.list({ part: ['snippet'], id: [videoId] });
-    const thumbs = meta.data?.items?.[0]?.snippet?.thumbnails;
+    const thumbs = response?.data?.snippet?.thumbnails;
     thumbnailUrl = thumbs?.high?.url || thumbs?.medium?.url || '';
 
     if (onProgress) {

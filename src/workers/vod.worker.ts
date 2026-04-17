@@ -53,6 +53,8 @@ const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job
         platformUsername,
         sourceUrl,
         isLive: false,
+        discordMessageId: messageId || undefined,
+        streamerName,
       });
 
       log.info({ vodId, platform }, `Downloaded ${vodId}.mp4`);

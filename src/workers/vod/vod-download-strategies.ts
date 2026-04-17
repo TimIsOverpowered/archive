@@ -5,7 +5,7 @@ import type { AppLogger } from '../../utils/logger.js';
 import type { TenantConfig } from '../../config/types.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { request } from '../../utils/http-client.js';
-import { sendVodDownloadFailed, sendVodDownloadStarted, sendVodDownloadSuccess } from '../../utils/discord-alerts.js';
+import { sendVodDownloadFailed, sendVodDownloadStarted, sendVodDownloadSuccess, updateFfmpegProgress } from '../../utils/discord-alerts.js';
 import { extractErrorDetails } from '../../utils/error.js';
 
 export interface VodDownloadResult {
@@ -50,10 +50,18 @@ async function downloadKickVodWithFfmpeg(vodId: string, finalPath: string, confi
 
   try {
     const streamerName = config.displayName || config.id;
-    messageId = await sendVodDownloadStarted(PLATFORMS.KICK, streamerName, vodId, streamerName);
+    messageId = await sendVodDownloadStarted(PLATFORMS.KICK, config.id, vodId, streamerName);
 
     // Download directly to MP4 using ffmpeg HLS streaming
-    await convertHlsToMp4(m3u8Url, finalPath, { vodId: vodId, isFmp4: false });
+    await convertHlsToMp4(m3u8Url, finalPath, {
+      vodId: vodId,
+      isFmp4: false,
+      onProgress: (percent) => {
+        if (messageId) {
+          void updateFfmpegProgress(messageId, PLATFORMS.KICK, vodId, percent, streamerName);
+        }
+      },
+    });
 
     log.info(`Downloaded ${vodId}.mp4`);
 
@@ -98,7 +106,15 @@ async function downloadTwitchVodWithFfmpeg(vodId: string, finalPath: string, con
     });
     const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
 
-    await convertHlsToMp4(m3u8Url, finalPath, { vodId, isFmp4 });
+    await convertHlsToMp4(m3u8Url, finalPath, {
+      vodId,
+      isFmp4,
+      onProgress: (percent) => {
+        if (messageId) {
+          void updateFfmpegProgress(messageId, PLATFORMS.TWITCH, vodId, percent, streamerName);
+        }
+      },
+    });
 
     log.info(`Downloaded ${vodId}.mp4`);
 

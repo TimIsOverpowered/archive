@@ -5,6 +5,8 @@ import { childLogger } from '../../utils/logger.js';
 const logger = childLogger({ module: 'ffmpeg' });
 import HLS from 'hls-parser';
 
+const lastFfmpegProgressBySource = new Map<string, number>();
+
 interface ProgressEvent {
   percent?: number;
 }
@@ -153,10 +155,16 @@ export async function convertHlsToMp4(source: string, outputPath: string, option
       .audioCodec('copy')
       .outputOptions(baseOptions)
       .toFormat('mp4')
-      // Progress callback (optional - not currently used by callers per requirement Z/skip)
+      // Progress callback with 25% throttling
       .on('progress', (progress: ProgressEvent) => {
         const percent = progress.percent != null ? Math.round(progress.percent) : 0;
-        options?.onProgress?.(percent);
+        const threshold = Math.floor(percent / 25) * 25;
+        const lastReported = lastFfmpegProgressBySource.get(source) ?? -1;
+
+        if (threshold > lastReported) {
+          lastFfmpegProgressBySource.set(source, threshold);
+          options?.onProgress?.(threshold);
+        }
       })
       // Start logging with format context
       .on('start', () => {
