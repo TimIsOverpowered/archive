@@ -15,7 +15,15 @@ export async function createYoutubeClient(tenantId: string): Promise<youtube_v3.
 
   oauth2Client.on('tokens', async (credentials) => {
     if (credentials.refresh_token && credentials.access_token && credentials.expiry_date) {
-      logger.info({ tenantId, expiry_date: credentials.expiry_date }, 'YouTube token auto-refreshed during upload');
+      const expiryDate = new Date(credentials.expiry_date);
+      logger.info(
+        {
+          tenantId,
+          expiry_date: expiryDate.toISOString(),
+          expiry_epoch: credentials.expiry_date,
+        },
+        'YouTube token auto-refreshed during api call'
+      );
       await updateYoutubeTokenInDb(tenantId, credentials.access_token, credentials.expiry_date, credentials.refresh_token);
     }
   });

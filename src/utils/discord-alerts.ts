@@ -46,7 +46,7 @@ function getEmbedColor(status: AlertStatus): number {
     case 'success':
       return 0x306934;
     case 'warning':
-      return 15158332;
+      return 0xffcc00;
     case 'error':
       return 0xed4245;
   }
@@ -187,14 +187,8 @@ export function resetFailures(tenantId: string): void {
   failureCounts.delete(tenantId);
 }
 
-export function formatProgressMessage(operation: string, streamerName: string, percent: number, current?: number, total?: number): string {
-  const bar = createProgressBarInternal(percent);
-
-  if (total !== undefined && current !== undefined) {
-    return `[${operation}] ${streamerName} ${bar} ${Math.round((current / total) * 100)}% (${current}/${total})`;
-  }
-
-  return `[${operation}] ${streamerName} ${bar} ${percent}%`;
+export function formatProgressMessage(percent: number): string {
+  return createProgressBar(percent);
 }
 
 export function createProgressBar(percent: number): string {

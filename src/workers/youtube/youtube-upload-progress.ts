@@ -1,6 +1,6 @@
 import type { UploadProgressCallbackData } from '../../services/youtube/index.js';
 import { extractErrorDetails } from '../../utils/error.js';
-import { updateDiscordEmbed, isAlertsEnabled } from '../../utils/discord-alerts.js';
+import { updateDiscordEmbed, isAlertsEnabled, createProgressBar } from '../../utils/discord-alerts.js';
 import type { UploadType } from '../../types/platforms.js';
 import { UPLOAD_TYPES } from '../../types/platforms.js';
 
@@ -12,6 +12,35 @@ interface UploadProgressOptions {
   gameName?: string;
   part?: number;
   totalParts?: number;
+}
+
+function formatBytes(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let unitIndex = 0;
+  let size = bytes;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex++;
+  }
+
+  return `${size.toFixed(1)} ${units[unitIndex]}`;
+}
+
+function formatETA(seconds: number): string {
+  if (seconds < 0 || isNaN(seconds)) return 'Calculating...';
+
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${secs}s`;
+  } else {
+    return `${secs}s`;
+  }
 }
 
 export function createYoutubeUploadProgressHandler({
@@ -32,7 +61,7 @@ export function createYoutubeUploadProgressHandler({
     switch (progress.milestone) {
       case 'starting': {
         const titlePrefix = type === UPLOAD_TYPES.VOD ? '📺 Uploading VOD' : '🎮 Uploading Game';
-        const title = type === UPLOAD_TYPES.VOD ? `${titlePrefix}${partSuffix}` : `${titlePrefix}${partSuffix}`;
+        const title = `${titlePrefix}${partSuffix}`;
         const videoField = videoTitle ? { name: 'Video', value: videoTitle.substring(0, 150), inline: false } : undefined;
         const gameField = gameName ? { name: 'Game', value: gameName.substring(0, 150), inline: true } : undefined;
 
@@ -51,9 +80,57 @@ export function createYoutubeUploadProgressHandler({
         break;
       }
 
+      case 'uploading': {
+        const titlePrefix = type === UPLOAD_TYPES.VOD ? '📺 Uploading VOD' : '🎮 Uploading Game';
+        const title = `${titlePrefix}${partSuffix}`;
+
+        const percent = progress.percent ?? 0;
+        const bytesUploaded = progress.bytesUploaded ?? 0;
+        const totalBytes = progress.totalBytes ?? 0;
+        const speedBps = progress.uploadSpeedBps ?? 0;
+        const etaSeconds = progress.etaSeconds ?? 0;
+
+        const fields: Array<{ name: string; value: string; inline: boolean }> = [
+          {
+            name: 'Progress',
+            value: createProgressBar(percent),
+            inline: false,
+          },
+          {
+            name: 'Uploaded',
+            value: `${formatBytes(bytesUploaded)} / ${totalBytes > 0 ? formatBytes(totalBytes) : 'N/A'}`,
+            inline: false,
+          },
+        ];
+
+        if (speedBps > 0) {
+          fields.push({
+            name: 'Speed',
+            value: `${formatBytes(speedBps)}/s`,
+            inline: true,
+          });
+          fields.push({
+            name: 'ETA',
+            value: formatETA(etaSeconds),
+            inline: true,
+          });
+        }
+
+        if (partField) fields.unshift(partField);
+
+        await updateDiscordEmbed(messageId, {
+          title,
+          description: `${channelName} - Uploading video to YouTube...`,
+          status: 'warning',
+          fields,
+          timestamp: new Date().toISOString(),
+        });
+        break;
+      }
+
       case 'processing_metadata': {
         const titlePrefix = type === UPLOAD_TYPES.VOD ? '🔄 Processing VOD' : '🔄 Processing Game';
-        const title = type === UPLOAD_TYPES.VOD ? `${titlePrefix}${partSuffix}` : `${titlePrefix}${partSuffix}`;
+        const title = `${titlePrefix}${partSuffix}`;
 
         const fields: Array<{ name: string; value: string; inline: boolean }> = [{ name: 'Video ID', value: progress.videoId || '', inline: false }];
         if (partField) fields.push(partField);
@@ -70,7 +147,7 @@ export function createYoutubeUploadProgressHandler({
 
       case 'success': {
         const titlePrefix = type === UPLOAD_TYPES.VOD ? '✅ VOD Upload Complete' : '✅ Game Upload Complete';
-        const title = type === UPLOAD_TYPES.VOD ? `${titlePrefix}${partSuffix}` : `${titlePrefix}${partSuffix}`;
+        const title = `${titlePrefix}${partSuffix}`;
 
         const fields: Array<{ name: string; value: string; inline: boolean }> = [
           { name: '', value: progress.thumbnailUrl || '', inline: false },

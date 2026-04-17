@@ -2,7 +2,7 @@ import type { PrismaClient } from '../../../generated/streamer/client.js';
 import type { AppLogger } from '../../utils/logger.js';
 import { splitVideo, getDuration } from '../utils/ffmpeg.js';
 import { uploadVideo, saveChaptersAndLinkParts } from '../../services/youtube/index.js';
-import { initRichAlert, updateAlert, formatProgressMessage } from '../../utils/discord-alerts.js';
+import { initRichAlert, updateAlert, createProgressBar } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 import { getEffectiveSplitDuration } from './validation.js';
 import { buildYoutubeMetadata } from './metadata-builder.js';
@@ -92,23 +92,27 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
   log.info({ duration, parts: totalParts }, 'VOD exceeds YouTube split duration, auto-splitting');
 
   const splitAlertMessageId = await initRichAlert({
-    title: '📺 VOD Splitting in Progress',
-    description: `${tenantId} - Preparing ${totalParts} parts...`,
+    title: '📺 VOD Splitting Started',
+    description: `${tenantId} - Splitting long VOD into ${totalParts} parts`,
     status: 'warning',
     fields: [
       { name: 'VOD ID', value: vodId, inline: true },
       { name: 'Total Duration', value: toHHMMSS(duration), inline: true },
-      { name: 'Parts Count', value: String(totalParts), inline: false },
+      { name: 'Parts', value: `${totalParts} parts (${toHHMMSS(splitDuration)} each)`, inline: false },
     ],
     timestamp: new Date().toISOString(),
   });
 
-  const parts = await splitVideo(filePath, duration, splitDuration, vodId, (percent: number) => {
+  const parts = await splitVideo(filePath, duration, splitDuration, vodId, (percent: number, partNum: number) => {
     void updateAlert(splitAlertMessageId, {
       title: '📺 Splitting VOD',
-      description: `${tenantId} - Preparing video parts for upload`,
+      description: `${tenantId} - Processing part ${partNum}/${totalParts}`,
       status: 'warning',
-      fields: [{ name: 'Progress', value: formatProgressMessage('VOD Splitting', tenantId, percent), inline: false }],
+      fields: [
+        { name: 'VOD ID', value: vodId, inline: true },
+        { name: 'Part Progress', value: `${partNum}/${totalParts}`, inline: true },
+        { name: 'Overall Progress', value: createProgressBar(percent), inline: false },
+      ],
       timestamp: new Date().toISOString(),
       updatedTimestamp: new Date().toISOString(),
     });
@@ -165,8 +169,9 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
     description: `${tenantId} - Successfully split into ${totalParts} parts`,
     status: 'success',
     fields: [
+      { name: 'VOD ID', value: vodId, inline: true },
       { name: 'Total Duration', value: toHHMMSS(duration), inline: true },
-      { name: 'Parts Count', value: String(totalParts), inline: false },
+      { name: 'Parts Created', value: `${totalParts} parts (${toHHMMSS(splitDuration)} each)`, inline: false },
     ],
     timestamp: new Date().toISOString(),
     updatedTimestamp: new Date().toISOString(),

@@ -55,6 +55,13 @@ export function createWorker<TData extends object, TResult>(config: WorkerConfig
     );
   });
 
+  worker.on('stalled', async (jobId) => {
+    logger.warn(
+      { jobId, queueName: queueName.toString() },
+      `[${name}] Job stalled - lock may have expired. This typically happens when a job takes longer than the lock duration (default: 30s). Check if event loop is blocked.`
+    );
+  });
+
   registerWorker(name, worker as Worker);
   logger.info(`[Workers] ${name} worker created`);
 

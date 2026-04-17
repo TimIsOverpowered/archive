@@ -11,6 +11,10 @@ export interface UploadProgressCallbackData {
   thumbnailUrl?: string;
   errorDetails?: Error;
   percent?: number;
+  bytesUploaded?: number;
+  totalBytes?: number;
+  uploadSpeedBps?: number;
+  etaSeconds?: number;
 }
 
 export type YoutubeUploadProgress = (data: UploadProgressCallbackData) => void | Promise<void>;
@@ -25,6 +29,7 @@ export async function uploadVideo(
   onProgress?: YoutubeUploadProgress
 ): Promise<{ videoId: string; thumbnailUrl: string }> {
   const logger = createAutoLogger('youtube-upload');
+  const uploadStartTime = Date.now();
 
   if (onProgress) {
     await onProgress({ milestone: 'starting' });
@@ -33,13 +38,21 @@ export async function uploadVideo(
   try {
     const youtube = await createYoutubeClient(tenantId);
 
-    logger.info(`[YouTube] Starting upload for ${displayName}: ${title}`);
-
     const fileSize = fs.statSync(filePath).size;
+    const fileName = filePath.split('/').pop() || filePath;
 
-    const progressStream = new ProgressStream(fileSize, (percent) => {
+    logger.info({ tenantId, title, fileSize, fileName, privacyStatus }, `[YouTube] Starting upload for ${displayName}: ${title}`);
+
+    const progressStream = new ProgressStream(fileSize, (progressData) => {
       if (onProgress) {
-        void onProgress({ milestone: 'uploading', percent });
+        void onProgress({
+          milestone: 'uploading',
+          percent: progressData.percent,
+          bytesUploaded: progressData.bytesUploaded,
+          totalBytes: fileSize,
+          uploadSpeedBps: progressData.speed,
+          etaSeconds: progressData.eta,
+        });
       }
     });
     const readStream = fs.createReadStream(filePath);
@@ -57,11 +70,11 @@ export async function uploadVideo(
     const videoId = response.data?.id;
     if (!videoId) throw new Error('Upload completed but no video ID returned');
 
+    logger.info({ tenantId, videoId, uploadDuration: Date.now() - uploadStartTime }, '[YouTube] Upload completed');
+
     if (onProgress) {
       await onProgress({ milestone: 'processing_metadata', videoId });
     }
-
-    await sleep(3000);
 
     let thumbnailUrl = '';
     const thumbs = response?.data?.snippet?.thumbnails;
@@ -71,10 +84,14 @@ export async function uploadVideo(
       await onProgress({ milestone: 'success', videoId, thumbnailUrl });
     }
 
+    logger.info({ tenantId, videoId, totalDuration: Date.now() - uploadStartTime }, '[YouTube] Upload completed successfully');
+
     return { videoId, thumbnailUrl };
   } catch (err) {
     const details = extractErrorDetails(err);
-    logger.error(details, `[YouTube] Upload failed for ${displayName}`);
+    const uploadDuration = Date.now() - uploadStartTime;
+
+    logger.error({ ...details, tenantId, uploadDuration, title }, `[YouTube] Upload failed for ${displayName}`);
 
     if (onProgress) {
       await onProgress({ milestone: 'error', errorDetails: err as Error });
