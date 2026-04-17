@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { getVods, getVodById, getVodByPlatformId } from '../../services/vods.service';
+import { getVods, getVodById, getVodByPlatformId, VodQuerySchema } from '../../services/vods.service';
 import { getEmotesByVodId } from '../../services/emotes.js';
 import createRateLimitMiddleware from '../middleware/rate-limit';
 import { publicRateLimiter } from '../plugins/redis.plugin';
@@ -52,17 +52,15 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
     },
     async (request) => {
       const { tenantId, db } = request.tenant;
-      const query = request.query as Record<string, unknown>;
 
-      const { vods, total } = await getVods(db, tenantId, query as never);
-      const page = Math.max(1, (query.page as number) || 1);
-      const limit = Math.min(100, Math.max(1, (query.limit as number) || 20));
+      const query = VodQuerySchema.parse(request.query);
+      const { vods, total } = await getVods(db, tenantId, query);
 
       return {
         data: vods,
         meta: {
-          page,
-          limit,
+          page: query.page,
+          limit: query.limit,
           total,
         },
       };

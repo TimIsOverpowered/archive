@@ -3,25 +3,17 @@ import 'dotenv/config';
 import { program } from 'commander';
 import { metaClient } from '../../src/db/meta-client.js';
 import { extractErrorDetails } from '../../src/utils/error.js';
-import { decryptObject } from '../../src/utils/encryption.js';
-import { loadTenantConfigs, getConfigs } from '../../src/config/loader.js';
+import { loadTenantConfigs } from '../../src/config/loader.js';
 import { getAppAccessToken } from '../../src/services/twitch/index.js';
 import { getTwitchCredentials } from '../../src/utils/credentials.js';
 import { humanizeDuration } from '../../src/utils/formatting.js';
+import { getTwitchAuth } from '../../src/utils/tenant-config.js';
 
 interface TwitchAuth {
   client_id: string;
   client_secret: string;
   access_token?: string;
   expiry_date?: number;
-}
-
-async function decryptTwitchAuth(encryptedValue: any): Promise<TwitchAuth | null> {
-  try {
-    return decryptObject<TwitchAuth>(encryptedValue);
-  } catch {
-    return null;
-  }
 }
 
 program
@@ -59,17 +51,10 @@ program
         process.exit(1);
       }
 
-      const twitchConfig = tenant.twitch as any;
-
-      if (!twitchConfig || !twitchConfig.auth) {
-        console.error('Twitch credentials not found. Run scripts/auth-twitch.ts first.');
-        process.exit(1);
-      }
-
-      let decrypted = await decryptTwitchAuth(twitchConfig.auth);
+      let decrypted = getTwitchAuth(tenant);
 
       if (!decrypted) {
-        console.error('Failed to decrypt Twitch auth data');
+        console.error('Twitch credentials not found. Run scripts/auth-twitch.ts first.');
         process.exit(1);
       }
 
@@ -95,13 +80,12 @@ program
             where: { id: tenantId },
           });
 
-          if (!updatedTenant || !(updatedTenant.twitch as any)?.auth) {
-            console.error('Error: Twitch credentials missing after refresh');
+          if (!updatedTenant) {
+            console.error('Error: Tenant not found after refresh');
             process.exit(1);
           }
 
-          const updatedTwitchConfig = updatedTenant.twitch as any;
-          let decryptedAfter = await decryptTwitchAuth(updatedTwitchConfig.auth);
+          let decryptedAfter = getTwitchAuth(updatedTenant);
 
           if (!decryptedAfter) {
             console.error('Failed to decrypt Twitch auth data after refresh');
