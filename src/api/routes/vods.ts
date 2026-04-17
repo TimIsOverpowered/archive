@@ -6,6 +6,7 @@ import { publicRateLimiter } from '../plugins/redis.plugin.js';
 import { notFound } from '../../utils/http-error.js';
 import { tenantMiddleware } from '../middleware/tenant-platform.js';
 import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
+import { INT32_MAX } from '../../constants.js';
 
 interface VodRoutesOptions {
   prefix: string;
@@ -89,7 +90,7 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
       const { db } = request.tenant;
       const vodIdNum = Number(vodId);
 
-      if (isNaN(vodIdNum) || vodIdNum < 0 || vodIdNum > 2147483647) {
+      if (isNaN(vodIdNum) || vodIdNum < 0 || vodIdNum > INT32_MAX) {
         notFound('VOD not found');
       }
 
@@ -157,7 +158,7 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
       const { db } = request.tenant;
       const vodIdNum = Number(vodId);
 
-      if (isNaN(vodIdNum) || vodIdNum < 0 || vodIdNum > 2147483647) {
+      if (isNaN(vodIdNum) || vodIdNum < 0 || vodIdNum > INT32_MAX) {
         notFound('VOD not found');
       }
 

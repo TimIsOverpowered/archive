@@ -21,6 +21,9 @@ export const REDIS_MAX_RETRIES = 10;
 export const KICK_API_TIMEOUT_MS = 10000;
 export const KICK_PAGE_DELAY_MS = 2000;
 
+// DB limits
+export const INT32_MAX = 2_147_483_647; // PostgreSQL integer column limit
+
 // DB client manager constants
 export const DB_CLIENT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 export const DB_CLIENT_MAX_CLIENTS = 10;
