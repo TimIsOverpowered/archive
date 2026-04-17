@@ -1,13 +1,10 @@
-import { createTwitchClient, createTwitchGqlClient, BACKUP_TWITCH_GQL_CLIENT_ID } from './client.js';
+import { getTwitchClient } from './auth.js';
+import { createTwitchGqlClient, BACKUP_TWITCH_GQL_CLIENT_ID } from './client.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 import { TenantContext } from '../../types/context.js';
 import { withDbRetry } from '../../db/client.js';
-
-function getTwitchClient(tenantId: string) {
-  return createTwitchClient(tenantId, () => import('./auth.js').then((m) => m.getAppAccessToken(tenantId)));
-}
 
 export async function getChapters(vodId: string, tenantId?: string): Promise<unknown[] | null> {
   const client = createTwitchGqlClient(tenantId, BACKUP_TWITCH_GQL_CLIENT_ID);

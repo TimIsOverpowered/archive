@@ -5,6 +5,7 @@ import { encryptObject, decryptObject } from '../../utils/encryption.js';
 import { metaClient } from '../../db/meta-client.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { request } from '../../utils/http-client.js';
+import { createTwitchClient, type TwitchClient } from './client.js';
 
 const log = createAutoLogger('twitch-auth');
 
@@ -88,4 +89,8 @@ export async function updateTwitchTokenInDb(tenantId: string, newToken: string, 
     const { message } = extractErrorDetails(err);
     log.warn({ tenantId, error: message }, 'Failed to update Twitch token in database');
   }
+}
+
+export function getTwitchClient(tenantId: string): TwitchClient {
+  return createTwitchClient(tenantId, () => getAppAccessToken(tenantId));
 }

@@ -1,5 +1,5 @@
 // Auth
-export { getAppAccessToken, updateTwitchTokenInDb } from './auth.js';
+export { getTwitchClient, getAppAccessToken, updateTwitchTokenInDb } from './auth.js';
 
 // Client
 export { createTwitchClient, type TwitchClient } from './client.js';
