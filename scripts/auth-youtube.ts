@@ -5,6 +5,7 @@ import http from 'http';
 import open from 'open';
 import readline from 'readline';
 import { z } from 'zod';
+import { Prisma } from '../prisma/generated/meta/index.js';
 import { metaClient } from '../src/db/meta-client.js';
 import { extractErrorDetails } from '../src/utils/error.js';
 import { YoutubeAuthSchema, YoutubeAuthObject, YoutubeSchema } from '../src/config/schemas.js';
@@ -428,12 +429,10 @@ async function storeAuthObject(tenantId: string, authObject: YoutubeAuthObject):
 
     console.log('\n=== Auth Object Stored Successfully ===\n');
   } catch (error: unknown) {
-    const details = extractErrorDetails(error);
-    const isTenantNotFound = typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2025';
-
-    if (isTenantNotFound) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
       throw new Error(`Tenant not found in database: ${tenantId}`);
     }
+    const details = extractErrorDetails(error);
     throw new Error(details.message);
   }
 }
