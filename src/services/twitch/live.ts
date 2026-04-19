@@ -4,6 +4,7 @@ import { extractErrorDetails } from '../../utils/error.js';
 import { getTwitchCredentials } from '../../utils/credentials.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { request } from '../../utils/http-client.js';
+import { TWITCH_HELIX_BASE_URL } from '../../constants.js';
 
 const log = createAutoLogger('twitch-live');
 
@@ -33,7 +34,7 @@ export async function getTwitchStreamStatus(userId: string, tenantId: string): P
       return null;
     }
 
-    const url = new URL('https://api.twitch.tv/helix/streams');
+    const url = new URL(`${TWITCH_HELIX_BASE_URL}/streams`);
     url.searchParams.append('user_id', userId);
 
     const data = await request<{ data: TwitchStreamStatus[] | null }>(url.toString(), {

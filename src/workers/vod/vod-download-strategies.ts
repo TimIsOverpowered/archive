@@ -12,6 +12,7 @@ import {
   updateFfmpegProgress,
 } from '../../utils/discord-alerts.js';
 import { extractErrorDetails } from '../../utils/error.js';
+import { TWITCH_USHER_BASE_URL } from '../../constants.js';
 
 export interface VodDownloadResult {
   finalPath: string;
@@ -116,7 +117,7 @@ async function downloadTwitchVodWithFfmpeg(
       throw new Error(`Failed to get token/sig for ${vodId}`);
     }
 
-    const m3u8Url = `https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h264,hevc&playlist_include_framerate=true&nauthsig=${tokenSig.signature}&nauth=${tokenSig.value}`;
+    const m3u8Url = `${TWITCH_USHER_BASE_URL}/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h264,hevc&playlist_include_framerate=true&nauthsig=${tokenSig.signature}&nauth=${tokenSig.value}`;
 
     const streamerName = config.displayName || tenantId;
     messageId = await sendVodDownloadStarted(PLATFORMS.TWITCH, tenantId, vodId, streamerName);

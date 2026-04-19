@@ -1,6 +1,7 @@
 import { getTwitchClient } from './auth.js';
 import { createTwitchGqlClient } from './client.js';
 import { request } from '../../utils/http-client.js';
+import { TWITCH_USHER_BASE_URL } from '../../constants.js';
 
 export interface VodData {
   id: string;
@@ -70,7 +71,7 @@ export async function getVodTokenSig(vodId: string, tenantId?: string): Promise<
 }
 
 export async function getM3u8(vodId: string, token: string, sig: string): Promise<string> {
-  const url = `https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h265,h264&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`;
+  const url = `${TWITCH_USHER_BASE_URL}/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h265,h264&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`;
 
   return request(url, {
     responseType: 'text',

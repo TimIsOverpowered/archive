@@ -11,6 +11,7 @@ import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest, notFound } from '../../../utils/http-error.js';
 import { findVodRecord } from './utils/vod-helpers.js';
+import { getStrategy } from '../../../services/platforms/index.js';
 import { getApiConfig } from '../../../config/env.js';
 import { Platform, PLATFORM_VALUES } from '../../../types/platforms.js';
 
@@ -110,15 +111,25 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
         return { data: { message: `${vodId} already exists!`, vodId: vodId } };
       }
 
-      const newVod = await db.vod.create({
-        data: {
-          vod_id: vodId,
-          title: title || null,
-          created_at: createdAt ? new Date(createdAt) : new Date(),
-          duration: Number(duration) || 0,
-          platform: platform,
-        },
-      });
+      const strategy = getStrategy(platform);
+      const newVod = strategy
+        ? await db.vod.create({
+            data: strategy.createVodData({
+              id: vodId,
+              title: title || '',
+              createdAt: createdAt || new Date().toISOString(),
+              duration: Number(duration) || 0,
+            }),
+          })
+        : await db.vod.create({
+            data: {
+              vod_id: vodId,
+              title: title || null,
+              created_at: createdAt ? new Date(createdAt) : new Date(),
+              duration: Number(duration) || 0,
+              platform: platform,
+            },
+          });
 
       log.info(`Created VOD ${vodId}`);
 

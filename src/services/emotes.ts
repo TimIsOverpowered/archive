@@ -7,7 +7,7 @@ import { safeRequest } from '../utils/http-client.js';
 import { RedisService } from '../utils/redis-service.js';
 import { getDisableRedisCache } from '../config/env-accessors.js';
 import { compressChatData, decompressChatData } from '../utils/compression.js';
-import { EMOTE_CACHE_TTL } from '../constants.js';
+import { EMOTE_CACHE_TTL, FFZ_API_BASE, BTTV_API_BASE, SEVENTV_API_BASE } from '../constants.js';
 
 export interface EmoteData extends Prisma.JsonObject {
   id: string;
@@ -68,19 +68,19 @@ export async function fetchAndSaveEmotes(
 
   if (platform === PLATFORMS.TWITCH && platformId) {
     const [ffzRes, bttvGlobalRes, bttvChannelRes, sevenTvRes, sevenTvGlobalRes] = await Promise.all([
-      safeRequest<FFZResponse>(`https://api.frankerfacez.com/v1/room/id/${platformId}`, {}, { timeoutMs: 5000 }),
+      safeRequest<FFZResponse>(`${FFZ_API_BASE}/${platformId}`, {}, { timeoutMs: 5000 }),
       safeRequest<BTTVGlobalResponse>(
-        'https://api.betterttv.net/3/cached/emotes/global',
+        `${BTTV_API_BASE}/emotes/global`,
         { emotes: [] },
         { timeoutMs: 5000 }
       ),
       safeRequest<BTTVChannelResponse>(
-        `https://api.betterttv.net/3/cached/users/twitch/${platformId}`,
+        `${BTTV_API_BASE}/users/twitch/${platformId}`,
         { channelEmotes: [] },
         { timeoutMs: 5000 }
       ),
-      safeRequest<SevenTVResponse>(`https://7tv.io/v3/users/twitch/${platformId}`, { emotes: [] }, { timeoutMs: 5000 }),
-      safeRequest<SevenTVResponse>(`https://7tv.io/v3/emote-sets/global`, { emotes: [] }, { timeoutMs: 5000 }),
+      safeRequest<SevenTVResponse>(`${SEVENTV_API_BASE}/users/twitch/${platformId}`, { emotes: [] }, { timeoutMs: 5000 }),
+      safeRequest<SevenTVResponse>(`${SEVENTV_API_BASE}/emote-sets/global`, { emotes: [] }, { timeoutMs: 5000 }),
     ]);
 
     ffzEmotes =
@@ -98,8 +98,8 @@ export async function fetchAndSaveEmotes(
     ];
   } else if (platform === PLATFORMS.KICK && platformId) {
     const [sevenTvRes, sevenTvGlobalRes] = await Promise.all([
-      safeRequest<SevenTVResponse>(`https://7tv.io/v3/users/twitch/${platformId}`, { emotes: [] }, { timeoutMs: 5000 }),
-      safeRequest<SevenTVResponse>(`https://7tv.io/v3/emote-sets/global`, { emotes: [] }, { timeoutMs: 5000 }),
+      safeRequest<SevenTVResponse>(`${SEVENTV_API_BASE}/users/twitch/${platformId}`, { emotes: [] }, { timeoutMs: 5000 }),
+      safeRequest<SevenTVResponse>(`${SEVENTV_API_BASE}/emote-sets/global`, { emotes: [] }, { timeoutMs: 5000 }),
     ]);
 
     ffzEmotes = [];

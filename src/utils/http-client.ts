@@ -1,6 +1,7 @@
 import { retryWithBackoff } from './retry.js';
 import { extractErrorDetails } from './error.js';
 import { logger } from './logger.js';
+import { HTTP_DEFAULT_ATTEMPTS, HTTP_DEFAULT_BASE_DELAY_MS, HTTP_DEFAULT_MAX_DELAY_MS } from '../constants.js';
 import { HttpError } from './http-error.js';
 
 export type ResponseType = 'json' | 'text' | 'blob' | 'arrayBuffer' | 'response';
@@ -157,9 +158,9 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
         return parsedData as RequestResult<T, R>;
       },
       {
-        attempts: retryOptions?.attempts ?? 3,
-        baseDelayMs: retryOptions?.baseDelayMs ?? 1000,
-        maxDelayMs: retryOptions?.maxDelayMs ?? 30000,
+        attempts: retryOptions?.attempts ?? HTTP_DEFAULT_ATTEMPTS,
+        baseDelayMs: retryOptions?.baseDelayMs ?? HTTP_DEFAULT_BASE_DELAY_MS,
+        maxDelayMs: retryOptions?.maxDelayMs ?? HTTP_DEFAULT_MAX_DELAY_MS,
         shouldRetry,
       }
     );
