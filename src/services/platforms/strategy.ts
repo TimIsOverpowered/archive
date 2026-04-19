@@ -1,5 +1,6 @@
 import type { Platform } from '../../types/platforms.js';
 import type { PrismaClient } from '../../../generated/streamer/client.js';
+import type { TenantConfig } from '../../config/types.js';
 import { VodCreateInput, VodUpdateInput } from '../../../generated/streamer/internal/prismaNamespace.js';
 
 export interface PlatformStreamStatus {
@@ -22,7 +23,7 @@ export interface PlatformVodMetadata {
 
 export interface PlatformStrategyContext {
   tenantId: string;
-  config: Record<string, unknown> | import('../../config/types.js').TenantConfig;
+  config: TenantConfig;
   platform: Platform;
   db?: PrismaClient;
 }

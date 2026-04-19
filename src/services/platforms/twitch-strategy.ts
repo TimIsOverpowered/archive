@@ -1,19 +1,16 @@
 import { getTwitchStreamStatus, getLatestTwitchVodObject } from '../twitch/live.js';
 import { getVodData } from '../twitch/vod.js';
 import type { PlatformStrategy, PlatformStreamStatus, PlatformVodMetadata } from './strategy.js';
-import type { TenantConfig } from '../../config/types.js';
 import { parseTwitchDuration } from '../../utils/formatting.js';
 
 export const twitchStrategy: PlatformStrategy = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
     const { tenantId, config, platform } = ctx;
-    const cfg = config as unknown as TenantConfig;
-
-    if (!cfg?.[platform]?.enabled) {
+    if (!config?.[platform]?.enabled) {
       return null;
     }
 
-    const userId = cfg.twitch?.id;
+    const userId = config?.[platform]?.id;
     if (!userId) {
       return null;
     }
@@ -50,9 +47,7 @@ export const twitchStrategy: PlatformStrategy = {
 
   async fetchVodObjectForLiveStream(streamId: string, ctx): Promise<PlatformVodMetadata | null> {
     const { tenantId, config, platform } = ctx;
-    const cfg = config as unknown as TenantConfig;
-
-    const userId = cfg?.[platform]?.id;
+    const userId = config?.[platform]?.id;
     if (!userId) {
       return null;
     }
