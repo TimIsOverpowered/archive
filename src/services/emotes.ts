@@ -69,17 +69,17 @@ export async function fetchAndSaveEmotes(
   if (platform === PLATFORMS.TWITCH && platformId) {
     const [ffzRes, bttvGlobalRes, bttvChannelRes, sevenTvRes, sevenTvGlobalRes] = await Promise.all([
       safeRequest<FFZResponse>(`${FFZ_API_BASE}/${platformId}`, {}, { timeoutMs: 5000 }),
-      safeRequest<BTTVGlobalResponse>(
-        `${BTTV_API_BASE}/emotes/global`,
-        { emotes: [] },
-        { timeoutMs: 5000 }
-      ),
+      safeRequest<BTTVGlobalResponse>(`${BTTV_API_BASE}/emotes/global`, { emotes: [] }, { timeoutMs: 5000 }),
       safeRequest<BTTVChannelResponse>(
         `${BTTV_API_BASE}/users/twitch/${platformId}`,
         { channelEmotes: [] },
         { timeoutMs: 5000 }
       ),
-      safeRequest<SevenTVResponse>(`${SEVENTV_API_BASE}/users/twitch/${platformId}`, { emotes: [] }, { timeoutMs: 5000 }),
+      safeRequest<SevenTVResponse>(
+        `${SEVENTV_API_BASE}/users/twitch/${platformId}`,
+        { emotes: [] },
+        { timeoutMs: 5000 }
+      ),
       safeRequest<SevenTVResponse>(`${SEVENTV_API_BASE}/emote-sets/global`, { emotes: [] }, { timeoutMs: 5000 }),
     ]);
 
@@ -98,7 +98,11 @@ export async function fetchAndSaveEmotes(
     ];
   } else if (platform === PLATFORMS.KICK && platformId) {
     const [sevenTvRes, sevenTvGlobalRes] = await Promise.all([
-      safeRequest<SevenTVResponse>(`${SEVENTV_API_BASE}/users/twitch/${platformId}`, { emotes: [] }, { timeoutMs: 5000 }),
+      safeRequest<SevenTVResponse>(
+        `${SEVENTV_API_BASE}/users/twitch/${platformId}`,
+        { emotes: [] },
+        { timeoutMs: 5000 }
+      ),
       safeRequest<SevenTVResponse>(`${SEVENTV_API_BASE}/emote-sets/global`, { emotes: [] }, { timeoutMs: 5000 }),
     ]);
 

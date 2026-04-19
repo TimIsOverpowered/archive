@@ -94,7 +94,12 @@ export const twitchStrategy: PlatformStrategy = {
 
   async finalizeChapters(ctx, dbId, vodId, finalDurationSeconds): Promise<void> {
     try {
-      await saveVodChapters({ tenantId: ctx.tenantId, config: ctx.config, db: ctx.db! }, dbId, vodId, finalDurationSeconds);
+      await saveVodChapters(
+        { tenantId: ctx.tenantId, config: ctx.config, db: ctx.db! },
+        dbId,
+        vodId,
+        finalDurationSeconds
+      );
     } catch (error) {
       logger.error(createErrorContext(error, { vodId }), 'Failed to finalize Twitch chapters');
     }

@@ -99,7 +99,12 @@ export const kickStrategy: PlatformStrategy = {
 
   async finalizeChapters(ctx, dbId, vodId, finalDurationSeconds): Promise<void> {
     try {
-      await finalizeKickChapters({ tenantId: ctx.tenantId, config: ctx.config, db: ctx.db! }, dbId, vodId, finalDurationSeconds);
+      await finalizeKickChapters(
+        { tenantId: ctx.tenantId, config: ctx.config, db: ctx.db! },
+        dbId,
+        vodId,
+        finalDurationSeconds
+      );
     } catch (error) {
       logger.error({ vodId, error }, 'Failed to finalize Kick chapters');
     }
