@@ -1,14 +1,12 @@
 import crypto from 'crypto';
 import { getEncryptionKeyBuffer } from '../config/env-accessors.js';
+import { ENCRYPTION_KEY_LENGTH, ENCRYPTION_IV_LENGTH, ENCRYPTION_AUTH_TAG_LENGTH } from '../constants.js';
 
 const ALGORITHM = 'aes-256-gcm';
-const KEY_LENGTH = 32; // AES-256 requires exactly 32 bytes
-const IV_LENGTH = 12; // Recommended for GCM mode
-const AUTH_TAG_LENGTH = 16;
 
 export function validateEncryptionKey(key: string): boolean {
   if (!key) return false;
-  if (key.length !== KEY_LENGTH * 2) return false;
+  if (key.length !== ENCRYPTION_KEY_LENGTH * 2) return false;
   return /^[0-9a-fA-F]+$/.test(key);
 }
 
@@ -18,7 +16,7 @@ export function getKeyBuffer(): Buffer {
 
 export function encrypt(plaintext: string): { ciphertext: Uint8Array } {
   const key = getKeyBuffer();
-  const iv = crypto.randomBytes(IV_LENGTH);
+  const iv = crypto.randomBytes(ENCRYPTION_IV_LENGTH);
 
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
 
@@ -36,13 +34,13 @@ export function decrypt(ciphertext: Uint8Array): string {
   const key = getKeyBuffer();
 
   // Extract IV (first 12 bytes), auth tag (next 16 bytes), and actual ciphertext
-  if (ciphertext.length < IV_LENGTH + AUTH_TAG_LENGTH) {
+  if (ciphertext.length < ENCRYPTION_IV_LENGTH + ENCRYPTION_AUTH_TAG_LENGTH) {
     throw new Error('Invalid ciphertext length');
   }
 
-  const iv = Buffer.from(ciphertext.subarray(0, IV_LENGTH));
-  const authTag = Buffer.from(ciphertext.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH));
-  const encryptedData = Buffer.from(ciphertext.subarray(IV_LENGTH + AUTH_TAG_LENGTH)).toString('base64');
+  const iv = Buffer.from(ciphertext.subarray(0, ENCRYPTION_IV_LENGTH));
+  const authTag = Buffer.from(ciphertext.subarray(ENCRYPTION_IV_LENGTH, ENCRYPTION_IV_LENGTH + ENCRYPTION_AUTH_TAG_LENGTH));
+  const encryptedData = Buffer.from(ciphertext.subarray(ENCRYPTION_IV_LENGTH + ENCRYPTION_AUTH_TAG_LENGTH)).toString('base64');
 
   const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
   decipher.setAuthTag(authTag);

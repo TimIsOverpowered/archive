@@ -2,6 +2,7 @@ import type { Browser } from 'puppeteer';
 import { extractErrorDetails } from './error.js';
 import { logger } from './logger.js';
 import { getFullMemoryStats, releaseBrowser, type MemoryStats } from './puppeteer-manager.js';
+import { PUPPETEER_HEALTH_CACHE_TTL_MS } from '../constants.js';
 
 type HealthStatus = 'ok' | 'elevated' | 'high_memory' | 'unavailable';
 
@@ -12,12 +13,11 @@ interface PuppeteerHealthStatus {
 
 let cachedStatus: PuppeteerHealthStatus | null = null;
 let cacheTimestamp = 0;
-const CACHE_TTL_MS = 30000; // Cache for 30 seconds
 
 export async function checkPuppeteerHealth(browserInstance?: Browser): Promise<PuppeteerHealthStatus> {
   const now = Date.now();
 
-  if (cachedStatus && now - cacheTimestamp < CACHE_TTL_MS) {
+  if (cachedStatus && now - cacheTimestamp < PUPPETEER_HEALTH_CACHE_TTL_MS) {
     return cachedStatus;
   }
 

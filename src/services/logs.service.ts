@@ -9,10 +9,8 @@ import {
 import { compressChatData, decompressChatData } from '../utils/compression.js';
 import { logger } from '../utils/logger.js';
 import { badRequest } from '../utils/http-error.js';
+import { LOGS_PAGE_SIZE, LOGS_DEFAULT_BUCKET_SIZE, LOGS_TARGET_COMMENTS_PER_BUCKET } from '../constants.js';
 
-const PAGE_SIZE = 200;
-const DEFAULT_BUCKET_SIZE = 120;
-const TARGET_COMMENTS_PER_BUCKET = 300;
 const BOUNDARIES = [30, 60, 90, 120, 180, 300, 600, 900, 1800, 3600];
 
 interface ChatMessage {
@@ -32,7 +30,7 @@ interface CursorData {
 }
 
 function computeBucketSize(commentsPer100s: number): number {
-  const raw = (TARGET_COMMENTS_PER_BUCKET / commentsPer100s) * 100;
+  const raw = (LOGS_TARGET_COMMENTS_PER_BUCKET / commentsPer100s) * 100;
   return BOUNDARIES.reduce((prev, curr) => (Math.abs(curr - raw) < Math.abs(prev - raw) ? curr : prev));
 }
 
@@ -64,7 +62,7 @@ async function getVodBucketSize(client: PrismaClient, tenantId: string, vodId: n
 
   const row = (rawResult as unknown[])[0] as { comments_per_100s?: unknown };
   const commentsPer100sValue = parseFloat(String(row?.comments_per_100s ?? ''));
-  const bucketSize = isFinite(commentsPer100sValue) ? computeBucketSize(commentsPer100sValue) : DEFAULT_BUCKET_SIZE;
+  const bucketSize = isFinite(commentsPer100sValue) ? computeBucketSize(commentsPer100sValue) : LOGS_DEFAULT_BUCKET_SIZE;
 
   if (!getDisableRedisCache() && redis) {
     try {
@@ -107,14 +105,14 @@ export async function getLogsByOffset(
       content_offset_seconds: { gte: bucket },
     },
     orderBy: [{ content_offset_seconds: 'asc' }, { createdAt: 'asc' }],
-    take: PAGE_SIZE + 1,
+    take: LOGS_PAGE_SIZE + 1,
   });
 
   if (!data || data.length === 0) {
     return { comments: [], cursor: undefined };
   }
 
-  const comments = data.slice(0, PAGE_SIZE).map((msg) => ({
+  const comments = data.slice(0, LOGS_PAGE_SIZE).map((msg) => ({
     id: msg.id,
     vod_id: msg.vod_id,
     display_name: msg.display_name,
@@ -126,8 +124,8 @@ export async function getLogsByOffset(
   }));
 
   let cursor: string | undefined;
-  if (data.length === PAGE_SIZE + 1) {
-    const lastMsg = data[PAGE_SIZE];
+  if (data.length === LOGS_PAGE_SIZE + 1) {
+    const lastMsg = data[LOGS_PAGE_SIZE];
     if (!lastMsg.createdAt) {
       throw new Error(`Missing createdAt on message ${lastMsg.id}`);
     }
@@ -205,14 +203,14 @@ export async function getLogsByCursor(
       ],
     },
     orderBy: [{ content_offset_seconds: 'asc' }, { createdAt: 'asc' }],
-    take: PAGE_SIZE + 1,
+    take: LOGS_PAGE_SIZE + 1,
   });
 
   if (!data || data.length === 0) {
     return { comments: [], cursor: undefined };
   }
 
-  const comments = data.slice(0, PAGE_SIZE).map((msg) => ({
+  const comments = data.slice(0, LOGS_PAGE_SIZE).map((msg) => ({
     id: msg.id,
     vod_id: msg.vod_id,
     display_name: msg.display_name,
@@ -224,8 +222,8 @@ export async function getLogsByCursor(
   }));
 
   let nextCursor: string | undefined;
-  if (data.length === PAGE_SIZE + 1) {
-    const lastMsg = data[PAGE_SIZE];
+  if (data.length === LOGS_PAGE_SIZE + 1) {
+    const lastMsg = data[LOGS_PAGE_SIZE];
     if (!lastMsg.createdAt) {
       throw new Error(`Missing createdAt on message ${lastMsg.id}`);
     }

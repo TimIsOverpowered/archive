@@ -84,5 +84,6 @@ function extractJobMeta(data: Record<string, unknown>) {
     platform: data?.platform,
     tenantId: data?.tenantId,
     type: data?.type,
+    reqId: data?.reqId,
   };
 }

@@ -2,9 +2,9 @@ import ipaddr from 'ipaddr.js';
 import { RedisService } from '../utils/redis-service.js';
 import { logger } from './logger.js';
 import { request } from './http-client.js';
+import { CF_IP_RANGES_TTL } from '../constants.js';
 
 const CF_IP_RANGES_KEY = 'cloudflare:ip_ranges';
-const CF_IP_RANGES_TTL = 86400 * 7; // 7 days
 const CF_IP_V4_URL = 'https://www.cloudflare.com/ips-v4';
 const CF_IP_V6_URL = 'https://www.cloudflare.com/ips-v6';
 

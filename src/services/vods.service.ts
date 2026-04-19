@@ -85,8 +85,8 @@ export const VodQuerySchema = z.object({
   to: z.string().datetime().optional(),
   uploaded: z.literal('youtube').optional(),
   game: z.string().optional(),
-  page: z.number().int().min(1).default(1),
-  limit: z.number().int().min(1).max(100).default(20),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
   sort: z.enum(['created_at', 'duration', 'uploaded_at']).default('created_at'),
   order: z.enum(['asc', 'desc']).default('desc'),
 });
