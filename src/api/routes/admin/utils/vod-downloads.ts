@@ -103,7 +103,10 @@ async function checkIfDownloadNeeded(
   return false;
 }
 
-function validatePlatformConfig(ctx: TenantPlatformContext, platform: Platform): { platformUserId: string; platformUsername: string } | null {
+function validatePlatformConfig(
+  ctx: TenantPlatformContext,
+  platform: Platform
+): { platformUserId: string; platformUsername: string } | null {
   const config = ctx.config?.[platform];
   const platformUserId = config?.id;
   const platformUsername = config?.username;

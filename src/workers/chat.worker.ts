@@ -44,10 +44,23 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
   const { db } = await getJobContext(tenantId);
   const chatAlerts = createChatWorkerAlerts();
 
-  const { offset: effectiveOffset, hasExistingData, lastMessageId } = await calculateResumeOffset(db, dbId, startOffset);
+  const {
+    offset: effectiveOffset,
+    hasExistingData,
+    lastMessageId,
+  } = await calculateResumeOffset(db, dbId, startOffset);
   log.debug({ vodId, startOffset, effectiveOffset, hasExistingData }, '[Chat] Resume check completed');
 
-  const messageId = await initChatAlert(log, chatAlerts, tenantId, vodId, platform, effectiveOffset, hasExistingData, startOffset);
+  const messageId = await initChatAlert(
+    log,
+    chatAlerts,
+    tenantId,
+    vodId,
+    platform,
+    effectiveOffset,
+    hasExistingData,
+    startOffset
+  );
 
   if (!messageId) {
     log.error('[Chat] Failed to initialize alert');
@@ -55,32 +68,95 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
   }
 
   if (hasExistingData && !startOffset) {
-    const skipResult = await checkAlreadyComplete(db, dbId, vodId, effectiveOffset, duration, lastMessageId, chatAlerts, tenantId, messageId, log);
+    const skipResult = await checkAlreadyComplete(
+      db,
+      dbId,
+      vodId,
+      effectiveOffset,
+      duration,
+      lastMessageId,
+      chatAlerts,
+      tenantId,
+      messageId,
+      log
+    );
     if (skipResult) return skipResult;
   }
 
-  const state: ChatProcessorState = { tenantId, dbId, vodId, platform: platform as 'twitch', duration, log, chatAlerts, messageId, db };
+  const state: ChatProcessorState = {
+    tenantId,
+    dbId,
+    vodId,
+    platform: platform as 'twitch',
+    duration,
+    log,
+    chatAlerts,
+    messageId,
+    db,
+  };
   const result = await processChatDownload(state, effectiveOffset);
 
   resetFailures(tenantId);
   log.debug({ vodId, ...result, finalOffset: effectiveOffset }, '[Chat] Download completed successfully');
   const resumeIndicator = startOffset || hasExistingData;
-  void updateAlert(messageId, chatAlerts.complete(tenantId, vodId, platform, result.totalMessages, result.batchCount, resumeIndicator ? (startOffset ?? 0) : undefined));
+  void updateAlert(
+    messageId,
+    chatAlerts.complete(
+      tenantId,
+      vodId,
+      platform,
+      result.totalMessages,
+      result.batchCount,
+      resumeIndicator ? (startOffset ?? 0) : undefined
+    )
+  );
   return { success: true, ...result };
 };
 
-async function initChatAlert(log: ReturnType<typeof createAutoLogger>, chatAlerts: ReturnType<typeof createChatWorkerAlerts>, tenantId: string, vodId: string, platform: string, effectiveOffset: number, hasExistingData: boolean, startOffset: number | undefined): Promise<string | null> {
+async function initChatAlert(
+  log: ReturnType<typeof createAutoLogger>,
+  chatAlerts: ReturnType<typeof createChatWorkerAlerts>,
+  tenantId: string,
+  vodId: string,
+  platform: string,
+  effectiveOffset: number,
+  hasExistingData: boolean,
+  startOffset: number | undefined
+): Promise<string | null> {
   const isResume = hasExistingData && !startOffset;
-  const alertData = chatAlerts.init(tenantId, vodId, platform as Platform, isResume, isResume ? effectiveOffset : undefined);
+  const alertData = chatAlerts.init(
+    tenantId,
+    vodId,
+    platform as Platform,
+    isResume,
+    isResume ? effectiveOffset : undefined
+  );
   return await initRichAlert(alertData);
 }
 
-async function checkAlreadyComplete(db: PrismaClient, dbId: number, vodId: string, effectiveOffset: number, duration: number, lastMessageId: string | undefined, chatAlerts: ReturnType<typeof createChatWorkerAlerts>, tenantId: string, messageId: string, log: ReturnType<typeof createAutoLogger>): Promise<ChatDownloadResult | null> {
+async function checkAlreadyComplete(
+  db: PrismaClient,
+  dbId: number,
+  vodId: string,
+  effectiveOffset: number,
+  duration: number,
+  lastMessageId: string | undefined,
+  chatAlerts: ReturnType<typeof createChatWorkerAlerts>,
+  tenantId: string,
+  messageId: string,
+  log: ReturnType<typeof createAutoLogger>
+): Promise<ChatDownloadResult | null> {
   if (duration !== 0 && effectiveOffset >= duration) {
     const totalMessages = await db.chatMessage.count({ where: { vod_id: dbId } });
-    log.info({ vodId, effectiveOffset, duration, totalMessages }, 'Chat download already complete (offset exceeds duration)');
+    log.info(
+      { vodId, effectiveOffset, duration, totalMessages },
+      'Chat download already complete (offset exceeds duration)'
+    );
     resetFailures(tenantId);
-       void updateAlert(messageId, chatAlerts.alreadyComplete(tenantId, vodId, PLATFORMS.TWITCH, totalMessages, effectiveOffset));
+    void updateAlert(
+      messageId,
+      chatAlerts.alreadyComplete(tenantId, vodId, PLATFORMS.TWITCH, totalMessages, effectiveOffset)
+    );
     return { success: true, totalMessages, skipped: true };
   }
 
@@ -94,7 +170,10 @@ async function checkAlreadyComplete(db: PrismaClient, dbId: number, vodId: strin
         const totalMessages = await db.chatMessage.count({ where: { vod_id: dbId } });
         log.info({ vodId, lastMessageId, totalMessages }, 'Chat download already complete');
         resetFailures(tenantId);
-   void updateAlert(messageId, chatAlerts.alreadyComplete(tenantId, vodId, PLATFORMS.TWITCH, totalMessages, effectiveOffset));
+        void updateAlert(
+          messageId,
+          chatAlerts.alreadyComplete(tenantId, vodId, PLATFORMS.TWITCH, totalMessages, effectiveOffset)
+        );
         return { success: true, totalMessages, skipped: true };
       }
     }
@@ -103,7 +182,10 @@ async function checkAlreadyComplete(db: PrismaClient, dbId: number, vodId: strin
   return null;
 }
 
-async function processChatDownload(state: ChatProcessorState, effectiveOffset: number): Promise<{ totalMessages: number; batchCount: number }> {
+async function processChatDownload(
+  state: ChatProcessorState,
+  effectiveOffset: number
+): Promise<{ totalMessages: number; batchCount: number }> {
   const { tenantId, dbId, vodId, platform, duration, log, chatAlerts, messageId, db } = state;
   let totalMessages = 0;
   let batchCount = 0;
@@ -129,7 +211,10 @@ async function processChatDownload(state: ChatProcessorState, effectiveOffset: n
     if (edges.length === 0) {
       log.warn({ vodId, effectiveOffset }, 'No chat messages found for VOD');
       resetFailures(tenantId);
-      void updateAlert(messageId, chatAlerts.noMessages(tenantId, vodId, platform as 'twitch' | 'kick', effectiveOffset));
+      void updateAlert(
+        messageId,
+        chatAlerts.noMessages(tenantId, vodId, platform as 'twitch' | 'kick', effectiveOffset)
+      );
       return { totalMessages: 0, batchCount: 0 };
     }
 
@@ -161,7 +246,10 @@ async function processChatDownload(state: ChatProcessorState, effectiveOffset: n
         log,
         vodId,
         onProgress: (offset, batchNumber, messagesInBatch) =>
-          void updateAlert(messageId, chatAlerts.progress(tenantId, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)),
+          void updateAlert(
+            messageId,
+            chatAlerts.progress(tenantId, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)
+          ),
         lastOffset,
         totalMessages,
         batchCount,
@@ -189,7 +277,10 @@ async function processChatDownload(state: ChatProcessorState, effectiveOffset: n
       log,
       vodId,
       onProgress: (offset, batchNumber, messagesInBatch) =>
-        void updateAlert(messageId, chatAlerts.progress(tenantId, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)),
+        void updateAlert(
+          messageId,
+          chatAlerts.progress(tenantId, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)
+        ),
       lastOffset,
       totalMessages,
       batchCount,
