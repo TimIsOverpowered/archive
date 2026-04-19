@@ -15,6 +15,7 @@ import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
 import { findStreamRecord } from './utils/vod-helpers.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job';
+import { VodUpdateSchema } from '../../../config/schemas.js';
 
 interface LiveCallbackBody {
   streamId: string;
@@ -99,6 +100,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
 
       // Update duration if provided and different from current value
       if (request.body.durationSecs && vodRecord.duration !== request.body.durationSecs) {
+        VodUpdateSchema.parse({ duration: request.body.durationSecs });
         await db.vod.update({
           where: { id: vodRecord.id },
           data: { duration: request.body.durationSecs },

@@ -2,6 +2,7 @@ import { Platform } from '../types/platforms.js';
 import { getStrategy } from './platforms/strategy.js';
 import { TenantContext } from '../types/context.js';
 import { withDbRetry } from '../db/client.js';
+import { VodUpdateSchema } from '../config/schemas.js';
 
 export interface FinalizeVodOptions {
   ctx: TenantContext;
@@ -24,6 +25,9 @@ export async function finalizeVod(options: FinalizeVodOptions): Promise<void> {
         durationSeconds
       );
     }
+    VodUpdateSchema.parse({
+      duration: durationSeconds ?? undefined,
+    });
     await db.vod.update({
       where: { id: dbId },
       data: {
