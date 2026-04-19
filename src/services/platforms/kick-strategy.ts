@@ -1,18 +1,15 @@
 import { getKickStreamStatus, getLatestKickVodObject } from '../kick-live.js';
 import { getVod } from '../kick.js';
 import type { PlatformStrategy, PlatformStreamStatus, PlatformVodMetadata } from './strategy.js';
-import type { TenantConfig } from '../../config/types.js';
-
 export const kickStrategy: PlatformStrategy = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
     const { config, platform } = ctx;
-    const cfg = config as unknown as TenantConfig;
 
-    if (!cfg?.[platform]?.enabled) {
+    if (!config?.[platform]?.enabled) {
       return null;
     }
 
-    const username = cfg.kick?.username;
+    const username = config?.kick?.username;
     if (!username) {
       return null;
     }
@@ -28,16 +25,15 @@ export const kickStrategy: PlatformStrategy = {
       title: streamStatus.session_title || '',
       startedAt: streamStatus.created_at,
       streamId: streamStatus.id,
-      platformUserId: cfg.kick?.id ?? undefined,
+      platformUserId: config?.kick?.id ?? undefined,
       platformUsername: username,
     };
   },
 
   async fetchVodMetadata(vodId: string, ctx): Promise<PlatformVodMetadata | null> {
     const { config, platform } = ctx;
-    const cfg = config as unknown as TenantConfig;
 
-    const username = cfg?.[platform]?.username;
+    const username = config?.[platform]?.username;
     if (!username) {
       return null;
     }
@@ -56,9 +52,8 @@ export const kickStrategy: PlatformStrategy = {
 
   async fetchVodObjectForLiveStream(streamId: string, ctx): Promise<PlatformVodMetadata | null> {
     const { config, platform } = ctx;
-    const cfg = config as unknown as TenantConfig;
 
-    const username = cfg?.[platform]?.username;
+    const username = config?.[platform]?.username;
     if (!username) {
       return null;
     }
