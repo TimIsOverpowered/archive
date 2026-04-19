@@ -2,7 +2,7 @@ import 'dotenv/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { metaClient } from '../src/db/meta-client.js';
+import { initMetaClient, getMetaClient } from '../src/db/meta-client.js';
 import { encryptObject, encryptScalar } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
 
@@ -159,7 +159,7 @@ async function importConfig(channelName: string, dbUrl: string): Promise<void> {
   }
 
   // Check for existing tenant
-  const existingTenant = await metaClient.tenant.findFirst({
+  const existingTenant = await getMetaClient().tenant.findFirst({
     where: { id: channelName },
   });
   if (existingTenant) {
@@ -202,7 +202,7 @@ async function importConfig(channelName: string, dbUrl: string): Promise<void> {
   if (youtube) createData.youtube = youtube;
   if (kick) createData.kick = kick;
 
-  await metaClient.tenant.create({ data: createData as any });
+  await getMetaClient().tenant.create({ data: createData as any });
 
   console.log(`✓ Imported ${channelName}`);
 }
@@ -224,6 +224,7 @@ async function main(): Promise<void> {
   }
 
   try {
+    await initMetaClient();
     await importConfig(channelName, dbUrl);
     console.log('Done!');
   } catch (error) {
@@ -231,7 +232,7 @@ async function main(): Promise<void> {
     console.error('Error importing config:', details.message);
     process.exit(1);
   } finally {
-    await metaClient.$disconnect();
+    await getMetaClient().$disconnect();
   }
 }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import 'dotenv/config';
 import { program } from 'commander';
-import { metaClient } from '../../src/db/meta-client.js';
+import { initMetaClient, getMetaClient } from '../../src/db/meta-client.js';
 import { extractErrorDetails } from '../../src/utils/error.js';
 import { decryptScalar, decryptObject } from '../../src/utils/encryption.js';
 import { loadTenantConfigs } from '../../src/config/loader.js';
@@ -35,13 +35,14 @@ program
   .option('-v, --verbose', 'Show detailed output including full token objects')
   .option('--check-only', 'Only check current state without forcing refresh')
   .action(async (options: { tenant?: string; forceRefresh: boolean; verbose: boolean; checkOnly: boolean }) => {
+    await initMetaClient();
     console.log('YouTube Token Test');
     console.log('==================\n');
 
     let tenantId = options.tenant;
 
     if (!tenantId) {
-      const tenants = await metaClient.tenant.findMany();
+      const tenants = await getMetaClient().tenant.findMany();
       if (tenants.length === 0) {
         console.error('No tenants found. Please create one first using scripts/create-tenant.ts');
         process.exit(1);
@@ -52,7 +53,7 @@ program
     }
 
     try {
-      const tenantWithYoutube = await metaClient.tenant.findFirst({
+      const tenantWithYoutube = await getMetaClient().tenant.findFirst({
         where: { id: tenantId },
       });
 
@@ -114,7 +115,7 @@ program
           }
         }
 
-        const updatedTenant = await metaClient.tenant.findFirst({
+        const updatedTenant = await getMetaClient().tenant.findFirst({
           where: { id: tenantId },
         });
 
@@ -143,7 +144,7 @@ program
       console.error('Error:', details.message);
       process.exit(1);
     } finally {
-      await metaClient.$disconnect();
+      await getMetaClient().$disconnect();
     }
   });
 

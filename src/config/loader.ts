@@ -1,4 +1,4 @@
-import { metaClient } from '../db/meta-client.js';
+import { initMetaClient, getMetaClient } from '../db/meta-client.js';
 import { decryptScalar } from '../utils/encryption.js';
 import { SettingsSchema, YoutubeSchema, TwitchSchema, KickSchema } from './schemas.js';
 import { TenantConfig } from './types.js';
@@ -7,7 +7,8 @@ import type { JsonObject } from '@prisma/client/runtime/client';
 const configCache = new Map<string, TenantConfig>();
 
 export async function loadTenantConfigs(): Promise<TenantConfig[]> {
-  const tenants = await metaClient.tenant.findMany();
+  await initMetaClient();
+  const tenants = await getMetaClient().tenant.findMany();
   if (tenants.length === 0) return [];
 
   for (const tenant of tenants) {

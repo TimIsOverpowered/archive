@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { getEncryptionKeyBuffer } from '../config/env-accessors.js';
 
 const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH = 32; // AES-256 requires exactly 32 bytes
@@ -12,11 +13,7 @@ export function validateEncryptionKey(key: string): boolean {
 }
 
 export function getKeyBuffer(): Buffer {
-  const key = process.env.ENCRYPTION_MASTER_KEY;
-  if (!key || !validateEncryptionKey(key)) {
-    throw new Error('ENCRYPTION_MASTER_KEY must be a valid 32-byte hex string');
-  }
-  return Buffer.from(key, 'hex');
+  return getEncryptionKeyBuffer();
 }
 
 export function encrypt(plaintext: string): { ciphertext: Uint8Array } {

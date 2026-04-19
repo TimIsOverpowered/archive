@@ -1,8 +1,9 @@
 import { redisClient } from '../api/plugins/redis.plugin.js';
+import { getDisableRedisCache } from '../config/env-accessors.js';
 import { logger } from '../utils/logger.js';
 
 export async function withCache<T>(key: string, ttl: number, fetcher: () => Promise<T>): Promise<T> {
-  if (process.env.DISABLE_REDIS_CACHE === 'true' || !redisClient) return fetcher();
+  if (getDisableRedisCache() || !redisClient) return fetcher();
 
   try {
     const cached = await redisClient.get(key);

@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import * as readline from 'readline';
 import { z } from 'zod';
-import { metaClient } from '../src/db/meta-client.js';
+import { initMetaClient, getMetaClient } from '../src/db/meta-client.js';
 import { encryptObject, validateEncryptionKey } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
 import { TwitchAuthSchema, TwitchAuthObject, TwitchSchema } from '../src/config/schemas.js';
@@ -90,6 +90,7 @@ async function main(): Promise<void> {
   let tenantIdToUpdate: string | null = null;
 
   try {
+    await initMetaClient();
     console.log('╔════════════════════════════╗');
     console.log('║  TWITCH AUTH CONFIGURATOR  ║');
     console.log('╚════════════════════════════╝');
@@ -107,7 +108,7 @@ async function main(): Promise<void> {
     }
 
     // Look up tenant in meta DB
-    const tenant = await metaClient.tenant.findUnique({
+    const tenant = await getMetaClient().tenant.findUnique({
       where: { id: tenantId },
     });
 
@@ -236,7 +237,7 @@ async function main(): Promise<void> {
       };
     }
 
-    await metaClient.tenant.update({
+    await getMetaClient().tenant.update({
       where: { id: tenantId },
       data: {
         twitch: updatedTwitchConfig,
@@ -275,7 +276,7 @@ async function main(): Promise<void> {
     // Rollback if tenant was partially updated
     if (tenantIdToUpdate !== null && process.argv.includes('--rollback')) {
       try {
-        await metaClient.tenant.delete({ where: { id: tenantIdToUpdate } });
+        await getMetaClient().tenant.delete({ where: { id: tenantIdToUpdate } });
         console.log('✓ Rolled back changes from meta DB');
       } catch (rollbackError) {
         const rollbackDetails = extractErrorDetails(rollbackError);
@@ -286,7 +287,7 @@ async function main(): Promise<void> {
     process.exit(1);
   } finally {
     rl.close();
-    await metaClient.$disconnect();
+    await getMetaClient().$disconnect();
   }
 }
 

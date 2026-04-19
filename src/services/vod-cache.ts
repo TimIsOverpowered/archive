@@ -1,10 +1,11 @@
 import { redisClient } from '../api/plugins/redis.plugin.js';
+import { getDisableRedisCache } from '../config/env-accessors.js';
 import { logger } from '../utils/logger.js';
 
 let redisConnectionFailed = false;
 
 export async function invalidateTenantVodListCache(tenantId: string): Promise<void> {
-  if (process.env.DISABLE_REDIS_CACHE === 'true' || !redisClient) {
+  if (getDisableRedisCache() || !redisClient) {
     return;
   }
 
@@ -37,7 +38,7 @@ export async function invalidateTenantVodListCache(tenantId: string): Promise<vo
 }
 
 export async function invalidateEmoteCache(tenantId: string, vodId: number): Promise<void> {
-  if (process.env.DISABLE_REDIS_CACHE === 'true' || !redisClient) {
+  if (getDisableRedisCache() || !redisClient) {
     return;
   }
 
@@ -66,7 +67,7 @@ export async function invalidateEmoteCache(tenantId: string, vodId: number): Pro
 }
 
 export async function invalidateVodCache(tenantId: string, vodId: number): Promise<void> {
-  if (process.env.DISABLE_REDIS_CACHE === 'true' || !redisClient) {
+  if (getDisableRedisCache() || !redisClient) {
     return;
   }
 
