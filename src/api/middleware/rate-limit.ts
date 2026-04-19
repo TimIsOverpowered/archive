@@ -1,10 +1,12 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { RateLimiterRedis } from 'rate-limiter-flexible';
+import { RateLimiterRedis, RateLimiterMemory } from 'rate-limiter-flexible';
 import { validateCloudflareRequest } from '../../utils/cloudflare-ip-validator.js';
 
+type RateLimiter = RateLimiterRedis | RateLimiterMemory;
+
 interface RateLimitOptions {
-  limiter: RateLimiterRedis;
-  writeLimiter?: RateLimiterRedis;
+  limiter: RateLimiter;
+  writeLimiter?: RateLimiter;
 }
 
 function getClientIp(request: FastifyRequest): string {

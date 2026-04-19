@@ -9,6 +9,7 @@ import configPlugin from './plugins/config.plugin';
 import createTenantLoggerMiddleware from './middleware/tenant-logger.js';
 import { getApiConfig } from '../config/env.js';
 import { extractErrorDetails } from '../utils/error.js';
+import { HttpError } from '../utils/http-error.js';
 import { logger } from '../utils/logger.js';
 import healthRoutes from './routes/health.js';
 import vodsRoutes from './routes/vods.js';
@@ -30,14 +31,26 @@ export async function buildServer() {
   // Set error handler immediately after creating instance (before any plugins/routes)
   // This ensures it's properly inherited by all child instances
   fastify.setErrorHandler((error, request, reply) => {
+    if (error instanceof HttpError) {
+      const { statusCode, message } = error;
+      const isClientError = statusCode >= 400 && statusCode < 500;
+      if (statusCode >= 500) {
+        logger.error({ err: error }, 'Request error');
+      }
+      return reply.status(statusCode).send({
+        error: {
+          message: isClientError ? message : 'Internal server error',
+          statusCode,
+        },
+      });
+    }
+
     const details = extractErrorDetails(error);
     const statusCode = (error as { statusCode?: number }).statusCode || 500;
 
-    // For 5xx errors, use generic code to avoid leaking internal error codes
     const isClientError = statusCode >= 400 && statusCode < 500;
     const errorMessage = isClientError ? details.message : 'Internal server error';
 
-    // Only log 5xx errors (server errors). 4xx are expected client errors and clutter logs.
     if (statusCode >= 500) {
       logger.error({ err: error }, 'Request error');
     }

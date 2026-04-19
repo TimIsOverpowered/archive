@@ -6,7 +6,7 @@ import {
   platformValidationMiddleware,
   type TenantPlatformContext,
 } from '../../middleware/tenant-platform.js';
-import { adminRateLimiter } from '../../plugins/redis.plugin.js';
+import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod } from '../../../types/platforms.js';
@@ -37,6 +37,7 @@ interface DmcaRequestBody {
 }
 
 export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
+  const adminRateLimiter = RedisService.getLimiter('rate:admin');
   if (!adminRateLimiter) {
     throw new Error('Rate limiter not initialized');
   }

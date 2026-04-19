@@ -1,174 +1,55 @@
-import Redis from 'ioredis';
-import { RateLimiterRedis } from 'rate-limiter-flexible';
-import { logger } from '../../utils/logger.js';
-import { extractErrorDetails } from '../../utils/error.js';
 import type { FastifyPluginAsync } from 'fastify';
+import { RedisService, type RateLimiterConfig } from '../../utils/redis-service.js';
+import { logger } from '../../utils/logger.js';
 
 interface RedisPluginOptions {
   url: string;
 }
 
-export let redisClient: Redis | null = null;
-export let publicRateLimiter: RateLimiterRedis | null = null;
-export let chatRateLimiter: RateLimiterRedis | null = null;
-export let adminRateLimiter: RateLimiterRedis | null = null;
-
-export function getRedisStatus(): { status: string; connected: boolean } {
-  if (!redisClient) {
-    return { status: 'not-initialized', connected: false };
-  }
-  return {
-    status: redisClient.status,
-    connected: redisClient.status === 'ready',
-  };
-}
-
 const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, options) => {
   const { url } = options;
 
-  const maskedUrl = url.replace(/:\/\/.*@/, '://***@');
-  logger.info({ url: maskedUrl }, 'Connecting to Redis');
+  const vodLimit = parseInt(process.env.RATE_LIMIT_VODS || '60', 10);
+  const chatLimit = parseInt(process.env.RATE_LIMIT_CHAT || '30', 10);
+  const adminGetLimit = parseInt(process.env.RATE_LIMIT_ADMIN_GET || '60', 10);
+  const blockDuration = parseInt(process.env.RATE_LIMIT_BLOCK_DURATION || '60', 10);
 
-  const isProduction = process.env.NODE_ENV === 'production';
-  let errorCount = 0;
-  let connectCount = 0;
-  const maxErrorsBeforeFail = isProduction ? 5 : 3;
-  const readyTimeout = isProduction ? 30000 : 10000;
+  const rateLimiters: RateLimiterConfig[] = [
+    { keyPrefix: 'rate:vods', points: vodLimit, duration: 60 },
+    { keyPrefix: 'rate:chat', points: chatLimit, duration: 60, blockDuration: blockDuration * 2 },
+    { keyPrefix: 'rate:admin', points: adminGetLimit, duration: 60, blockDuration: blockDuration * 5 },
+  ];
 
-  try {
-    redisClient = new Redis(url, {
-      retryStrategy(times: number) {
-        if (times > 10) return null; // Max Redis reconnection attempts reached
-        const delay = Math.min(times * 500, 5000);
-        logger.warn({ times, delay }, 'Redis reconnection attempt');
-        return delay;
-      },
-    });
+  RedisService.init({ url, rateLimiters });
 
-    if (!redisClient) {
-      logger.error('Redis client not initialized');
-      throw new Error('Redis client initialization failed');
-    }
+  await RedisService.instance!.connect();
 
-    redisClient.on('error', (err) => {
-      errorCount++;
-      logger.error({ err: err.message, errorCount }, 'Redis connection error');
+  // Register on Fastify instance for backward compatibility
+  fastify.decorate('redis', RedisService.getClient());
+  fastify.decorate('publicRateLimiter', RedisService.getLimiter('rate:vods'));
+  fastify.decorate('chatRateLimiter', RedisService.getLimiter('rate:chat'));
+  fastify.decorate('adminRateLimiter', RedisService.getLimiter('rate:admin'));
 
-      if (errorCount >= maxErrorsBeforeFail) {
-        const errorMsg = `Redis connection unstable after ${errorCount} errors`;
-        redisClient?.quit().catch(() => {});
-        throw new Error(errorMsg);
-      }
-    });
-
-    redisClient.on('connect', () => {
-      connectCount++;
-      if (errorCount === 0) {
-        logger.info('Redis connected');
-      }
-    });
-
-    // Wait for ready event with timeout (register BEFORE connect)
-    let readyResolved = false;
-    const readyPromise = new Promise<void>((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        redisClient?.off('ready', readyHandler);
-        const errorMsg = `Redis did not become ready after ${readyTimeout}ms (${errorCount} errors, ${connectCount} connects)`;
-        logger.error({ errorCount, connectCount }, errorMsg);
-        reject(new Error(errorMsg));
-      }, readyTimeout);
-
-      const readyHandler = () => {
-        if (readyResolved) return;
-        readyResolved = true;
-        clearTimeout(timeoutId);
-        logger.info('Redis client ready - connection stable');
-        resolve();
-      };
-
-      redisClient?.on('ready', readyHandler);
-    });
-
-    if (!redisClient) {
-      logger.error('Redis client became null after connection');
-      throw new Error('Redis client lost during connection');
-    }
-
-    await readyPromise;
-    logger.info('Redis connection established');
-
-    fastify.decorate('redis', redisClient);
-
-    // Initialize rate limiters from env vars
-    const vodLimit = parseInt(process.env.RATE_LIMIT_VODS || '60', 10);
-    const chatLimit = parseInt(process.env.RATE_LIMIT_CHAT || '30', 10);
-    const adminGetLimit = parseInt(process.env.RATE_LIMIT_ADMIN_GET || '60', 10);
-    const blockDuration = parseInt(process.env.RATE_LIMIT_BLOCK_DURATION || '60', 10);
-
-    publicRateLimiter = new RateLimiterRedis({
-      storeClient: redisClient,
-      keyPrefix: 'rate:vods',
-      points: vodLimit,
-      duration: 60,
-      blockDuration: blockDuration,
-    });
-    fastify.decorate('publicRateLimiter', publicRateLimiter);
-
-    chatRateLimiter = new RateLimiterRedis({
-      storeClient: redisClient,
-      keyPrefix: 'rate:chat',
-      points: chatLimit,
-      duration: 60,
-      blockDuration: blockDuration * 2,
-    });
-    fastify.decorate('chatRateLimiter', chatRateLimiter);
-
-    adminRateLimiter = new RateLimiterRedis({
-      storeClient: redisClient,
-      keyPrefix: 'rate:admin',
-      points: adminGetLimit,
-      duration: 60,
-      blockDuration: blockDuration * 5,
-    });
-    fastify.decorate('adminRateLimiter', adminRateLimiter);
-
-    logger.info({ vodLimit, chatLimit, adminGetLimit }, 'Rate limiters initialized');
-  } catch (error) {
-    const isProduction = process.env.NODE_ENV === 'production';
-    const details = extractErrorDetails(error);
-    const errorMessage = details.message;
-
-    if (isProduction) {
-      logger.fatal(
-        { error: errorMessage },
-        'Failed to connect to Redis - server cannot start in production without Redis'
-      );
-      throw error;
-    }
-
-    logger.warn(
-      { error: errorMessage },
-      'Redis connection failed - running without Redis (rate limiting and caching disabled)'
-    );
-  }
+  logger.info({ vodLimit, chatLimit, adminGetLimit }, 'Rate limiters initialized');
 };
 
 export default redisPlugin;
 
-/**
- * Gracefully close Redis client connection during shutdown
- */
+export { RedisService };
+
+export function getRedisStatus(): { status: string; connected: boolean } {
+  return RedisService.getStatus();
+}
+
+export function getRedisClient() {
+  return RedisService.getClient();
+}
+
+export const redisClient = null; // deprecated - use RedisService.getClient()
+export const publicRateLimiter = null; // deprecated - use RedisService.getLimiter('rate:vods')
+export const chatRateLimiter = null; // deprecated - use RedisService.getLimiter('rate:chat')
+export const adminRateLimiter = null; // deprecated - use RedisService.getLimiter('rate:admin')
+
 export async function closeRedisClient(): Promise<void> {
-  if (redisClient) {
-    try {
-      await redisClient.quit();
-      logger.info('Redis client closed');
-    } catch (error) {
-      const details = extractErrorDetails(error);
-      const errorMessage = details.message;
-      logger.warn({ error: errorMessage }, 'Error closing Redis client during shutdown');
-    } finally {
-      redisClient = null;
-    }
-  }
+  await RedisService.close();
 }

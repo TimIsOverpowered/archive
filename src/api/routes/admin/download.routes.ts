@@ -7,7 +7,7 @@ import {
   type TenantPlatformContext,
 } from '../../middleware/tenant-platform.js';
 import { ensureVodDownload, ensureVodRecord, findVodRecord } from './utils/vod-helpers.js';
-import { adminRateLimiter } from '../../plugins/redis.plugin.js';
+import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest, notFound } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
@@ -42,11 +42,12 @@ interface UploadBody {
 }
 
 export default async function downloadJobsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  if (!adminRateLimiter) {
+  const adminLimiter = RedisService.getLimiter('rate:admin');
+  if (!adminLimiter) {
     throw new Error('Rate limiter not initialized');
   }
 
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
+  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminLimiter });
 
   // Main download endpoint - creates VOD record if missing, then queues download + emote + chat jobs + upload (Twitch/Kick)
   fastify.post<{ Body: UploadBody; Params: Params }>(

@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { getVods, getVodById, getVodByPlatformId, VodQuerySchema } from '../../services/vods.service.js';
 import { getEmotesByVodId } from '../../services/emotes.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
-import { publicRateLimiter } from '../plugins/redis.plugin.js';
+import { RedisService } from '../../utils/redis-service.js';
 import { notFound } from '../../utils/http-error.js';
 import { tenantMiddleware } from '../middleware/tenant-platform.js';
 import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
@@ -13,6 +13,7 @@ interface VodRoutesOptions {
 }
 
 export default async function vodsRoutes(fastify: FastifyInstance, _options: VodRoutesOptions) {
+  const publicRateLimiter = RedisService.getLimiter('rate:vods');
   if (!publicRateLimiter) {
     throw new Error('Rate limiter not initialized');
   }

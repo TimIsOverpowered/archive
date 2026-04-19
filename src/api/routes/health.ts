@@ -5,7 +5,7 @@ import { getClient } from '../../db/client.js';
 import { checkPuppeteerHealth } from '../../utils/puppeteer-health.js';
 import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator.js';
 import healthCheckMiddleware from '../middleware/health-check.js';
-import { getRedisStatus } from '../plugins/redis.plugin';
+import { RedisService } from '../../utils/redis-service.js';
 
 interface HealthRouteOptions {
   prefix: string;
@@ -38,7 +38,7 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
     async () => {
       const redis = fastify.redis;
       const streamerConfigs = await loadTenantConfigs();
-      const redisStatusInfo = getRedisStatus();
+      const redisStatusInfo = RedisService.getStatus();
 
       let redisStatus = 'ok';
       try {

@@ -1,24 +1,25 @@
-import { redisClient } from '../api/plugins/redis.plugin.js';
+import { RedisService } from '../utils/redis-service.js';
 import { getDisableRedisCache } from '../config/env-accessors.js';
 import { logger } from '../utils/logger.js';
 
 let redisConnectionFailed = false;
 
 export async function invalidateTenantVodListCache(tenantId: string): Promise<void> {
-  if (getDisableRedisCache() || !redisClient) {
+  const client = RedisService.getClient();
+  if (getDisableRedisCache() || !client) {
     return;
   }
 
   try {
     const keysToDelete: string[] = [];
 
-    const stream = redisClient.scanStream({ match: `vods:${tenantId}:*`, count: 100 });
+    const stream = client.scanStream({ match: `vods:${tenantId}:*`, count: 100 });
     for await (const keys of stream) {
       keysToDelete.push(...keys);
     }
 
     if (keysToDelete.length > 0) {
-      await redisClient.unlink(...keysToDelete);
+      await client.unlink(...keysToDelete);
     }
 
     if (redisConnectionFailed) {
@@ -38,14 +39,15 @@ export async function invalidateTenantVodListCache(tenantId: string): Promise<vo
 }
 
 export async function invalidateEmoteCache(tenantId: string, vodId: number): Promise<void> {
-  if (getDisableRedisCache() || !redisClient) {
+  const client = RedisService.getClient();
+  if (getDisableRedisCache() || !client) {
     return;
   }
 
   const cacheKey = `emotes:${tenantId}:${vodId}`;
 
   try {
-    await redisClient.unlink(cacheKey);
+    await client.unlink(cacheKey);
 
     if (redisConnectionFailed) {
       redisConnectionFailed = false;
@@ -67,24 +69,25 @@ export async function invalidateEmoteCache(tenantId: string, vodId: number): Pro
 }
 
 export async function invalidateVodCache(tenantId: string, vodId: number): Promise<void> {
-  if (getDisableRedisCache() || !redisClient) {
+  const client = RedisService.getClient();
+  if (getDisableRedisCache() || !client) {
     return;
   }
 
   const vodIdStr = String(vodId);
 
   try {
-    await redisClient.unlink(`vod:${tenantId}:${vodIdStr}`);
+    await client.unlink(`vod:${tenantId}:${vodIdStr}`);
 
     const keysToDelete: string[] = [`vod:${tenantId}:${vodIdStr}`];
 
-    const stream = redisClient.scanStream({ match: `vods:${tenantId}:*`, count: 100 });
+    const stream = client.scanStream({ match: `vods:${tenantId}:*`, count: 100 });
     for await (const keys of stream) {
       keysToDelete.push(...keys);
     }
 
     if (keysToDelete.length > 0) {
-      await redisClient.unlink(...keysToDelete); // single round trip
+      await client.unlink(...keysToDelete); // single round trip
     }
 
     if (redisConnectionFailed) {
