@@ -53,7 +53,8 @@ export async function buildServer() {
     const { statusCode, message, isClientError } = formatErrorResponse(error);
 
     if (statusCode >= 500) {
-      logger.error({ err: error }, 'Request error');
+      const details = extractErrorDetails(error);
+      logger.error({ err: details.message, stack: details.stack }, 'Request error');
     }
 
     return reply.status(statusCode).send({
@@ -78,6 +79,10 @@ export async function buildServer() {
   // Add tenant display name to logger for routes with streamer ID
   const tenantLoggerMiddleware = createTenantLoggerMiddleware();
   fastify.addHook('preHandler', tenantLoggerMiddleware);
+  fastify.addHook('onResponse', async (_request, _reply) => {
+    const { exitTenantContext } = await import('./middleware/tenant-logger.js');
+    exitTenantContext();
+  });
 
   // Security headers
   await fastify.register(helmet, {

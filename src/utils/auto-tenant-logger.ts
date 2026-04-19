@@ -11,7 +11,7 @@ export function createAutoLogger(tenantId?: string | null): AppLogger {
   }
 
   const displayName = getTenantDisplayName(tenantId);
-  const childLog = logger.child({ tenant: displayName });
+  const childLog = logger.child({ tenantId: displayName });
 
   const prefix = (msg: string): string => {
     if (msg.match(/^\w+:/) || msg.startsWith(`[${displayName}]`)) {
