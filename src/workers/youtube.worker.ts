@@ -179,11 +179,13 @@ async function processGameUploadJob(
   } = job;
 
   if (platform === PLATFORMS.TWITCH && !config.twitch?.mainPlatform) {
+    log.warn('Skipping upload because mainPlatform is false');
     resetFailures(tenantId);
     return { success: true, videoId: '', gameId: '' };
   }
 
   if (platform === PLATFORMS.KICK && !config.kick?.mainPlatform) {
+    log.warn('Skipping upload because mainPlatform is false');
     resetFailures(tenantId);
     return { success: true, videoId: '', gameId: '' };
   }
