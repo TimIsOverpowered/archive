@@ -14,7 +14,7 @@ import { processGameUpload } from './youtube/game-upload-processor.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import type { AppLogger } from '../utils/logger.js';
 import { resetFailures } from '../utils/discord-alerts.js';
-import { PLATFORMS, UPLOAD_TYPES } from '../types/platforms.js';
+import { UPLOAD_TYPES } from '../types/platforms.js';
 import { TenantConfig } from '../config/types.js';
 import { PrismaClient } from '../../generated/streamer/client.js';
 
@@ -46,30 +46,6 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
   if (!config || !config.youtube) {
     throw new Error(`YouTube not configured for tenant ${tenantId}`);
   }
-
-  let fileSize: number | undefined;
-  try {
-    const fs = await import('fs');
-    const stats = fs.statSync(actualFilePath);
-    fileSize = stats.size;
-  } catch {
-    log.warn({ vodId, filePath: actualFilePath }, 'Could not get file size');
-  }
-
-  const state = await job.getState();
-  log.info(
-    {
-      vodId,
-      jobId,
-      type,
-      part: (job.data as YoutubeVodUploadJob).part,
-      fileSize,
-      filePath: actualFilePath,
-      state,
-      attemptsMade: job.attemptsMade,
-    },
-    '[youtube-upload] Job started'
-  );
 
   try {
     if (type === UPLOAD_TYPES.VOD) {
@@ -147,7 +123,14 @@ async function processVodUploadJob(
   for (const video of result.uploadedVideos) {
     await db.vodUpload.upsert({
       where: { vod_id_type_part: { vod_id: dbId, type, part: video.part } },
-      create: { vod_id: dbId, upload_id: video.id, type, part: video.part, status: 'COMPLETED', duration: video.duration },
+      create: {
+        vod_id: dbId,
+        upload_id: video.id,
+        type,
+        part: video.part,
+        status: 'COMPLETED',
+        duration: video.duration,
+      },
       update: { upload_id: video.id, status: 'COMPLETED', duration: video.duration },
     });
   }
@@ -164,31 +147,8 @@ async function processGameUploadJob(
   db: PrismaClient,
   log: AppLogger
 ): Promise<YoutubeUploadResult> {
-  const {
-    tenantId,
-    dbId,
-    vodId,
-    filePath,
-    platform,
-    chapterName,
-    chapterStart,
-    chapterEnd,
-    chapterGameId,
-    title,
-    description,
-  } = job;
-
-  if (platform === PLATFORMS.TWITCH && !config.twitch?.mainPlatform) {
-    log.warn('Skipping upload because mainPlatform is false');
-    resetFailures(tenantId);
-    return { success: true, videoId: '', gameId: '' };
-  }
-
-  if (platform === PLATFORMS.KICK && !config.kick?.mainPlatform) {
-    log.warn('Skipping upload because mainPlatform is false');
-    resetFailures(tenantId);
-    return { success: true, videoId: '', gameId: '' };
-  }
+  const { tenantId, dbId, vodId, filePath, chapterName, chapterStart, chapterEnd, chapterGameId, title, description } =
+    job;
 
   const result = await processGameUpload({
     tenantId,
