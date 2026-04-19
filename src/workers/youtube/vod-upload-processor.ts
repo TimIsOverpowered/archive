@@ -28,7 +28,7 @@ export interface VodUploadContext {
 }
 
 export interface VodUploadResult {
-  uploadedVideos: Array<{ id: string; part: number }>;
+  uploadedVideos: Array<{ id: string; part: number; duration: number }>;
   needsPartLinking: boolean;
 }
 
@@ -132,7 +132,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
     });
   });
 
-  const uploadedVideos: Array<{ id: string; part: number }> = [];
+  const uploadedVideos: Array<{ id: string; part: number; duration: number }> = [];
 
   for (let i = 0; i < parts.length; i++) {
     const currentPartNum = i + 1;
@@ -185,7 +185,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
       partDuration
     );
 
-    uploadedVideos.push({ id: result.videoId, part: i + 1 });
+    uploadedVideos.push({ id: result.videoId, part: i + 1, duration: partDuration });
 
     await deleteFileIfExists(parts[i]);
   }
@@ -279,7 +279,7 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
   );
 
   const uploadPart = part ?? 1;
-  const uploadedVideos = [{ id: result.videoId, part: uploadPart }];
+  const uploadedVideos = [{ id: result.videoId, part: uploadPart, duration }];
 
   if (!config.settings.saveMP4 || dmcaProcessed === true) {
     await deleteFileIfExists(filePath);
