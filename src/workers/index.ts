@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { pathToFileURL } from 'node:url';
 import { extractErrorDetails } from '../utils/error.js';
 import { loadTenantConfigs, clearConfigCache } from '../config/loader.js';
 import { QUEUE_NAMES, getQueue, closeQueues } from './jobs/queues.js';
@@ -13,11 +14,7 @@ import { VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY } from '../constants.js';
 import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/client.js';
 import { registerPlatformStrategies } from '../services/platforms/index.js';
 
-const workerConfig = loadWorkersConfig();
-setLoggerConfig({ level: workerConfig.LOG_LEVEL, isProduction: workerConfig.NODE_ENV === 'production' });
-await initWorkersRedis();
-
-async function clearAllJobsOnStartup() {
+async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkersConfig>) {
   if (!workerConfig.CLEAR_QUEUES_ON_STARTUP) return;
 
   getLogger().warn('[Queues] CLEAR_QUEUES_ON_STARTUP=true — all queued jobs will be permanently deleted');
@@ -43,7 +40,11 @@ async function clearAllJobsOnStartup() {
   getLogger().warn('[Queues] All queues cleared and reset');
 }
 
-async function bootstrap() {
+export async function bootstrap() {
+  const workerConfig = loadWorkersConfig();
+  setLoggerConfig({ level: workerConfig.LOG_LEVEL, isProduction: workerConfig.NODE_ENV === 'production' });
+  await initWorkersRedis();
+
   getLogger().info(`Starting worker process (NODE_ENV: ${workerConfig.NODE_ENV})`);
 
   try {
@@ -51,7 +52,7 @@ async function bootstrap() {
     const configs = await loadTenantConfigs();
     await waitForRedisReady();
     startTokenHealthCron();
-    await clearAllJobsOnStartup();
+    await clearAllJobsOnStartup(workerConfig);
 
     const workerInstances = WORKER_DEFINITIONS.map((def) => {
       if (def.name === QUEUE_NAMES.VOD_LIVE) {
@@ -105,4 +106,6 @@ function registerShutdownHandlers() {
   process.on('SIGINT', shutdown);
 }
 
-bootstrap();
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  bootstrap();
+}
