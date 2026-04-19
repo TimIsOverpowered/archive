@@ -1,21 +1,27 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { getTenantDisplayName } from '../../config/loader.js';
-import { enterTenantContext, exitTenantContext, TenantContextData } from '../../utils/async-context.js';
+import {
+  enterTenantContext,
+  exitTenantContext,
+  TenantContextData,
+  generateRequestId,
+} from '../../utils/async-context.js';
 
 // Extend request type to include tenant context for type safety
 declare module 'fastify' {
   interface FastifyRequest {
     tenantDisplayName?: string;
+    reqId?: string;
   }
 }
 
 /**
  * Simple middleware that sets tenant context in async-local storage.
- * This enables the pino mixin in server.ts to automatically inject tenant field into structured logs,
+ * This enables the pino mixin to automatically inject tenant and reqId fields into structured logs,
  * and allows route handlers to use createAutoLogger() without explicit tenantId parameter.
  */
 export default function createTenantLoggerMiddleware() {
-  return async function tenantLoggerMiddleware(request: FastifyRequest, _reply: FastifyReply) {
+  return async function tenantLoggerMiddleware(request: FastifyRequest, reply: FastifyReply) {
     // Extract tenantId from params (routes like /api/v1/:tenantId/vods/* or /api/v1/:tenantId/admin/...)
     const params = request.params as Record<string, string>;
 
@@ -31,8 +37,13 @@ export default function createTenantLoggerMiddleware() {
     const displayName = getTenantDisplayName(tenantId);
     request.tenantDisplayName = displayName;
 
-    // Set tenant in async-local storage so pino mixin can read it automatically during handler execution
-    const context: TenantContextData = { displayName, tenantId };
+    // Generate or reuse request ID for tracing across API → workers → DB
+    const reqId = generateRequestId();
+    request.reqId = reqId;
+    reply.header('X-Request-ID', reqId);
+
+    // Set tenant + reqId in async-local storage so pino mixin can read it automatically during handler execution
+    const context: TenantContextData = { displayName, tenantId, reqId };
 
     enterTenantContext(context);
   };

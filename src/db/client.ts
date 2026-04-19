@@ -7,176 +7,102 @@ import { DB_CLIENT_IDLE_TIMEOUT_MS, DB_CLIENT_MAX_CLIENTS, DB_CLIENT_CLEANUP_INT
 import { invalidateVodCache, invalidateTenantVodListCache, invalidateEmoteCache } from '../services/vod-cache.js';
 import { sleep } from '../utils/delay.js';
 
+function extractVodIdsFromWhere(where: Record<string, unknown> | undefined): number[] {
+  if (!where || typeof where !== 'object') return [];
+  const idClause = where.vod_id ?? where.id;
+  if (idClause === null || idClause === undefined) return [];
+  if (typeof idClause === 'object' && 'in' in idClause) {
+    const arr = (idClause as { in: unknown[] }).in;
+    return Array.isArray(arr) ? arr.map((id) => Number(id)).filter((id) => !isNaN(id)) : [];
+  }
+  if (typeof idClause !== 'object') {
+    const numId = Number(idClause);
+    return !isNaN(numId) ? [numId] : [];
+  }
+  return [];
+}
+
+function extractVodIdsFromData(data: unknown[]): number[] {
+  return data
+    .filter((item): item is Record<string, unknown> => item != null && typeof item === 'object' && 'vod_id' in item)
+    .map((item) => Number((item as { vod_id: unknown }).vod_id))
+    .filter((id) => !isNaN(id));
+}
+
+function invalidateVodIds(tenantId: string, ids: number[]): void {
+  for (const id of ids) {
+    invalidateVodCache(tenantId, id).catch((error) => {
+      logger.warn({ tenantId, vodId: id, error: extractErrorDetails(error) }, 'Cache invalidation failed');
+    });
+    logger.debug({ tenantId, vodId: id }, 'VOD cache invalidated via extension');
+  }
+}
+
 const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) =>
   baseClient.$extends({
     query: {
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
-          const isMutation = [
-            'create',
-            'update',
-            'upsert',
-            'delete',
-            'createMany',
-            'updateMany',
-            'deleteMany',
-          ].includes(operation);
-          const isRelevantModel = ['Vod', 'VodUpload', 'Chapter', 'Game'].includes(model);
-
-          if (!isMutation || !isRelevantModel) {
+          const mutations = ['create', 'update', 'upsert', 'delete', 'createMany', 'updateMany', 'deleteMany'];
+          if (!mutations.includes(operation) || !['Vod', 'VodUpload', 'Chapter', 'Game', 'Emote'].includes(model)) {
             return query(args);
           }
 
           try {
             const result = await query(args);
-
             const affectedVodIds: number[] = [];
 
             if (model === 'Vod') {
-              if (operation === 'delete' || operation === 'update' || operation === 'upsert') {
-                const where = (args as { where?: Record<string, unknown> }).where;
-                if (where && typeof where === 'object' && 'id' in where) {
-                  const idValue = (where as { id: unknown }).id;
-                  if (Array.isArray(idValue)) {
-                    affectedVodIds.push(...idValue.map((id) => Number(id)).filter((id) => !isNaN(id)));
-                  } else {
-                    const numId = Number(idValue);
-                    if (!isNaN(numId)) affectedVodIds.push(numId);
-                  }
-                }
-              } else if (operation === 'create') {
+              if (operation === 'create') {
                 if (result && typeof result === 'object' && 'id' in result) {
                   const numId = Number((result as { id: unknown }).id);
                   if (!isNaN(numId)) affectedVodIds.push(numId);
                 }
               } else if (operation === 'createMany') {
-                const data = (args as { data?: unknown[] }).data;
-                if (Array.isArray(data) && data.length > 0) {
-                  const extractedIds = data
-                    .filter(
-                      (item): item is Record<string, unknown> =>
-                        item != null && typeof item === 'object' && 'id' in (item as Record<string, unknown>)
-                    )
-                    .map((item) => Number((item as { id: unknown }).id))
-                    .filter((id) => !isNaN(id));
-
-                  if (extractedIds.length === 0 && data.length > 0) {
-                    logger.debug(
-                      { tenantId, operation, recordCount: data.length },
-                      'Vod.createMany called without explicit IDs — tenant list cache will be invalidated instead'
-                    );
-                  }
-
-                  affectedVodIds.push(...extractedIds);
+                const data = (args as { data?: unknown[] }).data ?? [];
+                const ids = data
+                  .filter((item): item is Record<string, unknown> => item != null && typeof item === 'object' && 'id' in item)
+                  .map((item) => Number((item as { id: unknown }).id))
+                  .filter((id) => !isNaN(id));
+                if (ids.length === 0 && data.length > 0) {
+                  logger.debug({ tenantId, recordCount: data.length },
+                    'Vod.createMany called without explicit IDs — tenant list cache will be invalidated instead');
                 }
-              } else if (operation === 'deleteMany' || operation === 'updateMany') {
-                const where = (args as { where?: Record<string, unknown> }).where;
-                if (where && typeof where === 'object' && 'id' in where) {
-                  const idClause = (where as { id: unknown }).id;
-                  if (idClause && typeof idClause === 'object' && 'in' in idClause) {
-                    const idArray = idClause.in as unknown[];
-                    if (Array.isArray(idArray)) {
-                      affectedVodIds.push(...idArray.map((id) => Number(id)).filter((id) => !isNaN(id)));
-                    }
-                  } else if (typeof idClause !== 'object' && idClause !== null && idClause !== undefined) {
-                    const numId = Number(idClause);
-                    if (!isNaN(numId)) affectedVodIds.push(numId);
-                  }
-                }
+                affectedVodIds.push(...ids);
+              } else {
+                affectedVodIds.push(...extractVodIdsFromWhere((args as { where?: Record<string, unknown> }).where));
               }
             } else if (model === 'Emote') {
-              if (operation === 'delete' || operation === 'update' || operation === 'upsert') {
-                const where = (args as { where?: Record<string, unknown> }).where;
-                if (where && typeof where === 'object' && 'vod_id' in where) {
-                  const vodIdClause = (where as { vod_id: unknown }).vod_id;
-                  if (typeof vodIdClause !== 'object' && vodIdClause !== null && vodIdClause !== undefined) {
-                    const numId = Number(vodIdClause);
-                    if (!isNaN(numId)) {
-                      invalidateEmoteCache(tenantId, numId).catch((error) => {
-                        logger.warn(
-                          { tenantId, vodId: numId, error: extractErrorDetails(error) },
-                          'Emote cache invalidation failed'
-                        );
-                      });
-                    }
-                  }
-                }
-              } else if (operation === 'create') {
+              const whereIds = extractVodIdsFromWhere((args as { where?: Record<string, unknown> }).where);
+              if (operation === 'create') {
                 const data = (args as { data?: Record<string, unknown> }).data;
-                if (data && typeof data === 'object' && 'vod_id' in data) {
+                if (data && 'vod_id' in data) {
                   const numId = Number((data as { vod_id: unknown }).vod_id);
-                  if (!isNaN(numId)) {
-                    invalidateEmoteCache(tenantId, numId).catch((error) => {
-                      logger.warn(
-                        { tenantId, vodId: numId, error: extractErrorDetails(error) },
-                        'Emote cache invalidation failed'
-                      );
-                    });
-                  }
+                  if (!isNaN(numId)) whereIds.push(numId);
                 }
               }
+              for (const id of whereIds) {
+                invalidateEmoteCache(tenantId, id).catch((error) => {
+                  logger.warn({ tenantId, vodId: id, error: extractErrorDetails(error) }, 'Emote cache invalidation failed');
+                });
+              }
             } else {
-              if (operation === 'delete' || operation === 'update' || operation === 'upsert') {
-                const where = (args as { where?: Record<string, unknown> }).where;
-                if (where && typeof where === 'object' && 'vod_id' in where) {
-                  const vodIdClause = (where as { vod_id: unknown }).vod_id;
-                  if (vodIdClause && typeof vodIdClause === 'object' && 'in' in vodIdClause) {
-                    const idArray = vodIdClause.in as unknown[];
-                    if (Array.isArray(idArray)) {
-                      affectedVodIds.push(...idArray.map((id) => Number(id)).filter((id) => !isNaN(id)));
-                    }
-                  } else if (typeof vodIdClause !== 'object' && vodIdClause !== null && vodIdClause !== undefined) {
-                    const numId = Number(vodIdClause);
-                    if (!isNaN(numId)) affectedVodIds.push(numId);
-                  }
-                }
-              } else if (operation === 'create') {
+              if (operation === 'create') {
                 const data = (args as { data?: Record<string, unknown> }).data;
-                if (data && typeof data === 'object' && 'vod_id' in data) {
+                if (data && 'vod_id' in data) {
                   const numId = Number((data as { vod_id: unknown }).vod_id);
                   if (!isNaN(numId)) affectedVodIds.push(numId);
                 }
               } else if (operation === 'createMany') {
-                const data = (args as { data?: unknown[] }).data;
-                if (Array.isArray(data) && data.length > 0) {
-                  affectedVodIds.push(
-                    ...data
-                      .filter(
-                        (item): item is Record<string, unknown> =>
-                          item != null && typeof item === 'object' && 'vod_id' in (item as Record<string, unknown>)
-                      )
-                      .map((item) => Number((item as { vod_id: unknown }).vod_id))
-                      .filter((id) => !isNaN(id))
-                  );
-                }
-              } else if (operation === 'updateMany' || operation === 'deleteMany') {
-                const where = (args as { where?: Record<string, unknown> }).where;
-                if (where && typeof where === 'object' && 'vod_id' in where) {
-                  const vodIdClause = (where as { vod_id: unknown }).vod_id;
-                  if (vodIdClause && typeof vodIdClause === 'object' && 'in' in vodIdClause) {
-                    const idArray = vodIdClause.in as unknown[];
-                    if (Array.isArray(idArray)) {
-                      affectedVodIds.push(...idArray.map((id) => Number(id)).filter((id) => !isNaN(id)));
-                    }
-                  } else if (typeof vodIdClause !== 'object' && vodIdClause !== null && vodIdClause !== undefined) {
-                    const numId = Number(vodIdClause);
-                    if (!isNaN(numId)) affectedVodIds.push(numId);
-                  }
-                }
+                const data = (args as { data?: unknown[] }).data ?? [];
+                affectedVodIds.push(...extractVodIdsFromData(data));
+              } else {
+                affectedVodIds.push(...extractVodIdsFromWhere((args as { where?: Record<string, unknown> }).where));
               }
             }
 
-            const uniqueIds = [...new Set(affectedVodIds)].filter((id) => !isNaN(id));
-
-            for (const id of uniqueIds) {
-              invalidateVodCache(tenantId, id).catch((error) => {
-                logger.warn({ tenantId, vodId: id, error: extractErrorDetails(error) }, 'Cache invalidation failed');
-              });
-
-              logger.debug({ tenantId, vodId: id, model, operation }, 'VOD cache invalidated via extension');
-            }
-
-            // Always invalidate tenant-level list cache for any mutation on relevant models
+            const uniqueIds = [...new Set(affectedVodIds)];
+            invalidateVodIds(tenantId, uniqueIds);
             await invalidateTenantVodListCache(tenantId).catch((error) => {
               logger.warn({ tenantId, error: extractErrorDetails(error) }, 'Tenant list cache invalidation failed');
             });

@@ -5,6 +5,7 @@ import { extractErrorDetails } from './error.js';
 import { logger } from './logger.js';
 import { limit, getPuppeteerQueueStats } from './puppeteer-limiter.js';
 import { sleep, getRetryDelay } from './delay.js';
+import { PUPPETEER_NAV_TIMEOUT_MS } from '../constants.js';
 
 const log = logger.child({ module: 'puppeteer-manager' });
 
@@ -49,7 +50,6 @@ export interface MemoryStats {
 
 let browserInstance: BrowserResult | null = null;
 let chromePid: number | null = null;
-const GLOBAL_NAV_TIMEOUT_MS = 5 * 60 * 1000;
 
 /**
  * Gets or initializes the singleton browser instance.
@@ -83,7 +83,7 @@ export async function getBrowser(): Promise<{ browser: Browser }> {
 }
 
 export async function navigateToUrl<T = unknown>(url: string, options?: NavigateOptions): Promise<NavigationResult<T>> {
-  const timeoutMs = options?.timeoutMs ?? GLOBAL_NAV_TIMEOUT_MS;
+  const timeoutMs = options?.timeoutMs ?? PUPPETEER_NAV_TIMEOUT_MS;
   const maxRetries = options?.maxRetries ?? 3;
   const isJsonEndpoint = options?.isJsonUrl ?? false;
   const browserData = await getBrowser();

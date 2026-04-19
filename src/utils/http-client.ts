@@ -173,32 +173,37 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
   }
 }
 
+export interface SafeRequestOptions<R extends ResponseType = 'json'> extends Omit<RequestOptions<R>, 'onError'> {
+  onError?: (error: unknown, url: string) => void;
+}
+
 export function safeRequest<T = unknown>(
   url: string | URL,
   defaultValue: T,
-  options?: RequestOptions<'json'>
+  options?: SafeRequestOptions<'json'>
 ): Promise<T>;
-export function safeRequest(url: string | URL, defaultValue: string, options?: RequestOptions<'text'>): Promise<string>;
-export function safeRequest(url: string | URL, defaultValue: Blob, options?: RequestOptions<'blob'>): Promise<Blob>;
+export function safeRequest(url: string | URL, defaultValue: string, options?: SafeRequestOptions<'text'>): Promise<string>;
+export function safeRequest(url: string | URL, defaultValue: Blob, options?: SafeRequestOptions<'blob'>): Promise<Blob>;
 export function safeRequest(
   url: string | URL,
   defaultValue: ArrayBuffer,
-  options?: RequestOptions<'arrayBuffer'>
+  options?: SafeRequestOptions<'arrayBuffer'>
 ): Promise<ArrayBuffer>;
 export function safeRequest(
   url: string | URL,
   defaultValue: Response,
-  options?: RequestOptions<'response'>
+  options?: SafeRequestOptions<'response'>
 ): Promise<Response>;
 export function safeRequest(
   url: string | URL,
   defaultValue: unknown,
-  options?: RequestOptions<ResponseType>
+  options?: SafeRequestOptions<ResponseType>
 ): Promise<unknown> {
   return (async () => {
     try {
       return await request(url, options as RequestOptions<'json'> | undefined);
-    } catch {
+    } catch (error) {
+      options?.onError?.(error, url.toString());
       return defaultValue;
     }
   })();

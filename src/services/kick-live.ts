@@ -2,10 +2,7 @@ import { navigateToUrl } from '../utils/puppeteer-manager.js';
 import { extractErrorDetails, createErrorContext } from '../utils/error.js';
 import { logger } from '../utils/logger.js';
 import { sleep } from '../utils/delay.js';
-
-// Kick Live API constants
-const KICK_LIVE_API_TIMEOUT_MS = 15000;
-const KICK_PAGE_DELAY_MS = 2000;
+import { KICK_LIVE_API_TIMEOUT_MS, KICK_PAGE_DELAY_MS } from '../constants.js';
 
 interface KickApiResponse {
   data?: Record<string, unknown>;
