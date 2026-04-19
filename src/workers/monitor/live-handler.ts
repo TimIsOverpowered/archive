@@ -92,8 +92,6 @@ async function handleOfflineStream(
       username || undefined,
       displayName
     );
-  } else {
-    log.debug('[Monitor]: No active live VOD to update for offline stream');
   }
 }
 
