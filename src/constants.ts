@@ -1,6 +1,10 @@
 // YouTube limits
 export const YOUTUBE_MAX_DURATION = 43199; // 12 hours - 1 second (720 minutes)
 
+// Live Worker Concurrency
+export const VOD_LIVE_HEADROOM = 2;
+export const VOD_MIN_CONCURRENCY = 50;
+
 // Chat download constants
 export const CHAT_BATCH_SIZE = 500;
 export const CHAT_RATE_LIMIT_MS = 150;
