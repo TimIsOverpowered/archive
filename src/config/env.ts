@@ -13,6 +13,7 @@ export const BaseConfigSchema = z.object({
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
   DISABLE_REDIS_CACHE: z.preprocess((val) => String(val).toLowerCase() === 'true', z.boolean()).default(false),
   PUPPETEER_CONCURRENCY: z.coerce.number().int().positive().default(3),
+  CONFIG_CACHE_TTL: z.coerce.number().int().positive().default(3600),
 });
 
 // API-specific schema (extends base + API-only fields)
@@ -78,6 +79,10 @@ export function loadWorkersConfig(): WorkersConfig {
 
 export function getWorkersConfig(): WorkersConfig {
   return workersConfigCache || loadWorkersConfig();
+}
+
+export function getConfigCacheTtl(): number {
+  return getApiConfig().CONFIG_CACHE_TTL;
 }
 
 // Clear cache (used by both)

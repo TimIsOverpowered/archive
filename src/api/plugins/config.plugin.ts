@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { loadTenantConfigs, getTenantConfig, clearConfigCache } from '../../config/loader.js';
+import { loadTenantConfigs, getTenantConfig, clearConfigCache, reloadTenantConfig } from '../../config/loader.js';
 import { TenantConfig } from '../../config/types.js';
 import { logger } from '../../utils/logger.js';
 
@@ -23,8 +23,12 @@ const configPlugin: FastifyPluginAsync = async (fastify) => {
       return loadTenantConfigs();
     });
 
-    fastify.decorate('clearConfigCache', (): void => {
-      clearConfigCache();
+    fastify.decorate('clearConfigCache', (tenantId?: string): void => {
+      clearConfigCache(tenantId);
+    });
+
+    fastify.decorate('reloadTenantConfig', async (id: string): Promise<TenantConfig | undefined> => {
+      return reloadTenantConfig(id);
     });
 
     // Add hook to reload configs on demand (for admin endpoints)
