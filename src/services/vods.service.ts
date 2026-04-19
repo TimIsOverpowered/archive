@@ -142,47 +142,40 @@ export async function getVods(
   const offset = (page - 1) * limit;
 
   const cacheKey = `vods:${tenantId}:${JSON.stringify({ ...query, page, limit })}`;
-
   const { where, orderBy } = buildVodQuery(query);
 
-  const [vods, total] = await Promise.all([
-    client.vod.findMany({
-      where,
-      skip: offset,
-      take: limit + 1,
-      orderBy,
-      include: VOD_INCLUDE,
-    }),
-    client.vod.count({ where }),
-  ]);
+  return await withCache(cacheKey, VOD_LIST_CACHE_TTL, async () => {
+    const [vods, total] = await Promise.all([
+      client.vod.findMany({
+        where,
+        skip: offset,
+        take: limit + 1,
+        orderBy,
+        include: VOD_INCLUDE,
+      }),
+      client.vod.count({ where }),
+    ]);
 
-  const hasMore = vods.length > limit;
-  const resultVods = hasMore ? vods.slice(0, limit) : vods;
-
-  const response = {
-    vods: resultVods as VodResponse[],
-    total,
-  };
-
-  return await withCache(cacheKey, VOD_LIST_CACHE_TTL, () => Promise.resolve(response));
+    const hasMore = vods.length > limit;
+    return {
+      vods: (hasMore ? vods.slice(0, limit) : vods) as VodResponse[],
+      total,
+    };
+  });
 }
 
 export async function getVodById(client: PrismaClient, tenantId: string, vodId: number): Promise<VodResponse | null> {
   const cacheKey = `vod:${tenantId}:${vodId}`;
 
-  const vod = await client.vod.findFirst({
-    where: {
-      id: vodId,
-    },
-    include: VOD_INCLUDE,
+  return await withCache(cacheKey, VOD_DETAILS_CACHE_TTL, async () => {
+    const vod = await client.vod.findFirst({
+      where: { id: vodId },
+      include: VOD_INCLUDE,
+    });
+
+    if (!vod) return null;
+    return vod as VodResponse;
   });
-
-  if (vod) {
-    const response = vod as VodResponse;
-    return await withCache(cacheKey, VOD_DETAILS_CACHE_TTL, () => Promise.resolve(response));
-  }
-
-  return null;
 }
 
 export async function getVodByPlatformId(
@@ -193,20 +186,15 @@ export async function getVodByPlatformId(
 ): Promise<VodResponse | null> {
   const cacheKey = `vod:platform:${tenantId}:${platform}:${platformVodId}`;
 
-  const vod = await client.vod.findFirst({
-    where: {
-      platform,
-      vod_id: platformVodId,
-    },
-    include: VOD_INCLUDE,
+  return await withCache(cacheKey, VOD_DETAILS_CACHE_TTL, async () => {
+    const vod = await client.vod.findFirst({
+      where: { platform, vod_id: platformVodId },
+      include: VOD_INCLUDE,
+    });
+
+    if (!vod) return null;
+    return vod as VodResponse;
   });
-
-  if (vod) {
-    const response = vod as VodResponse;
-    return await withCache(cacheKey, VOD_DETAILS_CACHE_TTL, () => Promise.resolve(response));
-  }
-
-  return null;
 }
 
 export { invalidateVodCache };

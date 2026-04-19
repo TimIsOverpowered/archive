@@ -144,6 +144,15 @@ export const defaultJobOptions = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const queueCache = new Map<string, Queue<any, any, string>>();
 
+function normalizeOptions(options: unknown): string {
+  if (!options) return '';
+  try {
+    return JSON.stringify(options, Object.keys(options as Record<string, unknown>).sort());
+  } catch {
+    return JSON.stringify(options);
+  }
+}
+
 let _flowProducer: FlowProducer | null = null;
 
 export function getFlowProducer(): FlowProducer {
@@ -159,7 +168,7 @@ export function getQueue<TData = unknown, TFinishedData = unknown>(
   name: string,
   jobOptions?: QueueOptions['defaultJobOptions']
 ): Queue<TData, TFinishedData, string> {
-  const cacheKey = `${name}:${JSON.stringify(jobOptions)}`;
+  const cacheKey = `${name}:${normalizeOptions(jobOptions)}`;
 
   if (queueCache.has(cacheKey)) {
     return queueCache.get(cacheKey)! as Queue<TData, TFinishedData, string>;

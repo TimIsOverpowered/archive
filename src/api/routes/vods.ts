@@ -7,9 +7,20 @@ import { notFound } from '../../utils/http-error.js';
 import { tenantMiddleware } from '../middleware/tenant-platform.js';
 import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
 import { INT32_MAX } from '../../constants.js';
+import type { PrismaClient } from '../../../generated/streamer/client.js';
 
 interface VodRoutesOptions {
   prefix: string;
+}
+
+async function fetchVodByIdSafe(vodId: string, db: PrismaClient, tenantId: string) {
+  const vodIdNum = Number(vodId);
+  if (isNaN(vodIdNum) || vodIdNum < 0 || vodIdNum > INT32_MAX) {
+    notFound('VOD not found');
+  }
+  const vod = await getVodById(db, tenantId, vodIdNum);
+  if (!vod) notFound('VOD not found');
+  return vod;
 }
 
 export default async function vodsRoutes(fastify: FastifyInstance, _options: VodRoutesOptions) {
@@ -89,18 +100,7 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
     async (request) => {
       const { tenantId, vodId } = request.params as { tenantId: string; vodId: string };
       const { db } = request.tenant;
-      const vodIdNum = Number(vodId);
-
-      if (isNaN(vodIdNum) || vodIdNum < 0 || vodIdNum > INT32_MAX) {
-        notFound('VOD not found');
-      }
-
-      const vod = await getVodById(db, tenantId, vodIdNum);
-
-      if (!vod) {
-        notFound('VOD not found');
-      }
-
+      const vod = await fetchVodByIdSafe(vodId, db, tenantId);
       return { data: vod };
     }
   );
@@ -161,19 +161,8 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
     async (request) => {
       const { tenantId, vodId } = request.params as { tenantId: string; vodId: string };
       const { db } = request.tenant;
-      const vodIdNum = Number(vodId);
-
-      if (isNaN(vodIdNum) || vodIdNum < 0 || vodIdNum > INT32_MAX) {
-        notFound('VOD not found');
-      }
-
-      const vod = await getVodById(db, tenantId, vodIdNum);
-
-      if (!vod) {
-        notFound('VOD not found');
-      }
-
-      const emotes = await getEmotesByVodId(db, tenantId, vodIdNum);
+      await fetchVodByIdSafe(vodId, db, tenantId);
+      const emotes = await getEmotesByVodId(db, tenantId, Number(vodId));
 
       if (!emotes) {
         notFound('Emotes not found for this VOD');
