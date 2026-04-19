@@ -165,7 +165,8 @@ export async function createGameUploadJobsForVod(
       jobs.push(job);
     } catch (error) {
       // Skip restricted games or other errors
-      log.warn({ chapter: chapter.name, tenantId, error: (error as Error).message }, 'Skipping game upload job');
+      const details = extractErrorDetails(error);
+      log.warn({ chapter: chapter.name, tenantId, ...details }, 'Skipping game upload job');
     }
   }
 
@@ -408,7 +409,8 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
       result.vodJobId = vodJobId;
       log.info({ vodId, chained: !!downloadJobId, vodJobId }, 'Queued YouTube VOD upload');
     } catch (error) {
-      log.warn({ error: (error as Error).message, vodId }, 'Failed to queue YouTube VOD upload');
+      const details = extractErrorDetails(error);
+      log.warn({ ...details, vodId }, 'Failed to queue YouTube VOD upload');
     }
   }
 
@@ -429,7 +431,8 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
         'Queued YouTube game uploads'
       );
     } catch (error) {
-      log.warn({ error: (error as Error).message, vodId }, 'Failed to queue YouTube game uploads');
+      const details = extractErrorDetails(error);
+      log.warn({ ...details, vodId }, 'Failed to queue YouTube game uploads');
     }
   }
 

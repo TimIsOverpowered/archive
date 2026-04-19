@@ -10,8 +10,15 @@ import { getKickStreamStatus } from './kick-live.js';
 import { KICK_API_TIMEOUT_MS, KICK_PAGE_DELAY_MS } from '../constants.js';
 import { TenantContext } from '../types/context.js';
 import { withDbRetry } from '../db/client.js';
+import { LRUCache } from 'lru-cache';
 
 const log = childLogger({ module: 'kick' });
+
+const kickCategoryCache = new LRUCache<string, Record<string, unknown>>({
+  max: 500,
+  ttl: 7 * 24 * 60 * 60 * 1000,
+  allowStale: false,
+});
 
 function getKickParsedM3u8(m3u8: string, baseURL: string): string | null {
   try {
@@ -173,6 +180,11 @@ export async function getKickParsedM3u8ForFfmpeg(sourceUrl: string): Promise<str
 }
 
 export async function getKickCategoryInfo(slug: string): Promise<Record<string, unknown> | null> {
+  const cached = kickCategoryCache.get(slug);
+  if (cached !== undefined) {
+    return cached;
+  }
+
   try {
     const result = await navigateToUrl(`https://kick.com/api/v1/subcategories/${slug}`, {
       isJsonUrl: true,
@@ -193,7 +205,11 @@ export async function getKickCategoryInfo(slug: string): Promise<Record<string, 
     }
 
     await page.close();
-    return response ?? null;
+    const cachedResult = response ?? null;
+    if (cachedResult) {
+      kickCategoryCache.set(slug, cachedResult as Record<string, unknown>);
+    }
+    return cachedResult;
   } catch (error) {
     log.warn(createErrorContext(error, { slug }), 'Failed to fetch category info');
     return null;

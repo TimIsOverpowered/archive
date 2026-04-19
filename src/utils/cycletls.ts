@@ -1,5 +1,6 @@
 import initCycleTLS from 'cycletls';
 import fs from 'fs';
+import fsPromises from 'fs/promises';
 import { pipeline } from 'node:stream/promises';
 import { logger } from './logger.js';
 import { Readable } from 'node:stream';
@@ -102,8 +103,11 @@ export class CycleTLSSession {
       const stream = response.data as Readable;
       await pipeline(stream, writeStream);
     } catch (err) {
-      if (fs.existsSync(outputPath)) {
-        await fs.promises.unlink(outputPath).catch(() => {});
+      try {
+        await fsPromises.access(outputPath);
+        await fsPromises.unlink(outputPath);
+      } catch {
+        // File doesn't exist or unlink failed — ignore
       }
       throw err;
     }

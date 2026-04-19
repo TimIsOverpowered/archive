@@ -1,3 +1,4 @@
+import { LRUCache } from 'lru-cache';
 import { initMetaClient, getMetaClient } from '../db/meta-client.js';
 import { decryptScalar } from '../utils/encryption.js';
 import { SettingsSchema, YoutubeSchema, TwitchSchema, KickSchema } from './schemas.js';
@@ -6,12 +7,27 @@ import { getConfigCacheTtl } from './env.js';
 import type { JsonObject } from '@prisma/client/runtime/client';
 import type { TenantModel } from '../../prisma/generated/meta/models/Tenant.js';
 
-interface CachedEntry {
-  config: TenantConfig;
-  expiresAt: number;
+let configCache: LRUCache<string, TenantConfig> | null = null;
+
+function _createConfigCache(): LRUCache<string, TenantConfig> {
+  const ttl = getConfigCacheTtl() * 1000;
+  return new LRUCache({
+    max: 500,
+    ttl,
+    allowStale: false,
+    updateAgeOnGet: true,
+    dispose: (_value, _key) => {
+      // No cleanup needed — TenantConfig is just plain data
+    },
+  });
 }
 
-const configCache = new Map<string, CachedEntry>();
+function _getCache(): LRUCache<string, TenantConfig> {
+  if (!configCache || configCache.size === 0) {
+    configCache = _createConfigCache();
+  }
+  return configCache;
+}
 
 function _now(): number {
   return Date.now();
@@ -69,16 +85,14 @@ export async function loadTenantConfigs(): Promise<TenantConfig[]> {
   const tenants = await getMetaClient().tenant.findMany();
   if (tenants.length === 0) return [];
 
-  const ttl = getConfigCacheTtl() * 1000;
-
+  const cache = _getCache();
   for (const tenant of tenants) {
     const config = _buildTenantConfig(tenant);
     if (!config) continue;
-
-    configCache.set(config.id, { config, expiresAt: _now() + ttl });
+    cache.set(config.id, config);
   }
 
-  return Array.from(configCache.values()).map((e) => e.config);
+  return Array.from(cache.values());
 }
 
 export async function reloadTenantConfig(tenantId: string): Promise<TenantConfig | undefined> {
@@ -89,31 +103,25 @@ export async function reloadTenantConfig(tenantId: string): Promise<TenantConfig
   const config = _buildTenantConfig(tenant);
   if (!config) return undefined;
 
-  const ttl = getConfigCacheTtl() * 1000;
-  configCache.set(config.id, { config, expiresAt: _now() + ttl });
+  _getCache().set(config.id, config);
   return config;
 }
 
 export function getTenantConfig(tenantId: string): TenantConfig | undefined {
-  const entry = configCache.get(tenantId);
-  if (!entry) return undefined;
-  if (_now() > entry.expiresAt) {
-    configCache.delete(tenantId);
-    return undefined;
-  }
-  return entry.config;
+  return _getCache().get(tenantId);
 }
 
 export function clearConfigCache(tenantId?: string): void {
   if (tenantId) {
-    configCache.delete(tenantId);
+    _getCache().delete(tenantId);
   } else {
-    configCache.clear();
+    configCache = null;
   }
 }
 
 export function getConfigs(): TenantConfig[] {
-  return Array.from(configCache.values()).map((e) => e.config);
+  const cache = _getCache();
+  return Array.from(cache.values());
 }
 
 export function getTenantDisplayName(tenantId: string): string {
@@ -122,19 +130,15 @@ export function getTenantDisplayName(tenantId: string): string {
 }
 
 export function updateTenantTwitchAuth(tenantId: string, encryptedAuth: string): void {
-  const entry = configCache.get(tenantId);
-  if (!entry?.config?.twitch?.auth) return;
-  configCache.set(tenantId, {
-    ...entry,
-    config: { ...entry.config, twitch: { ...entry.config.twitch, auth: encryptedAuth } },
-  });
+  const cache = _getCache();
+  const entry = cache.get(tenantId);
+  if (!entry?.twitch?.auth) return;
+  cache.set(tenantId, { ...entry, twitch: { ...entry.twitch, auth: encryptedAuth } });
 }
 
 export function updateTenantYoutubeAuth(tenantId: string, encryptedAuth: string): void {
-  const entry = configCache.get(tenantId);
-  if (!entry?.config?.youtube?.auth) return;
-  configCache.set(tenantId, {
-    ...entry,
-    config: { ...entry.config, youtube: { ...entry.config.youtube, auth: encryptedAuth } },
-  });
+  const cache = _getCache();
+  const entry = cache.get(tenantId);
+  if (!entry?.youtube?.auth) return;
+  cache.set(tenantId, { ...entry, youtube: { ...entry.youtube, auth: encryptedAuth } });
 }

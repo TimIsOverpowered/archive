@@ -432,5 +432,8 @@ export async function initRichAlert(data: RichEmbedData): Promise<string | null>
 
 export async function updateAlert(messageId: string | null, data: RichEmbedData): Promise<void> {
   if (!messageId || !isAlertsEnabled()) return;
-  await updateDiscordEmbed(messageId, data).catch(() => {});
+  await updateDiscordEmbed(messageId, data).catch((err) => {
+    const details = extractErrorDetails(err);
+    logger.warn({ ...details }, 'Failed to update Discord embed');
+  });
 }

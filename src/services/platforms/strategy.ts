@@ -33,6 +33,7 @@ export interface PlatformStrategy {
   fetchVodMetadata(vodId: string, ctx: PlatformStrategyContext): Promise<PlatformVodMetadata | null>;
   createVodData(meta: PlatformVodMetadata): VodCreateInput;
   updateVodData(meta: PlatformVodMetadata): VodUpdateInput;
+  finalizeChapters?(ctx: PlatformStrategyContext, dbId: number, vodId: string, finalDurationSeconds: number): Promise<void>;
   fetchVodObjectForLiveStream?(streamId: string, ctx: PlatformStrategyContext): Promise<PlatformVodMetadata | null>;
 }
 

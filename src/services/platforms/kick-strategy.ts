@@ -1,6 +1,7 @@
 import { getKickStreamStatus, getLatestKickVodObject } from '../kick-live.js';
-import { getVod } from '../kick.js';
+import { getVod, finalizeKickChapters } from '../kick.js';
 import type { PlatformStrategy, PlatformStreamStatus, PlatformVodMetadata } from './strategy.js';
+import { logger } from '../../utils/logger.js';
 export const kickStrategy: PlatformStrategy = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
     const { config, platform } = ctx;
@@ -94,5 +95,13 @@ export const kickStrategy: PlatformStrategy = {
       duration: meta.duration,
       stream_id: meta.streamId,
     };
+  },
+
+  async finalizeChapters(ctx, dbId, vodId, finalDurationSeconds): Promise<void> {
+    try {
+      await finalizeKickChapters({ tenantId: ctx.tenantId, config: ctx.config, db: ctx.db! }, dbId, vodId, finalDurationSeconds);
+    } catch (error) {
+      logger.error({ vodId, error }, 'Failed to finalize Kick chapters');
+    }
   },
 };

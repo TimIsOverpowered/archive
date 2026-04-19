@@ -8,6 +8,7 @@ import {
 } from '../config/env-accessors.js';
 import { compressChatData, decompressChatData } from '../utils/compression.js';
 import { logger } from '../utils/logger.js';
+import { extractErrorDetails } from '../utils/error.js';
 import { badRequest } from '../utils/http-error.js';
 import { LOGS_PAGE_SIZE, LOGS_DEFAULT_BUCKET_SIZE, LOGS_TARGET_COMMENTS_PER_BUCKET } from '../constants.js';
 
@@ -97,7 +98,8 @@ export async function getLogsByOffset(
         return data;
       }
     } catch (error) {
-      logger.warn({ vodId, bucket, error: String(error) }, '[CACHE MISS] bucket read failed');
+      const details = extractErrorDetails(error);
+      logger.warn({ vodId, bucket, ...details }, '[CACHE MISS] bucket read failed');
     }
   }
 
@@ -173,7 +175,8 @@ export async function getLogsByCursor(
         return data;
       }
     } catch (error) {
-      logger.warn({ vodId, error: String(error) }, '[CACHE MISS] cursor read failed');
+      const details = extractErrorDetails(error);
+      logger.warn({ vodId, ...details }, '[CACHE MISS] cursor read failed');
     }
   }
 

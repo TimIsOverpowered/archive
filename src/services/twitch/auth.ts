@@ -6,8 +6,16 @@ import { getMetaClient } from '../../db/meta-client.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { request } from '../../utils/http-client.js';
 import { createTwitchClient, type TwitchClient } from './client.js';
+import { LRUCache } from 'lru-cache';
 
 const log = createAutoLogger('twitch-auth');
+
+const accessTokenCache = new LRUCache<string, { token: string; expiresAt: number }>({
+  max: 50,
+  ttl: 55 * 60 * 1000,
+  allowStale: false,
+  updateAgeOnGet: true,
+});
 
 interface TwitchAuth {
   client_id: string;
@@ -17,6 +25,11 @@ interface TwitchAuth {
 }
 
 export async function getAppAccessToken(tenantId: string): Promise<string> {
+  const cached = accessTokenCache.get(tenantId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.token;
+  }
+
   const creds = getTwitchCredentials(tenantId);
   if (!creds) {
     throw new Error('Twitch credentials not configured');
@@ -26,6 +39,7 @@ export async function getAppAccessToken(tenantId: string): Promise<string> {
     const oneHourFromNow = Date.now() + 60 * 60 * 1000;
 
     if (creds.expiryDate > oneHourFromNow) {
+      accessTokenCache.set(tenantId, { token: creds.accessToken, expiresAt: creds.expiryDate });
       return creds.accessToken;
     }
   }
@@ -41,6 +55,8 @@ export async function getAppAccessToken(tenantId: string): Promise<string> {
 
   const { access_token, expires_in } = data;
   const expiryDate = Date.now() + expires_in * 1000;
+
+  accessTokenCache.set(tenantId, { token: access_token, expiresAt: expiryDate });
 
   log.info({ tenantId, expires_in, expiry_date: expiryDate }, 'Fetched new Twitch access token');
 

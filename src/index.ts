@@ -42,7 +42,8 @@ async function start() {
         logger.debug({ ttlRemaining: cacheInfo.ttlRemaining }, 'Cloudflare IP ranges cache is fresh');
       }
     } catch (err) {
-      logger.warn({ err: err instanceof Error ? err.message : err }, 'Failed to check Cloudflare IP ranges cache');
+      const details = extractErrorDetails(err);
+      logger.warn({ ...details }, 'Failed to check Cloudflare IP ranges cache');
     }
 
     // Start Cloudflare IP ranges refresh cron
@@ -95,7 +96,8 @@ async function shutdown(signal: string) {
     process.exit(0);
   } catch (error) {
     clearTimeout(shutdownTimeout);
-    logger.error({ error }, 'Error during shutdown');
+    const details = extractErrorDetails(error);
+    logger.error({ ...details }, 'Error during shutdown');
     process.exit(1);
   }
 }
