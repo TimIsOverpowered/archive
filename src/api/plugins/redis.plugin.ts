@@ -45,11 +45,6 @@ export function getRedisClient() {
   return RedisService.getClient();
 }
 
-export const redisClient = null; // deprecated - use RedisService.getClient()
-export const publicRateLimiter = null; // deprecated - use RedisService.getLimiter('rate:vods')
-export const chatRateLimiter = null; // deprecated - use RedisService.getLimiter('rate:chat')
-export const adminRateLimiter = null; // deprecated - use RedisService.getLimiter('rate:admin')
-
 export async function closeRedisClient(): Promise<void> {
   await RedisService.close();
 }
