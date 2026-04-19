@@ -1,6 +1,6 @@
 import pino from 'pino';
 import pretty from 'pino-pretty';
-import { getRequestId } from './async-context.js';
+import { getRequestId, getTenantId, getDisplayName } from './async-context.js';
 
 const logLevel = process.env.LOG_LEVEL || 'info';
 const isProduction = process.env.NODE_ENV === 'production';
@@ -12,8 +12,8 @@ export const logger = pino(
     level: logLevel,
     customLevels: { metric: 35 },
     mixin: () => {
-      const reqId = getRequestId();
-      return reqId ? { reqId } : {};
+      const ctx = { reqId: getRequestId(), tenantId: getTenantId(), displayName: getDisplayName() };
+      return Object.fromEntries(Object.entries(ctx).filter(([, v]) => v != null));
     },
   },
   isProduction
