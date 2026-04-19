@@ -14,28 +14,8 @@ import { findVodRecord } from './utils/vod-helpers.js';
 import { getStrategy } from '../../../services/platforms/index.js';
 import { getApiConfig } from '../../../config/env.js';
 import { VodCreateSchema } from '../../../config/schemas.js';
-import { Platform, PLATFORM_VALUES } from '../../../types/platforms.js';
-
-interface StatsParams {
-  tenantId: string;
-}
-interface CreateVodParams {
-  tenantId: string;
-}
-interface DeleteVodParams {
-  tenantId: string;
-}
-interface DeleteVodBody {
-  vodId: string;
-  platform: Platform;
-}
-interface CreateVodBody {
-  vodId: string;
-  title?: string;
-  createdAt?: string;
-  duration?: number;
-  platform: Platform;
-}
+import { PLATFORM_VALUES } from '../../../types/platforms.js';
+import type { StatsParams, CreateVodParams, DeleteVodParams, CreateVodBody, DeleteVodBody } from './types.js';
 
 export default async function vodManagementRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const adminRateLimiter = RedisService.getLimiter('rate:admin');

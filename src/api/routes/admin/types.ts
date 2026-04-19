@@ -1,40 +1,24 @@
 import type { Platform, SourceType } from '../../../types/platforms.js';
 
-export interface VodStats {
-  totalVods: number;
-  completedDownloads: number;
-  failedDownloads: number;
-  pendingUploads: number;
-  successfulUploads: number;
-  lastActivity?: Date | null;
+export interface TenantParams {
+  tenantId: string;
 }
 
-export interface TenantInfo {
-  id: string;
-  displayName: string;
-  platformStats: Record<Platform, VodStats>;
-  overallStats: VodStats;
-}
-
-export interface CreateVodParams {
-  id: string;
-}
-
-export interface DeleteVodParams {
-  id: string;
-  vodId: number;
-}
-
-export interface StatsParams {
-  id: string;
-}
+export type StatsParams = TenantParams;
+export type CreateVodParams = TenantParams;
+export type DeleteVodParams = TenantParams;
 
 export interface CreateVodBody {
-  vodId?: number;
+  vodId: string;
   title?: string;
   createdAt?: string;
   duration?: number;
-  platform?: Platform;
+  platform: Platform;
+}
+
+export interface DeleteVodBody {
+  vodId: string;
+  platform: Platform;
 }
 
 // Download jobs types
