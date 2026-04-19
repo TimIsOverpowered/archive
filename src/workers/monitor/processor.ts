@@ -42,7 +42,7 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
     }
   }
 
-  log.info({ jobId: job.id, tenantId }, '[Monitor] Poll cycle completed');
+  log.debug({ jobId: job.id, tenantId }, '[Monitor] Poll cycle completed');
   return { success: true };
 };
 

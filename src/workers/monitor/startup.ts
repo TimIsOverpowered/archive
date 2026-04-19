@@ -14,7 +14,7 @@ export async function registerMonitorRepeatJob(config: TenantConfig): Promise<vo
       { tenantId: config.id },
       {
         jobId,
-        repeat: { every: 30_000 },
+        repeat: { every: 30_000, immediately: true },
         deduplication: { id: jobId },
       }
     );

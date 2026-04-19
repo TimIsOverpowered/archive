@@ -34,6 +34,7 @@ export function createWorker<TData extends object, TResult>(
 
   worker.on('active', (job) => {
     if (!job) return;
+    if (name === 'monitor') return;
     logger.info(
       { jobId: String(job.id), ...extractJobMeta(job.data as Record<string, unknown>), attemptsMade: job.attemptsMade },
       `[${name}] job started`
@@ -42,6 +43,7 @@ export function createWorker<TData extends object, TResult>(
 
   worker.on('completed', (job) => {
     if (!job) return;
+    if (name === 'monitor') return;
     logger.info(
       { jobId: String(job.id), ...extractJobMeta(job.data as Record<string, unknown>) },
       `[${name}] job completed`
