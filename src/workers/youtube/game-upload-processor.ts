@@ -100,8 +100,8 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
   );
 
   const createdGameRecord = await db.game.upsert({
-    where: { vod_id_start_time_end_time_game_id_game_name: { vod_id: dbId, start_time: chapterStart, end_time: chapterEnd, game_id: chapterGameId ?? '', game_name: chapterName } },
-    create: { vod_id: dbId, start_time: chapterStart, end_time: chapterEnd, video_provider: 'youtube', video_id: result.videoId, thumbnail_url: result.thumbnailUrl || null, game_id: chapterGameId ?? '', game_name: chapterName, title: chapterName },
+    where: { vod_id_start_time_end_time: { vod_id: dbId, start_time: chapterStart, end_time: chapterEnd } },
+    create: { vod_id: dbId, start_time: chapterStart, end_time: chapterEnd, video_provider: 'youtube', video_id: result.videoId, thumbnail_url: result.thumbnailUrl || null, game_id: chapterGameId, game_name: chapterName, title: chapterName },
     update: { video_id: result.videoId, thumbnail_url: result.thumbnailUrl || null },
   });
 
@@ -194,8 +194,8 @@ async function processSplitGameUpload(
     );
 
     const createdGameRecord = await db.game.upsert({
-      where: { vod_id_start_time_end_time_game_id_game_name: { vod_id: dbId, start_time: startTime + chapterStart, end_time: endTime + chapterStart, game_id: chapterGameId ?? '', game_name: chapterName } },
-      create: { vod_id: dbId, start_time: startTime + chapterStart, end_time: endTime + chapterStart, video_provider: 'youtube', video_id: result.videoId, thumbnail_url: result.thumbnailUrl || null, game_id: chapterGameId ?? '', game_name: chapterName, title: chapterName },
+      where: { vod_id_start_time_end_time: { vod_id: dbId, start_time: startTime + chapterStart, end_time: endTime + chapterStart } },
+      create: { vod_id: dbId, start_time: startTime + chapterStart, end_time: endTime + chapterStart, video_provider: 'youtube', video_id: result.videoId, thumbnail_url: result.thumbnailUrl || null, game_id: chapterGameId, game_name: chapterName, title: chapterName },
       update: { video_id: result.videoId, thumbnail_url: result.thumbnailUrl || null },
     });
 

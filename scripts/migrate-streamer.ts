@@ -328,8 +328,8 @@ const createNormalizedSchema = async (client: any) => {
       "video_provider" TEXT,
       "video_id" TEXT,
       "thumbnail_url" TEXT,
-      "game_id" TEXT NOT NULL DEFAULT '',
-      "game_name" TEXT NOT NULL DEFAULT '',
+      "game_id" TEXT,
+        "game_name" TEXT,
       "title" TEXT,
       "chapter_image" TEXT,
       CONSTRAINT "games_new_pkey" PRIMARY KEY ("id")
@@ -369,7 +369,7 @@ const createNormalizedSchema = async (client: any) => {
     CREATE INDEX "games_new_vod_id_start_time_idx" ON "games_new"("vod_id", "start_time");
     CREATE INDEX "chapters_vod_id_start_idx" ON "chapters"("vod_id", "start");
     CREATE UNIQUE INDEX "vod_uploads_vod_id_type_part_key" ON "vod_uploads"("vod_id", "type", "part");
-    CREATE UNIQUE INDEX "games_unique_chapter_key" ON "games_new"("vod_id", "start_time", "end_time", "game_id", "game_name");
+    CREATE UNIQUE INDEX "games_unique_chapter_key" ON "games_new"("vod_id", "start_time", "end_time");
 
     ALTER TABLE "vod_uploads" ADD CONSTRAINT "vod_uploads_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE ON UPDATE CASCADE;
     ALTER TABLE "emotes_new" ADD CONSTRAINT "emotes_new_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -651,7 +651,7 @@ const main = async () => {
           await schemaClient.query(
             `INSERT INTO "games_new" (vod_id, start_time, end_time, video_provider, video_id, thumbnail_url, game_id, game_name, title, chapter_image)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-            [newVodId, startTime, endTime, game.video_provider, game.video_id, game.thumbnail_url, game.game_id ?? '', game.game_name ?? '', game.title, game.chapter_image]
+            [newVodId, startTime, endTime, game.video_provider, game.video_id, game.thumbnail_url, game.game_id, game.game_name, game.title, game.chapter_image]
           );
           migratedGames++;
         }

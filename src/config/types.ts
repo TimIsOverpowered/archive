@@ -13,7 +13,7 @@ export interface TenantConfig {
     apiKey?: string;
     splitDuration: number;
     perGameUpload: boolean;
-    restrictedGames: string[];
+    restrictedGames: (string | null)[];
     description: string;
   };
   kick?: { id?: string; enabled: boolean; username?: string; mainPlatform?: boolean };
