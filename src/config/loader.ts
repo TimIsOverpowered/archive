@@ -23,7 +23,7 @@ function _createConfigCache(): LRUCache<string, TenantConfig> {
 }
 
 function _getCache(): LRUCache<string, TenantConfig> {
-  if (!configCache || configCache.size === 0) {
+  if (!configCache) {
     configCache = _createConfigCache();
   }
   return configCache;
