@@ -39,6 +39,7 @@ model VodUpload {
   created_at    DateTime     @default(now())
   vod           Vod          @relation(fields: [vod_id], references: [id], onDelete: Cascade)
 
+  @@unique([vod_id, type, part], map: "vod_uploads_vod_id_type_part_key")
   @@index([vod_id])
   @@index([status])
   @@index([type])
@@ -60,17 +61,18 @@ model Emote {
 model Game {
   id             Int      @id(map: "games_new_pkey") @default(autoincrement())
   vod_id         Int
-  start_time     Int?
-  end_time       Int?
+  start_time     Int
+  end_time       Int
   video_provider String?
   video_id       String?
   thumbnail_url  String?
-  game_id        String?
-  game_name      String?
+  game_id        String
+  game_name      String
   title          String?
   chapter_image  String?
   vod            Vod      @relation(fields: [vod_id], references: [id], onDelete: Cascade, map: "games_new_vod_id_fkey")
 
+  @@unique([vod_id, start_time, end_time, game_id, game_name], map: "games_unique_chapter_key")
   @@index([game_name], map: "games_new_game_name_idx")
   @@index([vod_id, start_time], map: "games_new_vod_id_start_time_idx")
   @@map("games")

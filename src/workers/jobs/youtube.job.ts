@@ -169,7 +169,7 @@ export async function createGameUploadJobsForVod(
  */
 export async function enqueueVodUpload(job: YoutubeVodUploadJob, downloadJobId?: string): Promise<string | null> {
   const queue = getYoutubeUploadQueue();
-  const jobId = `youtube_${job.vodId}_vod`;
+  const jobId = `youtube_${job.vodId}_vod_${job.part ?? 1}`;
 
   try {
     if (downloadJobId) {
