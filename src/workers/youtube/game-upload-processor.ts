@@ -68,7 +68,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
 
   const uploadAlertMessageId = await initRichAlert({
     title: '🎮 Game Upload Started',
-    description: `${tenantId} - Uploading game clip to YouTube...`,
+    description: `${channelName} - Uploading game clip to YouTube...`,
     status: 'warning',
     fields: [
       { name: 'Game Name', value: chapterName, inline: true },
@@ -116,11 +116,12 @@ async function processSplitGameUpload(
   trimmedDuration: number
 ): Promise<GameUploadResult> {
   const { tenantId, dbId, chapterStart, chapterGameId, chapterName, title, description, config, db, vodId } = ctx;
+  const channelName = config.displayName || tenantId;
   const totalParts = Math.ceil(trimmedDuration / YOUTUBE_MAX_DURATION);
 
   const splitAlertMessageId = await initRichAlert({
     title: `✂️ Game Clip Splitting in Progress`,
-    description: `${tenantId} - Preparing ${totalParts} parts...`,
+    description: `${channelName} - Preparing ${totalParts} parts...`,
     status: 'warning',
     fields: [
       { name: 'Game Name', value: chapterName, inline: true },
@@ -138,7 +139,7 @@ async function processSplitGameUpload(
     (percent: number) => {
       void updateAlert(splitAlertMessageId, {
         title: `✂️ Splitting Game Clip`,
-        description: `${tenantId} - Game clip exceeds YouTube max duration`,
+        description: `${channelName} - Game clip exceeds YouTube max duration`,
         status: 'warning',
         fields: [{ name: 'Progress', value: createProgressBar(percent), inline: false }],
         timestamp: new Date().toISOString(),
@@ -159,7 +160,7 @@ async function processSplitGameUpload(
 
     const uploadAlertMessageId = await initRichAlert({
       title: `🎮 Game Upload (Part ${currentPartNum}/${totalParts})`,
-      description: `${tenantId} - Uploading game clip part to YouTube...`,
+      description: `${channelName} - Uploading game clip part to YouTube...`,
       status: 'warning',
       fields: [
         { name: 'Game Name', value: chapterName, inline: true },
@@ -214,7 +215,7 @@ async function processSplitGameUpload(
 
   void updateAlert(splitAlertMessageId, {
     title: `✅ Game Clip Splitting Complete`,
-    description: `${tenantId} - Successfully split into ${totalParts} parts`,
+    description: `${channelName} - Successfully split into ${totalParts} parts`,
     status: 'success',
     fields: [
       { name: 'Total Duration', value: toHHMMSS(trimmedDuration), inline: true },
