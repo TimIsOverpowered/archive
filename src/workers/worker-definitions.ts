@@ -5,6 +5,7 @@ import standardVodProcessor from './vod.worker.js';
 import chatProcessor from './chat.worker.js';
 import youtubeProcessor from './youtube.worker.js';
 import dmcaProcessor from './dmca.worker.js';
+import monitorProcessor from './monitor/processor.js';
 import {
   ChatDownloadJob,
   ChatDownloadResult,
@@ -15,11 +16,18 @@ import {
   YoutubeUploadResult,
   LiveDownloadJob,
   StandardVodJob,
+  MonitorJob,
 } from './jobs/queues.js';
 import { getWorkersConfig } from '../config/env.js';
 
 export type WorkerName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
-export type AllJobData = LiveDownloadJob | StandardVodJob | ChatDownloadJob | YoutubeUploadJob | DmcaProcessingJob;
+export type AllJobData =
+  | LiveDownloadJob
+  | StandardVodJob
+  | ChatDownloadJob
+  | YoutubeUploadJob
+  | DmcaProcessingJob
+  | MonitorJob;
 
 export interface WorkerConfig<TData extends object = object, TResult = unknown> {
   name: WorkerName;
@@ -67,6 +75,13 @@ export const WORKER_DEFINITIONS = [
     queueName: QUEUE_NAMES.DMCA_PROCESSING,
     processor: dmcaProcessor,
     concurrency: 1,
+    useWorkerThreads: true,
+  }),
+  defineWorker<MonitorJob, unknown>({
+    name: 'monitor',
+    queueName: QUEUE_NAMES.MONITOR,
+    processor: monitorProcessor,
+    concurrency: getWorkersConfig().MONITOR_CONCURRENCY,
     useWorkerThreads: true,
   }),
 ] as readonly WorkerConfig<object, unknown>[];

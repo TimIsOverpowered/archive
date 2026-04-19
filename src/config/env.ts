@@ -30,6 +30,7 @@ export const WorkersConfigSchema = BaseConfigSchema.extend({
   VOD_STANDARD_CONCURRENCY: z.coerce.number().int().positive().default(1),
   YOUTUBE_UPLOAD_CONCURRENCY: z.coerce.number().int().positive().default(1),
   CHAT_DOWNLOAD_CONCURRENCY: z.coerce.number().int().positive().default(1),
+  MONITOR_CONCURRENCY: z.coerce.number().int().positive().default(10),
 });
 
 // Type exports
