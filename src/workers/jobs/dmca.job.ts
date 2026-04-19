@@ -1,4 +1,4 @@
-import { defaultJobOptions, flowProducer, getDmcaProcessingQueue, getStandardVodQueue } from './queues.js';
+import { defaultJobOptions, getDmcaProcessingQueue, getFlowProducer, getStandardVodQueue } from './queues.js';
 import type { DmcaProcessingJob } from './queues.js';
 import { childLogger } from '../../utils/logger.js';
 import type { Platform, SourceType } from '../../types/platforms.js';
@@ -35,7 +35,7 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
 
   try {
     if (downloadJobId) {
-      const flow = await flowProducer.add({
+      const flow = await getFlowProducer().add({
         name: 'dmca_processing',
         queueName: getDmcaProcessingQueue().name,
         data: job,

@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import { getTenantConfig, updateTenantYoutubeAuth } from '../../config/loader.js';
 import { decryptObject, encryptObject } from '../../utils/encryption.js';
-import { metaClient } from '../../db/meta-client.js';
+import { getMetaClient } from '../../db/meta-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 
@@ -107,7 +107,7 @@ async function updateYoutubeTokenInDb(
 
     const encryptedAuth = encryptObject(updatedAuth);
 
-    await metaClient.tenant.update({
+    await getMetaClient().tenant.update({
       where: { id: tenantId },
       data: {
         youtube: {

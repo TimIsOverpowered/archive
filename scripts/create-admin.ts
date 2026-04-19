@@ -3,7 +3,7 @@
 import 'dotenv/config';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
-import { metaClient } from '../src/db/meta-client.js';
+import { initMetaClient, getMetaClient } from '../src/db/meta-client.js';
 import { extractErrorDetails } from '../src/utils/error.js';
 
 const API_KEY_PREFIX = 'archive_';
@@ -11,8 +11,9 @@ const API_KEY_LENGTH = 64; // hex chars after prefix
 const BCRYPT_COST = 10;
 
 async function createAdmin(username: string): Promise<void> {
+  await initMetaClient();
   // Check if username already exists
-  const existing = await metaClient.admin.findUnique({
+  const existing = await getMetaClient().admin.findUnique({
     where: { username },
   });
 
@@ -29,7 +30,7 @@ async function createAdmin(username: string): Promise<void> {
   const apikeyHash = await bcrypt.hash(apiKey, BCRYPT_COST);
 
   // Insert into database
-  await metaClient.admin.create({
+  await getMetaClient().admin.create({
     data: {
       username,
       api_key: apiKey,
@@ -62,7 +63,7 @@ async function main(): Promise<void> {
     console.error('Error creating admin user:', details.message);
     process.exit(1);
   } finally {
-    await metaClient.$disconnect();
+    await getMetaClient().$disconnect();
   }
 }
 

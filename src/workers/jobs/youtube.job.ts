@@ -1,4 +1,4 @@
-import { flowProducer, getStandardVodQueue, getYoutubeUploadQueue } from './queues.js';
+import { getFlowProducer, getStandardVodQueue, getYoutubeUploadQueue } from './queues.js';
 import type { YoutubeVodUploadJob, YoutubeGameUploadJob } from './queues.js';
 import dayjs from '../../utils/dayjs.js';
 import { childLogger } from '../../utils/logger.js';
@@ -185,7 +185,7 @@ export async function enqueueVodUpload(job: YoutubeVodUploadJob, downloadJobId?:
 
   try {
     if (downloadJobId) {
-      const flow = await flowProducer.add({
+      const flow = await getFlowProducer().add({
         name: 'youtube_upload',
         queueName: queue.name,
         data: job,
@@ -234,7 +234,7 @@ export async function enqueueGameUpload(job: YoutubeGameUploadJob, downloadJobId
 
   try {
     if (downloadJobId) {
-      const flow = await flowProducer.add({
+      const flow = await getFlowProducer().add({
         name: 'youtube_upload',
         queueName: queue.name,
         data: job,

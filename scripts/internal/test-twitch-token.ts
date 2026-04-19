@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import 'dotenv/config';
 import { program } from 'commander';
-import { metaClient } from '../../src/db/meta-client.js';
+import { initMetaClient, getMetaClient } from '../../src/db/meta-client.js';
 import { extractErrorDetails } from '../../src/utils/error.js';
 import { loadTenantConfigs } from '../../src/config/loader.js';
 import { getAppAccessToken } from '../../src/services/twitch/index.js';
@@ -25,13 +25,14 @@ program
   .option('--check-only', 'Only check current state without making API calls')
   .option('--validate-token', 'Validate current token by making a test API call to /helix/users')
   .action(async (options: { tenant?: string; forceRefresh: boolean; verbose: boolean; checkOnly: boolean; validateToken: boolean }) => {
+    await initMetaClient();
     console.log('Twitch Token Test');
     console.log('==================\n');
 
     let tenantId = options.tenant;
 
     if (!tenantId) {
-      const tenants = await metaClient.tenant.findMany();
+      const tenants = await getMetaClient().tenant.findMany();
       if (tenants.length === 0) {
         console.error('No tenants found. Please create one first using scripts/create-tenant.ts');
         process.exit(1);
@@ -42,7 +43,7 @@ program
     }
 
     try {
-      const tenant = await metaClient.tenant.findFirst({
+      const tenant = await getMetaClient().tenant.findFirst({
         where: { id: tenantId },
       });
 
@@ -76,7 +77,7 @@ program
 
           await new Promise((resolve) => setTimeout(resolve, 500));
 
-          const updatedTenant = await metaClient.tenant.findFirst({
+          const updatedTenant = await getMetaClient().tenant.findFirst({
             where: { id: tenantId },
           });
 
@@ -206,7 +207,7 @@ program
       }
       process.exit(1);
     } finally {
-      await metaClient.$disconnect();
+      await getMetaClient().$disconnect();
     }
   });
 

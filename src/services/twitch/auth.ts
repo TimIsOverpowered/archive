@@ -2,7 +2,7 @@ import { getTwitchCredentials } from '../../utils/credentials.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getTenantConfig, updateTenantTwitchAuth } from '../../config/loader.js';
 import { encryptObject, decryptObject } from '../../utils/encryption.js';
-import { metaClient } from '../../db/meta-client.js';
+import { getMetaClient } from '../../db/meta-client.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { request } from '../../utils/http-client.js';
 import { createTwitchClient, type TwitchClient } from './client.js';
@@ -72,7 +72,7 @@ export async function updateTwitchTokenInDb(tenantId: string, newToken: string, 
 
     const encryptedAuth = encryptObject(updatedAuth);
 
-    await metaClient.tenant.update({
+    await getMetaClient().tenant.update({
       where: { id: tenantId },
       data: {
         twitch: {

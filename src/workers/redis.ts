@@ -2,7 +2,9 @@ import Redis, { RedisOptions } from 'ioredis';
 import { logger } from '../utils/logger.js';
 import { REDIS_MAX_RETRIES, REDIS_RETRY_TIMEOUT_MS } from '../constants.js';
 
-// Eagerly created singleton ioredis instance for all BullMQ operations
+let redisInstance: Redis | null = null;
+let initPromise: Promise<void> | null = null;
+
 const redisOptions: RedisOptions = {
   maxRetriesPerRequest: null, // Required by BullMQ workers
   retryStrategy(times: number) {
@@ -13,56 +15,78 @@ const redisOptions: RedisOptions = {
   },
 };
 
-const redisInstance = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', redisOptions);
+export function getRedisInstance(): Redis {
+  if (!redisInstance) throw new Error('workers Redis not initialized. Call initWorkersRedis() first.');
+  return redisInstance;
+}
 
-// Wait for ready event with timeout
-const readyTimeout = REDIS_RETRY_TIMEOUT_MS;
+export async function initWorkersRedis(): Promise<void> {
+  if (redisInstance) return;
+  if (initPromise) return initPromise;
 
-const readyPromise: Promise<void> = new Promise<void>((resolve, reject) => {
-  if (redisInstance.status === 'ready') {
-    resolve();
-    return;
-  }
-  const timeoutId = setTimeout(() => {
-    const errorMsg = `Redis did not become ready after ${readyTimeout}ms`;
-    logger.fatal({ timeoutMs: readyTimeout }, errorMsg);
-    reject(new Error(errorMsg));
-  }, readyTimeout);
-  redisInstance.once('ready', () => {
-    clearTimeout(timeoutId);
-    logger.info('[Workers Redis] Connection ready - BullMQ can now process jobs');
-    resolve();
-  });
-});
+  initPromise = (async () => {
+    const { getWorkersConfig } = await import('../config/env.js');
+    const url = getWorkersConfig().REDIS_URL;
+    const maskedUrl = url.replace(/:\/\/.*@/, '://***@');
+    logger.info({ url: maskedUrl }, '[Workers Redis] Connecting to Redis');
 
-// Connection event handlers using project logger
-redisInstance.on('error', (err) => {
-  logger.error({ err: err.message }, '[Workers Redis] Connection error');
-});
+    redisInstance = new Redis(url, redisOptions);
 
-redisInstance.on('connect', () => {
-  logger.info('[Workers Redis] Connected to Redis server');
-});
+    const readyTimeout = REDIS_RETRY_TIMEOUT_MS;
+    let errorCount = 0;
 
-redisInstance.on('close', () => {
-  logger.info('[Workers Redis] Connection closed');
-});
+    redisInstance.on('error', (err) => {
+      errorCount++;
+      logger.error({ err: err.message, errorCount }, '[Workers Redis] Connection error');
+    });
 
-// Export the singleton instance
-export { redisInstance };
+    redisInstance.on('connect', () => {
+      logger.info('[Workers Redis] Connected to Redis server');
+    });
 
-// Export close function for graceful shutdown
+    redisInstance.on('close', () => {
+      logger.info('[Workers Redis] Connection closed');
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      if (redisInstance!.status === 'ready') {
+        logger.info('[Workers Redis] Connection ready - BullMQ can now process jobs');
+        resolve();
+        return;
+      }
+
+      const timeoutId = setTimeout(() => {
+        redisInstance!.off('ready', readyHandler);
+        const errorMsg = `Redis did not become ready after ${readyTimeout}ms`;
+        logger.fatal({ timeoutMs: readyTimeout }, errorMsg);
+        reject(new Error(errorMsg));
+      }, readyTimeout);
+
+      const readyHandler = () => {
+        clearTimeout(timeoutId);
+        logger.info('[Workers Redis] Connection ready - BullMQ can now process jobs');
+        resolve();
+      };
+
+      redisInstance!.once('ready', readyHandler);
+    });
+  })();
+
+  return initPromise;
+}
+
+export async function waitForRedisReady(): Promise<void> {
+  if (!initPromise) throw new Error('Call initWorkersRedis() first');
+  return initPromise;
+}
+
 export async function closeWorkersRedis(): Promise<void> {
-  if (redisInstance.status === 'ready' || redisInstance.status === 'connecting') {
+  if (redisInstance && (redisInstance.status === 'ready' || redisInstance.status === 'connecting')) {
     logger.info('[Workers Redis] Closing connection...');
     await redisInstance.quit();
   }
 }
 
-// Export connection status checker for health checks
 export function isRedisReady(): boolean {
-  return redisInstance.status === 'ready';
+  return redisInstance?.status === 'ready' || false;
 }
-
-// Export readyPromise for bootstrap to await
-export { readyPromise as waitForRedisReady };

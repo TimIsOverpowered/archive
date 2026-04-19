@@ -3,7 +3,7 @@
 import 'dotenv/config';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
-import { metaClient } from '../src/db/meta-client.js';
+import { initMetaClient, getMetaClient } from '../src/db/meta-client.js';
 import { extractErrorDetails } from '../src/utils/error.js';
 
 const API_KEY_PREFIX = 'archive_';
@@ -11,8 +11,9 @@ const API_KEY_LENGTH = 64; // hex chars after prefix
 const BCRYPT_COST = 10;
 
 async function resetAdminKey(username: string): Promise<void> {
+  await initMetaClient();
   // Check if admin exists
-  const admin = await metaClient.admin.findUnique({
+  const admin = await getMetaClient().admin.findUnique({
     where: { username },
   });
 
@@ -29,7 +30,7 @@ async function resetAdminKey(username: string): Promise<void> {
   const newApiKeyHash = await bcrypt.hash(newApiKey, BCRYPT_COST);
 
   // Update database
-  await metaClient.admin.update({
+  await getMetaClient().admin.update({
     where: { username },
     data: {
       api_key: newApiKey,
@@ -62,7 +63,7 @@ async function main(): Promise<void> {
     console.error('Error resetting API key:', details.message);
     process.exit(1);
   } finally {
-    await metaClient.$disconnect();
+    await getMetaClient().$disconnect();
   }
 }
 

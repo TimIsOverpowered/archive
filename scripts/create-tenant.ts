@@ -6,7 +6,7 @@ import * as readline from 'readline';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { Pool } from 'pg';
-import { metaClient } from '../src/db/meta-client.js';
+import { initMetaClient, getMetaClient } from '../src/db/meta-client.js';
 import { encryptScalar, validateEncryptionKey } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
 import { normalizePath as pathNormalize } from '../src/utils/path';
@@ -230,6 +230,7 @@ async function main(): Promise<void> {
   let tenantId: string | null = null;
 
   try {
+    await initMetaClient();
     console.log('╔════════════════════════════════════════════╗');
     console.log('║     CREATE TENANT - Interactive Wizard     ║');
     console.log('╚════════════════════════════════════════════╝');
@@ -255,7 +256,7 @@ async function main(): Promise<void> {
     }
 
     // Check for duplicates
-    const existingTenant = await metaClient.tenant.findFirst({
+    const existingTenant = await getMetaClient().tenant.findFirst({
       where: { id: channelName },
     });
     if (existingTenant) {
@@ -531,7 +532,7 @@ async function main(): Promise<void> {
     }
 
     // Step 2: Insert into meta DB with explicit ID
-    const createdTenant = await metaClient.tenant.create({
+    const createdTenant = await getMetaClient().tenant.create({
       data: {
         id: channelName,
         ...tenantData,
@@ -566,7 +567,7 @@ async function main(): Promise<void> {
       const rollback = await confirm('\nTenant was partially created. Rollback from meta DB?');
       if (rollback) {
         try {
-          await metaClient.tenant.delete({ where: { id: tenantId } });
+          await getMetaClient().tenant.delete({ where: { id: tenantId } });
           console.log('✓ Rolled back tenant from meta DB');
         } catch (rollbackError) {
           const errorMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
@@ -577,7 +578,7 @@ async function main(): Promise<void> {
 
     process.exit(1);
   } finally {
-    await metaClient.$disconnect();
+    await getMetaClient().$disconnect();
   }
 }
 

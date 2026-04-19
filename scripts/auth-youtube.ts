@@ -6,7 +6,7 @@ import open from 'open';
 import readline from 'readline';
 import { z } from 'zod';
 import { Prisma } from '../prisma/generated/meta/index.js';
-import { metaClient } from '../src/db/meta-client.js';
+import { initMetaClient, getMetaClient } from '../src/db/meta-client.js';
 import { extractErrorDetails } from '../src/utils/error.js';
 import { YoutubeAuthSchema, YoutubeAuthObject, YoutubeSchema } from '../src/config/schemas.js';
 import type { Tenant } from '../prisma/generated/meta/index.js';
@@ -108,7 +108,7 @@ function showManualPasteInstructions(authUrl: string, tenantId: string): void {
 
 async function getTenant(streamerIdOrName: string): Promise<Tenant | null> {
   try {
-    const tenant = await metaClient.tenant.findUnique({
+    const tenant = await getMetaClient().tenant.findUnique({
       where: { id: streamerIdOrName },
     });
 
@@ -361,7 +361,7 @@ async function storeAuthObject(tenantId: string, authObject: YoutubeAuthObject):
     YoutubeAuthSchema.parse(authObject);
 
     // Get current tenant record
-    const tenant = await metaClient.tenant.findUnique({ where: { id: tenantId } });
+    const tenant = await getMetaClient().tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) throw new Error(`Tenant not found in database: ${tenantId}`);
 
     console.log('Using encryption for auth object storage.');
@@ -422,7 +422,7 @@ async function storeAuthObject(tenantId: string, authObject: YoutubeAuthObject):
     youtubeConfig.auth = encryptedAuthValue;
 
     // Store as JSON object (Prisma handles serialization properly) - DO NOT stringify here!
-    await metaClient.tenant.update({
+    await getMetaClient().tenant.update({
       where: { id: tenantId },
       data: { youtube: youtubeConfig }, // Pass raw JS object, not stringified version!
     });
@@ -442,6 +442,7 @@ program
   .option('--open', 'Automatically open browser for OAuth flow and start callback server (default: manual paste mode)')
 
   .action(async (streamerId: string, options) => {
+    await initMetaClient();
     const tenant = await getTenant(streamerId);
 
     if (!tenant) {

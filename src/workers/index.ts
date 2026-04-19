@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { extractErrorDetails } from '../utils/error.js';
 import { loadTenantConfigs, clearConfigCache } from '../config/loader.js';
 import { QUEUE_NAMES, getQueue, closeQueues } from './jobs/queues.js';
-import { redisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
+import { initWorkersRedis, getRedisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
 import { startTokenHealthCron } from '../cron/token-health.js';
 import { startMonitorService, stopMonitorService } from './monitor/index.js';
 import { logger } from '../utils/logger.js';
@@ -13,6 +13,7 @@ import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/cl
 import { registerPlatformStrategies } from '../services/platforms/index.js';
 
 const workerConfig = loadWorkersConfig();
+await initWorkersRedis();
 
 async function clearAllJobsOnStartup() {
   if (!workerConfig.CLEAR_QUEUES_ON_STARTUP) return;
@@ -45,11 +46,11 @@ async function bootstrap() {
   try {
     registerPlatformStrategies();
     await loadTenantConfigs();
-    await waitForRedisReady;
+    await waitForRedisReady();
     startTokenHealthCron();
     await clearAllJobsOnStartup();
 
-    const workerInstances = WORKER_DEFINITIONS.map((def) => createWorker({ ...def, connection: redisInstance }));
+    const workerInstances = WORKER_DEFINITIONS.map((def) => createWorker({ ...def, connection: getRedisInstance() }));
 
     await waitForWorkersReady(workerInstances);
 

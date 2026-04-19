@@ -1,6 +1,6 @@
 import { Queue, QueueOptions, JobsOptions, FlowProducer } from 'bullmq';
 import type { DMCAClaim } from '../dmca/dmca.js';
-import { redisInstance } from '../redis.js';
+import { getRedisInstance } from '../redis.js';
 import type { Platform, SourceType, UploadType, DownloadMethod } from '../../types/platforms.js';
 import { VodRecord } from '../../types/db.js';
 
@@ -139,9 +139,16 @@ export const defaultJobOptions = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const queueCache = new Map<string, Queue<any, any, string>>();
 
-export const flowProducer = new FlowProducer({
-  connection: redisInstance,
-});
+let _flowProducer: FlowProducer | null = null;
+
+export function getFlowProducer(): FlowProducer {
+  if (!_flowProducer) {
+    _flowProducer = new FlowProducer({
+      connection: getRedisInstance(),
+    });
+  }
+  return _flowProducer;
+}
 
 export function getQueue<TData = unknown, TFinishedData = unknown>(
   name: string,
@@ -154,7 +161,7 @@ export function getQueue<TData = unknown, TFinishedData = unknown>(
   }
 
   const queue = new Queue<TData, TFinishedData, string>(name, {
-    connection: redisInstance,
+    connection: getRedisInstance(),
     defaultJobOptions: jobOptions || defaultJobOptions,
   });
 
@@ -219,7 +226,7 @@ export async function closeQueues(): Promise<void> {
     await queue.close();
   }
   queueCache.clear();
-  await flowProducer.close();
+  await getFlowProducer().close();
   // Don't quit redis here - it's managed by workers/redis.ts
   // The redis instance is shared and should only be closed during worker shutdown
 }
