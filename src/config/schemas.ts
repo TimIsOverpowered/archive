@@ -83,3 +83,53 @@ export const KickSchema = z.object({
   id: z.string().optional(),
   username: z.string().optional(),
 });
+
+// ── Prisma Operation Schemas ─────────────────────────────────────────────────
+
+export const VodCreateSchema = z.object({
+  vod_id: z.string(),
+  title: z.string().nullable().default(null),
+  created_at: z.coerce.date(),
+  duration: z.number().default(0),
+  stream_id: z.string().nullable().default(null),
+  platform: z.enum(['twitch', 'kick']),
+  is_live: z.boolean().default(false),
+});
+
+export const VodUpdateSchema = z.object({
+  vod_id: z.string().optional(),
+  title: z.string().nullable().default(null),
+  created_at: z.coerce.date().optional(),
+  duration: z.number().optional(),
+  stream_id: z.string().nullable().default(null),
+});
+
+export const ChapterCreateSchema = z.object({
+  vod_id: z.number(),
+  start: z.number(),
+  end: z.number().nullable().default(null),
+  duration: z.string(),
+  title: z.string().nullable().default(null),
+  game_id: z.string().nullable().default(null),
+});
+
+export const ChapterUpdateSchema = z.object({
+  start: z.number().optional(),
+  end: z.number().nullable().default(null),
+  duration: z.string().optional(),
+  title: z.string().nullable().default(null),
+  game_id: z.string().nullable().default(null),
+});
+
+export const GameUpsertSchema = z.object({
+  game_id: z.string(),
+  game_name: z.string(),
+  box_art_url: z.string().url().nullable().default(null),
+});
+
+export const EmoteUpsertSchema = z.object({
+  vod_id: z.number(),
+  ffz_emotes: z.array(z.object({ id: z.string(), code: z.string() })).default([]),
+  bttv_emotes: z.array(z.object({ id: z.string(), code: z.string() })).default([]),
+  seventv_emotes: z.array(z.object({ id: z.string(), code: z.string(), flags: z.number().optional() })).default([]),
+});

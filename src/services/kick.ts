@@ -7,7 +7,7 @@ import { sleep } from '../utils/delay.js';
 import { childLogger } from '../utils/logger.js';
 import { toHHMMSS } from '../utils/formatting.js';
 import { getKickStreamStatus } from './kick-live.js';
-import { KICK_API_TIMEOUT_MS, KICK_PAGE_DELAY_MS } from '../constants.js';
+import { KICK_API_TIMEOUT_MS, KICK_PAGE_DELAY_MS, KICK_API_BASE, KICK_SUBCATEGORIES_URL } from '../constants.js';
 import { TenantContext } from '../types/context.js';
 import { withDbRetry } from '../db/client.js';
 import { LRUCache } from 'lru-cache';
@@ -99,7 +99,7 @@ export interface KickVod {
 }
 
 export async function getVod(channelName: string, vodId: string): Promise<KickVod> {
-  const result = await navigateToUrl(`https://kick.com/api/v2/channels/${channelName}/videos`, {
+  const result = await navigateToUrl(`${KICK_API_BASE}/api/v2/channels/${channelName}/videos`, {
     isJsonUrl: true,
   });
 
@@ -186,7 +186,7 @@ export async function getKickCategoryInfo(slug: string): Promise<Record<string, 
   }
 
   try {
-    const result = await navigateToUrl(`https://kick.com/api/v1/subcategories/${slug}`, {
+    const result = await navigateToUrl(`${KICK_SUBCATEGORIES_URL}/${slug}`, {
       isJsonUrl: true,
       timeoutMs: KICK_API_TIMEOUT_MS,
     });

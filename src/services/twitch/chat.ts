@@ -1,4 +1,5 @@
-import { createTwitchGqlClient, BACKUP_TWITCH_GQL_CLIENT_ID } from './client.js';
+import { createTwitchGqlClient } from './client.js';
+import { BACKUP_GQL_TWITCH_CLIENT_ID } from '../../constants.js';
 
 function getTwitchGqlClient(tenantId?: string) {
   return createTwitchGqlClient(tenantId);
@@ -85,7 +86,7 @@ export async function fetchNextComments(
   cursor: string,
   tenantId?: string
 ): Promise<TwitchVideoCommentResponse | null> {
-  const client = createTwitchGqlClient(tenantId, BACKUP_TWITCH_GQL_CLIENT_ID);
+  const client = createTwitchGqlClient(tenantId, BACKUP_GQL_TWITCH_CLIENT_ID);
   const data = await client.post<{ data?: { video?: TwitchVideoCommentResponse } }>({
     operationName: 'VideoCommentsByOffsetOrCursor',
     variables: {

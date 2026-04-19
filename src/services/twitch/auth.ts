@@ -7,6 +7,7 @@ import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { request } from '../../utils/http-client.js';
 import { createTwitchClient, type TwitchClient } from './client.js';
 import { LRUCache } from 'lru-cache';
+import { TWITCH_TOKEN_URL } from '../../constants.js';
 
 const log = createAutoLogger('twitch-auth');
 
@@ -44,7 +45,7 @@ export async function getAppAccessToken(tenantId: string): Promise<string> {
     }
   }
 
-  const url = new URL('https://id.twitch.tv/oauth2/token');
+  const url = new URL(TWITCH_TOKEN_URL);
   url.searchParams.append('client_id', creds.clientId);
   url.searchParams.append('client_secret', creds.clientSecret);
   url.searchParams.append('grant_type', 'client_credentials');

@@ -4,6 +4,7 @@ import { createYoutubeClient } from './client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { ProgressStream } from '../../utils/progress-stream.js';
+import { YOUTUBE_CATEGORY_ID } from '../../constants.js';
 
 export interface UploadProgressCallbackData {
   milestone: 'starting' | 'uploading' | 'processing_metadata' | 'success' | 'error';
@@ -67,7 +68,7 @@ export async function uploadVideo(
     const response = await youtube.videos.insert({
       part: ['id', 'snippet', 'status'],
       requestBody: {
-        snippet: { title, description, categoryId: '20' },
+        snippet: { title, description, categoryId: YOUTUBE_CATEGORY_ID },
         status: { privacyStatus },
       },
       media: { body: progressStream },
