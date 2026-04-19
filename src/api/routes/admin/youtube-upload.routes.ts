@@ -6,7 +6,7 @@ import {
   platformValidationMiddleware,
   type TenantPlatformContext,
 } from '../../middleware/tenant-platform.js';
-import { adminRateLimiter } from '../../plugins/redis.plugin.js';
+import { RedisService } from '../../../utils/redis-service.js';
 import { notFound } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
 import {
@@ -35,6 +35,7 @@ interface ReUploadYoutubeBody {
 }
 
 export default async function youtubeUploadRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
+  const adminRateLimiter = RedisService.getLimiter('rate:admin');
   if (!adminRateLimiter) {
     throw new Error('Rate limiter not initialized');
   }

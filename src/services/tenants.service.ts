@@ -2,6 +2,7 @@ import { PrismaClient } from '../../generated/streamer/client.js';
 import { getTenantConfig, getConfigs } from '../config/loader.js';
 import { withCache } from '../utils/cache.js';
 import { PLATFORMS } from '../types/platforms.js';
+import { PERCENTAGE_PRECISION_MULTIPLIER, PERCENTAGE_PRECISION_DIVISOR } from '../constants.js';
 
 interface TenantStats {
   tenant: {
@@ -104,7 +105,10 @@ export async function getTenantStats(client: PrismaClient, tenantId: string, cac
     const lastUploadDate = lastUploadDateResult.length > 0 ? lastUploadDateResult[0].created_at : null;
 
     const uploadSuccessRate =
-      totalUploadsResult > 0 ? Math.round((completedUploads / totalUploadsResult) * 1000) / 10 : 0;
+      totalUploadsResult > 0
+        ? Math.round((completedUploads / totalUploadsResult) * PERCENTAGE_PRECISION_MULTIPLIER) /
+          PERCENTAGE_PRECISION_DIVISOR
+        : 0;
 
     const uniqueGames = new Set(uniqueGamesCount.map((g) => g.game_id));
 

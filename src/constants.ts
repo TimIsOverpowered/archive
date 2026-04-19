@@ -37,3 +37,10 @@ export const DB_CLIENT_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 export const VOD_DETAILS_CACHE_TTL = 3600; // 1 hour for individual VODs
 export const VOD_LIST_CACHE_TTL = 900; // 15 minutes for list queries
 export const EMOTE_CACHE_TTL = 86400; // 1 day for emotes
+
+// VOD duration tolerance (seconds)
+export const VOD_DURATION_TOLERANCE_SECONDS = 1;
+
+// Percentage precision (Math.round(x * 1000) / 10 = 1 decimal place)
+export const PERCENTAGE_PRECISION_MULTIPLIER = 1000;
+export const PERCENTAGE_PRECISION_DIVISOR = 10;

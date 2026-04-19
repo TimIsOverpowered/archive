@@ -7,7 +7,7 @@ import {
   type TenantPlatformContext,
 } from '../../middleware/tenant-platform.js';
 import { saveVodChapters } from '../../../services/twitch/index.js';
-import { adminRateLimiter } from '../../plugins/redis.plugin.js';
+import { RedisService } from '../../../utils/redis-service.js';
 import { badRequest, notFound } from '../../../utils/http-error.js';
 import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
@@ -29,6 +29,7 @@ interface SaveBody {
 }
 
 export default async function metadataFetchingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
+  const adminRateLimiter = RedisService.getLimiter('rate:admin');
   if (!adminRateLimiter) {
     throw new Error('Rate limiter not initialized');
   }

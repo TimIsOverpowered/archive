@@ -95,7 +95,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
 
       const commentsObj = rawPage.comments;
 
-      if (!commentsObj) throw `No Comments Object found`;
+      if (!commentsObj) throw new Error('No comments object found');
 
       const edges = extractEdges(commentsObj);
 

@@ -1,5 +1,5 @@
 import { PrismaClient } from '../../generated/streamer/client.js';
-import { redisClient } from '../api/plugins/redis.plugin.js';
+import { RedisService } from '../utils/redis-service.js';
 import {
   getDisableRedisCache,
   getChatCursorTtl,
@@ -39,9 +39,10 @@ function computeBucketSize(commentsPer100s: number): number {
 async function getVodBucketSize(client: PrismaClient, tenantId: string, vodId: number): Promise<number> {
   const key = `${tenantId}:${vodId}:bucketSize`;
 
-  if (!getDisableRedisCache() && redisClient) {
+  const redis = RedisService.getClient();
+  if (!getDisableRedisCache() && redis) {
     try {
-      const cached = await redisClient.get(key);
+      const cached = await redis.get(key);
       if (cached) {
         logger.debug({ vodId }, '[CACHE HIT] bucketSize');
         return parseInt(cached, 10);
@@ -65,9 +66,9 @@ async function getVodBucketSize(client: PrismaClient, tenantId: string, vodId: n
   const commentsPer100sValue = parseFloat(String(row?.comments_per_100s ?? ''));
   const bucketSize = isFinite(commentsPer100sValue) ? computeBucketSize(commentsPer100sValue) : DEFAULT_BUCKET_SIZE;
 
-  if (!getDisableRedisCache() && redisClient) {
+  if (!getDisableRedisCache() && redis) {
     try {
-      await redisClient.set(key, bucketSize.toString(), 'EX', getChatBucketSizeTtl());
+      await redis.set(key, bucketSize.toString(), 'EX', getChatBucketSizeTtl());
     } catch {
       // Ignore cache errors
     }
@@ -85,10 +86,11 @@ export async function getLogsByOffset(
   const bucketSize = await getVodBucketSize(client, tenantId, vodId);
   const bucket = Math.floor(offsetSeconds / bucketSize) * bucketSize;
   const cacheKey = `${tenantId}:${vodId}:bucket:${bucket}`;
+  const redis = RedisService.getClient();
 
-  if (!getDisableRedisCache() && redisClient) {
+  if (!getDisableRedisCache() && redis) {
     try {
-      const cached = await redisClient.getBuffer(cacheKey);
+      const cached = await redis.getBuffer(cacheKey);
       if (cached) {
         logger.debug({ vodId, bucket }, '[CACHE HIT] bucket');
         const data = (await decompressChatData(cached)) as { comments: ChatMessage[]; cursor?: string };
@@ -139,10 +141,10 @@ export async function getLogsByOffset(
 
   const response = { comments, cursor };
 
-  if (!getDisableRedisCache() && redisClient) {
+  if (!getDisableRedisCache() && redis) {
     try {
       const compressed = await compressChatData(response);
-      await redisClient.set(cacheKey, compressed as Buffer, 'EX', getChatOffsetTtl());
+      await redis.set(cacheKey, compressed as Buffer, 'EX', getChatOffsetTtl());
       logger.debug({ vodId, bucket }, '[CACHE SET] bucket');
     } catch {
       // Ignore cache errors
@@ -159,10 +161,11 @@ export async function getLogsByCursor(
   cursor: string
 ): Promise<{ comments: ChatMessage[]; cursor?: string }> {
   const cacheKey = `${tenantId}:${vodId}:cursor:${cursor}`;
+  const redis = RedisService.getClient();
 
-  if (!getDisableRedisCache() && redisClient) {
+  if (!getDisableRedisCache() && redis) {
     try {
-      const cached = await redisClient.getBuffer(cacheKey);
+      const cached = await redis.getBuffer(cacheKey);
       if (cached) {
         logger.debug({ vodId }, '[CACHE HIT] cursor');
 
@@ -236,10 +239,10 @@ export async function getLogsByCursor(
 
   const response = { comments, cursor: nextCursor };
 
-  if (!getDisableRedisCache() && redisClient) {
+  if (!getDisableRedisCache() && redis) {
     try {
       const compressed = await compressChatData(response);
-      await redisClient.set(cacheKey, compressed as Buffer, 'EX', getChatCursorTtl());
+      await redis.set(cacheKey, compressed as Buffer, 'EX', getChatCursorTtl());
       logger.debug({ vodId }, '[CACHE SET] cursor');
     } catch {
       // Ignore cache errors

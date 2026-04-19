@@ -5,6 +5,42 @@ import { invalidateVodCache } from './vod-cache.js';
 import { VOD_DETAILS_CACHE_TTL, VOD_LIST_CACHE_TTL } from '../constants.js';
 import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
 
+const VOD_INCLUDE = {
+  vod_uploads: {
+    select: {
+      upload_id: true,
+      type: true,
+      duration: true,
+      part: true,
+      status: true,
+      thumbnail_url: true,
+      created_at: true,
+    },
+  },
+  chapters: {
+    select: {
+      name: true,
+      image: true,
+      duration: true,
+      start: true,
+      end: true,
+    },
+  },
+  games: {
+    select: {
+      start_time: true,
+      end_time: true,
+      video_provider: true,
+      video_id: true,
+      thumbnail_url: true,
+      game_id: true,
+      game_name: true,
+      title: true,
+      chapter_image: true,
+    },
+  },
+};
+
 interface VodResponse {
   id: number;
   platform: Platform;
@@ -102,41 +138,7 @@ export async function getVods(
       orderBy: {
         [query.sort || 'created_at']: query.order || 'desc',
       },
-      include: {
-        vod_uploads: {
-          select: {
-            upload_id: true,
-            type: true,
-            duration: true,
-            part: true,
-            status: true,
-            thumbnail_url: true,
-            created_at: true,
-          },
-        },
-        chapters: {
-          select: {
-            name: true,
-            image: true,
-            duration: true,
-            start: true,
-            end: true,
-          },
-        },
-        games: {
-          select: {
-            start_time: true,
-            end_time: true,
-            video_provider: true,
-            video_id: true,
-            thumbnail_url: true,
-            game_id: true,
-            game_name: true,
-            title: true,
-            chapter_image: true,
-          },
-        },
-      },
+      include: VOD_INCLUDE,
     }),
     client.vod.count({ where }),
   ]);
@@ -159,40 +161,7 @@ export async function getVodById(client: PrismaClient, tenantId: string, vodId: 
     where: {
       id: vodId,
     },
-    include: {
-      vod_uploads: {
-        select: {
-          upload_id: true,
-          type: true,
-          duration: true,
-          part: true,
-          status: true,
-          thumbnail_url: true,
-        },
-      },
-      chapters: {
-        select: {
-          name: true,
-          image: true,
-          duration: true,
-          start: true,
-          end: true,
-        },
-      },
-      games: {
-        select: {
-          start_time: true,
-          end_time: true,
-          video_provider: true,
-          video_id: true,
-          thumbnail_url: true,
-          game_id: true,
-          game_name: true,
-          title: true,
-          chapter_image: true,
-        },
-      },
-    },
+    include: VOD_INCLUDE,
   });
 
   if (vod) {
@@ -216,40 +185,7 @@ export async function getVodByPlatformId(
       platform,
       vod_id: platformVodId,
     },
-    include: {
-      vod_uploads: {
-        select: {
-          upload_id: true,
-          type: true,
-          duration: true,
-          part: true,
-          status: true,
-          thumbnail_url: true,
-        },
-      },
-      chapters: {
-        select: {
-          name: true,
-          image: true,
-          duration: true,
-          start: true,
-          end: true,
-        },
-      },
-      games: {
-        select: {
-          start_time: true,
-          end_time: true,
-          video_provider: true,
-          video_id: true,
-          thumbnail_url: true,
-          game_id: true,
-          game_name: true,
-          title: true,
-          chapter_image: true,
-        },
-      },
-    },
+    include: VOD_INCLUDE,
   });
 
   if (vod) {

@@ -2,9 +2,10 @@ import { FastifyInstance } from 'fastify';
 import { getAllTenants } from '../../../services/tenants.service';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import { adminRateLimiter } from '../../plugins/redis.plugin';
+import { RedisService } from '../../../utils/redis-service.js';
 
 export default async function globalAdminRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
+  const adminRateLimiter = RedisService.getLimiter('rate:admin');
   if (!adminRateLimiter) {
     throw new Error('Rate limiter not initialized');
   }

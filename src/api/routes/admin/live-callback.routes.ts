@@ -8,7 +8,7 @@ import {
   type TenantPlatformContext,
 } from '../../middleware/tenant-platform.js';
 import { fileExists } from '../../../utils/path.js';
-import { adminRateLimiter } from '../../plugins/redis.plugin.js';
+import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound, badRequest } from '../../../utils/http-error.js';
 import type { Platform } from '../../../types/platforms.js';
@@ -33,6 +33,7 @@ interface LiveCallbackResponseData {
 }
 
 export default async function liveCallbackRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
+  const adminRateLimiter = RedisService.getLimiter('rate:admin');
   if (!adminRateLimiter) {
     throw new Error('Rate limiter not initialized');
   }

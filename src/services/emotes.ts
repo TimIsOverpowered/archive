@@ -4,7 +4,7 @@ import { Platform, PLATFORMS } from '../types/platforms.js';
 import { TenantContext } from '../types/context.js';
 import { withDbRetry } from '../db/client.js';
 import { safeRequest } from '../utils/http-client.js';
-import { redisClient } from '../api/plugins/redis.plugin.js';
+import { RedisService } from '../utils/redis-service.js';
 import { getDisableRedisCache } from '../config/env-accessors.js';
 import { compressChatData, decompressChatData } from '../utils/compression.js';
 import { EMOTE_CACHE_TTL } from '../constants.js';
@@ -150,9 +150,10 @@ export async function getEmotesByVodId(
 ): Promise<VodEmotes | null> {
   const cacheKey = `emotes:${tenantId}:${vodId}`;
 
-  if (redisClient && !getDisableRedisCache()) {
+  const redis = RedisService.getClient();
+  if (redis && !getDisableRedisCache()) {
     try {
-      const cached = await redisClient.get(cacheKey);
+      const cached = await redis.get(cacheKey);
       if (cached) {
         return (await decompressChatData(cached as unknown as Buffer)) as VodEmotes;
       }
@@ -183,10 +184,10 @@ export async function getEmotesByVodId(
     seventv_emotes: emote.seventv_emotes as EmoteData[],
   };
 
-  if (redisClient && !getDisableRedisCache()) {
+  if (redis && !getDisableRedisCache()) {
     try {
       const compressed = await compressChatData(result);
-      await redisClient.set(cacheKey, compressed as Buffer, 'EX', EMOTE_CACHE_TTL);
+      await redis.set(cacheKey, compressed as Buffer, 'EX', EMOTE_CACHE_TTL);
     } catch (err) {
       logger.warn({ err, cacheKey }, 'Emote cache write failed');
     }

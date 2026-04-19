@@ -1,5 +1,5 @@
 import ipaddr from 'ipaddr.js';
-import { redisClient } from '../api/plugins/redis.plugin';
+import { RedisService } from '../utils/redis-service.js';
 import { logger } from './logger.js';
 import { request } from './http-client.js';
 
@@ -44,9 +44,10 @@ export async function fetchCloudflareIpRanges(): Promise<CloudflareIpRanges> {
 
 /** Get from Redis cache or fetch fresh */
 export async function getCloudflareIpRanges(): Promise<CloudflareIpRanges | null> {
-  if (redisClient) {
+  const client = RedisService.getClient();
+  if (client) {
     try {
-      const cached = await redisClient.get(CF_IP_RANGES_KEY);
+      const cached = await client.get(CF_IP_RANGES_KEY);
       if (cached) {
         return JSON.parse(cached) as CloudflareIpRanges;
       }
@@ -57,9 +58,9 @@ export async function getCloudflareIpRanges(): Promise<CloudflareIpRanges | null
 
   const ranges = await fetchCloudflareIpRanges();
 
-  if (redisClient) {
+  if (client) {
     try {
-      await redisClient.set(CF_IP_RANGES_KEY, JSON.stringify(ranges), 'EX', CF_IP_RANGES_TTL);
+      await client.set(CF_IP_RANGES_KEY, JSON.stringify(ranges), 'EX', CF_IP_RANGES_TTL);
     } catch {
       // Ignore cache errors
     }
@@ -141,12 +142,13 @@ export async function validateCloudflareRequest(request: {
 
 /** Get cache info for health endpoint */
 export async function getCachedRangeInfo(): Promise<CloudflareCacheInfo | null> {
-  if (!redisClient) {
+  const client = RedisService.getClient();
+  if (!client) {
     return null;
   }
 
   try {
-    const cached = await redisClient.get(CF_IP_RANGES_KEY);
+    const cached = await client.get(CF_IP_RANGES_KEY);
     if (!cached) {
       return { status: 'missing' };
     }
@@ -170,9 +172,10 @@ export async function getCachedRangeInfo(): Promise<CloudflareCacheInfo | null> 
 /** Manual refresh trigger (for cron) */
 export async function refreshCloudflareRanges(): Promise<void> {
   const ranges = await fetchCloudflareIpRanges();
+  const client = RedisService.getClient();
 
-  if (redisClient) {
-    await redisClient.set(CF_IP_RANGES_KEY, JSON.stringify(ranges), 'EX', CF_IP_RANGES_TTL);
+  if (client) {
+    await client.set(CF_IP_RANGES_KEY, JSON.stringify(ranges), 'EX', CF_IP_RANGES_TTL);
   }
 
   logger.info({ v4Count: ranges.v4.length, v6Count: ranges.v6.length }, 'Cloudflare IP ranges refreshed');
