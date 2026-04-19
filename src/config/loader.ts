@@ -33,6 +33,10 @@ function _now(): number {
   return Date.now();
 }
 
+function asJsonObject(val: unknown): Record<string, unknown> | null {
+  return val && typeof val === 'object' && !Array.isArray(val) ? (val as Record<string, unknown>) : null;
+}
+
 function _buildTenantConfig(tenant: TenantModel): TenantConfig | null {
   if (!tenant.databaseUrl) return null;
 
@@ -56,25 +60,27 @@ function _buildTenantConfig(tenant: TenantModel): TenantConfig | null {
     settings,
   };
 
-  if (tenant.twitch && typeof tenant.twitch === 'object') {
-    tenantConfig.twitch = TwitchSchema.parse(tenant.twitch);
+  const twitchObj = asJsonObject(tenant.twitch);
+  if (twitchObj) {
+    tenantConfig.twitch = TwitchSchema.parse(twitchObj);
   }
 
-  if (tenant.youtube && typeof tenant.youtube === 'object') {
-    const youtube = tenant.youtube as JsonObject;
-    const youtubeParsed = YoutubeSchema.parse(youtube);
+  const youtubeObj = asJsonObject(tenant.youtube);
+  if (youtubeObj) {
+    const youtubeParsed = YoutubeSchema.parse(youtubeObj);
     tenantConfig.youtube = youtubeParsed;
-    if ('auth' in youtube && youtube.auth) {
-      tenantConfig.youtube.auth = youtube.auth as string;
+    if ('auth' in youtubeObj && youtubeObj.auth) {
+      tenantConfig.youtube.auth = youtubeObj.auth as string;
     }
-    if ('apiKey' in youtube && youtube.apiKey) {
-      const apiKey = decryptScalar(youtube.apiKey as string);
+    if ('apiKey' in youtubeObj && youtubeObj.apiKey) {
+      const apiKey = decryptScalar(youtubeObj.apiKey as string);
       tenantConfig.youtube.apiKey = apiKey;
     }
   }
 
-  if (tenant.kick && typeof tenant.kick === 'object') {
-    tenantConfig.kick = KickSchema.parse(tenant.kick);
+  const kickObj = asJsonObject(tenant.kick);
+  if (kickObj) {
+    tenantConfig.kick = KickSchema.parse(kickObj);
   }
 
   return tenantConfig;

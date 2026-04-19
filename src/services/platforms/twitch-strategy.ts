@@ -9,11 +9,11 @@ import { getLogger } from '../../utils/logger.js';
 export const twitchStrategy: PlatformStrategy = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
     const { tenantId, config, platform } = ctx;
-    if (!config?.[platform]?.enabled) {
+    if (!config[platform]?.enabled) {
       return null;
     }
 
-    const userId = config?.[platform]?.id;
+    const userId = config[platform]?.id;
     if (!userId) {
       return null;
     }
@@ -50,7 +50,7 @@ export const twitchStrategy: PlatformStrategy = {
 
   async fetchVodObjectForLiveStream(streamId: string, ctx): Promise<PlatformVodMetadata | null> {
     const { tenantId, config, platform } = ctx;
-    const userId = config?.[platform]?.id;
+    const userId = config[platform]?.id;
     if (!userId) {
       return null;
     }
