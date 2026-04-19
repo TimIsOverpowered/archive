@@ -38,7 +38,8 @@ export async function saveChaptersAndLinkParts(
       part: ['snippet'],
     });
 
-    const currentDescription = currentVideo.data?.items?.[0]?.snippet?.description || '';
+    const currentSnippet = currentVideo.data?.items?.[0]?.snippet || {};
+    const currentDescription = currentSnippet.description || '';
 
     let newDescription = currentDescription;
 
@@ -63,7 +64,9 @@ export async function saveChaptersAndLinkParts(
       requestBody: {
         id: videoId,
         snippet: {
+          title: currentSnippet.title,
           description: newDescription,
+          categoryId: currentSnippet.categoryId,
         },
       },
     });
