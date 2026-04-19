@@ -13,6 +13,14 @@ export function getRequestId(): string | undefined {
   return tenantContextStore.getStore()?.reqId;
 }
 
+export function getTenantId(): string | null | undefined {
+  return tenantContextStore.getStore()?.tenantId;
+}
+
+export function getDisplayName(): string | undefined {
+  return tenantContextStore.getStore()?.displayName;
+}
+
 export function generateRequestId(): string {
   return randomUUID();
 }
