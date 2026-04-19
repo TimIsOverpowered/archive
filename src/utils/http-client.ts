@@ -182,7 +182,11 @@ export function safeRequest<T = unknown>(
   defaultValue: T,
   options?: SafeRequestOptions<'json'>
 ): Promise<T>;
-export function safeRequest(url: string | URL, defaultValue: string, options?: SafeRequestOptions<'text'>): Promise<string>;
+export function safeRequest(
+  url: string | URL,
+  defaultValue: string,
+  options?: SafeRequestOptions<'text'>
+): Promise<string>;
 export function safeRequest(url: string | URL, defaultValue: Blob, options?: SafeRequestOptions<'blob'>): Promise<Blob>;
 export function safeRequest(
   url: string | URL,

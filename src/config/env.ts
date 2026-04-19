@@ -50,8 +50,8 @@ export function loadApiConfig(): ApiConfig {
     return apiConfigCache;
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errorMessages = error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', ');
-      throw new Error(`API config validation failed: ${errorMessages}`);
+      const errorMessages = error.issues.map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`).join('\n');
+      throw new Error(`API config validation failed:\n${errorMessages}`);
     }
     throw error;
   }
@@ -70,8 +70,8 @@ export function loadWorkersConfig(): WorkersConfig {
     return workersConfigCache;
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errorMessages = error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', ');
-      throw new Error(`Workers config validation failed: ${errorMessages}`);
+      const errorMessages = error.issues.map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`).join('\n');
+      throw new Error(`Workers config validation failed:\n${errorMessages}`);
     }
     throw error;
   }

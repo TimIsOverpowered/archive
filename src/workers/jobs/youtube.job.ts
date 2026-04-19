@@ -6,6 +6,7 @@ import type { Platform, SourceType, UploadMode } from '../../types/platforms.js'
 import { UPLOAD_MODES } from '../../types/platforms.js';
 import { TenantContext } from '../../types/context.js';
 import { withDbRetry } from '../../db/client.js';
+import { extractErrorDetails } from '../../utils/error.js';
 
 const log = childLogger({ module: 'youtube-job' });
 
@@ -214,7 +215,7 @@ export async function enqueueVodUpload(job: YoutubeVodUploadJob, downloadJobId?:
     });
     return addedJob.id ?? null;
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
+    const msg = extractErrorDetails(error).message;
     if (!msg.includes('deduplication')) {
       log.error({ jobId, tenantId: job.tenantId, error: msg }, 'Failed to enqueue YouTube VOD upload');
     }
@@ -264,7 +265,7 @@ export async function enqueueGameUpload(job: YoutubeGameUploadJob, downloadJobId
     });
     return addedJob.id ?? null;
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
+    const msg = extractErrorDetails(error).message;
     if (!msg.includes('deduplication')) {
       log.error({ jobId, tenantId: job.tenantId, error: msg }, 'Failed to enqueue YouTube game upload');
     }

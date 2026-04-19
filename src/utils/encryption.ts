@@ -39,8 +39,12 @@ export function decrypt(ciphertext: Uint8Array): string {
   }
 
   const iv = Buffer.from(ciphertext.subarray(0, ENCRYPTION_IV_LENGTH));
-  const authTag = Buffer.from(ciphertext.subarray(ENCRYPTION_IV_LENGTH, ENCRYPTION_IV_LENGTH + ENCRYPTION_AUTH_TAG_LENGTH));
-  const encryptedData = Buffer.from(ciphertext.subarray(ENCRYPTION_IV_LENGTH + ENCRYPTION_AUTH_TAG_LENGTH)).toString('base64');
+  const authTag = Buffer.from(
+    ciphertext.subarray(ENCRYPTION_IV_LENGTH, ENCRYPTION_IV_LENGTH + ENCRYPTION_AUTH_TAG_LENGTH)
+  );
+  const encryptedData = Buffer.from(ciphertext.subarray(ENCRYPTION_IV_LENGTH + ENCRYPTION_AUTH_TAG_LENGTH)).toString(
+    'base64'
+  );
 
   const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
   decipher.setAuthTag(authTag);

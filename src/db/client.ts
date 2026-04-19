@@ -61,12 +61,16 @@ const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) 
               } else if (operation === 'createMany') {
                 const data = (args as { data?: unknown[] }).data ?? [];
                 const ids = data
-                  .filter((item): item is Record<string, unknown> => item != null && typeof item === 'object' && 'id' in item)
+                  .filter(
+                    (item): item is Record<string, unknown> => item != null && typeof item === 'object' && 'id' in item
+                  )
                   .map((item) => Number((item as { id: unknown }).id))
                   .filter((id) => !isNaN(id));
                 if (ids.length === 0 && data.length > 0) {
-                  logger.debug({ tenantId, recordCount: data.length },
-                    'Vod.createMany called without explicit IDs — tenant list cache will be invalidated instead');
+                  logger.debug(
+                    { tenantId, recordCount: data.length },
+                    'Vod.createMany called without explicit IDs — tenant list cache will be invalidated instead'
+                  );
                 }
                 affectedVodIds.push(...ids);
               } else {
@@ -83,7 +87,10 @@ const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) 
               }
               for (const id of whereIds) {
                 invalidateEmoteCache(tenantId, id).catch((error) => {
-                  logger.warn({ tenantId, vodId: id, error: extractErrorDetails(error) }, 'Emote cache invalidation failed');
+                  logger.warn(
+                    { tenantId, vodId: id, error: extractErrorDetails(error) },
+                    'Emote cache invalidation failed'
+                  );
                 });
               }
             } else {
