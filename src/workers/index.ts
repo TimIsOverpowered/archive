@@ -9,6 +9,7 @@ import { logger } from '../utils/logger.js';
 import { WORKER_DEFINITIONS } from './worker-definitions.js';
 import { createWorker, waitForWorkersReady, workers } from './create-worker.js';
 import { loadWorkersConfig } from '../config/env.js';
+import { VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY } from '../constants.js';
 import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/client.js';
 import { registerPlatformStrategies } from '../services/platforms/index.js';
 
@@ -46,12 +47,23 @@ async function bootstrap() {
 
   try {
     registerPlatformStrategies();
-    await loadTenantConfigs();
+    const configs = await loadTenantConfigs();
     await waitForRedisReady();
     startTokenHealthCron();
     await clearAllJobsOnStartup();
 
-    const workerInstances = WORKER_DEFINITIONS.map((def) => createWorker({ ...def, connection: getRedisInstance() }));
+    const workerInstances = WORKER_DEFINITIONS.map((def) => {
+      if (def.name === QUEUE_NAMES.VOD_LIVE) {
+        const liveTenants = configs.filter((c) => c.settings.vodDownload && (c.twitch?.enabled || c.kick?.enabled));
+        const liveConcurrency = Math.max(liveTenants.length * 2 * VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY);
+        def.concurrency = liveConcurrency;
+        logger.info(
+          { liveTenants: liveTenants.length, concurrency: liveConcurrency },
+          'vod_live concurrency calculated'
+        );
+      }
+      return createWorker({ ...def, connection: getRedisInstance() });
+    });
 
     await waitForWorkersReady(workerInstances);
 

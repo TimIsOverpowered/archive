@@ -26,7 +26,6 @@ export const ApiConfigSchema = BaseConfigSchema.extend({
 // Workers-specific schema (extends base + workers-only fields)
 export const WorkersConfigSchema = BaseConfigSchema.extend({
   CLEAR_QUEUES_ON_STARTUP: z.preprocess((val) => String(val).toLowerCase() === 'true', z.boolean()).default(false),
-  VOD_LIVE_CONCURRENCY: z.coerce.number().int().positive().default(50),
   VOD_STANDARD_CONCURRENCY: z.coerce.number().int().positive().default(1),
   YOUTUBE_UPLOAD_CONCURRENCY: z.coerce.number().int().positive().default(1),
   CHAT_DOWNLOAD_CONCURRENCY: z.coerce.number().int().positive().default(1),

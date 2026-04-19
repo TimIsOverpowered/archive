@@ -1,4 +1,3 @@
-// workers/workerDefinitions.ts
 import { Processor } from 'bullmq';
 import liveProcessor from './live.worker.js';
 import standardVodProcessor from './vod.worker.js';
@@ -21,13 +20,7 @@ import {
 import { getWorkersConfig } from '../config/env.js';
 
 export type WorkerName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
-export type AllJobData =
-  | LiveDownloadJob
-  | StandardVodJob
-  | ChatDownloadJob
-  | YoutubeUploadJob
-  | DmcaProcessingJob
-  | MonitorJob;
+export type AllJobData = StandardVodJob | ChatDownloadJob | YoutubeUploadJob | DmcaProcessingJob | MonitorJob;
 
 export interface WorkerConfig<TData extends object = object, TResult = unknown> {
   name: WorkerName;
@@ -37,7 +30,9 @@ export interface WorkerConfig<TData extends object = object, TResult = unknown> 
   useWorkerThreads?: boolean;
 }
 
-function defineWorker<TData extends object, TResult>(def: WorkerConfig<TData, TResult>): WorkerConfig<object, unknown> {
+export function defineWorker<TData extends object, TResult>(
+  def: WorkerConfig<TData, TResult>
+): WorkerConfig<object, unknown> {
   return def as WorkerConfig<object, unknown>;
 }
 
@@ -46,7 +41,7 @@ export const WORKER_DEFINITIONS = [
     name: 'vod_live',
     queueName: QUEUE_NAMES.VOD_LIVE,
     processor: liveProcessor,
-    concurrency: getWorkersConfig().VOD_LIVE_CONCURRENCY,
+    concurrency: undefined,
     useWorkerThreads: true,
   }),
   defineWorker<StandardVodJob, unknown>({
