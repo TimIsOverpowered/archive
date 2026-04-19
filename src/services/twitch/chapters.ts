@@ -5,6 +5,13 @@ import { extractErrorDetails } from '../../utils/error.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 import { TenantContext } from '../../types/context.js';
 import { withDbRetry } from '../../db/client.js';
+import { LRUCache } from 'lru-cache';
+
+const gameDataCache = new LRUCache<string, Record<string, unknown>>({
+  max: 1000,
+  ttl: 24 * 60 * 60 * 1000,
+  allowStale: false,
+});
 
 export async function getChapters(vodId: string, tenantId?: string): Promise<unknown[] | null> {
   const client = createTwitchGqlClient(tenantId, BACKUP_TWITCH_GQL_CLIENT_ID);
@@ -48,13 +55,21 @@ export async function getChapter(vodId: string, tenantId?: string): Promise<Reco
 }
 
 export async function getGameData(gameId: string, tenantId: string): Promise<Record<string, unknown> | null> {
+  const cached = gameDataCache.get(gameId);
+  if (cached !== undefined) {
+    return cached;
+  }
+
   const client = getTwitchClient(tenantId);
   const data = await client.helix.get<{ data: Record<string, unknown>[] }>(`/games?id=${gameId}`);
 
   if (!data.data || data.data.length === 0) {
     return null;
   }
-  return data.data[0];
+
+  const result = data.data[0];
+  gameDataCache.set(gameId, result);
+  return result;
 }
 
 export async function saveVodChapters(

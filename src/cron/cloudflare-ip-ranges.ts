@@ -23,7 +23,8 @@ export function startCloudflareIpRangesCron(): NodeJS.Timeout {
   return setInterval(
     () => {
       refreshCloudflareIpRanges().catch((err) => {
-        logger.error({ err }, 'Cloudflare IP ranges cron failed');
+        const details = extractErrorDetails(err);
+        logger.error({ ...details }, 'Cloudflare IP ranges cron failed');
       });
     },
     24 * 60 * 60 * 1000

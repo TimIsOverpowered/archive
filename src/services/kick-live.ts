@@ -3,6 +3,21 @@ import { extractErrorDetails, createErrorContext } from '../utils/error.js';
 import { logger } from '../utils/logger.js';
 import { sleep } from '../utils/delay.js';
 import { KICK_LIVE_API_TIMEOUT_MS, KICK_PAGE_DELAY_MS } from '../constants.js';
+import { LRUCache } from 'lru-cache';
+
+const kickStreamCache = new LRUCache<string, KickStreamStatus>({
+  max: 100,
+  ttl: 30_000,
+  allowStale: true,
+});
+
+function _cacheKickStream(username: string, status: KickStreamStatus | null): void {
+  if (status === null) {
+    kickStreamCache.set(username, { id: '__offline__', session_title: null, created_at: '' } as KickStreamStatus);
+    return;
+  }
+  kickStreamCache.set(username, status);
+}
 
 interface KickApiResponse {
   data?: Record<string, unknown>;
@@ -33,6 +48,11 @@ export interface KickStreamStatus {
  * Check if a Kick user is currently live via Puppeteer scraping with real-browser protection
  */
 export async function getKickStreamStatus(username: string): Promise<KickStreamStatus | null> {
+  const cached = kickStreamCache.get(username);
+  if (cached !== undefined) {
+    return cached;
+  }
+
   try {
     const apiUrl = `https://kick.com/api/v2/channels/${username}/livestream`;
 
@@ -48,6 +68,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
 
     if (!result.success) {
       logger.warn({ username }, `[Kick] Failed to reach API endpoint for ${username}`);
+      _cacheKickStream(username, null);
       return null;
     }
 
@@ -73,6 +94,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
     if (!response) {
       logger.debug({ username }, `[Kick] Channel ${username} is offline (no livestream data)`);
       await page.close();
+      _cacheKickStream(username, null);
       return null;
     }
 
@@ -83,6 +105,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
         `[Kick] API request blocked or errored for ${username}: "${response.error}"`
       );
       await page.close();
+      _cacheKickStream(username, null);
       return null;
     }
 
@@ -91,6 +114,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
     if (!data || typeof data !== 'object') {
       logger.debug({ username }, `[Kick] Channel ${username} is offline (no livestream data object)`);
       await page.close();
+      _cacheKickStream(username, null);
       return null;
     }
 
@@ -102,6 +126,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
         `[Kick] Channel ${username} is offline (no livestream id in data)`
       );
       await page.close();
+      _cacheKickStream(username, null);
       return null;
     }
 
@@ -153,6 +178,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
     );
 
     await page.close();
+    _cacheKickStream(username, streamData);
     return streamData;
   } catch (error) {
     const details = extractErrorDetails(error);

@@ -3,6 +3,7 @@ import { extractErrorDetails } from './error.js';
 import { logger } from './logger.js';
 import { getFullMemoryStats, releaseBrowser, type MemoryStats } from './puppeteer-manager.js';
 import { PUPPETEER_HEALTH_CACHE_TTL_MS } from '../constants.js';
+import { LRUCache } from 'lru-cache';
 
 type HealthStatus = 'ok' | 'elevated' | 'high_memory' | 'unavailable';
 
@@ -11,14 +12,16 @@ interface PuppeteerHealthStatus {
   stats?: MemoryStats;
 }
 
-let cachedStatus: PuppeteerHealthStatus | null = null;
-let cacheTimestamp = 0;
+const healthCache = new LRUCache<string, PuppeteerHealthStatus>({
+  max: 1,
+  ttl: PUPPETEER_HEALTH_CACHE_TTL_MS,
+  allowStale: false,
+});
 
 export async function checkPuppeteerHealth(browserInstance?: Browser): Promise<PuppeteerHealthStatus> {
-  const now = Date.now();
-
-  if (cachedStatus && now - cacheTimestamp < PUPPETEER_HEALTH_CACHE_TTL_MS) {
-    return cachedStatus;
+  const cached = healthCache.get('health');
+  if (cached) {
+    return cached;
   }
 
   try {
@@ -31,23 +34,26 @@ export async function checkPuppeteerHealth(browserInstance?: Browser): Promise<P
 
     // Three-tier logic based on memory usage
     if (memStats.totalRssMb > limitMb) {
-      cachedStatus = { status: 'high_memory', stats: memStats };
+      const status: PuppeteerHealthStatus = { status: 'high_memory', stats: memStats };
+      healthCache.set('health', status);
       logger.error(
         { ...memStats, limitMb },
         '[Puppeteer Health] CRITICAL: Hard memory limit exceeded - immediate restart required'
       );
+      return status;
     } else if (memStats.totalRssMb > softLimitMb) {
-      cachedStatus = { status: 'elevated', stats: memStats };
+      const status: PuppeteerHealthStatus = { status: 'elevated', stats: memStats };
+      healthCache.set('health', status);
       logger.warn(
         { ...memStats, softLimitMb, limitMb },
         '[Puppeteer Health] Elevated memory usage - consider restart before next task'
       );
+      return status;
     } else {
-      cachedStatus = { status: 'ok', stats: memStats };
+      const status: PuppeteerHealthStatus = { status: 'ok', stats: memStats };
+      healthCache.set('health', status);
+      return status;
     }
-
-    cacheTimestamp = now;
-    return cachedStatus;
   } catch (error) {
     const details = extractErrorDetails(error);
 
@@ -70,8 +76,8 @@ export async function checkPuppeteerHealth(browserInstance?: Browser): Promise<P
       logger.warn(details, '[Puppeteer Health] Failed to check health (transient error)');
     }
 
-    cachedStatus = { status: 'unavailable' };
-    cacheTimestamp = now;
-    return cachedStatus;
+    const status: PuppeteerHealthStatus = { status: 'unavailable' };
+    healthCache.set('health', status);
+    return status;
   }
 }

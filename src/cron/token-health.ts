@@ -39,7 +39,10 @@ export function startTokenHealthCron(): NodeJS.Timeout {
 
   return setInterval(
     () => {
-      checkTokenHealth().catch((err) => logger.error({ err }, 'Token health cron failed'));
+      checkTokenHealth().catch((err) => {
+        const details = extractErrorDetails(err);
+        logger.error({ ...details }, 'Token health cron failed');
+      });
     },
     24 * 60 * 60 * 1000
   );

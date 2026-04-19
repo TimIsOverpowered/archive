@@ -1,6 +1,5 @@
-import { PLATFORMS, Platform } from '../types/platforms.js';
-import { finalizeKickChapters } from './kick.js';
-import { saveVodChapters as saveTwitchVodChapters } from './twitch/index.js';
+import { Platform } from '../types/platforms.js';
+import { getStrategy } from './platforms/strategy.js';
 import { TenantContext } from '../types/context.js';
 import { withDbRetry } from '../db/client.js';
 
@@ -17,10 +16,9 @@ export async function finalizeVod(options: FinalizeVodOptions): Promise<void> {
 
   await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
     if (durationSeconds) {
-      if (platform === PLATFORMS.KICK) {
-        await finalizeKickChapters(ctx, dbId, vodId, durationSeconds);
-      } else if (platform === PLATFORMS.TWITCH) {
-        await saveTwitchVodChapters(ctx, dbId, vodId, durationSeconds);
+      const strategy = getStrategy(platform);
+      if (strategy?.finalizeChapters) {
+        await strategy.finalizeChapters({ tenantId: ctx.tenantId, config: ctx.config, platform, db }, dbId, vodId, durationSeconds);
       }
       await db.vod.update({
         where: { id: dbId },

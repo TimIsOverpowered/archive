@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { loadTenantConfigs, getTenantConfig, clearConfigCache, reloadTenantConfig } from '../../config/loader.js';
 import { TenantConfig } from '../../config/types.js';
 import { logger } from '../../utils/logger.js';
+import { extractErrorDetails } from '../../utils/error.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -46,7 +47,8 @@ const configPlugin: FastifyPluginAsync = async (fastify) => {
       clearConfigCache();
     });
   } catch (error) {
-    logger.fatal({ error }, 'Failed to load streamer configurations');
+    const details = extractErrorDetails(error);
+    logger.fatal({ ...details }, 'Failed to load streamer configurations');
     throw error;
   }
 };

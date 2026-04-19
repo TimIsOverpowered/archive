@@ -1,4 +1,5 @@
 import fs from 'fs';
+import fsPromises from 'fs/promises';
 import { createYoutubeClient } from './client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
@@ -40,7 +41,7 @@ export async function uploadVideo(
   try {
     const youtube = await createYoutubeClient(tenantId);
 
-    const fileSize = fs.statSync(filePath).size;
+    const fileSize = (await fsPromises.stat(filePath)).size;
     const fileName = filePath.split('/').pop() || filePath;
 
     logger.info(
