@@ -18,7 +18,7 @@ import {
 } from './jobs/queues.js';
 import { getWorkersConfig } from '../config/env.js';
 
-export type WorkerName = 'vod_live' | 'vod_standard' | 'chat_download' | 'youtube_upload' | 'dmca_processing';
+export type WorkerName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 export type AllJobData = LiveDownloadJob | StandardVodJob | ChatDownloadJob | YoutubeUploadJob | DmcaProcessingJob;
 
 export interface WorkerConfig<TData extends object = object, TResult = unknown> {
@@ -52,7 +52,7 @@ export const WORKER_DEFINITIONS = [
     name: 'chat_download',
     queueName: QUEUE_NAMES.CHAT_DOWNLOAD,
     processor: chatProcessor,
-    concurrency: 3,
+    concurrency: getWorkersConfig().CHAT_DOWNLOAD_CONCURRENCY,
     useWorkerThreads: true,
   }),
   defineWorker<YoutubeUploadJob, YoutubeUploadResult>({
