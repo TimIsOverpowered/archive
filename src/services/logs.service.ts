@@ -51,15 +51,12 @@ async function getVodBucketSize(client: PrismaClient, tenantId: string, vodId: n
     }
   }
 
-  const rawResult = await client.$queryRawUnsafe(
-    `
-    SELECT 
+  const rawResult = await client.$queryRaw<Array<{ comments_per_100s: number | null }>>`
+    SELECT
       COUNT(*) / NULLIF((MAX(content_offset_seconds) - MIN(content_offset_seconds)), 0) * 100 AS comments_per_100s
     FROM chat_messages
-    WHERE vod_id = $1
-  `,
-    vodId
-  );
+    WHERE vod_id = ${vodId}
+  `;
 
   const row = (rawResult as unknown[])[0] as { comments_per_100s?: unknown };
   const commentsPer100sValue = parseFloat(String(row?.comments_per_100s ?? ''));
