@@ -51,6 +51,7 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
       }
 
       const streamers = [];
+      const dbStatuses = { ok: 0, error: 0, uninitialized: 0 };
       for (const config of streamerConfigs) {
         const client = getClient(config.id);
         let dbStatus = 'uninitialized';
@@ -64,6 +65,7 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
           }
         }
 
+        dbStatuses[dbStatus as 'ok' | 'error' | 'uninitialized']++;
         streamers.push({
           id: config.id,
           db: dbStatus,
@@ -81,15 +83,24 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
         cloudflareCache = { status: 'error' };
       }
 
+      const rateLimiters = {
+        vods: { fallback: RedisService.isLimiterFallback('rate:vods') },
+        chat: { fallback: RedisService.isLimiterFallback('rate:chat') },
+        admin: { fallback: RedisService.isLimiterFallback('rate:admin') },
+      };
+
       const response = {
         data: {
-          status: 'ok',
+          status: redisStatus === 'error' ? 'degraded' : 'ok',
+          uptime: process.uptime(),
           redis: {
             status: redisStatus,
             connection: redisStatusInfo.status,
             connected: redisStatusInfo.connected,
           },
+          rateLimiters,
           streamers,
+          dbStatuses,
           cloudflareIpCache: cloudflareCache,
           ...(kickConfig && {
             kick: {

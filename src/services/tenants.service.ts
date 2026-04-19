@@ -3,6 +3,14 @@ import { getTenantConfig, getConfigs } from '../config/loader.js';
 import { withCache } from '../utils/cache.js';
 import { PLATFORMS } from '../types/platforms.js';
 import { PERCENTAGE_PRECISION_MULTIPLIER, PERCENTAGE_PRECISION_DIVISOR } from '../constants.js';
+import type { TenantConfig } from '../config/types.js';
+
+export function getEnabledPlatforms(config: Pick<TenantConfig, 'twitch' | 'kick'>): string[] {
+  const platforms: string[] = [];
+  if (config.twitch?.enabled) platforms.push(PLATFORMS.TWITCH);
+  if (config.kick?.enabled) platforms.push(PLATFORMS.KICK);
+  return platforms;
+}
 
 interface TenantStats {
   tenant: {
@@ -43,9 +51,7 @@ export async function getTenantStats(client: PrismaClient, tenantId: string, cac
     throw new Error('Tenant not found');
   }
 
-  const platforms: string[] = [];
-  if (config.twitch?.enabled) platforms.push(PLATFORMS.TWITCH);
-  if (config.kick?.enabled) platforms.push(PLATFORMS.KICK);
+  const platforms = getEnabledPlatforms(config);
 
   const thisMonthStart = new Date();
   thisMonthStart.setDate(1);
@@ -158,16 +164,10 @@ export async function getAllTenants(): Promise<
 > {
   const configs = getConfigs();
 
-  return configs.map((config) => {
-    const platforms: string[] = [];
-    if (config.twitch?.enabled) platforms.push('twitch');
-    if (config.kick?.enabled) platforms.push('kick');
-
-    return {
-      id: config.id,
-      display_name: config.displayName ?? null,
-      platforms,
-      created_at: config.createdAt,
-    };
-  });
+  return configs.map((config) => ({
+    id: config.id,
+    display_name: config.displayName ?? null,
+    platforms: getEnabledPlatforms(config),
+    created_at: config.createdAt,
+  }));
 }

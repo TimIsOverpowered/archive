@@ -93,6 +93,45 @@ export const VodQuerySchema = z.object({
 
 export type VodQuery = z.infer<typeof VodQuerySchema>;
 
+export interface VodWhereInput {
+  platform?: string;
+  created_at?: { gte?: Date; lte?: Date };
+  vod_uploads?: { some: Record<string, unknown> };
+  games?: { some: { game_name: { contains: string; mode: 'insensitive' } } };
+}
+
+export function buildVodQuery(query: VodQuery): { where: VodWhereInput; orderBy: Record<string, string> } {
+  const where: VodWhereInput = {};
+
+  if (query.platform) {
+    where.platform = query.platform;
+  }
+
+  if (query.from || query.to) {
+    where.created_at = {};
+    if (query.from) (where.created_at as { gte?: Date }).gte = new Date(query.from);
+    if (query.to) (where.created_at as { lte?: Date }).lte = new Date(query.to);
+  }
+
+  if (query.uploaded === 'youtube') {
+    where.vod_uploads = { some: {} };
+  }
+
+  if (query.game) {
+    where.games = {
+      some: {
+        game_name: { contains: query.game, mode: 'insensitive' as const },
+      },
+    };
+  }
+
+  const orderBy = {
+    [query.sort || 'created_at']: query.order || 'desc',
+  };
+
+  return { where, orderBy };
+}
+
 export async function getVods(
   client: PrismaClient,
   tenantId: string,
@@ -104,40 +143,14 @@ export async function getVods(
 
   const cacheKey = `vods:${tenantId}:${JSON.stringify({ ...query, page, limit })}`;
 
-  const where: Record<string, unknown> = {};
-
-  if (query.platform) {
-    where.platform = query.platform;
-  }
-
-  if (query.from || query.to) {
-    where.created_at = {} as Record<string, unknown>;
-    if (query.from) (where.created_at as { gte?: Date }).gte = new Date(query.from);
-    if (query.to) (where.created_at as { lte?: Date }).lte = new Date(query.to);
-  }
-
-  if (query.uploaded === 'youtube') {
-    where.vod_uploads = {
-      some: {},
-    };
-  }
-
-  if (query.game) {
-    where.games = {
-      some: {
-        game_name: { contains: query.game, mode: 'insensitive' },
-      },
-    };
-  }
+  const { where, orderBy } = buildVodQuery(query);
 
   const [vods, total] = await Promise.all([
     client.vod.findMany({
       where,
       skip: offset,
       take: limit + 1,
-      orderBy: {
-        [query.sort || 'created_at']: query.order || 'desc',
-      },
+      orderBy,
       include: VOD_INCLUDE,
     }),
     client.vod.count({ where }),
