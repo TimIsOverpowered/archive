@@ -111,7 +111,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
 
   const splitAlertMessageId = await initRichAlert({
     title: '📺 VOD Splitting Started',
-    description: `${tenantId} - Splitting long VOD into ${totalParts} parts`,
+    description: `${channelName} - Splitting long VOD into ${totalParts} parts`,
     status: 'warning',
     fields: [
       { name: 'VOD ID', value: vodId, inline: true },
@@ -124,7 +124,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
   const parts = await splitVideo(filePath, duration, splitDuration, vodId, (percent: number, partNum: number) => {
     void updateAlert(splitAlertMessageId, {
       title: '📺 Splitting VOD',
-      description: `${tenantId} - Processing part ${partNum}/${totalParts}`,
+      description: `${channelName} - Processing part ${partNum}/${totalParts}`,
       status: 'warning',
       fields: [
         { name: 'VOD ID', value: vodId, inline: true },
@@ -156,7 +156,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
 
     const uploadAlertMessageId = await initRichAlert({
       title: `📺 YouTube Upload (Part ${currentPartNum}/${totalParts})`,
-      description: `${tenantId} - Uploading video part to YouTube...`,
+      description: `${channelName} - Uploading video part to YouTube...`,
       status: 'warning',
       fields: [
         { name: 'VOD ID', value: vodId, inline: true },
@@ -196,7 +196,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
 
   void updateAlert(splitAlertMessageId, {
     title: `✅ VOD Splitting Complete`,
-    description: `${tenantId} - Successfully split into ${totalParts} parts`,
+    description: `${channelName} - Successfully split into ${totalParts} parts`,
     status: 'success',
     fields: [
       { name: 'VOD ID', value: vodId, inline: true },
@@ -250,7 +250,7 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
 
   const uploadAlertMessageId = await initRichAlert({
     title: '📺 YouTube Upload Started',
-    description: `${tenantId} - Uploading VOD to YouTube...`,
+    description: `${channelName} - Uploading VOD to YouTube...`,
     status: 'warning',
     fields: [
       { name: 'VOD ID', value: vodId, inline: true },
