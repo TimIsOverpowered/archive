@@ -1,13 +1,7 @@
 import { getTenantConfig } from '../config/loader.js';
 import { decryptObject } from './encryption.js';
 import { createAutoLogger as loggerWithTenant } from './auto-tenant-logger.js';
-
-interface TwitchAuth {
-  client_id: string;
-  client_secret: string;
-  access_token?: string;
-  expiry_date?: number;
-}
+import type { TwitchAuthObject } from '../config/schemas.js';
 
 export interface TwitchCredentials {
   clientId: string;
@@ -30,7 +24,7 @@ export function getTwitchCredentials(tenantId: string): TwitchCredentials | null
   }
 
   try {
-    const auth: TwitchAuth = decryptObject(config.twitch.auth);
+    const auth = decryptObject<TwitchAuthObject>(config.twitch.auth);
 
     if (!auth.client_id || !auth.client_secret) {
       log.error('[Twitch] Missing client_id or client_secret in decrypted credentials');
