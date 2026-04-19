@@ -81,7 +81,11 @@ export async function getTenantStats(client: PrismaClient, tenantId: string, cac
       client.vod.count({
         where: { created_at: { gte: thisMonthStart } },
       }),
-      client.$queryRaw<Array<{ game_id: string }>>`SELECT DISTINCT game_id FROM chapter WHERE game_id IS NOT NULL`,
+      client.chapter.findMany({
+        distinct: ['game_id'],
+        select: { game_id: true },
+        where: { game_id: { not: null } },
+      }),
     ]);
 
     const byPlatform: Record<string, number> = {};
