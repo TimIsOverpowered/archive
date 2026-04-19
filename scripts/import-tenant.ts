@@ -80,6 +80,7 @@ function processTwitch(config: TwitchConfig | undefined) {
     enabled: config.enabled ?? false,
     id: config.id,
     username: config.username,
+    mainPlatform: false,
   };
 
   if (config.auth && (config.auth.client_secret || config.auth.access_token)) {
@@ -120,6 +121,7 @@ function processKick(config: KickConfig | undefined) {
 
   const kick: Record<string, unknown> = {
     enabled: config.enabled ?? false,
+    mainPlatform: false,
   };
 
   if (config.id) kick.id = config.id;
@@ -178,6 +180,12 @@ async function importConfig(channelName: string, dbUrl: string): Promise<void> {
   const youtube = processYoutube(rawConfig.youtube);
   const kick = processKick(rawConfig.kick);
   const settings = processSettings(rawConfig);
+
+  const platformCount = (twitch ? 1 : 0) + (kick ? 1 : 0);
+  if (platformCount === 1) {
+    if (twitch) (twitch as Record<string, unknown>).mainPlatform = true;
+    if (kick) (kick as Record<string, unknown>).mainPlatform = true;
+  }
 
   const encryptedDbUrl = encryptScalar(dbUrl);
 
