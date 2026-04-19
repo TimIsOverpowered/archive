@@ -1,6 +1,7 @@
 import type { ChatDownloadJob } from './queues.js';
 import { getChatDownloadQueue } from './queues.js';
 import { childLogger } from '../../utils/logger.js';
+import { extractErrorDetails } from '../../utils/error.js';
 import { Platform, PLATFORMS } from '../../types/platforms.js';
 
 const log = childLogger({ module: 'chat-job' });
@@ -16,7 +17,7 @@ async function enqueue(job: ChatDownloadJob): Promise<string | null> {
     });
     return added.id ?? null;
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
+    const msg = extractErrorDetails(error).message;
     const isDedup = msg.includes('deduplication');
     if (!isDedup) {
       log.error({ jobId, tenantId: job.tenantId, error: msg }, 'Failed to enqueue chat job');

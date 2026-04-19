@@ -1,6 +1,7 @@
 import { defaultJobOptions, getDmcaProcessingQueue, getFlowProducer, getStandardVodQueue } from './queues.js';
 import type { DmcaProcessingJob } from './queues.js';
 import { childLogger } from '../../utils/logger.js';
+import { extractErrorDetails } from '../../utils/error.js';
 import type { Platform, SourceType } from '../../types/platforms.js';
 
 const log = childLogger({ module: 'dmca-job' });
@@ -74,7 +75,7 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
     );
     return resultJobId;
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
+    const msg = extractErrorDetails(error).message;
     if (!msg.includes('deduplication')) {
       log.info({ jobId, tenantId, error: msg }, 'Failed to enqueue DMCA processing job');
     }

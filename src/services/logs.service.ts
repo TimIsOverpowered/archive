@@ -62,7 +62,9 @@ async function getVodBucketSize(client: PrismaClient, tenantId: string, vodId: n
 
   const row = (rawResult as unknown[])[0] as { comments_per_100s?: unknown };
   const commentsPer100sValue = parseFloat(String(row?.comments_per_100s ?? ''));
-  const bucketSize = isFinite(commentsPer100sValue) ? computeBucketSize(commentsPer100sValue) : LOGS_DEFAULT_BUCKET_SIZE;
+  const bucketSize = isFinite(commentsPer100sValue)
+    ? computeBucketSize(commentsPer100sValue)
+    : LOGS_DEFAULT_BUCKET_SIZE;
 
   if (!getDisableRedisCache() && redis) {
     try {

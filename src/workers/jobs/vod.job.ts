@@ -1,6 +1,7 @@
 import type { StandardVodJob } from './queues.js';
 import { getStandardVodQueue } from './queues.js';
 import { childLogger } from '../../utils/logger.js';
+import { extractErrorDetails } from '../../utils/error.js';
 import type { Platform, DownloadMethod } from '../../types/platforms.js';
 
 const log = childLogger({ module: 'vod-job' });
@@ -34,7 +35,7 @@ export async function triggerVodDownload(
     });
     return added.id ?? null;
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
+    const msg = extractErrorDetails(error).message;
     const isDedup = msg.includes('deduplication');
     if (!isDedup) {
       log.error({ jobId, tenantId, error: msg }, 'Failed to enqueue VOD job');
