@@ -112,24 +112,22 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       }
 
       const strategy = getStrategy(platform);
-      const newVod = strategy
-        ? await db.vod.create({
-            data: strategy.createVodData({
+      const newVod = await db.vod.create({
+        data: strategy
+          ? strategy.createVodData({
               id: vodId,
               title: title || '',
               createdAt: createdAt || new Date().toISOString(),
               duration: Number(duration) || 0,
-            }),
-          })
-        : await db.vod.create({
-            data: {
+            })
+          : {
               vod_id: vodId,
               title: title || null,
               created_at: createdAt ? new Date(createdAt) : new Date(),
               duration: Number(duration) || 0,
-              platform: platform,
+              platform,
             },
-          });
+      });
 
       log.info(`Created VOD ${vodId}`);
 
