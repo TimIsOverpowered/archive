@@ -81,7 +81,7 @@
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-click-and-wait": "^2.3.3",
     "puppeteer-real-browser": "^1.4.4",
-    "rate-limiter-flexible": "^11.0.0"
+    "rate-limiter-flexible": "^11.0.1"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
@@ -90,7 +90,7 @@
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
     "dotenv": "^17.4.2",
-    "eslint": "^10.2.0",
+    "eslint": "^10.2.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import-x": "^4.16.2",
     "open": "^11.0.0",
