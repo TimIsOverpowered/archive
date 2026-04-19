@@ -24,11 +24,11 @@ export async function startMonitorService(): Promise<void> {
     for (const config of allConfigs) {
       // Start independent loop per platform - mainPlatform flag is ONLY for YouTube game uploads, NOT stream detection
 
-      if (config.twitch?.enabled && config.twitch.username) {
+      if (config.settings.vodDownload && config.twitch?.enabled && config.twitch.username) {
         startStreamDetectionLoop(config.id, PLATFORMS.TWITCH, config);
       }
 
-      if (config.kick?.enabled && config.kick.username) {
+      if (config.settings.vodDownload && config.kick?.enabled && config.kick.username) {
         startStreamDetectionLoop(config.id, PLATFORMS.KICK, config);
       }
     }
