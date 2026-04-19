@@ -1,12 +1,15 @@
 import { extractErrorDetails } from './error.js';
 import { request } from './http-client.js';
 import { toHHMMSS } from './formatting.js';
-import { logger } from './logger.js';
+import { getLogger } from './logger.js';
 import { LRUCache } from 'lru-cache';
 import { getTenantDisplayName } from '../config/loader.js';
 import { capitalizePlatform, Platform } from '../types/platforms.js';
+import { getDiscordAlertsEnabled } from '../config/env-accessors.js';
 
-const globalDiscordAlertsEnabled = process.env.DISCORD_ALERTS_ENABLED !== 'false';
+export function isAlertsEnabled(): boolean {
+  return getDiscordAlertsEnabled();
+}
 
 export type AlertStatus = 'success' | 'warning' | 'error';
 
@@ -40,10 +43,6 @@ export interface StreamAlertData {
   streamerName?: string;
   durationSeconds?: number;
   errorMessage?: string;
-}
-
-export function isAlertsEnabled(): boolean {
-  return globalDiscordAlertsEnabled;
 }
 
 function getEmbedColor(status: AlertStatus): number {
@@ -121,7 +120,7 @@ export async function sendDiscordAlert(message: string): Promise<string | null> 
     }
     return null;
   } catch (err) {
-    logger.error(extractErrorDetails(err), 'Failed to send Discord alert');
+    getLogger().error(extractErrorDetails(err), 'Failed to send Discord alert');
     return null;
   }
 }
@@ -159,7 +158,7 @@ export async function sendRichAlert(data: RichEmbedData): Promise<string | null>
     }
     return null;
   } catch (err) {
-    logger.error(extractErrorDetails(err), 'Failed to send rich Discord alert');
+    getLogger().error(extractErrorDetails(err), 'Failed to send rich Discord alert');
     return null;
   }
 }
@@ -183,7 +182,7 @@ export async function updateDiscordEmbed(messageId: string, data: RichEmbedData)
       body: { embeds: [embed] },
     });
   } catch (err) {
-    logger.error(extractErrorDetails(err), 'Failed to update Discord embed');
+    getLogger().error(extractErrorDetails(err), 'Failed to update Discord embed');
   }
 }
 
@@ -275,7 +274,7 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
     });
     return responseData.id || null;
   } catch (err) {
-    logger.error(extractErrorDetails(err), 'Failed to send stream alert');
+    getLogger().error(extractErrorDetails(err), 'Failed to send stream alert');
     return null;
   }
 }
@@ -434,6 +433,6 @@ export async function updateAlert(messageId: string | null, data: RichEmbedData)
   if (!messageId || !isAlertsEnabled()) return;
   await updateDiscordEmbed(messageId, data).catch((err) => {
     const details = extractErrorDetails(err);
-    logger.warn({ ...details }, 'Failed to update Discord embed');
+    getLogger().warn({ ...details }, 'Failed to update Discord embed');
   });
 }

@@ -1,7 +1,8 @@
 import Redis from 'ioredis';
 import { RateLimiterRedis, RateLimiterMemory } from 'rate-limiter-flexible';
-import { logger } from './logger.js';
+import { getLogger } from './logger.js';
 import { extractErrorDetails } from './error.js';
+import { getBaseConfig } from '../config/env.js';
 
 export interface RateLimiterConfig {
   keyPrefix: string;
@@ -30,7 +31,7 @@ export class RedisService {
   private _options: RedisServiceOptions | null = null;
 
   private constructor() {
-    this.isProduction = process.env.NODE_ENV === 'production';
+    this.isProduction = getBaseConfig().NODE_ENV === 'production';
   }
 
   static get instance(): RedisService | null {
@@ -87,7 +88,7 @@ export class RedisService {
 
     const { url, rateLimiters, maxRetriesPerRequest } = this._options;
     const maskedUrl = url.replace(/:\/\/.*@/, '://***@');
-    logger.info({ url: maskedUrl }, 'Connecting to Redis');
+    getLogger().info({ url: maskedUrl }, 'Connecting to Redis');
 
     const maxRetries = this.isProduction ? 5 : 3;
 
@@ -96,22 +97,22 @@ export class RedisService {
       maxRetriesPerRequest,
       retryStrategy(times: number) {
         if (times > maxRetries) {
-          logger.error({ times }, 'Redis max connection retries exceeded. Giving up.');
+          getLogger().error({ times }, 'Redis max connection retries exceeded. Giving up.');
           return null;
         }
         const delay = Math.min(times * 500, 2000);
-        logger.warn({ times, delay }, 'Redis reconnection attempt');
+        getLogger().warn({ times, delay }, 'Redis reconnection attempt');
         return delay;
       },
     });
 
     try {
       await this.client.connect();
-      logger.info('Redis connection established');
+      getLogger().info('Redis connection established');
     } catch (error) {
       if (this.isProduction) {
         const details = extractErrorDetails(error);
-        logger.fatal(
+        getLogger().fatal(
           { error: details.message },
           'Failed to connect to Redis - server cannot start in production without Redis'
         );
@@ -119,7 +120,7 @@ export class RedisService {
       }
 
       const details = extractErrorDetails(error);
-      logger.warn(
+      getLogger().warn(
         { error: details.message },
         'Redis connection failed - running with in-memory rate limiters (caching disabled)'
       );
@@ -137,7 +138,7 @@ export class RedisService {
             isFallback: true,
           });
         }
-        logger.info({ count: rateLimiters.length }, 'In-memory fallback rate limiters initialized');
+        getLogger().info({ count: rateLimiters.length }, 'In-memory fallback rate limiters initialized');
         return;
       }
       return;
@@ -157,7 +158,7 @@ export class RedisService {
           isFallback: false,
         });
       }
-      logger.info({ count: rateLimiters.length }, 'Rate limiters initialized');
+      getLogger().info({ count: rateLimiters.length }, 'Rate limiters initialized');
     }
   }
 
@@ -179,10 +180,10 @@ export class RedisService {
     if (this.client) {
       try {
         await this.client.quit();
-        logger.info('Redis client closed');
+        getLogger().info('Redis client closed');
       } catch (error) {
         const details = extractErrorDetails(error);
-        logger.warn({ error: details.message }, 'Error closing Redis client during shutdown');
+        getLogger().warn({ error: details.message }, 'Error closing Redis client during shutdown');
       } finally {
         this.client = null;
       }

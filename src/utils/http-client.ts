@@ -1,6 +1,6 @@
 import { retryWithBackoff } from './retry.js';
 import { extractErrorDetails } from './error.js';
-import { logger } from './logger.js';
+import { getLogger } from './logger.js';
 import { HTTP_DEFAULT_ATTEMPTS, HTTP_DEFAULT_BASE_DELAY_MS, HTTP_DEFAULT_MAX_DELAY_MS } from '../constants.js';
 import { HttpError } from './http-error.js';
 
@@ -169,7 +169,7 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
   } catch (error) {
     const duration = Date.now() - startTime;
     const { message } = extractErrorDetails(error);
-    logger.error({ method, url: scrubbedUrl, duration, error: message, ...logContext }, '[HTTP] FAILED');
+    getLogger().error({ method, url: scrubbedUrl, duration, error: message, ...logContext }, '[HTTP] FAILED');
     throw error;
   }
 }

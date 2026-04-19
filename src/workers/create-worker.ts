@@ -1,5 +1,5 @@
 import { Worker, BaseJobOptions } from 'bullmq';
-import { logger } from '../utils/logger.js';
+import { getLogger } from '../utils/logger.js';
 import { WorkerConfig, WorkerName } from './worker-definitions.js';
 import type { Redis } from 'ioredis';
 
@@ -34,7 +34,7 @@ export function createWorker<TData extends object, TResult>(
 
   worker.on('active', (job) => {
     if (!job) return;
-    logger.debug(
+    getLogger().debug(
       { jobId: String(job.id), ...extractJobMeta(job.data as Record<string, unknown>), attemptsMade: job.attemptsMade },
       `[${name}] job started`
     );
@@ -42,7 +42,7 @@ export function createWorker<TData extends object, TResult>(
 
   worker.on('completed', (job) => {
     if (!job) return;
-    logger.debug(
+    getLogger().debug(
       { jobId: String(job.id), ...extractJobMeta(job.data as Record<string, unknown>) },
       `[${name}] job completed`
     );
@@ -50,7 +50,7 @@ export function createWorker<TData extends object, TResult>(
 
   worker.on('failed', (job, err) => {
     if (!job || !err) return;
-    logger.error(
+    getLogger().error(
       {
         jobId: String(job.id),
         ...extractJobMeta(job.data as Record<string, unknown>),
@@ -64,14 +64,14 @@ export function createWorker<TData extends object, TResult>(
   });
 
   worker.on('stalled', async (jobId) => {
-    logger.warn(
+    getLogger().warn(
       { jobId, queueName: queueName.toString() },
       `[${name}] Job stalled - lock may have expired. This typically happens when a job takes longer than the lock duration (default: 30s). Check if event loop is blocked.`
     );
   });
 
   registerWorker(name, worker as Worker);
-  logger.info(`[Workers] ${name} worker created`);
+  getLogger().info(`[Workers] ${name} worker created`);
 
   return worker;
 }

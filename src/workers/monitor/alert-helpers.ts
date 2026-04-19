@@ -2,7 +2,7 @@ import { sendRichAlert } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 import { capitalizePlatform, type Platform } from '../../types/platforms.js';
 import { createErrorContext } from '../../utils/error.js';
-import { logger } from '../../utils/logger.js';
+import { getLogger } from '../../utils/logger.js';
 
 export async function sendStreamLiveAlert(
   platform: Platform,
@@ -27,7 +27,7 @@ export async function sendStreamLiveAlert(
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.warn(createErrorContext(error), `Failed to send stream live alert for ${vodId}`);
+    getLogger().warn(createErrorContext(error), `Failed to send stream live alert for ${vodId}`);
   }
 }
 
@@ -60,6 +60,6 @@ export async function sendStreamOfflineAlert(
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.warn(createErrorContext(error), `Failed to send stream offline alert for ${vodId}`);
+    getLogger().warn(createErrorContext(error), `Failed to send stream offline alert for ${vodId}`);
   }
 }

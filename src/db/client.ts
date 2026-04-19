@@ -1,7 +1,7 @@
 import { PrismaClient } from '../../generated/streamer/client.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { TenantConfig } from '../config/types.js';
-import { logger } from '../utils/logger.js';
+import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import {
   PRISMA_MODELS_TO_INVALIDATE,
@@ -37,9 +37,9 @@ function extractVodIdsFromData(data: unknown[]): number[] {
 function invalidateVodIds(tenantId: string, ids: number[]): void {
   for (const id of ids) {
     invalidateVodCache(tenantId, id).catch((error) => {
-      logger.warn({ tenantId, vodId: id, error: extractErrorDetails(error) }, 'Cache invalidation failed');
+      getLogger().warn({ tenantId, vodId: id, error: extractErrorDetails(error) }, 'Cache invalidation failed');
     });
-    logger.debug({ tenantId, vodId: id }, 'VOD cache invalidated via extension');
+    getLogger().debug({ tenantId, vodId: id }, 'VOD cache invalidated via extension');
   }
 }
 
@@ -75,7 +75,7 @@ const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) 
                   .map((item) => Number((item as { id: unknown }).id))
                   .filter((id) => !isNaN(id));
                 if (ids.length === 0 && data.length > 0) {
-                  logger.debug(
+                  getLogger().debug(
                     { tenantId, recordCount: data.length },
                     'Vod.createMany called without explicit IDs — tenant list cache will be invalidated instead'
                   );
@@ -95,7 +95,7 @@ const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) 
               }
               for (const id of whereIds) {
                 invalidateEmoteCache(tenantId, id).catch((error) => {
-                  logger.warn(
+                  getLogger().warn(
                     { tenantId, vodId: id, error: extractErrorDetails(error) },
                     'Emote cache invalidation failed'
                   );
@@ -119,7 +119,10 @@ const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) 
             const uniqueIds = [...new Set(affectedVodIds)];
             invalidateVodIds(tenantId, uniqueIds);
             await invalidateTenantVodListCache(tenantId).catch((error) => {
-              logger.warn({ tenantId, error: extractErrorDetails(error) }, 'Tenant list cache invalidation failed');
+              getLogger().warn(
+                { tenantId, error: extractErrorDetails(error) },
+                'Tenant list cache invalidation failed'
+              );
             });
 
             return result;
@@ -201,7 +204,7 @@ class ClientManager {
       try {
         await entry.client.$disconnect();
       } catch (error) {
-        logger.warn({ tenantId, error: extractErrorDetails(error) }, 'Failed to disconnect DB client');
+        getLogger().warn({ tenantId, error: extractErrorDetails(error) }, 'Failed to disconnect DB client');
       }
       this.clients.delete(tenantId);
     }
@@ -220,7 +223,7 @@ class ClientManager {
 
     if (oldestTenantId) {
       await this.closeClient(oldestTenantId);
-      logger.info({ tenantId: oldestTenantId }, 'Evicted oldest idle client due to MAX_CLIENTS limit');
+      getLogger().info({ tenantId: oldestTenantId }, 'Evicted oldest idle client due to MAX_CLIENTS limit');
     }
   }
 
@@ -235,12 +238,12 @@ class ClientManager {
         try {
           await entry.client.$disconnect();
         } catch (error) {
-          logger.warn({ tenantId, error: extractErrorDetails(error) }, 'Failed to disconnect during eviction');
+          getLogger().warn({ tenantId, error: extractErrorDetails(error) }, 'Failed to disconnect during eviction');
         }
 
         this.clients.delete(tenantId);
 
-        logger.info(
+        getLogger().info(
           { tenantId, idleDuration, totalClients: this.clients.size },
           `[DB Client Manager] Evicted idle client for tenant: ${tenantId}. Idle for: ${idleDuration}ms. Active clients remaining: ${this.clients.size}`
         );
@@ -255,7 +258,7 @@ class ClientManager {
 
     this.cleanupIntervalId = setInterval(() => {
       this.evictIdleClients().catch((error) => {
-        logger.error({ error: extractErrorDetails(error) }, 'Error during idle client eviction');
+        getLogger().error({ error: extractErrorDetails(error) }, 'Error during idle client eviction');
       });
     }, DB_CLIENT_CLEANUP_INTERVAL_MS);
   }
@@ -280,7 +283,7 @@ class ClientManager {
       try {
         await entry.client.$disconnect();
       } catch (error) {
-        logger.warn({ tenantId, error: extractErrorDetails(error) }, 'Failed to disconnect during shutdown');
+        getLogger().warn({ tenantId, error: extractErrorDetails(error) }, 'Failed to disconnect during shutdown');
       }
     }
 
@@ -407,14 +410,17 @@ export async function withDbRetry<T>(
       }
 
       if (attempt === maxRetries) {
-        logger.error({ tenantId, attempt, error: extractErrorDetails(error) }, 'DB operation failed after max retries');
+        getLogger().error(
+          { tenantId, attempt, error: extractErrorDetails(error) },
+          'DB operation failed after max retries'
+        );
         throw error;
       }
 
-      logger.error({ tenantId, attempt, error: extractErrorDetails(error) }, 'DB connection error, retrying...');
+      getLogger().error({ tenantId, attempt, error: extractErrorDetails(error) }, 'DB connection error, retrying...');
 
       await closeClient(tenantId).catch((err) => {
-        logger.debug({ tenantId, error: extractErrorDetails(err) }, 'Failed to close invalid client');
+        getLogger().debug({ tenantId, error: extractErrorDetails(err) }, 'Failed to close invalid client');
       });
 
       await sleep(retryDelayMs);

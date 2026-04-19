@@ -2,12 +2,13 @@ import { connect } from 'puppeteer-real-browser';
 import type { Browser, Page } from 'puppeteer';
 import clickAndWaitPlugin from 'puppeteer-extra-plugin-click-and-wait';
 import { extractErrorDetails } from './error.js';
-import { logger } from './logger.js';
+import { childLogger } from './logger.js';
 import { limit, getPuppeteerQueueStats } from './puppeteer-limiter.js';
 import { sleep, getRetryDelay } from './delay.js';
 import { PUPPETEER_NAV_TIMEOUT_MS } from '../constants.js';
+import { getPuppeteerMemoryLimitMb, getPuppeteerShutdownTimeoutMs } from '../config/env-accessors.js';
 
-const log = logger.child({ module: 'puppeteer-manager' });
+const log = childLogger({ module: 'puppeteer-manager' });
 
 type BrowserResult = Awaited<ReturnType<typeof connect>>;
 
@@ -60,7 +61,7 @@ export async function getBrowser(): Promise<{ browser: Browser }> {
     return { browser: browserInstance.browser as unknown as Browser };
   }
 
-  const memoryLimit = parseInt(process.env.PUPPETEER_MEMORY_LIMIT_MB || '512', 10);
+  const memoryLimit = getPuppeteerMemoryLimitMb();
 
   browserInstance = await connect({
     headless: 'auto' as unknown as boolean,
@@ -258,7 +259,7 @@ export async function releaseBrowser(): Promise<void> {
 
   const browser = browserInstance.browser as unknown as Browser;
   const pid = chromePid;
-  const timeoutMs = parseInt(process.env.PUPPETEER_SHUTDOWN_TIMEOUT_MS || '5000', 10);
+  const timeoutMs = getPuppeteerShutdownTimeoutMs();
 
   try {
     log.info({ pid }, 'Attempting graceful browser shutdown...');

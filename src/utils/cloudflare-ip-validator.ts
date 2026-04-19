@@ -1,8 +1,9 @@
 import ipaddr from 'ipaddr.js';
 import { RedisService } from '../utils/redis-service.js';
-import { logger } from './logger.js';
+import { getLogger } from './logger.js';
 import { request } from './http-client.js';
 import { CF_IP_RANGES_TTL } from '../constants.js';
+import { getBaseConfig } from '../config/env.js';
 
 const CF_IP_RANGES_KEY = 'cloudflare:ip_ranges';
 const CF_IP_V4_URL = 'https://www.cloudflare.com/ips-v4';
@@ -104,7 +105,7 @@ export async function validateCloudflareRequest(request: {
   raw: { socket?: { remoteAddress?: string } };
   url?: string;
 }): Promise<boolean> {
-  if (process.env.NODE_ENV !== 'production') {
+  if (getBaseConfig().NODE_ENV !== 'production') {
     return true;
   }
 
@@ -126,15 +127,7 @@ export async function validateCloudflareRequest(request: {
   const isValid = isFromCloudflare(remoteAddress, ranges);
 
   if (!isValid) {
-    logger.warn(
-      {
-        cfConnectingIp: cfIp,
-        remoteAddress,
-        userAgent: request.headers['user-agent'],
-        url: request.url,
-      },
-      '[SECURITY] Cloudflare header spoofing detected - request rejected'
-    );
+    getLogger().warn({ ip: cfIp }, '[Cloudflare IP Validator] Request not from Cloudflare IP range');
   }
 
   return isValid;
@@ -178,5 +171,5 @@ export async function refreshCloudflareRanges(): Promise<void> {
     await client.set(CF_IP_RANGES_KEY, JSON.stringify(ranges), 'EX', CF_IP_RANGES_TTL);
   }
 
-  logger.info({ v4Count: ranges.v4.length, v6Count: ranges.v6.length }, 'Cloudflare IP ranges refreshed');
+  getLogger().info({ v4Count: ranges.v4.length, v6Count: ranges.v6.length }, 'Cloudflare IP ranges refreshed');
 }

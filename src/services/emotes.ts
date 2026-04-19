@@ -1,4 +1,4 @@
-import { logger } from '../utils/logger.js';
+import { getLogger } from '../utils/logger.js';
 import { Prisma, PrismaClient } from '../../generated/streamer/client.js';
 import { Platform, PLATFORMS } from '../types/platforms.js';
 import { TenantContext } from '../types/context.js';
@@ -150,7 +150,7 @@ export async function fetchAndSaveEmotes(
       });
     });
   } catch {
-    logger.error({ vodId }, 'Failed to save emotes');
+    getLogger().error({ vodId }, 'Failed to save emotes');
   }
 }
 
@@ -169,7 +169,7 @@ export async function getEmotesByVodId(
         return (await decompressChatData(cached as unknown as Buffer)) as VodEmotes;
       }
     } catch (err) {
-      logger.warn({ err, cacheKey }, 'Emote cache read failed, falling back to DB');
+      getLogger().warn({ err, cacheKey }, 'Emote cache read failed, falling back to DB');
     }
   }
 
@@ -200,7 +200,7 @@ export async function getEmotesByVodId(
       const compressed = await compressChatData(result);
       await redis.set(cacheKey, compressed as Buffer, 'EX', EMOTE_CACHE_TTL);
     } catch (err) {
-      logger.warn({ err, cacheKey }, 'Emote cache write failed');
+      getLogger().warn({ err, cacheKey }, 'Emote cache write failed');
     }
   }
 

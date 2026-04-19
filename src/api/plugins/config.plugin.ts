@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { loadTenantConfigs, getTenantConfig, clearConfigCache, reloadTenantConfig } from '../../config/loader.js';
 import { TenantConfig } from '../../config/types.js';
-import { logger } from '../../utils/logger.js';
+import { getLogger } from '../../utils/logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 
 declare module 'fastify' {
@@ -15,11 +15,11 @@ declare module 'fastify' {
 
 const configPlugin: FastifyPluginAsync = async (fastify) => {
   try {
-    logger.info('Loading streamer configurations from meta database');
+    getLogger().info('Loading streamer configurations from meta database');
 
     const configs = await loadTenantConfigs();
 
-    logger.info(
+    getLogger().info(
       { count: configs.length, streamers: configs.map((c) => c.id) },
       'Streamer configs loaded (DB clients will lazy-load on demand)'
     );
@@ -43,12 +43,12 @@ const configPlugin: FastifyPluginAsync = async (fastify) => {
 
     // Add hook to reload configs on demand (for admin endpoints)
     fastify.addHook('onClose', async () => {
-      logger.info('Clearing config cache on shutdown');
+      getLogger().info('Clearing config cache on shutdown');
       clearConfigCache();
     });
   } catch (error) {
     const details = extractErrorDetails(error);
-    logger.fatal({ ...details }, 'Failed to load streamer configurations');
+    getLogger().fatal({ ...details }, 'Failed to load streamer configurations');
     throw error;
   }
 };

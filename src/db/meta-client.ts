@@ -1,7 +1,8 @@
 // eslint-disable-next-line import-x/extensions
 import { PrismaClient } from '../../prisma/generated/meta';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { logger } from '../utils/logger.js';
+import { getLogger } from '../utils/logger.js';
+import { getBaseConfig } from '../config/env.js';
 
 const globalForPrisma = globalThis as unknown as { prismaMeta: PrismaClient | undefined };
 
@@ -15,8 +16,7 @@ let _metaClient: PrismaClient | null = null;
 export async function initMetaClient(): Promise<PrismaClient> {
   if (_metaClient) return _metaClient;
 
-  const url = process.env.META_DATABASE_URL;
-  if (!url) throw new Error('META_DATABASE_URL is not set');
+  const url = getBaseConfig().META_DATABASE_URL;
 
   if (globalForPrisma.prismaMeta) {
     _metaClient = globalForPrisma.prismaMeta;
@@ -28,9 +28,9 @@ export async function initMetaClient(): Promise<PrismaClient> {
   await client.$connect();
 
   _metaClient = client;
-  if (process.env.NODE_ENV !== 'production') globalForPrisma.prismaMeta = client;
+  if (getBaseConfig().NODE_ENV !== 'production') globalForPrisma.prismaMeta = client;
 
-  logger.info('[meta-client] Initialized');
+  getLogger().info('[meta-client] Initialized');
   return _metaClient;
 }
 

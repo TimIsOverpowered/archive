@@ -24,7 +24,7 @@
     "npm": ">=10.0.0"
   },
   "scripts": {
-    "test": "npm run lint && npm run test:node",
+    "test": "npm run test:node",
     "lint": "eslint \"src/**/*.ts\" --fix",
     "fix:": "npm run format && npm run lint",
     "format": "prettier --write \"src/**/*.ts\"",

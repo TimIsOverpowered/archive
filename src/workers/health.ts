@@ -3,7 +3,7 @@ import { extractErrorDetails } from '../utils/error.js';
 import { getQueue } from './jobs/queues.js';
 import { workers } from './create-worker.js';
 import { AllJobData } from './worker-definitions.js';
-import { logger } from '../utils/logger.js';
+import { getLogger } from '../utils/logger.js';
 
 export interface LastFailedJob {
   jobId: string;
@@ -85,7 +85,7 @@ export async function getWorkersHealth(): Promise<Record<string, WorkerHealthSta
     } catch (error) {
       const details = extractErrorDetails(error);
       const errorMessage = details.message;
-      logger.error({ workerName: name, error: errorMessage }, `Health check failed for ${name} queue`);
+      getLogger().error({ workerName: name, error: errorMessage }, `Health check failed for ${name} queue`);
 
       result[name] = {
         isRunning: null,

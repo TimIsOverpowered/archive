@@ -1,9 +1,10 @@
 import type { Browser } from 'puppeteer';
 import { extractErrorDetails } from './error.js';
-import { logger } from './logger.js';
+import { getLogger } from './logger.js';
 import { getFullMemoryStats, releaseBrowser, type MemoryStats } from './puppeteer-manager.js';
 import { PUPPETEER_HEALTH_CACHE_TTL_MS } from '../constants.js';
 import { LRUCache } from 'lru-cache';
+import { getPuppeteerMemoryLimitMb, getPuppeteerWarningThresholdPct } from '../config/env-accessors.js';
 
 type HealthStatus = 'ok' | 'elevated' | 'high_memory' | 'unavailable';
 
@@ -28,15 +29,15 @@ export async function checkPuppeteerHealth(browserInstance?: Browser): Promise<P
     const memStats = await getFullMemoryStats(browserInstance);
 
     // Use RSS for Docker OOM prevention (most honest total RAM metric)
-    const limitMb = parseInt(process.env.PUPPETEER_MEMORY_LIMIT_MB || '512', 10);
-    const warningThresholdPct = parseInt(process.env.PUPPETEER_WARNING_THRESHOLD_PCT || '85', 10);
+    const limitMb = getPuppeteerMemoryLimitMb();
+    const warningThresholdPct = getPuppeteerWarningThresholdPct();
     const softLimitMb = Math.floor(limitMb * (warningThresholdPct / 100));
 
     // Three-tier logic based on memory usage
     if (memStats.totalRssMb > limitMb) {
       const status: PuppeteerHealthStatus = { status: 'high_memory', stats: memStats };
       healthCache.set('health', status);
-      logger.error(
+      getLogger().error(
         { ...memStats, limitMb },
         '[Puppeteer Health] CRITICAL: Hard memory limit exceeded - immediate restart required'
       );
@@ -44,7 +45,7 @@ export async function checkPuppeteerHealth(browserInstance?: Browser): Promise<P
     } else if (memStats.totalRssMb > softLimitMb) {
       const status: PuppeteerHealthStatus = { status: 'elevated', stats: memStats };
       healthCache.set('health', status);
-      logger.warn(
+      getLogger().warn(
         { ...memStats, softLimitMb, limitMb },
         '[Puppeteer Health] Elevated memory usage - consider restart before next task'
       );
@@ -65,7 +66,7 @@ export async function checkPuppeteerHealth(browserInstance?: Browser): Promise<P
       errorMsg.includes('protocol error');
 
     if (isDisconnectionError) {
-      logger.error(
+      getLogger().error(
         { ...details, requiresRestart: true },
         '[Puppeteer Health] Browser process dead - releasing instance for restart'
       );
@@ -73,7 +74,7 @@ export async function checkPuppeteerHealth(browserInstance?: Browser): Promise<P
       // Clear the zombie browser globally to force fresh initialization on next getBrowser() call
       await releaseBrowser();
     } else {
-      logger.warn(details, '[Puppeteer Health] Failed to check health (transient error)');
+      getLogger().warn(details, '[Puppeteer Health] Failed to check health (transient error)');
     }
 
     const status: PuppeteerHealthStatus = { status: 'unavailable' };

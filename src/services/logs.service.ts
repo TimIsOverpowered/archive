@@ -7,7 +7,7 @@ import {
   getChatBucketSizeTtl,
 } from '../config/env-accessors.js';
 import { compressChatData, decompressChatData } from '../utils/compression.js';
-import { logger } from '../utils/logger.js';
+import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { badRequest } from '../utils/http-error.js';
 import { LOGS_PAGE_SIZE, LOGS_DEFAULT_BUCKET_SIZE, LOGS_TARGET_COMMENTS_PER_BUCKET } from '../constants.js';
@@ -43,7 +43,7 @@ async function getVodBucketSize(client: PrismaClient, tenantId: string, vodId: n
     try {
       const cached = await redis.get(key);
       if (cached) {
-        logger.debug({ vodId }, '[CACHE HIT] bucketSize');
+        getLogger().debug({ vodId }, '[CACHE HIT] bucketSize');
         return parseInt(cached, 10);
       }
     } catch {
@@ -93,13 +93,13 @@ export async function getLogsByOffset(
     try {
       const cached = await redis.getBuffer(cacheKey);
       if (cached) {
-        logger.debug({ vodId, bucket }, '[CACHE HIT] bucket');
+        getLogger().debug({ vodId, bucket }, '[CACHE HIT] bucket');
         const data = (await decompressChatData(cached)) as { comments: ChatMessage[]; cursor?: string };
         return data;
       }
     } catch (error) {
       const details = extractErrorDetails(error);
-      logger.warn({ vodId, bucket, ...details }, '[CACHE MISS] bucket read failed');
+      getLogger().warn({ vodId, bucket, ...details }, '[CACHE MISS] bucket read failed');
     }
   }
 
@@ -147,7 +147,7 @@ export async function getLogsByOffset(
     try {
       const compressed = await compressChatData(response);
       await redis.set(cacheKey, compressed as Buffer, 'EX', getChatOffsetTtl());
-      logger.debug({ vodId, bucket }, '[CACHE SET] bucket');
+      getLogger().debug({ vodId, bucket }, '[CACHE SET] bucket');
     } catch {
       // Ignore cache errors
     }
@@ -169,14 +169,14 @@ export async function getLogsByCursor(
     try {
       const cached = await redis.getBuffer(cacheKey);
       if (cached) {
-        logger.debug({ vodId }, '[CACHE HIT] cursor');
+        getLogger().debug({ vodId }, '[CACHE HIT] cursor');
 
         const data = (await decompressChatData(cached)) as { comments: ChatMessage[]; cursor?: string };
         return data;
       }
     } catch (error) {
       const details = extractErrorDetails(error);
-      logger.warn({ vodId, ...details }, '[CACHE MISS] cursor read failed');
+      getLogger().warn({ vodId, ...details }, '[CACHE MISS] cursor read failed');
     }
   }
 
@@ -246,7 +246,7 @@ export async function getLogsByCursor(
     try {
       const compressed = await compressChatData(response);
       await redis.set(cacheKey, compressed as Buffer, 'EX', getChatCursorTtl());
-      logger.debug({ vodId }, '[CACHE SET] cursor');
+      getLogger().debug({ vodId }, '[CACHE SET] cursor');
     } catch {
       // Ignore cache errors
     }

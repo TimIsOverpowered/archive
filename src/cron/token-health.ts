@@ -2,7 +2,7 @@ import { getAppAccessToken } from '../services/twitch/index.js';
 import type { TenantConfig as ConfigType } from '../config/types.js';
 import { sendDiscordAlert, trackFailure, resetFailures } from '../utils/discord-alerts.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { logger } from '../utils/logger.js';
+import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { getConfigs } from '../config/loader.js';
 import { TOKEN_MAX_FAILURES } from '../constants.js';
@@ -41,7 +41,7 @@ export function startTokenHealthCron(): NodeJS.Timeout {
     () => {
       checkTokenHealth().catch((err) => {
         const details = extractErrorDetails(err);
-        logger.error({ ...details }, 'Token health cron failed');
+        getLogger().error({ ...details }, 'Token health cron failed');
       });
     },
     24 * 60 * 60 * 1000

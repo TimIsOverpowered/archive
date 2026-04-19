@@ -1,6 +1,6 @@
 import { request } from '../../utils/http-client.js';
 import { getTwitchCredentials } from '../../utils/credentials.js';
-import { logger } from '../../utils/logger.js';
+import { getLogger } from '../../utils/logger.js';
 import { TWITCH_HELIX_BASE_URL, TWITCH_GQL_URL, TWITCH_GQL_CLIENT_ID } from '../../constants.js';
 
 export interface TwitchClient {
@@ -71,7 +71,7 @@ export function createTwitchGqlClient(
       if (result && typeof result === 'object' && 'errors' in result) {
         const errors = (result as Record<string, unknown>).errors;
         if (Array.isArray(errors) && errors.length > 0) {
-          logger.error(
+          getLogger().error(
             {
               tenantId,
               errors,

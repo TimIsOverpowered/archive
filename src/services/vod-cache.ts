@@ -1,6 +1,6 @@
 import { RedisService } from '../utils/redis-service.js';
 import { getDisableRedisCache } from '../config/env-accessors.js';
-import { logger } from '../utils/logger.js';
+import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 
 const redisConnectionFailed = new Map<string, boolean>();
@@ -25,16 +25,16 @@ export async function invalidateTenantVodListCache(tenantId: string): Promise<vo
 
     if (redisConnectionFailed.get(tenantId)) {
       redisConnectionFailed.set(tenantId, false);
-      logger.debug({ tenantId }, 'Redis connection restored, tenant list cache invalidation resumed');
+      getLogger().debug({ tenantId }, 'Redis connection restored, tenant list cache invalidation resumed');
     }
 
-    logger.debug({ tenantId }, 'Tenant VOD list cache invalidated');
+    getLogger().debug({ tenantId }, 'Tenant VOD list cache invalidated');
   } catch (error) {
     const { message } = extractErrorDetails(error);
 
     if (!redisConnectionFailed.get(tenantId) && message.includes('ECONNREFUSED')) {
       redisConnectionFailed.set(tenantId, true);
-      logger.warn({ tenantId, error: message }, 'Redis connection lost, tenant list cache invalidation suspended');
+      getLogger().warn({ tenantId, error: message }, 'Redis connection lost, tenant list cache invalidation suspended');
     }
   }
 }
@@ -52,16 +52,19 @@ export async function invalidateEmoteCache(tenantId: string, vodId: number): Pro
 
     if (redisConnectionFailed.get(tenantId)) {
       redisConnectionFailed.set(tenantId, false);
-      logger.debug({ tenantId, vodId }, 'Redis connection restored, emote cache invalidation resumed');
+      getLogger().debug({ tenantId, vodId }, 'Redis connection restored, emote cache invalidation resumed');
     }
 
-    logger.debug({ tenantId, vodId }, 'Emote cache invalidated');
+    getLogger().debug({ tenantId, vodId }, 'Emote cache invalidated');
   } catch (error) {
     const { message } = extractErrorDetails(error);
 
     if (!redisConnectionFailed.get(tenantId) && message.includes('ECONNREFUSED')) {
       redisConnectionFailed.set(tenantId, true);
-      logger.warn({ tenantId, vodId, error: message }, 'Redis connection lost, emote cache invalidation suspended');
+      getLogger().warn(
+        { tenantId, vodId, error: message },
+        'Redis connection lost, emote cache invalidation suspended'
+      );
     }
   }
 }
@@ -90,16 +93,16 @@ export async function invalidateVodCache(tenantId: string, vodId: number): Promi
 
     if (redisConnectionFailed.get(tenantId)) {
       redisConnectionFailed.set(tenantId, false);
-      logger.debug({ tenantId, vodId }, 'Redis connection restored, cache invalidation resumed');
+      getLogger().debug({ tenantId, vodId }, 'Redis connection restored, cache invalidation resumed');
     }
 
-    logger.debug({ tenantId, vodId }, 'VOD cache invalidated');
+    getLogger().debug({ tenantId, vodId }, 'VOD cache invalidated');
   } catch (error) {
     const { message } = extractErrorDetails(error);
 
     if (!redisConnectionFailed.get(tenantId) && message.includes('ECONNREFUSED')) {
       redisConnectionFailed.set(tenantId, true);
-      logger.warn({ tenantId, vodId, error: message }, 'Redis connection lost, cache invalidation suspended');
+      getLogger().warn({ tenantId, vodId, error: message }, 'Redis connection lost, cache invalidation suspended');
     }
   }
 }
