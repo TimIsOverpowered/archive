@@ -106,11 +106,6 @@ async function handleLiveStream(
   tenantId: string,
   log: ReturnType<typeof createAutoLogger>
 ): Promise<void> {
-  log.debug(
-    { streamId: streamStatus.id, title: streamStatus.title, startedAt: streamStatus.startedAt },
-    '[Monitor]: Stream is LIVE'
-  );
-
   const existingVod = await prisma.vod.findFirst({
     where: { stream_id: streamStatus.id, platform },
   });
