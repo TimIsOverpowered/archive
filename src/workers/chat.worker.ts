@@ -8,10 +8,22 @@ import { getJobContext } from './utils/job-context.js';
 import { CHAT_BATCH_SIZE, CHAT_RATE_LIMIT_MS } from '../constants.js';
 import { extractEdges, calculateResumeOffset, extractMessageData } from './chat/chat-helpers.js';
 import type { ChatMessageCreateInput } from './chat/chat-types.js';
-import { PLATFORMS } from '../types/platforms.js';
-import { handleWorkerError } from './utils/error-handler.js';
+import { PLATFORMS, type Platform } from '../types/platforms.js';
 import { flushChatBatch } from './chat/chat-batch-processor.js';
 import { createChatWorkerAlerts } from './utils/alert-factories.js';
+import type { PrismaClient } from '../../generated/streamer/client.js';
+
+interface ChatProcessorState {
+  tenantId: string;
+  dbId: number;
+  vodId: string;
+  platform: string;
+  duration: number;
+  log: ReturnType<typeof createAutoLogger>;
+  chatAlerts: ReturnType<typeof createChatWorkerAlerts>;
+  messageId: string;
+  db: PrismaClient;
+}
 
 const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
   job: Job<ChatDownloadJob>
@@ -30,145 +42,126 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
   }
 
   const { db } = await getJobContext(tenantId);
+  const chatAlerts = createChatWorkerAlerts();
 
-  const {
-    offset: effectiveOffset,
-    hasExistingData,
-    lastMessageId,
-  } = await calculateResumeOffset(db, dbId, startOffset);
-
+  const { offset: effectiveOffset, hasExistingData, lastMessageId } = await calculateResumeOffset(db, dbId, startOffset);
   log.debug({ vodId, startOffset, effectiveOffset, hasExistingData }, '[Chat] Resume check completed');
 
-  const chatAlerts = createChatWorkerAlerts();
-  const isResume = hasExistingData && !startOffset;
-  const messageId = await initRichAlert(
-    chatAlerts.init(tenantId, vodId, platform, isResume, isResume ? effectiveOffset : undefined)
-  );
+  const messageId = await initChatAlert(log, chatAlerts, tenantId, vodId, platform, effectiveOffset, hasExistingData, startOffset);
 
+  if (!messageId) {
+    log.error('[Chat] Failed to initialize alert');
+    throw new Error('Failed to initialize chat alert');
+  }
+
+  if (hasExistingData && !startOffset) {
+    const skipResult = await checkAlreadyComplete(db, dbId, vodId, effectiveOffset, duration, lastMessageId, chatAlerts, tenantId, messageId, log);
+    if (skipResult) return skipResult;
+  }
+
+  const state: ChatProcessorState = { tenantId, dbId, vodId, platform: platform as 'twitch', duration, log, chatAlerts, messageId, db };
+  const result = await processChatDownload(state, effectiveOffset);
+
+  resetFailures(tenantId);
+  log.debug({ vodId, ...result, finalOffset: effectiveOffset }, '[Chat] Download completed successfully');
+  const resumeIndicator = startOffset || hasExistingData;
+  void updateAlert(messageId, chatAlerts.complete(tenantId, vodId, platform, result.totalMessages, result.batchCount, resumeIndicator ? (startOffset ?? 0) : undefined));
+  return { success: true, ...result };
+};
+
+async function initChatAlert(log: ReturnType<typeof createAutoLogger>, chatAlerts: ReturnType<typeof createChatWorkerAlerts>, tenantId: string, vodId: string, platform: string, effectiveOffset: number, hasExistingData: boolean, startOffset: number | undefined): Promise<string | null> {
+  const isResume = hasExistingData && !startOffset;
+  const alertData = chatAlerts.init(tenantId, vodId, platform as Platform, isResume, isResume ? effectiveOffset : undefined);
+  return await initRichAlert(alertData);
+}
+
+async function checkAlreadyComplete(db: PrismaClient, dbId: number, vodId: string, effectiveOffset: number, duration: number, lastMessageId: string | undefined, chatAlerts: ReturnType<typeof createChatWorkerAlerts>, tenantId: string, messageId: string, log: ReturnType<typeof createAutoLogger>): Promise<ChatDownloadResult | null> {
+  if (duration !== 0 && effectiveOffset >= duration) {
+    const totalMessages = await db.chatMessage.count({ where: { vod_id: dbId } });
+    log.info({ vodId, effectiveOffset, duration, totalMessages }, 'Chat download already complete (offset exceeds duration)');
+    resetFailures(tenantId);
+       void updateAlert(messageId, chatAlerts.alreadyComplete(tenantId, vodId, PLATFORMS.TWITCH, totalMessages, effectiveOffset));
+    return { success: true, totalMessages, skipped: true };
+  }
+
+  if (lastMessageId) {
+    const rawPage = await fetchComments(vodId, effectiveOffset, tenantId);
+    if (rawPage?.comments) {
+      const edges = extractEdges(rawPage.comments);
+      const lastFetchedMessageId = edges[edges.length - 1]?.node?.id;
+
+      if (lastFetchedMessageId === lastMessageId) {
+        const totalMessages = await db.chatMessage.count({ where: { vod_id: dbId } });
+        log.info({ vodId, lastMessageId, totalMessages }, 'Chat download already complete');
+        resetFailures(tenantId);
+   void updateAlert(messageId, chatAlerts.alreadyComplete(tenantId, vodId, PLATFORMS.TWITCH, totalMessages, effectiveOffset));
+        return { success: true, totalMessages, skipped: true };
+      }
+    }
+  }
+
+  return null;
+}
+
+async function processChatDownload(state: ChatProcessorState, effectiveOffset: number): Promise<{ totalMessages: number; batchCount: number }> {
+  const { tenantId, dbId, vodId, platform, duration, log, chatAlerts, messageId, db } = state;
   let totalMessages = 0;
   let batchCount = 0;
   const batchBuffer: ChatMessageCreateInput[] = [];
   let lastOffset = effectiveOffset;
 
-  try {
-    log.info({ vodId, effectiveOffset }, 'Starting chat download');
+  log.info({ vodId, effectiveOffset }, 'Starting chat download');
 
-    let rawPage = await fetchComments(vodId, effectiveOffset, tenantId);
-    log.debug({ vodId, effectiveOffset }, '[Chat] Initial comments fetch completed');
+  let rawPage = await fetchComments(vodId, effectiveOffset, tenantId);
+  log.debug({ vodId, effectiveOffset }, '[Chat] Initial comments fetch completed');
 
-    if (hasExistingData && !startOffset && !forceRerun) {
-      if (duration !== 0 && effectiveOffset >= duration) {
-        const totalMessages = await db.chatMessage.count({ where: { vod_id: dbId } });
-        log.info(
-          { vodId, effectiveOffset, duration, totalMessages },
-          'Chat download already complete (offset exceeds duration)'
-        );
-        resetFailures(tenantId);
-        void updateAlert(
-          messageId,
-          chatAlerts.alreadyComplete(tenantId, vodId, platform, totalMessages, effectiveOffset)
-        );
-        return { success: true, totalMessages, skipped: true };
-      }
+  let lastCursor: string | null = null;
 
-      if (lastMessageId && rawPage && rawPage.comments) {
-        const edges = extractEdges(rawPage.comments);
-        const lastFetchedMessageId = edges[edges.length - 1]?.node?.id;
+  while (true) {
+    if (!rawPage || typeof rawPage !== 'object') break;
 
-        if (lastFetchedMessageId === lastMessageId) {
-          const totalMessages = await db.chatMessage.count({ where: { vod_id: dbId } });
-          log.info({ vodId, lastMessageId, totalMessages }, 'Chat download already complete');
-          resetFailures(tenantId);
-          void updateAlert(
-            messageId,
-            chatAlerts.alreadyComplete(tenantId, vodId, platform, totalMessages, effectiveOffset)
-          );
-          return { success: true, totalMessages, skipped: true };
-        }
-      }
+    const commentsObj = rawPage.comments;
+
+    if (!commentsObj) throw new Error('No comments object found');
+
+    const edges = extractEdges(commentsObj);
+
+    if (edges.length === 0) {
+      log.warn({ vodId, effectiveOffset }, 'No chat messages found for VOD');
+      resetFailures(tenantId);
+      void updateAlert(messageId, chatAlerts.noMessages(tenantId, vodId, platform as 'twitch' | 'kick', effectiveOffset));
+      return { totalMessages: 0, batchCount: 0 };
     }
 
-    let lastCursor: string | null = null;
+    for (const edge of edges) {
+      const node = edge.node;
+      if (!node) continue;
 
-    while (true) {
-      if (!rawPage || typeof rawPage !== 'object') break;
+      const { message, userBadges } = extractMessageData(node);
+      const offsetSeconds = 'contentOffsetSeconds' in node ? (node.contentOffsetSeconds ?? 0) : 0;
 
-      const commentsObj = rawPage.comments;
-
-      if (!commentsObj) throw new Error('No comments object found');
-
-      const edges = extractEdges(commentsObj);
-
-      if (edges.length === 0) {
-        log.warn({ vodId, effectiveOffset }, 'No chat messages found for VOD');
-        resetFailures(tenantId);
-        void updateAlert(messageId, chatAlerts.noMessages(tenantId, vodId, platform, effectiveOffset));
-        return { success: true, totalMessages: 0 };
-      }
-
-      for (const edge of edges) {
-        const node = edge.node;
-        if (!node) continue;
-
-        const { message, userBadges } = extractMessageData(node);
-        const offsetSeconds = 'contentOffsetSeconds' in node ? (node.contentOffsetSeconds ?? 0) : 0;
-
-        batchBuffer.push({
-          id: node.id,
-          vod_id: dbId,
-          display_name: ('commenter' in node && node.commenter?.displayName) || null,
-          content_offset_seconds: Math.round(offsetSeconds),
-          createdAt: 'createdAt' in node && node.createdAt ? new Date(node.createdAt as string) : new Date(),
-          message,
-          user_badges: userBadges,
-          user_color: ('message' in node && node.message?.userColor) || '#FFFFFF',
-        });
-      }
-
-      lastOffset = edges[edges.length - 1]?.node?.contentOffsetSeconds ?? lastOffset;
-
-      if (batchBuffer.length >= CHAT_BATCH_SIZE) {
-        const result = await flushChatBatch({
-          db,
-          buffer: batchBuffer,
-          log,
-          vodId,
-          onProgress: (offset, batchNumber, messagesInBatch) =>
-            void updateAlert(
-              messageId,
-              chatAlerts.progress(tenantId, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)
-            ),
-          lastOffset,
-          totalMessages,
-          batchCount,
-        });
-        totalMessages = result.totalMessages;
-        batchCount = result.batchCount;
-      }
-
-      const pageCursor = edges[edges.length - 1]?.cursor ?? null;
-
-      if (!pageCursor || pageCursor === lastCursor) {
-        log.info({ vodId }, 'Reached end of chat stream');
-        break;
-      }
-
-      lastCursor = pageCursor;
-      await sleep(CHAT_RATE_LIMIT_MS);
-      rawPage = await fetchNextComments(vodId, pageCursor, tenantId);
+      batchBuffer.push({
+        id: node.id,
+        vod_id: dbId,
+        display_name: ('commenter' in node && node.commenter?.displayName) || null,
+        content_offset_seconds: Math.round(offsetSeconds),
+        createdAt: 'createdAt' in node && node.createdAt ? new Date(node.createdAt as string) : new Date(),
+        message,
+        user_badges: userBadges,
+        user_color: ('message' in node && node.message?.userColor) || '#FFFFFF',
+      });
     }
 
-    if (batchBuffer.length > 0) {
+    lastOffset = edges[edges.length - 1]?.node?.contentOffsetSeconds ?? lastOffset;
+
+    if (batchBuffer.length >= CHAT_BATCH_SIZE) {
       const result = await flushChatBatch({
         db,
         buffer: batchBuffer,
         log,
         vodId,
         onProgress: (offset, batchNumber, messagesInBatch) =>
-          void updateAlert(
-            messageId,
-            chatAlerts.progress(tenantId, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)
-          ),
+          void updateAlert(messageId, chatAlerts.progress(tenantId, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)),
         lastOffset,
         totalMessages,
         batchCount,
@@ -177,28 +170,35 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
       batchCount = result.batchCount;
     }
 
-    resetFailures(tenantId);
-    log.debug({ vodId, totalMessages, batchCount, finalOffset: lastOffset }, '[Chat] Download completed successfully');
+    const pageCursor = edges[edges.length - 1]?.cursor ?? null;
 
-    const resumeIndicator = startOffset || hasExistingData;
-    void updateAlert(
-      messageId,
-      chatAlerts.complete(
-        tenantId,
-        vodId,
-        platform,
-        totalMessages,
-        batchCount,
-        resumeIndicator ? (startOffset ?? 0) : undefined
-      )
-    );
+    if (!pageCursor || pageCursor === lastCursor) {
+      log.info({ vodId }, 'Reached end of chat stream');
+      break;
+    }
 
-    return { success: true, totalMessages };
-  } catch (error) {
-    const errorMsg = handleWorkerError(error, log, { vodId, platform, dbId, tenantId, jobId: job.id });
-    void updateAlert(messageId, chatAlerts.error(tenantId, vodId, platform, totalMessages, errorMsg));
-    throw error;
+    lastCursor = pageCursor;
+    await sleep(CHAT_RATE_LIMIT_MS);
+    rawPage = await fetchNextComments(vodId, pageCursor, tenantId);
   }
-};
+
+  if (batchBuffer.length > 0) {
+    const result = await flushChatBatch({
+      db,
+      buffer: batchBuffer,
+      log,
+      vodId,
+      onProgress: (offset, batchNumber, messagesInBatch) =>
+        void updateAlert(messageId, chatAlerts.progress(tenantId, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)),
+      lastOffset,
+      totalMessages,
+      batchCount,
+    });
+    totalMessages = result.totalMessages;
+    batchCount = result.batchCount;
+  }
+
+  return { totalMessages, batchCount };
+}
 
 export default chatProcessor;

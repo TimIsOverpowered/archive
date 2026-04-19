@@ -68,6 +68,11 @@ export class RedisService {
     };
   }
 
+  static isLimiterFallback(key: string): boolean {
+    if (!this._instance) return false;
+    return this._instance.isLimiterFallback(key);
+  }
+
   static close(): Promise<void> {
     if (!this._instance) return Promise.resolve();
     const instance = this._instance;
