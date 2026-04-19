@@ -3,7 +3,7 @@ import { PrismaClient, UploadStatus } from '../../generated/streamer/client.js';
 import { withCache } from '../utils/cache.js';
 import { invalidateVodCache } from './vod-cache.js';
 import { VOD_DETAILS_CACHE_TTL, VOD_LIST_CACHE_TTL } from '../constants.js';
-import { Platform } from '../types/platforms.js';
+import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
 
 interface VodResponse {
   id: number;
@@ -44,7 +44,7 @@ interface VodResponse {
 }
 
 export const VodQuerySchema = z.object({
-  platform: z.enum(['twitch', 'kick']).optional(),
+  platform: z.enum(PLATFORM_VALUES as [string, ...string[]]).optional(),
   from: z.string().datetime().optional(),
   to: z.string().datetime().optional(),
   uploaded: z.literal('youtube').optional(),
