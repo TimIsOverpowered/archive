@@ -43,7 +43,7 @@ export const YoutubeSchema = z.object({
   multiTrack: z.boolean().default(false),
   splitDuration: z.number().default(YOUTUBE_MAX_DURATION),
   perGameUpload: z.boolean().default(false),
-  restrictedGames: z.array(z.string()).default([]),
+  restrictedGames: z.array(z.string().nullable()).default([]),
   description: z.string().default(''),
   auth: z.string().default(''),
 });

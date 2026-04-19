@@ -51,8 +51,8 @@ CREATE TABLE "games" (
     "video_provider" TEXT,
     "video_id" TEXT,
     "thumbnail_url" TEXT,
-    "game_id" TEXT NOT NULL DEFAULT '',
-    "game_name" TEXT NOT NULL DEFAULT '',
+    "game_id" TEXT,
+     "game_name" TEXT,
     "title" TEXT,
     "chapter_image" TEXT,
 
@@ -139,4 +139,4 @@ ALTER TABLE "chapters" ADD CONSTRAINT "chapters_vod_id_fkey" FOREIGN KEY ("vod_i
 CREATE UNIQUE INDEX "vod_uploads_vod_id_type_part_key" ON "vod_uploads"("vod_id", "type", "part");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "games_unique_chapter_key" ON "games"("vod_id", "start_time", "end_time", "game_id", "game_name");
+CREATE UNIQUE INDEX "games_unique_chapter_key" ON "games"("vod_id", "start_time", "end_time");

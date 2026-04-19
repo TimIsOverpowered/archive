@@ -66,13 +66,13 @@ model Game {
   video_provider String?
   video_id       String?
   thumbnail_url  String?
-  game_id        String
-  game_name      String
+  game_id        String?
+  game_name      String?
   title          String?
   chapter_image  String?
   vod            Vod      @relation(fields: [vod_id], references: [id], onDelete: Cascade, map: "games_new_vod_id_fkey")
 
-  @@unique([vod_id, start_time, end_time, game_id, game_name], map: "games_unique_chapter_key")
+  @@unique([vod_id, start_time, end_time], map: "games_unique_chapter_key")
   @@index([game_name], map: "games_new_game_name_idx")
   @@index([vod_id, start_time], map: "games_new_vod_id_start_time_idx")
   @@map("games")
