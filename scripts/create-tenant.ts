@@ -97,7 +97,13 @@ interface DatabaseResult {
 }
 
 // Database operations
-async function createDatabase(host: string, port: number, user: string, password: string, dbName: string): Promise<DatabaseResult> {
+async function createDatabase(
+  host: string,
+  port: number,
+  user: string,
+  password: string,
+  dbName: string
+): Promise<DatabaseResult> {
   try {
     const pool = new Pool({
       host,
@@ -147,7 +153,8 @@ async function createDatabase(host: string, port: number, user: string, password
     const isPermissionError =
       typeof error === 'object' &&
       error !== null &&
-      (('code' in error && (error as { code: string }).code === '42501') || ('message' in error && typeof error.message === 'string' && error.message.includes('permission denied')));
+      (('code' in error && (error as { code: string }).code === '42501') ||
+        ('message' in error && typeof error.message === 'string' && error.message.includes('permission denied')));
 
     if (isPermissionError) {
       console.log(`⚠️  Could not create database '${dbName}' automatically (insufficient privileges)`);
