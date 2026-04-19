@@ -1,6 +1,7 @@
 import { getTenantConfig } from '../config/loader.js';
 import { decryptObject } from './encryption.js';
 import { createAutoLogger as loggerWithTenant } from './auto-tenant-logger.js';
+import { extractErrorDetails } from './error.js';
 import type { TwitchAuthObject } from '../config/schemas.js';
 
 export interface TwitchCredentials {
@@ -37,7 +38,8 @@ export function getTwitchCredentials(tenantId: string): TwitchCredentials | null
       accessToken: auth.access_token,
       expiryDate: auth.expiry_date,
     };
-  } catch {
+  } catch (error) {
+    log.warn({ error: extractErrorDetails(error) }, '[Twitch] Failed to decrypt credentials');
     return null;
   }
 }
