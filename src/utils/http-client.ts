@@ -75,22 +75,6 @@ function prepareBodyAndHeaders(
   return { body: body as BodyInit, headers };
 }
 
-function shouldRetry(error: unknown): boolean {
-  if (error instanceof HttpError) {
-    const { statusCode } = error;
-    if (statusCode === 429 || statusCode === 408 || (statusCode >= 500 && statusCode < 600)) {
-      return true;
-    }
-    return false;
-  }
-
-  if (error instanceof Error && error.name === 'AbortError') {
-    return true;
-  }
-
-  return false;
-}
-
 // Overloads for proper type inference
 export function request<T = unknown>(url: string | URL, options?: RequestOptions<'json'>): Promise<T>;
 export function request(url: string | URL, options: RequestOptions<'text'>): Promise<string>;
@@ -118,6 +102,23 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
   const startTime = Date.now();
 
   const { body: preparedBody, headers: finalHeaders } = prepareBodyAndHeaders(body, customHeaders);
+  const externalSignal = options?.signal;
+
+  const shouldRetry = (error: unknown): boolean => {
+    if (error instanceof HttpError) {
+      const { statusCode } = error;
+      if (statusCode === 429 || statusCode === 408 || (statusCode >= 500 && statusCode < 600)) {
+        return true;
+      }
+      return false;
+    }
+
+    if (error instanceof Error && error.name === 'AbortError') {
+      return externalSignal == null || !externalSignal.aborted;
+    }
+
+    return false;
+  };
 
   try {
     const result = await retryWithBackoff(
