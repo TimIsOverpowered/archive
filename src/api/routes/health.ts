@@ -14,7 +14,6 @@ interface HealthRouteOptions {
 declare module 'fastify' {
   interface FastifyInstance {
     redis: Redis;
-    getAllConfigs: () => Promise<unknown[]>;
   }
 }
 

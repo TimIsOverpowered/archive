@@ -39,10 +39,10 @@ export default function createRateLimitMiddleware(options: RateLimitOptions) {
     const ip = getClientIp(request);
 
     try {
-      await activeLimiter.consume(ip);
+      const limiter = await activeLimiter.consume(ip);
 
       reply.header('X-RateLimit-Limit', activeLimiter.points);
-      reply.header('X-RateLimit-Remaining', activeLimiter.points);
+      reply.header('X-RateLimit-Remaining', String(limiter.remainingPoints));
     } catch (rateLimitError) {
       const error = rateLimitError as Error & { msBeforeNext?: number; code?: string };
 

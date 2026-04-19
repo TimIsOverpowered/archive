@@ -1,4 +1,5 @@
 import { PrismaClient } from '../../generated/streamer/client.js';
+import dayjs from 'dayjs';
 import { getTenantConfig, getConfigs } from '../config/loader.js';
 import { withCache } from '../utils/cache.js';
 import { PLATFORMS } from '../types/platforms.js';
@@ -53,9 +54,7 @@ export async function getTenantStats(client: PrismaClient, tenantId: string, cac
 
   const platforms = getEnabledPlatforms(config);
 
-  const thisMonthStart = new Date();
-  thisMonthStart.setDate(1);
-  thisMonthStart.setHours(0, 0, 0, 0);
+  const thisMonthStart = dayjs().startOf('month').toDate();
 
   const cacheKey = `stats:${tenantId}`;
 

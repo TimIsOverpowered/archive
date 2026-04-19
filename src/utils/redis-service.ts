@@ -89,82 +89,25 @@ export class RedisService {
     const maskedUrl = url.replace(/:\/\/.*@/, '://***@');
     logger.info({ url: maskedUrl }, 'Connecting to Redis');
 
-    let errorCount = 0;
-    const maxErrorsBeforeFail = this.isProduction ? 5 : 3;
-    const readyTimeout = this.isProduction ? 30000 : 10000;
+    const maxRetries = this.isProduction ? 5 : 3;
+
+    this.client = new Redis(url, {
+      lazyConnect: true,
+      maxRetriesPerRequest,
+      retryStrategy(times: number) {
+        if (times > maxRetries) {
+          logger.error({ times }, 'Redis max connection retries exceeded. Giving up.');
+          return null;
+        }
+        const delay = Math.min(times * 500, 2000);
+        logger.warn({ times, delay }, 'Redis reconnection attempt');
+        return delay;
+      },
+    });
 
     try {
-      this.client = new Redis(url, {
-        maxRetriesPerRequest,
-        retryStrategy(times: number) {
-          if (times > 10) return null;
-          const delay = Math.min(times * 500, 5000);
-          logger.warn({ times, delay }, 'Redis reconnection attempt');
-          return delay;
-        },
-      });
-
-      if (!this.client) {
-        logger.error('Redis client not initialized');
-        throw new Error('Redis client initialization failed');
-      }
-
-      this.client.on('error', (err) => {
-        errorCount++;
-        logger.error({ err: err.message, errorCount }, 'Redis connection error');
-
-        if (errorCount >= maxErrorsBeforeFail) {
-          const errorMsg = `Redis connection unstable after ${errorCount} errors`;
-          this.client?.quit().catch(() => {});
-          throw new Error(errorMsg);
-        }
-      });
-
-      this.client.on('connect', () => {
-        if (errorCount === 0) {
-          logger.info('Redis connected');
-        }
-      });
-
-      let readyResolved = false;
-      const readyPromise = new Promise<void>((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          this.client?.off('ready', readyHandler);
-          const errorMsg = `Redis did not become ready after ${readyTimeout}ms (${errorCount} errors)`;
-          logger.error({ errorCount }, errorMsg);
-          reject(new Error(errorMsg));
-        }, readyTimeout);
-
-        const readyHandler = () => {
-          if (readyResolved) return;
-          readyResolved = true;
-          clearTimeout(timeoutId);
-          logger.info('Redis client ready - connection stable');
-          resolve();
-        };
-
-        this.client?.on('ready', readyHandler);
-      });
-
-      await readyPromise;
+      await this.client.connect();
       logger.info('Redis connection established');
-
-      // Initialize rate limiters
-      if (rateLimiters && rateLimiters.length > 0) {
-        for (const rlConfig of rateLimiters) {
-          this.limiters.set(rlConfig.keyPrefix, {
-            limiter: new RateLimiterRedis({
-              storeClient: this.client,
-              keyPrefix: rlConfig.keyPrefix,
-              points: rlConfig.points,
-              duration: rlConfig.duration,
-              blockDuration: rlConfig.blockDuration,
-            }),
-            isFallback: false,
-          });
-        }
-        logger.info({ count: rateLimiters.length }, 'Rate limiters initialized');
-      }
     } catch (error) {
       if (this.isProduction) {
         const details = extractErrorDetails(error);
@@ -181,6 +124,8 @@ export class RedisService {
         'Redis connection failed - running with in-memory rate limiters (caching disabled)'
       );
 
+      this.client = null;
+
       // Initialize in-memory fallback rate limiters
       if (rateLimiters && rateLimiters.length > 0) {
         for (const rlConfig of rateLimiters) {
@@ -193,7 +138,26 @@ export class RedisService {
           });
         }
         logger.info({ count: rateLimiters.length }, 'In-memory fallback rate limiters initialized');
+        return;
       }
+      return;
+    }
+
+    // Initialize rate limiters
+    if (rateLimiters && rateLimiters.length > 0) {
+      for (const rlConfig of rateLimiters) {
+        this.limiters.set(rlConfig.keyPrefix, {
+          limiter: new RateLimiterRedis({
+            storeClient: this.client,
+            keyPrefix: rlConfig.keyPrefix,
+            points: rlConfig.points,
+            duration: rlConfig.duration,
+            blockDuration: rlConfig.blockDuration,
+          }),
+          isFallback: false,
+        });
+      }
+      logger.info({ count: rateLimiters.length }, 'Rate limiters initialized');
     }
   }
 
