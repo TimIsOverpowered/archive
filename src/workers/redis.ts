@@ -17,9 +17,7 @@ export async function initWorkersRedis(): Promise<void> {
     const maskedUrl = url.replace(/:\/\/.*@/, '://***@');
     getLogger().info({ url: maskedUrl }, '[Workers Redis] Connecting to Redis');
 
-    RedisService.init({ url, maxRetriesPerRequest: null });
-
-    await RedisService.instance!.connect();
+    await RedisService.init({ url, maxRetriesPerRequest: null }).connect();
   })();
 
   return initPromise;

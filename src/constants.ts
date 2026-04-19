@@ -3,7 +3,7 @@ export const YOUTUBE_MAX_DURATION = 43_199; // 12 hours - 1 second (720 minutes)
 
 // ── VOD / Live Worker ────────────────────────────────────────────────────────
 export const VOD_LIVE_HEADROOM = 2;
-export const VOD_MIN_CONCURRENCY = 50;
+export const VOD_MIN_CONCURRENCY = 50; // Minimum concurrent live workers regardless of tenant count; ensures adequate throughput for high-traffic channels
 export const VOD_DURATION_TOLERANCE_SECONDS = 1;
 
 // ── Chat Download ────────────────────────────────────────────────────────────

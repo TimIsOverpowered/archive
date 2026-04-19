@@ -22,9 +22,7 @@ const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, opti
     { keyPrefix: 'rate:admin', points: adminGetLimit, duration: 60, blockDuration: blockDuration * 5 },
   ];
 
-  RedisService.init({ url, rateLimiters });
-
-  await RedisService.instance!.connect();
+  await RedisService.init({ url, rateLimiters }).connect();
 
   // Register on Fastify instance for backward compatibility
   fastify.decorate('redis', RedisService.getClient());
