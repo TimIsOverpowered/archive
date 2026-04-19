@@ -9,10 +9,8 @@ export interface TenantContextData {
 
 const tenantContextStore = new AsyncLocalStorage<TenantContextData>();
 
-let currentStore = tenantContextStore.getStore();
-
 export function getRequestId(): string | undefined {
-  return currentStore?.reqId;
+  return tenantContextStore.getStore()?.reqId;
 }
 
 export function generateRequestId(): string {
@@ -21,10 +19,8 @@ export function generateRequestId(): string {
 
 export function enterTenantContext(context: TenantContextData): void {
   tenantContextStore.enterWith(context);
-  currentStore = tenantContextStore.getStore();
 }
 
 export const exitTenantContext = (): void => {
   tenantContextStore.exit(() => {});
-  currentStore = tenantContextStore.getStore();
 };
