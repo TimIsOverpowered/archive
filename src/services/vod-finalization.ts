@@ -17,7 +17,12 @@ export async function finalizeVod(options: FinalizeVodOptions): Promise<void> {
   await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
     const strategy = getStrategy(platform);
     if (durationSeconds && strategy?.finalizeChapters) {
-      await strategy.finalizeChapters({ tenantId: ctx.tenantId, config: ctx.config, platform, db }, dbId, vodId, durationSeconds);
+      await strategy.finalizeChapters(
+        { tenantId: ctx.tenantId, config: ctx.config, platform, db },
+        dbId,
+        vodId,
+        durationSeconds
+      );
     }
     await db.vod.update({
       where: { id: dbId },

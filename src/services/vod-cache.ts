@@ -61,10 +61,7 @@ export async function invalidateEmoteCache(tenantId: string, vodId: number): Pro
 
     if (!redisConnectionFailed.get(tenantId) && message.includes('ECONNREFUSED')) {
       redisConnectionFailed.set(tenantId, true);
-      logger.warn(
-        { tenantId, vodId, error: message },
-        'Redis connection lost, emote cache invalidation suspended'
-      );
+      logger.warn({ tenantId, vodId, error: message }, 'Redis connection lost, emote cache invalidation suspended');
     }
   }
 }

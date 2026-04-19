@@ -3,7 +3,12 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { TenantConfig } from '../config/types.js';
 import { logger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
-import { PRISMA_MODELS_TO_INVALIDATE, DB_CLIENT_IDLE_TIMEOUT_MS, DB_CLIENT_MAX_CLIENTS, DB_CLIENT_CLEANUP_INTERVAL_MS  } from '../constants.js';
+import {
+  PRISMA_MODELS_TO_INVALIDATE,
+  DB_CLIENT_IDLE_TIMEOUT_MS,
+  DB_CLIENT_MAX_CLIENTS,
+  DB_CLIENT_CLEANUP_INTERVAL_MS,
+} from '../constants.js';
 import { invalidateVodCache, invalidateTenantVodListCache, invalidateEmoteCache } from '../services/vod-cache.js';
 import { sleep } from '../utils/delay.js';
 
@@ -44,7 +49,10 @@ const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) 
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
           const mutations = ['create', 'update', 'upsert', 'delete', 'createMany', 'updateMany', 'deleteMany'];
-          if (!mutations.includes(operation) || !PRISMA_MODELS_TO_INVALIDATE.includes(model as typeof PRISMA_MODELS_TO_INVALIDATE[number])) {
+          if (
+            !mutations.includes(operation) ||
+            !PRISMA_MODELS_TO_INVALIDATE.includes(model as (typeof PRISMA_MODELS_TO_INVALIDATE)[number])
+          ) {
             return query(args);
           }
 
