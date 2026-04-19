@@ -26,6 +26,7 @@ async function clearAllJobsOnStartup() {
     QUEUE_NAMES.CHAT_DOWNLOAD,
     QUEUE_NAMES.YOUTUBE_UPLOAD,
     QUEUE_NAMES.DMCA_PROCESSING,
+    QUEUE_NAMES.MONITOR,
   ];
 
   for (const name of queueNames) {

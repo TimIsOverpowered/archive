@@ -1,3 +1,5 @@
+import fs from 'fs/promises';
+import path from 'path';
 import type { PrismaClient } from '../../../generated/streamer/client.js';
 import type { TenantConfig } from '../../config/types.js';
 import type { Platform } from '../../types/platforms.js';
@@ -5,6 +7,9 @@ import { getStrategy, type PlatformStreamStatus, type PlatformVodMetadata } from
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { sendStreamOfflineAlert, sendStreamLiveAlert } from './alert-helpers.js';
+import { getLiveDownloadQueue, enqueueJobWithLogging } from '../jobs/queues.js';
+import type { LiveDownloadJob } from '../jobs/queues.js';
+import { getTenantConfig } from '../../config/loader.js';
 
 type StreamerDbClient = PrismaClient;
 
@@ -270,5 +275,116 @@ async function handleAlreadyLiveStream(
   });
 }
 
-// Import from stream-detector to avoid duplication
-import { enqueueLiveHlsDownload } from './stream-detector.js';
+/**
+ * Validate that the VOD path exists and is writable before queuing a download job
+ */
+export async function validateVodPath(tenantId: string): Promise<{ valid: boolean }> {
+  const log = createAutoLogger(tenantId);
+
+  try {
+    const streamerConfig = getTenantConfig(tenantId);
+
+    if (!streamerConfig?.settings.vodPath) {
+      log.error({ tenantId }, `[Monitor] VOD path not configured for tenant - cannot queue downloads`);
+      return { valid: false };
+    }
+
+    const vodDirBase = streamerConfig.settings.vodPath;
+
+    try {
+      await fs.access(vodDirBase, fs.constants.R_OK | fs.constants.W_OK);
+
+      const testSubdir = path.join(vodDirBase, tenantId);
+      try {
+        await fs.mkdir(testSubdir, { recursive: true });
+        log.trace({ vodPath: vodDirBase }, `[Monitor] VOD path validated successfully`);
+        return { valid: true };
+      } catch (mkdirError) {
+        const details = extractErrorDetails(mkdirError);
+        log.error(
+          { tenantId, vodPath: testSubdir, error: details.message },
+          `[Monitor] Cannot write to VOD path - directory creation failed`
+        );
+        return { valid: false };
+      }
+    } catch (accessError) {
+      const details = extractErrorDetails(accessError);
+      log.error(
+        { tenantId, vodPath: vodDirBase, error: details.message },
+        `[Monitor] VOD path not accessible - check permissions`
+      );
+      return { valid: false };
+    }
+  } catch (error) {
+    const details = extractErrorDetails(error);
+    log.error({ tenantId, error: details.message }, `[Monitor] Unexpected error validating VOD path`);
+    return { valid: false };
+  }
+}
+
+/**
+ * Enqueue Live HLS Download job
+ */
+export async function enqueueLiveHlsDownload(params: {
+  dbId: number;
+  vodId: string;
+  platform: Platform;
+  tenantId: string;
+  platformUserId: string;
+  platformUsername?: string;
+  startedAt: Date;
+  sourceUrl?: string;
+}): Promise<void> {
+  const log = createAutoLogger(params.tenantId);
+
+  const validationResult = await validateVodPath(params.tenantId);
+  if (!validationResult.valid) {
+    log.error(
+      { vodId: params.vodId, platform: params.platform },
+      `[Monitor] Aborting download queue - VOD path validation failed`
+    );
+    return;
+  }
+
+  const queue = getLiveDownloadQueue();
+
+  try {
+    log.debug(
+      { vodId: params.vodId, platform: params.platform, tenantId: params.tenantId },
+      `[Monitor] Attempting to enqueue Live HLS download job`
+    );
+
+    const { jobId, isNew } = await enqueueJobWithLogging(
+      queue,
+      'live_hls_download',
+      {
+        dbId: params.dbId,
+        vodId: params.vodId,
+        platform: params.platform,
+        tenantId: params.tenantId,
+        platformUserId: params.platformUserId,
+        platformUsername: params.platformUsername,
+        startedAt: params.startedAt.toISOString(),
+        sourceUrl: params.sourceUrl,
+      } satisfies LiveDownloadJob,
+      {
+        jobId: `live_hls_${params.vodId}`,
+        attempts: 10,
+        backoff: { type: 'exponential' as const, delay: 5000 },
+        deduplication: { id: `live_hls_${params.vodId}` },
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+      { info: log.info.bind(log), debug: log.debug.bind(log) },
+      `[Monitor] Live HLS download job enqueued successfully`,
+      { dbId: params.dbId, vodId: params.vodId, platform: params.platform, queueName: 'vod_live' }
+    );
+
+    if (isNew) {
+      log.debug({ vodId: params.vodId, jobId }, `[Monitor] Job was newly added to queue`);
+    }
+  } catch (error) {
+    const details = extractErrorDetails(error);
+    log.error({ vodId: params.vodId, ...details }, `[Monitor] CRITICAL - Failed to enqueue Live HLS download job`);
+  }
+}

@@ -1,10 +1,7 @@
 import { z } from 'zod';
 
 // --- DISABLE_REDIS_CACHE ---
-const DisableRedisCacheSchema = z.preprocess(
-  (val) => String(val).toLowerCase() === 'true',
-  z.boolean(),
-);
+const DisableRedisCacheSchema = z.preprocess((val) => String(val).toLowerCase() === 'true', z.boolean());
 
 let _disableRedisCache: boolean | null = null;
 
@@ -20,10 +17,12 @@ export function getDisableRedisCache(): boolean {
 }
 
 // --- ENCRYPTION_MASTER_KEY ---
-const EncryptionKeySchema = z.string().refine(
-  (val) => val.length === 64 && /^[0-9a-fA-F]+$/.test(val),
-  'ENCRYPTION_MASTER_KEY must be a valid 32-byte hex string',
-);
+const EncryptionKeySchema = z
+  .string()
+  .refine(
+    (val) => val.length === 64 && /^[0-9a-fA-F]+$/.test(val),
+    'ENCRYPTION_MASTER_KEY must be a valid 32-byte hex string'
+  );
 
 let _keyBuffer: Buffer | null = null;
 

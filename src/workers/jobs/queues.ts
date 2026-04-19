@@ -79,6 +79,10 @@ export interface DmcaProcessingJob {
   filePath?: string;
 }
 
+export interface MonitorJob {
+  tenantId: string;
+}
+
 export interface ChatDownloadResult {
   success: true;
   totalMessages?: number;
@@ -127,6 +131,7 @@ export const QUEUE_NAMES = {
   CHAT_DOWNLOAD: 'chat_download',
   YOUTUBE_UPLOAD: 'youtube_upload',
   DMCA_PROCESSING: 'dmca_processing',
+  MONITOR: 'monitor',
 } as const;
 
 export const defaultJobOptions = {
@@ -187,6 +192,10 @@ export function getYoutubeUploadQueue(): Queue<YoutubeUploadJob, YoutubeUploadJo
 
 export function getDmcaProcessingQueue(): Queue<DmcaProcessingJob, DmcaProcessingJob, string> {
   return getQueue(QUEUE_NAMES.DMCA_PROCESSING);
+}
+
+export function getMonitorQueue(): Queue<MonitorJob, MonitorJob, string> {
+  return getQueue(QUEUE_NAMES.MONITOR);
 }
 
 export interface JobLogger {
