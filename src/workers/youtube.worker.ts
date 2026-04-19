@@ -112,7 +112,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
     });
 
     await db.vodUpload.updateMany({
-      where: { vod_id: dbId },
+      where: { vod_id: dbId, type },
       data: { status: 'FAILED' },
     });
 
@@ -145,14 +145,10 @@ async function processVodUploadJob(
   });
 
   for (const video of result.uploadedVideos) {
-    await db.vodUpload.create({
-      data: {
-        vod_id: dbId,
-        upload_id: video.id,
-        type,
-        part: video.part,
-        status: 'COMPLETED',
-      },
+    await db.vodUpload.upsert({
+      where: { vod_id_type_part: { vod_id: dbId, type, part: video.part } },
+      create: { vod_id: dbId, upload_id: video.id, type, part: video.part, status: 'COMPLETED' },
+      update: { upload_id: video.id, status: 'COMPLETED' },
     });
   }
 

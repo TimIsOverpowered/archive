@@ -224,8 +224,6 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
     platformName,
     config,
     type,
-    dbId,
-    db,
     dmcaProcessed,
     vodRecord,
     part,
@@ -282,17 +280,6 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
 
   const uploadPart = part ?? 1;
   const uploadedVideos = [{ id: result.videoId, part: uploadPart }];
-
-  // Save to database
-  await db.vodUpload.create({
-    data: {
-      vod_id: dbId,
-      upload_id: result.videoId,
-      type: UPLOAD_TYPES.VOD,
-      part: uploadPart,
-      status: 'COMPLETED',
-    },
-  });
 
   if (!config.settings.saveMP4 || dmcaProcessed === true) {
     await deleteFileIfExists(filePath);
