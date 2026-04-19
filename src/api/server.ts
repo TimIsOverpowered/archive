@@ -12,6 +12,25 @@ import { extractErrorDetails } from '../utils/error.js';
 import { HttpError } from '../utils/http-error.js';
 import { logger } from '../utils/logger.js';
 import healthRoutes from './routes/health.js';
+
+function formatErrorResponse(error: unknown): {
+  statusCode: number;
+  message: string;
+  isClientError: boolean;
+} {
+  if (error instanceof HttpError) {
+    const { statusCode, message } = error;
+    return { statusCode, message, isClientError: statusCode >= 400 && statusCode < 500 };
+  }
+
+  const details = extractErrorDetails(error);
+  const statusCode = (error as { statusCode?: number }).statusCode || 500;
+  return {
+    statusCode,
+    message: details.message,
+    isClientError: statusCode >= 400 && statusCode < 500,
+  };
+}
 import vodsRoutes from './routes/vods.js';
 import logsRoutes from './routes/logs.js';
 import badgesRoutes from './routes/badges.js';
@@ -31,25 +50,7 @@ export async function buildServer() {
   // Set error handler immediately after creating instance (before any plugins/routes)
   // This ensures it's properly inherited by all child instances
   fastify.setErrorHandler((error, request, reply) => {
-    if (error instanceof HttpError) {
-      const { statusCode, message } = error;
-      const isClientError = statusCode >= 400 && statusCode < 500;
-      if (statusCode >= 500) {
-        logger.error({ err: error }, 'Request error');
-      }
-      return reply.status(statusCode).send({
-        error: {
-          message: isClientError ? message : 'Internal server error',
-          statusCode,
-        },
-      });
-    }
-
-    const details = extractErrorDetails(error);
-    const statusCode = (error as { statusCode?: number }).statusCode || 500;
-
-    const isClientError = statusCode >= 400 && statusCode < 500;
-    const errorMessage = isClientError ? details.message : 'Internal server error';
+    const { statusCode, message, isClientError } = formatErrorResponse(error);
 
     if (statusCode >= 500) {
       logger.error({ err: error }, 'Request error');
@@ -57,7 +58,7 @@ export async function buildServer() {
 
     return reply.status(statusCode).send({
       error: {
-        message: errorMessage,
+        message: isClientError ? message : 'Internal server error',
         statusCode,
       },
     });
