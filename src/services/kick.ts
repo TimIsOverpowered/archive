@@ -1,4 +1,5 @@
 import HLS from 'hls-parser';
+import dayjs from 'dayjs';
 import { createSession } from '../utils/cycletls.js';
 import { navigateToUrl } from '../utils/puppeteer-manager.js';
 import { extractErrorDetails, createErrorContext } from '../utils/error.js';
@@ -215,7 +216,7 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
     }
 
     const { category, created_at } = streamData;
-    const currentTimeSeconds = Math.round((Date.now() - new Date(created_at).getTime()) / 1000);
+    const currentTimeSeconds = dayjs().diff(created_at, 'second');
 
     await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
       const lastChapter = await db.chapter.findFirst({

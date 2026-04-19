@@ -6,12 +6,16 @@ import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
 import redisPlugin from './plugins/redis.plugin';
 import configPlugin from './plugins/config.plugin';
-import createTenantLoggerMiddleware from './middleware/tenant-logger.js';
+import createTenantLoggerMiddleware, { exitTenantContext } from './middleware/tenant-logger.js';
 import { getApiConfig } from '../config/env.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { HttpError } from '../utils/http-error.js';
 import { logger } from '../utils/logger.js';
 import healthRoutes from './routes/health.js';
+import vodsRoutes from './routes/vods.js';
+import logsRoutes from './routes/logs.js';
+import badgesRoutes from './routes/badges.js';
+import { globalAdminRoutes, default as adminRoutes } from './routes/admin/index.js';
 
 function formatErrorResponse(error: unknown): {
   statusCode: number;
@@ -31,10 +35,6 @@ function formatErrorResponse(error: unknown): {
     isClientError: statusCode >= 400 && statusCode < 500,
   };
 }
-import vodsRoutes from './routes/vods.js';
-import logsRoutes from './routes/logs.js';
-import badgesRoutes from './routes/badges.js';
-import { globalAdminRoutes, default as adminRoutes } from './routes/admin/index.js';
 
 export async function buildServer() {
   const fastify = Fastify({
@@ -79,8 +79,7 @@ export async function buildServer() {
   // Add tenant display name to logger for routes with streamer ID
   const tenantLoggerMiddleware = createTenantLoggerMiddleware();
   fastify.addHook('preHandler', tenantLoggerMiddleware);
-  fastify.addHook('onResponse', async (_request, _reply) => {
-    const { exitTenantContext } = await import('./middleware/tenant-logger.js');
+  fastify.addHook('onResponse', async () => {
     exitTenantContext();
   });
 

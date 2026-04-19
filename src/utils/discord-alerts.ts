@@ -2,6 +2,7 @@ import { extractErrorDetails } from './error.js';
 import { request } from './http-client.js';
 import { toHHMMSS } from './formatting.js';
 import { logger } from './logger.js';
+import { LRUCache } from 'lru-cache';
 import { getTenantDisplayName } from '../config/loader.js';
 import { capitalizePlatform, Platform } from '../types/platforms.js';
 
@@ -186,11 +187,20 @@ export async function updateDiscordEmbed(messageId: string, data: RichEmbedData)
   }
 }
 
-const failureCounts = new Map<string, number>();
-const lastFfmpegProgressByMessage = new Map<string, number>();
+const failureCounts = new LRUCache<string, number>({
+  max: 500,
+  ttl: 30 * 60 * 1000,
+  allowStale: false,
+});
+
+const lastFfmpegProgressByMessage = new LRUCache<string, number>({
+  max: 1000,
+  ttl: 5 * 60 * 1000,
+  allowStale: false,
+});
 
 export function trackFailure(tenantId: string, maxBeforeAlert: number = 3): boolean {
-  const currentCount = (failureCounts.get(tenantId) || 0) + 1;
+  const currentCount = (failureCounts.get(tenantId) ?? 0) + 1;
   failureCounts.set(tenantId, currentCount);
   return currentCount >= maxBeforeAlert;
 }

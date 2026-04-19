@@ -5,6 +5,16 @@ import { invalidateVodCache } from './vod-cache.js';
 import { VOD_DETAILS_CACHE_TTL, VOD_LIST_CACHE_TTL } from '../constants.js';
 import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
 
+function buildCacheKey(...parts: (string | number | boolean | undefined | null)[]): string {
+  return parts.filter((p) => p !== undefined && p !== null && p !== '').join(':');
+}
+
+function buildQueryCacheKey(tenantId: string, query: VodQuery, page: number, limit: number): string {
+  const sorted = Object.keys(query).sort() as (keyof VodQuery)[];
+  const queryParts = sorted.map((k) => `${k}:${query[k]}`).filter(Boolean);
+  return buildCacheKey('vods', tenantId, ...queryParts, String(page), String(limit));
+}
+
 const VOD_INCLUDE = {
   vod_uploads: {
     select: {
@@ -141,7 +151,7 @@ export async function getVods(
   const limit = Math.min(100, Math.max(1, query.limit || 20));
   const offset = (page - 1) * limit;
 
-  const cacheKey = `vods:${tenantId}:${JSON.stringify({ ...query, page, limit })}`;
+  const cacheKey = buildQueryCacheKey(tenantId, query, page, limit);
   const { where, orderBy } = buildVodQuery(query);
 
   return await withCache(cacheKey, VOD_LIST_CACHE_TTL, async () => {
