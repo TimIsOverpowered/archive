@@ -1,5 +1,5 @@
 import { refreshCloudflareRanges } from '../utils/cloudflare-ip-validator.js';
-import { logger } from '../utils/logger.js';
+import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 
 /**
@@ -10,7 +10,7 @@ export async function refreshCloudflareIpRanges(): Promise<void> {
   try {
     await refreshCloudflareRanges();
   } catch (error) {
-    logger.error({ err: extractErrorDetails(error).message }, 'Failed to refresh Cloudflare IP ranges');
+    getLogger().error({ err: extractErrorDetails(error).message }, 'Failed to refresh Cloudflare IP ranges');
   }
 }
 
@@ -24,7 +24,7 @@ export function startCloudflareIpRangesCron(): NodeJS.Timeout {
     () => {
       refreshCloudflareIpRanges().catch((err) => {
         const details = extractErrorDetails(err);
-        logger.error({ ...details }, 'Cloudflare IP ranges cron failed');
+        getLogger().error({ ...details }, 'Cloudflare IP ranges cron failed');
       });
     },
     24 * 60 * 60 * 1000

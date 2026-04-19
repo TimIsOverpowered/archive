@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { RedisService, type RateLimiterConfig } from '../../utils/redis-service.js';
-import { logger } from '../../utils/logger.js';
+import { getLogger } from '../../utils/logger.js';
+import { getApiConfig } from '../../config/env.js';
 
 interface RedisPluginOptions {
   url: string;
@@ -8,11 +9,12 @@ interface RedisPluginOptions {
 
 const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, options) => {
   const { url } = options;
+  const config = getApiConfig();
 
-  const vodLimit = parseInt(process.env.RATE_LIMIT_VODS || '60', 10);
-  const chatLimit = parseInt(process.env.RATE_LIMIT_CHAT || '30', 10);
-  const adminGetLimit = parseInt(process.env.RATE_LIMIT_ADMIN_GET || '60', 10);
-  const blockDuration = parseInt(process.env.RATE_LIMIT_BLOCK_DURATION || '60', 10);
+  const vodLimit = config.RATE_LIMIT_VODS;
+  const chatLimit = config.RATE_LIMIT_CHAT;
+  const adminGetLimit = config.RATE_LIMIT_ADMIN_GET;
+  const blockDuration = config.RATE_LIMIT_BLOCK_DURATION;
 
   const rateLimiters: RateLimiterConfig[] = [
     { keyPrefix: 'rate:vods', points: vodLimit, duration: 60 },
@@ -30,7 +32,7 @@ const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, opti
   fastify.decorate('chatRateLimiter', RedisService.getLimiter('rate:chat'));
   fastify.decorate('adminRateLimiter', RedisService.getLimiter('rate:admin'));
 
-  logger.info({ vodLimit, chatLimit, adminGetLimit }, 'Rate limiters initialized');
+  getLogger().info({ vodLimit, chatLimit, adminGetLimit }, 'Rate limiters initialized');
 };
 
 export default redisPlugin;

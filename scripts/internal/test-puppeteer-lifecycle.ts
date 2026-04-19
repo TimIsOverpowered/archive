@@ -12,11 +12,11 @@
 
 import 'dotenv/config';
 import { getBrowser, releaseBrowser, getChromePid } from '../../src/utils/puppeteer-manager.js';
-import { logger } from '../../src/utils/logger.js';
+import { getLogger, childLogger } from '../../src/utils/logger.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
-const log = logger.child({ module: 'test-puppeteer-lifecycle' });
+const log = childLogger({ module: 'test-puppeteer-lifecycle' });
 const execAsync = promisify(exec);
 
 async function getChromeProcesses(): Promise<string[]> {

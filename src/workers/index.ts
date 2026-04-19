@@ -5,7 +5,7 @@ import { QUEUE_NAMES, getQueue, closeQueues } from './jobs/queues.js';
 import { initWorkersRedis, getRedisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
 import { startTokenHealthCron } from '../cron/token-health.js';
 import { startMonitorService, stopMonitorService } from './monitor/index.js';
-import { logger } from '../utils/logger.js';
+import { getLogger, setLoggerConfig } from '../utils/logger.js';
 import { WORKER_DEFINITIONS } from './worker-definitions.js';
 import { createWorker, waitForWorkersReady, workers } from './create-worker.js';
 import { loadWorkersConfig } from '../config/env.js';
@@ -14,12 +14,13 @@ import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/cl
 import { registerPlatformStrategies } from '../services/platforms/index.js';
 
 const workerConfig = loadWorkersConfig();
+setLoggerConfig({ level: workerConfig.LOG_LEVEL, isProduction: workerConfig.NODE_ENV === 'production' });
 await initWorkersRedis();
 
 async function clearAllJobsOnStartup() {
   if (!workerConfig.CLEAR_QUEUES_ON_STARTUP) return;
 
-  logger.warn('[Queues] CLEAR_QUEUES_ON_STARTUP=true — all queued jobs will be permanently deleted');
+  getLogger().warn('[Queues] CLEAR_QUEUES_ON_STARTUP=true — all queued jobs will be permanently deleted');
 
   const queueNames = [
     QUEUE_NAMES.VOD_LIVE,
@@ -36,14 +37,14 @@ async function clearAllJobsOnStartup() {
     await queue.obliterate({ force: true });
     await queue.resume();
 
-    logger.info(`[Queues] Fully obliterated and reset queue: ${name}`);
+    getLogger().info(`[Queues] Fully obliterated and reset queue: ${name}`);
   }
 
-  logger.warn('[Queues] All queues cleared and reset');
+  getLogger().warn('[Queues] All queues cleared and reset');
 }
 
 async function bootstrap() {
-  logger.info(`Starting worker process (NODE_ENV: ${workerConfig.NODE_ENV})`);
+  getLogger().info(`Starting worker process (NODE_ENV: ${workerConfig.NODE_ENV})`);
 
   try {
     registerPlatformStrategies();
@@ -57,7 +58,7 @@ async function bootstrap() {
         const liveTenants = configs.filter((c) => c.settings.vodDownload && (c.twitch?.enabled || c.kick?.enabled));
         const liveConcurrency = Math.max(liveTenants.length * 2 * VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY);
         def.concurrency = liveConcurrency;
-        logger.info(
+        getLogger().info(
           { liveTenants: liveTenants.length, concurrency: liveConcurrency },
           'vod_live concurrency calculated'
         );
@@ -72,23 +73,23 @@ async function bootstrap() {
     await startMonitorService();
 
     startClientCleanup();
-    logger.info('DB client cleanup started');
+    getLogger().info('DB client cleanup started');
 
-    logger.info('All workers started successfully');
+    getLogger().info('All workers started successfully');
   } catch (error) {
-    logger.error(extractErrorDetails(error), 'Failed to start workers');
+    getLogger().error(extractErrorDetails(error), 'Failed to start workers');
     process.exit(1);
   }
 }
 
 function registerShutdownHandlers() {
   const shutdown = async () => {
-    logger.info('Shutting down workers...');
+    getLogger().info('Shutting down workers...');
     await stopMonitorService();
 
     for (const [name, worker] of workers.entries()) {
       await worker.close(true);
-      logger.info({ name }, 'Worker closed');
+      getLogger().info({ name }, 'Worker closed');
     }
 
     await closeQueues();

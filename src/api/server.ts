@@ -10,7 +10,7 @@ import createTenantLoggerMiddleware, { exitTenantContext } from './middleware/te
 import { getApiConfig } from '../config/env.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { HttpError } from '../utils/http-error.js';
-import { logger } from '../utils/logger.js';
+import { getLogger } from '../utils/logger.js';
 import healthRoutes from './routes/health.js';
 import vodsRoutes from './routes/vods.js';
 import logsRoutes from './routes/logs.js';
@@ -54,7 +54,7 @@ export async function buildServer() {
 
     if (statusCode >= 500) {
       const details = extractErrorDetails(error);
-      logger.error({ err: details.message, stack: details.stack }, 'Request error');
+      getLogger().error({ err: details.message, stack: details.stack }, 'Request error');
     }
 
     return reply.status(statusCode).send({

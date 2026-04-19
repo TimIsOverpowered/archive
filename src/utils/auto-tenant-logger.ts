@@ -1,17 +1,17 @@
 import type { LogFn } from 'pino';
 import { getTenantDisplayName } from '../config/loader.js';
-import { type AppLogger, logger } from './logger.js';
+import { type AppLogger, getLogger } from './logger.js';
 
 // Define a specific call signature for the wrapper to satisfy ESLint
 type InternalLogCall = (arg1: unknown, ...args: unknown[]) => void;
 
 export function createAutoLogger(tenantId?: string | null): AppLogger {
   if (!tenantId) {
-    return logger;
+    return getLogger();
   }
 
   const displayName = getTenantDisplayName(tenantId);
-  const childLog = logger.child({ tenantId: displayName });
+  const childLog = getLogger().child({ tenantId: displayName });
 
   const prefix = (msg: string): string => {
     if (msg.match(/^\w+:/) || msg.startsWith(`[${displayName}]`)) {
@@ -55,7 +55,7 @@ export function createAutoLogger(tenantId?: string | null): AppLogger {
 
   const wrappedLog = Object.create(childLog) as AppLogger;
 
-  const logLevels: (keyof AppLogger)[] = ['info', 'error', 'warn', 'debug', 'trace', 'fatal', 'metric'];
+  const logLevels: (keyof AppLogger)[] = ['info', 'error', 'warn', 'debug', 'trace', 'fatal'] as (keyof AppLogger)[];
 
   for (const level of logLevels) {
     const original = childLog[level];

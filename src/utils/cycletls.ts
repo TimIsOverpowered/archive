@@ -2,8 +2,9 @@ import initCycleTLS from 'cycletls';
 import fs from 'fs';
 import fsPromises from 'fs/promises';
 import { pipeline } from 'node:stream/promises';
-import { logger } from './logger.js';
+import { getLogger } from './logger.js';
 import { Readable } from 'node:stream';
+import { getBaseConfig } from '../config/env.js';
 
 type CycleTLSClient = Awaited<ReturnType<typeof initCycleTLS>>;
 
@@ -23,10 +24,10 @@ async function getCycleTLS(): Promise<CycleTLSClient> {
   if (!initPromise) {
     initPromise = (async () => {
       try {
-        logger.debug('Initializing CycleTLS with Firefox fingerprint');
+        getLogger().debug('Initializing CycleTLS with Firefox fingerprint');
 
         const instance = await initCycleTLS({
-          debug: process.env.NODE_ENV === 'development',
+          debug: getBaseConfig().NODE_ENV === 'development',
           timeout: 30000,
         });
 
@@ -38,7 +39,7 @@ async function getCycleTLS(): Promise<CycleTLSClient> {
         if (error.code === 'ENOENT') {
           throw new Error('CycleTLS executable not found. Please ensure cycletls package was installed correctly.');
         } else {
-          logger.error({ message: error.message }, 'Failed to initialize CycleTLS');
+          getLogger().error({ message: error.message }, 'Failed to initialize CycleTLS');
           throw new Error(`Failed to initialize CycleTLS: ${error.message}`);
         }
       } finally {
@@ -65,7 +66,7 @@ export class CycleTLSSession {
 
     const client = await getCycleTLS();
 
-    logger.debug({ url }, `[CycleTLS] Fetching text from ${url}`);
+    getLogger().debug({ url }, `[CycleTLS] Fetching text from ${url}`);
 
     const response = await client.get(url, {
       ja3: LEGACY_FIREFOX_JA3,
@@ -86,7 +87,7 @@ export class CycleTLSSession {
 
     const client = await getCycleTLS();
 
-    logger.debug({ url }, `[CycleTLS] Streaming to file ${outputPath}`);
+    getLogger().debug({ url }, `[CycleTLS] Streaming to file ${outputPath}`);
 
     const response = await client.get(url, {
       ja3: LEGACY_FIREFOX_JA3,
@@ -117,7 +118,7 @@ export class CycleTLSSession {
     if (this._closed) return;
 
     this._closed = true;
-    logger.debug(`[CycleTLS] Closed`);
+    getLogger().debug(`[CycleTLS] Closed`);
   }
 }
 
@@ -125,7 +126,7 @@ export class CycleTLSSession {
  * Create a new session for persistent connections. Session must be explicitly closed when done.
  */
 export function createSession(): CycleTLSSession {
-  logger.debug(`[CycleTLS] Created session`);
+  getLogger().debug(`[CycleTLS] Created session`);
   return new CycleTLSSession();
 }
 
@@ -134,7 +135,7 @@ export function createSession(): CycleTLSSession {
  */
 export async function closeCycleTLS(): Promise<void> {
   if (cycleTLSInstance?.exit) {
-    logger.debug('[CycleTLS] Force closing all sessions');
+    getLogger().debug('[CycleTLS] Force closing all sessions');
     await cycleTLSInstance.exit().catch(() => {});
     cycleTLSInstance = null;
   }

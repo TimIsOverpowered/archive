@@ -4,7 +4,7 @@ import { saveVodChapters } from '../twitch/chapters.js';
 import type { PlatformStrategy, PlatformStreamStatus, PlatformVodMetadata } from './strategy.js';
 import { parseTwitchDuration } from '../../utils/formatting.js';
 import { createErrorContext } from '../../utils/error.js';
-import { logger } from '../../utils/logger.js';
+import { getLogger } from '../../utils/logger.js';
 
 export const twitchStrategy: PlatformStrategy = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
@@ -101,7 +101,7 @@ export const twitchStrategy: PlatformStrategy = {
         finalDurationSeconds
       );
     } catch (error) {
-      logger.error(createErrorContext(error, { vodId }), 'Failed to finalize Twitch chapters');
+      getLogger().error(createErrorContext(error, { vodId }), 'Failed to finalize Twitch chapters');
     }
   },
 };

@@ -64,6 +64,54 @@ export function getChatBucketSizeTtl(): number {
   return _bucketSizeTtl;
 }
 
+// --- DISCORD_ALERTS_ENABLED ---
+const DiscordAlertsEnabledSchema = z.preprocess((val) => String(val).toLowerCase() !== 'false', z.boolean());
+
+let _discordAlertsEnabled: boolean | null = null;
+
+export function getDiscordAlertsEnabled(): boolean {
+  if (_discordAlertsEnabled !== null) return _discordAlertsEnabled;
+  const parsed = DiscordAlertsEnabledSchema.safeParse(process.env.DISCORD_ALERTS_ENABLED);
+  _discordAlertsEnabled = parsed.success ? parsed.data : true;
+  return _discordAlertsEnabled;
+}
+
+// --- PUPPETEER_MEMORY_LIMIT_MB ---
+const PuppeteerMemoryLimitSchema = z.coerce.number().int().positive();
+
+let _puppeteerMemoryLimitMb: number | null = null;
+
+export function getPuppeteerMemoryLimitMb(): number {
+  if (_puppeteerMemoryLimitMb !== null) return _puppeteerMemoryLimitMb;
+  const parsed = PuppeteerMemoryLimitSchema.safeParse(process.env.PUPPETEER_MEMORY_LIMIT_MB);
+  _puppeteerMemoryLimitMb = parsed.success ? parsed.data : 512;
+  return _puppeteerMemoryLimitMb;
+}
+
+// --- PUPPETEER_SHUTDOWN_TIMEOUT_MS ---
+const PuppeteerShutdownTimeoutSchema = z.coerce.number().int().positive();
+
+let _puppeteerShutdownTimeoutMs: number | null = null;
+
+export function getPuppeteerShutdownTimeoutMs(): number {
+  if (_puppeteerShutdownTimeoutMs !== null) return _puppeteerShutdownTimeoutMs;
+  const parsed = PuppeteerShutdownTimeoutSchema.safeParse(process.env.PUPPETEER_SHUTDOWN_TIMEOUT_MS);
+  _puppeteerShutdownTimeoutMs = parsed.success ? parsed.data : 5000;
+  return _puppeteerShutdownTimeoutMs;
+}
+
+// --- PUPPETEER_WARNING_THRESHOLD_PCT ---
+const PuppeteerWarningThresholdSchema = z.coerce.number().int().positive();
+
+let _puppeteerWarningThresholdPct: number | null = null;
+
+export function getPuppeteerWarningThresholdPct(): number {
+  if (_puppeteerWarningThresholdPct !== null) return _puppeteerWarningThresholdPct;
+  const parsed = PuppeteerWarningThresholdSchema.safeParse(process.env.PUPPETEER_WARNING_THRESHOLD_PCT);
+  _puppeteerWarningThresholdPct = parsed.success ? parsed.data : 85;
+  return _puppeteerWarningThresholdPct;
+}
+
 // --- Test helper ---
 export function resetEnvAccessorCache(): void {
   _disableRedisCache = null;
@@ -71,4 +119,8 @@ export function resetEnvAccessorCache(): void {
   _cursorTtl = null;
   _offsetTtl = null;
   _bucketSizeTtl = null;
+  _discordAlertsEnabled = null;
+  _puppeteerMemoryLimitMb = null;
+  _puppeteerShutdownTimeoutMs = null;
+  _puppeteerWarningThresholdPct = null;
 }

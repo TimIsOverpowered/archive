@@ -21,6 +21,10 @@ export const ApiConfigSchema = BaseConfigSchema.extend({
   PORT: z.coerce.number().min(1).max(65535).default(3030),
   HOST: z.string().default('0.0.0.0'),
   STATS_CACHE_TTL: z.coerce.number().int().positive().default(60),
+  RATE_LIMIT_VODS: z.coerce.number().int().positive().default(60),
+  RATE_LIMIT_CHAT: z.coerce.number().int().positive().default(30),
+  RATE_LIMIT_ADMIN_GET: z.coerce.number().int().positive().default(60),
+  RATE_LIMIT_BLOCK_DURATION: z.coerce.number().int().positive().default(60),
 });
 
 // Workers-specific schema (extends base + workers-only fields)
@@ -79,6 +83,12 @@ export function loadWorkersConfig(): WorkersConfig {
 
 export function getWorkersConfig(): WorkersConfig {
   return workersConfigCache || loadWorkersConfig();
+}
+
+export function getBaseConfig(): BaseConfig {
+  if (apiConfigCache) return apiConfigCache;
+  if (workersConfigCache) return workersConfigCache;
+  throw new Error('No config loaded. Call loadApiConfig() or loadWorkersConfig() first.');
 }
 
 export function getConfigCacheTtl(): number {
