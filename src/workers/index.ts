@@ -19,17 +19,24 @@ async function clearAllJobsOnStartup() {
 
   logger.warn('[Queues] CLEAR_QUEUES_ON_STARTUP=true — all queued jobs will be permanently deleted');
 
-  const queues = [
-    getQueue(QUEUE_NAMES.VOD_LIVE),
-    getQueue(QUEUE_NAMES.VOD_STANDARD),
-    getQueue(QUEUE_NAMES.CHAT_DOWNLOAD),
-    getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD),
-    getQueue(QUEUE_NAMES.DMCA_PROCESSING),
+  const queueNames = [
+    QUEUE_NAMES.VOD_LIVE,
+    QUEUE_NAMES.VOD_STANDARD,
+    QUEUE_NAMES.CHAT_DOWNLOAD,
+    QUEUE_NAMES.YOUTUBE_UPLOAD,
+    QUEUE_NAMES.DMCA_PROCESSING,
   ];
 
-  await Promise.allSettled(queues.map((queue) => queue.obliterate({ force: true })));
+  for (const name of queueNames) {
+    const queue = getQueue(name);
+    await queue.pause();
+    await queue.obliterate({ force: true });
+    await queue.resume();
 
-  logger.warn('[Queues] All queues cleared');
+    logger.info(`[Queues] Fully obliterated and reset queue: ${name}`);
+  }
+
+  logger.warn('[Queues] All queues cleared and reset');
 }
 
 async function bootstrap() {

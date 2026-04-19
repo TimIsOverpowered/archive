@@ -60,6 +60,10 @@ export async function createGameUploadJob(
     throw new Error(`YouTube upload not enabled for tenant ${tenantId}`);
   }
 
+  if (!config?.[platform]?.mainPlatform) {
+    throw new Error(`Skipping upload because ${platform} mainPlatform is false`);
+  }
+
   const vodRecord = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
     return db.vod.findUnique({ where: { id: dbId } });
   });
@@ -91,13 +95,13 @@ export async function createGameUploadJob(
     .toUpperCase();
 
   const vodStreamTitle = vodRecord.title ? vodRecord.title.replace(/>|</gi, '') : '';
-  const domainName = config.settings?.domainName || 'localhost';
+  const domainName = config.settings?.domainName;
 
   // Generate title with EP number
   const title = `${channelName} plays ${chapter.name} EP ${epNumber} - ${dateFormatted}`;
 
   // Generate description
-  const description = `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description || ''}`;
+  const description = `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description}`;
 
   return {
     tenantId,
@@ -128,6 +132,14 @@ export async function createGameUploadJobsForVod(
   const { config, tenantId } = ctx;
   if (!config?.youtube?.perGameUpload) {
     return [];
+  }
+
+  if (!config?.youtube?.upload) {
+    throw new Error(`YouTube upload not enabled for tenant ${tenantId}`);
+  }
+
+  if (!config?.[platform]?.mainPlatform) {
+    throw new Error(`Skipping upload because ${platform} mainPlatform is false`);
   }
 
   // Fetch all chapters for this VOD
