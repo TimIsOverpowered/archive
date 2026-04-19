@@ -8,6 +8,7 @@ import { createYoutubeUploadProgressHandler as createGameUploadProgressHandler }
 import { YOUTUBE_MAX_DURATION } from '../../constants.js';
 import type { TenantConfig } from '../../config/types.js';
 import { deleteFileIfExists } from '../../utils/path.js';
+import { GameUpsertSchema } from '../../config/schemas.js';
 
 export interface GameUploadContext {
   tenantId: string;
@@ -99,6 +100,10 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     duration
   );
 
+  GameUpsertSchema.parse({
+    game_id: chapterGameId,
+    game_name: chapterName,
+  });
   const createdGameRecord = await db.game.upsert({
     where: { vod_id_start_time_end_time: { vod_id: dbId, start_time: chapterStart, end_time: chapterEnd } },
     create: {
@@ -204,6 +209,10 @@ async function processSplitGameUpload(
       partDuration
     );
 
+    GameUpsertSchema.parse({
+      game_id: chapterGameId,
+      game_name: chapterName,
+    });
     const createdGameRecord = await db.game.upsert({
       where: {
         vod_id_start_time_end_time: {

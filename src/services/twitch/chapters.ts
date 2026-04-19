@@ -7,6 +7,7 @@ import { toHHMMSS } from '../../utils/formatting.js';
 import { TenantContext } from '../../types/context.js';
 import { withDbRetry } from '../../db/client.js';
 import { LRUCache } from 'lru-cache';
+import { ChapterCreateSchema } from '../../config/schemas.js';
 
 const gameDataCache = new LRUCache<string, Record<string, unknown>>({
   max: 1000,
@@ -104,18 +105,26 @@ export async function saveVodChapters(
         const gameId = typeof game.id === 'string' ? game.id : null;
         const gameData = gameId ? await getGameData(gameId, tenantId) : null;
 
+        const validatedChapter = ChapterCreateSchema.parse({
+          vod_id: dbId,
+          start: 0,
+          end: finalDurationSeconds,
+          duration: '00:00:00',
+          title: typeof game.displayName === 'string' ? game.displayName : null,
+          game_id: gameId,
+        });
         await db.chapter.create({
           data: {
-            vod_id: dbId,
-            game_id: gameId,
-            name: typeof game.displayName === 'string' ? game.displayName : null,
+            vod_id: validatedChapter.vod_id,
+            game_id: validatedChapter.game_id,
+            name: validatedChapter.title,
             image:
               gameData && typeof gameData.box_art_url === 'string'
                 ? gameData.box_art_url.replace('{width}x{height}', '40x53')
                 : null,
-            duration: '00:00:00',
-            start: 0,
-            end: finalDurationSeconds,
+            duration: validatedChapter.duration,
+            start: validatedChapter.start,
+            end: validatedChapter.end,
           },
         });
 
@@ -152,14 +161,23 @@ export async function saveVodChapters(
             const endSeconds = durationMs === 0 ? finalDurationSeconds - startSeconds : Math.floor(durationMs / 1000);
             const durationFormatted = toHHMMSS(startSeconds);
 
-            chaptersToCreate.push({
+            const validatedChapter = ChapterCreateSchema.parse({
               vod_id: dbId,
-              game_id: gameId,
-              name: gameName,
-              image: gameImage,
-              duration: durationFormatted,
               start: startSeconds,
               end: endSeconds,
+              duration: durationFormatted,
+              title: gameName,
+              game_id: gameId,
+            });
+
+            chaptersToCreate.push({
+              vod_id: validatedChapter.vod_id,
+              game_id: validatedChapter.game_id,
+              name: validatedChapter.title,
+              image: gameImage,
+              duration: validatedChapter.duration,
+              start: validatedChapter.start,
+              end: validatedChapter.end,
             });
           } catch (error) {
             logger.warn({ error: extractErrorDetails(error).message }, 'Failed to process chapter');

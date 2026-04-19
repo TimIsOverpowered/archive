@@ -13,6 +13,7 @@ import { badRequest, notFound } from '../../../utils/http-error.js';
 import { findVodRecord } from './utils/vod-helpers.js';
 import { getStrategy } from '../../../services/platforms/index.js';
 import { getApiConfig } from '../../../config/env.js';
+import { VodCreateSchema } from '../../../config/schemas.js';
 import { Platform, PLATFORM_VALUES } from '../../../types/platforms.js';
 
 interface StatsParams {
@@ -112,21 +113,22 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       }
 
       const strategy = getStrategy(platform);
+      const validatedData = VodCreateSchema.parse({
+        vod_id: vodId,
+        title: title || null,
+        created_at: createdAt ? new Date(createdAt) : new Date(),
+        duration: Number(duration) || 0,
+        platform,
+      });
       const newVod = await db.vod.create({
         data: strategy
           ? strategy.createVodData({
-              id: vodId,
-              title: title || '',
-              createdAt: createdAt || new Date().toISOString(),
-              duration: Number(duration) || 0,
+              id: validatedData.vod_id,
+              title: validatedData.title || '',
+              createdAt: validatedData.created_at.toISOString(),
+              duration: validatedData.duration,
             })
-          : {
-              vod_id: vodId,
-              title: title || null,
-              created_at: createdAt ? new Date(createdAt) : new Date(),
-              duration: Number(duration) || 0,
-              platform,
-            },
+          : validatedData,
       });
 
       log.info(`Created VOD ${vodId}`);

@@ -8,6 +8,7 @@ import { RedisService } from '../utils/redis-service.js';
 import { getDisableRedisCache } from '../config/env-accessors.js';
 import { compressChatData, decompressChatData } from '../utils/compression.js';
 import { EMOTE_CACHE_TTL, FFZ_API_BASE, BTTV_API_BASE, SEVENTV_API_BASE } from '../constants.js';
+import { EmoteUpsertSchema } from '../config/schemas.js';
 
 export interface EmoteData extends Prisma.JsonObject {
   id: string;
@@ -127,18 +128,24 @@ export async function fetchAndSaveEmotes(
 
   try {
     await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+      const validatedEmotes = EmoteUpsertSchema.parse({
+        vod_id: vodId,
+        ffz_emotes: emoteData.ffz_emotes,
+        bttv_emotes: emoteData.bttv_emotes,
+        seventv_emotes: emoteData.seventv_emotes,
+      });
       await db.emote.upsert({
         where: { vod_id: vodId },
         create: {
-          vod_id: vodId,
-          ffz_emotes: emoteData.ffz_emotes as EmoteData[],
-          bttv_emotes: emoteData.bttv_emotes as EmoteData[],
-          seventv_emotes: emoteData.seventv_emotes as EmoteData[],
+          vod_id: validatedEmotes.vod_id,
+          ffz_emotes: validatedEmotes.ffz_emotes as EmoteData[],
+          bttv_emotes: validatedEmotes.bttv_emotes as EmoteData[],
+          seventv_emotes: validatedEmotes.seventv_emotes as EmoteData[],
         },
         update: {
-          ffz_emotes: emoteData.ffz_emotes as EmoteData[],
-          bttv_emotes: emoteData.bttv_emotes as EmoteData[],
-          seventv_emotes: emoteData.seventv_emotes as EmoteData[],
+          ffz_emotes: validatedEmotes.ffz_emotes as EmoteData[],
+          bttv_emotes: validatedEmotes.bttv_emotes as EmoteData[],
+          seventv_emotes: validatedEmotes.seventv_emotes as EmoteData[],
         },
       });
     });

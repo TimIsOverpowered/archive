@@ -4,6 +4,7 @@ import { childLogger } from '../../utils/logger.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { getDuration } from '../utils/ffmpeg.js';
 import type { TenantContext } from '../../types/context.js';
+import { VodUpdateSchema } from '../../config/schemas.js';
 
 const log = childLogger({ module: 'duration-updater' });
 
@@ -54,6 +55,7 @@ export async function updateVodDurationDuringDownload(
         return;
       }
 
+      VodUpdateSchema.parse({ duration });
       await db.vod.update({
         where: { id: dbId },
         data: { duration },

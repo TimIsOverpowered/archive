@@ -11,6 +11,7 @@ import { KICK_API_TIMEOUT_MS, KICK_PAGE_DELAY_MS, KICK_API_BASE, KICK_SUBCATEGOR
 import { TenantContext } from '../types/context.js';
 import { withDbRetry } from '../db/client.js';
 import { LRUCache } from 'lru-cache';
+import { ChapterCreateSchema, ChapterUpdateSchema } from '../config/schemas.js';
 
 const log = childLogger({ module: 'kick' });
 
@@ -241,6 +242,7 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
       });
 
       if (lastChapter && lastChapter.game_id === String(category.id)) {
+        ChapterUpdateSchema.parse({ end: currentTimeSeconds });
         await db.chapter.update({
           where: { id: lastChapter.id },
           data: { end: currentTimeSeconds },
@@ -251,6 +253,7 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
       }
 
       if (lastChapter) {
+        ChapterUpdateSchema.parse({ end: currentTimeSeconds });
         await db.chapter.update({
           where: { id: lastChapter.id },
           data: { end: currentTimeSeconds },
@@ -277,6 +280,7 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
       });
 
       if (existingChapter) {
+        ChapterUpdateSchema.parse({ end: currentTimeSeconds });
         await db.chapter.update({
           where: { id: existingChapter.id },
           data: { end: currentTimeSeconds },
@@ -290,14 +294,21 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
 
       const duration = lastChapter ? toHHMMSS(currentTimeSeconds - lastChapter.start) : '00:00:00';
 
+      const validatedChapter = ChapterCreateSchema.parse({
+        vod_id: dbId,
+        start: currentTimeSeconds,
+        duration,
+        title: category.name,
+        game_id: String(category.id),
+      });
       await db.chapter.create({
         data: {
-          vod_id: dbId,
-          game_id: String(category.id),
-          name: category.name,
+          vod_id: validatedChapter.vod_id,
+          game_id: validatedChapter.game_id,
+          name: validatedChapter.title,
           image: bannerImage,
-          duration: duration,
-          start: currentTimeSeconds,
+          duration: validatedChapter.duration,
+          start: validatedChapter.start,
         },
       });
 
@@ -330,6 +341,10 @@ export async function finalizeKickChapters(
       if (incompleteChapter) {
         const endDuration = finalDurationSeconds - incompleteChapter.start;
 
+        ChapterUpdateSchema.parse({
+          end: endDuration,
+          duration: toHHMMSS(endDuration),
+        });
         await db.chapter.update({
           where: { id: incompleteChapter.id },
           data: {
