@@ -695,73 +695,95 @@ describe('HTTP Client', () => {
 
   describe('URL scrubbing', () => {
     it('should redact nauth param', async () => {
-      global.fetch = async () =>
-        ({
+      let capturedUrl = '';
+      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
+        capturedUrl = String(_input);
+        return Promise.resolve({
           ok: true,
           status: 200,
           statusText: 'OK',
           json: async () => ({}),
-        }) as Response;
+        } as Response);
+      }) as typeof global.fetch;
 
       await request('https://api.example.com/test?nauth=secret123&other=value');
 
-      assert.ok(true);
+      assert.ok(!capturedUrl.includes('secret123'), 'nauth value should be redacted');
+      assert.ok(capturedUrl.includes('REDACTED'), 'nauth should be replaced with REDACTED');
+      assert.ok(capturedUrl.includes('other=value'), 'non-sensitive params should be preserved');
     });
 
     it('should redact nauthsig param', async () => {
-      global.fetch = async () =>
-        ({
+      let capturedUrl = '';
+      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
+        capturedUrl = String(_input);
+        return Promise.resolve({
           ok: true,
           status: 200,
           statusText: 'OK',
           json: async () => ({}),
-        }) as Response;
+        } as Response);
+      }) as typeof global.fetch;
 
       await request('https://api.example.com/test?nauthsig=secret456&other=value');
 
-      assert.ok(true);
+      assert.ok(!capturedUrl.includes('secret456'), 'nauthsig value should be redacted');
+      assert.ok(capturedUrl.includes('REDACTED'), 'nauthsig should be replaced with REDACTED');
+      assert.ok(capturedUrl.includes('other=value'), 'non-sensitive params should be preserved');
     });
 
     it('should redact access_token param', async () => {
-      global.fetch = async () =>
-        ({
+      let capturedUrl = '';
+      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
+        capturedUrl = String(_input);
+        return Promise.resolve({
           ok: true,
           status: 200,
           statusText: 'OK',
           json: async () => ({}),
-        }) as Response;
+        } as Response);
+      }) as typeof global.fetch;
 
       await request('https://api.example.com/test?access_token=secret789&other=value');
 
-      assert.ok(true);
+      assert.ok(!capturedUrl.includes('secret789'), 'access_token value should be redacted');
+      assert.ok(capturedUrl.includes('REDACTED'), 'access_token should be replaced with REDACTED');
+      assert.ok(capturedUrl.includes('other=value'), 'non-sensitive params should be preserved');
     });
 
     it('should preserve non-sensitive params', async () => {
-      global.fetch = async () =>
-        ({
+      let capturedUrl = '';
+      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
+        capturedUrl = String(_input);
+        return Promise.resolve({
           ok: true,
           status: 200,
           statusText: 'OK',
           json: async () => ({}),
-        }) as Response;
+        } as Response);
+      }) as typeof global.fetch;
 
       await request('https://api.example.com/test?public=data&other=value');
 
-      assert.ok(true);
+      assert.ok(capturedUrl.includes('public=data'), 'public param should be preserved');
+      assert.ok(capturedUrl.includes('other=value'), 'other param should be preserved');
     });
 
     it('should handle URL without query params', async () => {
-      global.fetch = async () =>
-        ({
+      let capturedUrl = '';
+      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
+        capturedUrl = String(_input);
+        return Promise.resolve({
           ok: true,
           status: 200,
           statusText: 'OK',
           json: async () => ({}),
-        }) as Response;
+        } as Response);
+      }) as typeof global.fetch;
 
       await request('https://api.example.com/test');
 
-      assert.ok(true);
+      assert.strictEqual(capturedUrl, 'https://api.example.com/test', 'URL without query params should pass through unchanged');
     });
   });
 
