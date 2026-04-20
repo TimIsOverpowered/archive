@@ -7,13 +7,14 @@ import { notFound } from '../../utils/http-error.js';
 import { tenantMiddleware } from '../middleware/tenant-platform.js';
 import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
 import { INT32_MAX } from '../../constants.js';
-import type { PrismaClient } from '../../../generated/streamer/client.js';
+import type { Kysely } from 'kysely';
+import type { StreamerDB } from '../../db/streamer-types';
 
 interface VodRoutesOptions {
   prefix: string;
 }
 
-async function fetchVodByIdSafe(vodId: string, db: PrismaClient, tenantId: string) {
+async function fetchVodByIdSafe(vodId: string, db: Kysely<StreamerDB>, tenantId: string) {
   const vodIdNum = Number(vodId);
   if (isNaN(vodIdNum) || vodIdNum < 0 || vodIdNum > INT32_MAX) {
     notFound('VOD not found');

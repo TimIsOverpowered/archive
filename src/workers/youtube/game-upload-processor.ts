@@ -1,4 +1,5 @@
-import type { PrismaClient } from '../../../generated/streamer/client.js';
+import type { Kysely } from 'kysely';
+import type { StreamerDB } from '../../db/streamer-types';
 import type { AppLogger } from '../../utils/logger.js';
 import { trimVideo, splitVideo, getDuration } from '../utils/ffmpeg.js';
 import { uploadVideo } from '../../services/youtube/index.js';
@@ -22,7 +23,7 @@ export interface GameUploadContext {
   chapterGameId?: string;
   title: string;
   description: string;
-  db: PrismaClient;
+  db: Kysely<StreamerDB>;
   config: TenantConfig;
   log: AppLogger;
 }
@@ -105,9 +106,9 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     game_id: chapterGameId,
     game_name: chapterName,
   });
-  const createdGameRecord = await db.game.upsert({
-    where: { vod_id_start_time_end_time: { vod_id: dbId, start_time: chapterStart, end_time: chapterEnd } },
-    create: {
+  const gameRecord = await db
+    .insertInto('games')
+    .values({
       vod_id: dbId,
       start_time: chapterStart,
       end_time: chapterEnd,
@@ -117,15 +118,25 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
       game_id: chapterGameId,
       game_name: chapterName,
       title: chapterName,
-    },
-    update: { video_id: result.videoId, thumbnail_url: result.thumbnailUrl || null },
-  });
+    })
+    .onConflict((oc) =>
+      oc.columns(['vod_id', 'start_time', 'end_time']).doUpdateSet({
+        video_provider: 'youtube',
+        video_id: result.videoId,
+        thumbnail_url: result.thumbnailUrl || null,
+        game_id: chapterGameId,
+        game_name: chapterName,
+        title: chapterName,
+      })
+    )
+    .returning('id')
+    .executeTakeFirst();
 
   await publishVodUpdate(tenantId, dbId);
 
   await deleteFileIfExists(trimmedPath);
 
-  return { success: true, videoId: result.videoId, gameId: String(createdGameRecord.id) };
+  return { success: true, videoId: result.videoId, gameId: String(gameRecord!.id) };
 }
 
 async function processSplitGameUpload(
@@ -216,15 +227,9 @@ async function processSplitGameUpload(
       game_id: chapterGameId,
       game_name: chapterName,
     });
-    const createdGameRecord = await db.game.upsert({
-      where: {
-        vod_id_start_time_end_time: {
-          vod_id: dbId,
-          start_time: startTime + chapterStart,
-          end_time: endTime + chapterStart,
-        },
-      },
-      create: {
+    const gameRecord = await db
+      .insertInto('games')
+      .values({
         vod_id: dbId,
         start_time: startTime + chapterStart,
         end_time: endTime + chapterStart,
@@ -234,9 +239,19 @@ async function processSplitGameUpload(
         game_id: chapterGameId,
         game_name: chapterName,
         title: chapterName,
-      },
-      update: { video_id: result.videoId, thumbnail_url: result.thumbnailUrl || null },
-    });
+      })
+      .onConflict((oc) =>
+        oc.columns(['vod_id', 'start_time', 'end_time']).doUpdateSet({
+          video_provider: 'youtube',
+          video_id: result.videoId,
+          thumbnail_url: result.thumbnailUrl || null,
+          game_id: chapterGameId,
+          game_name: chapterName,
+          title: chapterName,
+        })
+      )
+      .returning('id')
+      .executeTakeFirst();
 
     await publishVodUpdate(tenantId, dbId);
 
@@ -245,7 +260,7 @@ async function processSplitGameUpload(
       part: currentPartNum,
       startTime,
       endTime,
-      gameId: String(createdGameRecord.id),
+      gameId: String(gameRecord!.id),
     });
 
     if (!config.settings.saveMP4) {

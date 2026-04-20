@@ -1,6 +1,6 @@
 import type { TwitchChatEdge, TwitchChatMessageNode, TwitchCommentsConnection } from '../../services/twitch/index.js';
-import type { PrismaClient } from '../../../generated/streamer/client';
-import { InputJsonValue } from '../../../generated/streamer/internal/prismaNamespace.js';
+import type { Kysely } from 'kysely';
+import type { StreamerDB } from '../../db/streamer-types';
 
 /**
  * Removes __typename fields from GraphQL response objects recursively.
@@ -46,7 +46,7 @@ export function extractEdges(
  * If no manual startOffset is provided, checks for existing chat data and resumes from the last saved offset.
  */
 export async function calculateResumeOffset(
-  db: PrismaClient,
+  db: Kysely<StreamerDB>,
   vodId: number,
   manualStartOffset?: number
 ): Promise<{ offset: number; hasExistingData: boolean; lastMessageId?: string }> {
@@ -54,11 +54,12 @@ export async function calculateResumeOffset(
     return { offset: manualStartOffset, hasExistingData: false };
   }
 
-  const lastSavedRecord = await db.chatMessage.findFirst({
-    where: { vod_id: vodId },
-    orderBy: { content_offset_seconds: 'desc' },
-    select: { id: true, content_offset_seconds: true },
-  });
+  const lastSavedRecord = await db
+    .selectFrom('chat_messages')
+    .select(['id', 'content_offset_seconds'])
+    .where('vod_id', '=', vodId)
+    .orderBy('content_offset_seconds', 'desc')
+    .executeTakeFirst();
 
   if (!lastSavedRecord?.content_offset_seconds) {
     return { offset: 0, hasExistingData: false };
@@ -69,8 +70,8 @@ export async function calculateResumeOffset(
 }
 
 export function extractMessageData(node: TwitchChatMessageNode | null | undefined): {
-  message: InputJsonValue;
-  userBadges?: InputJsonValue;
+  message: Record<string, unknown>;
+  userBadges?: Record<string, unknown>;
 } {
   if (!node || !node.message) {
     return { message: { content: '', fragments: [] }, userBadges: undefined };
@@ -93,7 +94,7 @@ export function extractMessageData(node: TwitchChatMessageNode | null | undefine
     },
     userBadges:
       badgesRaw && typeof stripTypename(badgesRaw) === 'object'
-        ? (stripTypename(badgesRaw) as InputJsonValue)
+        ? (stripTypename(badgesRaw) as Record<string, unknown>)
         : undefined,
   };
 }

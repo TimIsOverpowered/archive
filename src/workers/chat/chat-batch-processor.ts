@@ -1,4 +1,5 @@
-import type { PrismaClient } from '../../../generated/streamer/client';
+import type { Kysely } from 'kysely';
+import type { StreamerDB } from '../../db/streamer-types';
 import type { ChatMessageCreateInput } from './chat-types.js';
 import type { AppLogger } from '../../utils/logger.js';
 import { retryWithBackoff } from '../../utils/retry.js';
@@ -10,7 +11,7 @@ export interface FlushBatchResult {
 }
 
 export interface FlushBatchOptions {
-  db: PrismaClient;
+  db: Kysely<StreamerDB>;
   buffer: ChatMessageCreateInput[];
   log: AppLogger;
   vodId: string;
@@ -27,10 +28,18 @@ export async function flushChatBatch(options: FlushBatchOptions): Promise<FlushB
     return { totalMessages, batchCount };
   }
 
-  await retryWithBackoff(() => db.chatMessage.createMany({ data: buffer, skipDuplicates: true }), {
-    attempts: CHAT_MAX_RETRIES,
-    baseDelayMs: CHAT_RETRY_DELAY_MS,
-  });
+  await retryWithBackoff(
+    () =>
+      (db as any)
+        .insertInto('chat_messages')
+        .values(buffer)
+        .onConflict((oc: any) => oc.column('id').doNothing())
+        .execute(),
+    {
+      attempts: CHAT_MAX_RETRIES,
+      baseDelayMs: CHAT_RETRY_DELAY_MS,
+    }
+  );
 
   const newTotalMessages = totalMessages + buffer.length;
   const newBatchCount = batchCount + 1;

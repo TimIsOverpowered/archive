@@ -102,16 +102,20 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
         duration: Number(duration) || 0,
         platform,
       });
-      const newVod = await db.vod.create({
-        data: strategy
-          ? strategy.createVodData({
-              id: validatedData.vod_id,
-              title: validatedData.title || '',
-              createdAt: validatedData.created_at.toISOString(),
-              duration: validatedData.duration,
-            })
-          : validatedData,
-      });
+      const newVod = (await db
+        .insertInto('vods')
+        .values(
+          strategy
+            ? (strategy.createVodData({
+                id: validatedData.vod_id,
+                title: validatedData.title || '',
+                createdAt: validatedData.created_at.toISOString(),
+                duration: validatedData.duration,
+              }) as any)
+            : validatedData
+        )
+        .returning(['id', 'vod_id', 'platform', 'title', 'duration', 'stream_id', 'created_at'])
+        .executeTakeFirst()) as any;
 
       await invalidateVodStaticCache(tenantId, newVod.id);
       await invalidateVodVolatileCache(tenantId, newVod.id);
@@ -156,7 +160,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
-      await db.vod.delete({ where: { platform_vod_id: { vod_id: vodId, platform } } });
+      await db.deleteFrom('vods').where('platform', '=', platform).where('vod_id', '=', vodId).execute();
 
       await invalidateVodStaticCache(tenantId, vodRecord.id);
       await invalidateVodVolatileCache(tenantId, vodRecord.id);

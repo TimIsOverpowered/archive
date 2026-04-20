@@ -26,9 +26,12 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
       continue;
     }
 
-    const activeLiveVod = await db.vod.findFirst({
-      where: { platform, is_live: true },
-    });
+    const activeLiveVod = await db
+      .selectFrom('vods')
+      .selectAll()
+      .where('platform', '=', platform)
+      .where('is_live', '=', true)
+      .executeTakeFirst();
 
     if (activeLiveVod) {
       log.debug({ platform, vodId: activeLiveVod.vod_id }, '[Monitor] Skipping - live worker active');

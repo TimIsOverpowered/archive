@@ -1,10 +1,12 @@
-import { PrismaClient } from '../../generated/streamer/client.js';
+import { sql } from 'kysely';
 import dayjs from 'dayjs';
 import { getTenantConfig, getConfigs } from '../config/loader.js';
 import { withCache } from '../utils/cache.js';
 import { PLATFORMS } from '../types/platforms.js';
 import { PERCENTAGE_PRECISION_MULTIPLIER, PERCENTAGE_PRECISION_DIVISOR } from '../constants.js';
 import type { TenantConfig } from '../config/types.js';
+import type { Kysely } from 'kysely';
+import type { StreamerDB } from '../db/streamer-types';
 
 export function getEnabledPlatforms(config: Pick<TenantConfig, 'twitch' | 'kick'>): string[] {
   const platforms: string[] = [];
@@ -45,7 +47,7 @@ interface TenantStats {
   };
 }
 
-export async function getTenantStats(client: PrismaClient, tenantId: string, cacheTtl = 60): Promise<TenantStats> {
+export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, cacheTtl = 60): Promise<TenantStats> {
   const config = getTenantConfig(tenantId);
 
   if (!config) {
@@ -61,31 +63,41 @@ export async function getTenantStats(client: PrismaClient, tenantId: string, cac
   return await withCache(cacheKey, cacheTtl, async () => {
     let dbStatus = 'connected';
     try {
-      await client.$queryRaw`SELECT 1`;
+      await sql`SELECT 1`.execute(db);
     } catch {
       dbStatus = 'error';
     }
 
     const [vodStats, uploadStats, chapterCount, thisMonthCount, uniqueGamesCount] = await Promise.all([
-      client.vod.groupBy({
-        by: ['platform'],
-        _count: { id: true },
-        _sum: { duration: true },
-        _max: { created_at: true },
-      }),
-      client.vodUpload.aggregate({
-        where: { status: 'FAILED' },
-        _count: { upload_id: true },
-      }),
-      client.chapter.count(),
-      client.vod.count({
-        where: { created_at: { gte: thisMonthStart } },
-      }),
-      client.chapter.findMany({
-        distinct: ['game_id'],
-        select: { game_id: true },
-        where: { game_id: { not: null } },
-      }),
+      db
+        .selectFrom('vods')
+        .select((eb) => [
+          'platform',
+          eb.fn.count<number>('id').as('cnt'),
+          eb.fn.sum<number>('duration').as('dur'),
+          eb.fn.max('created_at').as('last'),
+        ])
+        .groupBy('platform')
+        .execute(),
+      db
+        .selectFrom('vod_uploads')
+        .select((eb) => [eb.fn.count<number>('upload_id').as('cnt')])
+        .where('status', '=', 'FAILED')
+        .executeTakeFirst(),
+      (
+        await db
+          .selectFrom('chapters')
+          .select((eb) => [eb.fn.count<number>('id').as('cnt')])
+          .executeTakeFirst()
+      )?.cnt ?? 0,
+      (
+        await db
+          .selectFrom('vods')
+          .select((eb) => [eb.fn.count<number>('id').as('cnt')])
+          .where('created_at', '>=', thisMonthStart)
+          .executeTakeFirst()
+      )?.cnt ?? 0,
+      db.selectFrom('chapters').select('game_id').where('game_id', 'is not', null).groupBy('game_id').execute(),
     ]);
 
     const byPlatform: Record<string, number> = {};
@@ -93,25 +105,33 @@ export async function getTenantStats(client: PrismaClient, tenantId: string, cac
     let lastVodDate: Date | null = null;
 
     for (const stat of vodStats) {
-      byPlatform[stat.platform] = stat._count.id;
-      totalDurationSeconds += stat._sum.duration ?? 0;
-      if (stat._max.created_at && (!lastVodDate || stat._max.created_at > lastVodDate)) {
-        lastVodDate = stat._max.created_at;
+      byPlatform[stat.platform] = stat.cnt;
+      totalDurationSeconds += stat.dur ?? 0;
+      if (stat.last && (!lastVodDate || stat.last > lastVodDate)) {
+        lastVodDate = stat.last;
       }
     }
 
-    const failedUploads = uploadStats._count.upload_id;
-    const totalUploadsResult = await client.vodUpload.count({
-      where: { status: { in: ['COMPLETED', 'FAILED'] } },
-    });
+    const failedUploads = uploadStats?.cnt ?? 0;
+    const totalUploadsResult =
+      (
+        await db
+          .selectFrom('vod_uploads')
+          .select((eb) => [eb.fn.count<number>('upload_id').as('cnt')])
+          .where('status', 'in', ['COMPLETED', 'FAILED'])
+          .executeTakeFirst()
+      )?.cnt ?? 0;
     const completedUploads = totalUploadsResult - failedUploads;
-    const lastUploadDateResult = await client.vodUpload.findMany({
-      where: { status: 'COMPLETED' },
-      orderBy: { created_at: 'desc' },
-      take: 1,
-      select: { created_at: true },
-    });
-    const lastUploadDate = lastUploadDateResult.length > 0 ? lastUploadDateResult[0].created_at : null;
+    const lastUploadDate =
+      (
+        await db
+          .selectFrom('vod_uploads')
+          .select('created_at')
+          .where('status', '=', 'COMPLETED')
+          .orderBy('created_at', 'desc')
+          .limit(1)
+          .executeTakeFirst()
+      )?.created_at ?? null;
 
     const uploadSuccessRate =
       totalUploadsResult > 0
@@ -119,7 +139,7 @@ export async function getTenantStats(client: PrismaClient, tenantId: string, cac
           PERCENTAGE_PRECISION_DIVISOR
         : 0;
 
-    const uniqueGames = new Set(uniqueGamesCount.map((g) => g.game_id));
+    const uniqueGames = new Set(uniqueGamesCount.map((g: { game_id: string | null }) => g.game_id));
 
     const stats: TenantStats = {
       tenant: {
@@ -133,7 +153,7 @@ export async function getTenantStats(client: PrismaClient, tenantId: string, cac
         lastChecked: new Date(),
       },
       vods: {
-        totalCount: vodStats.reduce((sum, s) => sum + s._count.id, 0),
+        totalCount: vodStats.reduce((sum: number, s: { cnt: number }) => sum + s.cnt, 0),
         byPlatform,
         totalHours: Math.round((totalDurationSeconds / 3600) * 10) / 10,
         lastVodDate,

@@ -1,5 +1,6 @@
-import { PrismaClient } from '../../generated/streamer/client.js';
-import type { ChatMessage as PrismaChatMessage } from '../../generated/streamer/client.js';
+import { sql } from 'kysely';
+import type { Kysely } from 'kysely';
+import type { StreamerDB, SelectableChatMessages } from '../db/streamer-types.js';
 import { RedisService } from '../utils/redis-service.js';
 import { getDisableRedisCache } from '../config/env-accessors.js';
 import { getApiConfig } from '../config/env.js';
@@ -22,7 +23,7 @@ function computeBucketSize(commentsPer100s: number): number {
   return BOUNDARIES.reduce((prev, curr) => (Math.abs(curr - raw) < Math.abs(prev - raw) ? curr : prev));
 }
 
-async function getVodBucketSize(client: PrismaClient, tenantId: string, vodId: number): Promise<number> {
+async function getVodBucketSize(db: Kysely<StreamerDB>, tenantId: string, vodId: number): Promise<number> {
   const key = `${tenantId}:${vodId}:bucketSize`;
 
   const redis = RedisService.instance?.getClient() ?? null;
@@ -38,14 +39,14 @@ async function getVodBucketSize(client: PrismaClient, tenantId: string, vodId: n
     }
   }
 
-  const rawResult = await client.$queryRaw<Array<{ comments_per_100s: number | null }>>`
+  const rawResult = await sql`
     SELECT
       COUNT(*) / NULLIF((MAX(content_offset_seconds) - MIN(content_offset_seconds)), 0) * 100 AS comments_per_100s
     FROM chat_messages
     WHERE vod_id = ${vodId}
-  `;
+  `.execute(db);
 
-  const row = (rawResult as unknown[])[0] as { comments_per_100s?: unknown };
+  const row = (rawResult.rows as unknown[])[0] as { comments_per_100s?: unknown };
   const commentsPer100sValue = parseFloat(String(row?.comments_per_100s ?? ''));
   const bucketSize = isFinite(commentsPer100sValue)
     ? computeBucketSize(commentsPer100sValue)
@@ -63,12 +64,12 @@ async function getVodBucketSize(client: PrismaClient, tenantId: string, vodId: n
 }
 
 export async function getLogsByOffset(
-  client: PrismaClient,
+  db: Kysely<StreamerDB>,
   tenantId: string,
   vodId: number,
   offsetSeconds: number
-): Promise<{ comments: PrismaChatMessage[]; cursor?: string }> {
-  const bucketSize = await getVodBucketSize(client, tenantId, vodId);
+): Promise<{ comments: SelectableChatMessages[]; cursor?: string }> {
+  const bucketSize = await getVodBucketSize(db, tenantId, vodId);
   const bucket = Math.floor(offsetSeconds / bucketSize) * bucketSize;
   const cacheKey = `${tenantId}:${vodId}:bucket:${bucket}`;
   const redis = RedisService.instance?.getClient() ?? null;
@@ -78,7 +79,7 @@ export async function getLogsByOffset(
       const cached = await redis.getBuffer(cacheKey);
       if (cached) {
         getLogger().debug({ vodId, bucket }, '[CACHE HIT] bucket');
-        const data = (await decompressChatData(cached)) as { comments: PrismaChatMessage[]; cursor?: string };
+        const data = (await decompressChatData(cached)) as { comments: SelectableChatMessages[]; cursor?: string };
         return data;
       }
     } catch (error) {
@@ -87,14 +88,24 @@ export async function getLogsByOffset(
     }
   }
 
-  const data = await client.chatMessage.findMany({
-    where: {
-      vod_id: vodId,
-      content_offset_seconds: { gte: bucket },
-    },
-    orderBy: [{ content_offset_seconds: 'asc' }, { createdAt: 'asc' }],
-    take: LOGS_PAGE_SIZE + 1,
-  });
+  const data = await db
+    .selectFrom('chat_messages')
+    .select([
+      'id',
+      'vod_id',
+      'display_name',
+      'content_offset_seconds',
+      'user_color',
+      'created_at',
+      'message',
+      'user_badges',
+    ])
+    .where('vod_id', '=', vodId)
+    .where('content_offset_seconds', '>=', bucket)
+    .orderBy('content_offset_seconds', 'asc')
+    .orderBy('created_at', 'asc')
+    .limit(LOGS_PAGE_SIZE + 1)
+    .execute();
 
   if (!data || data.length === 0) {
     return { comments: [], cursor: undefined };
@@ -105,12 +116,12 @@ export async function getLogsByOffset(
   let cursor: string | undefined;
   if (data.length === LOGS_PAGE_SIZE + 1) {
     const lastMsg = data[LOGS_PAGE_SIZE];
-    if (!lastMsg.createdAt) {
-      throw new Error(`Missing createdAt on message ${lastMsg.id}`);
+    if (!lastMsg.created_at) {
+      throw new Error(`Missing created_at on message ${lastMsg.id}`);
     }
     const cursorData: CursorData = {
       offset: lastMsg.content_offset_seconds,
-      createdAt: lastMsg.createdAt.toISOString(),
+      createdAt: lastMsg.created_at.toISOString(),
       id: lastMsg.id,
     };
     cursor = Buffer.from(JSON.stringify(cursorData)).toString('base64');
@@ -132,11 +143,11 @@ export async function getLogsByOffset(
 }
 
 export async function getLogsByCursor(
-  client: PrismaClient,
+  db: Kysely<StreamerDB>,
   tenantId: string,
   vodId: number,
   cursor: string
-): Promise<{ comments: PrismaChatMessage[]; cursor?: string }> {
+): Promise<{ comments: SelectableChatMessages[]; cursor?: string }> {
   const cacheKey = `${tenantId}:${vodId}:cursor:${cursor}`;
   const redis = RedisService.instance?.getClient() ?? null;
 
@@ -146,7 +157,7 @@ export async function getLogsByCursor(
       if (cached) {
         getLogger().debug({ vodId }, '[CACHE HIT] cursor');
 
-        const data = (await decompressChatData(cached)) as { comments: PrismaChatMessage[]; cursor?: string };
+        const data = (await decompressChatData(cached)) as { comments: SelectableChatMessages[]; cursor?: string };
         return data;
       }
     } catch (error) {
@@ -171,20 +182,35 @@ export async function getLogsByCursor(
     badRequest('Invalid cursor: invalid date');
   }
 
-  const data = await client.chatMessage.findMany({
-    where: {
-      vod_id: vodId,
-      OR: [
-        { content_offset_seconds: { gt: cursorJson.offset } },
-        {
-          content_offset_seconds: cursorJson.offset,
-          OR: [{ createdAt: { gt: cursorDate } }, { createdAt: cursorDate, id: { gt: cursorJson.id } }],
-        },
-      ],
-    },
-    orderBy: [{ content_offset_seconds: 'asc' }, { createdAt: 'asc' }],
-    take: LOGS_PAGE_SIZE + 1,
-  });
+  const data = await db
+    .selectFrom('chat_messages')
+    .select([
+      'id',
+      'vod_id',
+      'display_name',
+      'content_offset_seconds',
+      'user_color',
+      'created_at',
+      'message',
+      'user_badges',
+    ])
+    .where('vod_id', '=', vodId)
+    .where((eb) =>
+      eb.or([
+        eb('content_offset_seconds', '>', cursorJson.offset!),
+        eb.and([
+          eb('content_offset_seconds', '=', cursorJson.offset!),
+          eb.or([
+            eb('created_at', '>', cursorDate),
+            eb.and([eb('created_at', '=', cursorDate), eb('id', '>', cursorJson.id!)]),
+          ]),
+        ]),
+      ])
+    )
+    .orderBy('content_offset_seconds', 'asc')
+    .orderBy('created_at', 'asc')
+    .limit(LOGS_PAGE_SIZE + 1)
+    .execute();
 
   if (!data || data.length === 0) {
     return { comments: [], cursor: undefined };
@@ -195,12 +221,12 @@ export async function getLogsByCursor(
   let nextCursor: string | undefined;
   if (data.length === LOGS_PAGE_SIZE + 1) {
     const lastMsg = data[LOGS_PAGE_SIZE];
-    if (!lastMsg.createdAt) {
-      throw new Error(`Missing createdAt on message ${lastMsg.id}`);
+    if (!lastMsg.created_at) {
+      throw new Error(`Missing created_at on message ${lastMsg.id}`);
     }
     const cursorData: CursorData = {
       offset: lastMsg.content_offset_seconds,
-      createdAt: lastMsg.createdAt.toISOString(),
+      createdAt: lastMsg.created_at.toISOString(),
       id: lastMsg.id,
     };
     nextCursor = Buffer.from(JSON.stringify(cursorData)).toString('base64');

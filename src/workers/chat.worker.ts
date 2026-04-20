@@ -11,7 +11,8 @@ import type { ChatMessageCreateInput } from './chat/chat-types.js';
 import { PLATFORMS, type Platform } from '../types/platforms.js';
 import { flushChatBatch } from './chat/chat-batch-processor.js';
 import { createChatWorkerAlerts } from './utils/alert-factories.js';
-import type { PrismaClient } from '../../generated/streamer/client.js';
+import type { Kysely } from 'kysely';
+import type { StreamerDB } from '../db/streamer-types';
 
 interface ChatProcessorState {
   tenantId: string;
@@ -22,7 +23,7 @@ interface ChatProcessorState {
   log: ReturnType<typeof createAutoLogger>;
   chatAlerts: ReturnType<typeof createChatWorkerAlerts>;
   messageId: string;
-  db: PrismaClient;
+  db: Kysely<StreamerDB>;
 }
 
 const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
@@ -133,7 +134,7 @@ async function initChatAlert(
 }
 
 async function checkAlreadyComplete(
-  db: PrismaClient,
+  db: Kysely<StreamerDB>,
   dbId: number,
   vodId: string,
   effectiveOffset: number,
@@ -145,7 +146,14 @@ async function checkAlreadyComplete(
   log: ReturnType<typeof createAutoLogger>
 ): Promise<ChatDownloadResult | null> {
   if (duration !== 0 && effectiveOffset >= duration) {
-    const totalMessages = await db.chatMessage.count({ where: { vod_id: dbId } });
+    const totalMessages =
+      (
+        await db
+          .selectFrom('chat_messages')
+          .select((eb) => [eb.fn.count<number>('id').as('cnt')])
+          .where('vod_id', '=', dbId)
+          .executeTakeFirst()
+      )?.cnt ?? 0;
     log.info(
       { vodId, effectiveOffset, duration, totalMessages },
       'Chat download already complete (offset exceeds duration)'
@@ -165,7 +173,14 @@ async function checkAlreadyComplete(
       const lastFetchedMessageId = edges[edges.length - 1]?.node?.id;
 
       if (lastFetchedMessageId === lastMessageId) {
-        const totalMessages = await db.chatMessage.count({ where: { vod_id: dbId } });
+        const totalMessages =
+          (
+            await db
+              .selectFrom('chat_messages')
+              .select((eb) => [eb.fn.count<number>('id').as('cnt')])
+              .where('vod_id', '=', dbId)
+              .executeTakeFirst()
+          )?.cnt ?? 0;
         log.info({ vodId, lastMessageId, totalMessages }, 'Chat download already complete');
         resetFailures(tenantId);
         void updateAlert(

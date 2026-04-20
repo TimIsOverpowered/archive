@@ -35,7 +35,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     throw new Error(`YouTube not configured for tenant ${tenantId}`);
   }
 
-  const vodRecord = await db.vod.findUnique({ where: { id: dbId } });
+  const vodRecord = await db.selectFrom('vods').where('id', '=', dbId).selectAll().executeTakeFirst();
 
   if (!vodRecord) {
     throw new Error(`VOD not found in database for streamer ${tenantId}`);

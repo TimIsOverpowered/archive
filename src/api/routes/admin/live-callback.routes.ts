@@ -102,10 +102,11 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
       // Update duration if provided and different from current value
       if (request.body.durationSecs && vodRecord.duration !== request.body.durationSecs) {
         VodUpdateSchema.parse({ duration: request.body.durationSecs });
-        await db.vod.update({
-          where: { id: vodRecord.id },
-          data: { duration: request.body.durationSecs },
-        });
+        await db
+          .updateTable('vods')
+          .set({ duration: request.body.durationSecs })
+          .where('id', '=', vodRecord.id)
+          .execute();
 
         await publishVodDurationUpdate(tenantId, vodRecord.id, request.body.durationSecs, vodRecord.is_live);
 
