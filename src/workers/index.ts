@@ -13,6 +13,7 @@ import { loadWorkersConfig } from '../config/env.js';
 import { VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY } from '../constants.js';
 import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/client.js';
 import { registerPlatformStrategies } from '../services/platforms/index.js';
+import { closeMetaClient } from '../db/meta-client.js';
 
 async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkersConfig>) {
   if (!workerConfig.CLEAR_QUEUES_ON_STARTUP) return;
@@ -97,6 +98,7 @@ function registerShutdownHandlers() {
 
     await stopClientCleanup();
     await closeAllClients();
+    await closeMetaClient();
     await closeWorkersRedis();
     clearConfigCache();
     setTimeout(() => process.exit(0), 100);

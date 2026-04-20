@@ -1,11 +1,11 @@
 import { LRUCache } from 'lru-cache';
-import { initMetaClient, getMetaClient } from '../db/meta-client.js';
+import { initMetaClient } from '../db/meta-client.js';
+import { getAllTenants, getTenantById } from '../services/meta-tenants.service.js';
 import { decryptScalar } from '../utils/encryption.js';
 import { SettingsSchema, YoutubeSchema, TwitchSchema, KickSchema } from './schemas.js';
 import { TenantConfig } from './types.js';
 import { getConfigCacheTtl } from './env.js';
-import type { JsonObject } from '@prisma/client/runtime/client';
-import type { TenantModel } from '../../prisma/generated/meta/models/Tenant.js';
+import type { TenantResult } from '../db/meta-types.js';
 
 let configCache: LRUCache<string, TenantConfig> | null = null;
 
@@ -33,12 +33,12 @@ function asJsonObject(val: unknown): Record<string, unknown> | null {
   return val && typeof val === 'object' && !Array.isArray(val) ? (val as Record<string, unknown>) : null;
 }
 
-function buildTenantConfig(tenant: TenantModel): TenantConfig | null {
+function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
   if (!tenant.databaseUrl) return null;
 
   const dbUrl = decryptScalar(tenant.databaseUrl);
 
-  const settingsObj: JsonObject =
+  const settingsObj: Record<string, unknown> =
     tenant.settings && typeof tenant.settings === 'object' && !Array.isArray(tenant.settings) ? tenant.settings : {};
   const settings = SettingsSchema.parse(settingsObj);
 
@@ -50,7 +50,7 @@ function buildTenantConfig(tenant: TenantModel): TenantConfig | null {
 
   const tenantConfig: TenantConfig = {
     id: tenant.id,
-    displayName: tenant.displayName,
+    displayName: tenant.displayName ?? undefined,
     createdAt: tenant.createdAt,
     database: { url: dbUrl },
     settings,
@@ -84,7 +84,7 @@ function buildTenantConfig(tenant: TenantModel): TenantConfig | null {
 
 export async function loadTenantConfigs(): Promise<TenantConfig[]> {
   await initMetaClient();
-  const tenants = await getMetaClient().tenant.findMany();
+  const tenants = await getAllTenants();
   if (tenants.length === 0) return [];
 
   const cache = getCache();
@@ -99,7 +99,7 @@ export async function loadTenantConfigs(): Promise<TenantConfig[]> {
 
 export async function reloadTenantConfig(tenantId: string): Promise<TenantConfig | undefined> {
   await initMetaClient();
-  const tenant = await getMetaClient().tenant.findUnique({ where: { id: tenantId } });
+  const tenant = await getTenantById(tenantId);
   if (!tenant) return undefined;
 
   const config = buildTenantConfig(tenant);

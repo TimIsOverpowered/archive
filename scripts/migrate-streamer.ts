@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import 'dotenv/config';
-import { PrismaClient } from '../prisma/generated/meta/index.js';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { initMetaClient, getMetaClient, closeMetaClient } from '../src/db/meta-client.js';
 import readline from 'readline';
 import { extractErrorDetails } from '../src/utils/error.js';
 import { decryptScalar } from '../src/utils/encryption.js';
@@ -15,8 +14,8 @@ if (!META_DB_URL) {
   process.exit(1);
 }
 
-const adapter = new PrismaPg({ connectionString: META_DB_URL });
-const metaClient = new PrismaClient({ adapter });
+await initMetaClient();
+const metaClient = getMetaClient();
 
 const createInterface = () => readline.createInterface({ input: process.stdin, output: process.stdout });
 
@@ -425,28 +424,25 @@ const main = async () => {
 
   let dbUrl: string | null;
   try {
-    const tenant = await metaClient.tenant.findUnique({
-      where: { id: streamerName },
-      select: { databaseUrl: true },
-    });
+    const tenant = await metaClient.selectFrom('tenants').select('database_url').where('id', '=', streamerName).executeTakeFirst();
 
-    if (!tenant?.databaseUrl) {
+    if (!tenant?.database_url) {
       console.error(`❌ Tenant "${streamerName}" not found in meta database`);
       process.exit(1);
     }
 
     try {
-      dbUrl = decryptScalar(tenant.databaseUrl as string);
+      dbUrl = decryptScalar(tenant.database_url as string);
     } catch (decryptError) {
       const details = extractErrorDetails(decryptError);
       console.error('❌ Failed to decrypt database URL:', details.message);
-      await metaClient.$disconnect();
+      await closeMetaClient();
       process.exit(1);
     }
   } catch (error) {
     const details = extractErrorDetails(error);
     console.error('❌ Failed to fetch tenant from meta database:', details.message);
-    await metaClient.$disconnect();
+    await closeMetaClient();
     process.exit(1);
   }
 
@@ -682,7 +678,7 @@ const main = async () => {
         schemaClientReleased = true;
         schemaClient.release();
         if (!poolEnded) await oldPool.end();
-        await metaClient.$disconnect();
+        await closeMetaClient();
         process.exit(1);
       } finally {
         if (!schemaClientReleased) schemaClient.release();
@@ -871,7 +867,7 @@ const main = async () => {
         }
 
         if (!poolEnded) await oldPool.end();
-        await metaClient.$disconnect();
+        await closeMetaClient();
         process.exit(1);
       }
     } catch (migrationError) {
@@ -888,7 +884,7 @@ const main = async () => {
       process.exit(1);
     } finally {
       if (!poolEnded) await oldPool.end();
-      await metaClient.$disconnect();
+      await closeMetaClient();
     }
   } catch (initError) {
     errors.push(`Initialization error: ${String(initError)}`);

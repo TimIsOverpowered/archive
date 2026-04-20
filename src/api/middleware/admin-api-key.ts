@@ -1,6 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { validateApiKey } from '../../services/admin.service.js';
-import { getMetaClient } from '../../db/meta-client.js';
+import { validateApiKey, findAdminByApiKey } from '../../services/admin.service.js';
 
 export interface AdminContext {
   adminId: number;
@@ -47,10 +46,7 @@ export default async function adminApiKeyMiddleware(request: FastifyRequest, rep
     });
   }
 
-  const admin = await getMetaClient().admin.findFirst({
-    where: { api_key: apiKey },
-    select: { id: true, username: true },
-  });
+  const admin = await findAdminByApiKey(apiKey);
 
   if (!admin) {
     return reply.status(403).send({

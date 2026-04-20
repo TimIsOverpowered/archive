@@ -13,11 +13,10 @@ import http from 'http';
 import open from 'open';
 import readline from 'readline';
 import { z } from 'zod';
-import { Prisma } from '../prisma/generated/meta/index.js';
-import { initMetaClient, getMetaClient } from '../src/db/meta-client.js';
+import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
 import { extractErrorDetails } from '../src/utils/error.js';
 import { YoutubeAuthSchema, YoutubeAuthObject, YoutubeSchema } from '../src/config/schemas.js';
-import type { Tenant } from '../prisma/generated/meta/index.js';
+import { getTenantById } from '../src/services/meta-tenants.service.js';
 import { encryptScalar, decryptObject } from '../src/utils/encryption.js';
 
 program.name('auth-youtube').description('YouTube OAuth authentication CLI tool').version('1.0.0');
@@ -114,11 +113,9 @@ function showManualPasteInstructions(authUrl: string, tenantId: string): void {
   console.log(`• Just the authorization code (the value after "code=" in the URL)\n`);
 }
 
-async function getTenant(streamerIdOrName: string): Promise<Tenant | null> {
+async function getTenant(streamerIdOrName: string): Promise<any | null> {
   try {
-    const tenant = await getMetaClient().tenant.findUnique({
-      where: { id: streamerIdOrName },
-    });
+    const tenant = await getTenantById(streamerIdOrName);
 
     if (!tenant) {
       console.error(`Tenant not found: ${streamerIdOrName}`);
@@ -429,17 +426,15 @@ async function storeAuthObject(tenantId: string, authObject: YoutubeAuthObject):
 
     youtubeConfig.auth = encryptedAuthValue;
 
-    // Store as JSON object (Prisma handles serialization properly) - DO NOT stringify here!
-    await getMetaClient().tenant.update({
-      where: { id: tenantId },
-      data: { youtube: youtubeConfig }, // Pass raw JS object, not stringified version!
-    });
+    // Store as JSON object - DO NOT stringify here!
+    await getMetaClient()
+      .updateTable('tenants')
+      .set({ youtube: youtubeConfig as any })
+      .where('id', '=', tenantId)
+      .execute();
 
     console.log('\n=== Auth Object Stored Successfully ===\n');
   } catch (error: unknown) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-      throw new Error(`Tenant not found in database: ${tenantId}`);
-    }
     const details = extractErrorDetails(error);
     throw new Error(details.message);
   }

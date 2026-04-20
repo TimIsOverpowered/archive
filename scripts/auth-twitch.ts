@@ -1,10 +1,11 @@
 import 'dotenv/config';
 import * as readline from 'readline';
 import { z } from 'zod';
-import { initMetaClient, getMetaClient } from '../src/db/meta-client.js';
+import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
 import { encryptObject, validateEncryptionKey } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
 import { TwitchAuthSchema, TwitchAuthObject, TwitchSchema } from '../src/config/schemas.js';
+import { getTenantById, updateTenant } from '../src/services/meta-tenants.service.js';
 
 // Validate encryption key at startup
 if (!process.env.ENCRYPTION_MASTER_KEY || !validateEncryptionKey(process.env.ENCRYPTION_MASTER_KEY)) {
@@ -108,9 +109,7 @@ async function main(): Promise<void> {
     }
 
     // Look up tenant in meta DB
-    const tenant = await getMetaClient().tenant.findUnique({
-      where: { id: tenantId },
-    });
+    const tenant = await getTenantById(tenantId);
 
     if (!tenant) {
       console.error('\n❌ Tenant not found:', tenantId);
@@ -237,12 +236,7 @@ async function main(): Promise<void> {
       };
     }
 
-    await getMetaClient().tenant.update({
-      where: { id: tenantId },
-      data: {
-        twitch: updatedTwitchConfig,
-      },
-    });
+    await updateTenant(tenantId, { twitch: updatedTwitchConfig as any });
 
     // Track the ID for potential rollback on error (though we're past that point)
     tenantIdToUpdate = tenantId;
@@ -276,7 +270,8 @@ async function main(): Promise<void> {
     // Rollback if tenant was partially updated
     if (tenantIdToUpdate !== null && process.argv.includes('--rollback')) {
       try {
-        await getMetaClient().tenant.delete({ where: { id: tenantIdToUpdate } });
+        const { deleteTenant } = await import('../src/services/meta-tenants.service.js');
+        await deleteTenant(tenantIdToUpdate);
         console.log('✓ Rolled back changes from meta DB');
       } catch (rollbackError) {
         const rollbackDetails = extractErrorDetails(rollbackError);
@@ -287,7 +282,7 @@ async function main(): Promise<void> {
     process.exit(1);
   } finally {
     rl.close();
-    await getMetaClient().$disconnect();
+    await closeMetaClient();
   }
 }
 

@@ -6,10 +6,11 @@ import * as readline from 'readline';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { Pool } from 'pg';
-import { initMetaClient, getMetaClient } from '../src/db/meta-client.js';
+import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
 import { encryptScalar, validateEncryptionKey } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
 import { normalizePath as pathNormalize } from '../src/utils/path';
+import { findTenantFirst, createTenant, deleteTenant } from '../src/services/meta-tenants.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -256,9 +257,7 @@ async function main(): Promise<void> {
     }
 
     // Check for duplicates
-    const existingTenant = await getMetaClient().tenant.findFirst({
-      where: { id: channelName },
-    });
+    const existingTenant = await findTenantFirst({ id: channelName });
     if (existingTenant) {
       console.error('❌ Tenant with this channel name already exists.');
       process.exit(1);
@@ -532,12 +531,10 @@ async function main(): Promise<void> {
     }
 
     // Step 2: Insert into meta DB with explicit ID
-    const createdTenant = await getMetaClient().tenant.create({
-      data: {
-        id: channelName,
-        ...tenantData,
-      },
-    });
+    const createdTenant = await createTenant({
+      id: channelName,
+      ...tenantData,
+    } as any);
     tenantId = createdTenant.id;
 
     // Success message
@@ -567,7 +564,7 @@ async function main(): Promise<void> {
       const rollback = await confirm('\nTenant was partially created. Rollback from meta DB?');
       if (rollback) {
         try {
-          await getMetaClient().tenant.delete({ where: { id: tenantId } });
+          await deleteTenant(tenantId);
           console.log('✓ Rolled back tenant from meta DB');
         } catch (rollbackError) {
           const errorMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
@@ -578,7 +575,7 @@ async function main(): Promise<void> {
 
     process.exit(1);
   } finally {
-    await getMetaClient().$disconnect();
+    await closeMetaClient();
   }
 }
 
