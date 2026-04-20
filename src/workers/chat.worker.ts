@@ -52,7 +52,6 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
   log.debug({ vodId, startOffset, effectiveOffset, hasExistingData }, '[Chat] Resume check completed');
 
   const messageId = await initChatAlert(
-    log,
     chatAlerts,
     tenantId,
     vodId,
@@ -114,7 +113,6 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
 };
 
 async function initChatAlert(
-  log: ReturnType<typeof createAutoLogger>,
   chatAlerts: ReturnType<typeof createChatWorkerAlerts>,
   tenantId: string,
   vodId: string,
