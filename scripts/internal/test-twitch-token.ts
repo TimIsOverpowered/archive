@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import 'dotenv/config';
 import { program } from 'commander';
-import { initMetaClient, getMetaClient } from '../../src/db/meta-client.js';
+import { initMetaClient, closeMetaClient } from '../../src/db/meta-client.js';
 import { extractErrorDetails } from '../../src/utils/error.js';
 import { loadTenantConfigs } from '../../src/config/loader.js';
 import { getAppAccessToken } from '../../src/services/twitch/index.js';
 import { getTwitchCredentials } from '../../src/utils/credentials.js';
 import { humanizeDuration } from '../../src/utils/formatting.js';
 import { getTwitchAuth } from '../../src/utils/tenant-config.js';
+import { getAllTenants, findTenantFirst } from '../../src/services/meta-tenants.service.js';
 
 interface TwitchAuth {
   client_id: string;
@@ -32,7 +33,7 @@ program
     let tenantId = options.tenant;
 
     if (!tenantId) {
-      const tenants = await getMetaClient().tenant.findMany();
+      const tenants = await getAllTenants();
       if (tenants.length === 0) {
         console.error('No tenants found. Please create one first using scripts/create-tenant.ts');
         process.exit(1);
@@ -43,9 +44,7 @@ program
     }
 
     try {
-      const tenant = await getMetaClient().tenant.findFirst({
-        where: { id: tenantId },
-      });
+      const tenant = await findTenantFirst({ id: tenantId });
 
       if (!tenant) {
         console.error('Tenant not found');
@@ -77,9 +76,7 @@ program
 
           await new Promise((resolve) => setTimeout(resolve, 500));
 
-          const updatedTenant = await getMetaClient().tenant.findFirst({
-            where: { id: tenantId },
-          });
+          const updatedTenant = await findTenantFirst({ id: tenantId });
 
           if (!updatedTenant) {
             console.error('Error: Tenant not found after refresh');
@@ -207,7 +204,7 @@ program
       }
       process.exit(1);
     } finally {
-      await getMetaClient().$disconnect();
+      await closeMetaClient();
     }
   });
 

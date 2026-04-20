@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import type { Tenant } from '../../prisma/generated/meta/client.js';
+import type { TenantResult } from '../db/meta-types.js';
 import { TwitchAuthSchema, TwitchSchema, YoutubeAuthSchema, YoutubeSchema, KickSchema } from '../config/schemas.js';
 
-export function getTwitchConfig(tenant: Tenant): z.infer<typeof TwitchSchema> | null {
+export function getTwitchConfig(tenant: TenantResult): z.infer<typeof TwitchSchema> | null {
   if (!tenant.twitch) {
     return null;
   }
@@ -14,7 +14,7 @@ export function getTwitchConfig(tenant: Tenant): z.infer<typeof TwitchSchema> | 
   }
 }
 
-export function getTwitchAuth(tenant: Tenant): z.infer<typeof TwitchAuthSchema> | null {
+export function getTwitchAuth(tenant: TenantResult): z.infer<typeof TwitchAuthSchema> | null {
   const twitchConfig = getTwitchConfig(tenant);
 
   if (!twitchConfig || !twitchConfig.auth) {
@@ -29,7 +29,7 @@ export function getTwitchAuth(tenant: Tenant): z.infer<typeof TwitchAuthSchema> 
   }
 }
 
-export function getYoutubeConfig(tenant: Tenant): z.infer<typeof YoutubeSchema> | null {
+export function getYoutubeConfig(tenant: TenantResult): z.infer<typeof YoutubeSchema> | null {
   if (!tenant.youtube) {
     return null;
   }
@@ -41,7 +41,7 @@ export function getYoutubeConfig(tenant: Tenant): z.infer<typeof YoutubeSchema> 
   }
 }
 
-export function getYoutubeAuth(tenant: Tenant): z.infer<typeof YoutubeAuthSchema> | null {
+export function getYoutubeAuth(tenant: TenantResult): z.infer<typeof YoutubeAuthSchema> | null {
   const youtubeConfig = getYoutubeConfig(tenant);
 
   if (!youtubeConfig || !youtubeConfig.auth) {
@@ -56,7 +56,7 @@ export function getYoutubeAuth(tenant: Tenant): z.infer<typeof YoutubeAuthSchema
   }
 }
 
-export function getKickConfig(tenant: Tenant): z.infer<typeof KickSchema> | null {
+export function getKickConfig(tenant: TenantResult): z.infer<typeof KickSchema> | null {
   if (!tenant.kick) {
     return null;
   }

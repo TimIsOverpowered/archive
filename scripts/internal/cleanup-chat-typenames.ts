@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import 'dotenv/config';
-import { PrismaClient } from '../../prisma/generated/meta/index.js';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { initMetaClient, getMetaClient, closeMetaClient } from '../../src/db/meta-client.js';
 import { extractErrorDetails } from '../../src/utils/error.js';
 import readline from 'readline';
 import { decryptScalar } from '../../src/utils/encryption.js';
@@ -14,8 +13,8 @@ if (!META_DB_URL) {
   process.exit(1);
 }
 
-const adapter = new PrismaPg({ connectionString: META_DB_URL });
-const metaClient = new PrismaClient({ adapter });
+await initMetaClient();
+const metaClient = getMetaClient();
 
 function stripTypename(obj: any): any {
   if (obj === null || obj === undefined) return obj;
@@ -211,10 +210,7 @@ async function main() {
 
   let dbUrl: string;
   try {
-    const tenant = await metaClient.tenant.findUnique({
-      where: { id: streamerName },
-      select: { databaseUrl: true },
-    });
+    const tenant = await metaClient.selectFrom('tenants').select('database_url').where('id', '=', streamerName).executeTakeFirst();
 
     if (!tenant?.databaseUrl) {
       console.error(`❌ Tenant "${streamerName}" not found`);
@@ -225,12 +221,12 @@ async function main() {
       dbUrl = decryptScalar(tenant.databaseUrl as string);
     } catch (decryptError) {
       console.error('❌ Failed to decrypt database URL:', extractErrorDetails(decryptError).message);
-      await metaClient.$disconnect();
+      await closeMetaClient();
       process.exit(1);
     }
   } catch (error) {
     console.error('❌ Failed to fetch tenant:', extractErrorDetails(error).message);
-    await metaClient.$disconnect();
+    await closeMetaClient();
     process.exit(1);
   }
 
@@ -286,7 +282,7 @@ async function main() {
       if (String(err).includes('does not exist')) {
         console.log('ℹ️  chat_messages table does not exist — nothing to clean\n');
         await pool.end();
-        await metaClient.$disconnect();
+        await closeMetaClient();
         process.exit(0);
       }
       throw err;
@@ -295,7 +291,7 @@ async function main() {
     if (tableStats.estimatedRows === 0) {
       console.log('ℹ️  No rows in chat_messages — nothing to clean\n');
       await pool.end();
-      await metaClient.$disconnect();
+      await closeMetaClient();
       process.exit(0);
     }
 
@@ -313,7 +309,7 @@ async function main() {
     if (!quickCheck.rows[0].has_typename) {
       console.log('ℹ️  No __typename fields found — nothing to clean\n');
       await pool.end();
-      await metaClient.$disconnect();
+      await closeMetaClient();
       process.exit(0);
     }
 
@@ -328,7 +324,7 @@ async function main() {
     if (dryRun) {
       console.log('✅ Dry run complete — __typename fields detected, would proceed with cleanup\n');
       await pool.end();
-      await metaClient.$disconnect();
+      await closeMetaClient();
       return;
     }
 
@@ -337,7 +333,7 @@ async function main() {
       if (!proceed) {
         console.log('❌ Cancelled\n');
         await pool.end();
-        await metaClient.$disconnect();
+        await closeMetaClient();
         process.exit(0);
       }
     }
@@ -455,11 +451,11 @@ async function main() {
     } else {
       console.error('❌ Error:', msg);
     }
-    await metaClient.$disconnect();
+    await closeMetaClient();
     process.exit(1);
   }
 
-  await metaClient.$disconnect();
+  await closeMetaClient();
 }
 
 main();

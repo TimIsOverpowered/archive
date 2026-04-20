@@ -9,8 +9,9 @@
 
 import 'dotenv/config';
 import { program } from 'commander';
-import { initMetaClient, getMetaClient } from '../../src/db/meta-client.js';
+import { initMetaClient, closeMetaClient } from '../../src/db/meta-client.js';
 import { decryptScalar, decryptObject } from '../../src/utils/encryption.js';
+import { getTenantById, getAllTenants } from '../../src/services/meta-tenants.service.js';
 
 interface DecryptionResult {
   raw: string | null;
@@ -151,12 +152,10 @@ async function main(): Promise<void> {
   try {
     await initMetaClient();
     // Find tenant by ID or display name
-    let tenant: any | null = await getMetaClient().tenant.findUnique({
-      where: { id: program.args[0] },
-    });
+    let tenant: any | null = await getTenantById(program.args[0]);
 
     if (!tenant) {
-      const allTenants = await getMetaClient().tenant.findMany();
+      const allTenants = await getAllTenants();
       tenant = allTenants.find((t: any) => t.displayName === program.args[0]);
 
       if (tenant) {
@@ -286,7 +285,7 @@ async function main(): Promise<void> {
 
     process.exit(1);
   } finally {
-    await getMetaClient().$disconnect();
+    await closeMetaClient();
   }
 }
 

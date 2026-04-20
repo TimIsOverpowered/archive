@@ -9,6 +9,7 @@ import { startCloudflareIpRangesCron } from './cron/cloudflare-ip-ranges.js';
 import { getCachedRangeInfo, getCloudflareIpRanges } from './utils/cloudflare-ip-validator.js';
 import { releaseBrowser } from './utils/puppeteer-manager.js';
 import { registerPlatformStrategies } from './services/platforms/index.js';
+import { closeMetaClient } from './db/meta-client.js';
 
 const config = loadApiConfig();
 setLoggerConfig({ level: config.LOG_LEVEL, isProduction: config.NODE_ENV === 'production' });
@@ -88,8 +89,9 @@ async function shutdown(signal: string) {
     stopClientCleanup();
     getLogger().info('DB client cleanup stopped');
 
-    // Close all Prisma DB clients
+    // Close all DB clients (Kysely streamer + meta)
     await closeAllClients();
+    await closeMetaClient();
     getLogger().info('Database connections closed');
 
     clearTimeout(shutdownTimeout);
