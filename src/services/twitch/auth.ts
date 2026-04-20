@@ -89,15 +89,11 @@ export async function updateTwitchTokenInDb(tenantId: string, newToken: string, 
 
     const encryptedAuth = encryptObject(updatedAuth);
 
-    await getMetaClient().tenant.update({
-      where: { id: tenantId },
-      data: {
-        twitch: {
-          ...config.twitch,
-          auth: encryptedAuth,
-        },
-      },
-    });
+    await getMetaClient()
+      .updateTable('tenants')
+      .set({ twitch: JSON.stringify({ ...config.twitch, auth: encryptedAuth }) })
+      .where('id', '=', tenantId)
+      .execute();
 
     updateTenantTwitchAuth(tenantId, encryptedAuth);
 
