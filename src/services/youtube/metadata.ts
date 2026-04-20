@@ -52,7 +52,7 @@ export async function saveChaptersAndLinkParts(
     }
 
     if (needsLinking) {
-      const navLinks = buildPartNavigationLinks(sortedParts, i, videoId);
+      const navLinks = buildPartNavigationLinks(sortedParts, videoId);
       if (navLinks) {
         newDescription = navLinks + '\n' + newDescription;
         videosWithLinks++;
@@ -111,7 +111,6 @@ function buildChapterTimestampsForPart(chapters: Chapter[], partNum: number, spl
 
 function buildPartNavigationLinks(
   sortedParts: { id: string; part: number }[],
-  currentIndex: number,
   currentVideoId: string
 ): string {
   let result = '';

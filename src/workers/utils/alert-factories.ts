@@ -246,7 +246,7 @@ export function createChatWorkerAlerts(): ChatWorkerAlerts {
       timestamp: new Date().toISOString(),
     }),
 
-    progress: (tenantId, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration) => {
+    progress: (tenantId, vodId, offset, batchNumber, messagesInBatch, _totalMessages, duration) => {
       const percent = duration > 0 ? Math.min(Math.round((offset / duration) * 100), 100) : 0;
       const progressBar = createProgressBar(percent);
 

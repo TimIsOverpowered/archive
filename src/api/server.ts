@@ -59,7 +59,7 @@ export async function buildServer() {
 
   // Set error handler immediately after creating instance (before any plugins/routes)
   // This ensures it's properly inherited by all child instances
-  fastify.setErrorHandler((error, request, reply) => {
+  fastify.setErrorHandler((error, _request, reply) => {
     const { statusCode, message, isClientError } = formatErrorResponse(error);
 
     if (statusCode >= 500) {
@@ -76,7 +76,7 @@ export async function buildServer() {
   });
 
   // Set 404 handler immediately after error handler
-  fastify.setNotFoundHandler((request, reply) => {
+  fastify.setNotFoundHandler((_request, reply) => {
     return reply.status(404).send({
       error: {
         message: 'Route not found',
