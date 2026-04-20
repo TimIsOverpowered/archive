@@ -29,7 +29,12 @@ if (!process.env.META_DATABASE_URL) {
 }
 
 // Validate PostgreSQL connection before starting prompts
-async function validatePostgresConnection(host: string, port: number, user: string, password: string): Promise<boolean> {
+async function validatePostgresConnection(
+  host: string,
+  port: number,
+  user: string,
+  password: string
+): Promise<boolean> {
   try {
     const pool = new Pool({
       host,
@@ -394,7 +399,9 @@ async function main(): Promise<void> {
       youtubeSplitDuration = 43199;
     }
 
-    const youtubeLiveUpload = await confirm('Enable live stream upload?');
+    const youtubeLiveUpload = await confirm(
+      'Enable live upload while user is live (Will upload parts while stream is live)?'
+    );
     const youtubeMultiTrack = await confirm('Multi-track audio upload?');
     // YouTube uploads always enabled by default
     const youtubeUploadEnabled = true;
