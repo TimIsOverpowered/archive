@@ -7,41 +7,43 @@ const brotliDecompress = promisify(zlib.brotliDecompress);
 const gzipCompress = promisify(zlib.gzip);
 const gzipDecompress = promisify(zlib.gunzip);
 
-type CompressionAlgorithm = 'brotli' | 'gzip' | 'none';
-
-const algorithm: CompressionAlgorithm = getRedisChatCompression();
-const level = getRedisCompressionLevel();
-
 export async function compressChatData(data: unknown): Promise<Buffer> {
-  const json = JSON.stringify(data);
-  const buffer = Buffer.from(json, 'utf8');
+  const algo = getRedisChatCompression();
+  const lvl = getRedisCompressionLevel();
+  const buffer = Buffer.from(JSON.stringify(data), 'utf8');
 
-  if (algorithm === 'none') {
+  if (algo === 'none') {
     return buffer;
   }
 
-  if (algorithm === 'brotli') {
-    return brotliCompress(buffer);
+  if (algo === 'brotli') {
+    return brotliCompress(buffer, {
+      params: { [zlib.constants.BROTLI_PARAM_QUALITY]: lvl }
+    });
   }
 
-  if (algorithm === 'gzip') {
-    return gzipCompress(buffer, { level });
+  if (algo === 'gzip') {
+    return gzipCompress(buffer, { level: lvl });
   }
 
   return buffer;
 }
 
 export async function decompressChatData(compressed: Buffer): Promise<unknown> {
-  if (algorithm === 'none') {
+  const algo = getRedisChatCompression();
+
+  if (algo === 'none') {
     return JSON.parse(compressed.toString('utf8'));
   }
 
   let decompressed: Buffer;
 
-  if (algorithm === 'brotli') {
+  if (algo === 'brotli') {
     decompressed = await brotliDecompress(compressed);
-  } else {
+  } else if (algo === 'gzip') {
     decompressed = await gzipDecompress(compressed);
+  } else {
+    throw new Error(`Unknown compression algorithm: ${algo}`);
   }
 
   return JSON.parse(decompressed.toString('utf8'));
