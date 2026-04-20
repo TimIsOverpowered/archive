@@ -82,7 +82,10 @@ export const VodQuerySchema = z.object({
 
 export type VodQuery = z.infer<typeof VodQuerySchema>;
 
-export function buildVodQuery(query: VodQuery): { where: Prisma.VodWhereInput; orderBy: Prisma.VodOrderByWithRelationInput } {
+export function buildVodQuery(query: VodQuery): {
+  where: Prisma.VodWhereInput;
+  orderBy: Prisma.VodOrderByWithRelationInput;
+} {
   const where: Prisma.VodWhereInput = {};
 
   if (query.platform) {

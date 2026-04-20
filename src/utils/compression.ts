@@ -18,7 +18,7 @@ export async function compressChatData(data: unknown): Promise<Buffer> {
 
   if (algo === 'brotli') {
     return brotliCompress(buffer, {
-      params: { [zlib.constants.BROTLI_PARAM_QUALITY]: lvl }
+      params: { [zlib.constants.BROTLI_PARAM_QUALITY]: lvl },
     });
   }
 
