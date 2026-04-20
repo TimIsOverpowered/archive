@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert';
-import { isClientValid, touchClient, isConnectionError, ensureClient, withDbRetry, resetClientManager, createClient, closeClient } from '../../src/db/client.js';
+import { poolManager, withDbRetry, resetClientManager, createClient, isConnectionError, ensureClient } from '../../src/db/client.js';
 import type { TenantConfig } from '../../src/config/types.js';
 
 const createMockConfig = (id: string): TenantConfig => ({
@@ -35,45 +35,43 @@ const createMockConfig = (id: string): TenantConfig => ({
   },
 });
 
+const mockDb: any = {
+  selectFrom: () => mockDb,
+  insertInto: () => mockDb,
+  update: () => mockDb,
+  deleteFrom: () => mockDb,
+  transaction: () => ({ execute: () => Promise.resolve({}) }),
+  $pool: { end: () => Promise.resolve() },
+  destroy: () => Promise.resolve(),
+};
+
+function nb() {
+  return mockDb;
+}
+
+mockDb.select = nb;
+mockDb.where = nb;
+mockDb.orderBy = nb;
+mockDb.limit = nb;
+mockDb.first = () => Promise.resolve(null);
+mockDb.values = nb;
+mockDb.returning = nb;
+mockDb.set = nb;
+mockDb.execute = () => Promise.resolve({ affectedRows: 1 });
+mockDb.raw = () => ({ execute: () => Promise.resolve([]) });
+
+beforeEach(() => {
+  resetClientManager();
+  mock.method(poolManager, 'createClient', async () => mockDb);
+  mock.method(poolManager, 'closeClient', async () => {});
+});
+
+afterEach(() => {
+  mock.restoreAll();
+  resetClientManager();
+});
+
 describe('DB Client Lifecycle Management', () => {
-  beforeEach(() => {
-    resetClientManager();
-  });
-
-  afterEach(() => {
-    resetClientManager();
-  });
-
-  describe('isClientValid', () => {
-    it('returns false for non-existent tenant', () => {
-      const result = isClientValid('non-existent');
-      assert.strictEqual(result, false);
-    });
-
-    it('returns true for recently created client', async () => {
-      const config = createMockConfig('test-tenant');
-
-      await createClient(config);
-      const result = isClientValid('test-tenant');
-      assert.strictEqual(result, true);
-    });
-  });
-
-  describe('touchClient', () => {
-    it('returns false for non-existent tenant', () => {
-      const result = touchClient('non-existent');
-      assert.strictEqual(result, false);
-    });
-
-    it('returns true and updates lastAccessedAt for existing client', async () => {
-      const config = createMockConfig('test-tenant');
-
-      await createClient(config);
-      const result = touchClient('test-tenant');
-      assert.strictEqual(result, true);
-    });
-  });
-
   describe('isConnectionError', () => {
     it('detects PostgreSQL error codes', () => {
       const errors = [
@@ -123,51 +121,40 @@ describe('DB Client Lifecycle Management', () => {
   describe('ensureClient', () => {
     it('creates new client if none exists', async () => {
       const config = createMockConfig('test-tenant');
-
       const client = await ensureClient('test-tenant', config);
       assert.ok(client !== undefined);
-      assert.ok(isClientValid('test-tenant'));
     });
 
     it('returns existing valid client', async () => {
       const config = createMockConfig('test-tenant');
-
       const client1 = await ensureClient('test-tenant', config);
       const client2 = await ensureClient('test-tenant', config);
-
       assert.strictEqual(client1, client2);
     });
 
-    it('touches existing client to prevent eviction', async () => {
+    it('returns client after timeout', async () => {
       const config = createMockConfig('test-tenant');
-
       await createClient(config);
       await new Promise((resolve) => setTimeout(resolve, 10));
-
       const client = await ensureClient('test-tenant', config);
-
       assert.ok(client !== undefined);
-      assert.ok(isClientValid('test-tenant'));
     });
   });
 
   describe('withDbRetry', () => {
     it('executes operation successfully on first attempt', async () => {
       const config = createMockConfig('test-tenant');
-
       let callCount = 0;
       const result = await withDbRetry('test-tenant', config, async (db) => {
         callCount++;
         return { success: true, callCount };
       });
-
       assert.strictEqual(callCount, 1);
       assert.strictEqual(result.success, true);
     });
 
     it('retries on connection error and succeeds', async () => {
       const config = createMockConfig('test-tenant');
-
       let attempt = 0;
       const result = await withDbRetry('test-tenant', config, async () => {
         attempt++;
@@ -178,14 +165,12 @@ describe('DB Client Lifecycle Management', () => {
         }
         return { success: true, attempts: attempt };
       });
-
       assert.strictEqual(attempt, 2);
       assert.strictEqual(result.success, true);
     });
 
     it('rethrows after max retries on connection error', async () => {
       const config = createMockConfig('test-tenant');
-
       await assert.rejects(
         withDbRetry('test-tenant', config, async () => {
           const error = new Error('connection lost');
@@ -201,7 +186,6 @@ describe('DB Client Lifecycle Management', () => {
 
     it('rethrows immediately on non-connection error', async () => {
       const config = createMockConfig('test-tenant');
-
       let callCount = 0;
       await assert.rejects(
         withDbRetry('test-tenant', config, async () => {
@@ -218,7 +202,6 @@ describe('DB Client Lifecycle Management', () => {
 
     it('uses custom retry options', async () => {
       const config = createMockConfig('test-tenant');
-
       let attempt = 0;
       const result = await withDbRetry(
         'test-tenant',
@@ -234,7 +217,6 @@ describe('DB Client Lifecycle Management', () => {
         },
         { maxRetries: 3, retryDelayMs: 10 }
       );
-
       assert.strictEqual(attempt, 3);
       assert.strictEqual(result.success, true);
     });
