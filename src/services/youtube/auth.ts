@@ -39,15 +39,11 @@ async function updateYoutubeTokenInDb(
 
     const encryptedAuth = encryptObject(updatedAuth);
 
-    await getMetaClient().tenant.update({
-      where: { id: tenantId },
-      data: {
-        youtube: {
-          ...config.youtube,
-          auth: encryptedAuth,
-        },
-      },
-    });
+    await getMetaClient()
+      .updateTable('tenants')
+      .set({ youtube: JSON.stringify({ ...config.youtube, auth: encryptedAuth }) })
+      .where('id', '=', tenantId)
+      .execute();
 
     updateTenantYoutubeAuth(tenantId, encryptedAuth);
 
