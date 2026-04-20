@@ -49,6 +49,25 @@ const parseDuration = (durationStr: string): number => {
   return 0;
 };
 
+function stripTypename(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) return obj.map(stripTypename);
+  if (typeof obj === 'object') {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (key !== '__typename') cleaned[key] = stripTypename(value);
+    }
+    return cleaned;
+  }
+  return obj;
+}
+
+function hasTypename(obj: any): boolean {
+  if (!obj) return false;
+  const str = typeof obj === 'string' ? obj : JSON.stringify(obj);
+  return str.includes('__typename');
+}
+
 interface ChatWorkerProgress {
   workerId: number;
   processed: number;
@@ -136,8 +155,18 @@ async function migrateChatWorker(
           offsets.push(Math.round(Number(row.content_offset_seconds)));
           colors.push(row.user_color);
           createdAts.push(row.createdAt);
-          messages.push(row.message ? JSON.stringify(row.message) : null);
-          badges.push(row.user_badges ? JSON.stringify(row.user_badges) : null);
+
+          let msg = row.message;
+          if (msg && hasTypename(msg)) {
+            msg = stripTypename(msg);
+          }
+          messages.push(msg ? JSON.stringify(msg) : null);
+
+          let badgesVal = row.user_badges;
+          if (badgesVal && hasTypename(badgesVal)) {
+            badgesVal = stripTypename(badgesVal);
+          }
+          badges.push(badgesVal ? JSON.stringify(badgesVal) : null);
         }
       }
       const processTime = Date.now() - processStart;
@@ -787,7 +816,6 @@ const main = async () => {
         }
 
         console.log('✅ FK integrity validation passed');
-        console.log('ℹ️ To clean __typename from chat messages, run: npx tsx scripts/cleanup-chat-typenames.js --streamer=<name>\n');
 
         const newVodsCount = await oldPool.query('SELECT COUNT(*) FROM "vods_new"');
         const newUploadsCount = await oldPool.query('SELECT COUNT(*) FROM "vod_uploads"');
