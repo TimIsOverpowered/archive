@@ -5,7 +5,7 @@ import { getLogger } from './logger.js';
 import { LRUCache } from 'lru-cache';
 import { getTenantDisplayName } from '../config/loader.js';
 import { capitalizePlatform, Platform } from '../types/platforms.js';
-import { getDiscordAlertsEnabled } from '../config/env-accessors.js';
+import { getDiscordAlertsEnabled, getDiscordAlertWebhookUrl } from '../config/env-accessors.js';
 
 export function isAlertsEnabled(): boolean {
   return getDiscordAlertsEnabled();
@@ -104,7 +104,7 @@ export async function sendDiscordAlert(message: string): Promise<string | null> 
     return null;
   }
 
-  const webhookUrl = process.env.DISCORD_ALERT_WEBHOOK_URL;
+  const webhookUrl = getDiscordAlertWebhookUrl();
   if (!webhookUrl) {
     return null;
   }
@@ -130,7 +130,7 @@ export async function sendRichAlert(data: RichEmbedData): Promise<string | null>
     return null;
   }
 
-  const webhookUrl = process.env.DISCORD_ALERT_WEBHOOK_URL;
+  const webhookUrl = getDiscordAlertWebhookUrl();
   if (!webhookUrl) {
     return null;
   }
@@ -168,7 +168,7 @@ export async function updateDiscordEmbed(messageId: string, data: RichEmbedData)
     return;
   }
 
-  const webhookUrl = process.env.DISCORD_ALERT_WEBHOOK_URL;
+  const webhookUrl = getDiscordAlertWebhookUrl();
   if (!webhookUrl) {
     return;
   }
@@ -228,7 +228,7 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
     return null;
   }
 
-  const webhookUrl = process.env.DISCORD_ALERT_WEBHOOK_URL;
+  const webhookUrl = getDiscordAlertWebhookUrl();
   if (!webhookUrl) {
     return null;
   }
