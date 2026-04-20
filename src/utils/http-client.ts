@@ -38,7 +38,7 @@ function scrubSensitiveParams(url: string): string {
 
     for (const param of sensitiveParams) {
       if (urlObj.searchParams.has(param)) {
-        urlObj.searchParams.set(param, '[REDACTED]');
+        urlObj.searchParams.set(param, 'REDACTED');
       }
     }
 
@@ -127,7 +127,7 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
         if (options?.signal) signals.push(options.signal);
         const combinedSignal = AbortSignal.any(signals);
 
-        const response = await fetch(urlStr, {
+        const response = await fetch(scrubbedUrl, {
           method,
           headers: finalHeaders,
           body: preparedBody,
