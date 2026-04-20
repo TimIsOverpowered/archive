@@ -260,6 +260,25 @@ describe('HTTP Client', () => {
       assert.strictEqual(capturedBody, buffer);
       assert.notStrictEqual(capturedHeaders?.['Content-Type'], 'application/json');
     });
+
+    it('should pass dispatcher to fetch when provided', async () => {
+      let capturedDispatcher: unknown = undefined;
+
+      global.fetch = ((_input: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
+        capturedDispatcher = init?.dispatcher;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => ({ success: true }),
+        } as Response);
+      }) as typeof global.fetch;
+
+      const mockAgent = {} as any;
+      await request('https://api.example.com/test', { dispatcher: mockAgent });
+
+      assert.strictEqual(capturedDispatcher, mockAgent, 'dispatcher should be passed through to fetch');
+    });
   });
 
   describe('retry logic', () => {

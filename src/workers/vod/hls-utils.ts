@@ -12,7 +12,7 @@ import pLimit from 'p-limit';
 import type { AppLogger } from '../../utils/logger.js';
 import { fileExists } from '../../utils/path.js';
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch/index.js';
-import { request } from '../../utils/http-client.js';
+import { request, segmentDownloadAgent } from '../../utils/http-client.js';
 
 export type DownloadStrategy = { type: 'fetch'; signal?: AbortSignal } | { type: 'cycletls'; session: CycleTLSSession };
 
@@ -74,6 +74,7 @@ export async function downloadSegmentsParallel(
               responseType: 'response',
               signal: strategy.signal,
               timeoutMs: 30000,
+              dispatcher: segmentDownloadAgent,
               retryOptions: {
                 attempts: retryAttempts,
               },

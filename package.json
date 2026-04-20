@@ -77,7 +77,8 @@
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-click-and-wait": "^2.3.3",
     "puppeteer-real-browser": "^1.4.4",
-    "rate-limiter-flexible": "^11.0.1"
+    "rate-limiter-flexible": "^11.0.1",
+    "undici": "^8.1.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
