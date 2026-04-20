@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PrismaClient, UploadStatus } from '../../generated/streamer/client.js';
+import { Prisma, PrismaClient } from '../../generated/streamer/client.js';
 import { withStaleWhileRevalidate } from '../utils/cache.js';
 import { VOD_DETAILS_CACHE_TTL, VOD_LIST_CACHE_TTL, VOD_VOLATILE_CACHE_TTL } from '../constants.js';
 import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
@@ -56,43 +56,7 @@ const VOD_INCLUDE = {
   },
 };
 
-export interface VodResponse {
-  id: number;
-  platform: Platform;
-  title: string | null;
-  duration: number;
-  created_at: Date;
-  updated_at: Date;
-  is_live: boolean;
-  started_at: Date | null;
-  vod_uploads?: Array<{
-    upload_id: string;
-    type: string | null;
-    duration: number;
-    part: number;
-    status: UploadStatus;
-    thumbnail_url: string | null;
-    created_at?: Date;
-  }>;
-  chapters?: Array<{
-    name: string | null;
-    image: string | null;
-    duration: string | null;
-    start: number;
-    end: number | null;
-  }>;
-  games?: Array<{
-    start_time: number | null;
-    end_time: number | null;
-    video_provider: string | null;
-    video_id: string | null;
-    thumbnail_url: string | null;
-    game_id: string | null;
-    game_name: string | null;
-    title: string | null;
-    chapter_image: string | null;
-  }>;
-}
+export type VodResponse = Prisma.VodGetPayload<{ include: typeof VOD_INCLUDE }>;
 
 export const VodQuerySchema = z.object({
   platform: z.enum(PLATFORM_VALUES as [string, ...string[]]).optional(),
@@ -200,7 +164,7 @@ export async function getVods(
     ]);
 
     const hasMore = vods.length > limit;
-    const resultVods = (hasMore ? vods.slice(0, limit) : vods) as VodResponse[];
+    const resultVods = hasMore ? vods.slice(0, limit) : vods;
     const dbIds = resultVods.map((v) => v.id);
     const volatileMap = await getVodVolatileCacheBatch(tenantId, dbIds);
 
@@ -249,10 +213,10 @@ export async function getVodById(client: PrismaClient, tenantId: string, vodId: 
     });
 
     if (!vod) return null;
-    return vod as VodResponse;
+    return vod;
   };
 
-  const staticData = await withStaleWhileRevalidate<VodResponse | null>(
+  const staticData = await withStaleWhileRevalidate(
     cacheKey,
     VOD_DETAILS_CACHE_TTL,
     VOD_DETAILS_CACHE_TTL * 0.8,
@@ -284,10 +248,10 @@ export async function getVodByPlatformId(
     });
 
     if (!vod) return null;
-    return vod as VodResponse;
+    return vod;
   };
 
-  const staticData = await withStaleWhileRevalidate<VodResponse | null>(
+  const staticData = await withStaleWhileRevalidate(
     cacheKey,
     VOD_DETAILS_CACHE_TTL,
     VOD_DETAILS_CACHE_TTL * 0.8,

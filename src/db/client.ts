@@ -33,7 +33,9 @@ class ClientManager {
 
     if (this.creationLocks.has(config.id)) {
       await this.creationLocks.get(config.id)!;
-      return this.clients.get(config.id)!.client;
+      const existing = this.clients.get(config.id);
+      if (!existing) throw new Error(`Client creation failed for ${config.id}`);
+      return existing.client;
     }
 
     if (this.clients.size >= DB_CLIENT_MAX_CLIENTS) {
@@ -144,6 +146,22 @@ class ClientManager {
     this.creationLocks.clear();
   }
 
+  getCount(): number {
+    return this.clients.size;
+  }
+
+  isClientValid(tenantId: string): boolean {
+    const entry = this.clients.get(tenantId);
+    if (!entry) return false;
+    return Date.now() - entry.lastAccessedAt <= DB_CLIENT_IDLE_TIMEOUT_MS;
+  }
+
+  touchClient(tenantId: string): boolean {
+    const entry = this.clients.get(tenantId);
+    if (entry) entry.lastAccessedAt = Date.now();
+    return !!entry;
+  }
+
   async closeAll(): Promise<void> {
     this.stopCleanup();
 
@@ -187,7 +205,7 @@ export function stopClientCleanup(): void {
 }
 
 export function getClientCount(): number {
-  return clientManager['clients'].size;
+  return clientManager.getCount();
 }
 
 export function resetClientManager(): void {
@@ -198,24 +216,14 @@ export function resetClientManager(): void {
  * Check if client is still valid (not evicted due to idle timeout)
  */
 export function isClientValid(tenantId: string): boolean {
-  const entry = clientManager['clients'].get(tenantId);
-  if (!entry) return false;
-
-  const now = Date.now();
-  const isIdle = now - entry.lastAccessedAt > DB_CLIENT_IDLE_TIMEOUT_MS;
-  return !isIdle;
+  return clientManager.isClientValid(tenantId);
 }
 
 /**
  * Touch client to prevent eviction during long-running operations
  */
 export function touchClient(tenantId: string): boolean {
-  const entry = clientManager['clients'].get(tenantId);
-  if (entry) {
-    entry.lastAccessedAt = Date.now();
-    return true;
-  }
-  return false;
+  return clientManager.touchClient(tenantId);
 }
 
 /**

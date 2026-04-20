@@ -18,6 +18,10 @@ import badgesRoutes from './routes/badges.js';
 import { globalAdminRoutes, default as adminRoutes } from './routes/admin/index.js';
 import { registerCacheSubscriber } from '../services/cache-invalidator.js';
 
+function hasStatusCode(e: unknown): e is { statusCode: number } {
+  return typeof e === 'object' && e !== null && 'statusCode' in e && typeof (e as { statusCode: unknown }).statusCode === 'number';
+}
+
 function formatErrorResponse(error: unknown): {
   statusCode: number;
   message: string;
@@ -29,7 +33,7 @@ function formatErrorResponse(error: unknown): {
   }
 
   const details = extractErrorDetails(error);
-  const statusCode = (error as { statusCode?: number }).statusCode || 500;
+  const statusCode = hasStatusCode(error) ? error.statusCode : 500;
   return {
     statusCode,
     message: details.message,

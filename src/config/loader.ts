@@ -9,7 +9,7 @@ import type { TenantModel } from '../../prisma/generated/meta/models/Tenant.js';
 
 let configCache: LRUCache<string, TenantConfig> | null = null;
 
-function _createConfigCache(): LRUCache<string, TenantConfig> {
+function createConfigCache(): LRUCache<string, TenantConfig> {
   const ttl = getConfigCacheTtl() * 1000;
   return new LRUCache({
     max: 500,
@@ -22,22 +22,18 @@ function _createConfigCache(): LRUCache<string, TenantConfig> {
   });
 }
 
-function _getCache(): LRUCache<string, TenantConfig> {
+function getCache(): LRUCache<string, TenantConfig> {
   if (!configCache) {
-    configCache = _createConfigCache();
+    configCache = createConfigCache();
   }
   return configCache;
-}
-
-function _now(): number {
-  return Date.now();
 }
 
 function asJsonObject(val: unknown): Record<string, unknown> | null {
   return val && typeof val === 'object' && !Array.isArray(val) ? (val as Record<string, unknown>) : null;
 }
 
-function _buildTenantConfig(tenant: TenantModel): TenantConfig | null {
+function buildTenantConfig(tenant: TenantModel): TenantConfig | null {
   if (!tenant.databaseUrl) return null;
 
   const dbUrl = decryptScalar(tenant.databaseUrl);
@@ -91,9 +87,9 @@ export async function loadTenantConfigs(): Promise<TenantConfig[]> {
   const tenants = await getMetaClient().tenant.findMany();
   if (tenants.length === 0) return [];
 
-  const cache = _getCache();
+  const cache = getCache();
   for (const tenant of tenants) {
-    const config = _buildTenantConfig(tenant);
+    const config = buildTenantConfig(tenant);
     if (!config) continue;
     cache.set(config.id, config);
   }
@@ -106,27 +102,27 @@ export async function reloadTenantConfig(tenantId: string): Promise<TenantConfig
   const tenant = await getMetaClient().tenant.findUnique({ where: { id: tenantId } });
   if (!tenant) return undefined;
 
-  const config = _buildTenantConfig(tenant);
+  const config = buildTenantConfig(tenant);
   if (!config) return undefined;
 
-  _getCache().set(config.id, config);
+  getCache().set(config.id, config);
   return config;
 }
 
 export function getTenantConfig(tenantId: string): TenantConfig | undefined {
-  return _getCache().get(tenantId);
+  return getCache().get(tenantId);
 }
 
 export function clearConfigCache(tenantId?: string): void {
   if (tenantId) {
-    _getCache().delete(tenantId);
+    getCache().delete(tenantId);
   } else {
     configCache = null;
   }
 }
 
 export function getConfigs(): TenantConfig[] {
-  const cache = _getCache();
+  const cache = getCache();
   return Array.from(cache.values());
 }
 
@@ -136,14 +132,14 @@ export function getTenantDisplayName(tenantId: string): string {
 }
 
 export function updateTenantTwitchAuth(tenantId: string, encryptedAuth: string): void {
-  const cache = _getCache();
+  const cache = getCache();
   const entry = cache.get(tenantId);
   if (!entry?.twitch?.auth) return;
   cache.set(tenantId, { ...entry, twitch: { ...entry.twitch, auth: encryptedAuth } });
 }
 
 export function updateTenantYoutubeAuth(tenantId: string, encryptedAuth: string): void {
-  const cache = _getCache();
+  const cache = getCache();
   const entry = cache.get(tenantId);
   if (!entry?.youtube?.auth) return;
   cache.set(tenantId, { ...entry, youtube: { ...entry.youtube, auth: encryptedAuth } });
