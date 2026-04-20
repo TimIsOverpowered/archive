@@ -97,7 +97,7 @@ export function getWorkersConfig(): WorkersConfig {
 export function getBaseConfig(): BaseConfig {
   if (apiConfigCache) return apiConfigCache;
   if (workersConfigCache) return workersConfigCache;
-  throw new Error('No config loaded. Call loadApiConfig() or loadWorkersConfig() first.');
+  return BaseConfigSchema.parse(process.env);
 }
 
 let _configCacheTtl: number | null = null;

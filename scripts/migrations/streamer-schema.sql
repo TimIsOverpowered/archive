@@ -10,7 +10,7 @@ CREATE TABLE "vods" (
     "duration" INTEGER NOT NULL DEFAULT 0,
     "stream_id" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "is_live" BOOLEAN NOT NULL DEFAULT false,
     "started_at" TIMESTAMP(3),
 
@@ -140,3 +140,17 @@ CREATE UNIQUE INDEX "vod_uploads_vod_id_type_part_key" ON "vod_uploads"("vod_id"
 
 -- CreateIndex
 CREATE UNIQUE INDEX "games_unique_chapter_key" ON "games"("vod_id", "start_time", "end_time");
+
+-- Create the trigger function
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = CURRENT_TIMESTAMP;
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Attach the trigger to the vods table
+CREATE TRIGGER update_vods_updated_at
+BEFORE UPDATE ON "vods"
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

@@ -212,13 +212,13 @@ async function main() {
   try {
     const tenant = await metaClient.selectFrom('tenants').select('database_url').where('id', '=', streamerName).executeTakeFirst();
 
-    if (!tenant?.databaseUrl) {
+    if (!tenant?.database_url) {
       console.error(`❌ Tenant "${streamerName}" not found`);
       process.exit(1);
     }
 
     try {
-      dbUrl = decryptScalar(tenant.databaseUrl as string);
+      dbUrl = decryptScalar(tenant.database_url);
     } catch (decryptError) {
       console.error('❌ Failed to decrypt database URL:', extractErrorDetails(decryptError).message);
       await closeMetaClient();
