@@ -109,10 +109,7 @@ function buildChapterTimestampsForPart(chapters: Chapter[], partNum: number, spl
   return result.trim();
 }
 
-function buildPartNavigationLinks(
-  sortedParts: { id: string; part: number }[],
-  currentVideoId: string
-): string {
+function buildPartNavigationLinks(sortedParts: { id: string; part: number }[], currentVideoId: string): string {
   let result = '';
 
   for (let i = 0; i < sortedParts.length; i++) {

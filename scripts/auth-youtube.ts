@@ -1,5 +1,13 @@
 import 'dotenv/config';
 import { program } from 'commander';
+
+const clientId = process.env.YOUTUBE_CLIENT_ID;
+const clientSecret = process.env.YOUTUBE_CLIENT_SECRET;
+
+if (!clientId || !clientSecret) {
+  console.error('YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET must be set');
+  process.exit(1);
+}
 import crypto from 'crypto';
 import http from 'http';
 import open from 'open';
@@ -130,7 +138,7 @@ async function startOAuthFlow(tenantId: string): Promise<void> {
   const scopes = ['https://www.googleapis.com/auth/youtube.force-ssl', 'https://www.googleapis.com/auth/youtube', 'https://www.googleapis.com/auth/youtube.upload'].join(' ');
 
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  authUrl.searchParams.set('client_id', process.env.YOUTUBE_CLIENT_ID || '');
+  authUrl.searchParams.set('client_id', clientId);
   authUrl.searchParams.set('redirect_uri', 'http://localhost:9999/callback');
   authUrl.searchParams.set('response_type', 'code');
   authUrl.searchParams.set('scope', scopes);
@@ -289,8 +297,8 @@ async function completeOAuth(streamerId: string, expectedState: string, urlOrCod
       },
       body: new URLSearchParams({
         code,
-        client_id: process.env.YOUTUBE_CLIENT_ID || '',
-        client_secret: process.env.YOUTUBE_CLIENT_SECRET || '',
+        client_id: clientId,
+        client_secret: clientSecret,
         redirect_uri: 'http://localhost:9999/callback',
         grant_type: 'authorization_code',
       }),
