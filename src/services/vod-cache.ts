@@ -3,7 +3,7 @@ import { getDisableRedisCache } from '../config/env-accessors.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { invalidateVodTags, invalidateVodVolatileCache } from './cache-tags.js';
-import { redisConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
+import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
 
 export { invalidateVodVolatileCache };
 
@@ -117,7 +117,7 @@ export async function invalidateVodStaticCache(tenantId: string, dbId: number): 
     await client.unlink(getStaticCacheKey(tenantId, dbId));
     await invalidateVodTags(tenantId, dbId);
 
-    if (redisConnectionFailed.get(tenantId)) {
+    if (isConnectionFailed(tenantId)) {
       markConnectionRestored(tenantId);
       getLogger().debug({ tenantId }, 'Redis connection restored, cache invalidation resumed');
     }
@@ -126,7 +126,7 @@ export async function invalidateVodStaticCache(tenantId: string, dbId: number): 
   } catch (error) {
     const { message } = extractErrorDetails(error);
 
-    if (!redisConnectionFailed.get(tenantId) && message.includes('ECONNREFUSED')) {
+    if (!isConnectionFailed(tenantId) && message.includes('ECONNREFUSED')) {
       markConnectionFailed(tenantId);
       getLogger().warn({ tenantId, dbId, error: message }, 'Redis connection lost, cache invalidation suspended');
     }
@@ -142,7 +142,7 @@ export async function invalidateEmoteCache(tenantId: string, vodId: number): Pro
   try {
     await client.unlink(cacheKey);
 
-    if (redisConnectionFailed.get(tenantId)) {
+    if (isConnectionFailed(tenantId)) {
       markConnectionRestored(tenantId);
       getLogger().debug({ tenantId, vodId }, 'Redis connection restored, emote cache invalidation resumed');
     }
@@ -151,7 +151,7 @@ export async function invalidateEmoteCache(tenantId: string, vodId: number): Pro
   } catch (error) {
     const { message } = extractErrorDetails(error);
 
-    if (!redisConnectionFailed.get(tenantId) && message.includes('ECONNREFUSED')) {
+    if (!isConnectionFailed(tenantId) && message.includes('ECONNREFUSED')) {
       markConnectionFailed(tenantId);
       getLogger().warn(
         { tenantId, vodId, error: message },
