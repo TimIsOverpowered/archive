@@ -9,8 +9,8 @@ export interface VodCreateData {
   title: string | null;
   created_at: Date;
   duration: number;
-  stream_id: string | null | undefined;
-  is_live?: boolean;
+  stream_id: string | null;
+  is_live: boolean;
 }
 
 export interface VodUpdateData {

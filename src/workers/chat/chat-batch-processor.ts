@@ -1,5 +1,5 @@
 import type { Kysely } from 'kysely';
-import type { StreamerDB } from '../../db/streamer-types';
+import type { StreamerDB, InsertableChatMessages } from '../../db/streamer-types';
 import type { ChatMessageCreateInput } from './chat-types.js';
 import type { AppLogger } from '../../utils/logger.js';
 import { retryWithBackoff } from '../../utils/retry.js';
@@ -21,6 +21,19 @@ export interface FlushBatchOptions {
   batchCount: number;
 }
 
+function toInsertableChatMessage(msg: ChatMessageCreateInput): InsertableChatMessages {
+  return {
+    id: msg.id,
+    vod_id: msg.vod_id,
+    display_name: msg.display_name,
+    content_offset_seconds: msg.content_offset_seconds,
+    user_color: msg.user_color,
+    created_at: msg.createdAt.toISOString(),
+    message: (msg.message as string | null) ?? null,
+    user_badges: (msg.user_badges as string | null) ?? null,
+  };
+}
+
 export async function flushChatBatch(options: FlushBatchOptions): Promise<FlushBatchResult> {
   const { db, buffer, log, vodId, onProgress, lastOffset, totalMessages, batchCount } = options;
 
@@ -30,10 +43,10 @@ export async function flushChatBatch(options: FlushBatchOptions): Promise<FlushB
 
   await retryWithBackoff(
     () =>
-      (db as any)
+      db
         .insertInto('chat_messages')
-        .values(buffer)
-        .onConflict((oc: any) => oc.column('id').doNothing())
+        .values(buffer.map(toInsertableChatMessage))
+        .onConflict((oc) => oc.column('id').doNothing())
         .execute(),
     {
       attempts: CHAT_MAX_RETRIES,

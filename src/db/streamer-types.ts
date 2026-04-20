@@ -42,12 +42,18 @@ export interface VodUploadsTable {
   created_at: ColumnType<Date, string | undefined, never>;
 }
 
+export interface EmoteData {
+  id: string;
+  code: string;
+  flags?: number;
+}
+
 export interface EmotesTable {
   id: Generated<number>;
   vod_id: number;
-  ffz_emotes: JSONColumnType<Record<string, any>> | null;
-  bttv_emotes: JSONColumnType<Record<string, any>> | null;
-  seventv_emotes: JSONColumnType<Record<string, any>> | null;
+  ffz_emotes: JSONColumnType<EmoteData[]> | null;
+  bttv_emotes: JSONColumnType<EmoteData[]> | null;
+  seventv_emotes: JSONColumnType<EmoteData[]> | null;
 }
 
 export interface GamesTable {
@@ -82,8 +88,8 @@ export interface ChatMessagesTable {
   content_offset_seconds: number;
   user_color: string | null;
   created_at: ColumnType<Date, string | undefined, never>;
-  message: JSONColumnType<Record<string, any>> | null;
-  user_badges: JSONColumnType<Record<string, any>> | null;
+  message: JSONColumnType<Record<string, unknown>> | null;
+  user_badges: JSONColumnType<Record<string, unknown>> | null;
 }
 
 // Utility types

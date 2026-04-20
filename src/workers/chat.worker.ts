@@ -146,14 +146,15 @@ async function checkAlreadyComplete(
   log: ReturnType<typeof createAutoLogger>
 ): Promise<ChatDownloadResult | null> {
   if (duration !== 0 && effectiveOffset >= duration) {
-    const totalMessages =
+    const totalMessages = Number(
       (
         await db
           .selectFrom('chat_messages')
           .select((eb) => [eb.fn.count<number>('id').as('cnt')])
           .where('vod_id', '=', dbId)
           .executeTakeFirst()
-      )?.cnt ?? 0;
+      )?.cnt ?? 0
+    );
     log.info(
       { vodId, effectiveOffset, duration, totalMessages },
       'Chat download already complete (offset exceeds duration)'
@@ -173,14 +174,15 @@ async function checkAlreadyComplete(
       const lastFetchedMessageId = edges[edges.length - 1]?.node?.id;
 
       if (lastFetchedMessageId === lastMessageId) {
-        const totalMessages =
+        const totalMessages = Number(
           (
             await db
               .selectFrom('chat_messages')
               .select((eb) => [eb.fn.count<number>('id').as('cnt')])
               .where('vod_id', '=', dbId)
               .executeTakeFirst()
-          )?.cnt ?? 0;
+          )?.cnt ?? 0
+        );
         log.info({ vodId, lastMessageId, totalMessages }, 'Chat download already complete');
         resetFailures(tenantId);
         void updateAlert(

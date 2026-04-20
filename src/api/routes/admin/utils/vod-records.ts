@@ -3,7 +3,7 @@ import { type AppLogger } from '../../../../utils/logger.js';
 import type { VodRecord } from '../../../../types/db.js';
 import type { Platform } from '../../../../types/platforms.js';
 import type { Kysely } from 'kysely';
-import type { StreamerDB } from '../../../../db/streamer-types';
+import type { StreamerDB, InsertableVods, UpdateableVods } from '../../../../db/streamer-types';
 import { fetchAndSaveEmotes } from '../../../../services/emotes.js';
 import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { triggerChatDownload } from '../../../../workers/jobs/chat.job.js';
@@ -105,7 +105,7 @@ export async function ensureVodRecord(
 
   const vodRecord = (await db
     .insertInto('vods')
-    .values(strategy.createVodData(vodMetadata) as any)
+    .values(strategy.createVodData(vodMetadata) as InsertableVods)
     .returning(['id', 'vod_id', 'platform', 'title', 'duration', 'stream_id', 'created_at'])
     .executeTakeFirst()) as VodRecord;
 
@@ -158,7 +158,7 @@ export async function refreshVodRecord(
 
   const updatedRecord = (await db
     .updateTable('vods')
-    .set(strategy.updateVodData(vodMetadata) as any)
+    .set(strategy.updateVodData(vodMetadata) as UpdateableVods)
     .where('id', '=', dbId)
     .returning(['id', 'vod_id', 'platform', 'title', 'duration', 'stream_id', 'created_at'])
     .executeTakeFirst()) as VodRecord;
