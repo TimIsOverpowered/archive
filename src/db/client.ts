@@ -7,6 +7,12 @@ import { DB_POOL_IDLE_TIMEOUT_MS, DB_POOL_MAX_CLIENTS, DB_POOL_CLEANUP_INTERVAL_
 import { sleep } from '../utils/delay.js';
 import type { StreamerDB } from './streamer-types.js';
 
+let PoolCtor: typeof Pool = Pool;
+
+export function _setPoolCtor(ctor: typeof Pool): void {
+  PoolCtor = ctor;
+}
+
 interface PgPoolEntry {
   pool: Pool;
   db: Kysely<StreamerDB>;
@@ -15,6 +21,8 @@ interface PgPoolEntry {
 }
 
 class PoolManager {
+  static _instanceCount = 0;
+  readonly _id = ++PoolManager._instanceCount;
   private pools = new Map<string, PgPoolEntry>();
   private cleanupIntervalId: NodeJS.Timeout | null = null;
   private creationLocks = new Map<string, Promise<Kysely<StreamerDB>>>();
@@ -48,7 +56,7 @@ class PoolManager {
       let db: Kysely<StreamerDB>;
       try {
         const connectionLimit = config.database.connectionLimit || 5;
-        const pool = new Pool({
+        const pool = new PoolCtor({
           connectionString: config.database.url,
           max: connectionLimit,
         });
@@ -183,6 +191,8 @@ class PoolManager {
 }
 
 const poolManager = new PoolManager();
+
+export { poolManager };
 
 export function getClient(tenantId: string): Kysely<StreamerDB> | undefined {
   return poolManager.getClient(tenantId);
