@@ -1,5 +1,5 @@
 import { getMetaClient } from '../db/meta-client.js';
-import type { InsertableTenants, TenantResult, UpdateableTenants } from '../db/meta-types.js';
+import type { InsertableTenants, TenantResult, UpdateableTenants, SelectableTenants } from '../db/meta-types.js';
 
 const tenantSelect = [
   'id',
@@ -21,11 +21,17 @@ export async function getTenantById(id: string): Promise<TenantResult | undefine
   return getMetaClient().selectFrom('tenants').select(tenantSelect).where('id', '=', id).executeTakeFirst();
 }
 
-export async function findTenantFirst(where: Record<string, unknown>): Promise<TenantResult | undefined> {
+export async function findTenantFirst(where: Partial<SelectableTenants>): Promise<TenantResult | undefined> {
   let query = getMetaClient().selectFrom('tenants').select(tenantSelect);
-  for (const [key, value] of Object.entries(where)) {
-    query = query.where(key as any, '=', value as any);
+
+  let key: keyof SelectableTenants;
+  for (key in where) {
+    const value = where[key];
+    if (value !== undefined) {
+      query = query.where(key, '=', value as never);
+    }
   }
+
   return await query.executeTakeFirst();
 }
 
@@ -36,7 +42,7 @@ export async function createTenant(data: InsertableTenants): Promise<TenantResul
 export async function updateTenant(id: string, data: Partial<InsertableTenants>): Promise<TenantResult | undefined> {
   return getMetaClient()
     .updateTable('tenants')
-    .set(data as UpdateableTenants)
+    .set({ ...data, updated_at: new Date() } as UpdateableTenants)
     .where('id', '=', id)
     .returning(tenantSelect)
     .executeTakeFirst();

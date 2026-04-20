@@ -105,14 +105,14 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
     let lastVodDate: Date | null = null;
 
     for (const stat of vodStats) {
-      byPlatform[stat.platform] = stat.cnt;
-      totalDurationSeconds += stat.dur ?? 0;
+      byPlatform[stat.platform] = Number(stat.cnt);
+      totalDurationSeconds += Number(stat.dur ?? 0);
       if (stat.last && (!lastVodDate || stat.last > lastVodDate)) {
         lastVodDate = stat.last;
       }
     }
 
-    const failedUploads = uploadStats?.cnt ?? 0;
+    const failedUploads = Number(uploadStats?.cnt ?? 0);
     const totalUploadsResult =
       (
         await db
@@ -121,7 +121,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
           .where('status', 'in', ['COMPLETED', 'FAILED'])
           .executeTakeFirst()
       )?.cnt ?? 0;
-    const completedUploads = totalUploadsResult - failedUploads;
+    const completedUploads = Number(totalUploadsResult) - failedUploads;
     const lastUploadDate =
       (
         await db
@@ -153,7 +153,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
         lastChecked: new Date(),
       },
       vods: {
-        totalCount: vodStats.reduce((sum: number, s: { cnt: number }) => sum + s.cnt, 0),
+        totalCount: vodStats.reduce((sum: number, s: { cnt: number | string }) => sum + Number(s.cnt), 0),
         byPlatform,
         totalHours: Math.round((totalDurationSeconds / 3600) * 10) / 10,
         lastVodDate,

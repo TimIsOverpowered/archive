@@ -82,7 +82,7 @@ export const twitchStrategy: PlatformStrategy = {
       title: meta.title || null,
       created_at: new Date(meta.createdAt),
       duration: meta.duration,
-      stream_id: meta.streamId,
+      stream_id: meta.streamId ?? null,
       platform: 'twitch',
       is_live: false,
     };

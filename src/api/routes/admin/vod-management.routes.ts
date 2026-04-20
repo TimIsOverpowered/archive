@@ -18,6 +18,7 @@ import { PLATFORM_VALUES } from '../../../types/platforms.js';
 import { invalidateVodStaticCache } from '../../../services/vod-cache.js';
 import { invalidateVodVolatileCache } from '../../../services/cache-tags.js';
 import type { StatsParams, CreateVodParams, DeleteVodParams, CreateVodBody, DeleteVodBody } from './types.js';
+import type { InsertableVods, SelectableVods } from '../../../db/streamer-types.js';
 
 export default async function vodManagementRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const adminRateLimiter = RedisService.getLimiter('rate:admin');
@@ -111,11 +112,19 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
                 title: validatedData.title || '',
                 createdAt: validatedData.created_at.toISOString(),
                 duration: validatedData.duration,
-              }) as any)
-            : validatedData
+              }) as InsertableVods)
+            : ({
+                vod_id: validatedData.vod_id,
+                title: validatedData.title,
+                created_at: validatedData.created_at.toISOString(),
+                duration: validatedData.duration,
+                platform: validatedData.platform,
+                stream_id: null,
+                is_live: false,
+              } as InsertableVods)
         )
         .returning(['id', 'vod_id', 'platform', 'title', 'duration', 'stream_id', 'created_at'])
-        .executeTakeFirst()) as any;
+        .executeTakeFirst()) as SelectableVods;
 
       await invalidateVodStaticCache(tenantId, newVod.id);
       await invalidateVodVolatileCache(tenantId, newVod.id);
