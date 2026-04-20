@@ -26,7 +26,9 @@ export const REDIS_MAX_RETRIES = 10;
 // ── Cache TTLs (seconds) ────────────────────────────────────────────────────
 export const VOD_DETAILS_CACHE_TTL = 3_600; // 1 hour for individual VODs
 export const VOD_LIST_CACHE_TTL = 900; // 15 minutes for list queries
+export const VOD_VOLATILE_CACHE_TTL = 15; // 15 seconds for live status/duration
 export const EMOTE_CACHE_TTL = 86_400; // 1 day for emotes
+export const MAX_CACHE_PAGES = 10; // cap paginated list cache to prevent tag explosion
 
 // ── Database ─────────────────────────────────────────────────────────────────
 export const INT32_MAX = 2_147_483_647; // PostgreSQL integer column limit
@@ -84,9 +86,6 @@ export const YOUTUBE_REDIRECT_URI = 'https://developers.google.com/oauthplaygrou
 export const HTTP_DEFAULT_ATTEMPTS = 3;
 export const HTTP_DEFAULT_BASE_DELAY_MS = 1_000;
 export const HTTP_DEFAULT_MAX_DELAY_MS = 30_000;
-
-// ── Prisma Model Names ───────────────────────────────────────────────────────
-export const PRISMA_MODELS_TO_INVALIDATE = ['Vod', 'VodUpload', 'Chapter', 'Game', 'Emote'] as const;
 
 // ── Math / Misc ──────────────────────────────────────────────────────────────
 export const PERCENTAGE_PRECISION_MULTIPLIER = 1_000;

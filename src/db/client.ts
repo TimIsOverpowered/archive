@@ -3,136 +3,8 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { TenantConfig } from '../config/types.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
-import {
-  PRISMA_MODELS_TO_INVALIDATE,
-  DB_CLIENT_IDLE_TIMEOUT_MS,
-  DB_CLIENT_MAX_CLIENTS,
-  DB_CLIENT_CLEANUP_INTERVAL_MS,
-} from '../constants.js';
-import { invalidateVodCache, invalidateTenantVodListCache, invalidateEmoteCache } from '../services/vod-cache.js';
+import { DB_CLIENT_IDLE_TIMEOUT_MS, DB_CLIENT_MAX_CLIENTS, DB_CLIENT_CLEANUP_INTERVAL_MS } from '../constants.js';
 import { sleep } from '../utils/delay.js';
-
-function extractVodIdsFromWhere(where: Record<string, unknown> | undefined): number[] {
-  if (!where || typeof where !== 'object') return [];
-  const idClause = where.vod_id ?? where.id;
-  if (idClause === null || idClause === undefined) return [];
-  if (typeof idClause === 'object' && 'in' in idClause) {
-    const arr = (idClause as { in: unknown[] }).in;
-    return Array.isArray(arr) ? arr.map((id) => Number(id)).filter((id) => !isNaN(id)) : [];
-  }
-  if (typeof idClause !== 'object') {
-    const numId = Number(idClause);
-    return !isNaN(numId) ? [numId] : [];
-  }
-  return [];
-}
-
-function extractVodIdsFromData(data: unknown[]): number[] {
-  return data
-    .filter((item): item is Record<string, unknown> => item != null && typeof item === 'object' && 'vod_id' in item)
-    .map((item) => Number((item as { vod_id: unknown }).vod_id))
-    .filter((id) => !isNaN(id));
-}
-
-function invalidateVodIds(tenantId: string, ids: number[]): void {
-  for (const id of ids) {
-    invalidateVodCache(tenantId, id).catch((error) => {
-      getLogger().warn({ tenantId, vodId: id, error: extractErrorDetails(error) }, 'Cache invalidation failed');
-    });
-    getLogger().debug({ tenantId, vodId: id }, 'VOD cache invalidated via extension');
-  }
-}
-
-const cacheInvalidationExtension = (tenantId: string, baseClient: PrismaClient) =>
-  baseClient.$extends({
-    query: {
-      $allModels: {
-        async $allOperations({ model, operation, args, query }) {
-          const mutations = ['create', 'update', 'upsert', 'delete', 'createMany', 'updateMany', 'deleteMany'];
-          if (
-            !mutations.includes(operation) ||
-            !PRISMA_MODELS_TO_INVALIDATE.includes(model as (typeof PRISMA_MODELS_TO_INVALIDATE)[number])
-          ) {
-            return query(args);
-          }
-
-          try {
-            const result = await query(args);
-            const affectedVodIds: number[] = [];
-
-            if (model === 'Vod') {
-              if (operation === 'create') {
-                if (result && typeof result === 'object' && 'id' in result) {
-                  const numId = Number((result as { id: unknown }).id);
-                  if (!isNaN(numId)) affectedVodIds.push(numId);
-                }
-              } else if (operation === 'createMany') {
-                const data = (args as { data?: unknown[] }).data ?? [];
-                const ids = data
-                  .filter(
-                    (item): item is Record<string, unknown> => item != null && typeof item === 'object' && 'id' in item
-                  )
-                  .map((item) => Number((item as { id: unknown }).id))
-                  .filter((id) => !isNaN(id));
-                if (ids.length === 0 && data.length > 0) {
-                  getLogger().debug(
-                    { tenantId, recordCount: data.length },
-                    'Vod.createMany called without explicit IDs — tenant list cache will be invalidated instead'
-                  );
-                }
-                affectedVodIds.push(...ids);
-              } else {
-                affectedVodIds.push(...extractVodIdsFromWhere((args as { where?: Record<string, unknown> }).where));
-              }
-            } else if (model === 'Emote') {
-              const whereIds = extractVodIdsFromWhere((args as { where?: Record<string, unknown> }).where);
-              if (operation === 'create') {
-                const data = (args as { data?: Record<string, unknown> }).data;
-                if (data && 'vod_id' in data) {
-                  const numId = Number((data as { vod_id: unknown }).vod_id);
-                  if (!isNaN(numId)) whereIds.push(numId);
-                }
-              }
-              for (const id of whereIds) {
-                invalidateEmoteCache(tenantId, id).catch((error) => {
-                  getLogger().warn(
-                    { tenantId, vodId: id, error: extractErrorDetails(error) },
-                    'Emote cache invalidation failed'
-                  );
-                });
-              }
-            } else {
-              if (operation === 'create') {
-                const data = (args as { data?: Record<string, unknown> }).data;
-                if (data && 'vod_id' in data) {
-                  const numId = Number((data as { vod_id: unknown }).vod_id);
-                  if (!isNaN(numId)) affectedVodIds.push(numId);
-                }
-              } else if (operation === 'createMany') {
-                const data = (args as { data?: unknown[] }).data ?? [];
-                affectedVodIds.push(...extractVodIdsFromData(data));
-              } else {
-                affectedVodIds.push(...extractVodIdsFromWhere((args as { where?: Record<string, unknown> }).where));
-              }
-            }
-
-            const uniqueIds = [...new Set(affectedVodIds)];
-            invalidateVodIds(tenantId, uniqueIds);
-            await invalidateTenantVodListCache(tenantId).catch((error) => {
-              getLogger().warn(
-                { tenantId, error: extractErrorDetails(error) },
-                'Tenant list cache invalidation failed'
-              );
-            });
-
-            return result;
-          } catch (error) {
-            throw error;
-          }
-        },
-      },
-    },
-  });
 
 interface ClientEntry {
   client: PrismaClient;
@@ -169,26 +41,22 @@ class ClientManager {
     }
 
     const creationPromise = (async (): Promise<PrismaClient> => {
-      let extendedClient: PrismaClient;
+      let client: PrismaClient;
       try {
         const connectionLimit = config.database.connectionLimit || 5;
         const urlWithParams = `${config.database.url}${config.database.url.includes('?') ? '&' : '?'}connection_limit=${connectionLimit}`;
         const adapter = new PrismaPg({ connectionString: urlWithParams });
 
-        // Create base client
-        const baseClient = new PrismaClient({ adapter });
-        await baseClient.$connect();
-
-        // Extend with cache invalidation - THIS IS THE CLIENT WE STORE
-        extendedClient = cacheInvalidationExtension(config.id, baseClient) as unknown as PrismaClient;
+        client = new PrismaClient({ adapter });
+        await client.$connect();
 
         this.clients.set(config.id, {
-          client: extendedClient, // Store the extended client, not baseClient
+          client,
           lastAccessedAt: Date.now(),
           createdAt: Date.now(),
         });
 
-        return extendedClient; // Return the extended client
+        return client;
       } finally {
         this.creationLocks.delete(config.id);
       }

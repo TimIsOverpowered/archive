@@ -17,6 +17,7 @@ import { resetFailures } from '../utils/discord-alerts.js';
 import { UPLOAD_TYPES } from '../types/platforms.js';
 import { TenantConfig } from '../config/types.js';
 import { PrismaClient } from '../../generated/streamer/client.js';
+import { publishVodUpdate } from '../services/cache-invalidator.js';
 
 const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async (job: Job<YoutubeUploadJob>) => {
   const { tenantId, dbId, vodId, type, filePath } = job.data;
@@ -92,6 +93,8 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
       data: { status: 'FAILED' },
     });
 
+    await publishVodUpdate(tenantId, dbId);
+
     log.error({ vodId, jobId, duration, stateAtFailure, errorMsg }, '[youtube-upload] Job failed');
 
     throw error;
@@ -134,6 +137,8 @@ async function processVodUploadJob(
       update: { upload_id: video.id, status: 'COMPLETED', duration: video.duration },
     });
   }
+
+  await publishVodUpdate(tenantId, dbId);
 
   const splitDuration = getEffectiveSplitDuration(config.youtube!.splitDuration);
   await linkVodPartsAfterDelay(tenantId, dbId, result.uploadedVideos, splitDuration, db);

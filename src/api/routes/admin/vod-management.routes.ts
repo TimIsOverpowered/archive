@@ -15,6 +15,8 @@ import { getStrategy } from '../../../services/platforms/index.js';
 import { getApiConfig } from '../../../config/env.js';
 import { VodCreateSchema } from '../../../config/schemas.js';
 import { PLATFORM_VALUES } from '../../../types/platforms.js';
+import { invalidateVodStaticCache } from '../../../services/vod-cache.js';
+import { invalidateVodVolatileCache } from '../../../services/cache-tags.js';
 import type { StatsParams, CreateVodParams, DeleteVodParams, CreateVodBody, DeleteVodBody } from './types.js';
 
 export default async function vodManagementRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
@@ -111,6 +113,9 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
           : validatedData,
       });
 
+      await invalidateVodStaticCache(tenantId, newVod.id);
+      await invalidateVodVolatileCache(tenantId, newVod.id);
+
       log.info(`Created VOD ${vodId}`);
 
       return { data: { message: `${newVod.id} created!`, vodId: newVod.id } };
@@ -147,11 +152,14 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       const { vodId } = request.body;
       const log = createAutoLogger(tenantId);
 
-      const vodRecord = findVodRecord(db, vodId, platform);
+      const vodRecord = await findVodRecord(db, vodId, platform);
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
       await db.vod.delete({ where: { platform_vod_id: { vod_id: vodId, platform } } });
+
+      await invalidateVodStaticCache(tenantId, vodRecord.id);
+      await invalidateVodVolatileCache(tenantId, vodRecord.id);
 
       log.info(`Deleted VOD ${vodId} (${platform}) and all related data (cascade)`);
 

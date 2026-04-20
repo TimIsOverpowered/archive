@@ -16,6 +16,7 @@ import { PLATFORM_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
 import { findStreamRecord } from './utils/vod-helpers.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job';
 import { VodUpdateSchema } from '../../../config/schemas.js';
+import { publishVodDurationUpdate } from '../../../services/cache-invalidator.js';
 
 interface LiveCallbackBody {
   streamId: string;
@@ -105,6 +106,8 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
           where: { id: vodRecord.id },
           data: { duration: request.body.durationSecs },
         });
+
+        await publishVodDurationUpdate(tenantId, vodRecord.id, request.body.durationSecs, vodRecord.is_live);
 
         log.info(`Updated VOD ${vodRecord.id} duration to ${request.body.durationSecs}s`);
       } else if (!request.body.durationSecs && vodRecord.duration === 0) {

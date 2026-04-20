@@ -9,6 +9,8 @@ import { getDisableRedisCache } from '../config/env-accessors.js';
 import { compressChatData, decompressChatData } from '../utils/compression.js';
 import { EMOTE_CACHE_TTL, FFZ_API_BASE, BTTV_API_BASE, SEVENTV_API_BASE } from '../constants.js';
 import { EmoteUpsertSchema } from '../config/schemas.js';
+import { invalidateEmoteCache } from './vod-cache.js';
+import { publishVodUpdate } from './cache-invalidator.js';
 
 export interface EmoteData extends Prisma.JsonObject {
   id: string;
@@ -148,6 +150,9 @@ export async function fetchAndSaveEmotes(
           seventv_emotes: validatedEmotes.seventv_emotes as EmoteData[],
         },
       });
+
+      await invalidateEmoteCache(ctx.tenantId, vodId);
+      await publishVodUpdate(ctx.tenantId, vodId);
     });
   } catch {
     getLogger().error({ vodId }, 'Failed to save emotes');

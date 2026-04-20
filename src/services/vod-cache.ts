@@ -2,56 +2,148 @@ import { RedisService } from '../utils/redis-service.js';
 import { getDisableRedisCache } from '../config/env-accessors.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
+import { invalidateVodTags, invalidateVodVolatileCache } from './cache-tags.js';
+import { redisConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
 
-const redisConnectionFailed = new Map<string, boolean>();
+export { invalidateVodVolatileCache };
 
-export async function invalidateTenantVodListCache(tenantId: string): Promise<void> {
+export interface VodVolatileData {
+  duration: number;
+  is_live: boolean;
+}
+
+function getStaticCacheKey(tenantId: string, dbId: number): string {
+  return `vod:{${tenantId}}:${dbId}`;
+}
+
+function getVolatileCacheKey(tenantId: string, dbId: number): string {
+  return `vod:volatile:{${tenantId}}:${dbId}`;
+}
+
+export async function getVodStaticCache(tenantId: string, dbId: number): Promise<string | null> {
   const client = RedisService.getClient();
-  if (getDisableRedisCache() || !client) {
-    return;
-  }
+  if (!client || getDisableRedisCache()) return null;
 
   try {
-    const keysToDelete: string[] = [];
+    return await client.get(getStaticCacheKey(tenantId, dbId));
+  } catch {
+    return null;
+  }
+}
 
-    const stream = client.scanStream({ match: `vods:${tenantId}:*`, count: 100 });
-    for await (const keys of stream) {
-      keysToDelete.push(...keys);
-    }
+export async function setVodStaticCache(tenantId: string, dbId: number, data: string, ttl: number): Promise<void> {
+  const client = RedisService.getClient();
+  if (!client || getDisableRedisCache()) return;
 
-    if (keysToDelete.length > 0) {
-      await client.unlink(...keysToDelete);
+  try {
+    await client.set(getStaticCacheKey(tenantId, dbId), data, 'EX', ttl);
+  } catch (error) {
+    const details = extractErrorDetails(error);
+    getLogger().warn({ err: details, tenantId, dbId }, 'Static cache write failed');
+  }
+}
+
+export async function getVodVolatileCache(tenantId: string, dbId: number): Promise<VodVolatileData | null> {
+  const client = RedisService.getClient();
+  if (!client || getDisableRedisCache()) return null;
+
+  try {
+    const cached = await client.get(getVolatileCacheKey(tenantId, dbId));
+    if (!cached) return null;
+    return JSON.parse(cached) as VodVolatileData;
+  } catch (err) {
+    const details = extractErrorDetails(err);
+    getLogger().warn({ err: details, tenantId, dbId }, 'Failed to parse volatile cache entry');
+    return null;
+  }
+}
+
+export async function setVodVolatileCache(
+  tenantId: string,
+  dbId: number,
+  data: VodVolatileData,
+  ttl: number
+): Promise<void> {
+  const client = RedisService.getClient();
+  if (!client || getDisableRedisCache()) return;
+
+  try {
+    await client.set(getVolatileCacheKey(tenantId, dbId), JSON.stringify(data), 'EX', ttl);
+  } catch (error) {
+    const details = extractErrorDetails(error);
+    getLogger().warn({ err: details, tenantId, dbId }, 'Volatile cache write failed');
+  }
+}
+
+export async function getVodVolatileCacheBatch(
+  tenantId: string,
+  dbIds: number[]
+): Promise<Map<number, VodVolatileData>> {
+  const result = new Map<number, VodVolatileData>();
+
+  if (dbIds.length === 0) return result;
+
+  const client = RedisService.getClient();
+  if (!client || getDisableRedisCache()) return result;
+
+  const keys = dbIds.map((id) => getVolatileCacheKey(tenantId, id));
+
+  try {
+    const values = await client.mget(...keys);
+    if (values) {
+      dbIds.forEach((id, i) => {
+        if (values[i]) {
+          try {
+            result.set(id, JSON.parse(values[i]) as VodVolatileData);
+          } catch {
+            // Corrupt entry, skip
+          }
+        }
+      });
     }
+  } catch (err) {
+    const details = extractErrorDetails(err);
+    getLogger().warn({ err: details, tenantId }, 'Volatile cache batch read failed');
+  }
+
+  return result;
+}
+
+export async function invalidateVodStaticCache(tenantId: string, dbId: number): Promise<void> {
+  const client = RedisService.getClient();
+  if (getDisableRedisCache() || !client) return;
+
+  try {
+    await client.unlink(getStaticCacheKey(tenantId, dbId));
+    await invalidateVodTags(tenantId, dbId);
 
     if (redisConnectionFailed.get(tenantId)) {
-      redisConnectionFailed.set(tenantId, false);
-      getLogger().debug({ tenantId }, 'Redis connection restored, tenant list cache invalidation resumed');
+      markConnectionRestored(tenantId);
+      getLogger().debug({ tenantId }, 'Redis connection restored, cache invalidation resumed');
     }
 
-    getLogger().debug({ tenantId }, 'Tenant VOD list cache invalidated');
+    getLogger().debug({ tenantId, dbId }, 'VOD static cache invalidated');
   } catch (error) {
     const { message } = extractErrorDetails(error);
 
     if (!redisConnectionFailed.get(tenantId) && message.includes('ECONNREFUSED')) {
-      redisConnectionFailed.set(tenantId, true);
-      getLogger().warn({ tenantId, error: message }, 'Redis connection lost, tenant list cache invalidation suspended');
+      markConnectionFailed(tenantId);
+      getLogger().warn({ tenantId, dbId, error: message }, 'Redis connection lost, cache invalidation suspended');
     }
   }
 }
 
 export async function invalidateEmoteCache(tenantId: string, vodId: number): Promise<void> {
   const client = RedisService.getClient();
-  if (getDisableRedisCache() || !client) {
-    return;
-  }
+  if (getDisableRedisCache() || !client) return;
 
-  const cacheKey = `emotes:${tenantId}:${vodId}`;
+  const cacheKey = `emotes:{${tenantId}}:${vodId}`;
 
   try {
     await client.unlink(cacheKey);
 
     if (redisConnectionFailed.get(tenantId)) {
-      redisConnectionFailed.set(tenantId, false);
+      markConnectionRestored(tenantId);
       getLogger().debug({ tenantId, vodId }, 'Redis connection restored, emote cache invalidation resumed');
     }
 
@@ -60,49 +152,11 @@ export async function invalidateEmoteCache(tenantId: string, vodId: number): Pro
     const { message } = extractErrorDetails(error);
 
     if (!redisConnectionFailed.get(tenantId) && message.includes('ECONNREFUSED')) {
-      redisConnectionFailed.set(tenantId, true);
+      markConnectionFailed(tenantId);
       getLogger().warn(
         { tenantId, vodId, error: message },
         'Redis connection lost, emote cache invalidation suspended'
       );
-    }
-  }
-}
-
-export async function invalidateVodCache(tenantId: string, vodId: number): Promise<void> {
-  const client = RedisService.getClient();
-  if (getDisableRedisCache() || !client) {
-    return;
-  }
-
-  const vodIdStr = String(vodId);
-
-  try {
-    await client.unlink(`vod:${tenantId}:${vodIdStr}`);
-
-    const keysToDelete: string[] = [`vod:${tenantId}:${vodIdStr}`];
-
-    const stream = client.scanStream({ match: `vods:${tenantId}:*`, count: 100 });
-    for await (const keys of stream) {
-      keysToDelete.push(...keys);
-    }
-
-    if (keysToDelete.length > 0) {
-      await client.unlink(...keysToDelete); // single round trip
-    }
-
-    if (redisConnectionFailed.get(tenantId)) {
-      redisConnectionFailed.set(tenantId, false);
-      getLogger().debug({ tenantId, vodId }, 'Redis connection restored, cache invalidation resumed');
-    }
-
-    getLogger().debug({ tenantId, vodId }, 'VOD cache invalidated');
-  } catch (error) {
-    const { message } = extractErrorDetails(error);
-
-    if (!redisConnectionFailed.get(tenantId) && message.includes('ECONNREFUSED')) {
-      redisConnectionFailed.set(tenantId, true);
-      getLogger().warn({ tenantId, vodId, error: message }, 'Redis connection lost, cache invalidation suspended');
     }
   }
 }

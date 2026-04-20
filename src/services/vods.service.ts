@@ -1,9 +1,14 @@
 import { z } from 'zod';
 import { PrismaClient, UploadStatus } from '../../generated/streamer/client.js';
-import { withCache } from '../utils/cache.js';
-import { invalidateVodCache } from './vod-cache.js';
-import { VOD_DETAILS_CACHE_TTL, VOD_LIST_CACHE_TTL } from '../constants.js';
+import { withStaleWhileRevalidate } from '../utils/cache.js';
+import { VOD_DETAILS_CACHE_TTL, VOD_LIST_CACHE_TTL, VOD_VOLATILE_CACHE_TTL } from '../constants.js';
 import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
+import { RedisService } from '../utils/redis-service.js';
+import { getDisableRedisCache } from '../config/env-accessors.js';
+import { registerVodTags } from './cache-tags.js';
+import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.js';
+
+const inflightListQueries = new Map<string, Promise<{ vods: VodResponse[]; total: number }>>();
 
 function buildCacheKey(...parts: (string | number | boolean | undefined | null)[]): string {
   return parts.filter((p) => p !== undefined && p !== null && p !== '').join(':');
@@ -12,7 +17,7 @@ function buildCacheKey(...parts: (string | number | boolean | undefined | null)[
 function buildQueryCacheKey(tenantId: string, query: VodQuery, page: number, limit: number): string {
   const sorted = Object.keys(query).sort() as (keyof VodQuery)[];
   const queryParts = sorted.map((k) => `${k}:${query[k]}`).filter(Boolean);
-  return buildCacheKey('vods', tenantId, ...queryParts, String(page), String(limit));
+  return buildCacheKey('vods', `{${tenantId}}`, ...queryParts, String(page), String(limit));
 }
 
 const VOD_INCLUDE = {
@@ -51,7 +56,7 @@ const VOD_INCLUDE = {
   },
 };
 
-interface VodResponse {
+export interface VodResponse {
   id: number;
   platform: Platform;
   title: string | null;
@@ -154,7 +159,35 @@ export async function getVods(
   const cacheKey = buildQueryCacheKey(tenantId, query, page, limit);
   const { where, orderBy } = buildVodQuery(query);
 
-  return await withCache(cacheKey, VOD_LIST_CACHE_TTL, async () => {
+  const redisClient = RedisService.getClient();
+  const disabled = !redisClient || getDisableRedisCache();
+
+  if (!disabled) {
+    try {
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        const cachedResult = JSON.parse(cached) as { vods: VodResponse[]; total: number };
+        const dbIds = cachedResult.vods.map((v) => v.id);
+        const volatileMap = await getVodVolatileCacheBatch(tenantId, dbIds);
+        const mergedVods = cachedResult.vods.map((vod) => {
+          const volatile = volatileMap.get(vod.id);
+          if (volatile) {
+            return { ...vod, duration: volatile.duration, is_live: volatile.is_live } as VodResponse;
+          }
+          return vod;
+        });
+        return { vods: mergedVods, total: cachedResult.total };
+      }
+    } catch {
+      // Cache read failed, fall through to DB
+    }
+  }
+
+  if (inflightListQueries.has(cacheKey)) {
+    return inflightListQueries.get(cacheKey)!;
+  }
+
+  const fetchPromise = (async () => {
     const [vods, total] = await Promise.all([
       client.vod.findMany({
         where,
@@ -167,17 +200,49 @@ export async function getVods(
     ]);
 
     const hasMore = vods.length > limit;
-    return {
-      vods: (hasMore ? vods.slice(0, limit) : vods) as VodResponse[],
-      total,
-    };
-  });
+    const resultVods = (hasMore ? vods.slice(0, limit) : vods) as VodResponse[];
+    const dbIds = resultVods.map((v) => v.id);
+    const volatileMap = await getVodVolatileCacheBatch(tenantId, dbIds);
+
+    if (!disabled) {
+      const mergedVods = resultVods.map((vod) => {
+        const volatile = volatileMap.get(vod.id);
+        if (volatile) {
+          return { ...vod, duration: volatile.duration, is_live: volatile.is_live } as VodResponse;
+        }
+        return vod;
+      });
+
+      const hasLiveVod = mergedVods.some((vod) => vod.is_live);
+      const ttl = hasLiveVod ? VOD_VOLATILE_CACHE_TTL : VOD_LIST_CACHE_TTL;
+      await registerVodTags(tenantId, mergedVods, cacheKey, JSON.stringify({ vods: mergedVods, total }), ttl);
+      return { vods: mergedVods, total };
+    }
+
+    const mergedVods = resultVods.map((vod) => {
+      const volatile = volatileMap.get(vod.id);
+      if (volatile) {
+        return { ...vod, duration: volatile.duration, is_live: volatile.is_live } as VodResponse;
+      }
+      return vod;
+    });
+
+    return { vods: mergedVods, total };
+  })();
+
+  inflightListQueries.set(cacheKey, fetchPromise);
+
+  try {
+    return await fetchPromise;
+  } finally {
+    inflightListQueries.delete(cacheKey);
+  }
 }
 
 export async function getVodById(client: PrismaClient, tenantId: string, vodId: number): Promise<VodResponse | null> {
-  const cacheKey = `vod:${tenantId}:${vodId}`;
+  const cacheKey = `vod:{${tenantId}}:${vodId}`;
 
-  return await withCache(cacheKey, VOD_DETAILS_CACHE_TTL, async () => {
+  const fetcher = async () => {
     const vod = await client.vod.findFirst({
       where: { id: vodId },
       include: VOD_INCLUDE,
@@ -185,7 +250,23 @@ export async function getVodById(client: PrismaClient, tenantId: string, vodId: 
 
     if (!vod) return null;
     return vod as VodResponse;
-  });
+  };
+
+  const staticData = await withStaleWhileRevalidate<VodResponse | null>(
+    cacheKey,
+    VOD_DETAILS_CACHE_TTL,
+    VOD_DETAILS_CACHE_TTL * 0.8,
+    fetcher
+  );
+
+  if (!staticData) return null;
+
+  const volatile = await getVodVolatileCache(tenantId, vodId);
+  if (volatile) {
+    return { ...staticData, duration: volatile.duration, is_live: volatile.is_live };
+  }
+
+  return staticData;
 }
 
 export async function getVodByPlatformId(
@@ -194,9 +275,9 @@ export async function getVodByPlatformId(
   platform: Platform,
   platformVodId: string
 ): Promise<VodResponse | null> {
-  const cacheKey = `vod:platform:${tenantId}:${platform}:${platformVodId}`;
+  const cacheKey = `vod:platform:{${tenantId}}:${platform}:${platformVodId}`;
 
-  return await withCache(cacheKey, VOD_DETAILS_CACHE_TTL, async () => {
+  const fetcher = async () => {
     const vod = await client.vod.findFirst({
       where: { platform, vod_id: platformVodId },
       include: VOD_INCLUDE,
@@ -204,7 +285,21 @@ export async function getVodByPlatformId(
 
     if (!vod) return null;
     return vod as VodResponse;
-  });
-}
+  };
 
-export { invalidateVodCache };
+  const staticData = await withStaleWhileRevalidate<VodResponse | null>(
+    cacheKey,
+    VOD_DETAILS_CACHE_TTL,
+    VOD_DETAILS_CACHE_TTL * 0.8,
+    fetcher
+  );
+
+  if (!staticData) return null;
+
+  const volatile = await getVodVolatileCache(tenantId, staticData.id);
+  if (volatile) {
+    return { ...staticData, duration: volatile.duration, is_live: volatile.is_live };
+  }
+
+  return staticData;
+}
