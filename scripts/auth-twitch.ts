@@ -6,7 +6,6 @@ import { encryptObject, validateEncryptionKey } from '../src/utils/encryption.js
 import { extractErrorDetails } from '../src/utils/error.js';
 import { TwitchAuthSchema, TwitchAuthObject, TwitchSchema } from '../src/config/schemas.js';
 import { getTenantById, updateTenant } from '../src/services/meta-tenants.service.js';
-
 // Validate encryption key at startup
 if (!process.env.ENCRYPTION_MASTER_KEY || !validateEncryptionKey(process.env.ENCRYPTION_MASTER_KEY)) {
   console.error('❌ ENCRYPTION_MASTER_KEY must be a valid 32-byte hex string (64 hex characters)');
@@ -30,54 +29,6 @@ function prompt(question: string): Promise<string> {
     rl.question(question, (answer) => {
       resolve(answer.trim());
     });
-  });
-}
-
-function promptHidden(question: string): Promise<string> {
-  return new Promise((resolve) => {
-    const rlHidden = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-
-    // Disable terminal echo for hidden input
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode(true);
-    }
-    process.stdin.resume();
-
-    console.log(question);
-
-    const buffer: string[] = [];
-
-    const listener = (chunk: Buffer) => {
-      for (const char of chunk.toString()) {
-        if (char === '\r' || char === '\n') {
-          if (process.stdin.isTTY) {
-            process.stdin.setRawMode(false);
-          }
-          process.stdin.removeListener('data', listener);
-          rlHidden.close();
-
-          console.log('\n'); // New line after hidden input
-          resolve(buffer.join(''));
-          return;
-        }
-        if (char === '\u007F' || char === '\b') {
-          // Backspace
-          if (buffer.length > 0) {
-            buffer.pop();
-            process.stdout.write('\b \b');
-          }
-        } else if (char >= '\x20' && char <= '\x7E') {
-          // Printable ASCII
-          buffer.push(char);
-          process.stdout.write('*');
-        }
-      }
-    };
-
-    process.stdin.on('data', listener);
   });
 }
 
@@ -122,7 +73,6 @@ async function main(): Promise<void> {
     // Display current Twitch status
     const twitchParsed = TwitchSchema.safeParse(tenant.twitch);
     const hasTwitchAuth = twitchParsed.success && twitchParsed.data.auth !== undefined;
-    const twitchEnabled = twitchParsed.success ? twitchParsed.data.enabled || false : false;
 
     if (hasTwitchAuth) {
       console.log(`\nCurrent Twitch Status: Enabled with auth configured`);

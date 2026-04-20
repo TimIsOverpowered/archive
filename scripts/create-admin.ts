@@ -11,7 +11,7 @@ const API_KEY_PREFIX = 'archive_';
 const API_KEY_LENGTH = 64; // hex chars after prefix
 const BCRYPT_COST = 10;
 
-async function createAdmin(username: string): Promise<void> {
+async function createAdminUser(username: string): Promise<void> {
   await initMetaClient();
   // Check if username already exists
   const existing = await findAdminByUsername(username);
@@ -54,7 +54,7 @@ async function main(): Promise<void> {
   const [username] = args;
 
   try {
-    await createAdmin(username);
+    await createAdminUser(username);
   } catch (error) {
     const details = extractErrorDetails(error);
     console.error('Error creating admin user:', details.message);

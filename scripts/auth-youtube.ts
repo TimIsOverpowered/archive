@@ -1,5 +1,15 @@
 import 'dotenv/config';
+import crypto from 'crypto';
+import http from 'http';
+import open from 'open';
+import readline from 'readline';
 import { program } from 'commander';
+import { z } from 'zod';
+import { initMetaClient } from '../src/db/meta-client.js';
+import { extractErrorDetails } from '../src/utils/error.js';
+import { YoutubeAuthSchema, YoutubeAuthObject, YoutubeSchema } from '../src/config/schemas.js';
+import { getTenantById, updateTenant } from '../src/services/meta-tenants.service.js';
+import { encryptScalar, decryptObject } from '../src/utils/encryption.js';
 
 const clientId = process.env.YOUTUBE_CLIENT_ID;
 const clientSecret = process.env.YOUTUBE_CLIENT_SECRET;
@@ -8,16 +18,6 @@ if (!clientId || !clientSecret) {
   console.error('YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET must be set');
   process.exit(1);
 }
-import crypto from 'crypto';
-import http from 'http';
-import open from 'open';
-import readline from 'readline';
-import { z } from 'zod';
-import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
-import { extractErrorDetails } from '../src/utils/error.js';
-import { YoutubeAuthSchema, YoutubeAuthObject, YoutubeSchema } from '../src/config/schemas.js';
-import { getTenantById } from '../src/services/meta-tenants.service.js';
-import { encryptScalar, decryptObject } from '../src/utils/encryption.js';
 
 program.name('auth-youtube').description('YouTube OAuth authentication CLI tool').version('1.0.0');
 
@@ -135,7 +135,7 @@ async function startOAuthFlow(tenantId: string): Promise<void> {
   const scopes = ['https://www.googleapis.com/auth/youtube.force-ssl', 'https://www.googleapis.com/auth/youtube', 'https://www.googleapis.com/auth/youtube.upload'].join(' ');
 
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  authUrl.searchParams.set('client_id', clientId);
+  authUrl.searchParams.set('client_id', clientId!);
   authUrl.searchParams.set('redirect_uri', 'http://localhost:9999/callback');
   authUrl.searchParams.set('response_type', 'code');
   authUrl.searchParams.set('scope', scopes);
@@ -217,7 +217,8 @@ function startCallbackServer(streamerId: string, expectedState: string): void {
         process.exit(0);
       });
     } catch (error: unknown) {
-      const message = typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : String(error);
+      const details = extractErrorDetails(error);
+      console.error('[OAuth] Callback error:', details.message);
       res.write(`<!DOCTYPE html><html><head><title>Authentication Failed</title></head>
 <body style="font-family: sans-serif; text-align: center;">
   <h1>✗ Authentication Failed</h1>
@@ -294,8 +295,8 @@ async function completeOAuth(streamerId: string, expectedState: string, urlOrCod
       },
       body: new URLSearchParams({
         code,
-        client_id: clientId,
-        client_secret: clientSecret,
+        client_id: clientId!,
+        client_secret: clientSecret!,
         redirect_uri: 'http://localhost:9999/callback',
         grant_type: 'authorization_code',
       }),
@@ -366,7 +367,7 @@ async function storeAuthObject(tenantId: string, authObject: YoutubeAuthObject):
     YoutubeAuthSchema.parse(authObject);
 
     // Get current tenant record
-    const tenant = await getMetaClient().tenant.findUnique({ where: { id: tenantId } });
+    const tenant = await getTenantById(tenantId);
     if (!tenant) throw new Error(`Tenant not found in database: ${tenantId}`);
 
     console.log('Using encryption for auth object storage.');
@@ -427,11 +428,7 @@ async function storeAuthObject(tenantId: string, authObject: YoutubeAuthObject):
     youtubeConfig.auth = encryptedAuthValue;
 
     // Store as JSON object - DO NOT stringify here!
-    await getMetaClient()
-      .updateTable('tenants')
-      .set({ youtube: youtubeConfig as any })
-      .where('id', '=', tenantId)
-      .execute();
+    await updateTenant(tenantId, { youtube: youtubeConfig as any });
 
     console.log('\n=== Auth Object Stored Successfully ===\n');
   } catch (error: unknown) {
@@ -444,7 +441,7 @@ program
   .argument('<streamer_id>', 'Streamer ID or display name to authenticate')
   .option('--open', 'Automatically open browser for OAuth flow and start callback server (default: manual paste mode)')
 
-  .action(async (streamerId: string, options) => {
+  .action(async (streamerId: string, _options) => {
     await initMetaClient();
     const tenant = await getTenant(streamerId);
 
@@ -453,8 +450,7 @@ program
       process.exit(1);
     }
 
-    startOAuthFlow(tenant.id).catch((error: unknown) => {
-      const details = extractErrorDetails(error);
+    startOAuthFlow(tenant.id).catch(() => {
       callbackServer?.close();
       process.exit(1);
     });

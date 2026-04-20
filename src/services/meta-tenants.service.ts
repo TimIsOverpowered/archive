@@ -36,7 +36,14 @@ export async function findTenantFirst(where: Partial<SelectableTenants>): Promis
 }
 
 export async function createTenant(data: InsertableTenants): Promise<TenantResult> {
-  return getMetaClient().insertInto('tenants').values(data).returning(tenantSelect).executeTakeFirstOrThrow();
+  return getMetaClient()
+    .insertInto('tenants')
+    .values({
+      ...data,
+      updated_at: new Date(),
+    })
+    .returning(tenantSelect)
+    .executeTakeFirstOrThrow();
 }
 
 export async function updateTenant(id: string, data: Partial<InsertableTenants>): Promise<TenantResult | undefined> {

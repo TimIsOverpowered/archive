@@ -23,7 +23,7 @@ export interface TenantsTable {
   database_url: string | null;
   settings: JSONColumnType<Record<string, unknown>>;
   created_at: ColumnType<Date, string | undefined, never>;
-  updated_at: ColumnType<Date, never, never>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
 export interface AdminsTable {

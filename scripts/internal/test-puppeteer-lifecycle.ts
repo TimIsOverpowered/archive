@@ -12,7 +12,7 @@
 
 import 'dotenv/config';
 import { getBrowser, releaseBrowser, getChromePid } from '../../src/utils/puppeteer-manager.js';
-import { getLogger, childLogger } from '../../src/utils/logger.js';
+import { childLogger } from '../../src/utils/logger.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 

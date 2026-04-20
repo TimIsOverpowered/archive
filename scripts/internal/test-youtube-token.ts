@@ -7,7 +7,7 @@ import { decryptScalar, decryptObject } from '../../src/utils/encryption.js';
 import { loadTenantConfigs } from '../../src/config/loader.js';
 import { createYoutubeClient } from '../../src/services/youtube/client.js';
 import { humanizeDuration } from '../../src/utils/formatting.js';
-import { getAllTenants, getTenantById, findTenantFirst } from '../../src/services/meta-tenants.service.js';
+import { getAllTenants, findTenantFirst } from '../../src/services/meta-tenants.service.js';
 
 interface YoutubeAuth {
   access_token?: string;

@@ -11,6 +11,7 @@ import { encryptScalar, validateEncryptionKey } from '../src/utils/encryption.js
 import { extractErrorDetails } from '../src/utils/error.js';
 import { normalizePath as pathNormalize } from '../src/utils/path';
 import { findTenantFirst, createTenant, deleteTenant } from '../src/services/meta-tenants.service.js';
+import type { InsertableTenants } from '../src/db/meta-types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,7 +29,7 @@ if (!process.env.META_DATABASE_URL) {
 }
 
 // Validate PostgreSQL connection before starting prompts
-function validatePostgresConnection(host: string, port: number, user: string, password: string): boolean {
+async function validatePostgresConnection(host: string, port: number, user: string, password: string): Promise<boolean> {
   try {
     const pool = new Pool({
       host,
@@ -38,7 +39,7 @@ function validatePostgresConnection(host: string, port: number, user: string, pa
       database: 'postgres', // Connect to default postgres DB
     });
 
-    const result = pool.query('SELECT 1');
+    await pool.query('SELECT 1');
     pool.end();
     return true;
   } catch (error) {
@@ -482,17 +483,18 @@ async function main(): Promise<void> {
     // Phase 7: Execution - Register tenant in meta database
 
     const tenantData: any = {
-      displayName: displayName,
-      databaseUrl: encryptScalar(dbUrl),
+      id: channelName,
+      display_name: displayName,
+      database_url: encryptScalar(dbUrl),
       settings: {
-        domainName: domainName,
-        vodPath: vodPath,
-        livePath: livePath,
-        timezone: timezone,
-        chatDownload: chatDownload,
-        vodDownload: vodDownload,
-        saveHLS: saveHLS,
-        saveMP4: saveMP4,
+        domainName,
+        vodPath,
+        livePath,
+        timezone,
+        chatDownload,
+        vodDownload,
+        saveHLS,
+        saveMP4,
       },
     };
 
@@ -529,10 +531,7 @@ async function main(): Promise<void> {
     }
 
     // Step 2: Insert into meta DB with explicit ID
-    const createdTenant = await createTenant({
-      id: channelName,
-      ...tenantData,
-    } as any);
+    const createdTenant = await createTenant(tenantData as InsertableTenants);
     tenantId = createdTenant.id;
 
     // Success message

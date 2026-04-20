@@ -6,6 +6,7 @@ import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
 import { encryptObject, encryptScalar } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
 import { findTenantFirst, createTenant } from '../src/services/meta-tenants.service.js';
+import type { InsertableTenants } from '../src/db/meta-types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -190,18 +191,18 @@ async function importConfig(channelName: string, dbUrl: string): Promise<void> {
 
   const displayName = rawConfig.channel || channelName;
 
-  const createData: Record<string, unknown> = {
+  const createData: any = {
     id: channelName,
-    displayName: displayName,
-    databaseUrl: encryptedDbUrl,
-    settings: settings as SettingsConfig,
+    display_name: displayName,
+    database_url: encryptedDbUrl,
+    settings,
   };
 
   if (twitch) createData.twitch = twitch;
   if (youtube) createData.youtube = youtube;
   if (kick) createData.kick = kick;
 
-  await createTenant(createData as any);
+  await createTenant(createData as InsertableTenants);
 
   console.log(`✓ Imported ${channelName}`);
 }
