@@ -1,8 +1,15 @@
 import { retryWithBackoff } from './retry.js';
 import { extractErrorDetails } from './error.js';
 import { getLogger } from './logger.js';
-import { HTTP_DEFAULT_ATTEMPTS, HTTP_DEFAULT_BASE_DELAY_MS, HTTP_DEFAULT_MAX_DELAY_MS } from '../constants.js';
+import {
+  HTTP_DEFAULT_ATTEMPTS,
+  HTTP_DEFAULT_BASE_DELAY_MS,
+  HTTP_DEFAULT_MAX_DELAY_MS,
+  SEGMENT_DOWNLOAD_MAX_CONNECTIONS,
+  SEGMENT_DOWNLOAD_PIPELINING,
+} from '../constants.js';
 import { HttpError } from './http-error.js';
+import { Agent } from 'undici';
 
 export type ResponseType = 'json' | 'text' | 'blob' | 'arrayBuffer' | 'response';
 
@@ -19,6 +26,7 @@ export interface RequestOptions<R extends ResponseType = 'json'> {
   };
   logContext?: Record<string, unknown>;
   signal?: AbortSignal;
+  dispatcher?: Agent;
 }
 
 export type RequestResult<T, R extends ResponseType> = R extends 'json'
@@ -30,6 +38,11 @@ export type RequestResult<T, R extends ResponseType> = R extends 'json'
       : R extends 'arrayBuffer'
         ? ArrayBuffer
         : Response;
+
+export const segmentDownloadAgent = new Agent({
+  connections: SEGMENT_DOWNLOAD_MAX_CONNECTIONS,
+  pipelining: SEGMENT_DOWNLOAD_PIPELINING,
+});
 
 function scrubSensitiveParams(url: string): string {
   try {
@@ -93,6 +106,7 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
     responseType,
     retryOptions,
     logContext = {},
+    dispatcher,
   } = options ?? {};
 
   const actualResponseType = responseType ?? ('json' as R);
@@ -127,12 +141,15 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
         if (options?.signal) signals.push(options.signal);
         const combinedSignal = AbortSignal.any(signals);
 
-        const response = await fetch(scrubbedUrl, {
+        const fetchInit: RequestInit & { dispatcher?: Agent } = {
           method,
           headers: finalHeaders,
           body: preparedBody,
           signal: combinedSignal,
-        });
+          dispatcher,
+        };
+
+        const response = await fetch(scrubbedUrl, fetchInit);
 
         if (!response.ok) {
           throw new HttpError(response.status, `HTTP ${response.status}: ${response.statusText}`);

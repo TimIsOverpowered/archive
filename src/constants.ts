@@ -87,6 +87,10 @@ export const HTTP_DEFAULT_ATTEMPTS = 3;
 export const HTTP_DEFAULT_BASE_DELAY_MS = 1_000;
 export const HTTP_DEFAULT_MAX_DELAY_MS = 30_000;
 
+// ── HTTP / Connection Pooling ────────────────────────────────────────────────
+export const SEGMENT_DOWNLOAD_MAX_CONNECTIONS = 5000;
+export const SEGMENT_DOWNLOAD_PIPELINING = 1;
+
 // ── Math / Misc ──────────────────────────────────────────────────────────────
 export const PERCENTAGE_PRECISION_MULTIPLIER = 1_000;
 export const PERCENTAGE_PRECISION_DIVISOR = 10;
