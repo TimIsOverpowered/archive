@@ -9,6 +9,7 @@ import { YOUTUBE_MAX_DURATION } from '../../constants.js';
 import type { TenantConfig } from '../../config/types.js';
 import { deleteFileIfExists } from '../../utils/path.js';
 import { GameUpsertSchema } from '../../config/schemas.js';
+import { publishVodUpdate } from '../../services/cache-invalidator.js';
 
 export interface GameUploadContext {
   tenantId: string;
@@ -119,6 +120,8 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     },
     update: { video_id: result.videoId, thumbnail_url: result.thumbnailUrl || null },
   });
+
+  await publishVodUpdate(tenantId, dbId);
 
   await deleteFileIfExists(trimmedPath);
 
@@ -234,6 +237,8 @@ async function processSplitGameUpload(
       },
       update: { video_id: result.videoId, thumbnail_url: result.thumbnailUrl || null },
     });
+
+    await publishVodUpdate(tenantId, dbId);
 
     uploadedGameVideos.push({
       id: result.videoId,

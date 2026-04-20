@@ -8,6 +8,7 @@ import { TenantContext } from '../../types/context.js';
 import { withDbRetry } from '../../db/client.js';
 import { LRUCache } from 'lru-cache';
 import { ChapterCreateSchema } from '../../config/schemas.js';
+import { publishVodUpdate } from '../cache-invalidator.js';
 
 const gameDataCache = new LRUCache<string, Record<string, unknown>>({
   max: 1000,
@@ -88,6 +89,8 @@ export async function saveVodChapters(
         where: { vod_id: dbId },
       });
 
+      await publishVodUpdate(tenantId, dbId);
+
       const chapters = await getChapters(vodId, tenantId);
       if (!chapters) {
         logger.warn({ vodId }, 'No chapters data available from Twitch API');
@@ -127,6 +130,8 @@ export async function saveVodChapters(
             end: validatedChapter.end,
           },
         });
+
+        await publishVodUpdate(tenantId, dbId);
 
         logger.info(
           { dbId, vodId, game: typeof game.displayName === 'string' ? game.displayName : 'unknown' },
@@ -188,6 +193,8 @@ export async function saveVodChapters(
           await db.chapter.createMany({
             data: chaptersToCreate,
           });
+
+          await publishVodUpdate(tenantId, dbId);
 
           logger.info({ dbId, vodId, chapterCount: chaptersToCreate.length }, 'Saved all chapters');
         }

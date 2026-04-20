@@ -16,6 +16,7 @@ import vodsRoutes from './routes/vods.js';
 import logsRoutes from './routes/logs.js';
 import badgesRoutes from './routes/badges.js';
 import { globalAdminRoutes, default as adminRoutes } from './routes/admin/index.js';
+import { registerCacheSubscriber } from '../services/cache-invalidator.js';
 
 function formatErrorResponse(error: unknown): {
   statusCode: number;
@@ -102,6 +103,9 @@ export async function buildServer() {
   await fastify.register(redisPlugin, {
     url: getApiConfig().REDIS_URL,
   });
+
+  // Pub/Sub subscriber for cache invalidation events from workers
+  registerCacheSubscriber(fastify);
 
   // Swagger/OpenAPI documentation
   await fastify.register(swagger, {

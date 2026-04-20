@@ -5,6 +5,7 @@ import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { getDuration } from '../utils/ffmpeg.js';
 import type { TenantContext } from '../../types/context.js';
 import { VodUpdateSchema } from '../../config/schemas.js';
+import { publishVodDurationUpdate } from '../../services/cache-invalidator.js';
 
 const log = childLogger({ module: 'duration-updater' });
 
@@ -47,7 +48,7 @@ export async function updateVodDurationDuringDownload(
     await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
       const current = await db.vod.findUnique({
         where: { id: dbId },
-        select: { duration: true },
+        select: { duration: true, is_live: true },
       });
 
       // Skip update if current duration is already >= new duration
@@ -60,6 +61,8 @@ export async function updateVodDurationDuringDownload(
         where: { id: dbId },
         data: { duration },
       });
+
+      await publishVodDurationUpdate(ctx.tenantId, dbId, duration, current?.is_live ?? false);
 
       log.debug({ vodId, duration, previous: current?.duration }, 'Duration updated');
     });

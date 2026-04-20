@@ -12,6 +12,7 @@ import { TenantContext } from '../types/context.js';
 import { withDbRetry } from '../db/client.js';
 import { LRUCache } from 'lru-cache';
 import { ChapterCreateSchema, ChapterUpdateSchema } from '../config/schemas.js';
+import { publishVodUpdate } from './cache-invalidator.js';
 
 const log = childLogger({ module: 'kick' });
 
@@ -248,6 +249,8 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
           data: { end: currentTimeSeconds },
         });
 
+        await publishVodUpdate(ctx.tenantId, dbId);
+
         log.debug({ vodId, chapterId: lastChapter.id, currentTime: currentTimeSeconds }, 'Updated chapter end time');
         return;
       }
@@ -258,6 +261,9 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
           where: { id: lastChapter.id },
           data: { end: currentTimeSeconds },
         });
+
+        await publishVodUpdate(ctx.tenantId, dbId);
+
         log.debug({ vodId, chapterId: lastChapter.id }, 'Closed previous chapter');
       }
 
@@ -285,9 +291,12 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
           where: { id: existingChapter.id },
           data: { end: currentTimeSeconds },
         });
+
+        await publishVodUpdate(ctx.tenantId, dbId);
+
         log.debug(
-          { vodId, chapterId: existingChapter.id, start: currentTimeSeconds },
-          'Chapter already exists, updated end time'
+          { dbId, vodId, categoryId: category.id, categoryName: category.name, startTime: currentTimeSeconds },
+          'Created new chapter'
         );
         return;
       }
@@ -311,6 +320,8 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
           start: validatedChapter.start,
         },
       });
+
+      await publishVodUpdate(ctx.tenantId, dbId);
 
       log.debug(
         { dbId, vodId, categoryId: category.id, categoryName: category.name, startTime: currentTimeSeconds },
@@ -352,6 +363,8 @@ export async function finalizeKickChapters(
             duration: toHHMMSS(endDuration),
           },
         });
+
+        await publishVodUpdate(ctx.tenantId, dbId);
 
         log.info({ vodId, chapterId: incompleteChapter.id, finalDuration: endDuration }, 'Finalized last chapter');
       } else {

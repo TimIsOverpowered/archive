@@ -10,6 +10,7 @@ import { sendStreamOfflineAlert, sendStreamLiveAlert } from './alert-helpers.js'
 import { getLiveDownloadQueue, enqueueJobWithLogging } from '../jobs/queues.js';
 import type { LiveDownloadJob } from '../jobs/queues.js';
 import { getTenantConfig } from '../../config/loader.js';
+import { publishVodUpdate } from '../../services/cache-invalidator.js';
 
 type StreamerDbClient = PrismaClient;
 
@@ -47,7 +48,7 @@ export async function handlePlatformLiveCheck(
   }
 
   if (!streamStatus) {
-    await handleOfflineStream(prisma, platform, platformUsername || undefined, config.displayName, log);
+    await handleOfflineStream(prisma, tenantId, platform, platformUsername || undefined, config.displayName, log);
     return;
   }
 
@@ -66,6 +67,7 @@ export async function handlePlatformLiveCheck(
 
 async function handleOfflineStream(
   prisma: PrismaClient,
+  tenantId: string,
   platform: Platform,
   username: string | undefined,
   displayName: string | undefined,
@@ -84,6 +86,8 @@ async function handleOfflineStream(
       where: { id: activeLiveVod.id },
       data: { is_live: false },
     });
+
+    await publishVodUpdate(tenantId, activeLiveVod.id);
 
     await sendStreamOfflineAlert(
       platform,
@@ -197,6 +201,8 @@ async function handleNewLiveStream(
     },
   });
 
+  await publishVodUpdate(tenantId, createdVod.id);
+
   await sendStreamLiveAlert(platform, vodMetadata.id, streamStatus.title, platformUsername, config.displayName);
 
   log.info({ vodId: vodMetadata.id }, '[Monitor]: Queuing HLS download');
@@ -232,6 +238,8 @@ async function handleExistingVodBecameLive(
       started_at: new Date(streamStatus.startedAt),
     },
   });
+
+  await publishVodUpdate(tenantId, existingVod.id);
 
   log.info({ vodId: existingVod.vod_id }, '[Monitor]: Queuing HLS download');
 

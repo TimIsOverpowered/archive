@@ -3,6 +3,7 @@ import { getStrategy } from './platforms/strategy.js';
 import { TenantContext } from '../types/context.js';
 import { withDbRetry } from '../db/client.js';
 import { VodUpdateSchema } from '../config/schemas.js';
+import { publishVodDurationUpdate } from './cache-invalidator.js';
 
 export interface FinalizeVodOptions {
   ctx: TenantContext;
@@ -35,5 +36,7 @@ export async function finalizeVod(options: FinalizeVodOptions): Promise<void> {
         ...(durationSeconds !== null && { duration: durationSeconds }),
       },
     });
+
+    await publishVodDurationUpdate(ctx.tenantId, dbId, durationSeconds ?? 0, false);
   });
 }
