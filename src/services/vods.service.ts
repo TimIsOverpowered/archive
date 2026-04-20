@@ -10,6 +10,13 @@ import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.js';
 
 const inflightListQueries = new Map<string, Promise<{ vods: VodResponse[]; total: number }>>();
 
+function applyVolatileData(vods: VodResponse[], volatileMap: Map<number, { duration: number | null; is_live: boolean }>): VodResponse[] {
+  return vods.map((vod) => {
+    const volatile = volatileMap.get(vod.id);
+    return volatile ? { ...vod, duration: volatile.duration, is_live: volatile.is_live } as VodResponse : vod;
+  });
+}
+
 function buildCacheKey(...parts: (string | number | boolean | undefined | null)[]): string {
   return parts.filter((p) => p !== undefined && p !== null && p !== '').join(':');
 }
@@ -133,13 +140,7 @@ export async function getVods(
         const cachedResult = JSON.parse(cached) as { vods: VodResponse[]; total: number };
         const dbIds = cachedResult.vods.map((v) => v.id);
         const volatileMap = await getVodVolatileCacheBatch(tenantId, dbIds);
-        const mergedVods = cachedResult.vods.map((vod) => {
-          const volatile = volatileMap.get(vod.id);
-          if (volatile) {
-            return { ...vod, duration: volatile.duration, is_live: volatile.is_live } as VodResponse;
-          }
-          return vod;
-        });
+        const mergedVods = applyVolatileData(cachedResult.vods, volatileMap);
         return { vods: mergedVods, total: cachedResult.total };
       }
     } catch {
@@ -169,13 +170,7 @@ export async function getVods(
     const volatileMap = await getVodVolatileCacheBatch(tenantId, dbIds);
 
     if (!disabled) {
-      const mergedVods = resultVods.map((vod) => {
-        const volatile = volatileMap.get(vod.id);
-        if (volatile) {
-          return { ...vod, duration: volatile.duration, is_live: volatile.is_live } as VodResponse;
-        }
-        return vod;
-      });
+      const mergedVods = applyVolatileData(resultVods, volatileMap);
 
       const hasLiveVod = mergedVods.some((vod) => vod.is_live);
       const ttl = hasLiveVod ? VOD_VOLATILE_CACHE_TTL : VOD_LIST_CACHE_TTL;
@@ -183,13 +178,7 @@ export async function getVods(
       return { vods: mergedVods, total };
     }
 
-    const mergedVods = resultVods.map((vod) => {
-      const volatile = volatileMap.get(vod.id);
-      if (volatile) {
-        return { ...vod, duration: volatile.duration, is_live: volatile.is_live } as VodResponse;
-      }
-      return vod;
-    });
+    const mergedVods = applyVolatileData(resultVods, volatileMap);
 
     return { vods: mergedVods, total };
   })();
