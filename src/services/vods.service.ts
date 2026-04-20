@@ -82,15 +82,8 @@ export const VodQuerySchema = z.object({
 
 export type VodQuery = z.infer<typeof VodQuerySchema>;
 
-export interface VodWhereInput {
-  platform?: string;
-  created_at?: { gte?: Date; lte?: Date };
-  vod_uploads?: { some: Record<string, unknown> };
-  games?: { some: { game_name: { contains: string; mode: 'insensitive' } } };
-}
-
-export function buildVodQuery(query: VodQuery): { where: VodWhereInput; orderBy: Record<string, string> } {
-  const where: VodWhereInput = {};
+export function buildVodQuery(query: VodQuery): { where: Prisma.VodWhereInput; orderBy: Prisma.VodOrderByWithRelationInput } {
+  const where: Prisma.VodWhereInput = {};
 
   if (query.platform) {
     where.platform = query.platform;
