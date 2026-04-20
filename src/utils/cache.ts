@@ -2,8 +2,14 @@ import { RedisService } from '../utils/redis-service.js';
 import { getDisableRedisCache } from '../config/env-accessors.js';
 import { extractErrorDetails } from './error.js';
 import { getLogger } from '../utils/logger.js';
+import { LRUCache } from 'lru-cache';
+import { retryWithBackoff } from './retry.js';
 
-const SWR_FAILURES = new Map<string, number>();
+const SWR_FAILURES = new LRUCache<string, number>({
+  max: 5000,
+  ttl: 5 * 60 * 1000,
+  allowStale: false,
+});
 const MAX_SWR_FAILURES = 3;
 
 interface CacheEntry<T> {
@@ -12,7 +18,7 @@ interface CacheEntry<T> {
 }
 
 export async function withCache<T>(key: string, ttl: number, fetcher: () => Promise<T>): Promise<T> {
-  const client = getDisableRedisCache() ? null : RedisService.getClient();
+  const client = getDisableRedisCache() ? null : (RedisService.instance?.getClient() ?? null);
   if (!client) return fetcher();
 
   try {
@@ -35,7 +41,11 @@ export async function withCache<T>(key: string, ttl: number, fetcher: () => Prom
   return result;
 }
 
-const inflightPromises = new Map<string, Promise<unknown>>();
+const inflightPromises = new LRUCache<string, Promise<unknown>>({
+  max: 5000,
+  ttl: 60 * 1000,
+  allowStale: false,
+});
 
 export async function withStaleWhileRevalidate<T>(
   key: string,
@@ -43,7 +53,7 @@ export async function withStaleWhileRevalidate<T>(
   staleAfter: number,
   fetcher: () => Promise<T>
 ): Promise<T> {
-  const client = getDisableRedisCache() ? null : RedisService.getClient();
+  const client = getDisableRedisCache() ? null : (RedisService.instance?.getClient() ?? null);
   if (!client) return fetcher();
 
   const now = Date.now();
@@ -55,7 +65,7 @@ export async function withStaleWhileRevalidate<T>(
       const isStale = now - entry.timestamp > staleAfter * 1000;
 
       if (isStale) {
-        if (!inflightPromises.has(key)) {
+        if (!inflightPromises.get(key)) {
           const revalidatePromise = revalidateWithRetry(client, key, ttl, fetcher).catch(() =>
             inflightPromises.delete(key)
           );
@@ -73,7 +83,7 @@ export async function withStaleWhileRevalidate<T>(
     getLogger().warn({ err: details, key }, 'SWR cache read failed, falling back to DB');
   }
 
-  if (inflightPromises.has(key)) {
+  if (inflightPromises.get(key)) {
     return (await inflightPromises.get(key)) as T;
   }
 
@@ -103,26 +113,15 @@ async function revalidateWithRetry<T>(
   }
 
   try {
-    const data = await fetcher();
+    const data = await retryWithBackoff(fetcher, { attempts: 2, baseDelayMs: 2000 });
     SWR_FAILURES.delete(key);
     await client.set(key, JSON.stringify({ data, timestamp: Date.now() }), 'EX', ttl);
     inflightPromises.delete(key);
     return data;
   } catch (err) {
     SWR_FAILURES.set(key, failures + 1);
-    log.warn({ err: extractErrorDetails(err), attempt: failures + 1 }, 'SWR revalidation failed');
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    try {
-      const data = await fetcher();
-      SWR_FAILURES.delete(key);
-      await client.set(key, JSON.stringify({ data, timestamp: Date.now() }), 'EX', ttl);
-      inflightPromises.delete(key);
-      return data;
-    } catch (retryErr) {
-      SWR_FAILURES.delete(key);
-      inflightPromises.delete(key);
-      log.error({ err: extractErrorDetails(retryErr) }, 'SWR revalidation exhausted retries');
-      throw retryErr;
-    }
+    inflightPromises.delete(key);
+    log.error({ err: extractErrorDetails(err) }, 'SWR revalidation exhausted retries');
+    throw err;
   }
 }
