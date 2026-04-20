@@ -39,7 +39,7 @@ The script validates the channel name (which becomes the tenant ID):
 2. Prompts for display name (defaults to channel name if empty)
 3. Validates PostgreSQL connection before starting prompts
 4. Attempts to create the PostgreSQL database (or asks you to create manually)
-5. Runs Prisma migrations to set up the normalized schema
+5. Runs schema migrations to set up the normalized database schema
 6. Collects streaming platform metadata only (Twitch, Kick user IDs/usernames - **no OAuth credentials**)
 7. Collects YouTube upload behavior settings (**no API key or OAuth tokens**)
 8. Collects general archive settings (paths, timezone, download preferences)
@@ -85,7 +85,7 @@ DATABASE SETUP
 ──────────────────────────────────────────
 ✓ Created database 'moonmoon'
 
-📦 Running Prisma migrations...
+📦 Running schema migrations...
 ✓ Migrations completed successfully
 
 ──────────────────────────────────────────
@@ -492,7 +492,7 @@ New API Key: archive_<new-64-hex-chars>
 
 ### migrate-streamer.ts
 
-Migrate a streamer's database from legacy Sequelize schema to new Prisma schema. Interactive mode only - no flags required.
+Migrate a streamer's database from legacy schema to normalized schema. Interactive mode only - no flags required.
 
 **Usage:**
 
@@ -532,7 +532,7 @@ Dry run only? (y/N to skip validation-only mode): y
    - Emotes: Maps 7tv_emotes column to seventv_emotes
    - Games: Migrates game chapter timestamps
    - Chapters: Extracts Kick-specific chapters from JSONB `chapters[]` array in vods table
-   - Chat messages: Renames `logs` table to `chat_messages` (no data migration needed)
+   - Chat messages: Migrates `logs` table to `chat_messages` using parallel ctid scan
 5. **Transaction-based:** All operations in single transaction with automatic rollback on error
 6. **Legacy rename:** After confirmation, renames old tables to `*_legacy` for safe rollback capability
 

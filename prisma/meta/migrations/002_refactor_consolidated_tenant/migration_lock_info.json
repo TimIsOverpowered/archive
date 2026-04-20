@@ -1,4 +1,0 @@
-{"version":"1","steps":[{"uuid":{"$id":1},"migration_name":"refactor_consolidated_tenant"}]}
--- Migration name: '002_refactor_consolidated_tenant'
---
--- Date: 2026-03-23T18:30:00.000Z

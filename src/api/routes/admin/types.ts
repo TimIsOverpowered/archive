@@ -28,7 +28,7 @@ export interface VodRecordBase {
   created_at: Date;
   duration: number;
   stream_id: string | null;
-  platform: Platform | string; // Allow string for Prisma compatibility
+  platform: Platform | string; // Allow string for legacy data compatibility
 }
 
 export interface VODDownloadJobBody {
