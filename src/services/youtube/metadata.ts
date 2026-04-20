@@ -1,4 +1,5 @@
-import type { PrismaClient, Chapter } from '../../../generated/streamer/client.js';
+import type { Kysely } from 'kysely';
+import type { StreamerDB, SelectableChapters } from '../../db/streamer-types.js';
 import dayjs from '../../utils/dayjs.js';
 import { createYoutubeClient } from './client.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
@@ -8,15 +9,17 @@ export async function saveChaptersAndLinkParts(
   dbId: number,
   uploadedVideos: { id: string; part: number }[],
   splitDuration: number,
-  db: PrismaClient
+  db: Kysely<StreamerDB>
 ): Promise<void> {
   const logger = createAutoLogger('youtube-metadata');
   const youtube = await createYoutubeClient(tenantId);
 
-  const chapters = await db.chapter.findMany({
-    where: { vod_id: dbId },
-    orderBy: { start: 'asc' },
-  });
+  const chapters = await db
+    .selectFrom('chapters')
+    .selectAll()
+    .where('vod_id', '=', dbId)
+    .orderBy('start', 'asc')
+    .execute();
 
   const hasChapters = chapters && chapters.length > 0;
   const needsLinking = uploadedVideos.length > 1;
@@ -85,7 +88,7 @@ export async function saveChaptersAndLinkParts(
   );
 }
 
-function buildChapterTimestampsForPart(chapters: Chapter[], partNum: number, splitDuration: number): string {
+function buildChapterTimestampsForPart(chapters: SelectableChapters[], partNum: number, splitDuration: number): string {
   const partStart = splitDuration * (partNum - 1);
   const partEnd = splitDuration * partNum;
 

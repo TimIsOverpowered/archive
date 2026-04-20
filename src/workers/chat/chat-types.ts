@@ -1,4 +1,4 @@
-import type { InputJsonValue } from '../../../generated/streamer/internal/prismaNamespace';
+export type JsonValue = unknown;
 
 export interface ChatMessageCreateInput {
   id: string;
@@ -6,7 +6,7 @@ export interface ChatMessageCreateInput {
   display_name: string | null;
   content_offset_seconds: number;
   createdAt: Date;
-  message?: InputJsonValue;
-  user_badges?: InputJsonValue;
+  message?: JsonValue;
+  user_badges?: JsonValue;
   user_color: string | null;
 }

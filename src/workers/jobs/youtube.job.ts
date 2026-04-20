@@ -27,7 +27,7 @@ export async function createVodUploadJob(
   }
 
   const vodRecord = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-    return db.vod.findUnique({ where: { id: dbId } });
+    return db.selectFrom('vods').where('id', '=', dbId).selectAll().executeTakeFirst();
   });
 
   if (!vodRecord) {
@@ -66,7 +66,7 @@ export async function createGameUploadJob(
   }
 
   const vodRecord = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-    return db.vod.findUnique({ where: { id: dbId } });
+    return db.selectFrom('vods').where('id', '=', dbId).selectAll().executeTakeFirst();
   });
 
   if (!vodRecord) {
@@ -80,12 +80,13 @@ export async function createGameUploadJob(
 
   // Calculate EP number (global count across all VODs)
   const gameCount = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-    return db.game.count({
-      where: {
-        game_name: chapter.name,
-        vod_id: { not: dbId },
-      },
-    });
+    const result = await db
+      .selectFrom('games')
+      .select((eb) => eb.fn.count<number>('id').as('cnt'))
+      .where('game_name', '=', chapter.name)
+      .where('vod_id', '!=', dbId)
+      .executeTakeFirst();
+    return result?.cnt ?? 0;
   });
   const epNumber = gameCount + 1;
 
@@ -145,10 +146,7 @@ export async function createGameUploadJobsForVod(
 
   // Fetch all chapters for this VOD
   const chapters = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-    return db.chapter.findMany({
-      where: { vod_id: dbId },
-      orderBy: { start: 'asc' },
-    });
+    return db.selectFrom('chapters').where('vod_id', '=', dbId).orderBy('start', 'asc').selectAll().execute();
   });
 
   const jobs: YoutubeGameUploadJob[] = [];
@@ -321,7 +319,7 @@ export async function queueYoutubeGameUpload(
   downloadJobId?: string
 ): Promise<string | null> {
   const chapter = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-    return db.chapter.findUnique({ where: { id: chapterId } });
+    return db.selectFrom('chapters').where('id', '=', chapterId).selectAll().executeTakeFirst();
   });
 
   if (!chapter) return null;

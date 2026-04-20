@@ -46,10 +46,11 @@ export async function updateVodDurationDuringDownload(
 
     // Update DB if duration increased
     await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-      const current = await db.vod.findUnique({
-        where: { id: dbId },
-        select: { duration: true, is_live: true },
-      });
+      const current = await db
+        .selectFrom('vods')
+        .select(['duration', 'is_live'])
+        .where('id', '=', dbId)
+        .executeTakeFirst();
 
       // Skip update if current duration is already >= new duration
       if (current?.duration && current.duration >= duration) {
@@ -57,10 +58,7 @@ export async function updateVodDurationDuringDownload(
       }
 
       VodUpdateSchema.parse({ duration });
-      await db.vod.update({
-        where: { id: dbId },
-        data: { duration },
-      });
+      await db.updateTable('vods').set({ duration }).where('id', '=', dbId).execute();
 
       await publishVodDurationUpdate(ctx.tenantId, dbId, duration, current?.is_live ?? false);
 

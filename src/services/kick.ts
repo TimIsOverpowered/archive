@@ -237,17 +237,16 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
     const currentTimeSeconds = dayjs().diff(created_at, 'second');
 
     await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-      const lastChapter = await db.chapter.findFirst({
-        where: { vod_id: dbId },
-        orderBy: { start: 'desc' },
-      });
+      const lastChapter = await db
+        .selectFrom('chapters')
+        .selectAll()
+        .where('vod_id', '=', dbId)
+        .orderBy('start', 'desc')
+        .executeTakeFirst();
 
       if (lastChapter && lastChapter.game_id === String(category.id)) {
         ChapterUpdateSchema.parse({ end: currentTimeSeconds });
-        await db.chapter.update({
-          where: { id: lastChapter.id },
-          data: { end: currentTimeSeconds },
-        });
+        await db.updateTable('chapters').set({ end: currentTimeSeconds }).where('id', '=', lastChapter.id).execute();
 
         await publishVodUpdate(ctx.tenantId, dbId);
 
@@ -257,10 +256,7 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
 
       if (lastChapter) {
         ChapterUpdateSchema.parse({ end: currentTimeSeconds });
-        await db.chapter.update({
-          where: { id: lastChapter.id },
-          data: { end: currentTimeSeconds },
-        });
+        await db.updateTable('chapters').set({ end: currentTimeSeconds }).where('id', '=', lastChapter.id).execute();
 
         await publishVodUpdate(ctx.tenantId, dbId);
 
@@ -279,18 +275,20 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
         }
       }
 
-      const existingChapter = await db.chapter.findUnique({
-        where: {
-          vod_id_start: { vod_id: dbId, start: currentTimeSeconds },
-        },
-      });
+      const existingChapter = await db
+        .selectFrom('chapters')
+        .selectAll()
+        .where('vod_id', '=', dbId)
+        .where('start', '=', currentTimeSeconds)
+        .executeTakeFirst();
 
       if (existingChapter) {
         ChapterUpdateSchema.parse({ end: currentTimeSeconds });
-        await db.chapter.update({
-          where: { id: existingChapter.id },
-          data: { end: currentTimeSeconds },
-        });
+        await db
+          .updateTable('chapters')
+          .set({ end: currentTimeSeconds })
+          .where('id', '=', existingChapter.id)
+          .execute();
 
         await publishVodUpdate(ctx.tenantId, dbId);
 
@@ -310,16 +308,17 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
         title: category.name,
         game_id: String(category.id),
       });
-      await db.chapter.create({
-        data: {
+      await db
+        .insertInto('chapters')
+        .values({
           vod_id: validatedChapter.vod_id,
           game_id: validatedChapter.game_id,
           name: validatedChapter.title,
           image: bannerImage,
           duration: validatedChapter.duration,
           start: validatedChapter.start,
-        },
-      });
+        })
+        .execute();
 
       await publishVodUpdate(ctx.tenantId, dbId);
 
@@ -341,13 +340,13 @@ export async function finalizeKickChapters(
 ): Promise<void> {
   try {
     await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-      const incompleteChapter = await db.chapter.findFirst({
-        where: {
-          vod_id: dbId,
-          end: null,
-        },
-        orderBy: { start: 'desc' },
-      });
+      const incompleteChapter = await db
+        .selectFrom('chapters')
+        .selectAll()
+        .where('vod_id', '=', dbId)
+        .where('end', 'is', null)
+        .orderBy('start', 'desc')
+        .executeTakeFirst();
 
       if (incompleteChapter) {
         const endDuration = finalDurationSeconds - incompleteChapter.start;
@@ -356,13 +355,14 @@ export async function finalizeKickChapters(
           end: endDuration,
           duration: toHHMMSS(endDuration),
         });
-        await db.chapter.update({
-          where: { id: incompleteChapter.id },
-          data: {
+        await db
+          .updateTable('chapters')
+          .set({
             end: endDuration,
             duration: toHHMMSS(endDuration),
-          },
-        });
+          })
+          .where('id', '=', incompleteChapter.id)
+          .execute();
 
         await publishVodUpdate(ctx.tenantId, dbId);
 

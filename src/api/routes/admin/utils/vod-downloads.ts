@@ -40,7 +40,7 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
   const filePath =
     type === SOURCE_TYPES.LIVE ? getLiveFilePath({ config, streamId: vodId }) : getVodFilePath({ config, vodId });
 
-  let vodRecord = await db.vod.findUnique({ where: { id: dbId } });
+  let vodRecord = (await db.selectFrom('vods').selectAll().where('id', '=', dbId).executeTakeFirst()) ?? null;
   if (vodRecord && vodRecord.duration === 0) {
     log.info({ dbId, vodId }, 'VOD duration is 0, refreshing metadata before download check');
     vodRecord = await refreshVodRecord(ctx, vodId, dbId, platformUserId, platformUsername, log);

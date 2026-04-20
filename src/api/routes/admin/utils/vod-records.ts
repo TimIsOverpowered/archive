@@ -2,7 +2,8 @@ import { saveVodChapters } from '../../../../services/twitch/index.js';
 import { type AppLogger } from '../../../../utils/logger.js';
 import type { VodRecord } from '../../../../types/db.js';
 import type { Platform } from '../../../../types/platforms.js';
-import type { PrismaClient } from '../../../../../generated/streamer/client';
+import type { Kysely } from 'kysely';
+import type { StreamerDB } from '../../../../db/streamer-types';
 import { fetchAndSaveEmotes } from '../../../../services/emotes.js';
 import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { triggerChatDownload } from '../../../../workers/jobs/chat.job.js';
@@ -32,30 +33,36 @@ function validatePlatformConfig(
  * Fetches VOD record or returns null if not found
  */
 export async function findVodRecord(
-  client: PrismaClient,
+  db: Kysely<StreamerDB>,
   vodId: string,
   platform: Platform
 ): Promise<VodRecord | null> {
-  try {
-    return await client.vod.findUnique({ where: { platform_vod_id: { platform, vod_id: vodId } } });
-  } catch {
-    return null;
-  }
+  return (
+    (await db
+      .selectFrom('vods')
+      .selectAll()
+      .where('platform', '=', platform)
+      .where('vod_id', '=', vodId)
+      .executeTakeFirst()) ?? null
+  );
 }
 
 /**
  * Fetches VOD record by stream_id or returns null if not found
  */
 export async function findStreamRecord(
-  client: PrismaClient,
+  db: Kysely<StreamerDB>,
   streamId: string,
   platform: Platform
 ): Promise<VodRecord | null> {
-  try {
-    return await client.vod.findFirst({ where: { platform, stream_id: streamId } });
-  } catch {
-    return null;
-  }
+  return (
+    (await db
+      .selectFrom('vods')
+      .selectAll()
+      .where('platform', '=', platform)
+      .where('stream_id', '=', streamId)
+      .executeTakeFirst()) ?? null
+  );
 }
 
 /**
@@ -96,9 +103,11 @@ export async function ensureVodRecord(
 
   log.info(`Creating new VOD ${vodId} for platform ${platform}`);
 
-  const vodRecord = (await db.vod.create({
-    data: strategy.createVodData(vodMetadata),
-  })) as VodRecord;
+  const vodRecord = (await db
+    .insertInto('vods')
+    .values(strategy.createVodData(vodMetadata) as any)
+    .returning(['id', 'vod_id', 'platform', 'title', 'duration', 'stream_id', 'created_at'])
+    .executeTakeFirst()) as VodRecord;
 
   if (platform === 'twitch') {
     await saveVodChapters(ctx, vodRecord.id, vodRecord.vod_id, vodRecord.duration);
@@ -147,10 +156,12 @@ export async function refreshVodRecord(
     return null;
   }
 
-  const updatedRecord = (await db.vod.update({
-    where: { id: dbId },
-    data: strategy.updateVodData(vodMetadata),
-  })) as VodRecord;
+  const updatedRecord = (await db
+    .updateTable('vods')
+    .set(strategy.updateVodData(vodMetadata) as any)
+    .where('id', '=', dbId)
+    .returning(['id', 'vod_id', 'platform', 'title', 'duration', 'stream_id', 'created_at'])
+    .executeTakeFirst()) as VodRecord;
 
   log.info({ vodId, platform, duration: updatedRecord.duration }, 'VOD metadata refreshed');
 

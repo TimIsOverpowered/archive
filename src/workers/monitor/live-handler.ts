@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
-import type { PrismaClient } from '../../../generated/streamer/client.js';
+import type { Kysely } from 'kysely';
+import type { StreamerDB, InsertableVods } from '../../db/streamer-types';
 import type { TenantConfig } from '../../config/types.js';
 import type { Platform } from '../../types/platforms.js';
 import { getStrategy, type PlatformStreamStatus, type PlatformVodMetadata } from '../../services/platforms/index.js';
@@ -12,10 +13,10 @@ import type { LiveDownloadJob } from '../jobs/queues.js';
 import { getTenantConfig } from '../../config/loader.js';
 import { publishVodUpdate } from '../../services/cache-invalidator.js';
 
-type StreamerDbClient = PrismaClient;
+type StreamerDbClient = Kysely<StreamerDB>;
 
 export async function handlePlatformLiveCheck(
-  prisma: StreamerDbClient,
+  db: StreamerDbClient,
   tenantId: string,
   platform: Platform,
   config: TenantConfig
@@ -48,12 +49,12 @@ export async function handlePlatformLiveCheck(
   }
 
   if (!streamStatus) {
-    await handleOfflineStream(prisma, tenantId, platform, platformUsername || undefined, config.displayName, log);
+    await handleOfflineStream(db, tenantId, platform, platformUsername || undefined, config.displayName, log);
     return;
   }
 
   await handleLiveStream(
-    prisma,
+    db,
     streamStatus,
     platform,
     platformUserId,
@@ -66,7 +67,7 @@ export async function handlePlatformLiveCheck(
 }
 
 async function handleOfflineStream(
-  prisma: PrismaClient,
+  db: StreamerDbClient,
   tenantId: string,
   platform: Platform,
   username: string | undefined,
@@ -75,17 +76,17 @@ async function handleOfflineStream(
 ): Promise<void> {
   log.debug({ username }, '[Monitor]: Streamer is OFFLINE');
 
-  const activeLiveVod = await prisma.vod.findFirst({
-    where: { platform, is_live: true },
-  });
+  const activeLiveVod = await db
+    .selectFrom('vods')
+    .selectAll()
+    .where('platform', '=', platform)
+    .where('is_live', '=', true)
+    .executeTakeFirst();
 
   if (activeLiveVod) {
     log.info({ vodId: activeLiveVod.vod_id }, '[Monitor]: Marking VOD as ended');
 
-    await prisma.vod.update({
-      where: { id: activeLiveVod.id },
-      data: { is_live: false },
-    });
+    await db.updateTable('vods').set({ is_live: false }).where('id', '=', activeLiveVod.id).execute();
 
     await publishVodUpdate(tenantId, activeLiveVod.id);
 
@@ -100,7 +101,7 @@ async function handleOfflineStream(
 }
 
 async function handleLiveStream(
-  prisma: PrismaClient,
+  db: StreamerDbClient,
   streamStatus: PlatformStreamStatus,
   platform: Platform,
   platformUserId: string,
@@ -110,13 +111,16 @@ async function handleLiveStream(
   tenantId: string,
   log: ReturnType<typeof createAutoLogger>
 ): Promise<void> {
-  const existingVod = await prisma.vod.findFirst({
-    where: { stream_id: streamStatus.id, platform },
-  });
+  const existingVod = await db
+    .selectFrom('vods')
+    .selectAll()
+    .where('stream_id', '=', streamStatus.id)
+    .where('platform', '=', platform)
+    .executeTakeFirst();
 
   if (!existingVod) {
     await handleNewLiveStream(
-      prisma,
+      db,
       streamStatus,
       platform,
       platformUserId,
@@ -131,7 +135,7 @@ async function handleLiveStream(
 
   if (!existingVod.is_live) {
     await handleExistingVodBecameLive(
-      prisma,
+      db,
       existingVod,
       streamStatus,
       platform,
@@ -155,7 +159,7 @@ async function handleLiveStream(
 }
 
 async function handleNewLiveStream(
-  prisma: PrismaClient,
+  db: StreamerDbClient,
   streamStatus: PlatformStreamStatus,
   platform: Platform,
   platformUserId: string,
@@ -179,11 +183,14 @@ async function handleNewLiveStream(
     return;
   }
 
-  const vodAlreadyExists = await prisma.vod.findFirst({
-    where: { vod_id: vodMetadata.id, platform },
-  });
+  const existingVod = await db
+    .selectFrom('vods')
+    .selectAll()
+    .where('vod_id', '=', vodMetadata.id)
+    .where('platform', '=', platform)
+    .executeTakeFirst();
 
-  if (vodAlreadyExists) {
+  if (existingVod) {
     log.debug({ vodId: vodMetadata.id }, '[Monitor]: VOD was created by concurrent poll');
     return;
   }
@@ -193,13 +200,15 @@ async function handleNewLiveStream(
     '[Monitor]: Creating VOD record for live stream'
   );
 
-  const createdVod = await prisma.vod.create({
-    data: {
+  const [createdVod] = await db
+    .insertInto('vods')
+    .values({
       ...strategy.createVodData(vodMetadata),
       is_live: true,
       started_at: new Date(streamStatus.startedAt),
-    },
-  });
+    } as InsertableVods)
+    .returning('id')
+    .execute();
 
   await publishVodUpdate(tenantId, createdVod.id);
 
@@ -220,7 +229,7 @@ async function handleNewLiveStream(
 }
 
 async function handleExistingVodBecameLive(
-  prisma: PrismaClient,
+  db: StreamerDbClient,
   existingVod: { id: number; vod_id: string },
   streamStatus: PlatformStreamStatus,
   platform: Platform,
@@ -231,13 +240,14 @@ async function handleExistingVodBecameLive(
 ): Promise<void> {
   log.info({ vodId: existingVod.vod_id }, '[Monitor]: Existing VOD is now active');
 
-  await prisma.vod.update({
-    where: { id: existingVod.id },
-    data: {
+  await db
+    .updateTable('vods')
+    .set({
       is_live: true,
       started_at: new Date(streamStatus.startedAt),
-    },
-  });
+    })
+    .where('id', '=', existingVod.id)
+    .execute();
 
   await publishVodUpdate(tenantId, existingVod.id);
 

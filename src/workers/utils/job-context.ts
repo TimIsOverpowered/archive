@@ -1,11 +1,12 @@
 import { getTenantConfig } from '../../config/loader.js';
 import { ensureClient } from '../../db/client.js';
 import type { TenantConfig } from '../../config/types.js';
-import type { PrismaClient } from '../../../generated/streamer/client.js';
+import type { Kysely } from 'kysely';
+import type { StreamerDB } from '../../db/streamer-types.js';
 
 export interface JobContext {
   config: TenantConfig;
-  db: PrismaClient;
+  db: Kysely<StreamerDB>;
   tenantId: string;
 }
 

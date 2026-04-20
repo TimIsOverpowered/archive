@@ -1,64 +1,68 @@
-import { PrismaClient } from '../../generated/streamer/client.js';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
+import { Kysely, PostgresDialect } from 'kysely';
 import { TenantConfig } from '../config/types.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
-import { DB_CLIENT_IDLE_TIMEOUT_MS, DB_CLIENT_MAX_CLIENTS, DB_CLIENT_CLEANUP_INTERVAL_MS } from '../constants.js';
+import { DB_POOL_IDLE_TIMEOUT_MS, DB_POOL_MAX_CLIENTS, DB_POOL_CLEANUP_INTERVAL_MS } from '../constants.js';
 import { sleep } from '../utils/delay.js';
+import type { StreamerDB } from './streamer-types.js';
 
-interface ClientEntry {
-  client: PrismaClient;
+interface PgPoolEntry {
+  pool: Pool;
+  db: Kysely<StreamerDB>;
   lastAccessedAt: number;
   createdAt: number;
 }
 
-class ClientManager {
-  private clients = new Map<string, ClientEntry>();
+class PoolManager {
+  private pools = new Map<string, PgPoolEntry>();
   private cleanupIntervalId: NodeJS.Timeout | null = null;
-  private creationLocks = new Map<string, Promise<PrismaClient>>();
+  private creationLocks = new Map<string, Promise<Kysely<StreamerDB>>>();
 
-  getClient(tenantId: string): PrismaClient | undefined {
-    const entry = this.clients.get(tenantId);
+  getClient(tenantId: string): Kysely<StreamerDB> | undefined {
+    const entry = this.pools.get(tenantId);
     if (entry) {
       entry.lastAccessedAt = Date.now();
-      return entry.client;
+      return entry.db;
     }
     return undefined;
   }
 
-  async createClient(config: TenantConfig): Promise<PrismaClient> {
-    if (this.clients.has(config.id)) {
-      return this.clients.get(config.id)!.client;
+  async createClient(config: TenantConfig): Promise<Kysely<StreamerDB>> {
+    if (this.pools.has(config.id)) {
+      return this.pools.get(config.id)!.db;
     }
 
     if (this.creationLocks.has(config.id)) {
       await this.creationLocks.get(config.id)!;
-      const existing = this.clients.get(config.id);
+      const existing = this.pools.get(config.id);
       if (!existing) throw new Error(`Client creation failed for ${config.id}`);
-      return existing.client;
+      return existing.db;
     }
 
-    if (this.clients.size >= DB_CLIENT_MAX_CLIENTS) {
+    if (this.pools.size >= DB_POOL_MAX_CLIENTS) {
       await this.evictOldestIdleClient();
     }
 
-    const creationPromise = (async (): Promise<PrismaClient> => {
-      let client: PrismaClient;
+    const creationPromise = (async (): Promise<Kysely<StreamerDB>> => {
+      let db: Kysely<StreamerDB>;
       try {
         const connectionLimit = config.database.connectionLimit || 5;
-        const urlWithParams = `${config.database.url}${config.database.url.includes('?') ? '&' : '?'}connection_limit=${connectionLimit}`;
-        const adapter = new PrismaPg({ connectionString: urlWithParams });
+        const pool = new Pool({
+          connectionString: config.database.url,
+          max: connectionLimit,
+        });
+        const dialect = new PostgresDialect({ pool });
+        db = new Kysely<StreamerDB>({ dialect });
 
-        client = new PrismaClient({ adapter });
-        await client.$connect();
-
-        this.clients.set(config.id, {
-          client,
+        this.pools.set(config.id, {
+          pool,
+          db,
           lastAccessedAt: Date.now(),
           createdAt: Date.now(),
         });
 
-        return client;
+        return db;
       } finally {
         this.creationLocks.delete(config.id);
       }
@@ -69,14 +73,14 @@ class ClientManager {
   }
 
   async closeClient(tenantId: string): Promise<void> {
-    const entry = this.clients.get(tenantId);
+    const entry = this.pools.get(tenantId);
     if (entry) {
       try {
-        await entry.client.$disconnect();
+        await entry.pool.end();
       } catch (error) {
-        getLogger().warn({ tenantId, error: extractErrorDetails(error) }, 'Failed to disconnect DB client');
+        getLogger().warn({ tenantId, error: extractErrorDetails(error) }, 'Failed to disconnect DB pool');
       }
-      this.clients.delete(tenantId);
+      this.pools.delete(tenantId);
     }
   }
 
@@ -84,7 +88,7 @@ class ClientManager {
     let oldestTenantId: string | null = null;
     let oldestTimestamp = Infinity;
 
-    for (const [tenantId, entry] of this.clients.entries()) {
+    for (const [tenantId, entry] of this.pools.entries()) {
       if (entry.lastAccessedAt < oldestTimestamp) {
         oldestTimestamp = entry.lastAccessedAt;
         oldestTenantId = tenantId;
@@ -99,23 +103,23 @@ class ClientManager {
 
   async evictIdleClients(): Promise<void> {
     const now = Date.now();
-    const cutoff = now - DB_CLIENT_IDLE_TIMEOUT_MS;
+    const cutoff = now - DB_POOL_IDLE_TIMEOUT_MS;
 
-    for (const [tenantId, entry] of this.clients.entries()) {
+    for (const [tenantId, entry] of this.pools.entries()) {
       if (entry.lastAccessedAt < cutoff) {
         const idleDuration = now - entry.lastAccessedAt;
 
         try {
-          await entry.client.$disconnect();
+          await entry.pool.end();
         } catch (error) {
           getLogger().warn({ tenantId, error: extractErrorDetails(error) }, 'Failed to disconnect during eviction');
         }
 
-        this.clients.delete(tenantId);
+        this.pools.delete(tenantId);
 
         getLogger().info(
-          { tenantId, idleDuration, totalClients: this.clients.size },
-          `[DB Client Manager] Evicted idle client for tenant: ${tenantId}. Idle for: ${idleDuration}ms. Active clients remaining: ${this.clients.size}`
+          { tenantId, idleDuration, totalPools: this.pools.size },
+          `[DB Pool Manager] Evicted idle pool for tenant: ${tenantId}. Idle for: ${idleDuration}ms. Active pools remaining: ${this.pools.size}`
         );
       }
     }
@@ -128,9 +132,9 @@ class ClientManager {
 
     this.cleanupIntervalId = setInterval(() => {
       this.evictIdleClients().catch((error) => {
-        getLogger().error({ error: extractErrorDetails(error) }, 'Error during idle client eviction');
+        getLogger().error({ error: extractErrorDetails(error) }, 'Error during idle pool eviction');
       });
-    }, DB_CLIENT_CLEANUP_INTERVAL_MS);
+    }, DB_POOL_CLEANUP_INTERVAL_MS);
   }
 
   stopCleanup(): void {
@@ -142,22 +146,22 @@ class ClientManager {
 
   reset(): void {
     this.stopCleanup();
-    this.clients.clear();
+    this.pools.clear();
     this.creationLocks.clear();
   }
 
   getCount(): number {
-    return this.clients.size;
+    return this.pools.size;
   }
 
-  isClientValid(tenantId: string): boolean {
-    const entry = this.clients.get(tenantId);
+  isPoolValid(tenantId: string): boolean {
+    const entry = this.pools.get(tenantId);
     if (!entry) return false;
-    return Date.now() - entry.lastAccessedAt <= DB_CLIENT_IDLE_TIMEOUT_MS;
+    return Date.now() - entry.lastAccessedAt <= DB_POOL_IDLE_TIMEOUT_MS;
   }
 
-  touchClient(tenantId: string): boolean {
-    const entry = this.clients.get(tenantId);
+  touchPool(tenantId: string): boolean {
+    const entry = this.pools.get(tenantId);
     if (entry) entry.lastAccessedAt = Date.now();
     return !!entry;
   }
@@ -165,69 +169,69 @@ class ClientManager {
   async closeAll(): Promise<void> {
     this.stopCleanup();
 
-    for (const [tenantId, entry] of this.clients.entries()) {
+    for (const [tenantId, entry] of this.pools.entries()) {
       try {
-        await entry.client.$disconnect();
+        await entry.pool.end();
       } catch (error) {
         getLogger().warn({ tenantId, error: extractErrorDetails(error) }, 'Failed to disconnect during shutdown');
       }
     }
 
-    this.clients.clear();
+    this.pools.clear();
     this.creationLocks.clear();
   }
 }
 
-const clientManager = new ClientManager();
+const poolManager = new PoolManager();
 
-export function getClient(tenantId: string): PrismaClient | undefined {
-  return clientManager.getClient(tenantId);
+export function getClient(tenantId: string): Kysely<StreamerDB> | undefined {
+  return poolManager.getClient(tenantId);
 }
 
-export async function createClient(config: TenantConfig): Promise<PrismaClient> {
-  return clientManager.createClient(config);
+export async function createClient(config: TenantConfig): Promise<Kysely<StreamerDB>> {
+  return poolManager.createClient(config);
 }
 
 export async function closeClient(tenantId: string): Promise<void> {
-  return clientManager.closeClient(tenantId);
+  return poolManager.closeClient(tenantId);
 }
 
 export async function closeAllClients(): Promise<void> {
-  return clientManager.closeAll();
+  return poolManager.closeAll();
 }
 
 export function startClientCleanup(): void {
-  clientManager.startCleanup();
+  poolManager.startCleanup();
 }
 
 export function stopClientCleanup(): void {
-  clientManager.stopCleanup();
+  poolManager.stopCleanup();
 }
 
 export function getClientCount(): number {
-  return clientManager.getCount();
+  return poolManager.getCount();
 }
 
 export function resetClientManager(): void {
-  clientManager.reset();
+  poolManager.reset();
 }
 
 /**
- * Check if client is still valid (not evicted due to idle timeout)
+ * Check if pool is still valid (not evicted due to idle timeout)
  */
 export function isClientValid(tenantId: string): boolean {
-  return clientManager.isClientValid(tenantId);
+  return poolManager.isPoolValid(tenantId);
 }
 
 /**
- * Touch client to prevent eviction during long-running operations
+ * Touch pool to prevent eviction during long-running operations
  */
 export function touchClient(tenantId: string): boolean {
-  return clientManager.touchClient(tenantId);
+  return poolManager.touchPool(tenantId);
 }
 
 /**
- * Detect connection errors from Prisma/PostgreSQL
+ * Detect connection errors from PostgreSQL
  */
 export function isConnectionError(error: unknown): boolean {
   const msg = error instanceof Error ? error.message : String(error);
@@ -249,9 +253,9 @@ export function isConnectionError(error: unknown): boolean {
 }
 
 /**
- * Ensure client is valid, recreate if evicted or invalid
+ * Ensure pool is valid, recreate if evicted or invalid
  */
-export async function ensureClient(tenantId: string, config: TenantConfig): Promise<PrismaClient> {
+export async function ensureClient(tenantId: string, config: TenantConfig): Promise<Kysely<StreamerDB>> {
   let client = getClient(tenantId);
 
   if (!client || !isClientValid(tenantId)) {
@@ -269,7 +273,7 @@ export async function ensureClient(tenantId: string, config: TenantConfig): Prom
 export async function withDbRetry<T>(
   tenantId: string,
   config: TenantConfig,
-  operation: (db: PrismaClient) => Promise<T>,
+  operation: (db: Kysely<StreamerDB>) => Promise<T>,
   options: { maxRetries?: number; retryDelayMs?: number } = {}
 ): Promise<T> {
   const { maxRetries = 2, retryDelayMs = 1000 } = options;

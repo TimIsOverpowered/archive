@@ -1,4 +1,5 @@
-import type { PrismaClient } from '../../../generated/streamer/client.js';
+import type { Kysely } from 'kysely';
+import type { StreamerDB } from '../../db/streamer-types';
 import type { AppLogger } from '../../utils/logger.js';
 import { splitVideo, getDuration } from '../utils/ffmpeg.js';
 import { uploadVideo, saveChaptersAndLinkParts } from '../../services/youtube/index.js';
@@ -22,7 +23,7 @@ export interface VodUploadContext {
   dbId: number;
   vodId: string;
   filePath?: string;
-  db: PrismaClient;
+  db: Kysely<StreamerDB>;
   config: TenantConfig;
   vodRecord: VodRecord;
   dmcaProcessed?: boolean;
@@ -297,7 +298,7 @@ export async function linkVodPartsAfterDelay(
   dbId: number,
   uploadedVideos: Array<{ id: string; part: number; duration: number }>,
   splitDuration: number,
-  db: PrismaClient
+  db: Kysely<StreamerDB>
 ): Promise<void> {
   if (uploadedVideos.length > 0) {
     setTimeout(async () => {

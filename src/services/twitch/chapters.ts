@@ -85,9 +85,7 @@ export async function saveVodChapters(
   const logger = createAutoLogger('twitch-chapters');
   try {
     await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-      await db.chapter.deleteMany({
-        where: { vod_id: dbId },
-      });
+      await db.deleteFrom('chapters').where('vod_id', '=', dbId).execute();
 
       await publishVodUpdate(tenantId, dbId);
 
@@ -116,8 +114,9 @@ export async function saveVodChapters(
           title: typeof game.displayName === 'string' ? game.displayName : null,
           game_id: gameId,
         });
-        await db.chapter.create({
-          data: {
+        await db
+          .insertInto('chapters')
+          .values({
             vod_id: validatedChapter.vod_id,
             game_id: validatedChapter.game_id,
             name: validatedChapter.title,
@@ -128,8 +127,8 @@ export async function saveVodChapters(
             duration: validatedChapter.duration,
             start: validatedChapter.start,
             end: validatedChapter.end,
-          },
-        });
+          })
+          .execute();
 
         await publishVodUpdate(tenantId, dbId);
 
@@ -190,9 +189,9 @@ export async function saveVodChapters(
         }
 
         if (chaptersToCreate.length > 0) {
-          await db.chapter.createMany({
-            data: chaptersToCreate,
-          });
+          for (const ch of chaptersToCreate) {
+            await db.insertInto('chapters').values(ch).execute();
+          }
 
           await publishVodUpdate(tenantId, dbId);
 

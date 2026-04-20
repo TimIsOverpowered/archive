@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import Redis from 'ioredis';
+import { sql } from 'kysely';
 import { loadTenantConfigs } from '../../config/loader.js';
 import { getClient } from '../../db/client.js';
 import { checkPuppeteerHealth } from '../../utils/puppeteer-health.js';
@@ -58,7 +59,7 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
         if (client) {
           dbStatus = 'ok';
           try {
-            await client.$queryRaw`SELECT 1`;
+            await sql`SELECT 1`.execute(client);
           } catch {
             dbStatus = 'error';
           }

@@ -1,5 +1,7 @@
 import { z } from 'zod';
-import { Prisma, PrismaClient } from '../../generated/streamer/client.js';
+import { jsonArrayFrom } from 'kysely/helpers/postgres';
+import type { Kysely, ExpressionBuilder } from 'kysely';
+import type { StreamerDB, DBClient } from '../db/streamer-types.js';
 import { withStaleWhileRevalidate } from '../utils/cache.js';
 import { VOD_DETAILS_CACHE_TTL, VOD_LIST_CACHE_TTL, VOD_VOLATILE_CACHE_TTL } from '../constants.js';
 import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
@@ -30,43 +32,45 @@ function buildQueryCacheKey(tenantId: string, query: VodQuery, page: number, lim
   return buildCacheKey('vods', `{${tenantId}}`, ...queryParts, String(page), String(limit));
 }
 
-const VOD_INCLUDE = {
-  vod_uploads: {
-    select: {
-      upload_id: true,
-      type: true,
-      duration: true,
-      part: true,
-      status: true,
-      thumbnail_url: true,
-      created_at: true,
-    },
-  },
-  chapters: {
-    select: {
-      name: true,
-      image: true,
-      duration: true,
-      start: true,
-      end: true,
-    },
-  },
-  games: {
-    select: {
-      start_time: true,
-      end_time: true,
-      video_provider: true,
-      video_id: true,
-      thumbnail_url: true,
-      game_id: true,
-      game_name: true,
-      title: true,
-      chapter_image: true,
-    },
-  },
-};
-
-export type VodResponse = Prisma.VodGetPayload<{ include: typeof VOD_INCLUDE }>;
+export interface VodResponse {
+  id: number;
+  vod_id: string;
+  platform: string;
+  title: string | null;
+  duration: number;
+  stream_id: string | null;
+  created_at: Date;
+  updated_at: Date;
+  is_live: boolean;
+  started_at: Date | null;
+  vod_uploads: Array<{
+    upload_id: string;
+    type: string | null;
+    duration: number;
+    part: number;
+    status: string;
+    thumbnail_url: string | null;
+    created_at: Date;
+  }>;
+  chapters: Array<{
+    name: string | null;
+    image: string | null;
+    duration: string | null;
+    start: number;
+    end: number | null;
+  }>;
+  games: Array<{
+    start_time: number;
+    end_time: number;
+    video_provider: string | null;
+    video_id: string | null;
+    thumbnail_url: string | null;
+    game_id: string | null;
+    game_name: string | null;
+    title: string | null;
+    chapter_image: string | null;
+  }>;
+}
 
 export const VodQuerySchema = z.object({
   platform: z.enum(PLATFORM_VALUES as [string, ...string[]]).optional(),
@@ -83,42 +87,47 @@ export const VodQuerySchema = z.object({
 export type VodQuery = z.infer<typeof VodQuerySchema>;
 
 export function buildVodQuery(query: VodQuery): {
-  where: Prisma.VodWhereInput;
-  orderBy: Prisma.VodOrderByWithRelationInput;
+  where: (eb: ExpressionBuilder<StreamerDB, 'vods'>) => unknown;
+  orderBy: { col: string; dir: 'asc' | 'desc' };
 } {
-  const where: Prisma.VodWhereInput = {};
+  const where = (eb: ExpressionBuilder<StreamerDB, 'vods'>) => {
+    const conditions: unknown[] = [];
 
-  if (query.platform) {
-    where.platform = query.platform;
-  }
+    if (query.platform) {
+      conditions.push(eb('platform', '=', query.platform));
+    }
 
-  if (query.from || query.to) {
-    where.created_at = {};
-    if (query.from) (where.created_at as { gte?: Date }).gte = new Date(query.from);
-    if (query.to) (where.created_at as { lte?: Date }).lte = new Date(query.to);
-  }
+    if (query.from) {
+      conditions.push(eb('created_at', '>=', new Date(query.from)));
+    }
+    if (query.to) {
+      conditions.push(eb('created_at', '<=', new Date(query.to)));
+    }
 
-  if (query.uploaded === 'youtube') {
-    where.vod_uploads = { some: {} };
-  }
+    if (query.uploaded === 'youtube') {
+      conditions.push(eb('id', 'in', eb.selectFrom('vod_uploads').select('vod_uploads.vod_id')));
+    }
 
-  if (query.game) {
-    where.games = {
-      some: {
-        game_name: { contains: query.game, mode: 'insensitive' as const },
-      },
-    };
-  }
+    if (query.game) {
+      conditions.push(
+        eb('id', 'in', eb.selectFrom('games').select('games.vod_id').where('game_name', 'ilike', `%${query.game}%`))
+      );
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return eb.and(conditions as any);
+  };
 
   const orderBy = {
-    [query.sort || 'created_at']: query.order || 'desc',
+    col: (query.sort === 'uploaded_at' ? 'created_at' : query.sort) || 'created_at',
+    dir: query.order || 'desc',
   };
 
   return { where, orderBy };
 }
 
 export async function getVods(
-  client: PrismaClient,
+  db: Kysely<StreamerDB>,
   tenantId: string,
   query: VodQuery
 ): Promise<{ vods: VodResponse[]; total: number }> {
@@ -152,19 +161,57 @@ export async function getVods(
   }
 
   const fetchPromise = (async () => {
-    const [vods, total] = await Promise.all([
-      client.vod.findMany({
-        where,
-        skip: offset,
-        take: limit + 1,
-        orderBy,
-        include: VOD_INCLUDE,
-      }),
-      client.vod.count({ where }),
+    const [result, totalRow] = await Promise.all([
+      db
+        .selectFrom('vods')
+        .selectAll('vods')
+        .select((eb) => [
+          jsonArrayFrom(
+            eb
+              .selectFrom('vod_uploads')
+              .select(['upload_id', 'type', 'duration', 'part', 'status', 'thumbnail_url', 'created_at'])
+              .whereRef('vod_uploads.vod_id', '=', 'vods.id')
+          ).as('vod_uploads'),
+          jsonArrayFrom(
+            eb
+              .selectFrom('chapters')
+              .select(['name', 'image', 'duration', 'start', 'end'])
+              .whereRef('chapters.vod_id', '=', 'vods.id')
+          ).as('chapters'),
+          jsonArrayFrom(
+            eb
+              .selectFrom('games')
+              .select([
+                'start_time',
+                'end_time',
+                'video_provider',
+                'video_id',
+                'thumbnail_url',
+                'game_id',
+                'game_name',
+                'title',
+                'chapter_image',
+              ])
+              .whereRef('games.vod_id', '=', 'vods.id')
+          ).as('games'),
+        ])
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .where(where as any)
+        .orderBy(orderBy.col as 'created_at' | 'duration', orderBy.dir)
+        .limit(limit + 1)
+        .offset(offset)
+        .execute(),
+      db
+        .selectFrom('vods')
+        .select((eb) => [eb.fn.count('id').as('cnt')])
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .where(where as any)
+        .executeTakeFirst(),
     ]);
 
-    const hasMore = vods.length > limit;
-    const resultVods = hasMore ? vods.slice(0, limit) : vods;
+    const total = Number(totalRow?.cnt ?? 0);
+    const hasMore = result.length > limit;
+    const resultVods = (hasMore ? result.slice(0, limit) : result) as unknown as VodResponse[];
     const dbIds = resultVods.map((v) => v.id);
     const volatileMap = await getVodVolatileCacheBatch(tenantId, dbIds);
 
@@ -191,52 +238,48 @@ export async function getVods(
   }
 }
 
-export async function getVodById(client: PrismaClient, tenantId: string, vodId: number): Promise<VodResponse | null> {
+export async function getVodById(db: DBClient, tenantId: string, vodId: number): Promise<VodResponse | null> {
   const cacheKey = `vod:{${tenantId}}:${vodId}`;
 
   const fetcher = async () => {
-    const vod = await client.vod.findFirst({
-      where: { id: vodId },
-      include: VOD_INCLUDE,
-    });
+    const vod = await db
+      .selectFrom('vods')
+      .selectAll('vods')
+      .select((eb) => [
+        jsonArrayFrom(
+          eb
+            .selectFrom('vod_uploads')
+            .select(['upload_id', 'type', 'duration', 'part', 'status', 'thumbnail_url', 'created_at'])
+            .whereRef('vod_uploads.vod_id', '=', 'vods.id')
+        ).as('vod_uploads'),
+        jsonArrayFrom(
+          eb
+            .selectFrom('chapters')
+            .select(['name', 'image', 'duration', 'start', 'end'])
+            .whereRef('chapters.vod_id', '=', 'vods.id')
+        ).as('chapters'),
+        jsonArrayFrom(
+          eb
+            .selectFrom('games')
+            .select([
+              'start_time',
+              'end_time',
+              'video_provider',
+              'video_id',
+              'thumbnail_url',
+              'game_id',
+              'game_name',
+              'title',
+              'chapter_image',
+            ])
+            .whereRef('games.vod_id', '=', 'vods.id')
+        ).as('games'),
+      ])
+      .where('id', '=', vodId)
+      .executeTakeFirst();
 
     if (!vod) return null;
-    return vod;
-  };
-
-  const staticData = await withStaleWhileRevalidate(
-    cacheKey,
-    VOD_DETAILS_CACHE_TTL,
-    VOD_DETAILS_CACHE_TTL * 0.8,
-    fetcher
-  );
-
-  if (!staticData) return null;
-
-  const volatile = await getVodVolatileCache(tenantId, vodId);
-  if (volatile) {
-    return { ...staticData, duration: volatile.duration, is_live: volatile.is_live };
-  }
-
-  return staticData;
-}
-
-export async function getVodByPlatformId(
-  client: PrismaClient,
-  tenantId: string,
-  platform: Platform,
-  platformVodId: string
-): Promise<VodResponse | null> {
-  const cacheKey = `vod:platform:{${tenantId}}:${platform}:${platformVodId}`;
-
-  const fetcher = async () => {
-    const vod = await client.vod.findFirst({
-      where: { platform, vod_id: platformVodId },
-      include: VOD_INCLUDE,
-    });
-
-    if (!vod) return null;
-    return vod;
+    return vod as unknown as VodResponse;
   };
 
   const staticData = await withStaleWhileRevalidate(
@@ -250,7 +293,74 @@ export async function getVodByPlatformId(
 
   const volatile = await getVodVolatileCache(tenantId, staticData.id);
   if (volatile) {
-    return { ...staticData, duration: volatile.duration, is_live: volatile.is_live };
+    return { ...staticData, duration: volatile.duration, is_live: volatile.is_live } as VodResponse;
+  }
+
+  return staticData;
+}
+
+export async function getVodByPlatformId(
+  db: Kysely<StreamerDB>,
+  tenantId: string,
+  platform: Platform,
+  platformVodId: string
+): Promise<VodResponse | null> {
+  const cacheKey = `vod:platform:{${tenantId}}:${platform}:${platformVodId}`;
+
+  const fetcher = async () => {
+    const vod = await db
+      .selectFrom('vods')
+      .selectAll('vods')
+      .select((eb) => [
+        jsonArrayFrom(
+          eb
+            .selectFrom('vod_uploads')
+            .select(['upload_id', 'type', 'duration', 'part', 'status', 'thumbnail_url', 'created_at'])
+            .whereRef('vod_uploads.vod_id', '=', 'vods.id')
+        ).as('vod_uploads'),
+        jsonArrayFrom(
+          eb
+            .selectFrom('chapters')
+            .select(['name', 'image', 'duration', 'start', 'end'])
+            .whereRef('chapters.vod_id', '=', 'vods.id')
+        ).as('chapters'),
+        jsonArrayFrom(
+          eb
+            .selectFrom('games')
+            .select([
+              'start_time',
+              'end_time',
+              'video_provider',
+              'video_id',
+              'thumbnail_url',
+              'game_id',
+              'game_name',
+              'title',
+              'chapter_image',
+            ])
+            .whereRef('games.vod_id', '=', 'vods.id')
+        ).as('games'),
+      ])
+      .where('platform', '=', platform)
+      .where('vod_id', '=', platformVodId)
+      .executeTakeFirst();
+
+    if (!vod) return null;
+    return vod as unknown as VodResponse;
+  };
+
+  const staticData = await withStaleWhileRevalidate(
+    cacheKey,
+    VOD_DETAILS_CACHE_TTL,
+    VOD_DETAILS_CACHE_TTL * 0.8,
+    fetcher
+  );
+
+  if (!staticData) return null;
+
+  const volatile = await getVodVolatileCache(tenantId, staticData.id);
+  if (volatile) {
+    return { ...staticData, duration: volatile.duration, is_live: volatile.is_live } as VodResponse;
   }
 
   return staticData;

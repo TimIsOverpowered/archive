@@ -16,7 +16,8 @@ import type { AppLogger } from '../utils/logger.js';
 import { resetFailures } from '../utils/discord-alerts.js';
 import { UPLOAD_TYPES } from '../types/platforms.js';
 import { TenantConfig } from '../config/types.js';
-import { PrismaClient } from '../../generated/streamer/client.js';
+import type { Kysely } from 'kysely';
+import type { StreamerDB } from '../db/streamer-types';
 import { publishVodUpdate } from '../services/cache-invalidator.js';
 
 const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async (job: Job<YoutubeUploadJob>) => {
@@ -88,10 +89,12 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
       filePath: actualFilePath,
     });
 
-    await db.vodUpload.updateMany({
-      where: { vod_id: dbId, type },
-      data: { status: 'FAILED' },
-    });
+    await db
+      .updateTable('vod_uploads')
+      .set({ status: 'FAILED' })
+      .where('vod_id', '=', dbId)
+      .where('type', '=', type)
+      .execute();
 
     await publishVodUpdate(tenantId, dbId);
 
@@ -104,7 +107,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 async function processVodUploadJob(
   job: YoutubeVodUploadJob & { filePath: string },
   config: TenantConfig,
-  db: PrismaClient,
+  db: Kysely<StreamerDB>,
   log: AppLogger
 ): Promise<YoutubeUploadResult> {
   const { tenantId, dbId, vodId, filePath, dmcaProcessed, vodRecord, part, type } = job;
@@ -124,18 +127,22 @@ async function processVodUploadJob(
   });
 
   for (const video of result.uploadedVideos) {
-    await db.vodUpload.upsert({
-      where: { vod_id_type_part: { vod_id: dbId, type, part: video.part } },
-      create: {
+    await db
+      .insertInto('vod_uploads')
+      .values({
         vod_id: dbId,
         upload_id: video.id,
         type,
+        duration: video.duration,
         part: video.part,
         status: 'COMPLETED',
-        duration: video.duration,
-      },
-      update: { upload_id: video.id, status: 'COMPLETED', duration: video.duration },
-    });
+      })
+      .onConflict((oc) =>
+        oc
+          .columns(['vod_id', 'type', 'part'])
+          .doUpdateSet({ upload_id: video.id, status: 'COMPLETED', duration: video.duration })
+      )
+      .execute();
   }
 
   await publishVodUpdate(tenantId, dbId);
@@ -149,7 +156,7 @@ async function processVodUploadJob(
 async function processGameUploadJob(
   job: YoutubeGameUploadJob & { filePath: string },
   config: TenantConfig,
-  db: PrismaClient,
+  db: Kysely<StreamerDB>,
   log: AppLogger
 ): Promise<YoutubeUploadResult> {
   const { tenantId, dbId, vodId, filePath, chapterName, chapterStart, chapterEnd, chapterGameId, title, description } =

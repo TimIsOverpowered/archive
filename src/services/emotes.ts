@@ -1,5 +1,5 @@
 import { getLogger } from '../utils/logger.js';
-import { Prisma, PrismaClient } from '../../generated/streamer/client.js';
+import type { DBClient } from '../db/streamer-types';
 import { Platform, PLATFORMS } from '../types/platforms.js';
 import { TenantContext } from '../types/context.js';
 import { withDbRetry } from '../db/client.js';
@@ -12,7 +12,7 @@ import { EmoteUpsertSchema } from '../config/schemas.js';
 import { invalidateEmoteCache } from './vod-cache.js';
 import { publishVodUpdate } from './cache-invalidator.js';
 
-export interface EmoteData extends Prisma.JsonObject {
+export interface EmoteData {
   id: string;
   code: string;
   flags?: number;
@@ -136,20 +136,22 @@ export async function fetchAndSaveEmotes(
         bttv_emotes: emoteData.bttv_emotes,
         seventv_emotes: emoteData.seventv_emotes,
       });
-      await db.emote.upsert({
-        where: { vod_id: vodId },
-        create: {
+      await db
+        .insertInto('emotes')
+        .values({
           vod_id: validatedEmotes.vod_id,
-          ffz_emotes: validatedEmotes.ffz_emotes as EmoteData[],
-          bttv_emotes: validatedEmotes.bttv_emotes as EmoteData[],
-          seventv_emotes: validatedEmotes.seventv_emotes as EmoteData[],
-        },
-        update: {
-          ffz_emotes: validatedEmotes.ffz_emotes as EmoteData[],
-          bttv_emotes: validatedEmotes.bttv_emotes as EmoteData[],
-          seventv_emotes: validatedEmotes.seventv_emotes as EmoteData[],
-        },
-      });
+          ffz_emotes: JSON.stringify(validatedEmotes.ffz_emotes),
+          bttv_emotes: JSON.stringify(validatedEmotes.bttv_emotes),
+          seventv_emotes: JSON.stringify(validatedEmotes.seventv_emotes),
+        })
+        .onConflict((oc) =>
+          oc.column('vod_id').doUpdateSet({
+            ffz_emotes: JSON.stringify(validatedEmotes.ffz_emotes),
+            bttv_emotes: JSON.stringify(validatedEmotes.bttv_emotes),
+            seventv_emotes: JSON.stringify(validatedEmotes.seventv_emotes),
+          })
+        )
+        .execute();
 
       await invalidateEmoteCache(ctx.tenantId, vodId);
       await publishVodUpdate(ctx.tenantId, vodId);
@@ -159,11 +161,7 @@ export async function fetchAndSaveEmotes(
   }
 }
 
-export async function getEmotesByVodId(
-  client: PrismaClient,
-  tenantId: string,
-  vodId: number
-): Promise<VodEmotes | null> {
+export async function getEmotesByVodId(db: DBClient, tenantId: string, vodId: number): Promise<VodEmotes | null> {
   const cacheKey = `emotes:${tenantId}:${vodId}`;
 
   const redis = RedisService.instance?.getClient() ?? null;
@@ -178,26 +176,28 @@ export async function getEmotesByVodId(
     }
   }
 
-  const emote = await client.emote.findUnique({
-    where: { vod_id: vodId },
-    include: {
-      vod: {
-        select: {
-          id: true,
-        },
-      },
-    },
-  });
+  const emote = await db
+    .selectFrom('emotes')
+    .innerJoin('vods', 'vods.id', 'emotes.vod_id')
+    .select([
+      'emotes.vod_id',
+      'emotes.ffz_emotes',
+      'emotes.bttv_emotes',
+      'emotes.seventv_emotes',
+      'vods.id as vod_check',
+    ])
+    .where('emotes.vod_id', '=', vodId)
+    .executeTakeFirst();
 
-  if (!emote || !emote.vod) {
+  if (!emote) {
     return null;
   }
 
   const result: VodEmotes = {
     vodId: emote.vod_id,
-    ffz_emotes: emote.ffz_emotes as EmoteData[],
-    bttv_emotes: emote.bttv_emotes as EmoteData[],
-    seventv_emotes: emote.seventv_emotes as EmoteData[],
+    ffz_emotes: emote.ffz_emotes as unknown as EmoteData[],
+    bttv_emotes: emote.bttv_emotes as unknown as EmoteData[],
+    seventv_emotes: emote.seventv_emotes as unknown as EmoteData[],
   };
 
   if (redis && !getDisableRedisCache()) {

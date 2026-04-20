@@ -29,13 +29,14 @@ export async function finalizeVod(options: FinalizeVodOptions): Promise<void> {
     VodUpdateSchema.parse({
       duration: durationSeconds ?? undefined,
     });
-    await db.vod.update({
-      where: { id: dbId },
-      data: {
+    await db
+      .updateTable('vods')
+      .set({
         is_live: false,
         ...(durationSeconds !== null && { duration: durationSeconds }),
-      },
-    });
+      })
+      .where('id', '=', dbId)
+      .execute();
 
     await publishVodDurationUpdate(ctx.tenantId, dbId, durationSeconds ?? 0, false);
   });

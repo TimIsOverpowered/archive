@@ -1,6 +1,12 @@
 import { getKickStreamStatus, getLatestKickVodObject } from '../kick-live.js';
 import { getVod, finalizeKickChapters } from '../kick.js';
-import type { PlatformStrategy, PlatformStreamStatus, PlatformVodMetadata } from './strategy.js';
+import type {
+  PlatformStrategy,
+  PlatformStreamStatus,
+  PlatformVodMetadata,
+  VodCreateData,
+  VodUpdateData,
+} from './strategy.js';
 import { getLogger } from '../../utils/logger.js';
 export const kickStrategy: PlatformStrategy = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
@@ -75,7 +81,7 @@ export const kickStrategy: PlatformStrategy = {
     };
   },
 
-  createVodData(meta: PlatformVodMetadata): import('../../../generated/streamer/client.js').Prisma.VodCreateInput {
+  createVodData(meta: PlatformVodMetadata): VodCreateData {
     return {
       vod_id: meta.id,
       title: meta.title || null,
@@ -87,7 +93,7 @@ export const kickStrategy: PlatformStrategy = {
     };
   },
 
-  updateVodData(meta: PlatformVodMetadata): import('../../../generated/streamer/client.js').Prisma.VodUpdateInput {
+  updateVodData(meta: PlatformVodMetadata): VodUpdateData {
     return {
       vod_id: meta.id,
       title: meta.title || null,

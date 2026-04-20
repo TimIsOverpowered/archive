@@ -1,7 +1,13 @@
 import { getTwitchStreamStatus, getLatestTwitchVodObject } from '../twitch/live.js';
 import { getVodData } from '../twitch/vod.js';
 import { saveVodChapters } from '../twitch/chapters.js';
-import type { PlatformStrategy, PlatformStreamStatus, PlatformVodMetadata } from './strategy.js';
+import type {
+  PlatformStrategy,
+  PlatformStreamStatus,
+  PlatformVodMetadata,
+  VodCreateData,
+  VodUpdateData,
+} from './strategy.js';
 import { parseTwitchDuration } from '../../utils/formatting.js';
 import { createErrorContext } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
@@ -70,7 +76,7 @@ export const twitchStrategy: PlatformStrategy = {
     };
   },
 
-  createVodData(meta: PlatformVodMetadata): import('../../../generated/streamer/client.js').Prisma.VodCreateInput {
+  createVodData(meta: PlatformVodMetadata): VodCreateData {
     return {
       vod_id: meta.id,
       title: meta.title || null,
@@ -82,7 +88,7 @@ export const twitchStrategy: PlatformStrategy = {
     };
   },
 
-  updateVodData(meta: PlatformVodMetadata): import('../../../generated/streamer/client.js').Prisma.VodUpdateInput {
+  updateVodData(meta: PlatformVodMetadata): VodUpdateData {
     return {
       vod_id: meta.id,
       title: meta.title || null,
