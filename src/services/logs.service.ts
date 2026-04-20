@@ -1,4 +1,5 @@
 import { PrismaClient } from '../../generated/streamer/client.js';
+import type { ChatMessage as PrismaChatMessage } from '../../generated/streamer/client.js';
 import { RedisService } from '../utils/redis-service.js';
 import { getDisableRedisCache } from '../config/env-accessors.js';
 import { getApiConfig } from '../config/env.js';
@@ -9,16 +10,6 @@ import { badRequest } from '../utils/http-error.js';
 import { LOGS_PAGE_SIZE, LOGS_DEFAULT_BUCKET_SIZE, LOGS_TARGET_COMMENTS_PER_BUCKET } from '../constants.js';
 
 const BOUNDARIES = [30, 60, 90, 120, 180, 300, 600, 900, 1800, 3600];
-
-interface ChatMessage {
-  id: string;
-  vod_id: number;
-  display_name: string | null;
-  content_offset_seconds: number;
-  message: unknown;
-  user_badges: unknown;
-  user_color: string | null;
-}
 
 interface CursorData {
   offset: number;
@@ -76,7 +67,7 @@ export async function getLogsByOffset(
   tenantId: string,
   vodId: number,
   offsetSeconds: number
-): Promise<{ comments: ChatMessage[]; cursor?: string }> {
+): Promise<{ comments: PrismaChatMessage[]; cursor?: string }> {
   const bucketSize = await getVodBucketSize(client, tenantId, vodId);
   const bucket = Math.floor(offsetSeconds / bucketSize) * bucketSize;
   const cacheKey = `${tenantId}:${vodId}:bucket:${bucket}`;
@@ -87,7 +78,7 @@ export async function getLogsByOffset(
       const cached = await redis.getBuffer(cacheKey);
       if (cached) {
         getLogger().debug({ vodId, bucket }, '[CACHE HIT] bucket');
-        const data = (await decompressChatData(cached)) as { comments: ChatMessage[]; cursor?: string };
+        const data = (await decompressChatData(cached)) as { comments: PrismaChatMessage[]; cursor?: string };
         return data;
       }
     } catch (error) {
@@ -109,16 +100,7 @@ export async function getLogsByOffset(
     return { comments: [], cursor: undefined };
   }
 
-  const comments = data.slice(0, LOGS_PAGE_SIZE).map((msg) => ({
-    id: msg.id,
-    vod_id: msg.vod_id,
-    display_name: msg.display_name,
-    content_offset_seconds: msg.content_offset_seconds,
-    message: msg.message,
-    user_badges: msg.user_badges,
-    user_color: msg.user_color,
-    created_at: msg.createdAt,
-  }));
+  const comments = data.slice(0, LOGS_PAGE_SIZE);
 
   let cursor: string | undefined;
   if (data.length === LOGS_PAGE_SIZE + 1) {
@@ -154,7 +136,7 @@ export async function getLogsByCursor(
   tenantId: string,
   vodId: number,
   cursor: string
-): Promise<{ comments: ChatMessage[]; cursor?: string }> {
+): Promise<{ comments: PrismaChatMessage[]; cursor?: string }> {
   const cacheKey = `${tenantId}:${vodId}:cursor:${cursor}`;
   const redis = RedisService.instance?.getClient() ?? null;
 
@@ -164,7 +146,7 @@ export async function getLogsByCursor(
       if (cached) {
         getLogger().debug({ vodId }, '[CACHE HIT] cursor');
 
-        const data = (await decompressChatData(cached)) as { comments: ChatMessage[]; cursor?: string };
+        const data = (await decompressChatData(cached)) as { comments: PrismaChatMessage[]; cursor?: string };
         return data;
       }
     } catch (error) {
@@ -208,16 +190,7 @@ export async function getLogsByCursor(
     return { comments: [], cursor: undefined };
   }
 
-  const comments = data.slice(0, LOGS_PAGE_SIZE).map((msg) => ({
-    id: msg.id,
-    vod_id: msg.vod_id,
-    display_name: msg.display_name,
-    content_offset_seconds: msg.content_offset_seconds,
-    message: msg.message,
-    user_badges: msg.user_badges,
-    user_color: msg.user_color,
-    created_at: msg.createdAt,
-  }));
+  const comments = data.slice(0, LOGS_PAGE_SIZE);
 
   let nextCursor: string | undefined;
   if (data.length === LOGS_PAGE_SIZE + 1) {
