@@ -18,7 +18,7 @@ interface VodUpdateEvent {
 }
 
 export async function publishVodUpdate(tenantId: string, dbId: number): Promise<void> {
-  const client = RedisService.getClient();
+  const client = RedisService.instance?.getClient() ?? null;
   if (!client || getDisableRedisCache()) return;
 
   const event: VodUpdateEvent = { type: 'VOD_UPDATED', tenantId, dbId };
@@ -37,7 +37,7 @@ export async function publishVodDurationUpdate(
   duration: number,
   isLive: boolean
 ): Promise<void> {
-  const client = RedisService.getClient();
+  const client = RedisService.instance?.getClient() ?? null;
   if (!client || getDisableRedisCache()) return;
 
   const event: VodUpdateEvent = { type: 'VOD_DURATION_UPDATED', tenantId, dbId, duration, is_live: isLive };
@@ -51,7 +51,7 @@ export async function publishVodDurationUpdate(
 }
 
 export function registerCacheSubscriber(fastify: FastifyInstance): void {
-  const mainClient = RedisService.getClient();
+  const mainClient = RedisService.instance?.getClient() ?? null;
   if (!mainClient || getDisableRedisCache()) return;
 
   const subClient = mainClient.duplicate();

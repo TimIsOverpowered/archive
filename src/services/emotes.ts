@@ -166,7 +166,7 @@ export async function getEmotesByVodId(
 ): Promise<VodEmotes | null> {
   const cacheKey = `emotes:${tenantId}:${vodId}`;
 
-  const redis = RedisService.getClient();
+  const redis = RedisService.instance?.getClient() ?? null;
   if (redis && !getDisableRedisCache()) {
     try {
       const cached = await redis.get(cacheKey);
