@@ -130,7 +130,7 @@ export async function getVods(
   const cacheKey = buildQueryCacheKey(tenantId, query, page, limit);
   const { where, orderBy } = buildVodQuery(query);
 
-  const redisClient = RedisService.getClient();
+  const redisClient = RedisService.instance?.getClient() ?? null;
   const disabled = !redisClient || getDisableRedisCache();
 
   if (!disabled) {

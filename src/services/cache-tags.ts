@@ -2,7 +2,7 @@ import { RedisService } from '../utils/redis-service.js';
 import { getDisableRedisCache } from '../config/env-accessors.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
-import { redisConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
+import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
 import { MAX_CACHE_PAGES } from '../constants.js';
 
 function extractPageFromKey(key: string): number | null {
@@ -23,7 +23,7 @@ export async function registerVodTags(
   const client = RedisService.getClient();
   if (!client || getDisableRedisCache()) return;
 
-  if (redisConnectionFailed.get(tenantId)) {
+  if (isConnectionFailed(tenantId)) {
     return;
   }
 
@@ -85,7 +85,7 @@ export async function invalidateVodVolatileCache(tenantId: string, dbId: number)
   try {
     await client.unlink(`vod:volatile:{${tenantId}}:${dbId}`);
 
-    if (redisConnectionFailed.get(tenantId)) {
+    if (isConnectionFailed(tenantId)) {
       markConnectionRestored(tenantId);
       getLogger().debug({ tenantId }, 'Redis connection restored, cache invalidation resumed');
     }
@@ -94,7 +94,7 @@ export async function invalidateVodVolatileCache(tenantId: string, dbId: number)
   } catch (error) {
     const { message } = extractErrorDetails(error);
 
-    if (!redisConnectionFailed.get(tenantId) && message.includes('ECONNREFUSED')) {
+    if (!isConnectionFailed(tenantId) && message.includes('ECONNREFUSED')) {
       markConnectionFailed(tenantId);
       getLogger().warn({ tenantId, dbId, error: message }, 'Redis connection lost, cache invalidation suspended');
     }

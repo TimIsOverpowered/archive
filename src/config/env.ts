@@ -92,7 +92,7 @@ export function getBaseConfig(): BaseConfig {
 }
 
 export function getConfigCacheTtl(): number {
-  return getApiConfig().CONFIG_CACHE_TTL;
+  return getBaseConfig().CONFIG_CACHE_TTL;
 }
 
 // Clear cache (used by both)
