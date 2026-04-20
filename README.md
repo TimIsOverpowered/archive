@@ -19,31 +19,18 @@ Stores tenant configurations and admin users.
 ```bash
 # Create the database
 createdb archive
-
-# Run migrations (from project root)
-NODE_ENV=development npx prisma migrate deploy --config=./prisma/meta/prisma.config.ts
 ```
 
-**Important**: Always use `--config=./prisma/meta/prisma.config.ts` when running Prisma CLI commands for the meta database from the project root. Alternatively, run commands from within the `prisma/meta/` directory.
+The `tenants` and `admins` tables must be created manually before use.
 
 ### Streamer Database (Per-Tenant)
 
 Each tenant has its own database for VODs, chat logs, emotes, etc. The database URL is stored in the tenant's record in the meta database.
 
-To run migrations for a specific tenant:
+Migrations are applied automatically when creating a new tenant via the create-tenant script. For migrating legacy databases, use:
 
 ```bash
-# Set the tenant's database URL
-export DATABASE_URL=" postgresql://<user>:***@<host>:5432/<db>"
-
-# Run migrations
-npx prisma migrate deploy
-```
-
-Or use the migration script:
-
-```bash
-NODE_ENV=development npx tsx scripts/migrate-streamer.ts --streamer <tenant-name> --db-url <database-url>
+NODE_ENV=development npx tsx scripts/migrate-streamer.ts
 ```
 
 ## Getting Started
@@ -87,12 +74,7 @@ See `.env.example` for all available configuration options. Key variables:
 
 ### "Cannot resolve environment variable" errors
 
-Ensure `.env` or `.env.development` exists and `NODE_ENV` is set before running Prisma commands:
-
-```bash
-export NODE_ENV=development
-npx prisma migrate deploy --config=./prisma/meta/prisma.config.ts
-```
+Ensure `.env` or `.env.development` exists and `NODE_ENV` is set before running scripts.
 
 ## Verifying your YouTube channel
 

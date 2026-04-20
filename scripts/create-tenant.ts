@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 import 'dotenv/config';
+import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
-import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { Pool } from 'pg';
 import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
@@ -203,26 +203,27 @@ async function createDatabase(
   }
 }
 
-async function runMigrations(channelName: string, dbUrl: string): Promise<void> {
-  console.log('\n📦 Running Prisma migrations...');
+async function runSchemaMigrations(dbUrl: string): Promise<void> {
+  console.log('\n📦 Running schema migrations...');
 
-  const envDbUrl = process.env.DATABASE_URL;
+  const migrationPath = path.resolve(__dirname, 'migrations/streamer-schema.sql');
+  const sql = await fs.promises.readFile(migrationPath, 'utf-8');
 
+  const pool = new Pool({ connectionString: dbUrl });
+  const client = await pool.connect();
   try {
-    process.env.DATABASE_URL = dbUrl;
-
-    // Run migrations with captured output to avoid stdin issues
-    execSync('npx prisma migrate deploy --schema=./prisma/schema.prisma', {
-      stdio: ['pipe', 'inherit', 'inherit'],
-    });
-
+    await client.query('BEGIN');
+    try {
+      await client.query(sql);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    }
     console.log('✓ Migrations completed successfully');
-  } catch (error) {
-    const details = extractErrorDetails(error);
-    console.error('❌ Migration failed:', details.message);
-    throw error;
   } finally {
-    process.env.DATABASE_URL = envDbUrl;
+    client.release();
+    await pool.end();
   }
 }
 
@@ -298,10 +299,7 @@ async function main(): Promise<void> {
 
     // Only run migrations for new databases or if explicitly requested
     if (dbResult.isNew) {
-      await runMigrations(channelName, dbUrl);
-
-      // Reset stdin after execSync to fix readline issues
-      process.stdin.setRawMode(false);
+      await runSchemaMigrations(dbUrl);
       process.stdin.resume();
     } else {
       console.log(`ℹ️  Skipping migrations - database '${dbName}' already exists`);

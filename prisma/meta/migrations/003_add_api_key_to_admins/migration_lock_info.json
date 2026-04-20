@@ -1,4 +1,0 @@
-{"version":"1","steps":[{"uuid":{"$id":1},"migration_name":"add_api_key_to_admins"}]}
--- Migration name: '003_add_api_key_to_admins'
---
--- Date: 2026-03-23T19:00:00.000Z

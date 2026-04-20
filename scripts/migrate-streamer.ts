@@ -6,7 +6,6 @@ import { extractErrorDetails } from '../src/utils/error.js';
 import { decryptScalar } from '../src/utils/encryption.js';
 import pg from 'pg';
 import os from 'os';
-import { execSync } from 'child_process';
 
 const META_DB_URL = process.env.META_DATABASE_URL;
 if (!META_DB_URL) {
@@ -824,21 +823,6 @@ const main = async () => {
             }
 
             console.log('✅ Legacy tables renamed and migration finalized\n');
-
-            // Baseline Prisma migration
-            console.log('📌 Baseline Prisma migration...\n');
-            process.env.DATABASE_URL = dbUrl;
-            try {
-              execSync('npx prisma migrate resolve --applied 20260406073608_init', {
-                stdio: 'inherit',
-                env: process.env,
-              });
-              console.log('✅ Prisma migration baselined\n');
-            } catch (baselineError) {
-              errors.push(`Failed to baseline Prisma migration: ${String(baselineError)}`);
-              console.error('❌ Failed to baseline Prisma migration:', baselineError);
-              throw baselineError;
-            }
           } catch (renameError) {
             errors.push(`Failed to rename legacy tables: ${String(renameError)}`);
             throw renameError;

@@ -84,7 +84,7 @@ export const KickSchema = z.object({
   username: z.string().optional(),
 });
 
-// ── Prisma Operation Schemas ─────────────────────────────────────────────────
+// ── Operation Schemas ──────────────────────────────────────────────────────
 
 export const VodCreateSchema = z.object({
   vod_id: z.string(),
