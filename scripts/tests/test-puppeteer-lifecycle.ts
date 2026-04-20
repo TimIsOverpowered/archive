@@ -7,7 +7,7 @@
  * 2. releaseBrowser() closes gracefully
  * 3. No zombie Chrome processes remain after shutdown
  *
- * Usage: npx tsx scripts/internal/test-puppeteer-lifecycle.ts
+ * Usage: npx tsx scripts/tests/test-puppeteer-lifecycle.ts
  */
 
 import 'dotenv/config';

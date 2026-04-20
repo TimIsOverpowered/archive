@@ -24,11 +24,10 @@
     "npm": ">=10.0.0"
   },
   "scripts": {
-    "test": "npm run test:node",
+    "tests": "node --test --import tsx --test-timeout 10000 --test-concurrency true \"tests/**/*.test.ts\"",
     "lint": "eslint \"src/**/*.ts\" --fix",
     "fix": "npm run format && npm run lint",
     "format": "prettier --write \"src/**/*.ts\"",
-    "test:node": "node --test --import tsx --test-timeout 10000 --test-concurrency true \"test/**/*.test.ts\"",
     "build": "tsc",
     "dev": "cross-env NODE_ENV=development tsx watch src/index.ts",
     "start": "node dist/index.js",
