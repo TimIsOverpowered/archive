@@ -19,7 +19,12 @@ import { globalAdminRoutes, default as adminRoutes } from './routes/admin/index.
 import { registerCacheSubscriber } from '../services/cache-invalidator.js';
 
 function hasStatusCode(e: unknown): e is { statusCode: number } {
-  return typeof e === 'object' && e !== null && 'statusCode' in e && typeof (e as { statusCode: unknown }).statusCode === 'number';
+  return (
+    typeof e === 'object' &&
+    e !== null &&
+    'statusCode' in e &&
+    typeof (e as { statusCode: unknown }).statusCode === 'number'
+  );
 }
 
 function formatErrorResponse(error: unknown): {

@@ -21,7 +21,7 @@ let server: Awaited<ReturnType<typeof buildServer>> | null = null;
 
 async function start() {
   try {
-    getLogger().info({ port: PORT, host: HOST, env: process.env.NODE_ENV }, 'Starting Archive API server');
+    getLogger().info({ port: PORT, host: HOST, env: config.NODE_ENV }, 'Starting Archive API server');
 
     server = await buildServer();
 

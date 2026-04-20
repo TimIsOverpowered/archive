@@ -11,6 +11,9 @@ export const BaseConfigSchema = z.object({
     return /^[0-9a-fA-F]+$/.test(val);
   }, 'ENCRYPTION_MASTER_KEY must be a valid 32-byte hex string'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
+  DISCORD_ALERT_WEBHOOK_URL: z.string().url().optional(),
+  REDIS_CHAT_COMPRESSION: z.enum(['brotli', 'gzip', 'none']).default('brotli'),
+  REDIS_COMPRESSION_LEVEL: z.coerce.number().int().min(0).max(11).default(6),
   DISABLE_REDIS_CACHE: z.preprocess((val) => String(val).toLowerCase() === 'true', z.boolean()).default(false),
   PUPPETEER_CONCURRENCY: z.coerce.number().int().positive().default(3),
   CONFIG_CACHE_TTL: z.coerce.number().int().positive().default(3600),
@@ -25,6 +28,10 @@ export const ApiConfigSchema = BaseConfigSchema.extend({
   RATE_LIMIT_CHAT: z.coerce.number().int().positive().default(30),
   RATE_LIMIT_ADMIN_GET: z.coerce.number().int().positive().default(60),
   RATE_LIMIT_BLOCK_DURATION: z.coerce.number().int().positive().default(60),
+  CHAT_CURSOR_TTL: z.coerce.number().int().positive().default(259200),
+  CHAT_OFFSET_TTL: z.coerce.number().int().positive().default(259200),
+  CHAT_BUCKET_SIZE_TTL: z.coerce.number().int().positive().default(2592000),
+  HEALTH_TOKEN: z.string().optional(),
 });
 
 // Workers-specific schema (extends base + workers-only fields)
@@ -34,6 +41,8 @@ export const WorkersConfigSchema = BaseConfigSchema.extend({
   YOUTUBE_UPLOAD_CONCURRENCY: z.coerce.number().int().positive().default(1),
   CHAT_DOWNLOAD_CONCURRENCY: z.coerce.number().int().positive().default(1),
   MONITOR_CONCURRENCY: z.coerce.number().int().positive().default(10),
+  YOUTUBE_CLIENT_ID: z.string().min(1, 'YOUTUBE_CLIENT_ID is required'),
+  YOUTUBE_CLIENT_SECRET: z.string().min(1, 'YOUTUBE_CLIENT_SECRET is required'),
 });
 
 // Type exports
@@ -91,12 +100,18 @@ export function getBaseConfig(): BaseConfig {
   throw new Error('No config loaded. Call loadApiConfig() or loadWorkersConfig() first.');
 }
 
+let _configCacheTtl: number | null = null;
+
 export function getConfigCacheTtl(): number {
-  return getBaseConfig().CONFIG_CACHE_TTL;
+  if (_configCacheTtl !== null) return _configCacheTtl;
+  const parsed = z.coerce.number().int().positive().safeParse(process.env.CONFIG_CACHE_TTL);
+  _configCacheTtl = parsed.success ? parsed.data : 3600;
+  return _configCacheTtl;
 }
 
 // Clear cache (used by both)
 export function resetEnvConfig(): void {
   apiConfigCache = null;
   workersConfigCache = null;
+  _configCacheTtl = null;
 }

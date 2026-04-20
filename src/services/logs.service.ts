@@ -1,11 +1,7 @@
 import { PrismaClient } from '../../generated/streamer/client.js';
 import { RedisService } from '../utils/redis-service.js';
-import {
-  getDisableRedisCache,
-  getChatCursorTtl,
-  getChatOffsetTtl,
-  getChatBucketSizeTtl,
-} from '../config/env-accessors.js';
+import { getDisableRedisCache } from '../config/env-accessors.js';
+import { getApiConfig } from '../config/env.js';
 import { compressChatData, decompressChatData } from '../utils/compression.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
@@ -66,7 +62,7 @@ async function getVodBucketSize(client: PrismaClient, tenantId: string, vodId: n
 
   if (!getDisableRedisCache() && redis) {
     try {
-      await redis.set(key, bucketSize.toString(), 'EX', getChatBucketSizeTtl());
+      await redis.set(key, bucketSize.toString(), 'EX', getApiConfig().CHAT_BUCKET_SIZE_TTL);
     } catch {
       // Ignore cache errors
     }
@@ -143,7 +139,7 @@ export async function getLogsByOffset(
   if (!getDisableRedisCache() && redis) {
     try {
       const compressed = await compressChatData(response);
-      await redis.set(cacheKey, compressed as Buffer, 'EX', getChatOffsetTtl());
+      await redis.set(cacheKey, compressed as Buffer, 'EX', getApiConfig().CHAT_OFFSET_TTL);
       getLogger().debug({ vodId, bucket }, '[CACHE SET] bucket');
     } catch {
       // Ignore cache errors
@@ -242,7 +238,7 @@ export async function getLogsByCursor(
   if (!getDisableRedisCache() && redis) {
     try {
       const compressed = await compressChatData(response);
-      await redis.set(cacheKey, compressed as Buffer, 'EX', getChatCursorTtl());
+      await redis.set(cacheKey, compressed as Buffer, 'EX', getApiConfig().CHAT_CURSOR_TTL);
       getLogger().debug({ vodId }, '[CACHE SET] cursor');
     } catch {
       // Ignore cache errors

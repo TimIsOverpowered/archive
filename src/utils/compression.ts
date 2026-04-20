@@ -1,5 +1,6 @@
 import * as zlib from 'zlib';
 import { promisify } from 'util';
+import { getRedisChatCompression, getRedisCompressionLevel } from '../config/env-accessors.js';
 
 const brotliCompress = promisify(zlib.brotliCompress);
 const brotliDecompress = promisify(zlib.brotliDecompress);
@@ -8,8 +9,8 @@ const gzipDecompress = promisify(zlib.gunzip);
 
 type CompressionAlgorithm = 'brotli' | 'gzip' | 'none';
 
-const algorithm: CompressionAlgorithm = (process.env.REDIS_CHAT_COMPRESSION || 'brotli') as CompressionAlgorithm;
-const level = parseInt(process.env.REDIS_COMPRESSION_LEVEL || '6', 10);
+const algorithm: CompressionAlgorithm = getRedisChatCompression();
+const level = getRedisCompressionLevel();
 
 export async function compressChatData(data: unknown): Promise<Buffer> {
   const json = JSON.stringify(data);

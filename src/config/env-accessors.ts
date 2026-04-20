@@ -36,32 +36,14 @@ export function getEncryptionKeyBuffer(): Buffer {
   return _keyBuffer;
 }
 
-// --- CHAT TTLs (worker-specific) ---
-const ChatTtlSchema = z.coerce.number().int().positive();
+// --- DISCORD_ALERT_WEBHOOK_URL ---
+let _discordAlertWebhookUrl: string | undefined | null = null;
 
-let _cursorTtl: number | null = null;
-let _offsetTtl: number | null = null;
-let _bucketSizeTtl: number | null = null;
-
-export function getChatCursorTtl(): number {
-  if (_cursorTtl !== null) return _cursorTtl;
-  const parsed = ChatTtlSchema.safeParse(process.env.CHAT_CURSOR_TTL);
-  _cursorTtl = parsed.success ? parsed.data : 259200;
-  return _cursorTtl;
-}
-
-export function getChatOffsetTtl(): number {
-  if (_offsetTtl !== null) return _offsetTtl;
-  const parsed = ChatTtlSchema.safeParse(process.env.CHAT_OFFSET_TTL);
-  _offsetTtl = parsed.success ? parsed.data : 259200;
-  return _offsetTtl;
-}
-
-export function getChatBucketSizeTtl(): number {
-  if (_bucketSizeTtl !== null) return _bucketSizeTtl;
-  const parsed = ChatTtlSchema.safeParse(process.env.CHAT_BUCKET_SIZE_TTL);
-  _bucketSizeTtl = parsed.success ? parsed.data : 2592000;
-  return _bucketSizeTtl;
+export function getDiscordAlertWebhookUrl(): string | undefined {
+  if (_discordAlertWebhookUrl !== null) return _discordAlertWebhookUrl;
+  const url = process.env.DISCORD_ALERT_WEBHOOK_URL;
+  _discordAlertWebhookUrl = url || undefined;
+  return _discordAlertWebhookUrl;
 }
 
 // --- DISCORD_ALERTS_ENABLED ---
@@ -112,15 +94,59 @@ export function getPuppeteerWarningThresholdPct(): number {
   return _puppeteerWarningThresholdPct;
 }
 
+// --- PUPPETEER_CONCURRENCY ---
+const PuppeteerConcurrencySchema = z.coerce.number().int().positive();
+
+let _puppeteerConcurrency: number | null = null;
+
+export function getPuppeteerConcurrency(): number {
+  if (_puppeteerConcurrency !== null) return _puppeteerConcurrency;
+  const parsed = PuppeteerConcurrencySchema.safeParse(process.env.PUPPETEER_CONCURRENCY);
+  _puppeteerConcurrency = parsed.success ? parsed.data : 3;
+  return _puppeteerConcurrency;
+}
+
+// --- REDIS_COMPRESSION ---
+const RedisCompressionAlgorithmSchema = z.enum(['brotli', 'gzip', 'none']);
+
+let _redisChatCompression: string | null = null;
+let _redisCompressionLevel: number | null = null;
+
+export function getRedisChatCompression(): 'brotli' | 'gzip' | 'none' {
+  if (_redisChatCompression !== null) return _redisChatCompression as 'brotli' | 'gzip' | 'none';
+  const parsed = RedisCompressionAlgorithmSchema.safeParse(process.env.REDIS_CHAT_COMPRESSION);
+  _redisChatCompression = parsed.success ? parsed.data : 'brotli';
+  return _redisChatCompression as 'brotli' | 'gzip' | 'none';
+}
+
+export function getRedisCompressionLevel(): number {
+  if (_redisCompressionLevel !== null) return _redisCompressionLevel;
+  const parsed = z.coerce.number().int().min(0).max(11).safeParse(process.env.REDIS_COMPRESSION_LEVEL);
+  _redisCompressionLevel = parsed.success ? parsed.data : 6;
+  return _redisCompressionLevel;
+}
+
+// --- HEALTH_TOKEN ---
+let _healthToken: string | undefined | null = null;
+
+export function getHealthToken(): string | undefined {
+  if (_healthToken !== null) return _healthToken;
+  const token = process.env.HEALTH_TOKEN;
+  _healthToken = token || undefined;
+  return _healthToken;
+}
+
 // --- Test helper ---
 export function resetEnvAccessorCache(): void {
   _disableRedisCache = null;
   _keyBuffer = null;
-  _cursorTtl = null;
-  _offsetTtl = null;
-  _bucketSizeTtl = null;
+  _discordAlertWebhookUrl = null;
   _discordAlertsEnabled = null;
   _puppeteerMemoryLimitMb = null;
   _puppeteerShutdownTimeoutMs = null;
   _puppeteerWarningThresholdPct = null;
+  _puppeteerConcurrency = null;
+  _redisChatCompression = null;
+  _redisCompressionLevel = null;
+  _healthToken = null;
 }

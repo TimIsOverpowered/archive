@@ -10,10 +10,13 @@ import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.js';
 
 const inflightListQueries = new Map<string, Promise<{ vods: VodResponse[]; total: number }>>();
 
-function applyVolatileData(vods: VodResponse[], volatileMap: Map<number, { duration: number | null; is_live: boolean }>): VodResponse[] {
+function applyVolatileData(
+  vods: VodResponse[],
+  volatileMap: Map<number, { duration: number | null; is_live: boolean }>
+): VodResponse[] {
   return vods.map((vod) => {
     const volatile = volatileMap.get(vod.id);
-    return volatile ? { ...vod, duration: volatile.duration, is_live: volatile.is_live } as VodResponse : vod;
+    return volatile ? ({ ...vod, duration: volatile.duration, is_live: volatile.is_live } as VodResponse) : vod;
   });
 }
 
