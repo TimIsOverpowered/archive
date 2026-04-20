@@ -45,7 +45,7 @@ export async function fetchCloudflareIpRanges(): Promise<CloudflareIpRanges> {
 
 /** Get from Redis cache or fetch fresh */
 export async function getCloudflareIpRanges(): Promise<CloudflareIpRanges | null> {
-  const client = RedisService.getClient();
+  const client = RedisService.instance?.getClient() ?? null;
   if (client) {
     try {
       const cached = await client.get(CF_IP_RANGES_KEY);
@@ -135,7 +135,7 @@ export async function validateCloudflareRequest(request: {
 
 /** Get cache info for health endpoint */
 export async function getCachedRangeInfo(): Promise<CloudflareCacheInfo | null> {
-  const client = RedisService.getClient();
+  const client = RedisService.instance?.getClient() ?? null;
   if (!client) {
     return null;
   }
@@ -165,7 +165,7 @@ export async function getCachedRangeInfo(): Promise<CloudflareCacheInfo | null> 
 /** Manual refresh trigger (for cron) */
 export async function refreshCloudflareRanges(): Promise<void> {
   const ranges = await fetchCloudflareIpRanges();
-  const client = RedisService.getClient();
+  const client = RedisService.instance?.getClient() ?? null;
 
   if (client) {
     await client.set(CF_IP_RANGES_KEY, JSON.stringify(ranges), 'EX', CF_IP_RANGES_TTL);

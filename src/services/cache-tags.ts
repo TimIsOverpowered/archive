@@ -20,7 +20,7 @@ export async function registerVodTags(
   data: string,
   ttl: number
 ): Promise<void> {
-  const client = RedisService.getClient();
+  const client = RedisService.instance?.getClient() ?? null;
   if (!client || getDisableRedisCache()) return;
 
   if (isConnectionFailed(tenantId)) {
@@ -52,7 +52,7 @@ export async function registerVodTags(
 }
 
 export async function invalidateVodTags(tenantId: string, dbId: number): Promise<void> {
-  const client = RedisService.getClient();
+  const client = RedisService.instance?.getClient() ?? null;
   if (getDisableRedisCache() || !client) return;
 
   try {
@@ -79,7 +79,7 @@ export async function invalidateVodTags(tenantId: string, dbId: number): Promise
 }
 
 export async function invalidateVodVolatileCache(tenantId: string, dbId: number): Promise<void> {
-  const client = RedisService.getClient();
+  const client = RedisService.instance?.getClient() ?? null;
   if (getDisableRedisCache() || !client) return;
 
   try {
