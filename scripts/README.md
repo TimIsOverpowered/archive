@@ -598,44 +598,7 @@ ALTER TABLE streams_legacy RENAME TO streams;
 
 ## Internal/Testing Scripts
 
-Scripts in the `scripts/internal/` directory are for testing, debugging, and maintenance tasks.
-
-### cleanup-chat-typenames.ts
-
-Remove `__typename` fields from chat message JSONB columns (message and user_badges).
-
-**Usage:**
-
-```bash
-npx tsx scripts/internal/cleanup-chat-typenames.ts [options] [streamer]
-```
-
-**Options:**
-
-- `--streamer <id>` or positional argument - Target specific streamer (optional, defaults to all)
-- `--dry-run` - Validate without making changes
-- `--yes` or `-y` - Auto-confirm without prompt
-- `--batch-size <n>` - Set batch size (default: 50000)
-- `--workers <n>` - Set worker count for parallel processing (default: 4)
-
-**Example:**
-
-```bash
-# Dry run for specific streamer
-npx tsx scripts/internal/cleanup-chat-typenames.ts --streamer moonmoon --dry-run
-
-# Process all streamers with auto-confirm
-npx tsx scripts/internal/cleanup-chat-typenames.ts --yes --workers 8
-```
-
-**What it does:**
-
-1. Scans `chat_messages` table for JSONB fields containing `__typename`
-2. Strips `__typename` from nested objects in `message` and `user_badges` columns
-3. Updates records in parallel using multiple workers
-4. Reports progress and statistics
-
----
+Scripts in the `scripts/tests/` directory are for testing, debugging, and maintenance tasks.
 
 ### test-decrypt.ts
 
@@ -644,7 +607,7 @@ Test decryption functionality for encrypted database fields.
 **Usage:**
 
 ```bash
-npx tsx scripts/internal/test-decrypt.ts
+npx tsx scripts/tests/test-decrypt.ts
 ```
 
 **What it does:**
@@ -662,7 +625,7 @@ Test Discord webhook connectivity and message delivery.
 **Usage:**
 
 ```bash
-npx tsx scripts/internal/test-discord-webhook.ts
+npx tsx scripts/tests/test-discord-webhook.ts
 ```
 
 **Prerequisites:**
@@ -705,7 +668,7 @@ Test YouTube OAuth token persistence, refresh, and validation.
 **Usage:**
 
 ```bash
-npx tsx scripts/internal/test-youtube-token.ts [options]
+npx tsx scripts/tests/test-youtube-token.ts [options]
 ```
 
 **Options:**
@@ -719,10 +682,10 @@ npx tsx scripts/internal/test-youtube-token.ts [options]
 
 ```bash
 # Check token status for specific tenant
-npx tsx scripts/internal/test-youtube-token.ts --tenant moonmoon --verbose
+npx tsx scripts/tests/test-youtube-token.ts --tenant moonmoon --verbose
 
 # Force token refresh
-npx tsx scripts/internal/test-youtube-token.ts --tenant moonmoon --force-refresh
+npx tsx scripts/tests/test-youtube-token.ts --tenant moonmoon --force-refresh
 ```
 
 **What it does:**
