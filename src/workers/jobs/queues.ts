@@ -86,6 +86,7 @@ export interface MonitorJob {
 export interface ChatDownloadResult {
   success: true;
   totalMessages?: number;
+  batchCount?: number;
   skipped?: boolean;
 }
 

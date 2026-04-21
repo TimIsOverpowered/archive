@@ -3,14 +3,13 @@ import { jsonArrayFrom } from 'kysely/helpers/postgres';
 import type { Kysely, ExpressionBuilder } from 'kysely';
 import type { StreamerDB, DBClient } from '../db/streamer-types.js';
 import { withStaleWhileRevalidate } from '../utils/cache.js';
+import { deduplicate } from '../utils/deduplicate.js';
 import { VOD_DETAILS_CACHE_TTL, VOD_LIST_CACHE_TTL, VOD_VOLATILE_CACHE_TTL } from '../constants.js';
 import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
 import { RedisService } from '../utils/redis-service.js';
 import { getDisableRedisCache } from '../config/env-accessors.js';
 import { registerVodTags } from './cache-tags.js';
 import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.js';
-
-const inflightListQueries = new Map<string, Promise<{ vods: VodResponse[]; total: number }>>();
 
 function applyVolatileData(
   vods: VodResponse[],
@@ -156,11 +155,7 @@ export async function getVods(
     }
   }
 
-  if (inflightListQueries.has(cacheKey)) {
-    return inflightListQueries.get(cacheKey)!;
-  }
-
-  const fetchPromise = (async () => {
+  return deduplicate(cacheKey, async () => {
     const [result, totalRow] = await Promise.all([
       db
         .selectFrom('vods')
@@ -227,15 +222,7 @@ export async function getVods(
     const mergedVods = applyVolatileData(resultVods, volatileMap);
 
     return { vods: mergedVods, total };
-  })();
-
-  inflightListQueries.set(cacheKey, fetchPromise);
-
-  try {
-    return await fetchPromise;
-  } finally {
-    inflightListQueries.delete(cacheKey);
-  }
+  });
 }
 
 export async function getVodById(db: DBClient, tenantId: string, vodId: number): Promise<VodResponse | null> {
