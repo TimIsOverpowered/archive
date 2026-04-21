@@ -54,6 +54,7 @@ export type WorkersConfig = z.infer<typeof WorkersConfigSchema>;
 // Separate caches (Option B)
 let apiConfigCache: ApiConfig | null = null;
 let workersConfigCache: WorkersConfig | null = null;
+let baseConfigCache: BaseConfig | null = null;
 
 // API config loader
 export function loadApiConfig(): ApiConfig {
@@ -98,7 +99,9 @@ export function getWorkersConfig(): WorkersConfig {
 export function getBaseConfig(): BaseConfig {
   if (apiConfigCache) return apiConfigCache;
   if (workersConfigCache) return workersConfigCache;
-  return BaseConfigSchema.parse(process.env);
+  if (baseConfigCache) return baseConfigCache;
+  baseConfigCache = BaseConfigSchema.parse(process.env);
+  return baseConfigCache;
 }
 
 let _configCacheTtl: number | null = null;
@@ -114,5 +117,6 @@ export function getConfigCacheTtl(): number {
 export function resetEnvConfig(): void {
   apiConfigCache = null;
   workersConfigCache = null;
+  baseConfigCache = null;
   _configCacheTtl = null;
 }
