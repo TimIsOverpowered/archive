@@ -37,7 +37,7 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
     }
 
     try {
-      await handlePlatformLiveCheck(db, tenantId, platform, config);
+      await handlePlatformLiveCheck(db, tenantId, platform, config, activeLiveVod ?? null);
     } catch (error) {
       handleWorkerError(error, log, { platform, tenantId });
     }
