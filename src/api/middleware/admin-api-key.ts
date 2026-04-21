@@ -46,7 +46,7 @@ export default async function adminApiKeyMiddleware(request: FastifyRequest, rep
     });
   }
 
-  (request as { admin: AdminContext }).admin = {
+  request.admin = {
     adminId: admin.id,
     username: admin.username,
   };
