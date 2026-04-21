@@ -179,7 +179,7 @@ async function migrateChatWorker(
            SELECT id, vod_id, display_name, content_offset_seconds, user_color, created_at, message, user_badges
            FROM UNNEST($1::uuid[], $2::int[], $3::text[], $4::int[], $5::text[], $6::timestamptz[], $7::jsonb[], $8::jsonb[])
            AS t(id, vod_id, display_name, content_offset_seconds, user_color, created_at, message, user_badges)
-           ON CONFLICT (id) DO NOTHING`,
+           ON CONFLICT (id, created_at) DO NOTHING`,
           [ids, vodIds, displayNames, offsets, colors, createdAts, messages, badges]
         );
         const insertTime = Date.now() - insertStart;
@@ -866,7 +866,7 @@ const main = async () => {
       // Rebuild destination indexes and FK now that bulk load is complete
       console.log('🔨 Rebuilding indexes and FK on chat_messages_new...');
       await oldPool.query(`
-        CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_chat_messages_new_vod_offset_created
+        CREATE INDEX IF NOT EXISTS idx_chat_messages_new_vod_offset_created
         ON chat_messages_new (vod_id, content_offset_seconds, created_at)
       `);
       await oldPool.query(`
