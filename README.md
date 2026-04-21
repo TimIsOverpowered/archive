@@ -1,14 +1,15 @@
-# Archives
+# Archive
 
-Automated VOD upload from Twitch to YouTube after streaming.
+Automated VOD upload from Twitch/Kick to YouTube after streaming.
 
 ## Prerequisites
 
 - Node.js 20+
 - PostgreSQL 14+
 - Redis 6+
-- PgBouncer (required — connection pooler on port 6432)
-- FlareSolverr (for Kick stream detection and VOD fetching)
+- PgBouncer
+- FlareSolverr (for Kick)
+- TimescaleDB
 
 ## Database Setup
 
@@ -127,6 +128,110 @@ docker run -d \
 
 Set `PGBOUNCER_URL` in your environment variables (e.g., `postgresql://archive@localhost:6432/archive`).
 
+## TimescaleDB Setup
+
+TimescaleDB is used as the hypertable engine for the `chat_messages` table, providing time-based partitioning and automatic compression for chat log data.
+
+### Prerequisites
+
+- PostgreSQL 14+ with the TimescaleDB extension installed
+- The extension is created automatically by the migration scripts
+
+### Installation
+
+**Ubuntu/Debian:**
+
+```bash
+sudo apt install postgresql-timescaledb
+sudo systemctl restart postgresql
+```
+
+**Docker:**
+
+```bash
+docker run -d \
+  --name=timescaledb \
+  -p 5432:5432 \
+  -e POSTGRES_PASSWORD=yourpassword \
+  -v /path/to/data:/var/lib/postgresql/data \
+  --restart unless-stopped \
+  timescaledb/timescaledb:latest-pg16
+```
+
+### How It Works
+
+The `chat_messages` table is converted to a hypertable with the following configuration:
+
+| Setting              | Value                        | Purpose                                                |
+| -------------------- | ---------------------------- | ------------------------------------------------------ |
+| Partition column     | `created_at`                 | Chunks created by time intervals                       |
+| Chunk interval       | 7 days                       | Each chunk covers a 7-day window                       |
+| Compression          | Enabled                      | Reduces storage for older chat data                    |
+| Compression segment  | `vod_id`                     | Keeps messages from the same VOD together              |
+| Compression order    | `content_offset_seconds ASC` | Optimizes for sequential replay queries                |
+| Auto-compress policy | 30 days                      | Chunks older than 30 days are compressed automatically |
+
+### Composite Primary Key
+
+The `chat_messages` table uses a composite primary key on `(id, created_at)`. This is a TimescaleDB requirement: any unique index on a hypertable must include the partitioning column. Without it, TimescaleDB would need to scan every chunk globally to enforce uniqueness, destroying write performance. Including `created_at` guarantees uniqueness checks are confined to the active chunk.
+
+### Verification
+
+Check that the hypertable is set up correctly:
+
+```sql
+SELECT hypertable_name, chunk_time_interval, create_time FROM timescaledb_information.hypertables;
+
+SELECT * FROM timescaledb_information.compression_settings WHERE hypertable_name = 'chat_messages';
+
+SELECT policy_name, schedule_interval, target::regclass, initial_start, timezone FROM timescaledb_information.policies;
+```
+
+### Maintenance
+
+**Monitor chunk status:**
+
+```sql
+SELECT chunk_name, created_at, upper_boundary, compressed FROM timescaledb_information.chunks
+WHERE hypertable_name = 'chat_messages' ORDER BY created_at DESC;
+```
+
+**Manually compress a chunk:**
+
+```sql
+SELECT compress_chunk(chunk_id, if_not_compressed => true)
+FROM timescaledb_information.chunks
+WHERE hypertable_name = 'chat_messages' AND NOT compressed;
+```
+
+**Decompress a chunk (rarely needed):**
+
+```sql
+SELECT decompress_chunk(chunk_id)
+FROM timescaledb_information.chunks
+WHERE hypertable_name = 'chat_messages' AND compressed;
+```
+
+**Monitor compression ratio:**
+
+```sql
+SELECT
+  pg_size_pretty(sum(pg_total_relation_size(c.oid))) AS total_size,
+  pg_size_pretty(sum(pg_relation_size(c.oid))) AS uncompressed_size,
+  pg_size_pretty(sum(case when c.relkind = 'c' then pg_total_relation_size(c.oid) else 0 end)) AS compressed_size
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'timescaledb_internal'
+  AND c.relname LIKE 'chunk%';
+```
+
+### Important Notes
+
+- **No configuration changes needed** — TimescaleDB is transparent to the application. All queries use standard SQL and Kysely queries work identically.
+- **PgBouncer compatibility** — TimescaleDB uses standard PostgreSQL protocol, so PgBouncer works without any special configuration.
+- **Compression is transparent** — The application reads and writes compressed chunks automatically. Decompression happens on-the-fly during queries.
+- **Chunk retention** — Chunks are never automatically dropped. If you need to delete old data, use `drop_chunks('chat_messages', older_than => INTERVAL '90 days')`.
+
 ## Environment Variables
 
 See `.env.example` for all available configuration options. Key variables:
@@ -142,7 +247,7 @@ See `.env.example` for all available configuration options. Key variables:
 
 ### "Cannot resolve environment variable" errors
 
-Ensure `.env` or `.env.development` exists and `NODE_ENV` is set before running scripts.
+Ensure `.env` exists and `NODE_ENV` is set before running scripts.
 
 ## Verifying your YouTube channel
 
