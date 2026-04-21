@@ -1,6 +1,23 @@
+import { EventEmitter } from 'node:events';
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
-import { getClient, createClient, closeClient, closeAllClients, startClientCleanup, stopClientCleanup, getClientCount, resetClientManager } from '../../src/db/client.js';
+import { resetEnvConfig } from '../../src/config/env.js';
+import {
+  getClient,
+  createClient,
+  closeClient,
+  closeAllClients,
+  startClientCleanup,
+  stopClientCleanup,
+  getClientCount,
+  resetClientManager,
+  _setPoolCtor,
+} from '../../src/db/client.js';
+
+process.env.REDIS_URL = 'redis://localhost:6379';
+process.env.META_DATABASE_URL = 'postgresql://localhost/test';
+process.env.ENCRYPTION_MASTER_KEY = '0000000000000000000000000000000000000000000000000000000000000000';
+process.env.PGBOUNCER_URL = 'postgresql://localhost/placeholder';
 import { TenantConfig } from '../../src/config/types.js';
 
 const createMockConfig = (id: string): TenantConfig => ({
@@ -35,14 +52,24 @@ const createMockConfig = (id: string): TenantConfig => ({
   },
 });
 
+class MockPool extends EventEmitter {
+  query = mock.fn(() => Promise.resolve({ rows: [] }));
+  end = mock.fn(() => Promise.resolve());
+  connect = mock.fn(() => Promise.resolve({ release: () => {} }));
+  on = mock.fn(() => this);
+}
+
 describe('DB Client Manager', () => {
   beforeEach(() => {
+    _setPoolCtor(MockPool as unknown as typeof import('pg').Pool);
     resetClientManager();
+    resetEnvConfig();
   });
 
   afterEach(() => {
     stopClientCleanup();
     resetClientManager();
+    mock.restoreAll();
   });
 
   describe('getClient', () => {
@@ -51,79 +78,50 @@ describe('DB Client Manager', () => {
       assert.strictEqual(client, undefined);
     });
 
-    it('should update lastAccessedAt timestamp on each call', () => {
+    it('should return existing client and update lastAccessedAt', async () => {
       const config = createMockConfig('tenant-1');
+      const client = await createClient(config);
+      assert.ok(client !== undefined);
 
-      const originalCreateClient = createClient;
-      const mockClient = {
-        $connect: mock.fn(() => Promise.resolve()),
-        $disconnect: mock.fn(() => Promise.resolve()),
-      };
-
-      mock.method(global, 'setTimeout', ((fn: () => void) => fn() as unknown as NodeJS.Timeout) as any);
-
-      originalCreateClient(config).catch(() => {});
-
-      setTimeout(() => {
-        const client1 = getClient('tenant-1');
-        const client2 = getClient('tenant-1');
-        assert.strictEqual(client1, client2);
-      }, 100);
+      const client1 = getClient('tenant-1');
+      const client2 = getClient('tenant-1');
+      assert.strictEqual(client1, client2);
+      assert.strictEqual(client1, client);
     });
   });
 
   describe('createClient', () => {
     it('should create a new client for a tenant', async () => {
       const config = createMockConfig('tenant-create-test');
-
-      try {
-        const client = await createClient(config);
-        assert.ok(client !== undefined);
-        assert.strictEqual(getClientCount(), 1);
-      } catch {
-        assert.ok(true);
-      }
+      const client = await createClient(config);
+      assert.ok(client !== undefined);
+      assert.strictEqual(getClientCount(), 1);
     });
 
     it('should return existing client when called twice for same tenant', async () => {
       const config = createMockConfig('tenant-existing');
-
-      try {
-        const client1 = await createClient(config);
-        const client2 = await createClient(config);
-        assert.strictEqual(client1, client2);
-        assert.strictEqual(getClientCount(), 1);
-      } catch {
-        assert.ok(true);
-      }
+      const client1 = await createClient(config);
+      const client2 = await createClient(config);
+      assert.strictEqual(client1, client2);
+      assert.strictEqual(getClientCount(), 1);
     });
 
     it('should handle race condition when called simultaneously', async () => {
       const config = createMockConfig('tenant-race');
-
-      try {
-        const [client1, client2] = await Promise.all([createClient(config), createClient(config)]);
-        assert.strictEqual(client1, client2);
-        assert.strictEqual(getClientCount(), 1);
-      } catch {
-        assert.ok(true);
-      }
+      const [client1, client2] = await Promise.all([createClient(config), createClient(config)]);
+      assert.strictEqual(client1, client2);
+      assert.strictEqual(getClientCount(), 1);
     });
   });
 
   describe('closeClient', () => {
     it('should remove client from map after closing', async () => {
       const config = createMockConfig('tenant-close');
+      await createClient(config);
+      assert.strictEqual(getClientCount(), 1);
 
-      try {
-        await createClient(config);
-        assert.strictEqual(getClientCount(), 1);
-
-        await closeClient('tenant-close');
-        assert.strictEqual(getClientCount(), 0);
-      } catch {
-        assert.ok(true);
-      }
+      await closeClient('tenant-close');
+      assert.strictEqual(getClientCount(), 0);
     });
 
     it('should handle closing non-existent client gracefully', async () => {
@@ -137,16 +135,12 @@ describe('DB Client Manager', () => {
       const config1 = createMockConfig('tenant-all-1');
       const config2 = createMockConfig('tenant-all-2');
 
-      try {
-        await createClient(config1);
-        await createClient(config2);
-        assert.strictEqual(getClientCount(), 2);
+      await createClient(config1);
+      await createClient(config2);
+      assert.strictEqual(getClientCount(), 2);
 
-        await closeAllClients();
-        assert.strictEqual(getClientCount(), 0);
-      } catch {
-        assert.ok(true);
-      }
+      await closeAllClients();
+      assert.strictEqual(getClientCount(), 0);
     });
   });
 
@@ -159,31 +153,22 @@ describe('DB Client Manager', () => {
       const config1 = createMockConfig('tenant-count-1');
       const config2 = createMockConfig('tenant-count-2');
 
-      try {
-        await createClient(config1);
-        assert.strictEqual(getClientCount(), 1);
+      await createClient(config1);
+      assert.strictEqual(getClientCount(), 1);
 
-        await createClient(config2);
-        assert.strictEqual(getClientCount(), 2);
-      } catch {
-        assert.ok(true);
-      }
+      await createClient(config2);
+      assert.strictEqual(getClientCount(), 2);
     });
   });
 
   describe('resetClientManager', () => {
     it('should clear all clients and locks', async () => {
       const config = createMockConfig('tenant-reset');
+      await createClient(config);
+      assert.strictEqual(getClientCount(), 1);
 
-      try {
-        await createClient(config);
-        assert.strictEqual(getClientCount(), 1);
-
-        resetClientManager();
-        assert.strictEqual(getClientCount(), 0);
-      } catch {
-        assert.ok(true);
-      }
+      resetClientManager();
+      assert.strictEqual(getClientCount(), 0);
     });
   });
 
@@ -206,26 +191,24 @@ describe('DB Client Manager', () => {
 
   describe('LRU eviction at MAX_CLIENTS', () => {
     it('should evict oldest idle client when MAX_CLIENTS is reached', async () => {
-      const maxClients = 5;
-
-      const originalMaxClients = 100;
-
+      // DB_POOL_MAX_CLIENTS = 10, so creating 11 should evict the oldest
       const configs: TenantConfig[] = [];
-      for (let i = 0; i < maxClients; i++) {
+      for (let i = 0; i < 11; i++) {
         configs.push(createMockConfig(`tenant-lru-${i}`));
       }
 
-      try {
-        for (const config of configs) {
-          await createClient(config);
-        }
+      for (const config of configs) {
+        await createClient(config);
+      }
 
-        assert.strictEqual(getClientCount(), maxClients);
+      assert.strictEqual(getClientCount(), 10);
 
-        await closeClient(`tenant-lru-0`);
-        assert.strictEqual(getClientCount(), maxClients - 1);
-      } catch {
-        assert.ok(true);
+      // The oldest client (tenant-lru-0) should have been evicted
+      assert.strictEqual(getClient('tenant-lru-0'), undefined);
+
+      // The newest 10 should still exist
+      for (let i = 1; i <= 10; i++) {
+        assert.ok(getClient(`tenant-lru-${i}`), `tenant-lru-${i} should exist`);
       }
     });
   });
@@ -233,19 +216,25 @@ describe('DB Client Manager', () => {
   describe('idle timeout eviction', () => {
     it('should evict clients that have been idle for longer than IDLE_TIMEOUT', async () => {
       const config = createMockConfig('tenant-idle');
+      await createClient(config);
+      assert.strictEqual(getClientCount(), 1);
 
-      try {
-        await createClient(config);
-        assert.strictEqual(getClientCount(), 1);
+      const originalNow = Date.now;
+      // Set the client's lastAccessedAt to 31 minutes ago
+      const oldTime = originalNow() - 31 * 60 * 1000;
 
-        startClientCleanup();
+      // Manually touch the pool to simulate it being idle
+      const { poolManager } = await import('../../src/db/client.js');
+      const entry = poolManager['pools'].get('tenant-idle') as { lastAccessedAt: number };
+      entry.lastAccessedAt = oldTime;
 
-        const mockNow = Date.now() + 31 * 60 * 1000;
+      // Run eviction manually
+      await poolManager.evictIdleClients();
 
-        stopClientCleanup();
-      } catch {
-        assert.ok(true);
-      }
+      assert.strictEqual(getClientCount(), 0);
+      assert.strictEqual(getClient('tenant-idle'), undefined);
+
+      Date.now = originalNow;
     });
   });
 
@@ -253,24 +242,21 @@ describe('DB Client Manager', () => {
     it('should handle full lifecycle: create, access, close', async () => {
       const config = createMockConfig('tenant-lifecycle');
 
-      try {
-        assert.strictEqual(getClientCount(), 0);
+      assert.strictEqual(getClientCount(), 0);
 
-        const client = await createClient(config);
-        assert.ok(client !== undefined);
-        assert.strictEqual(getClientCount(), 1);
+      const client = await createClient(config);
+      assert.ok(client !== undefined);
+      assert.strictEqual(getClientCount(), 1);
 
-        const retrievedClient = getClient('tenant-lifecycle');
-        assert.ok(retrievedClient !== undefined);
+      const retrievedClient = getClient('tenant-lifecycle');
+      assert.ok(retrievedClient !== undefined);
+      assert.strictEqual(retrievedClient, client);
 
-        await closeClient('tenant-lifecycle');
-        assert.strictEqual(getClientCount(), 0);
+      await closeClient('tenant-lifecycle');
+      assert.strictEqual(getClientCount(), 0);
 
-        const afterClose = getClient('tenant-lifecycle');
-        assert.strictEqual(afterClose, undefined);
-      } catch {
-        assert.ok(true);
-      }
+      const afterClose = getClient('tenant-lifecycle');
+      assert.strictEqual(afterClose, undefined);
     });
 
     it('should maintain correct state after multiple operations', async () => {
@@ -278,24 +264,21 @@ describe('DB Client Manager', () => {
       const config2 = createMockConfig('tenant-state-2');
       const config3 = createMockConfig('tenant-state-3');
 
-      try {
-        await createClient(config1);
-        await createClient(config2);
-        assert.strictEqual(getClientCount(), 2);
+      await createClient(config1);
+      await createClient(config2);
+      assert.strictEqual(getClientCount(), 2);
 
-        getClient('tenant-state-1');
+      getClient('tenant-state-1');
+      assert.strictEqual(getClientCount(), 2);
 
-        await closeClient('tenant-state-2');
-        assert.strictEqual(getClientCount(), 1);
+      await closeClient('tenant-state-2');
+      assert.strictEqual(getClientCount(), 1);
 
-        await createClient(config3);
-        assert.strictEqual(getClientCount(), 2);
+      await createClient(config3);
+      assert.strictEqual(getClientCount(), 2);
 
-        await closeAllClients();
-        assert.strictEqual(getClientCount(), 0);
-      } catch {
-        assert.ok(true);
-      }
+      await closeAllClients();
+      assert.strictEqual(getClientCount(), 0);
     });
   });
 });

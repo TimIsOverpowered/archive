@@ -3,7 +3,7 @@ import { getJobContext } from '../utils/job-context.js';
 import { handlePlatformLiveCheck } from './live-handler.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { handleWorkerError } from '../utils/error-handler.js';
-import type { Platform } from '../../types/platforms.js';
+import { PLATFORM_VALUES } from '../../types/platforms.js';
 
 const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async (job: Job<{ tenantId: string }>) => {
   const { tenantId } = job.data;
@@ -18,9 +18,7 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
     return { success: true };
   }
 
-  const platforms: Platform[] = ['twitch', 'kick'];
-
-  for (const platform of platforms) {
+  for (const platform of PLATFORM_VALUES) {
     const platformConfig = config[platform];
     if (!platformConfig?.enabled || !platformConfig.username) {
       continue;
