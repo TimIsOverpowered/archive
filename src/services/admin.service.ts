@@ -2,36 +2,37 @@ import bcrypt from 'bcrypt';
 import { getMetaClient } from '../db/meta-client.js';
 import type { SelectableAdmins, InsertableAdmins, UpdateableAdmins } from '../db/meta-types.js';
 
-const BCRYPT_COST = 10;
+const adminSelect = ['id', 'username', 'created_at'] as const;
+const adminAuthSelect = [...adminSelect, 'api_key_hash'] as const;
 
-const adminSelect = ['id', 'username', 'api_key_hash', 'created_at'] as const;
+type PublicAdmin = Pick<SelectableAdmins, 'id' | 'username' | 'created_at'>;
 
 export async function findAdminByApiKey(apiKey: string): Promise<SelectableAdmins | undefined> {
   if (!apiKey || !apiKey.startsWith('archive_')) return;
 
-  const hash = await bcrypt.hash(apiKey, BCRYPT_COST);
+  const admins = await getMetaClient().selectFrom('admins').select(adminAuthSelect).execute();
 
-  const admin = await getMetaClient()
-    .selectFrom('admins')
-    .select(adminSelect)
-    .where('api_key_hash', '=', hash)
-    .executeTakeFirst();
+  for (const admin of admins) {
+    if (await bcrypt.compare(apiKey, admin.api_key_hash)) {
+      return admin;
+    }
+  }
 
-  return admin;
+  return undefined;
 }
 
-export async function findAdminByUsername(username: string): Promise<SelectableAdmins | undefined> {
-  return getMetaClient().selectFrom('admins').selectAll().where('username', '=', username).executeTakeFirst();
+export async function findAdminByUsername(username: string): Promise<PublicAdmin | undefined> {
+  return getMetaClient().selectFrom('admins').select(adminSelect).where('username', '=', username).executeTakeFirst();
 }
 
-export async function createAdmin(data: InsertableAdmins): Promise<SelectableAdmins> {
+export async function createAdmin(data: InsertableAdmins): Promise<PublicAdmin> {
   return getMetaClient().insertInto('admins').values(data).returning(adminSelect).executeTakeFirstOrThrow();
 }
 
 export async function updateAdmin(
   username: string,
   data: Partial<InsertableAdmins>
-): Promise<SelectableAdmins | undefined> {
+): Promise<PublicAdmin | undefined> {
   return getMetaClient()
     .updateTable('admins')
     .set(data as UpdateableAdmins)

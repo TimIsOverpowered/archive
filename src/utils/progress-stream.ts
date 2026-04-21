@@ -1,3 +1,4 @@
+import { TransformCallback } from 'stream';
 import stream from 'stream';
 
 export interface UploadProgressData {
@@ -26,7 +27,7 @@ export class ProgressStream extends stream.Transform {
   _transform(
     chunk: Buffer | string,
     encoding: BufferEncoding,
-    callback: (error?: Error | null, data?: Buffer | string) => void
+    callback: TransformCallback
   ): void {
     const byteLength = Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(chunk, encoding);
     this.bytesUploaded += byteLength;

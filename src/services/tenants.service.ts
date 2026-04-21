@@ -68,7 +68,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
       dbStatus = 'error';
     }
 
-    const [vodStats, uploadStats, chapterCount, thisMonthCount, uniqueGamesCount, totalUploadsRow, lastUploadRow] =
+    const [vodStats, uploadStats, chapterRow, thisMonthRow, uniqueGamesCount, totalUploadsRow, lastUploadRow] =
       await Promise.all([
         db
           .selectFrom('vods')
@@ -85,19 +85,15 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
           .select((eb) => [eb.fn.count<number>('upload_id').as('cnt')])
           .where('status', '=', 'FAILED')
           .executeTakeFirst(),
-        (
-          await db
-            .selectFrom('chapters')
-            .select((eb) => [eb.fn.count<number>('id').as('cnt')])
-            .executeTakeFirst()
-        )?.cnt ?? 0,
-        (
-          await db
-            .selectFrom('vods')
-            .select((eb) => [eb.fn.count<number>('id').as('cnt')])
-            .where('created_at', '>=', thisMonthStart)
-            .executeTakeFirst()
-        )?.cnt ?? 0,
+        db
+          .selectFrom('chapters')
+          .select((eb) => [eb.fn.count<number>('id').as('cnt')])
+          .executeTakeFirst(),
+        db
+          .selectFrom('vods')
+          .select((eb) => [eb.fn.count<number>('id').as('cnt')])
+          .where('created_at', '>=', thisMonthStart)
+          .executeTakeFirst(),
         db.selectFrom('chapters').select('game_id').where('game_id', 'is not', null).groupBy('game_id').execute(),
         db
           .selectFrom('vod_uploads')
@@ -110,6 +106,9 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
           .where('status', '=', 'COMPLETED')
           .executeTakeFirst(),
       ]);
+
+    const chapterCount = chapterRow?.cnt ?? 0;
+    const thisMonthCount = thisMonthRow?.cnt ?? 0;
 
     const byPlatform: Record<string, number> = {};
     let totalDurationSeconds = 0;
