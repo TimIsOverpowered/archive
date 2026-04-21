@@ -53,6 +53,7 @@ export function createYoutubeUploadProgressHandler({
   gameName,
   part,
   totalParts,
+  privacyStatus,
 }: UploadProgressOptions): (progress: UploadProgressCallbackData) => Promise<void> {
   return async (progress: UploadProgressCallbackData) => {
     if (!messageId || !isAlertsEnabled()) return;
@@ -76,6 +77,10 @@ export function createYoutubeUploadProgressHandler({
         if (gameField) fields.push(gameField);
         if (videoField) fields.push(videoField);
         if (partField) fields.push(partField);
+        if (privacyStatus) {
+          const privacyLabel = privacyStatus.charAt(0).toUpperCase() + privacyStatus.slice(1);
+          fields.push({ name: 'Privacy', value: privacyLabel, inline: true });
+        }
 
         await updateDiscordEmbed(messageId, {
           title,
