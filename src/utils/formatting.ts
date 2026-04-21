@@ -35,6 +35,11 @@ export function humanizeDuration(seconds: number): string {
 }
 
 export function extractDatabaseName(connectionString: string): string {
-  const match = connectionString.match(/\/([^/?]+)(?:\?|$)/);
-  return match ? match[1] : 'postgres';
+  try {
+    const parsed = new URL(connectionString);
+    const dbName = parsed.pathname.slice(1);
+    return dbName || 'postgres';
+  } catch {
+    return 'postgres';
+  }
 }
