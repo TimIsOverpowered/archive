@@ -58,47 +58,47 @@ export function getDiscordAlertsEnabled(): boolean {
   return _discordAlertsEnabled;
 }
 
-// --- FLOARESOLVERR_BASE_URL ---
+// --- FLARESOLVERR_BASE_URL ---
 let _flaresolverrBaseUrl: string | null = null;
 
 export function getFlareSolverrBaseUrl(): string {
   if (_flaresolverrBaseUrl !== null) return _flaresolverrBaseUrl;
-  _flaresolverrBaseUrl = process.env.FLOARESOLVERR_BASE_URL || 'http://localhost:8191';
+  _flaresolverrBaseUrl = process.env.FLARESOLVERR_BASE_URL || 'http://localhost:8191';
   return _flaresolverrBaseUrl;
 }
 
-// --- FLOARESOLVERR_TIMEOUT_MS ---
+// --- FLARESOLVERR_TIMEOUT_MS ---
 const FlareSolverrTimeoutSchema = z.coerce.number().int().positive();
 
 let _flaresolverrTimeoutMs: number | null = null;
 
 export function getFlareSolverrTimeoutMs(): number {
   if (_flaresolverrTimeoutMs !== null) return _flaresolverrTimeoutMs;
-  const parsed = FlareSolverrTimeoutSchema.safeParse(process.env.FLOARESOLVERR_TIMEOUT_MS);
+  const parsed = FlareSolverrTimeoutSchema.safeParse(process.env.FLARESOLVERR_TIMEOUT_MS);
   _flaresolverrTimeoutMs = parsed.success ? parsed.data : 300_000;
   return _flaresolverrTimeoutMs;
 }
 
-// --- FLOARESOLVERR_SESSION_TTL ---
+// --- FLARESOLVERR_SESSION_TTL ---
 const FlareSolverrSessionTtlSchema = z.coerce.number().int().positive();
 
 let _flaresolverrSessionTtl: number | null = null;
 
 export function getFlareSolverrSessionTtl(): number {
   if (_flaresolverrSessionTtl !== null) return _flaresolverrSessionTtl;
-  const parsed = FlareSolverrSessionTtlSchema.safeParse(process.env.FLOARESOLVERR_SESSION_TTL);
+  const parsed = FlareSolverrSessionTtlSchema.safeParse(process.env.FLARESOLVERR_SESSION_TTL);
   _flaresolverrSessionTtl = parsed.success ? parsed.data : 3600;
   return _flaresolverrSessionTtl;
 }
 
-// --- FLOARESOLVERR_CONCURRENCY ---
+// --- FLARESOLVERR_CONCURRENCY ---
 const FlareSolverrConcurrencySchema = z.coerce.number().int().positive();
 
 let _flaresolverrConcurrency: number | null = null;
 
 export function getFlareSolverrConcurrency(): number {
   if (_flaresolverrConcurrency !== null) return _flaresolverrConcurrency;
-  const parsed = FlareSolverrConcurrencySchema.safeParse(process.env.FLOARESOLVERR_CONCURRENCY);
+  const parsed = FlareSolverrConcurrencySchema.safeParse(process.env.FLARESOLVERR_CONCURRENCY);
   _flaresolverrConcurrency = parsed.success ? parsed.data : 3;
   return _flaresolverrConcurrency;
 }

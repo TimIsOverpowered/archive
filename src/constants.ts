@@ -41,8 +41,8 @@ export const KICK_API_TIMEOUT_MS = 10_000;
 export const KICK_LIVE_API_TIMEOUT_MS = 15_000;
 
 // ── FlareSolverr ─────────────────────────────────────────────────────────────
-export const FLOARESOLVERR_TIMEOUT_MS = 5 * 60 * 1_000;
-export const FLOARESOLVERR_HEALTH_CACHE_TTL_MS = 30_000;
+export const FLARESOLVERR_TIMEOUT_MS = 5 * 60 * 1_000;
+export const FLARESOLVERR_HEALTH_CACHE_TTL_MS = 30_000;
 
 // ── Encryption ───────────────────────────────────────────────────────────────
 export const ENCRYPTION_KEY_LENGTH = 32; // AES-256 requires exactly 32 bytes

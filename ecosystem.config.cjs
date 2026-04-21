@@ -2,7 +2,7 @@
  * PM2 Ecosystem Configuration for Archive API
  *
  * Prerequisites:
- * - FlareSolverr must be running on FLOARESOLVERR_BASE_URL (default: http://localhost:8191)
+ * - FlareSolverr must be running on FLARESOLVERR_BASE_URL (default: http://localhost:8191)
  *   See: https://github.com/FlareSolverr/FlareSolverr
  *
  * Docker:

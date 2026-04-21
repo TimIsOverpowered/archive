@@ -15,7 +15,7 @@ export const BaseConfigSchema = z.object({
   REDIS_CHAT_COMPRESSION: z.enum(['brotli', 'gzip', 'none']).default('brotli'),
   REDIS_COMPRESSION_LEVEL: z.coerce.number().int().min(0).max(11).default(6),
   DISABLE_REDIS_CACHE: z.preprocess((val) => String(val).toLowerCase() === 'true', z.boolean()).default(false),
-  FLOARESOLVERR_CONCURRENCY: z.coerce.number().int().positive().default(3),
+  FLARESOLVERR_CONCURRENCY: z.coerce.number().int().positive().default(3),
   CONFIG_CACHE_TTL: z.coerce.number().int().positive().default(3600),
 });
 
