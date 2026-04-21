@@ -30,7 +30,6 @@ async function resetAdminKey(username: string): Promise<void> {
 
   // Update database
   await updateAdmin(username, {
-    api_key: newApiKey,
     api_key_hash: newApiKeyHash,
   });
 

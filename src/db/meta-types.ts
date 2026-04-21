@@ -29,7 +29,6 @@ export interface TenantsTable {
 export interface AdminsTable {
   id: Generated<number>;
   username: string;
-  api_key: string;
   api_key_hash: string;
   created_at: ColumnType<Date, string | undefined, never>;
 }

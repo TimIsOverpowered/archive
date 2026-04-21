@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { validateApiKey, findAdminByApiKey } from '../../services/admin.service.js';
+import { findAdminByApiKey } from '../../services/admin.service.js';
 
 export interface AdminContext {
   adminId: number;
@@ -30,18 +30,6 @@ export default async function adminApiKeyMiddleware(request: FastifyRequest, rep
         message: 'Missing or invalid API key',
         code: 'UNAUTHORIZED',
         statusCode: 401,
-      },
-    });
-  }
-
-  const isValid = await validateApiKey(apiKey);
-
-  if (!isValid) {
-    return reply.status(403).send({
-      error: {
-        message: 'Invalid API key',
-        code: 'FORBIDDEN',
-        statusCode: 403,
       },
     });
   }
