@@ -49,12 +49,18 @@ async function decryptField(value: string | null): Promise<DecryptionResult> {
       const isLikelyEncrypted = /^[A-Za-z0-9+/=]{50,}$/.test(value);
 
       console.warn('⚠️  ENCRYPTION_MASTER_KEY not set. Cannot decrypt values.');
-      result.decrypted = { error: 'ENCRYPTION_MASTER_KEY required', rawValue: isLikelyEncrypted ? '[encrypted data]' : value.substring(0, 100) + (value.length > 100 ? '...' : '') };
+      result.decrypted = {
+        error: 'ENCRYPTION_MASTER_KEY required',
+        rawValue: isLikelyEncrypted ? '[encrypted data]' : value.substring(0, 100) + (value.length > 100 ? '...' : ''),
+      };
     } else if (parsedValue) {
       // Already parsed as JSON (unencrypted or failed decryption attempt returned string)
       result.decrypted =
         typeof parsedValue === 'string' && /^[A-Za-z0-9+/=]{50,}$/.test(parsedValue)
-          ? { error: 'Could not parse - may be encrypted', rawValue: value.substring(0, 100) + (value.length > 100 ? '...' : '') }
+          ? {
+              error: 'Could not parse - may be encrypted',
+              rawValue: value.substring(0, 100) + (value.length > 100 ? '...' : ''),
+            }
           : parsedValue;
     }
   } catch (error: unknown) {
@@ -70,7 +76,8 @@ function displayField(name: string, value: DecryptionResult): void {
   console.log('─'.repeat(50));
 
   if (value.raw) {
-    const preview = typeof value.raw === 'string' && value.raw.length > 120 ? `${value.raw.substring(0, 120)}...` : String(value.raw);
+    const preview =
+      typeof value.raw === 'string' && value.raw.length > 120 ? `${value.raw.substring(0, 120)}...` : String(value.raw);
 
     console.log(`Raw: ${preview}`);
   } else {
@@ -207,7 +214,16 @@ async function main(): Promise<void> {
         displayField('YouTube API Key', apiKeyResult);
 
         // Show non-encrypted settings first
-        const youtubeSettings = ['description', 'public', 'vodUpload', 'perGameUpload', 'splitDuration', 'liveUpload', 'multiTrack', 'upload'];
+        const youtubeSettings = [
+          'description',
+          'public',
+          'vodUpload',
+          'perGameUpload',
+          'splitDuration',
+          'liveUpload',
+          'multiTrack',
+          'upload',
+        ];
 
         console.log('\nYouTube Settings:');
         console.log('─'.repeat(50));

@@ -25,188 +25,196 @@ program
   .option('-v, --verbose', 'Show detailed output including full API responses')
   .option('--check-only', 'Only check current state without making API calls')
   .option('--validate-token', 'Validate current token by making a test API call to /helix/users')
-  .action(async (options: { tenant?: string; forceRefresh: boolean; verbose: boolean; checkOnly: boolean; validateToken: boolean }) => {
-    await initMetaClient();
-    console.log('Twitch Token Test');
-    console.log('==================\n');
+  .action(
+    async (options: {
+      tenant?: string;
+      forceRefresh: boolean;
+      verbose: boolean;
+      checkOnly: boolean;
+      validateToken: boolean;
+    }) => {
+      await initMetaClient();
+      console.log('Twitch Token Test');
+      console.log('==================\n');
 
-    let tenantId = options.tenant;
+      let tenantId = options.tenant;
 
-    if (!tenantId) {
-      const tenants = await getAllTenants();
-      if (tenants.length === 0) {
-        console.error('No tenants found. Please create one first using scripts/create-tenant.ts');
-        process.exit(1);
-      }
-
-      tenantId = tenants[0].id;
-      console.log(`Using tenant: ${tenantId}`);
-    }
-
-    try {
-      const tenant = await findTenantFirst({ id: tenantId });
-
-      if (!tenant) {
-        console.error('Tenant not found');
-        process.exit(1);
-      }
-
-      let decrypted = getTwitchAuth(tenant);
-
-      if (!decrypted) {
-        console.error('Twitch credentials not found. Run scripts/auth-twitch.ts first.');
-        process.exit(1);
-      }
-
-      console.log('\nCurrent Token State:');
-      console.log('-'.repeat(50));
-
-      const hasIssuesBefore = displayTokenState(decrypted, 'Before', options.verbose);
-
-      if (options.forceRefresh) {
-        console.log('\nForcing token refresh...');
-
-        console.log('Loading streamer configs from DB...');
-        await loadTenantConfigs();
-
-        try {
-          const newToken = await getAppAccessToken(tenantId);
-          console.log('✅ Token refreshed successfully!');
-          console.log(`   New token: ${newToken.substring(0, 20)}...${newToken.slice(-10)}`);
-
-          await new Promise((resolve) => setTimeout(resolve, 500));
-
-          const updatedTenant = await findTenantFirst({ id: tenantId });
-
-          if (!updatedTenant) {
-            console.error('Error: Tenant not found after refresh');
-            process.exit(1);
-          }
-
-          let decryptedAfter = getTwitchAuth(updatedTenant);
-
-          if (!decryptedAfter) {
-            console.error('Failed to decrypt Twitch auth data after refresh');
-            process.exit(1);
-          }
-
-          console.log('\n\nToken State After Refresh:');
-          console.log('-'.repeat(50));
-          displayTokenState(decryptedAfter, 'After', options.verbose);
-        } catch (err: any) {
-          const details = extractErrorDetails(err);
-          console.error('\n❌ FAIL: Token refresh failed');
-          console.error(`   Error: ${details.message}`);
-
-          if (options.verbose && err?.rawResponse) {
-            console.error('\nRaw API Response:');
-            console.error(JSON.stringify(err.rawResponse, null, 2));
-          }
-
-          if (details.message.includes('403')) {
-            console.error('\n⚠️  403 Forbidden indicates invalid or revoked credentials.');
-            console.error('   Run "npm run auth:twitch" to re-authenticate with fresh credentials.');
-          } else if (details.message.includes('400')) {
-            console.error('\n⚠️  400 Bad Request indicates malformed request or invalid client credentials.');
-          } else if (details.message.includes('429')) {
-            console.error('\n⚠️  429 Too Many Requests - Twitch has rate-limited your app.');
-            console.error('   Wait a few minutes and try again.');
-          }
-
+      if (!tenantId) {
+        const tenants = await getAllTenants();
+        if (tenants.length === 0) {
+          console.error('No tenants found. Please create one first using scripts/create-tenant.ts');
           process.exit(1);
         }
-      } else if (options.validateToken) {
-        console.log('\nValidating current token...');
 
-        await loadTenantConfigs();
+        tenantId = tenants[0].id;
+        console.log(`Using tenant: ${tenantId}`);
+      }
 
-        try {
-          const accessToken = await getAppAccessToken(tenantId);
+      try {
+        const tenant = await findTenantFirst({ id: tenantId });
 
-          if (!accessToken || accessToken === null) {
-            console.error('❌ FAIL: Could not get access token');
+        if (!tenant) {
+          console.error('Tenant not found');
+          process.exit(1);
+        }
+
+        let decrypted = getTwitchAuth(tenant);
+
+        if (!decrypted) {
+          console.error('Twitch credentials not found. Run scripts/auth-twitch.ts first.');
+          process.exit(1);
+        }
+
+        console.log('\nCurrent Token State:');
+        console.log('-'.repeat(50));
+
+        const hasIssuesBefore = displayTokenState(decrypted, 'Before', options.verbose);
+
+        if (options.forceRefresh) {
+          console.log('\nForcing token refresh...');
+
+          console.log('Loading streamer configs from DB...');
+          await loadTenantConfigs();
+
+          try {
+            const newToken = await getAppAccessToken(tenantId);
+            console.log('✅ Token refreshed successfully!');
+            console.log(`   New token: ${newToken.substring(0, 20)}...${newToken.slice(-10)}`);
+
+            await new Promise((resolve) => setTimeout(resolve, 500));
+
+            const updatedTenant = await findTenantFirst({ id: tenantId });
+
+            if (!updatedTenant) {
+              console.error('Error: Tenant not found after refresh');
+              process.exit(1);
+            }
+
+            let decryptedAfter = getTwitchAuth(updatedTenant);
+
+            if (!decryptedAfter) {
+              console.error('Failed to decrypt Twitch auth data after refresh');
+              process.exit(1);
+            }
+
+            console.log('\n\nToken State After Refresh:');
+            console.log('-'.repeat(50));
+            displayTokenState(decryptedAfter, 'After', options.verbose);
+          } catch (err: any) {
+            const details = extractErrorDetails(err);
+            console.error('\n❌ FAIL: Token refresh failed');
+            console.error(`   Error: ${details.message}`);
+
+            if (options.verbose && err?.rawResponse) {
+              console.error('\nRaw API Response:');
+              console.error(JSON.stringify(err.rawResponse, null, 2));
+            }
+
+            if (details.message.includes('403')) {
+              console.error('\n⚠️  403 Forbidden indicates invalid or revoked credentials.');
+              console.error('   Run "npm run auth:twitch" to re-authenticate with fresh credentials.');
+            } else if (details.message.includes('400')) {
+              console.error('\n⚠️  400 Bad Request indicates malformed request or invalid client credentials.');
+            } else if (details.message.includes('429')) {
+              console.error('\n⚠️  429 Too Many Requests - Twitch has rate-limited your app.');
+              console.error('   Wait a few minutes and try again.');
+            }
+
             process.exit(1);
           }
+        } else if (options.validateToken) {
+          console.log('\nValidating current token...');
 
-          const creds = getTwitchCredentials(tenantId);
+          await loadTenantConfigs();
 
-          if (!creds || !creds.clientId) {
-            console.error('❌ FAIL: Could not retrieve credentials');
-            process.exit(1);
-          }
+          try {
+            const accessToken = await getAppAccessToken(tenantId);
 
-          const url = new URL('https://api.twitch.tv/helix/users');
-          url.searchParams.append('login', '');
+            if (!accessToken || accessToken === null) {
+              console.error('❌ FAIL: Could not get access token');
+              process.exit(1);
+            }
 
-          const response = await fetch(url.toString(), {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              'Client-Id': creds.clientId,
-            },
-            signal: AbortSignal.timeout(10000),
-          });
+            const creds = getTwitchCredentials(tenantId);
 
-          if (!response.ok) {
-            const errorBody = await response.text().catch(() => 'Unable to read response body');
-            console.error(`\n❌ FAIL: Token validation failed with status ${response.status} ${response.statusText}`);
+            if (!creds || !creds.clientId) {
+              console.error('❌ FAIL: Could not retrieve credentials');
+              process.exit(1);
+            }
+
+            const url = new URL('https://api.twitch.tv/helix/users');
+            url.searchParams.append('login', '');
+
+            const response = await fetch(url.toString(), {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Client-Id': creds.clientId,
+              },
+              signal: AbortSignal.timeout(10000),
+            });
+
+            if (!response.ok) {
+              const errorBody = await response.text().catch(() => 'Unable to read response body');
+              console.error(`\n❌ FAIL: Token validation failed with status ${response.status} ${response.statusText}`);
+
+              if (options.verbose) {
+                console.error('\nRaw API Response:');
+                console.error(errorBody);
+              }
+
+              if (response.status === 401) {
+                console.error('\n⚠️  401 Unauthorized - token is expired or invalid.');
+                console.error('   Run with --force-refresh to get a new token.');
+              } else if (response.status === 403) {
+                console.error('\n⚠️  403 Forbidden - credentials may be revoked.');
+                console.error('   Run "npm run auth:twitch" to re-authenticate.');
+              }
+
+              process.exit(1);
+            }
+
+            const data = await response.json();
+            console.log('✅ Token is valid and working!');
+            console.log(`   API returned ${response.status} OK`);
 
             if (options.verbose) {
-              console.error('\nRaw API Response:');
-              console.error(errorBody);
+              console.log('\nAPI Response (first 200 chars):');
+              const responseStr = JSON.stringify(data);
+              console.log(responseStr.substring(0, 200) + (responseStr.length > 200 ? '...' : ''));
             }
+          } catch (err: any) {
+            const details = extractErrorDetails(err);
+            console.error('\n❌ FAIL: Token validation error');
+            console.error(`   Error: ${details.message}`);
 
-            if (response.status === 401) {
-              console.error('\n⚠️  401 Unauthorized - token is expired or invalid.');
-              console.error('   Run with --force-refresh to get a new token.');
-            } else if (response.status === 403) {
-              console.error('\n⚠️  403 Forbidden - credentials may be revoked.');
-              console.error('   Run "npm run auth:twitch" to re-authenticate.');
+            if (options.verbose) {
+              console.error('\nFull error details:');
+              console.error(details.stack || details.message);
             }
 
             process.exit(1);
           }
+        } else if (options.checkOnly) {
+          console.log('\nMode: Check-only (--check-only). No API calls made.');
 
-          const data = await response.json();
-          console.log('✅ Token is valid and working!');
-          console.log(`   API returned ${response.status} OK`);
-
-          if (options.verbose) {
-            console.log('\nAPI Response (first 200 chars):');
-            const responseStr = JSON.stringify(data);
-            console.log(responseStr.substring(0, 200) + (responseStr.length > 200 ? '...' : ''));
+          if (hasIssuesBefore) {
+            console.error('\n❌ Token has issues (see above)');
+            process.exit(1);
           }
-        } catch (err: any) {
-          const details = extractErrorDetails(err);
-          console.error('\n❌ FAIL: Token validation error');
-          console.error(`   Error: ${details.message}`);
-
-          if (options.verbose) {
-            console.error('\nFull error details:');
-            console.error(details.stack || details.message);
-          }
-
-          process.exit(1);
         }
-      } else if (options.checkOnly) {
-        console.log('\nMode: Check-only (--check-only). No API calls made.');
-
-        if (hasIssuesBefore) {
-          console.error('\n❌ Token has issues (see above)');
-          process.exit(1);
+      } catch (error) {
+        const details = extractErrorDetails(error);
+        console.error('Error:', details.message);
+        if (options.verbose && details.stack) {
+          console.error('\nStack trace:');
+          console.error(details.stack);
         }
+        process.exit(1);
+      } finally {
+        await closeMetaClient();
       }
-    } catch (error) {
-      const details = extractErrorDetails(error);
-      console.error('Error:', details.message);
-      if (options.verbose && details.stack) {
-        console.error('\nStack trace:');
-        console.error(details.stack);
-      }
-      process.exit(1);
-    } finally {
-      await closeMetaClient();
     }
-  });
+  );
 
 program.parse(process.argv);
 

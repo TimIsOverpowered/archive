@@ -10,9 +10,19 @@ if (!url || !/^https:\/\/discord\.com\/api\/webhooks\/\d+/.test(url)) {
   process.exit(1);
 }
 
-console.log(`Webhook: ${url.split('/').slice(-2).join('/')}`.replace(/[a-zA-Z0-9_-]{4,}$/, '****') + '\n' + '='.repeat(65) + '\nDiscord Webhook Test Suite\n' + '='.repeat(65));
+console.log(
+  `Webhook: ${url.split('/').slice(-2).join('/')}`.replace(/[a-zA-Z0-9_-]{4,}$/, '****') +
+    '\n' +
+    '='.repeat(65) +
+    '\nDiscord Webhook Test Suite\n' +
+    '='.repeat(65)
+);
 const enabled = process.env.DISCORD_ALERTS_ENABLED !== 'false';
-console.log(enabled ? colors.green + '✅ Alerts enabled\n' + colors.reset : '\n⚠️  DISCORD_ALERTS_ENABLED=false - alerts disabled\n');
+console.log(
+  enabled
+    ? colors.green + '✅ Alerts enabled\n' + colors.reset
+    : '\n⚠️  DISCORD_ALERTS_ENABLED=false - alerts disabled\n'
+);
 
 async function post(msg: string) {
   try {
@@ -43,7 +53,16 @@ async function embed() {
       headers: {
         'Content-Type': 'application/json' as any,
       },
-      body: JSON.stringify({ embeds: [{ title: '🧪 Embed Test', description: `Time:${new Date().toISOString()}`, color: 5763719, fields: [{ name: 'Status', value: '✅' }] }] }),
+      body: JSON.stringify({
+        embeds: [
+          {
+            title: '🧪 Embed Test',
+            description: `Time:${new Date().toISOString()}`,
+            color: 5763719,
+            fields: [{ name: 'Status', value: '✅' }],
+          },
+        ],
+      }),
       signal: AbortSignal.timeout(10000),
     });
 
@@ -57,4 +76,6 @@ async function embed() {
 
 await embed();
 
-console.log('='.repeat(65) + '\n' + colors.cyan + 'All automated tests complete!' + colors.green + ' ✅' + colors.reset);
+console.log(
+  '='.repeat(65) + '\n' + colors.cyan + 'All automated tests complete!' + colors.green + ' ✅' + colors.reset
+);

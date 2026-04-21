@@ -84,7 +84,7 @@ CREATE TABLE "chat_messages" (
     "message" JSONB,
     "user_badges" JSONB,
 
-    CONSTRAINT "chat_messages_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "chat_messages_pkey" PRIMARY KEY ("id", "created_at")
 );
 
 -- CreateIndex
@@ -154,3 +154,19 @@ $$ language 'plpgsql';
 CREATE TRIGGER update_vods_updated_at
 BEFORE UPDATE ON "vods"
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- 1. Enable the extension
+CREATE EXTENSION IF NOT EXISTS timescaledb;
+
+-- 2. Convert the table into a Hypertable chunked by 7 days
+SELECT create_hypertable('chat_messages', 'created_at', chunk_time_interval => INTERVAL '7 days');
+
+-- 3. Enable Compression (Segmented by vod_id for fast replay queries)
+ALTER TABLE chat_messages SET (
+  timescaledb.compress,
+  timescaledb.compress_segmentby = 'vod_id',
+  timescaledb.compress_orderby = 'content_offset_seconds ASC'
+);
+
+-- 4. Auto-compress chunks older than 30 days
+SELECT add_compression_policy('chat_messages', INTERVAL '30 days');
