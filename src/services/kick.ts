@@ -1,13 +1,12 @@
 import HLS from 'hls-parser';
 import dayjs from 'dayjs';
 import { createSession } from '../utils/cycletls.js';
-import { navigateToUrl } from '../utils/puppeteer-manager.js';
+import { fetchUrl } from '../utils/flaresolverr-client.js';
 import { extractErrorDetails, createErrorContext } from '../utils/error.js';
-import { sleep } from '../utils/delay.js';
 import { childLogger } from '../utils/logger.js';
 import { toHHMMSS } from '../utils/formatting.js';
 import { getKickStreamStatus } from './kick-live.js';
-import { KICK_API_TIMEOUT_MS, KICK_PAGE_DELAY_MS, KICK_API_BASE, KICK_SUBCATEGORIES_URL } from '../constants.js';
+import { KICK_API_TIMEOUT_MS, KICK_API_BASE, KICK_SUBCATEGORIES_URL } from '../constants.js';
 import { TenantContext } from '../types/context.js';
 import { withDbRetry } from '../db/client.js';
 import { LRUCache } from 'lru-cache';
@@ -101,50 +100,28 @@ export interface KickVod {
 }
 
 export async function getVod(channelName: string, vodId: string): Promise<KickVod> {
-  const result = await navigateToUrl(`${KICK_API_BASE}/api/v2/channels/${channelName}/videos`, {
-    isJsonUrl: true,
-  });
+  const result = await fetchUrl<KickVod[]>(`${KICK_API_BASE}/api/v2/channels/${channelName}/videos`);
 
   if (!result.success) {
     throw new Error('Failed to load Kick videos API after retries');
   }
 
-  const page = result.page;
+  const dataArray = result.data;
 
-  try {
-    await sleep(KICK_PAGE_DELAY_MS);
-
-    // Use extracted data from navigator if available
-    let dataArray: KickVod[] | undefined;
-    if ('data' in result && Array.isArray(result.data)) {
-      dataArray = result.data as KickVod[];
-    } else {
-      const content = await page.content();
-      try {
-        dataArray = JSON.parse(content) as KickVod[];
-      } catch (error) {
-        log.error(createErrorContext(error, { channelName }), `Failed to parse videos API for VOD ${vodId}`);
-        throw new Error(`VOD ${vodId} not found`);
-      }
-    }
-
-    if (!Array.isArray(dataArray)) {
-      throw new Error(`VOD ${vodId} not found`);
-    }
-
-    const video = dataArray.find((v): v is KickVod => {
-      if (!v || typeof v !== 'object') return false;
-      return v.id === Number(vodId);
-    });
-
-    if (!video) {
-      throw new Error(`VOD ${vodId} not found`);
-    }
-
-    return video;
-  } finally {
-    await page.close();
+  if (!Array.isArray(dataArray)) {
+    throw new Error(`VOD ${vodId} not found`);
   }
+
+  const video = dataArray.find((v): v is KickVod => {
+    if (!v || typeof v !== 'object') return false;
+    return v.id === Number(vodId);
+  });
+
+  if (!video) {
+    throw new Error(`VOD ${vodId} not found`);
+  }
+
+  return video;
 }
 
 /**
@@ -188,25 +165,13 @@ export async function getKickCategoryInfo(slug: string): Promise<Record<string, 
   }
 
   try {
-    const result = await navigateToUrl(`${KICK_SUBCATEGORIES_URL}/${slug}`, {
-      isJsonUrl: true,
+    const result = await fetchUrl<Record<string, unknown>>(`${KICK_SUBCATEGORIES_URL}/${slug}`, {
       timeoutMs: KICK_API_TIMEOUT_MS,
     });
 
     if (!result.success) return null;
 
-    const page = result.page;
-    await sleep(KICK_PAGE_DELAY_MS);
-
-    let response: Record<string, unknown> | undefined;
-    if ('data' in result && result.data !== undefined) {
-      response = result.data as Record<string, unknown>;
-    } else {
-      const content = await page.content();
-      response = JSON.parse(content);
-    }
-
-    await page.close();
+    const response = result.data;
     const cachedResult = response ?? null;
     if (cachedResult) {
       kickCategoryCache.set(slug, cachedResult as Record<string, unknown>);

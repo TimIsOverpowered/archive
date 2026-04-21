@@ -7,7 +7,7 @@ import { closeRedisClient } from './api/plugins/redis.plugin.js';
 import { extractErrorDetails } from './utils/error.js';
 import { startCloudflareIpRangesCron } from './cron/cloudflare-ip-ranges.js';
 import { getCachedRangeInfo, getCloudflareIpRanges } from './utils/cloudflare-ip-validator.js';
-import { releaseBrowser } from './utils/puppeteer-manager.js';
+
 import { registerPlatformStrategies } from './services/platforms/index.js';
 import { closeMetaClient } from './db/meta-client.js';
 
@@ -73,10 +73,6 @@ async function shutdown(signal: string) {
   }
 
   try {
-    // Release Puppeteer browser if instantiated (no-op if null)
-    await releaseBrowser();
-    getLogger().info('Puppeteer browser released');
-
     // Close HTTP server (waits for in-flight requests)
     await server.close();
     getLogger().info('HTTP server closed');
