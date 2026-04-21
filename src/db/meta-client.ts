@@ -26,7 +26,11 @@ export async function initMetaClient(): Promise<Kysely<MetaDB>> {
   }
 
   const metaDbName = extractDatabaseName(metaDbUrl);
-  const pool = new Pool({ connectionString: pgbouncerUrl, database: metaDbName });
+
+  const url = new URL(pgbouncerUrl);
+  url.pathname = `/${metaDbName}`;
+
+  const pool = new Pool({ connectionString: url.toString() });
   const dialect = new PostgresDialect({ pool });
   const db = new Kysely<MetaDB>({ dialect });
 

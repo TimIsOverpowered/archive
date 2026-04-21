@@ -60,9 +60,12 @@ class PoolManager {
         const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
         const connectionLimit = config.database.connectionLimit || 2;
         const tenantDbName = extractDatabaseName(config.database.url);
+
+        const url = new URL(pgbouncerUrl);
+        url.pathname = `/${tenantDbName}`;
+
         const pool = new PoolCtor({
-          connectionString: pgbouncerUrl,
-          database: tenantDbName,
+          connectionString: url.toString(),
           max: connectionLimit,
         });
         const dialect = new PostgresDialect({ pool });
