@@ -68,37 +68,48 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
       dbStatus = 'error';
     }
 
-    const [vodStats, uploadStats, chapterCount, thisMonthCount, uniqueGamesCount] = await Promise.all([
-      db
-        .selectFrom('vods')
-        .select((eb) => [
-          'platform',
-          eb.fn.count<number>('id').as('cnt'),
-          eb.fn.sum<number>('duration').as('dur'),
-          eb.fn.max('created_at').as('last'),
-        ])
-        .groupBy('platform')
-        .execute(),
-      db
-        .selectFrom('vod_uploads')
-        .select((eb) => [eb.fn.count<number>('upload_id').as('cnt')])
-        .where('status', '=', 'FAILED')
-        .executeTakeFirst(),
-      (
-        await db
-          .selectFrom('chapters')
-          .select((eb) => [eb.fn.count<number>('id').as('cnt')])
-          .executeTakeFirst()
-      )?.cnt ?? 0,
-      (
-        await db
+    const [vodStats, uploadStats, chapterCount, thisMonthCount, uniqueGamesCount, totalUploadsRow, lastUploadRow] =
+      await Promise.all([
+        db
           .selectFrom('vods')
-          .select((eb) => [eb.fn.count<number>('id').as('cnt')])
-          .where('created_at', '>=', thisMonthStart)
-          .executeTakeFirst()
-      )?.cnt ?? 0,
-      db.selectFrom('chapters').select('game_id').where('game_id', 'is not', null).groupBy('game_id').execute(),
-    ]);
+          .select((eb) => [
+            'platform',
+            eb.fn.count<number>('id').as('cnt'),
+            eb.fn.sum<number>('duration').as('dur'),
+            eb.fn.max('created_at').as('last'),
+          ])
+          .groupBy('platform')
+          .execute(),
+        db
+          .selectFrom('vod_uploads')
+          .select((eb) => [eb.fn.count<number>('upload_id').as('cnt')])
+          .where('status', '=', 'FAILED')
+          .executeTakeFirst(),
+        (
+          await db
+            .selectFrom('chapters')
+            .select((eb) => [eb.fn.count<number>('id').as('cnt')])
+            .executeTakeFirst()
+        )?.cnt ?? 0,
+        (
+          await db
+            .selectFrom('vods')
+            .select((eb) => [eb.fn.count<number>('id').as('cnt')])
+            .where('created_at', '>=', thisMonthStart)
+            .executeTakeFirst()
+        )?.cnt ?? 0,
+        db.selectFrom('chapters').select('game_id').where('game_id', 'is not', null).groupBy('game_id').execute(),
+        db
+          .selectFrom('vod_uploads')
+          .select((eb) => [eb.fn.count<number>('upload_id').as('cnt')])
+          .where('status', 'in', ['COMPLETED', 'FAILED'])
+          .executeTakeFirst(),
+        db
+          .selectFrom('vod_uploads')
+          .select((eb) => [eb.fn.max('created_at').as('maxCreatedAt')])
+          .where('status', '=', 'COMPLETED')
+          .executeTakeFirst(),
+      ]);
 
     const byPlatform: Record<string, number> = {};
     let totalDurationSeconds = 0;
@@ -113,29 +124,13 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
     }
 
     const failedUploads = Number(uploadStats?.cnt ?? 0);
-    const totalUploadsResult =
-      (
-        await db
-          .selectFrom('vod_uploads')
-          .select((eb) => [eb.fn.count<number>('upload_id').as('cnt')])
-          .where('status', 'in', ['COMPLETED', 'FAILED'])
-          .executeTakeFirst()
-      )?.cnt ?? 0;
-    const completedUploads = Number(totalUploadsResult) - failedUploads;
-    const lastUploadDate =
-      (
-        await db
-          .selectFrom('vod_uploads')
-          .select('created_at')
-          .where('status', '=', 'COMPLETED')
-          .orderBy('created_at', 'desc')
-          .limit(1)
-          .executeTakeFirst()
-      )?.created_at ?? null;
+    const totalUploadsCnt = Number(totalUploadsRow?.cnt ?? 0);
+    const completedUploads = totalUploadsCnt - failedUploads;
+    const lastUploadDate = lastUploadRow?.maxCreatedAt ?? null;
 
     const uploadSuccessRate =
-      totalUploadsResult > 0
-        ? Math.round((completedUploads / totalUploadsResult) * PERCENTAGE_PRECISION_MULTIPLIER) /
+      totalUploadsCnt > 0
+        ? Math.round((completedUploads / totalUploadsCnt) * PERCENTAGE_PRECISION_MULTIPLIER) /
           PERCENTAGE_PRECISION_DIVISOR
         : 0;
 

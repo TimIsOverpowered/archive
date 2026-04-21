@@ -3,7 +3,7 @@ import { getTenantConfig } from '../../config/loader.js';
 import { ensureClient } from '../../db/client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { TenantContext as BaseTenantContext } from '../../types/context.js';
-import { PLATFORMS, type Platform } from '../../types/platforms.js';
+import { type Platform } from '../../types/platforms.js';
 
 export interface TenantContext extends BaseTenantContext {
   platform?: Platform;
@@ -67,7 +67,7 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
     });
   }
 
-  (request as { tenant: TenantContext }).tenant = {
+  request.tenant = {
     tenantId,
     config,
     db: client,
@@ -80,7 +80,7 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
  * Register in preValidation hook
  */
 export async function platformValidationMiddleware(request: FastifyRequest, reply: FastifyReply) {
-  const requestPlatform = (request.body as { platform?: string }).platform as Platform;
+  const requestPlatform = (request.body as { platform?: string }).platform?.toLowerCase() as Platform;
 
   if (!requestPlatform) {
     return reply.status(400).send({
@@ -104,23 +104,9 @@ export async function platformValidationMiddleware(request: FastifyRequest, repl
     });
   }
 
-  if (requestPlatform === PLATFORMS.TWITCH && !config.twitch?.enabled) {
+  if (!config[requestPlatform]?.enabled) {
     return reply.status(400).send({
-      error: {
-        message: 'Twitch is not enabled for this tenant',
-        code: 'BAD_REQUEST',
-        statusCode: 400,
-      },
-    });
-  }
-
-  if (requestPlatform === PLATFORMS.KICK && !config.kick?.enabled) {
-    return reply.status(400).send({
-      error: {
-        message: 'Kick is not enabled for this tenant',
-        code: 'BAD_REQUEST',
-        statusCode: 400,
-      },
+      error: { message: `${requestPlatform} is not enabled for this tenant`, code: 'BAD_REQUEST', statusCode: 400 },
     });
   }
 

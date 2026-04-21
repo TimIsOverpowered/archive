@@ -1,6 +1,6 @@
 import { Processor, Job } from 'bullmq';
 import { sleep } from '../utils/delay.js';
-import { fetchComments, fetchNextComments } from '../services/twitch/index.js';
+import { fetchComments, fetchNextComments, type TwitchVideoCommentResponse } from '../services/twitch/index.js';
 import { initRichAlert, resetFailures, updateAlert } from '../utils/discord-alerts.js';
 import type { ChatDownloadJob, ChatDownloadResult } from './jobs/queues.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
@@ -18,7 +18,7 @@ interface ChatProcessorState {
   tenantId: string;
   dbId: number;
   vodId: string;
-  platform: string;
+  platform: typeof PLATFORMS.TWITCH;
   duration: number;
   log: ReturnType<typeof createAutoLogger>;
   chatAlerts: ReturnType<typeof createChatWorkerAlerts>;
@@ -87,7 +87,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
     tenantId,
     dbId,
     vodId,
-    platform: platform as 'twitch',
+    platform,
     duration,
     log,
     chatAlerts,
@@ -133,6 +133,44 @@ async function initChatAlert(
   return await initRichAlert(alertData);
 }
 
+async function countChatMessages(db: Kysely<StreamerDB>, dbId: number): Promise<number> {
+  const result = await db
+    .selectFrom('chat_messages')
+    .select((eb) => [eb.fn.count<number>('id').as('cnt')])
+    .where('vod_id', '=', dbId)
+    .executeTakeFirst();
+  return Number(result?.cnt ?? 0);
+}
+
+async function isCompleteByOffset(
+  db: Kysely<StreamerDB>,
+  dbId: number,
+  effectiveOffset: number,
+  duration: number
+): Promise<number | null> {
+  if (duration !== 0 && effectiveOffset >= duration) {
+    return await countChatMessages(db, dbId);
+  }
+  return null;
+}
+
+async function isCompleteByLastMessage(
+  db: Kysely<StreamerDB>,
+  dbId: number,
+  vodId: string,
+  effectiveOffset: number,
+  lastMessageId: string | undefined,
+  tenantId: string
+): Promise<number | null> {
+  if (!lastMessageId) return null;
+  const rawPage = await fetchComments(vodId, effectiveOffset, tenantId);
+  if (!rawPage?.comments) return null;
+  const edges = extractEdges(rawPage.comments);
+  const lastFetchedMessageId = edges[edges.length - 1]?.node?.id;
+  if (lastFetchedMessageId !== lastMessageId) return null;
+  return await countChatMessages(db, dbId);
+}
+
 async function checkAlreadyComplete(
   db: Kysely<StreamerDB>,
   dbId: number,
@@ -145,56 +183,60 @@ async function checkAlreadyComplete(
   messageId: string,
   log: ReturnType<typeof createAutoLogger>
 ): Promise<ChatDownloadResult | null> {
-  if (duration !== 0 && effectiveOffset >= duration) {
-    const totalMessages = Number(
-      (
-        await db
-          .selectFrom('chat_messages')
-          .select((eb) => [eb.fn.count<number>('id').as('cnt')])
-          .where('vod_id', '=', dbId)
-          .executeTakeFirst()
-      )?.cnt ?? 0
-    );
+  const msgCountByOffset = await isCompleteByOffset(db, dbId, effectiveOffset, duration);
+  if (msgCountByOffset !== null) {
     log.info(
-      { vodId, effectiveOffset, duration, totalMessages },
+      { vodId, effectiveOffset, duration, msgCountByOffset },
       'Chat download already complete (offset exceeds duration)'
     );
     resetFailures(tenantId);
     void updateAlert(
       messageId,
-      chatAlerts.alreadyComplete(tenantId, vodId, PLATFORMS.TWITCH, totalMessages, effectiveOffset)
+      chatAlerts.alreadyComplete(tenantId, vodId, PLATFORMS.TWITCH, msgCountByOffset, effectiveOffset)
     );
-    return { success: true, totalMessages, skipped: true };
+    return { success: true, totalMessages: msgCountByOffset, skipped: true };
   }
 
-  if (lastMessageId) {
-    const rawPage = await fetchComments(vodId, effectiveOffset, tenantId);
-    if (rawPage?.comments) {
-      const edges = extractEdges(rawPage.comments);
-      const lastFetchedMessageId = edges[edges.length - 1]?.node?.id;
-
-      if (lastFetchedMessageId === lastMessageId) {
-        const totalMessages = Number(
-          (
-            await db
-              .selectFrom('chat_messages')
-              .select((eb) => [eb.fn.count<number>('id').as('cnt')])
-              .where('vod_id', '=', dbId)
-              .executeTakeFirst()
-          )?.cnt ?? 0
-        );
-        log.info({ vodId, lastMessageId, totalMessages }, 'Chat download already complete');
-        resetFailures(tenantId);
-        void updateAlert(
-          messageId,
-          chatAlerts.alreadyComplete(tenantId, vodId, PLATFORMS.TWITCH, totalMessages, effectiveOffset)
-        );
-        return { success: true, totalMessages, skipped: true };
-      }
-    }
+  const msgCountByLastMessage = await isCompleteByLastMessage(
+    db,
+    dbId,
+    vodId,
+    effectiveOffset,
+    lastMessageId,
+    tenantId
+  );
+  if (msgCountByLastMessage !== null) {
+    log.info({ vodId, lastMessageId, msgCountByLastMessage }, 'Chat download already complete');
+    resetFailures(tenantId);
+    void updateAlert(
+      messageId,
+      chatAlerts.alreadyComplete(tenantId, vodId, PLATFORMS.TWITCH, msgCountByLastMessage, effectiveOffset)
+    );
+    return { success: true, totalMessages: msgCountByLastMessage, skipped: true };
   }
 
   return null;
+}
+
+async function* paginateChatComments(
+  vodId: string,
+  offset: number,
+  tenantId: string
+): AsyncGenerator<TwitchVideoCommentResponse> {
+  let page = await fetchComments(vodId, offset, tenantId);
+  let lastCursor: string | null = null;
+
+  while (page && typeof page === 'object') {
+    yield page;
+    const comments = page.comments;
+    if (!comments) break;
+    const edges = extractEdges(comments);
+    const cursor = edges.at(-1)?.cursor ?? null;
+    if (!cursor || cursor === lastCursor) break;
+    lastCursor = cursor;
+    await sleep(CHAT_RATE_LIMIT_MS);
+    page = await fetchNextComments(vodId, cursor, tenantId);
+  }
 }
 
 async function processChatDownload(
@@ -209,14 +251,7 @@ async function processChatDownload(
 
   log.info({ vodId, effectiveOffset }, 'Starting chat download');
 
-  let rawPage = await fetchComments(vodId, effectiveOffset, tenantId);
-  log.debug({ vodId, effectiveOffset }, '[Chat] Initial comments fetch completed');
-
-  let lastCursor: string | null = null;
-
-  while (true) {
-    if (!rawPage || typeof rawPage !== 'object') break;
-
+  for await (const rawPage of paginateChatComments(vodId, effectiveOffset, tenantId)) {
     const commentsObj = rawPage.comments;
 
     if (!commentsObj) throw new Error('No comments object found');
@@ -226,10 +261,7 @@ async function processChatDownload(
     if (edges.length === 0) {
       log.warn({ vodId, effectiveOffset }, 'No chat messages found for VOD');
       resetFailures(tenantId);
-      void updateAlert(
-        messageId,
-        chatAlerts.noMessages(tenantId, vodId, platform as 'twitch' | 'kick', effectiveOffset)
-      );
+      void updateAlert(messageId, chatAlerts.noMessages(tenantId, vodId, platform, effectiveOffset));
       return { totalMessages: 0, batchCount: 0 };
     }
 
@@ -272,18 +304,9 @@ async function processChatDownload(
       totalMessages = result.totalMessages;
       batchCount = result.batchCount;
     }
-
-    const pageCursor = edges[edges.length - 1]?.cursor ?? null;
-
-    if (!pageCursor || pageCursor === lastCursor) {
-      log.info({ vodId }, 'Reached end of chat stream');
-      break;
-    }
-
-    lastCursor = pageCursor;
-    await sleep(CHAT_RATE_LIMIT_MS);
-    rawPage = await fetchNextComments(vodId, pageCursor, tenantId);
   }
+
+  log.info({ vodId }, 'Reached end of chat stream');
 
   if (batchBuffer.length > 0) {
     const result = await flushChatBatch({
