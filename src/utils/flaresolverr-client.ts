@@ -2,7 +2,7 @@ import { extractErrorDetails } from './error.js';
 import { childLogger } from './logger.js';
 import { getFlareSolverrBaseUrl, getFlareSolverrSessionTtl } from '../config/env-accessors.js';
 import { FLARESOLVERR_TIMEOUT_MS } from '../constants.js';
-import { sleep, getRetryDelay } from './delay.js';
+import { retryWithBackoff } from './retry.js';
 
 const log = childLogger({ module: 'flaresolverr-client' });
 
@@ -45,76 +45,83 @@ interface FlareSolverrResponse {
   message?: string;
 }
 
-export async function fetchUrl<T = unknown>(url: string, options?: FetchUrlOptions): Promise<FetchUrlResult<T>> {
+async function fetchFromFlareSolverr(
+  url: string,
+  timeoutMs: number,
+  sessionTTL: number
+): Promise<FetchUrlResult<unknown>> {
   const baseURL = getFlareSolverrBaseUrl();
+
+  const response = await fetch(`${baseURL}/v1`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      cmd: 'request.get',
+      url,
+      maxTimeout: timeoutMs,
+      session: 'archive-session',
+      session_ttl_minutes: Math.ceil(sessionTTL / 60),
+    }),
+  });
+
+  const body: FlareSolverrResponse = await response.json();
+
+  if (body.error || body.message) {
+    throw new Error(body.error || body.message);
+  }
+
+  const solution = body.solution;
+  const status = solution.status;
+
+  if (status >= 400) {
+    throw new Error(`HTTP ${status}`);
+  }
+
+  const content = solution.response;
+
+  let data: unknown;
+  try {
+    data = JSON.parse(content);
+  } catch {
+    if (content.startsWith('{') || content.startsWith('[')) {
+      try {
+        data = JSON.parse(content);
+      } catch {
+        throw new Error('Failed to parse response as JSON');
+      }
+    } else {
+      throw new Error('Response is not valid JSON (possible CAPTCHA)');
+    }
+  }
+
+  return { success: true, data, status };
+}
+
+export async function fetchUrl<T = unknown>(url: string, options?: FetchUrlOptions): Promise<FetchUrlResult<T>> {
   const timeoutMs = options?.timeoutMs ?? FLARESOLVERR_TIMEOUT_MS;
   const maxRetries = options?.maxRetries ?? 3;
   const sessionTTL = getFlareSolverrSessionTtl();
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await fetch(`${baseURL}/v1`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cmd: 'request.get',
-          url,
-          maxTimeout: timeoutMs,
-          session: 'kick-session',
-          session_ttl_minutes: Math.ceil(sessionTTL / 60),
-        }),
-      });
+  try {
+    const result = await retryWithBackoff<FetchUrlResult<T>>(
+      () => fetchFromFlareSolverr(url, timeoutMs, sessionTTL) as Promise<FetchUrlResult<T>>,
+      { attempts: maxRetries + 1, baseDelayMs: 2000, maxDelayMs: 30_000 }
+    );
 
-      const body: FlareSolverrResponse = await response.json();
+    return result;
+  } catch (error) {
+    const details = extractErrorDetails(error);
+    const message = details.message.toLowerCase();
 
-      if (body.error || body.message) {
-        if (attempt === maxRetries) {
-          return { success: false, error: body.error || body.message!, code: 'NETWORK_ERROR' };
-        }
-        continue;
-      }
-
-      const solution = body.solution;
-      const status = solution.status;
-
-      if (status >= 400) {
-        if (attempt === maxRetries) {
-          return { success: false, error: `HTTP ${status}`, code: 'HTTP_ERROR' };
-        }
-        continue;
-      }
-
-      const content = solution.response;
-
-      let data: T;
-      try {
-        data = JSON.parse(content) as T;
-      } catch {
-        if (content.startsWith('{') || content.startsWith('[')) {
-          try {
-            data = JSON.parse(content) as T;
-          } catch {
-            return { success: false, error: 'Failed to parse response as JSON', code: 'INVALID_JSON_RESPONSE' };
-          }
-        } else {
-          return { success: false, error: 'Response is not valid JSON (possible CAPTCHA)', code: 'CAPTCHA_DETECTED' };
-        }
-      }
-
-      return { success: true, data, status };
-    } catch (error) {
-      const details = extractErrorDetails(error);
-      if (attempt === maxRetries) {
-        return { success: false, error: details.message, code: 'NETWORK_ERROR' };
-      }
+    if (message.includes('json') || message.includes('captcha')) {
+      return { success: false, error: details.message, code: 'INVALID_JSON_RESPONSE' };
     }
 
-    if (attempt < maxRetries) {
-      const delayMs = getRetryDelay(attempt, 2000, 3, true);
-      log.trace({ attempt, delayMs }, 'Applying backoff delay before next retry');
-      await sleep(delayMs);
+    if (message.startsWith('http')) {
+      return { success: false, error: details.message, code: 'HTTP_ERROR' };
     }
+
+    log.trace({ error: details.message }, 'FlareSolverr request failed');
+    return { success: false, error: details.message, code: 'NETWORK_ERROR' };
   }
-
-  return { success: false, error: 'MAX_RETRIES_EXCEEDED', code: 'MAX_RETRIES_EXCEEDED' };
 }
