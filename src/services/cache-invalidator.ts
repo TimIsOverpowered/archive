@@ -97,8 +97,11 @@ export function registerCacheSubscriber(fastify: FastifyInstance): void {
   void subClient.subscribe(CACHE_CHANNEL);
 
   fastify.addHook('onClose', async () => {
-    await subClient.unsubscribe(CACHE_CHANNEL);
-    await subClient.quit();
+    try {
+      await subClient.unsubscribe(CACHE_CHANNEL);
+    } finally {
+      await subClient.quit();
+    }
     log.debug('Cache subscriber disconnected');
   });
 }
