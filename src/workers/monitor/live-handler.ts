@@ -278,6 +278,7 @@ async function handleAlreadyLiveStream(
     platformUserId,
     platformUsername,
     startedAt: existingVod.started_at ?? new Date(streamStatus.startedAt),
+    skipValidation: true,
   });
 }
 
@@ -340,16 +341,19 @@ export async function enqueueLiveHlsDownload(params: {
   platformUsername?: string;
   startedAt: Date;
   sourceUrl?: string;
+  skipValidation?: boolean;
 }): Promise<void> {
   const log = createAutoLogger(params.tenantId);
 
-  const validationResult = await validateVodPath(params.tenantId);
-  if (!validationResult.valid) {
-    log.error(
-      { vodId: params.vodId, platform: params.platform },
-      `[Monitor] Aborting download queue - VOD path validation failed`
-    );
-    return;
+  if (!params.skipValidation) {
+    const validationResult = await validateVodPath(params.tenantId);
+    if (!validationResult.valid) {
+      log.error(
+        { vodId: params.vodId, platform: params.platform },
+        `[Monitor] Aborting download queue - VOD path validation failed`
+      );
+      return;
+    }
   }
 
   const queue = getLiveDownloadQueue();

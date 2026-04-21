@@ -16,9 +16,9 @@ export async function startMonitorService(): Promise<void> {
 }
 
 export async function stopMonitorService(): Promise<void> {
-  getLogger().info('[Monitor] Received shutdown signal. Cleaning up...');
-
-  getLogger().info('[Monitor] Shutdown complete.');
+  // Repeat jobs are persisted in Redis and re-registered on next startup.
+  // No explicit cleanup is needed here.
+  getLogger().info('[Monitor] Monitor service stopped.');
 }
 
 export { removeMonitorRepeatJob };

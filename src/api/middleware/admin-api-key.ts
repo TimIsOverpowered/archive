@@ -13,8 +13,8 @@ declare module 'fastify' {
 }
 
 export default async function adminApiKeyMiddleware(request: FastifyRequest, reply: FastifyReply) {
-  const authHeader = request.headers.authorization || request.headers['Authorization'];
-  const apiKeyHeader = request.headers['x-api-key'] || request.headers['X-Api-Key'] || request.headers['X-API-Key'];
+  const authHeader = request.headers.authorization;
+  const apiKeyHeader = request.headers['x-api-key'];
 
   let apiKey: string | undefined;
 
