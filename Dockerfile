@@ -20,7 +20,7 @@ RUN npm run build
 # ============================================
 # Stage 2: Runtime
 # ============================================
-FROM node:22-bookworm-slim AS runtime
+FROM node:24-bookworm-slim AS runtime
 
 # Install dumb-init for proper signal handling and zombie reaping
 # Also install Chromium dependencies
