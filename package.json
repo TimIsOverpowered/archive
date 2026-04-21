@@ -6,18 +6,13 @@
   "private": true,
   "type": "module",
   "main": "src",
-  "keywords": [
-    "feathers"
-  ],
   "author": {
     "name": "TimIsOverpowered"
   },
   "contributors": [],
   "bugs": {},
   "directories": {
-    "lib": "src",
-    "test": "test/",
-    "config": "config/"
+    "tests": "tests/"
   },
   "engines": {
     "node": ">=24.0.0",
