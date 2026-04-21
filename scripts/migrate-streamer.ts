@@ -579,12 +579,8 @@ const main = async () => {
         const vods = await oldPool.query('SELECT * FROM vods ORDER BY "createdAt" ASC');
         vodIdMap = new Map<string, number>();
 
-        for (let i = 0; i < vods.rows.length; i++) {
-          const vod = vods.rows[i];
+        for (const vod of vods.rows) {
           const legacyVodId = vod.id;
-          const newId = i + 1;
-
-          vodIdMap.set(legacyVodId, newId);
 
           const platform = vod.platform;
           const title = vod.title;
@@ -593,11 +589,15 @@ const main = async () => {
           const streamId = vod.stream_id;
           const vodStartedAt = streamId ? streamsMap.get(streamId) || null : null;
 
-          await schemaClient.query(
-            `INSERT INTO "vods_new" (id, vod_id, platform, title, duration, stream_id, started_at, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [newId, legacyVodId, platform, title, duration, streamId, vodStartedAt, vod.createdAt || new Date()]
+          const insertResult = await schemaClient.query(
+            `INSERT INTO "vods_new" (vod_id, platform, title, duration, stream_id, started_at, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             RETURNING id`,
+            [legacyVodId, platform, title, duration, streamId, vodStartedAt, vod.createdAt || new Date()]
           );
+          const newId = insertResult.rows[0].id;
+
+          vodIdMap.set(legacyVodId, newId);
 
           if (vod.youtube && Array.isArray(vod.youtube) && vod.youtube.length > 0) {
             for (const upload of vod.youtube) {
