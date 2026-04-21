@@ -28,6 +28,14 @@
 
 module.exports = {
   apps: [
+    // === PREREQUISITE: PgBouncer (Required — Connection Pooler) ===
+    // Install: sudo apt install pgbouncer
+    // Configure: /etc/pgbouncer/pgbouncer.ini (see pgbouncer.ini in repo root)
+    // Auth file: /etc/pgbouncer/userlist.txt
+    // Pool mode: transaction | Listen: 127.0.0.1:6432
+    // Docker: docker run -d --name pgbouncer -p 6432:6432 -v /path/to/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini postgres
+    // PGBOUNCER_URL in .env is required — all DB connections route through it
+    //
     // === APP #1: HTTP API Server (Fastify/Feathers REST endpoints) ===
     {
       name: 'archive-api', // PM2 app identifier

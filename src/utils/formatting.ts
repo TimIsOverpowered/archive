@@ -33,3 +33,8 @@ export function parseTwitchDuration(durationStr: string): number {
 export function humanizeDuration(seconds: number): string {
   return dayjs.duration(seconds, 'seconds').humanize(true);
 }
+
+export function extractDatabaseName(connectionString: string): string {
+  const match = connectionString.match(/\/([^/?]+)(?:\?|$)/);
+  return match ? match[1] : 'postgres';
+}

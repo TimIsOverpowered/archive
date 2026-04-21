@@ -1,8 +1,10 @@
 import { Pool } from 'pg';
 import { Kysely, PostgresDialect } from 'kysely';
 import { TenantConfig } from '../config/types.js';
+import { getBaseConfig } from '../config/env.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
+import { extractDatabaseName } from '../utils/formatting.js';
 import { DB_POOL_IDLE_TIMEOUT_MS, DB_POOL_MAX_CLIENTS, DB_POOL_CLEANUP_INTERVAL_MS } from '../constants.js';
 import { sleep } from '../utils/delay.js';
 import type { StreamerDB } from './streamer-types.js';
@@ -55,9 +57,12 @@ class PoolManager {
     const creationPromise = (async (): Promise<Kysely<StreamerDB>> => {
       let db: Kysely<StreamerDB>;
       try {
-        const connectionLimit = config.database.connectionLimit || 5;
+        const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
+        const connectionLimit = config.database.connectionLimit || 2;
+        const tenantDbName = extractDatabaseName(config.database.url);
         const pool = new PoolCtor({
-          connectionString: config.database.url,
+          connectionString: pgbouncerUrl,
+          database: tenantDbName,
           max: connectionLimit,
         });
         const dialect = new PostgresDialect({ pool });

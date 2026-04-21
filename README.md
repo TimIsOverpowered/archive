@@ -7,6 +7,7 @@ Automated VOD upload from Twitch to YouTube after streaming.
 - Node.js 20+
 - PostgreSQL 14+
 - Redis 6+
+- PgBouncer (required — connection pooler on port 6432)
 - FlareSolverr (for Kick stream detection and VOD fetching)
 
 ## Database Setup
@@ -96,10 +97,41 @@ curl -X POST 'http://localhost:8191/v1' \
   -d '{"cmd":"status"}'
 ```
 
+## PgBouncer Setup
+
+PgBouncer is required as the connection pooler between the application and PostgreSQL. It listens on `127.0.0.1:6432` in `transaction` pool mode.
+
+**Installation:**
+
+```bash
+# Debian/Ubuntu
+sudo apt install pgbouncer
+
+# Docker
+docker run -d \
+  --name=pgbouncer \
+  -p 6432:6432 \
+  -v /path/to/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini \
+  -v /path/to/userlist.txt:/etc/pgbouncer/userlist.txt \
+  --restart unless-stopped \
+  postgres
+```
+
+**Configuration:**
+
+- `pgbouncer.ini` — see `pgbouncer.ini` in repo root for a reference config
+- `userlist.txt` — PgBouncer auth file (format: `"username"="md5hash"` or `"username"="password"` depending on `auth_type`)
+- `listen_addr = 127.0.0.1` — never expose PgBouncer externally
+- `pool_mode = transaction` — connections released after each transaction
+- Wildcard `* = host=<PG_HOST> port=5432` in `[databases]` for dynamic tenant DBs
+
+Set `PGBOUNCER_URL` in your environment variables (e.g., `postgresql://archive@localhost:6432/archive`).
+
 ## Environment Variables
 
 See `.env.example` for all available configuration options. Key variables:
 
+- `PGBOUNCER_URL`: PgBouncer connection string (required, e.g., `postgresql://archive@localhost:6432/archive`)
 - `META_DATABASE_URL`: Connection string for the meta database
 - `REDIS_URL`: Redis connection for caching and job queues
 - `ENCRYPTION_MASTER_KEY`: 64-character hex string for encrypting sensitive data

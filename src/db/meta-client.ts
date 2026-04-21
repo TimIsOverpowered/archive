@@ -3,6 +3,7 @@ import { Kysely, PostgresDialect } from 'kysely';
 import type { MetaDB } from './meta-types.js';
 import { getLogger } from '../utils/logger.js';
 import { getBaseConfig } from '../config/env.js';
+import { extractDatabaseName } from '../utils/formatting.js';
 
 const globalForMeta = globalThis as unknown as { metaDb: Kysely<MetaDB> | undefined };
 
@@ -16,14 +17,16 @@ let _metaDb: Kysely<MetaDB> | null = null;
 export async function initMetaClient(): Promise<Kysely<MetaDB>> {
   if (_metaDb) return _metaDb;
 
-  const url = getBaseConfig().META_DATABASE_URL;
+  const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
+  const metaDbUrl = getBaseConfig().META_DATABASE_URL;
 
   if (globalForMeta.metaDb) {
     _metaDb = globalForMeta.metaDb;
     return _metaDb;
   }
 
-  const pool = new Pool({ connectionString: url });
+  const metaDbName = extractDatabaseName(metaDbUrl);
+  const pool = new Pool({ connectionString: pgbouncerUrl, database: metaDbName });
   const dialect = new PostgresDialect({ pool });
   const db = new Kysely<MetaDB>({ dialect });
 
