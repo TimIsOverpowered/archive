@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import type { Kysely } from 'kysely';
-import type { StreamerDB, InsertableVods } from '../../db/streamer-types';
+import type { StreamerDB, InsertableVods, SelectableVods } from '../../db/streamer-types';
 import type { TenantConfig } from '../../config/types.js';
 import type { Platform } from '../../types/platforms.js';
 import { getStrategy, type PlatformStreamStatus, type PlatformVodMetadata } from '../../services/platforms/index.js';
@@ -19,7 +19,8 @@ export async function handlePlatformLiveCheck(
   db: StreamerDbClient,
   tenantId: string,
   platform: Platform,
-  config: TenantConfig
+  config: TenantConfig,
+  activeLiveVod: SelectableVods | null = null
 ): Promise<void> {
   const log = createAutoLogger(tenantId);
 
@@ -49,7 +50,7 @@ export async function handlePlatformLiveCheck(
   }
 
   if (!streamStatus) {
-    await handleOfflineStream(db, tenantId, platform, platformUsername || undefined, config.displayName, log);
+    await handleOfflineStream(db, tenantId, platform, platformUsername || undefined, config.displayName, log, activeLiveVod);
     return;
   }
 
@@ -72,16 +73,10 @@ async function handleOfflineStream(
   platform: Platform,
   username: string | undefined,
   displayName: string | undefined,
-  log: ReturnType<typeof createAutoLogger>
+  log: ReturnType<typeof createAutoLogger>,
+  activeLiveVod: SelectableVods | null = null
 ): Promise<void> {
   log.debug({ username }, '[Monitor]: Streamer is OFFLINE');
-
-  const activeLiveVod = await db
-    .selectFrom('vods')
-    .selectAll()
-    .where('platform', '=', platform)
-    .where('is_live', '=', true)
-    .executeTakeFirst();
 
   if (activeLiveVod) {
     log.info({ vodId: activeLiveVod.vod_id }, '[Monitor]: Marking VOD as ended');
