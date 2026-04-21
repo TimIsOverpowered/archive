@@ -67,8 +67,12 @@ NODE_ENV=development npx tsx scripts/migrate-streamer.ts
 FlareSolverr is required for Kick stream detection and VOD fetching. Run it as a Docker container:
 
 ```bash
-docker run -d --name flaresolverr -p 8191:8191 \
-  -e LOG_LEVEL=info ghcr.io/flaresolverr/flaresolverr:latest
+docker run -d \
+  --name=flaresolverr \
+  -p 8191:8191 \
+  -e LOG_LEVEL=info \
+  --restart unless-stopped \
+  ghcr.io/flaresolverr/flaresolverr:latest
 ```
 
 Or install standalone:
