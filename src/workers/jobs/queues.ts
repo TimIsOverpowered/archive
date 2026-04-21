@@ -126,6 +126,14 @@ export interface DmcaProcessingSuccessResult {
 
 export type DmcaProcessingResult = DmcaProcessingSuccessResult;
 
+export type QueueJob =
+  | LiveDownloadJob
+  | StandardVodJob
+  | ChatDownloadJob
+  | YoutubeUploadJob
+  | DmcaProcessingJob
+  | MonitorJob;
+
 export const QUEUE_NAMES = {
   VOD_LIVE: 'vod_live',
   VOD_STANDARD: 'vod_standard',
@@ -142,8 +150,7 @@ export const defaultJobOptions = {
   removeOnFail: true,
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const queueCache = new Map<string, Queue<any, any, string>>();
+const queueCache = new Map<string, Queue<QueueJob, QueueJob, string>>();
 
 function normalizeOptions(options: unknown): string {
   if (!options) return '';
@@ -180,7 +187,7 @@ export function getQueue<TData = unknown, TFinishedData = unknown>(
     defaultJobOptions: jobOptions || defaultJobOptions,
   });
 
-  queueCache.set(cacheKey, queue);
+  queueCache.set(cacheKey, queue as Queue<QueueJob, QueueJob, string>);
   return queue;
 }
 

@@ -23,8 +23,6 @@ interface PgPoolEntry {
 }
 
 class PoolManager {
-  static _instanceCount = 0;
-  readonly _id = ++PoolManager._instanceCount;
   private pools = new Map<string, PgPoolEntry>();
   private cleanupIntervalId: NodeJS.Timeout | null = null;
   private creationLocks = new Map<string, Promise<Kysely<StreamerDB>>>();
