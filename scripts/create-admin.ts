@@ -31,7 +31,6 @@ async function createAdminUser(username: string): Promise<void> {
   // Insert into database
   await createAdmin({
     username,
-    api_key: apiKey,
     api_key_hash: apikeyHash,
   });
 
