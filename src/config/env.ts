@@ -17,6 +17,7 @@ export const BaseConfigSchema = z.object({
   DISABLE_REDIS_CACHE: z.preprocess((val) => String(val).toLowerCase() === 'true', z.boolean()).default(false),
   FLARESOLVERR_CONCURRENCY: z.coerce.number().int().positive().default(3),
   CONFIG_CACHE_TTL: z.coerce.number().int().positive().default(3600),
+  PGBOUNCER_URL: z.string().min(1, 'PGBOUNCER_URL is required'),
 });
 
 // API-specific schema (extends base + API-only fields)
