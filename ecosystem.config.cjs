@@ -1,9 +1,26 @@
 /**
  * PM2 Ecosystem Configuration for Archive API
  *
+ * Prerequisites:
+ * - FlareSolverr must be running on FLOARESOLVERR_BASE_URL (default: http://localhost:8191)
+ *   See: https://github.com/FlareSolverr/FlareSolverr
+ *
+ * Docker:
+ *   docker run -d --name flaresolverr -p 8191:8191 \
+ *     -e LOG_LEVEL=info ghcr.io/flaresolverr/flaresolverr:latest
+ *
+ * Non-Docker (Linux):
+ *   sudo apt install -y chromium-browser xvfb
+ *   pip install flaresolverr
+ *   flaresolverr --port 8191
+ *
+ * Non-Docker (Windows):
+ *   Download from https://github.com/FlareSolverr/FlareSolverr/releases
+ *   Run: flaresolverr.exe --port 8191
+ *
  * Defines two app instances running under a single PM2 process manager (Linux production server):
  * 1. archive-api - HTTP REST endpoints (Fastify/Feathers)
- * 2. archive-worker - Background job processors + stream detection monitoring (BullMQ + Puppeteer)
+ * 2. archive-worker - Background job processors + stream detection monitoring (BullMQ + FlareSolverr via HTTP)
  *
  * Deployment on Linux:
  *   npm install && npm run start:pm2
@@ -42,7 +59,7 @@ module.exports = {
       instances: 1, // Single instance per app
       exec_mode: 'fork', // Standard process mode
 
-      kill_timeout: 10000, // Allow Puppeteer 10s to shutdown gracefully before PM2 force-kills
+      kill_timeout: 10000, // Allow graceful shutdown before PM2 force-kills
 
       merge_logs: true, // Combine stdout + stderr into single log file
 
@@ -50,7 +67,7 @@ module.exports = {
       error_file: './logs/api-error.log', // Uncaught errors and exceptions
     },
 
-    // === APP #2: Background Workers + Stream Monitoring (BullMQ queues + Puppeteer for VOD/Chat downloads, YouTube uploads, and live stream detection) ===
+    // === APP #2: Background Workers + Stream Monitoring (BullMQ queues + FlareSolverr for Kick API access) ===
     {
       name: 'archive-worker', // Separate PM2 app identifier
 
@@ -71,14 +88,14 @@ module.exports = {
         LOG_LEVEL: 'debug', // Can match or differ from API server level
       },
 
-      max_memory_restart: '1G', // Higher limit needed - Puppeteer browsers + video processing are memory-intensive (2x API)
+      max_memory_restart: '1G', // Higher limit needed - video processing is memory-intensive (2x API)
 
       autorestart: true, // Auto-recover on crashes
       watch: false, // Disable file watching in production
       instances: 1,
       exec_mode: 'fork',
 
-      kill_timeout: 10000, // Allow Puppeteer 10s to shutdown gracefully before PM2 force-kills
+      kill_timeout: 10000, // Allow graceful shutdown before PM2 force-kills
 
       merge_logs: true, // Combine streams for cleaner log viewing
 

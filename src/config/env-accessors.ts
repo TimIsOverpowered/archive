@@ -58,52 +58,49 @@ export function getDiscordAlertsEnabled(): boolean {
   return _discordAlertsEnabled;
 }
 
-// --- PUPPETEER_MEMORY_LIMIT_MB ---
-const PuppeteerMemoryLimitSchema = z.coerce.number().int().positive();
+// --- FLOARESOLVERR_BASE_URL ---
+let _flaresolverrBaseUrl: string | null = null;
 
-let _puppeteerMemoryLimitMb: number | null = null;
-
-export function getPuppeteerMemoryLimitMb(): number {
-  if (_puppeteerMemoryLimitMb !== null) return _puppeteerMemoryLimitMb;
-  const parsed = PuppeteerMemoryLimitSchema.safeParse(process.env.PUPPETEER_MEMORY_LIMIT_MB);
-  _puppeteerMemoryLimitMb = parsed.success ? parsed.data : 512;
-  return _puppeteerMemoryLimitMb;
+export function getFlareSolverrBaseUrl(): string {
+  if (_flaresolverrBaseUrl !== null) return _flaresolverrBaseUrl;
+  _flaresolverrBaseUrl = process.env.FLOARESOLVERR_BASE_URL || 'http://localhost:8191';
+  return _flaresolverrBaseUrl;
 }
 
-// --- PUPPETEER_SHUTDOWN_TIMEOUT_MS ---
-const PuppeteerShutdownTimeoutSchema = z.coerce.number().int().positive();
+// --- FLOARESOLVERR_TIMEOUT_MS ---
+const FlareSolverrTimeoutSchema = z.coerce.number().int().positive();
 
-let _puppeteerShutdownTimeoutMs: number | null = null;
+let _flaresolverrTimeoutMs: number | null = null;
 
-export function getPuppeteerShutdownTimeoutMs(): number {
-  if (_puppeteerShutdownTimeoutMs !== null) return _puppeteerShutdownTimeoutMs;
-  const parsed = PuppeteerShutdownTimeoutSchema.safeParse(process.env.PUPPETEER_SHUTDOWN_TIMEOUT_MS);
-  _puppeteerShutdownTimeoutMs = parsed.success ? parsed.data : 5000;
-  return _puppeteerShutdownTimeoutMs;
+export function getFlareSolverrTimeoutMs(): number {
+  if (_flaresolverrTimeoutMs !== null) return _flaresolverrTimeoutMs;
+  const parsed = FlareSolverrTimeoutSchema.safeParse(process.env.FLOARESOLVERR_TIMEOUT_MS);
+  _flaresolverrTimeoutMs = parsed.success ? parsed.data : 300_000;
+  return _flaresolverrTimeoutMs;
 }
 
-// --- PUPPETEER_WARNING_THRESHOLD_PCT ---
-const PuppeteerWarningThresholdSchema = z.coerce.number().int().positive();
+// --- FLOARESOLVERR_SESSION_TTL ---
+const FlareSolverrSessionTtlSchema = z.coerce.number().int().positive();
 
-let _puppeteerWarningThresholdPct: number | null = null;
+let _flaresolverrSessionTtl: number | null = null;
 
-export function getPuppeteerWarningThresholdPct(): number {
-  if (_puppeteerWarningThresholdPct !== null) return _puppeteerWarningThresholdPct;
-  const parsed = PuppeteerWarningThresholdSchema.safeParse(process.env.PUPPETEER_WARNING_THRESHOLD_PCT);
-  _puppeteerWarningThresholdPct = parsed.success ? parsed.data : 85;
-  return _puppeteerWarningThresholdPct;
+export function getFlareSolverrSessionTtl(): number {
+  if (_flaresolverrSessionTtl !== null) return _flaresolverrSessionTtl;
+  const parsed = FlareSolverrSessionTtlSchema.safeParse(process.env.FLOARESOLVERR_SESSION_TTL);
+  _flaresolverrSessionTtl = parsed.success ? parsed.data : 3600;
+  return _flaresolverrSessionTtl;
 }
 
-// --- PUPPETEER_CONCURRENCY ---
-const PuppeteerConcurrencySchema = z.coerce.number().int().positive();
+// --- FLOARESOLVERR_CONCURRENCY ---
+const FlareSolverrConcurrencySchema = z.coerce.number().int().positive();
 
-let _puppeteerConcurrency: number | null = null;
+let _flaresolverrConcurrency: number | null = null;
 
-export function getPuppeteerConcurrency(): number {
-  if (_puppeteerConcurrency !== null) return _puppeteerConcurrency;
-  const parsed = PuppeteerConcurrencySchema.safeParse(process.env.PUPPETEER_CONCURRENCY);
-  _puppeteerConcurrency = parsed.success ? parsed.data : 3;
-  return _puppeteerConcurrency;
+export function getFlareSolverrConcurrency(): number {
+  if (_flaresolverrConcurrency !== null) return _flaresolverrConcurrency;
+  const parsed = FlareSolverrConcurrencySchema.safeParse(process.env.FLOARESOLVERR_CONCURRENCY);
+  _flaresolverrConcurrency = parsed.success ? parsed.data : 3;
+  return _flaresolverrConcurrency;
 }
 
 // --- REDIS_COMPRESSION ---
@@ -142,10 +139,10 @@ export function resetEnvAccessorCache(): void {
   _keyBuffer = null;
   _discordAlertWebhookUrl = null;
   _discordAlertsEnabled = null;
-  _puppeteerMemoryLimitMb = null;
-  _puppeteerShutdownTimeoutMs = null;
-  _puppeteerWarningThresholdPct = null;
-  _puppeteerConcurrency = null;
+  _flaresolverrBaseUrl = null;
+  _flaresolverrTimeoutMs = null;
+  _flaresolverrSessionTtl = null;
+  _flaresolverrConcurrency = null;
   _redisChatCompression = null;
   _redisCompressionLevel = null;
   _healthToken = null;

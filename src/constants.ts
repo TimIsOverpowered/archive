@@ -39,11 +39,10 @@ export const DB_POOL_CLEANUP_INTERVAL_MS = 5 * 60 * 1_000;
 // ── Kick API ─────────────────────────────────────────────────────────────────
 export const KICK_API_TIMEOUT_MS = 10_000;
 export const KICK_LIVE_API_TIMEOUT_MS = 15_000;
-export const KICK_PAGE_DELAY_MS = 2_000;
 
-// ── Puppeteer ────────────────────────────────────────────────────────────────
-export const PUPPETEER_NAV_TIMEOUT_MS = 5 * 60 * 1_000;
-export const PUPPETEER_HEALTH_CACHE_TTL_MS = 30_000;
+// ── FlareSolverr ─────────────────────────────────────────────────────────────
+export const FLOARESOLVERR_TIMEOUT_MS = 5 * 60 * 1_000;
+export const FLOARESOLVERR_HEALTH_CACHE_TTL_MS = 30_000;
 
 // ── Encryption ───────────────────────────────────────────────────────────────
 export const ENCRYPTION_KEY_LENGTH = 32; // AES-256 requires exactly 32 bytes

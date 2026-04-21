@@ -3,7 +3,7 @@ import Redis from 'ioredis';
 import { sql } from 'kysely';
 import { loadTenantConfigs } from '../../config/loader.js';
 import { getClient } from '../../db/client.js';
-import { checkPuppeteerHealth } from '../../utils/puppeteer-health.js';
+import { checkFlareSolverrHealth } from '../../utils/flaresolverr-health.js';
 import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator.js';
 import healthCheckMiddleware from '../middleware/health-check.js';
 import { RedisService } from '../../utils/redis-service.js';
@@ -73,7 +73,7 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
       }
 
       const kickConfig = streamerConfigs.find((c) => c.kick?.enabled);
-      const puppeteerHealth = await checkPuppeteerHealth();
+      const flaresolverrHealth = await checkFlareSolverrHealth();
 
       let cloudflareCache = { status: 'unknown' };
       try {
@@ -104,8 +104,8 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
           cloudflareIpCache: cloudflareCache,
           ...(kickConfig && {
             kick: {
-              puppeteer: puppeteerHealth.status,
-              memoryStats: puppeteerHealth.stats,
+              flaresolverr: flaresolverrHealth.status,
+              version: flaresolverrHealth.stats.version,
             },
           }),
         },
