@@ -69,7 +69,9 @@ function extractAuthCode(input: string, expectedState: string): { error?: string
 
       if (receivedState !== expectedState) {
         const preview = receivedState?.substring(0, 16) || 'null';
-        return { error: `Session mismatch! Expected state: ${expectedState.substring(0, 16)}..., Received: ${preview}...` };
+        return {
+          error: `Session mismatch! Expected state: ${expectedState.substring(0, 16)}..., Received: ${preview}...`,
+        };
       }
 
       const receivedCode = urlObj.searchParams.get('code');
@@ -132,7 +134,11 @@ async function getTenant(streamerIdOrName: string): Promise<any | null> {
 
 async function startOAuthFlow(tenantId: string): Promise<void> {
   const state = crypto.randomBytes(32).toString('hex');
-  const scopes = ['https://www.googleapis.com/auth/youtube.force-ssl', 'https://www.googleapis.com/auth/youtube', 'https://www.googleapis.com/auth/youtube.upload'].join(' ');
+  const scopes = [
+    'https://www.googleapis.com/auth/youtube.force-ssl',
+    'https://www.googleapis.com/auth/youtube',
+    'https://www.googleapis.com/auth/youtube.upload',
+  ].join(' ');
 
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
   authUrl.searchParams.set('client_id', clientId!);
@@ -313,7 +319,11 @@ async function completeOAuth(streamerId: string, expectedState: string, urlOrCod
     // Debug log to see what Google returned
     console.log('\n=== Raw Token Response from Google ===');
     console.log('access_token present:', !!tokenData.access_token, `(${tokenData.access_token?.length || 0} chars)`);
-    console.log('refresh_token present:', !!tokenData.refresh_token, `(value: "${tokenData.refresh_token}" - ${typeof tokenData.refresh_token})`);
+    console.log(
+      'refresh_token present:',
+      !!tokenData.refresh_token,
+      `(value: "${tokenData.refresh_token}" - ${typeof tokenData.refresh_token})`
+    );
     console.log('expires_in:', tokenData.expiresIn || tokenData.expires_in);
     console.log('scope:', tokenData.scope?.substring(0, 100) + '...');
 
@@ -388,7 +398,8 @@ async function storeAuthObject(tenantId: string, authObject: YoutubeAuthObject):
           youtubeConfig = decryptedValue as Partial<z.infer<typeof YoutubeSchema>>;
 
           // Check if previous run stored only auth token as string instead of full config
-          const hasAuthFieldOnly = Object.keys(youtubeConfig).length > 0 && ('type' in youtubeConfig || 'refresh_token' in youtubeConfig);
+          const hasAuthFieldOnly =
+            Object.keys(youtubeConfig).length > 0 && ('type' in youtubeConfig || 'refresh_token' in youtubeConfig);
 
           if (!hasAuthFieldOnly) {
             console.log(`Preserved ${Object.keys(youtubeConfig).length} YouTube settings from database.`);
@@ -403,7 +414,8 @@ async function storeAuthObject(tenantId: string, authObject: YoutubeAuthObject):
       } catch (decryptError) {
         // Failed to decrypt - previous data might be unencrypted JSON or invalid
         try {
-          const parsedJson = typeof currentYoutubeValue === 'string' ? JSON.parse(currentYoutubeValue) : currentYoutubeValue;
+          const parsedJson =
+            typeof currentYoutubeValue === 'string' ? JSON.parse(currentYoutubeValue) : currentYoutubeValue;
 
           if (typeof parsedJson === 'object') {
             console.log('Using existing YouTube config from database (unencrypted)...');

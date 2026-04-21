@@ -88,6 +88,14 @@ export async function getLogsByOffset(
     }
   }
 
+  const vod = await db.selectFrom('vods').select(['created_at', 'duration']).where('id', '=', vodId).executeTakeFirst();
+
+  if (!vod) throw new Error('VOD not found');
+
+  // Add a 2-hour buffer to the end time to account for slight timestamp drifts
+  const streamStart = vod.created_at;
+  const streamEnd = new Date(streamStart.getTime() + (vod.duration + 7200) * 1000);
+
   const data = await db
     .selectFrom('chat_messages')
     .select([
@@ -102,6 +110,8 @@ export async function getLogsByOffset(
     ])
     .where('vod_id', '=', vodId)
     .where('content_offset_seconds', '>=', bucket)
+    .where('created_at', '>=', streamStart)
+    .where('created_at', '<=', streamEnd)
     .orderBy('content_offset_seconds', 'asc')
     .orderBy('created_at', 'asc')
     .limit(LOGS_PAGE_SIZE + 1)
@@ -182,6 +192,13 @@ export async function getLogsByCursor(
     badRequest('Invalid cursor: invalid date');
   }
 
+  const vod = await db.selectFrom('vods').select(['created_at', 'duration']).where('id', '=', vodId).executeTakeFirst();
+
+  if (!vod) throw new Error('VOD not found');
+
+  const streamStart = vod.created_at;
+  const streamEnd = new Date(streamStart.getTime() + (vod.duration + 7200) * 1000);
+
   const data = await db
     .selectFrom('chat_messages')
     .select([
@@ -195,6 +212,8 @@ export async function getLogsByCursor(
       'user_badges',
     ])
     .where('vod_id', '=', vodId)
+    .where('created_at', '>=', streamStart)
+    .where('created_at', '<=', streamEnd)
     .where((eb) =>
       eb.or([
         eb('content_offset_seconds', '>', cursorJson.offset!),

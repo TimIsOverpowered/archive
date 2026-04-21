@@ -222,5 +222,9 @@ function displayTokenState(auth: YoutubeAuth, label: string, verbose = false) {
     }
   }
 
-  return statusText.includes('EXPIRED') || (!auth.access_token && !auth.refresh_token) || (expiryDate !== null ? typeof expiryDate === 'number' && expiryDate < 10000000 : false);
+  return (
+    statusText.includes('EXPIRED') ||
+    (!auth.access_token && !auth.refresh_token) ||
+    (expiryDate !== null ? typeof expiryDate === 'number' && expiryDate < 10000000 : false)
+  );
 }

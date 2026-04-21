@@ -87,7 +87,7 @@ export interface ChatMessagesTable {
   display_name: string | null;
   content_offset_seconds: number;
   user_color: string | null;
-  created_at: ColumnType<Date, string | undefined, never>;
+  created_at: ColumnType<Date, string | Date | undefined, never>;
   message: JSONColumnType<Record<string, unknown>> | null;
   user_badges: JSONColumnType<Record<string, unknown>> | null;
 }

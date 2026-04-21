@@ -46,7 +46,7 @@ export async function flushChatBatch(options: FlushBatchOptions): Promise<FlushB
       db
         .insertInto('chat_messages')
         .values(buffer.map(toInsertableChatMessage))
-        .onConflict((oc) => oc.column('id').doNothing())
+        .onConflict((oc) => oc.columns(['id', 'created_at']).doNothing())
         .execute(),
     {
       attempts: CHAT_MAX_RETRIES,
