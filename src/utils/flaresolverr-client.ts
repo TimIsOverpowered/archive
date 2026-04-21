@@ -1,7 +1,7 @@
 import { extractErrorDetails } from './error.js';
 import { childLogger } from './logger.js';
 import { getFlareSolverrBaseUrl, getFlareSolverrSessionTtl } from '../config/env-accessors.js';
-import { FLOARESOLVERR_TIMEOUT_MS } from '../constants.js';
+import { FLARESOLVERR_TIMEOUT_MS } from '../constants.js';
 import { sleep, getRetryDelay } from './delay.js';
 
 const log = childLogger({ module: 'flaresolverr-client' });
@@ -47,7 +47,7 @@ interface FlareSolverrResponse {
 
 export async function fetchUrl<T = unknown>(url: string, options?: FetchUrlOptions): Promise<FetchUrlResult<T>> {
   const baseURL = getFlareSolverrBaseUrl();
-  const timeoutMs = options?.timeoutMs ?? FLOARESOLVERR_TIMEOUT_MS;
+  const timeoutMs = options?.timeoutMs ?? FLARESOLVERR_TIMEOUT_MS;
   const maxRetries = options?.maxRetries ?? 3;
   const sessionTTL = getFlareSolverrSessionTtl();
 

@@ -104,7 +104,7 @@ See `.env.example` for all available configuration options. Key variables:
 - `REDIS_URL`: Redis connection for caching and job queues
 - `ENCRYPTION_MASTER_KEY`: 64-character hex string for encrypting sensitive data
 - `JWT_SECRET`: Secret for admin dashboard authentication
-- `FLOARESOLVERR_BASE_URL`: FlareSolverr API endpoint (default: `http://localhost:8191`)
+- `FLARESOLVERR_BASE_URL`: FlareSolverr API endpoint (default: `http://localhost:8191`)
 
 ## Troubleshooting
 
