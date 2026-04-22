@@ -21,9 +21,9 @@ function getClientIp(request: FastifyRequest): string {
 
 export default function createRateLimitMiddleware(options: RateLimitOptions) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
-    const { limiter, writeLimiter } = options;
+    const { limiter: readLimiter, writeLimiter } = options;
     const method = request.method;
-    const activeLimiter = method === 'GET' ? limiter : writeLimiter || limiter;
+    const activeLimiter = method === 'GET' ? readLimiter : writeLimiter ?? readLimiter;
 
     const isValidCfRequest = await validateCloudflareRequest(request);
     if (!isValidCfRequest) {
@@ -39,10 +39,10 @@ export default function createRateLimitMiddleware(options: RateLimitOptions) {
     const ip = getClientIp(request);
 
     try {
-      const limiter = await activeLimiter.consume(ip);
+      const consumeResult = await activeLimiter.consume(ip);
 
       reply.header('X-RateLimit-Limit', activeLimiter.points);
-      reply.header('X-RateLimit-Remaining', String(limiter.remainingPoints));
+      reply.header('X-RateLimit-Remaining', String(consumeResult.remainingPoints));
     } catch (rateLimitError) {
       const error = rateLimitError as Error & { msBeforeNext?: number; code?: string };
 

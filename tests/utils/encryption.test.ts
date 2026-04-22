@@ -43,12 +43,12 @@ describe('Encryption', () => {
   });
 
   describe('encrypt', () => {
-    it('should encrypt plaintext and return ciphertext', () => {
+    it('should encrypt plaintext and return ciphertext buffer', () => {
       const plaintext = 'sensitive data';
       const result = encrypt(plaintext);
 
-      assert.ok('ciphertext' in result);
-      assert.ok(result.ciphertext instanceof Uint8Array);
+      assert.ok(result instanceof Buffer);
+      assert.ok(result instanceof Uint8Array);
     });
 
     it('should produce different ciphertext for same plaintext (due to random IV)', () => {
@@ -56,18 +56,18 @@ describe('Encryption', () => {
       const result1 = encrypt(plaintext);
       const result2 = encrypt(plaintext);
 
-      assert.notDeepStrictEqual(result1.ciphertext, result2.ciphertext);
+      assert.notDeepStrictEqual(result1, result2);
     });
 
     it('should handle empty string', () => {
       const result = encrypt('');
-      assert.ok(result.ciphertext);
+      assert.ok(result.length > 0);
     });
 
     it('should handle special characters', () => {
       const plaintext = 'special!@#$%^&*()chars';
       const result = encrypt(plaintext);
-      assert.ok(result.ciphertext);
+      assert.ok(result.length > 0);
     });
   });
 
@@ -75,7 +75,7 @@ describe('Encryption', () => {
     it('should decrypt ciphertext back to original plaintext', () => {
       const original = 'secret message';
       const encrypted = encrypt(original);
-      const decrypted = decrypt(encrypted.ciphertext);
+      const decrypted = decrypt(encrypted);
 
       assert.strictEqual(decrypted, original);
     });
@@ -85,7 +85,7 @@ describe('Encryption', () => {
 
       for (const testCase of testCases) {
         const encrypted = encrypt(testCase);
-        const decrypted = decrypt(encrypted.ciphertext);
+        const decrypted = decrypt(encrypted);
         assert.strictEqual(decrypted, testCase);
       }
     });
@@ -93,7 +93,7 @@ describe('Encryption', () => {
     it('should reject tampered ciphertext', () => {
       const original = 'secret';
       const encrypted = encrypt(original);
-      const tampered = new Uint8Array(encrypted.ciphertext);
+      const tampered = new Uint8Array(encrypted);
       tampered[tampered.length - 1] = 0xff;
 
       assert.throws(() => decrypt(tampered));
@@ -102,7 +102,7 @@ describe('Encryption', () => {
     it('should reject truncated ciphertext', () => {
       const original = 'secret';
       const encrypted = encrypt(original);
-      const truncated = encrypted.ciphertext.slice(0, 10);
+      const truncated = encrypted.subarray(0, 10);
 
       assert.throws(() => decrypt(truncated));
     });

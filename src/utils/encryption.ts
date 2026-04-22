@@ -14,7 +14,7 @@ export function getKeyBuffer(): Buffer {
   return getEncryptionKeyBuffer();
 }
 
-export function encrypt(plaintext: string): { ciphertext: Uint8Array } {
+export function encrypt(plaintext: string): Buffer {
   const key = getKeyBuffer();
   const iv = crypto.randomBytes(ENCRYPTION_IV_LENGTH);
 
@@ -27,7 +27,7 @@ export function encrypt(plaintext: string): { ciphertext: Uint8Array } {
 
   const combined = Buffer.concat([iv, authTag, Buffer.from(encrypted, 'base64')]);
 
-  return { ciphertext: combined };
+  return combined;
 }
 
 export function decrypt(ciphertext: Uint8Array): string {
@@ -56,9 +56,7 @@ export function decrypt(ciphertext: Uint8Array): string {
 }
 
 export function encryptObject(obj: object): string {
-  const plaintext = JSON.stringify(obj);
-  const { ciphertext } = encrypt(plaintext);
-  return Buffer.from(ciphertext).toString('base64');
+  return encryptScalar(JSON.stringify(obj));
 }
 
 export function decryptObject<T>(encryptedBase64: string): T {
@@ -68,8 +66,7 @@ export function decryptObject<T>(encryptedBase64: string): T {
 }
 
 export function encryptScalar(value: string): string {
-  const { ciphertext } = encrypt(value);
-  return Buffer.from(ciphertext).toString('base64');
+  return encrypt(value).toString('base64');
 }
 
 export function decryptScalar(encryptedBase64: string): string {
