@@ -56,7 +56,9 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (
       discordMessageId: messageId || undefined,
       streamerName,
       onProgress: (segmentsDownloaded) => {
-        void updateAlert(messageId, alerts.progress(vodId, segmentsDownloaded));
+        updateAlert(messageId, alerts.progress(vodId, segmentsDownloaded)).catch((err) => {
+          log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
+        });
       },
     });
 

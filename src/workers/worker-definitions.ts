@@ -83,9 +83,7 @@ export function registerWorkers(
     const workerConfig: WorkerConfig & { connection: Redis } = { ...def, connection };
 
     if (name === QUEUE_NAMES.VOD_LIVE) {
-      const liveTenants = tenantConfigs.filter(
-        (c) => c.settings.vodDownload && (c.twitch?.enabled || c.kick?.enabled)
-      );
+      const liveTenants = tenantConfigs.filter((c) => c.settings.vodDownload && (c.twitch?.enabled || c.kick?.enabled));
       workerConfig.concurrency = Math.max(liveTenants.length * 2 * vodLiveHeadroom, vodMinConcurrency);
     }
 

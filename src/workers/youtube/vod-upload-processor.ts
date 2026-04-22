@@ -123,7 +123,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
   });
 
   const parts = await splitVideo(filePath, duration, splitDuration, vodId, (percent: number, partNum: number) => {
-    void updateAlert(splitAlertMessageId, {
+    updateAlert(splitAlertMessageId, {
       title: '📺 Splitting VOD',
       description: `${channelName} - Processing part ${partNum}/${totalParts}`,
       status: 'warning',
@@ -134,6 +134,8 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
       ],
       timestamp: new Date().toISOString(),
       updatedTimestamp: new Date().toISOString(),
+    }).catch((err) => {
+      log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
     });
   });
 
@@ -197,7 +199,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
     await deleteFileIfExists(partPath);
   }
 
-  void updateAlert(splitAlertMessageId, {
+  updateAlert(splitAlertMessageId, {
     title: `✅ VOD Splitting Complete`,
     description: `${channelName} - Successfully split into ${totalParts} parts`,
     status: 'success',
@@ -208,6 +210,8 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
     ],
     timestamp: new Date().toISOString(),
     updatedTimestamp: new Date().toISOString(),
+  }).catch((err) => {
+    log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
   });
 
   return { uploadedVideos, needsPartLinking: uploadedVideos.length > 1 };

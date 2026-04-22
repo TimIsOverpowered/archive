@@ -11,6 +11,7 @@ import type { TenantConfig } from '../../config/types.js';
 import { deleteFileIfExists } from '../../utils/path.js';
 import { GameUpsertSchema } from '../../config/schemas.js';
 import { publishVodUpdate } from '../../services/cache-invalidator.js';
+import { extractErrorDetails } from '../../utils/error.js';
 
 export interface GameUploadContext {
   tenantId: string;
@@ -166,13 +167,15 @@ async function processSplitGameUpload(
     YOUTUBE_MAX_DURATION,
     `${vodId}-game`,
     (percent: number) => {
-      void updateAlert(splitAlertMessageId, {
+      updateAlert(splitAlertMessageId, {
         title: `✂️ Splitting Game Clip`,
         description: `${channelName} - Game clip exceeds YouTube max duration`,
         status: 'warning',
         fields: [{ name: 'Progress', value: createProgressBar(percent), inline: false }],
         timestamp: new Date().toISOString(),
         updatedTimestamp: new Date().toISOString(),
+      }).catch((err) => {
+        log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
       });
     }
   );
@@ -274,7 +277,7 @@ async function processSplitGameUpload(
     }
   }
 
-  void updateAlert(splitAlertMessageId, {
+  updateAlert(splitAlertMessageId, {
     title: `✅ Game Clip Splitting Complete`,
     description: `${channelName} - Successfully split into ${totalParts} parts`,
     status: 'success',
@@ -284,6 +287,8 @@ async function processSplitGameUpload(
     ],
     timestamp: new Date().toISOString(),
     updatedTimestamp: new Date().toISOString(),
+  }).catch((err) => {
+    log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
   });
 
   return { success: true, videos: uploadedGameVideos };
