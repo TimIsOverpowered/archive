@@ -63,7 +63,7 @@ async function start() {
 }
 
 async function shutdown(signal: string) {
-  getLogger().info({ signal }, `Received ${signal}, starting graceful shutdown...`);
+  getLogger().info({ signal }, 'Received shutdown signal');
 
   const shutdownTimeout = setTimeout(() => {
     getLogger().error('Forced shutdown after 5 second timeout');

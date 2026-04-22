@@ -38,7 +38,7 @@ export async function registerAllMonitorRepeatJobs(): Promise<void> {
   const jobs = configs.map((config) => registerMonitorRepeatJob(config));
   await Promise.all(jobs);
 
-  getLogger().info(`[Monitor] Registered ${configs.length} monitor repeat job(s)`);
+  getLogger().info({ count: configs.length }, 'Registered monitor repeat jobs');
 }
 
 export async function removeMonitorRepeatJob(tenantId: string): Promise<void> {

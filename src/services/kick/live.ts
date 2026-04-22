@@ -58,7 +58,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
   try {
     const apiUrl = `https://kick.com/api/v2/channels/${username}/livestream`;
 
-    getLogger().debug({ username }, `[Kick] Fetching livestream data for ${username} from ${apiUrl}`);
+    getLogger().debug({ username, apiUrl }, 'Fetching Kick livestream data');
 
     const result = await fetchUrl<KickApiResponse>(apiUrl, {
       timeoutMs: KICK_LIVE_API_TIMEOUT_MS,
@@ -66,7 +66,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
     });
 
     if (!result.success) {
-      getLogger().warn({ username }, `[Kick] Failed to reach API endpoint for ${username}`);
+      getLogger().warn({ username }, 'Failed to reach Kick API endpoint');
       _cacheKickStream(username, null);
       return null;
     }
@@ -74,16 +74,13 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
     const response = result.data;
 
     if (!response) {
-      getLogger().debug({ username }, `[Kick] Channel ${username} is offline (no livestream data)`);
+      getLogger().debug({ username }, 'Kick channel is offline (no livestream data)');
       _cacheKickStream(username, null);
       return null;
     }
 
     if ('error' in response && typeof response.error === 'string') {
-      getLogger().warn(
-        { username, error: response.error },
-        `[Kick] API request blocked or errored for ${username}: "${response.error}"`
-      );
+      getLogger().warn({ username, error: response.error }, 'Kick API request blocked or errored');
       _cacheKickStream(username, null);
       return null;
     }
@@ -91,7 +88,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
     const data = response.data as Record<string, unknown> | undefined;
 
     if (!data || typeof data !== 'object') {
-      getLogger().debug({ username }, `[Kick] Channel ${username} is offline (no livestream data object)`);
+      getLogger().debug({ username }, 'Kick channel is offline (no livestream data object)');
       _cacheKickStream(username, null);
       return null;
     }
@@ -149,15 +146,15 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
     };
 
     getLogger().debug(
-      { username },
-      `[Kick] Live stream detected for ${username}: ID=${streamData.id}, Title="${streamData.session_title}"`
+      { username, streamId: streamData.id, sessionTitle: streamData.session_title },
+      'Kick live stream detected'
     );
 
     _cacheKickStream(username, streamData);
     return streamData;
   } catch (error) {
     const details = extractErrorDetails(error);
-    getLogger().error({ username, ...details }, `[Kick Live Check] Failed to get stream status for ${username}`);
+    getLogger().error({ username, ...details }, 'Failed to get Kick stream status');
     throw error;
   }
 }
@@ -169,7 +166,7 @@ export async function getLatestKickVodObject(
   try {
     const videosUrl = `https://kick.com/api/v2/channels/${username}/videos`;
 
-    getLogger().debug({ username }, `[Kick] Fetching video data for ${username} from ${videosUrl}`);
+    getLogger().debug({ username, videosUrl }, 'Fetching Kick video data');
 
     const result = await fetchUrl<unknown[]>(videosUrl, {
       timeoutMs: KICK_LIVE_API_TIMEOUT_MS,
@@ -177,14 +174,14 @@ export async function getLatestKickVodObject(
     });
 
     if (!result.success) {
-      getLogger().warn({ username }, `[Kick] Failed to reach videos API endpoint for ${username}`);
+      getLogger().warn({ username }, 'Failed to reach Kick videos API endpoint');
       return null;
     }
 
     const dataArray = result.data;
 
     if (!dataArray || !Array.isArray(dataArray)) {
-      getLogger().debug({ username }, `[Kick] No video data found for ${username}`);
+      getLogger().debug({ username }, 'Kick has no video data');
       return null;
     }
 
@@ -195,18 +192,15 @@ export async function getLatestKickVodObject(
     });
 
     if (!vodObject) {
-      getLogger().debug(
-        { username, expectedStreamId },
-        `[Kick] Video object not found yet for stream ${expectedStreamId}`
-      );
+      getLogger().debug({ username, expectedStreamId }, 'Kick video object not found yet');
       return null;
     }
 
     const vod = vodObject as Record<string, unknown>;
 
     getLogger().debug(
-      { username, expectedStreamId },
-      `[Kick] Video object ready! ID=${expectedStreamId}, Title="${vod.session_title || vod.title}"`
+      { username, expectedStreamId, sessionTitle: vod.session_title, title: vod.title },
+      'Kick video object ready'
     );
 
     return {
@@ -216,7 +210,7 @@ export async function getLatestKickVodObject(
     };
   } catch (error) {
     const details = extractErrorDetails(error);
-    getLogger().error({ username, ...details }, `[Kick] Failed to get video object for ${username}`);
+    getLogger().error({ username, ...details }, 'Failed to get Kick video object');
     throw error;
   }
 }
