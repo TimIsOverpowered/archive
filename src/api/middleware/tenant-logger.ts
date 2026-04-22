@@ -7,14 +7,6 @@ import {
   generateRequestId,
 } from '../../utils/async-context.js';
 
-// Extend request type to include tenant context for type safety
-declare module 'fastify' {
-  interface FastifyRequest {
-    tenantDisplayName?: string;
-    reqId?: string;
-  }
-}
-
 /**
  * Simple middleware that sets tenant context in async-local storage.
  * This enables the pino mixin to automatically inject tenant and reqId fields into structured logs,

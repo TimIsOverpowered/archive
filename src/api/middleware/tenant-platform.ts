@@ -13,12 +13,6 @@ export interface TenantPlatformContext extends TenantContext {
   platform: Platform;
 }
 
-declare module 'fastify' {
-  interface FastifyRequest {
-    tenant: TenantContext;
-  }
-}
-
 /**
  * Generic tenant middleware - validates tenant exists and database is available.
  * Safe for both public and admin routes (no auth checks).

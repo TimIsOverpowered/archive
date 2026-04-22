@@ -50,7 +50,15 @@ export async function handlePlatformLiveCheck(
   }
 
   if (!streamStatus) {
-    await handleOfflineStream(db, tenantId, platform, platformUsername || undefined, config.displayName, log, activeLiveVod);
+    await handleOfflineStream(
+      db,
+      tenantId,
+      platform,
+      platformUsername || undefined,
+      config.displayName,
+      log,
+      activeLiveVod
+    );
     return;
   }
 

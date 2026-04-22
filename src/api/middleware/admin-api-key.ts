@@ -6,12 +6,6 @@ export interface AdminContext {
   username: string;
 }
 
-declare module 'fastify' {
-  interface FastifyRequest {
-    admin?: AdminContext;
-  }
-}
-
 export default async function adminApiKeyMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const authHeader = request.headers.authorization;
   const apiKeyHeader = request.headers['x-api-key'];
