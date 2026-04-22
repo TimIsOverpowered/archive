@@ -4,6 +4,7 @@ import { handlePlatformLiveCheck } from './live-handler.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { handleWorkerError } from '../utils/error-handler.js';
 import { PLATFORM_VALUES } from '../../types/platforms.js';
+import { getLiveDownloadQueue } from '../jobs/queues.js';
 
 const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async (job: Job<{ tenantId: string }>) => {
   const { tenantId } = job.data;
@@ -17,6 +18,9 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
     log.debug({ tenantId }, '[Monitor] VOD download disabled, skipping');
     return { success: true };
   }
+
+  const liveQueue = getLiveDownloadQueue();
+  const activeLiveJobs = await liveQueue.getActive();
 
   for (const platform of PLATFORM_VALUES) {
     const platformConfig = config[platform];
@@ -32,8 +36,12 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
       .executeTakeFirst();
 
     if (activeLiveVod) {
-      log.debug({ platform, vodId: activeLiveVod.vod_id }, '[Monitor] Skipping - live worker active');
-      continue;
+      const hasActiveJob = activeLiveJobs.some((j) => j.opts.jobId === `live_hls_${activeLiveVod.vod_id}`);
+      if (hasActiveJob) {
+        log.debug({ platform, vodId: activeLiveVod.vod_id }, '[Monitor] Skipping - live worker active');
+        continue;
+      }
+      log.debug({ platform, vodId: activeLiveVod.vod_id }, '[Monitor] No active job found, rechecking');
     }
 
     try {
