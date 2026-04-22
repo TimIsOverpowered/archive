@@ -5,7 +5,6 @@ import { TenantContext } from '../types/context.js';
 import { withDbRetry } from '../db/client.js';
 import { safeRequest } from '../utils/http-client.js';
 import { RedisService } from '../utils/redis-service.js';
-import { getDisableRedisCache } from '../config/env.js';
 import { compressChatData, decompressChatData } from '../utils/compression.js';
 import { EMOTE_CACHE_TTL, FFZ_API_BASE, BTTV_API_BASE, SEVENTV_API_BASE } from '../constants.js';
 import { EmoteUpsertSchema } from '../config/schemas.js';
@@ -164,8 +163,8 @@ export async function fetchAndSaveEmotes(
 export async function getEmotesByVodId(db: DBClient, tenantId: string, vodId: number): Promise<VodEmotes | null> {
   const cacheKey = `emotes:${tenantId}:${vodId}`;
 
-  const redis = RedisService.instance?.getClient() ?? null;
-  if (redis && !getDisableRedisCache()) {
+  const redis = RedisService.getActiveClient();
+  if (redis) {
     try {
       const cached = await redis.get(cacheKey);
       if (cached) {
@@ -200,7 +199,7 @@ export async function getEmotesByVodId(db: DBClient, tenantId: string, vodId: nu
     seventv_emotes: emote.seventv_emotes as unknown as EmoteData[],
   };
 
-  if (redis && !getDisableRedisCache()) {
+  if (redis) {
     try {
       const compressed = await compressChatData(result);
       await redis.set(cacheKey, compressed as Buffer, 'EX', EMOTE_CACHE_TTL);

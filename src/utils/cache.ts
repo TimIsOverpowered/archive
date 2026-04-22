@@ -1,5 +1,4 @@
 import { RedisService } from '../utils/redis-service.js';
-import { getDisableRedisCache } from '../config/env.js';
 import { extractErrorDetails } from './error.js';
 import { getLogger } from '../utils/logger.js';
 import { LRUCache } from 'lru-cache';
@@ -33,7 +32,7 @@ const inflightSimple = new LRUCache<string, Promise<unknown>>({
 });
 
 export async function withCache<T>(key: string, ttl: number, fetcher: () => Promise<T>): Promise<T> {
-  const client = getDisableRedisCache() ? null : (RedisService.instance?.getClient() ?? null);
+  const client = RedisService.getActiveClient();
   if (!client) return fetcher();
 
   try {
@@ -81,7 +80,7 @@ export async function withStaleWhileRevalidate<T>(
   staleAfter: number,
   fetcher: () => Promise<T>
 ): Promise<T> {
-  const client = getDisableRedisCache() ? null : (RedisService.instance?.getClient() ?? null);
+  const client = RedisService.getActiveClient();
   if (!client) return fetcher();
 
   const now = Date.now();

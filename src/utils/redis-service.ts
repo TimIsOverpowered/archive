@@ -53,6 +53,11 @@ export class RedisService {
     return this._instance.client;
   }
 
+  static getActiveClient(): Redis | null {
+    if (getBaseConfig().DISABLE_REDIS_CACHE) return null;
+    return this._instance?.client ?? null;
+  }
+
   static getLimiter(key: string): RateLimiterRedis | RateLimiterMemory | null {
     if (!this._instance) return null;
     const entry = this._instance.limiters.get(key);

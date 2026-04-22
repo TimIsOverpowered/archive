@@ -2,7 +2,7 @@ import { sql } from 'kysely';
 import type { Kysely } from 'kysely';
 import type { StreamerDB, SelectableChatMessages } from '../db/streamer-types.js';
 import { RedisService } from '../utils/redis-service.js';
-import { getDisableRedisCache, getApiConfig } from '../config/env.js';
+import { getApiConfig } from '../config/env.js';
 import { compressChatData, decompressChatData } from '../utils/compression.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
@@ -25,8 +25,8 @@ function computeBucketSize(commentsPer100s: number): number {
 async function getVodBucketSize(db: Kysely<StreamerDB>, tenantId: string, vodId: number): Promise<number> {
   const key = `${tenantId}:${vodId}:bucketSize`;
 
-  const redis = RedisService.instance?.getClient() ?? null;
-  if (!getDisableRedisCache() && redis) {
+  const redis = RedisService.getActiveClient();
+  if (redis) {
     try {
       const cached = await redis.get(key);
       if (cached) {
@@ -51,7 +51,7 @@ async function getVodBucketSize(db: Kysely<StreamerDB>, tenantId: string, vodId:
     ? computeBucketSize(commentsPer100sValue)
     : LOGS_DEFAULT_BUCKET_SIZE;
 
-  if (!getDisableRedisCache() && redis) {
+  if (redis) {
     try {
       await redis.set(key, bucketSize.toString(), 'EX', getApiConfig().CHAT_BUCKET_SIZE_TTL);
     } catch {
@@ -71,9 +71,9 @@ export async function getLogsByOffset(
   const bucketSize = await getVodBucketSize(db, tenantId, vodId);
   const bucket = Math.floor(offsetSeconds / bucketSize) * bucketSize;
   const cacheKey = `${tenantId}:${vodId}:bucket:${bucket}`;
-  const redis = RedisService.instance?.getClient() ?? null;
+  const redis = RedisService.getActiveClient();
 
-  if (!getDisableRedisCache() && redis) {
+  if (redis) {
     try {
       const cached = await redis.getBuffer(cacheKey);
       if (cached) {
@@ -142,7 +142,7 @@ export async function getLogsByOffset(
 
   const response = { comments, cursor };
 
-  if (!getDisableRedisCache() && redis) {
+  if (redis) {
     try {
       const compressed = await compressChatData(response);
       await redis.set(cacheKey, compressed as Buffer, 'EX', getApiConfig().CHAT_OFFSET_TTL);
@@ -162,9 +162,9 @@ export async function getLogsByCursor(
   cursor: string
 ): Promise<{ comments: SelectableChatMessages[]; cursor?: string | undefined }> {
   const cacheKey = `${tenantId}:${vodId}:cursor:${cursor}`;
-  const redis = RedisService.instance?.getClient() ?? null;
+  const redis = RedisService.getActiveClient();
 
-  if (!getDisableRedisCache() && redis) {
+  if (redis) {
     try {
       const cached = await redis.getBuffer(cacheKey);
       if (cached) {
@@ -260,7 +260,7 @@ export async function getLogsByCursor(
 
   const response = { comments, cursor: nextCursor };
 
-  if (!getDisableRedisCache() && redis) {
+  if (redis) {
     try {
       const compressed = await compressChatData(response);
       await redis.set(cacheKey, compressed as Buffer, 'EX', getApiConfig().CHAT_CURSOR_TTL);

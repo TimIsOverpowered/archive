@@ -1,5 +1,4 @@
 import { RedisService } from '../utils/redis-service.js';
-import { getDisableRedisCache } from '../config/env.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
@@ -23,8 +22,8 @@ export async function registerVodTags(
   data: string,
   ttl: number
 ): Promise<void> {
-  const client = RedisService.instance?.getClient() ?? null;
-  if (!client || getDisableRedisCache()) return;
+  const client = RedisService.getActiveClient();
+  if (!client) return;
 
   if (isConnectionFailed(tenantId)) {
     return;
@@ -62,8 +61,8 @@ export async function registerVodTags(
 }
 
 export async function invalidateVodTags(tenantId: string, dbId: number): Promise<void> {
-  const client = RedisService.instance?.getClient() ?? null;
-  if (getDisableRedisCache() || !client) return;
+  const client = RedisService.getActiveClient();
+  if (!client) return;
 
   try {
     const tagKey = `vods:tags:{${tenantId}}:${dbId}`;
@@ -88,8 +87,8 @@ export async function invalidateVodTags(tenantId: string, dbId: number): Promise
 }
 
 export async function invalidateVodVolatileCache(tenantId: string, dbId: number): Promise<void> {
-  const client = RedisService.instance?.getClient() ?? null;
-  if (getDisableRedisCache() || !client) return;
+  const client = RedisService.getActiveClient();
+  if (!client) return;
 
   try {
     await client.unlink(`vod:volatile:{${tenantId}}:${dbId}`);
