@@ -29,10 +29,7 @@ export async function createAdmin(data: InsertableAdmins): Promise<PublicAdmin> 
   return getMetaClient().insertInto('admins').values(data).returning(adminSelect).executeTakeFirstOrThrow();
 }
 
-export async function updateAdmin(
-  username: string,
-  data: Partial<InsertableAdmins>
-): Promise<PublicAdmin | undefined> {
+export async function updateAdmin(username: string, data: Partial<InsertableAdmins>): Promise<PublicAdmin | undefined> {
   return getMetaClient()
     .updateTable('admins')
     .set(data as UpdateableAdmins)

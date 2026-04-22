@@ -4,15 +4,6 @@ import { TenantConfig } from '../../config/types.js';
 import { getLogger } from '../../utils/logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 
-declare module 'fastify' {
-  interface FastifyInstance {
-    getTenantConfig(id: string): TenantConfig | undefined;
-    getAllConfigs(): Promise<TenantConfig[]>;
-    clearConfigCache(tenantId?: string): void;
-    reloadTenantConfig(id: string): Promise<TenantConfig | undefined>;
-  }
-}
-
 const configPlugin: FastifyPluginAsync = async (fastify) => {
   try {
     getLogger().info('Loading streamer configurations from meta database');

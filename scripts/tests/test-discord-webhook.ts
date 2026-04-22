@@ -29,7 +29,7 @@ async function post(msg: string) {
     const response = await fetch(url!, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json' as any,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({ content: msg }),
       signal: AbortSignal.timeout(10000),
@@ -51,7 +51,7 @@ async function embed() {
     const response = await fetch(url!, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json' as any,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         embeds: [

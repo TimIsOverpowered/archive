@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-import Redis from 'ioredis';
 import { sql } from 'kysely';
 import { loadTenantConfigs } from '../../config/loader.js';
 import { getClient } from '../../db/client.js';
@@ -10,12 +9,6 @@ import { RedisService } from '../../utils/redis-service.js';
 
 interface HealthRouteOptions {
   prefix: string;
-}
-
-declare module 'fastify' {
-  interface FastifyInstance {
-    redis: Redis;
-  }
 }
 
 export default async function healthRoutes(fastify: FastifyInstance, _options: HealthRouteOptions) {

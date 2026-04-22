@@ -4,7 +4,7 @@ import { initMetaClient, getMetaClient, closeMetaClient } from '../src/db/meta-c
 import readline from 'readline';
 import { extractErrorDetails } from '../src/utils/error.js';
 import { decryptScalar } from '../src/utils/encryption.js';
-import pg from 'pg';
+import pg, { type Pool, type PoolClient } from 'pg';
 import os from 'os';
 
 const META_DB_URL = process.env.META_DATABASE_URL;
@@ -76,7 +76,7 @@ interface ChatWorkerProgress {
   completed: boolean;
 }
 
-async function getTableStats(pool: any): Promise<{ pages: number; rowsPerPage: number }> {
+async function getTableStats(pool: Pool): Promise<{ pages: number; rowsPerPage: number }> {
   const result = await pool.query(`
     SELECT relpages, reltuples,
            ROUND(reltuples / NULLIF(relpages, 0)) as rows_per_page
@@ -97,7 +97,7 @@ function partitionPageRanges(totalPages: number, workerCount: number): Array<{ s
 }
 
 async function migrateChatWorker(
-  pool: any,
+  pool: Pool,
   workerId: number,
   startPage: number,
   endPage: number,
@@ -122,7 +122,7 @@ async function migrateChatWorker(
       const startTid = `(${currentPage},0)`;
       const endTid = `(${batchEndPage},0)`;
 
-      const rows: any = await conn.query(
+      const rows = await conn.query(
         `SELECT cm.id, cm.vod_id, cm.display_name, cm.content_offset_seconds,
                 cm.user_color, cm."createdAt", cm.message, cm.user_badges
         FROM logs cm
@@ -140,7 +140,7 @@ async function migrateChatWorker(
       const ids: string[] = [];
       const vodIds: number[] = [];
       const displayNames: (string | null)[] = [];
-      const offsets: any[] = [];
+      const offsets: number[] = [];
       const colors: (string | null)[] = [];
       const createdAts: Date[] = [];
       const messages: (string | null)[] = [];
@@ -203,7 +203,7 @@ async function migrateChatWorker(
 }
 
 async function migrateChatMessagesParallel(
-  pool: any,
+  pool: Pool,
   totalChat: number,
   workerCount: number,
   batchSize: number,
@@ -304,12 +304,12 @@ async function migrateChatMessagesParallel(
   }
 }
 
-const rollbackMigration = async (client: any) => {
+const rollbackMigration = async (client: PoolClient) => {
   const tablesToCheck = ['vods_new', 'vod_uploads', 'emotes_new', 'games_new', 'chapters', 'chat_messages_new'];
   const existingTables: string[] = [];
 
   for (const tableName of tablesToCheck) {
-    const result: any = await client.query(
+    const result = await client.query(
       `SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1)`,
       [tableName]
     );
@@ -332,7 +332,7 @@ const rollbackMigration = async (client: any) => {
   }
 };
 
-const createNormalizedSchema = async (client: any) => {
+const createNormalizedSchema = async (client: PoolClient) => {
   await client.query('DROP TYPE IF EXISTS "UploadStatus" CASCADE');
   await client.query(`
     CREATE TYPE "UploadStatus" AS ENUM ('PENDING', 'UPLOADING', 'COMPLETED', 'FAILED');
@@ -444,7 +444,7 @@ const createNormalizedSchema = async (client: any) => {
   `);
 };
 
-const applySchemaMigrations = async (client: any) => {
+const applySchemaMigrations = async (client: PoolClient) => {
   await client.query(`
     CREATE OR REPLACE FUNCTION update_updated_at_column()
     RETURNS TRIGGER AS $$
@@ -559,7 +559,7 @@ const main = async () => {
       const oldVodsCount = await oldPool.query('SELECT COUNT(*) FROM vods');
       const oldEmotesCount = await oldPool.query('SELECT COUNT(*) FROM emotes');
       const oldGamesCount = await oldPool.query('SELECT COUNT(*) FROM games');
-      const oldLogsResult: any = await oldPool.query(`
+      const oldLogsResult = await oldPool.query(`
         SELECT reltuples as estimated_count
         FROM pg_class
         WHERE relname = 'logs'
@@ -880,7 +880,7 @@ const main = async () => {
       console.log('📌 PHASE 3: Validating FK integrity and finalizing...\n');
 
       try {
-        const fkCheckResult: any = await oldPool.query(`
+        const fkCheckResult = await oldPool.query(`
           SELECT
             (SELECT COUNT(*) FROM "emotes_new" e WHERE NOT EXISTS (SELECT 1 FROM "vods_new" v WHERE v.id = e.vod_id)) as emotes_count,
             (SELECT COUNT(*) FROM "games_new" g WHERE NOT EXISTS (SELECT 1 FROM "vods_new" v WHERE v.id = g.vod_id)) as games_count,

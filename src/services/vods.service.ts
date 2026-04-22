@@ -5,7 +5,12 @@ import type { Expression, ExpressionBuilder, Kysely, SqlBool } from 'kysely';
 import type { StreamerDB, DBClient } from '../db/streamer-types.js';
 import { withStaleWhileRevalidate } from '../utils/cache.js';
 import { deduplicate } from '../utils/deduplicate.js';
-import { VOD_DETAILS_CACHE_TTL, VOD_LIST_CACHE_TTL, VOD_VOLATILE_CACHE_TTL, VOD_DETAILS_STALE_RATIO } from '../constants.js';
+import {
+  VOD_DETAILS_CACHE_TTL,
+  VOD_LIST_CACHE_TTL,
+  VOD_VOLATILE_CACHE_TTL,
+  VOD_DETAILS_STALE_RATIO,
+} from '../constants.js';
 import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
 import { RedisService } from '../utils/redis-service.js';
 import { getDisableRedisCache } from '../config/env-accessors.js';
