@@ -119,8 +119,8 @@ class PoolManager {
         this.pools.delete(tenantId);
 
         getLogger().info(
-          { tenantId, idleDuration, totalPools: this.pools.size },
-          `[DB Pool Manager] Evicted idle pool for tenant: ${tenantId}. Idle for: ${idleDuration}ms. Active pools remaining: ${this.pools.size}`
+          { tenantId, idleDurationMs: idleDuration, activePools: this.pools.size },
+          'DB pool evicted (idle timeout)'
         );
       }
     }

@@ -197,7 +197,7 @@ export async function fetchTwitchPlaylist(
 
     return { variantM3u8String, baseURL };
   } catch (error: unknown) {
-    log.error(createErrorContext(error, { vodId }), `[${vodId}] Failed to get Twitch HLS playlist`);
+    log.error(createErrorContext(error, { vodId }), 'Failed to get Twitch HLS playlist');
 
     if (retryCount > maxRetryBeforeEndDetection) {
       log.warn(`[${vodId}] Too many consecutive failures. Assuming stream ended or platform issue.`);
@@ -260,7 +260,7 @@ export async function fetchKickPlaylist(
       return { variantM3u8String: response, baseURL };
     }
   } catch (error: unknown) {
-    log.error(createErrorContext(error, { vodId }), `[${vodId}] Failed to fetch Kick HLS playlist`);
+    log.error(createErrorContext(error, { vodId }), 'Failed to fetch Kick HLS playlist');
 
     await sleep(5000 * Math.min(retryCount, 6));
 

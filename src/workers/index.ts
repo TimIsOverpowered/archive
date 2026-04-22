@@ -39,7 +39,7 @@ async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkers
     await queue.obliterate({ force: true });
     await queue.resume();
 
-    getLogger().info(`[Queues] Fully obliterated and reset queue: ${name}`);
+    getLogger().info({ queue: name }, 'Queue obliterated and reset');
   }
 
   getLogger().warn('[Queues] All queues cleared and reset');
@@ -50,7 +50,7 @@ export async function bootstrap() {
   setLoggerConfig({ level: workerConfig.LOG_LEVEL, isProduction: workerConfig.NODE_ENV === 'production' });
   await initWorkersRedis();
 
-  getLogger().info(`Starting worker process (NODE_ENV: ${workerConfig.NODE_ENV})`);
+  getLogger().info({ nodeEnv: workerConfig.NODE_ENV }, 'Starting worker process');
 
   try {
     registerPlatformStrategies();

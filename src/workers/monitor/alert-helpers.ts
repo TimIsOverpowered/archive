@@ -27,7 +27,7 @@ export async function sendStreamLiveAlert(
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    getLogger().warn(createErrorContext(error), `Failed to send stream live alert for ${vodId}`);
+    getLogger().warn({ vodId, ...createErrorContext(error) }, 'Failed to send stream live alert');
   }
 }
 
@@ -60,6 +60,6 @@ export async function sendStreamOfflineAlert(
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    getLogger().warn(createErrorContext(error), `Failed to send stream offline alert for ${vodId}`);
+    getLogger().warn({ vodId, ...createErrorContext(error) }, 'Failed to send stream offline alert');
   }
 }

@@ -85,7 +85,7 @@ export async function getWorkersHealth(): Promise<Record<string, WorkerHealthSta
     } catch (error) {
       const details = extractErrorDetails(error);
       const errorMessage = details.message;
-      getLogger().error({ workerName: name, error: errorMessage }, `Health check failed for ${name} queue`);
+      getLogger().error({ workerName: name, error: errorMessage }, 'Health check failed');
 
       result[name] = {
         isRunning: null,

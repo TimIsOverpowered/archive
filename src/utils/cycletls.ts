@@ -66,7 +66,7 @@ export class CycleTLSSession {
 
     const client = await getCycleTLS();
 
-    getLogger().debug({ url }, `[CycleTLS] Fetching text from ${url}`);
+    getLogger().debug({ url }, 'CycleTLS fetching text');
 
     const response = await client.get(url, {
       ja3: LEGACY_FIREFOX_JA3,
@@ -87,7 +87,7 @@ export class CycleTLSSession {
 
     const client = await getCycleTLS();
 
-    getLogger().debug({ url }, `[CycleTLS] Streaming to file ${outputPath}`);
+    getLogger().debug({ url, outputPath }, 'CycleTLS streaming to file');
 
     const response = await client.get(url, {
       ja3: LEGACY_FIREFOX_JA3,
@@ -118,7 +118,7 @@ export class CycleTLSSession {
     if (this._closed) return;
 
     this._closed = true;
-    getLogger().debug(`[CycleTLS] Closed`);
+    getLogger().debug('CycleTLS session closed');
   }
 }
 
@@ -126,7 +126,7 @@ export class CycleTLSSession {
  * Create a new session for persistent connections. Session must be explicitly closed when done.
  */
 export function createSession(): CycleTLSSession {
-  getLogger().debug(`[CycleTLS] Created session`);
+  getLogger().debug('CycleTLS session created');
   return new CycleTLSSession();
 }
 

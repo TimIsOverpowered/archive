@@ -76,7 +76,7 @@ export function createWorker<TData extends object, TResult>(
   });
 
   registerWorker(name, worker as Worker);
-  getLogger().info(`[Workers] ${name} worker created`);
+  getLogger().info({ name }, 'Worker created');
 
   return worker;
 }
