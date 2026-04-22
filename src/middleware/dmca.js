@@ -1,59 +1,55 @@
-const config = require("../../config/config.json");
-const ffmpeg = require("fluent-ffmpeg");
-const drive = require("./drive");
-const youtube = require("./youtube");
-const vod = require("./vod");
-const kick = require("./kick");
-const fs = require("fs");
-const path = require("path");
-const readline = require("readline");
-const dayjs = require("dayjs");
-const utc = require("dayjs/plugin/utc");
-const timezone = require("dayjs/plugin/timezone");
+const config = require('../../config/config.json');
+const ffmpeg = require('fluent-ffmpeg');
+const drive = require('./drive');
+const youtube = require('./youtube');
+const vod = require('./vod');
+const kick = require('./kick');
+const fs = require('fs');
+const path = require('path');
+const readline = require('readline');
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+const timezone = require('dayjs/plugin/timezone');
 dayjs.extend(utc);
 dayjs.extend(timezone);
-const { getDuration } = require("./ffmpeg");
+const { getDuration } = require('./ffmpeg');
 
 const mute = async (vodPath, muteSection, vodId) => {
   let returnPath;
   await new Promise((resolve, reject) => {
-    const filePath = path.normalize(
-      `${path.dirname(vodPath)}/${vodId}-muted.mp4`,
-    );
+    const filePath = path.normalize(`${path.dirname(vodPath)}/${vodId}-muted.mp4`);
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
-      .videoCodec("copy")
+      .videoCodec('copy')
       .audioFilters(muteSection)
-      .toFormat("mp4")
-      .on("progress", (progress) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .toFormat('mp4')
+      .on('progress', (progress) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
-          process.stdout.write(
-            `MUTE VIDEO PROGRESS: ${Math.round(progress.percent)}%`,
-          );
+          process.stdout.write(`MUTE VIDEO PROGRESS: ${Math.round(progress.percent)}%`);
         }
       })
-      .on("start", (cmd) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .on('start', (cmd) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           console.info(cmd);
         }
       })
-      .on("error", function (err) {
-        ffmpeg_process.kill("SIGKILL");
+      .on('error', function (err) {
+        ffmpeg_process.kill('SIGKILL');
         reject(err);
       })
-      .on("end", function () {
+      .on('end', function () {
         resolve(filePath);
       })
       .saveToFile(filePath);
   })
     .then((result) => {
       returnPath = result;
-      console.info("\n");
+      console.info('\n');
     })
     .catch((e) => {
-      console.error("\nffmpeg error occurred: " + e);
+      console.error('\nffmpeg error occurred: ' + e);
     });
   return returnPath;
 };
@@ -61,38 +57,32 @@ const mute = async (vodPath, muteSection, vodId) => {
 const blackoutVideo = async (vodPath, vodId, start, duration, end) => {
   const start_video_path = await getStartVideo(vodPath, vodId, start);
   if (!start_video_path) {
-    console.error("failed to get start video");
+    console.error('failed to get start video');
     return null;
   }
   const clip_path = await getClip(vodPath, vodId, start, duration);
   if (!clip_path) {
-    console.error("failed to get clip");
+    console.error('failed to get clip');
     return null;
   }
   const trim_clip_path = await getTrimmedClip(clip_path, vodId);
   if (!trim_clip_path) {
-    console.error("failed to get trimmed clip");
+    console.error('failed to get trimmed clip');
     return null;
   }
   const end_video_path = await getEndVideo(vodPath, vodId, end);
   if (!end_video_path) {
-    console.error("failed to get end video");
+    console.error('failed to get end video');
     return null;
   }
-  const list = await getTextList(
-    vodId,
-    start_video_path,
-    trim_clip_path,
-    end_video_path,
-    vodPath,
-  );
+  const list = await getTextList(vodId, start_video_path, trim_clip_path, end_video_path, vodPath);
   if (!list) {
-    console.error("failed to get text list");
+    console.error('failed to get text list');
     return null;
   }
   const returnPath = await concat(vodId, list);
   if (!returnPath) {
-    console.error("failed to concat");
+    console.error('failed to concat');
     return null;
   }
   fs.unlinkSync(start_video_path);
@@ -103,61 +93,48 @@ const blackoutVideo = async (vodPath, vodId, start, duration, end) => {
   return returnPath;
 };
 
-const getTextList = async (
-  vodId,
-  start_video_path,
-  trim_clip_path,
-  end_video_path,
-  vodPath,
-) => {
+const getTextList = async (vodId, start_video_path, trim_clip_path, end_video_path, vodPath) => {
   const textPath = path.normalize(`${path.dirname(vodPath)}/${vodId}-list.txt`);
-  fs.writeFileSync(
-    textPath,
-    `file '${start_video_path}'\nfile '${trim_clip_path}'\nfile '${end_video_path}'`,
-  );
+  fs.writeFileSync(textPath, `file '${start_video_path}'\nfile '${trim_clip_path}'\nfile '${end_video_path}'`);
   return textPath;
 };
 
 const concat = async (vodId, list) => {
   let returnPath;
   await new Promise((resolve, reject) => {
-    const filePath = path.normalize(
-      `${path.dirname(list)}/${vodId}-trimmed.mp4`,
-    );
+    const filePath = path.normalize(`${path.dirname(list)}/${vodId}-trimmed.mp4`);
     const ffmpeg_process = ffmpeg(list);
     ffmpeg_process
-      .inputOptions(["-f concat", "-safe 0"])
-      .videoCodec("copy")
-      .audioCodec("copy")
-      .on("progress", (progress) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .inputOptions(['-f concat', '-safe 0'])
+      .videoCodec('copy')
+      .audioCodec('copy')
+      .on('progress', (progress) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
-          process.stdout.write(
-            `CONCAT PROGRESS: ${Math.round(progress.percent)}%`,
-          );
+          process.stdout.write(`CONCAT PROGRESS: ${Math.round(progress.percent)}%`);
         }
       })
-      .on("start", (cmd) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .on('start', (cmd) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           console.info(cmd);
         }
       })
-      .on("error", function (err) {
-        ffmpeg_process.kill("SIGKILL");
+      .on('error', function (err) {
+        ffmpeg_process.kill('SIGKILL');
         reject(err);
       })
-      .on("end", function () {
+      .on('end', function () {
         resolve(filePath);
       })
       .saveToFile(filePath);
   })
     .then((result) => {
       returnPath = result;
-      console.info("\n");
+      console.info('\n');
     })
     .catch((e) => {
-      console.error("\nffmpeg error occurred: " + e);
+      console.error('\nffmpeg error occurred: ' + e);
     });
   return returnPath;
 };
@@ -165,44 +142,40 @@ const concat = async (vodId, list) => {
 const getStartVideo = async (vodPath, vodId, start) => {
   let returnPath;
   await new Promise((resolve, reject) => {
-    const filePath = path.normalize(
-      `${path.dirname(vodPath)}/${vodId}-start.mp4`,
-    );
+    const filePath = path.normalize(`${path.dirname(vodPath)}/${vodId}-start.mp4`);
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
-      .videoCodec("copy")
-      .audioCodec("copy")
+      .videoCodec('copy')
+      .audioCodec('copy')
       .duration(start)
-      .toFormat("mp4")
-      .on("progress", (progress) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .toFormat('mp4')
+      .on('progress', (progress) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
-          process.stdout.write(
-            `GET START VIDEO PROGRESS: ${Math.round(progress.percent)}%`,
-          );
+          process.stdout.write(`GET START VIDEO PROGRESS: ${Math.round(progress.percent)}%`);
         }
       })
-      .on("start", (cmd) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .on('start', (cmd) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           console.info(cmd);
         }
       })
-      .on("error", function (err) {
-        ffmpeg_process.kill("SIGKILL");
+      .on('error', function (err) {
+        ffmpeg_process.kill('SIGKILL');
         reject(err);
       })
-      .on("end", function () {
+      .on('end', function () {
         resolve(filePath);
       })
       .saveToFile(filePath);
   })
     .then((result) => {
       returnPath = result;
-      console.info("\n");
+      console.info('\n');
     })
     .catch((e) => {
-      console.error("\nffmpeg error occurred: " + e);
+      console.error('\nffmpeg error occurred: ' + e);
     });
   return returnPath;
 };
@@ -210,45 +183,41 @@ const getStartVideo = async (vodPath, vodId, start) => {
 const getClip = async (vodPath, vodId, start, duration) => {
   let returnPath;
   await new Promise((resolve, reject) => {
-    const filePath = path.normalize(
-      `${path.dirname(vodPath)}/${vodId}-clip.mp4`,
-    );
+    const filePath = path.normalize(`${path.dirname(vodPath)}/${vodId}-clip.mp4`);
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
-      .videoCodec("copy")
-      .audioCodec("copy")
+      .videoCodec('copy')
+      .audioCodec('copy')
       .seekOutput(start)
       .duration(duration)
-      .toFormat("mp4")
-      .on("progress", (progress) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .toFormat('mp4')
+      .on('progress', (progress) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
-          process.stdout.write(
-            `GET CLIP PROGRESS: ${Math.round(progress.percent)}%`,
-          );
+          process.stdout.write(`GET CLIP PROGRESS: ${Math.round(progress.percent)}%`);
         }
       })
-      .on("start", (cmd) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .on('start', (cmd) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           console.info(cmd);
         }
       })
-      .on("error", function (err) {
-        ffmpeg_process.kill("SIGKILL");
+      .on('error', function (err) {
+        ffmpeg_process.kill('SIGKILL');
         reject(err);
       })
-      .on("end", function () {
+      .on('end', function () {
         resolve(filePath);
       })
       .saveToFile(filePath);
   })
     .then((result) => {
       returnPath = result;
-      console.info("\n");
+      console.info('\n');
     })
     .catch((e) => {
-      console.error("\nffmpeg error occurred: " + e);
+      console.error('\nffmpeg error occurred: ' + e);
     });
   return returnPath;
 };
@@ -256,43 +225,39 @@ const getClip = async (vodPath, vodId, start, duration) => {
 const getTrimmedClip = async (clipPath, vodId) => {
   let returnPath;
   await new Promise((resolve, reject) => {
-    const filePath = path.normalize(
-      `${path.dirname(clipPath)}/${vodId}-clip-muted.mp4`,
-    );
+    const filePath = path.normalize(`${path.dirname(clipPath)}/${vodId}-clip-muted.mp4`);
     const ffmpeg_process = ffmpeg(clipPath);
     ffmpeg_process
-      .audioCodec("copy")
-      .videoFilter("geq=0:128:128")
-      .toFormat("mp4")
-      .on("progress", (progress) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .audioCodec('copy')
+      .videoFilter('geq=0:128:128')
+      .toFormat('mp4')
+      .on('progress', (progress) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
-          process.stdout.write(
-            `GET TRIMMED CLIP PROGRESS: ${Math.round(progress.percent)}%`,
-          );
+          process.stdout.write(`GET TRIMMED CLIP PROGRESS: ${Math.round(progress.percent)}%`);
         }
       })
-      .on("start", (cmd) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .on('start', (cmd) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           console.info(cmd);
         }
       })
-      .on("error", function (err) {
-        ffmpeg_process.kill("SIGKILL");
+      .on('error', function (err) {
+        ffmpeg_process.kill('SIGKILL');
         reject(err);
       })
-      .on("end", function () {
+      .on('end', function () {
         resolve(filePath);
       })
       .saveToFile(filePath);
   })
     .then((result) => {
       returnPath = result;
-      console.info("\n");
+      console.info('\n');
     })
     .catch((e) => {
-      console.error("\nffmpeg error occurred: " + e);
+      console.error('\nffmpeg error occurred: ' + e);
     });
   return returnPath;
 };
@@ -300,44 +265,40 @@ const getTrimmedClip = async (clipPath, vodId) => {
 const getEndVideo = async (vodPath, vodId, end) => {
   let returnPath;
   await new Promise((resolve, reject) => {
-    const filePath = path.normalize(
-      `${path.dirname(vodPath)}/${vodId}-end.mp4`,
-    );
+    const filePath = path.normalize(`${path.dirname(vodPath)}/${vodId}-end.mp4`);
     const ffmpeg_process = ffmpeg(vodPath);
     ffmpeg_process
-      .videoCodec("copy")
-      .audioCodec("copy")
+      .videoCodec('copy')
+      .audioCodec('copy')
       .seekOutput(end)
-      .toFormat("mp4")
-      .on("progress", (progress) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .toFormat('mp4')
+      .on('progress', (progress) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           readline.clearLine(process.stdout, 0);
           readline.cursorTo(process.stdout, 0, null);
-          process.stdout.write(
-            `GET END VIDEO PROGRESS: ${Math.round(progress.percent)}%`,
-          );
+          process.stdout.write(`GET END VIDEO PROGRESS: ${Math.round(progress.percent)}%`);
         }
       })
-      .on("start", (cmd) => {
-        if ((process.env.NODE_ENV || "").trim() !== "production") {
+      .on('start', (cmd) => {
+        if ((process.env.NODE_ENV || '').trim() !== 'production') {
           console.info(cmd);
         }
       })
-      .on("error", function (err) {
-        ffmpeg_process.kill("SIGKILL");
+      .on('error', function (err) {
+        ffmpeg_process.kill('SIGKILL');
         reject(err);
       })
-      .on("end", function () {
+      .on('end', function () {
         resolve(filePath);
       })
       .saveToFile(filePath);
   })
     .then((result) => {
       returnPath = result;
-      console.info("\n");
+      console.info('\n');
     })
     .catch((e) => {
-      console.error("\nffmpeg error occurred: " + e);
+      console.error('\nffmpeg error occurred: ' + e);
     });
   return returnPath;
 };
@@ -346,24 +307,21 @@ module.exports = function (app) {
   return async function (req, res, next) {
     const { vodId, type, receivedClaims, platform } = req.body;
 
-    if (!receivedClaims)
-      return res.status(400).json({ error: true, msg: "No claims" });
-    if (!vodId) return res.status(400).json({ error: true, msg: "No vod id" });
-    if (!type) return res.status(400).json({ error: true, msg: "No type" });
-    if (!platform)
-      return res.status(400).json({ error: true, msg: "No platform" });
+    if (!receivedClaims) return res.status(400).json({ error: true, msg: 'No claims' });
+    if (!vodId) return res.status(400).json({ error: true, msg: 'No vod id' });
+    if (!type) return res.status(400).json({ error: true, msg: 'No type' });
+    if (!platform) return res.status(400).json({ error: true, msg: 'No platform' });
 
     let vod_data;
     await app
-      .service("vods")
+      .service('vods')
       .get(vodId)
       .then((data) => {
         vod_data = data;
       })
       .catch(() => {});
 
-    if (!vod_data)
-      return console.error("Failed to download video: no VOD in database");
+    if (!vod_data) return console.error('Failed to download video: no VOD in database');
 
     res.status(200).json({
       error: false,
@@ -371,17 +329,17 @@ module.exports = function (app) {
     });
 
     let videoPath =
-      type === "live"
+      type === 'live'
         ? `${config.livePath}/${config.twitch.username}/${vod_data.stream_id}/${vod_data.stream_id}.mp4`
         : `${config.vodPath}/${vodId}.mp4`;
 
     if (!(await fileExists(videoPath))) {
       if (config.drive.upload) {
         videoPath = await drive.download(vodId, type, app);
-      } else if (type === "vod") {
-        if (platform === "twitch") {
+      } else if (type === 'vod') {
+        if (platform === 'twitch') {
           vodPath = await vod.mp4Download(vodId);
-        } else if (platform === "kick") {
+        } else if (platform === 'kick') {
           vodPath = await kick.downloadMP4(app, config.kick.username, vodId);
         }
       } else {
@@ -389,8 +347,7 @@ module.exports = function (app) {
       }
     }
 
-    if (!videoPath)
-      return console.error(`Could not find a download source for ${vodId}`);
+    if (!videoPath) return console.error(`Could not find a download source for ${vodId}`);
 
     let muteSection = [],
       newVodPath,
@@ -398,24 +355,20 @@ module.exports = function (app) {
     for (let dmca of receivedClaims) {
       const policyType = dmca.claimPolicy.primaryPolicy.policyType;
       if (
-        policyType === "POLICY_TYPE_GLOBAL_BLOCK" ||
-        policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK" ||
-        policyType === "POLICY_TYPE_BLOCK"
+        policyType === 'POLICY_TYPE_GLOBAL_BLOCK' ||
+        policyType === 'POLICY_TYPE_MOSTLY_GLOBAL_BLOCK' ||
+        policyType === 'POLICY_TYPE_BLOCK'
       ) {
-        if (dmca.type === "CLAIM_TYPE_AUDIO") {
+        if (dmca.type === 'CLAIM_TYPE_AUDIO') {
           muteSection.push(
-            `volume=0:enable='between(t,${
-              dmca.matchDetails.longestMatchStartTimeSeconds
-            },${
+            `volume=0:enable='between(t,${dmca.matchDetails.longestMatchStartTimeSeconds},${
               parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
               parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
             })'`,
           );
-        } else if (dmca.type === "CLAIM_TYPE_VISUAL") {
+        } else if (dmca.type === 'CLAIM_TYPE_VISUAL') {
           console.info(
-            `Trying to blackout ${
-              blackoutPath ? blackoutPath : videoPath
-            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`,
+            `Trying to blackout ${blackoutPath ? blackoutPath : videoPath}. Claim: ${JSON.stringify(dmca.asset.metadata)}`,
           );
           blackoutPath = await blackoutVideo(
             blackoutPath ? blackoutPath : videoPath,
@@ -425,19 +378,15 @@ module.exports = function (app) {
             parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
               parseInt(dmca.matchDetails.longestMatchDurationSeconds),
           );
-        } else if (dmca.type === "CLAIM_TYPE_AUDIOVISUAL") {
+        } else if (dmca.type === 'CLAIM_TYPE_AUDIOVISUAL') {
           muteSection.push(
-            `volume=0:enable='between(t,${
-              dmca.matchDetails.longestMatchStartTimeSeconds
-            },${
+            `volume=0:enable='between(t,${dmca.matchDetails.longestMatchStartTimeSeconds},${
               parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
               parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
             })'`,
           );
           console.info(
-            `Trying to blackout ${
-              blackoutPath ? blackoutPath : videoPath
-            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`,
+            `Trying to blackout ${blackoutPath ? blackoutPath : videoPath}. Claim: ${JSON.stringify(dmca.asset.metadata)}`,
           );
           blackoutPath = await blackoutVideo(
             blackoutPath ? blackoutPath : videoPath,
@@ -453,21 +402,20 @@ module.exports = function (app) {
 
     if (muteSection.length > 0) {
       console.info(`Trying to mute ${blackoutPath ? blackoutPath : videoPath}`);
-      newVodPath = await mute(
-        blackoutPath ? blackoutPath : videoPath,
-        muteSection,
-        vodId,
-      );
-      if (!newVodPath) return console.error("failed to mute video");
+      newVodPath = await mute(blackoutPath ? blackoutPath : videoPath, muteSection, vodId);
+      if (!newVodPath) return console.error('failed to mute video');
+      fs.unlinkSync(trimmedPath);
     }
 
-    const duration = await getDuration(newVodPath);
+    if (!newVodPath && !blackoutPath) return console.error("nothing to mute or blackout. don't try to upload..");
+
+    const duration = await getDuration(newVodPath ? newVodPath : blackoutPath);
 
     if (duration > config.youtube.splitDuration) {
       let paths = await vod.splitVideo(newVodPath, duration, vodId);
 
       if (!paths) {
-        console.error("Something went wrong trying to split the trimmed video");
+        console.error('Something went wrong trying to split the trimmed video');
         return;
       }
 
@@ -475,30 +423,24 @@ module.exports = function (app) {
         const data = {
           path: paths[i],
           title:
-            type === "vod"
-              ? `${config.channel} ${
-                  vod_data.platform.charAt(0).toUpperCase() +
-                  vod_data.platform.slice(1)
-                } VOD - ${dayjs(vod_data.createdAt)
+            type === 'vod'
+              ? `${config.channel} ${vod_data.platform.charAt(0).toUpperCase() + vod_data.platform.slice(1)} VOD - ${dayjs(
+                  vod_data.createdAt,
+                )
                   .tz(config.timezone)
-                  .format("MMMM DD YYYY")
+                  .format('MMMM DD YYYY')
                   .toUpperCase()} PART ${i + 1}`
-              : `${config.channel} ${
-                  vod_data.platform.charAt(0).toUpperCase() +
-                  vod_data.platform.slice(1)
-                }  Live VOD - ${dayjs(vod_data.createdAt)
+              : `${config.channel} ${vod_data.platform.charAt(0).toUpperCase() + vod_data.platform.slice(1)}  Live VOD - ${dayjs(
+                  vod_data.createdAt,
+                )
                   .tz(config.timezone)
-                  .format("MMMM DD YYYY")
+                  .format('MMMM DD YYYY')
                   .toUpperCase()} PART ${i + 1}`,
           type: type,
           public:
-            config.youtube.multiTrack &&
-            type === "live" &&
-            config.youtube.public
+            config.youtube.multiTrack && type === 'live' && config.youtube.public
               ? true
-              : !config.youtube.multiTrack &&
-                  type === "vod" &&
-                  config.youtube.public
+              : !config.youtube.multiTrack && type === 'vod' && config.youtube.public
                 ? true
                 : false,
           duration: await getDuration(paths[i]),
@@ -517,25 +459,23 @@ module.exports = function (app) {
         {
           path: newVodPath,
           title:
-            type === "vod"
-              ? `${config.channel} ${
-                  vod_data.platform.charAt(0).toUpperCase() +
-                  vod_data.platform.slice(1)
-                } VOD - ${dayjs(vod_data.createdAt)
+            type === 'vod'
+              ? `${config.channel} ${vod_data.platform.charAt(0).toUpperCase() + vod_data.platform.slice(1)} VOD - ${dayjs(
+                  vod_data.createdAt,
+                )
                   .tz(config.timezone)
-                  .format("MMMM DD YYYY")
+                  .format('MMMM DD YYYY')
                   .toUpperCase()}`
-              : `${config.channel} ${
-                  vod_data.platform.charAt(0).toUpperCase() +
-                  vod_data.platform.slice(1)
-                } Live VOD - ${dayjs(vod_data.createdAt)
+              : `${config.channel} ${vod_data.platform.charAt(0).toUpperCase() + vod_data.platform.slice(1)} Live VOD - ${dayjs(
+                  vod_data.createdAt,
+                )
                   .tz(config.timezone)
-                  .format("MMMM DD YYYY")
+                  .format('MMMM DD YYYY')
                   .toUpperCase()}`,
           public:
-            config.youtube.multiTrack && type === "live"
+            config.youtube.multiTrack && type === 'live'
               ? true
-              : !config.youtube.multiTrack && type === "vod"
+              : !config.youtube.multiTrack && type === 'vod'
                 ? true
                 : false,
           vod: vod_data,
@@ -552,13 +492,11 @@ module.exports.part = function (app) {
   return async function (req, res, next) {
     const { vodId, part, type, receivedClaims, platform } = req.body;
 
-    if (!receivedClaims)
-      return res.status(400).json({ error: true, msg: "No claims" });
-    if (!vodId) return res.status(400).json({ error: true, msg: "No vod id" });
-    if (!part) return res.status(400).json({ error: true, msg: "No part" });
-    if (!type) return res.status(400).json({ error: true, msg: "No type" });
-    if (!platform)
-      return res.status(400).json({ error: true, msg: "No platform" });
+    if (!receivedClaims) return res.status(400).json({ error: true, msg: 'No claims' });
+    if (!vodId) return res.status(400).json({ error: true, msg: 'No vod id' });
+    if (!part) return res.status(400).json({ error: true, msg: 'No part' });
+    if (!type) return res.status(400).json({ error: true, msg: 'No type' });
+    if (!platform) return res.status(400).json({ error: true, msg: 'No platform' });
 
     res.status(200).json({
       error: false,
@@ -567,27 +505,27 @@ module.exports.part = function (app) {
 
     let vod_data;
     await app
-      .service("vods")
+      .service('vods')
       .get(vodId)
       .then((data) => {
         vod_data = data;
       })
       .catch(() => {});
 
-    if (!vod_data) return console.error("Failed get vod: no VOD in database");
+    if (!vod_data) return console.error('Failed get vod: no VOD in database');
 
     let videoPath =
-      type === "live"
+      type === 'live'
         ? `${config.livePath}/${config.twitch.username}/${vod_data.stream_id}/${vod_data.stream_id}.mp4`
         : `${config.vodPath}/${vodId}.mp4`;
 
     if (!(await fileExists(videoPath))) {
       if (config.drive.upload) {
         videoPath = await drive.download(vodId, type, app);
-      } else if (type === "vod") {
-        if (platform === "twitch") {
+      } else if (type === 'vod') {
+        if (platform === 'twitch') {
           vodPath = await vod.mp4Download(vodId);
-        } else if (platform === "kick") {
+        } else if (platform === 'kick') {
           vodPath = await kick.downloadMP4(app, config.kick.username, vodId);
         }
       } else {
@@ -595,8 +533,7 @@ module.exports.part = function (app) {
       }
     }
 
-    if (!videoPath)
-      return console.error(`Could not find a download source for ${vodId}`);
+    if (!videoPath) return console.error(`Could not find a download source for ${vodId}`);
 
     const trimmedPath = await vod.trim(
       videoPath,
@@ -605,10 +542,9 @@ module.exports.part = function (app) {
       config.youtube.splitDuration,
     );
 
-    if (!trimmedPath)
-      return console.error(`Failed Trim for ${vodId} Part ${part}`);
+    if (!trimmedPath) return console.error(`Failed Trim for ${vodId} Part ${part}`);
 
-    console.info("Finished Trim..");
+    console.info('Finished Trim..');
 
     let muteSection = [],
       newVodPath,
@@ -616,24 +552,20 @@ module.exports.part = function (app) {
     for (let dmca of receivedClaims) {
       const policyType = dmca.claimPolicy.primaryPolicy.policyType;
       if (
-        policyType === "POLICY_TYPE_GLOBAL_BLOCK" ||
-        policyType === "POLICY_TYPE_MOSTLY_GLOBAL_BLOCK" ||
-        policyType === "POLICY_TYPE_BLOCK"
+        policyType === 'POLICY_TYPE_GLOBAL_BLOCK' ||
+        policyType === 'POLICY_TYPE_MOSTLY_GLOBAL_BLOCK' ||
+        policyType === 'POLICY_TYPE_BLOCK'
       ) {
-        if (dmca.type === "CLAIM_TYPE_AUDIO") {
+        if (dmca.type === 'CLAIM_TYPE_AUDIO') {
           muteSection.push(
-            `volume=0:enable='between(t,${
-              dmca.matchDetails.longestMatchStartTimeSeconds
-            },${
+            `volume=0:enable='between(t,${dmca.matchDetails.longestMatchStartTimeSeconds},${
               parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
               parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
             })'`,
           );
-        } else if (dmca.type === "CLAIM_TYPE_VISUAL") {
+        } else if (dmca.type === 'CLAIM_TYPE_VISUAL') {
           console.info(
-            `Trying to blackout ${
-              blackoutPath ? blackoutPath : trimmedPath
-            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`,
+            `Trying to blackout ${blackoutPath ? blackoutPath : trimmedPath}. Claim: ${JSON.stringify(dmca.asset.metadata)}`,
           );
           blackoutPath = await blackoutVideo(
             blackoutPath ? blackoutPath : trimmedPath,
@@ -643,19 +575,15 @@ module.exports.part = function (app) {
             parseInt(dmca.matchDetails.longestMatchStartTimeSeconds) +
               parseInt(dmca.matchDetails.longestMatchDurationSeconds),
           );
-        } else if (dmca.type === "CLAIM_TYPE_AUDIOVISUAL") {
+        } else if (dmca.type === 'CLAIM_TYPE_AUDIOVISUAL') {
           muteSection.push(
-            `volume=0:enable='between(t,${
-              dmca.matchDetails.longestMatchStartTimeSeconds
-            },${
+            `volume=0:enable='between(t,${dmca.matchDetails.longestMatchStartTimeSeconds},${
               parseInt(dmca.matchDetails.longestMatchDurationSeconds) +
               parseInt(dmca.matchDetails.longestMatchStartTimeSeconds)
             })'`,
           );
           console.info(
-            `Trying to blackout ${
-              blackoutPath ? blackoutPath : trimmedPath
-            }. Claim: ${JSON.stringify(dmca.asset.metadata)}`,
+            `Trying to blackout ${blackoutPath ? blackoutPath : trimmedPath}. Claim: ${JSON.stringify(dmca.asset.metadata)}`,
           );
           blackoutPath = await blackoutVideo(
             blackoutPath ? blackoutPath : trimmedPath,
@@ -670,23 +598,13 @@ module.exports.part = function (app) {
     }
 
     if (muteSection.length > 0) {
-      console.info(
-        `Trying to mute ${blackoutPath ? blackoutPath : trimmedPath}`,
-      );
-      newVodPath = await mute(
-        blackoutPath ? blackoutPath : trimmedPath,
-        muteSection,
-        vodId,
-      );
-      if (!newVodPath) return console.error("failed to mute video");
-
+      console.info(`Trying to mute ${blackoutPath ? blackoutPath : trimmedPath}`);
+      newVodPath = await mute(blackoutPath ? blackoutPath : trimmedPath, muteSection, vodId);
+      if (!newVodPath) return console.error('failed to mute video');
       fs.unlinkSync(trimmedPath);
     }
 
-    if (!newVodPath && !blackoutPath)
-      return console.error(
-        "nothing to mute or blackout. don't try to upload..",
-      );
+    if (!newVodPath && !blackoutPath) return console.error("nothing to mute or blackout. don't try to upload..");
 
     const duration = await getDuration(newVodPath ? newVodPath : blackoutPath);
 
@@ -694,25 +612,18 @@ module.exports.part = function (app) {
       {
         path: newVodPath ? newVodPath : blackoutPath,
         title:
-          type === "vod"
-            ? `${config.channel} ${
-                vod_data.platform.charAt(0).toUpperCase() +
-                vod_data.platform.slice(1)
-              } VOD - ${dayjs(vod_data.createdAt)
+          type === 'vod'
+            ? `${config.channel} ${vod_data.platform.charAt(0).toUpperCase() + vod_data.platform.slice(1)} VOD - ${dayjs(vod_data.createdAt).tz(config.timezone).format('MMMM DD YYYY').toUpperCase()}`
+            : `${config.channel} ${vod_data.platform.charAt(0).toUpperCase() + vod_data.platform.slice(1)} Live VOD - ${dayjs(
+                vod_data.createdAt,
+              )
                 .tz(config.timezone)
-                .format("MMMM DD YYYY")
-                .toUpperCase()}`
-            : `${config.channel} ${
-                vod_data.platform.charAt(0).toUpperCase() +
-                vod_data.platform.slice(1)
-              } Live VOD - ${dayjs(vod_data.createdAt)
-                .tz(config.timezone)
-                .format("MMMM DD YYYY")
+                .format('MMMM DD YYYY')
                 .toUpperCase()}`,
         public:
-          config.youtube.multiTrack && type === "live"
+          config.youtube.multiTrack && type === 'live'
             ? true
-            : !config.youtube.multiTrack && type === "vod"
+            : !config.youtube.multiTrack && type === 'vod'
               ? true
               : false,
         vod: vod_data,
