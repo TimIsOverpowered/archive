@@ -102,8 +102,12 @@ async function shutdown(signal: string) {
 }
 
 // Handle graceful shutdown signals
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => {
+  shutdown('SIGTERM');
+});
+process.on('SIGINT', () => {
+  shutdown('SIGINT');
+});
 
 // Start the server
 start();

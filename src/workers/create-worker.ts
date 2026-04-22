@@ -65,11 +65,14 @@ export function createWorker<TData extends object, TResult>(
     );
   });
 
-  worker.on('stalled', async (jobId) => {
-    getLogger().warn(
-      { jobId, queueName: queueName.toString() },
-      `[${name}] Job stalled - lock may have expired. This typically happens when a job takes longer than the lock duration (default: 30s). Check if event loop is blocked.`
-    );
+  worker.on('stalled', (_jobId) => {
+    (async () => {
+      const jobId = _jobId;
+      getLogger().warn(
+        { jobId, queueName: queueName.toString() },
+        `[${name}] Job stalled - lock may have expired. This typically happens when a job takes longer than the lock duration (default: 30s). Check if event loop is blocked.`
+      );
+    })();
   });
 
   registerWorker(name, worker as Worker);

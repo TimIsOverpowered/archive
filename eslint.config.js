@@ -20,14 +20,18 @@ export default tseslint.config(
       },
     },
     rules: {
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-confusing-void-expression': 'error',
+      '@typescript-eslint/no-misused-promises': ['error', {
+        checksVoidReturn: { attributes: false },
+      }],
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
       ],
       'no-unused-vars': 'off',
+      'no-unused-expressions': 'off',
       'import-x/no-duplicates': 'error',
       'no-empty-function': 'off',
       'import-x/extensions': ['error', 'ignorePackages', { ts: 'never', js: 'always' }],

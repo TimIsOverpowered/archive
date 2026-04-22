@@ -104,8 +104,12 @@ function registerShutdownHandlers() {
     setTimeout(() => process.exit(0), 100);
   };
 
-  process.on('SIGTERM', shutdown);
-  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', () => {
+    shutdown();
+  });
+  process.on('SIGINT', () => {
+    shutdown();
+  });
 }
 
 const scriptPath = process.argv[1];

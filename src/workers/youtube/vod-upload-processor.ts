@@ -303,15 +303,17 @@ export async function linkVodPartsAfterDelay(
   db: Kysely<StreamerDB>
 ): Promise<void> {
   if (uploadedVideos.length > 0) {
-    setTimeout(async () => {
-      try {
-        await saveChaptersAndLinkParts(tenantId, dbId, uploadedVideos, splitDuration, db);
-      } catch (error) {
-        log.error(
-          { dbId, vodId: uploadedVideos[0]?.id, error: extractErrorDetails(error).message },
-          'Failed to link VOD parts (non-fatal)'
-        );
-      }
+    setTimeout(() => {
+      (async () => {
+        try {
+          await saveChaptersAndLinkParts(tenantId, dbId, uploadedVideos, splitDuration, db);
+        } catch (error) {
+          log.error(
+            { dbId, vodId: uploadedVideos[0]?.id, error: extractErrorDetails(error).message },
+            'Failed to link VOD parts (non-fatal)'
+          );
+        }
+      })();
     }, 60000);
   }
 }
