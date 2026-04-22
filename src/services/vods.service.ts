@@ -5,7 +5,7 @@ import type { Expression, ExpressionBuilder, Kysely, SqlBool } from 'kysely';
 import type { StreamerDB, DBClient } from '../db/streamer-types.js';
 import { withStaleWhileRevalidate } from '../utils/cache.js';
 import { deduplicate } from '../utils/deduplicate.js';
-import { VOD_DETAILS_CACHE_TTL, VOD_LIST_CACHE_TTL, VOD_VOLATILE_CACHE_TTL } from '../constants.js';
+import { VOD_DETAILS_CACHE_TTL, VOD_LIST_CACHE_TTL, VOD_VOLATILE_CACHE_TTL, VOD_DETAILS_STALE_RATIO } from '../constants.js';
 import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
 import { RedisService } from '../utils/redis-service.js';
 import { getDisableRedisCache } from '../config/env-accessors.js';
@@ -213,17 +213,13 @@ export async function getVods(
     const resultVods = (hasMore ? result.slice(0, limit) : result) as VodResponse[];
     const dbIds = resultVods.map((v) => v.id);
     const volatileMap = await getVodVolatileCacheBatch(tenantId, dbIds);
+    const mergedVods = applyVolatileData(resultVods, volatileMap);
 
     if (!disabled) {
-      const mergedVods = applyVolatileData(resultVods, volatileMap);
-
       const hasLiveVod = mergedVods.some((vod) => vod.is_live);
       const ttl = hasLiveVod ? VOD_VOLATILE_CACHE_TTL : VOD_LIST_CACHE_TTL;
       await registerVodTags(tenantId, mergedVods, cacheKey, JSON.stringify({ vods: mergedVods, total }), ttl);
-      return { vods: mergedVods, total };
     }
-
-    const mergedVods = applyVolatileData(resultVods, volatileMap);
 
     return { vods: mergedVods, total };
   });
@@ -247,7 +243,7 @@ export async function getVodById(db: DBClient, tenantId: string, vodId: number):
   const staticData = await withStaleWhileRevalidate(
     cacheKey,
     VOD_DETAILS_CACHE_TTL,
-    VOD_DETAILS_CACHE_TTL * 0.8,
+    VOD_DETAILS_CACHE_TTL * VOD_DETAILS_STALE_RATIO,
     fetcher
   );
 
@@ -285,7 +281,7 @@ export async function getVodByPlatformId(
   const staticData = await withStaleWhileRevalidate(
     cacheKey,
     VOD_VOLATILE_CACHE_TTL,
-    VOD_VOLATILE_CACHE_TTL * 0.8,
+    VOD_VOLATILE_CACHE_TTL * VOD_DETAILS_STALE_RATIO,
     fetcher
   );
 

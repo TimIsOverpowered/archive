@@ -30,6 +30,9 @@ export const VOD_VOLATILE_CACHE_TTL = 15; // 15 seconds for live status/duration
 export const EMOTE_CACHE_TTL = 86_400; // 1 day for emotes
 export const MAX_CACHE_PAGES = 10; // cap paginated list cache to prevent tag explosion
 
+// ── Cache Stale-While-Revalidate ────────────────────────────────────────────
+export const VOD_DETAILS_STALE_RATIO = 0.8; // Revalidate when 80% of TTL has elapsed
+
 // ── Database ─────────────────────────────────────────────────────────────────
 export const INT32_MAX = 2_147_483_647; // PostgreSQL integer column limit
 export const DB_POOL_IDLE_TIMEOUT_MS = 30 * 60 * 1_000;
