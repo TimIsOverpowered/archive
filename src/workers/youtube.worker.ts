@@ -19,6 +19,7 @@ import { TenantConfig } from '../config/types.js';
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../db/streamer-types';
 import { publishVodUpdate } from '../services/cache-invalidator.js';
+import type { VodRecord } from '../types/db.js';
 
 const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async (job: Job<YoutubeUploadJob>) => {
   const { tenantId, dbId, vodId, type, filePath } = job.data;
@@ -110,7 +111,13 @@ async function processVodUploadJob(
   db: Kysely<StreamerDB>,
   log: AppLogger
 ): Promise<YoutubeUploadResult> {
-  const { tenantId, dbId, vodId, filePath, dmcaProcessed, vodRecord, part, type } = job;
+  const { tenantId, dbId, vodId, filePath, dmcaProcessed, part, type } = job;
+
+  const vodRecord = await db.selectFrom('vods').where('id', '=', dbId).selectAll().executeTakeFirst();
+
+  if (!vodRecord) {
+    throw new Error(`VOD record not found for dbId ${dbId}`);
+  }
 
   const result = await processVodUpload({
     tenantId,
@@ -119,12 +126,12 @@ async function processVodUploadJob(
     filePath,
     db,
     config,
-    vodRecord,
     dmcaProcessed,
     log,
     type,
     part,
-  });
+    vodRecord: vodRecord as VodRecord,
+  } as Parameters<typeof processVodUpload>[0]);
 
   for (const video of result.uploadedVideos) {
     await db

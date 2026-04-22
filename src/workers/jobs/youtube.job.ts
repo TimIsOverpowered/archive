@@ -26,21 +26,12 @@ export async function createVodUploadJob(
     throw new Error(`YouTube upload not enabled for tenant ${tenantId}`);
   }
 
-  const vodRecord = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-    return db.selectFrom('vods').where('id', '=', dbId).selectAll().executeTakeFirst();
-  });
-
-  if (!vodRecord) {
-    throw new Error(`VOD record not found for dbId ${dbId}`);
-  }
-
   return {
     tenantId,
     dbId,
     vodId,
     filePath,
     type,
-    vodRecord,
     platform,
     part: part ?? 1,
   };
