@@ -1,3 +1,5 @@
+import { Platform } from '../types/platforms.js';
+
 export interface TenantBase {
   id: string;
   displayName?: string | undefined;
@@ -55,4 +57,17 @@ export interface TenantConfig extends TenantBase {
   kick?: KickConfig;
   database: DatabaseConfig;
   settings: TenantSettings;
+}
+
+export type PlatformConfig = TwitchConfig | KickConfig | undefined;
+
+export function getPlatformConfig(config: TenantConfig, platform: Platform): PlatformConfig {
+  switch (platform) {
+    case 'twitch':
+      return config.twitch;
+    case 'kick':
+      return config.kick;
+    default:
+      return undefined;
+  }
 }

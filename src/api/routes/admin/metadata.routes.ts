@@ -14,6 +14,7 @@ import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
 import { findVodRecord } from './utils/vod-helpers.js';
 import { fetchAndSaveEmotes } from '../../../services/emotes.js';
 import { triggerChatDownload } from '../../../workers/jobs/chat.job';
+import { getPlatformConfig } from '../../../config/types.js';
 
 type RouteParams = { tenantId: string };
 
@@ -123,7 +124,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       if (!vodRecord) throw notFound(`VOD ${vodId} not found`);
 
       // Queue emote save job (fire-and-forget within request context)
-      const platformId = config?.[platform]?.id;
+      const platformId = getPlatformConfig(config, platform)?.id;
 
       if (!platformId) throw badRequest(`No platform ID available for ${platform} ${vodId}`);
 
@@ -168,7 +169,8 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       if (!vodRecord) throw notFound(`VOD ${vodId} not found`);
 
       // Queue emote save job (fire-and-forget within request context)
-      const platformId = config?.[platform]?.id;
+      const platformCfg = getPlatformConfig(config, platform);
+      const platformId = platformCfg?.id;
 
       if (!platformId) throw badRequest(`No platform ID available for ${platform} ${vodId}`);
 
@@ -179,7 +181,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
         vodId,
         platform,
         Math.round(vodRecord.duration),
-        config?.[platform]?.username,
+        platformCfg?.username,
         forceRerun
       );
 
