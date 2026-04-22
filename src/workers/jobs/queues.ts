@@ -2,7 +2,6 @@ import { Queue, QueueOptions, JobsOptions, FlowProducer } from 'bullmq';
 import type { DMCAClaim } from '../dmca/dmca.js';
 import { getRedisInstance } from '../redis.js';
 import type { Platform, SourceType, UploadType, DownloadMethod } from '../../types/platforms.js';
-import { VodRecord } from '../../types/db.js';
 
 export interface LiveDownloadJob {
   dbId: number;
@@ -46,7 +45,6 @@ export interface YoutubeVodUploadJob {
   type: SourceType;
   platform: Platform;
   dmcaProcessed?: boolean | undefined;
-  vodRecord: VodRecord;
   part?: number | undefined;
 }
 

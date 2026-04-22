@@ -25,7 +25,6 @@ export interface VodUploadContext {
   filePath?: string | undefined;
   db: Kysely<StreamerDB>;
   config: TenantConfig;
-  vodRecord: VodRecord;
   dmcaProcessed?: boolean | undefined;
   log: AppLogger;
   type: SourceType;
@@ -38,10 +37,16 @@ export interface VodUploadResult {
 }
 
 export async function processVodUpload(ctx: VodUploadContext): Promise<VodUploadResult> {
-  const { tenantId, filePath, config, vodRecord } = ctx;
+  const { tenantId, filePath, config, db, dbId } = ctx;
 
   if (!filePath) {
     throw new Error('File path is required for VOD upload');
+  }
+
+  const vodRecord = await db.selectFrom('vods').where('id', '=', dbId).selectAll().executeTakeFirst();
+
+  if (!vodRecord) {
+    throw new Error(`VOD record not found for dbId ${dbId}`);
   }
 
   const channelName = config.displayName || tenantId;
@@ -72,6 +77,7 @@ export async function processVodUpload(ctx: VodUploadContext): Promise<VodUpload
       domainName,
       privacyStatus,
       platformName,
+      vodRecord,
     });
   }
 }
@@ -83,6 +89,7 @@ interface SplitVodUploadContext extends VodUploadContext {
   domainName: string;
   privacyStatus: string;
   platformName: Platform;
+  vodRecord: VodRecord;
 }
 
 async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUploadResult> {
@@ -222,6 +229,7 @@ interface SingleVodUploadContext extends VodUploadContext {
   domainName: string;
   privacyStatus: string;
   platformName: Platform;
+  vodRecord: VodRecord;
 }
 
 async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodUploadResult> {
