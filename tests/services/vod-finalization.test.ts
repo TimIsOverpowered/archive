@@ -67,7 +67,7 @@ describe('finalizeVod', () => {
     };
 
     (RedisService as any)._instance = {
-      getClient: () => mockClient,
+      client: mockClient,
     };
 
     resetEnvConfig();

@@ -36,10 +36,40 @@ describe('registerVodTags', () => {
         redisCalls.push(`pexpire:${args.join(',')}`);
       },
       get: async () => null,
+      pipeline: () => ({
+        set: (...args: any[]) => {
+          redisCalls.push(`set:${args.join(',')}`);
+          return {
+            sadd: (...args: any[]) => {
+              redisCalls.push(`sadd:${args.join(',')}`);
+              return {
+                pexpire: (...args: any[]) => {
+                  redisCalls.push(`pexpire:${args.join(',')}`);
+                  return { exec: async () => [] };
+                },
+              };
+            },
+          };
+        },
+        sadd: (...args: any[]) => {
+          redisCalls.push(`sadd:${args.join(',')}`);
+          return {
+            pexpire: (...args: any[]) => {
+              redisCalls.push(`pexpire:${args.join(',')}`);
+              return { exec: async () => [] };
+            },
+          };
+        },
+        pexpire: (...args: any[]) => {
+          redisCalls.push(`pexpire:${args.join(',')}`);
+          return { exec: async () => [] };
+        },
+        exec: async () => [],
+      }),
     };
 
     (RedisService as any)._instance = {
-      getClient: () => mockClient,
+      client: mockClient,
     };
 
     resetEnvConfig();
@@ -120,7 +150,7 @@ describe('invalidateVodTags', () => {
     };
 
     (RedisService as any)._instance = {
-      getClient: () => mockClient,
+      client: mockClient,
     };
 
     resetEnvConfig();
@@ -171,7 +201,7 @@ describe('invalidateVodVolatileCache', () => {
     };
 
     (RedisService as any)._instance = {
-      getClient: () => mockClient,
+      client: mockClient,
     };
 
     resetEnvConfig();

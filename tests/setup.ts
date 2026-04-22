@@ -7,5 +7,6 @@ process.env.PGBOUNCER_URL = 'postgresql://localhost/placeholder';
 process.env.NODE_ENV = 'test';
 process.env.PORT = '3000';
 process.env.LOG_LEVEL = 'info';
-
-afterEach(resetCacheState);
+process.env.YOUTUBE_CLIENT_ID = 'test-youtube-client-id';
+process.env.YOUTUBE_CLIENT_SECRET = 'test-youtube-client-secret';
+process.env.VOD_PATH = '/tmp/test-vods';
