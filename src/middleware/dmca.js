@@ -410,7 +410,9 @@ module.exports = function (app) {
       if (!newVodPath) return console.error('failed to mute video');
     }
 
-    const duration = await getDuration(newVodPath);
+    if (!newVodPath && !blackoutPath) return console.error("nothing to mute or blackout. don't try to upload..");
+
+    const duration = await getDuration(newVodPath ? newVodPath : blackoutPath);
 
     if (duration > config.youtube.splitDuration) {
       let paths = await vod.splitVideo(newVodPath, duration, vodId);
