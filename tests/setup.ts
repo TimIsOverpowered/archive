@@ -1,0 +1,7 @@
+process.env.REDIS_URL = 'redis://localhost:6379';
+process.env.META_DATABASE_URL = 'postgresql://localhost/test';
+process.env.ENCRYPTION_MASTER_KEY = '0000000000000000000000000000000000000000000000000000000000000000';
+process.env.PGBOUNCER_URL = 'postgresql://localhost/placeholder';
+process.env.NODE_ENV = 'test';
+process.env.PORT = '3000';
+process.env.LOG_LEVEL = 'info';
