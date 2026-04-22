@@ -1,5 +1,5 @@
 import { getVodTokenSig } from '../../services/twitch/index.js';
-import { getVod as getKickVod, getKickParsedM3u8ForFfmpeg } from '../../services/kick.js';
+import { getVod as getKickVod, getKickParsedM3u8ForFfmpeg } from '../../services/kick/index.js';
 import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
 import type { AppLogger } from '../../utils/logger.js';
 import type { TenantConfig } from '../../config/types.js';

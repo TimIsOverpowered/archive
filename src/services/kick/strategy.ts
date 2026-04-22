@@ -1,14 +1,13 @@
-import { getKickStreamStatus, getLatestKickVodObject } from '../kick-live.js';
-import { getVod, finalizeKickChapters } from '../kick.js';
+import { getKickStreamStatus, getLatestKickVodObject, getVod, finalizeKickChapters } from './index.js';
 import type {
   PlatformStrategy,
   PlatformStreamStatus,
   PlatformVodMetadata,
   VodCreateData,
   VodUpdateData,
-} from './strategy.js';
+} from '../platforms/strategy.js';
 import { getLogger } from '../../utils/logger.js';
-export const kickStrategy: PlatformStrategy = {
+export const strategy: PlatformStrategy = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
     const { config, platform } = ctx;
 
