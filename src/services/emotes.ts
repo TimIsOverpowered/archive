@@ -10,6 +10,7 @@ import { EMOTE_CACHE_TTL, FFZ_API_BASE, BTTV_API_BASE, SEVENTV_API_BASE } from '
 import { EmoteUpsertSchema } from '../config/schemas.js';
 import { invalidateEmoteCache } from './vod-cache.js';
 import { publishVodUpdate } from './cache-invalidator.js';
+import { CacheKeys } from '../utils/cache-keys.js';
 
 export interface EmoteData {
   id: string;
@@ -161,7 +162,7 @@ export async function fetchAndSaveEmotes(
 }
 
 export async function getEmotesByVodId(db: DBClient, tenantId: string, vodId: number): Promise<VodEmotes | null> {
-  const cacheKey = `emotes:${tenantId}:${vodId}`;
+  const cacheKey = CacheKeys.emotes(tenantId, vodId);
 
   const redis = RedisService.getActiveClient();
   if (redis) {

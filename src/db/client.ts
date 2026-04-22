@@ -8,6 +8,7 @@ import { extractDatabaseName } from '../utils/formatting.js';
 import { DB_POOL_IDLE_TIMEOUT_MS, DB_POOL_MAX_CLIENTS, DB_POOL_CLEANUP_INTERVAL_MS } from '../constants.js';
 import { sleep } from '../utils/delay.js';
 import type { StreamerDB } from './streamer-types.js';
+import { buildPgBouncerUrl } from './utils.js';
 
 let PoolCtor: typeof Pool = Pool;
 
@@ -57,10 +58,9 @@ class PoolManager {
     const connectionLimit = config.database.connectionLimit ?? 2;
     const tenantDbName = extractDatabaseName(config.database.url);
 
-    const url = new URL(pgbouncerUrl);
-    url.pathname = `/${tenantDbName}`;
+    const url = buildPgBouncerUrl(pgbouncerUrl, tenantDbName);
 
-    const pool = new PoolCtor({ connectionString: url.toString(), max: connectionLimit });
+    const pool = new PoolCtor({ connectionString: url, max: connectionLimit });
     const db = new Kysely<StreamerDB>({ dialect: new PostgresDialect({ pool }) });
 
     this.pools.set(config.id, {
