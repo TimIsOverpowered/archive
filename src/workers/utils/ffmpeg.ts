@@ -51,8 +51,8 @@ export function detectFmp4FromPlaylist(m3u8Content: string): boolean {
     );
 
     return hasFmp4Segments;
-  } catch {
-    throw new Error('Failed to parse m3u8 playlist for fMP4 detection');
+} catch {
+    return false;
   }
 }
 

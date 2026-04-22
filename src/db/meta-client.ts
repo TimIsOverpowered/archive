@@ -17,14 +17,15 @@ let _metaDb: Kysely<MetaDB> | null = null;
 export async function initMetaClient(): Promise<Kysely<MetaDB>> {
   if (_metaDb) return _metaDb;
 
-  const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
-  const metaDbUrl = getBaseConfig().META_DATABASE_URL;
-
-  if (globalForMeta.metaDb) {
+  // In development, share across hot-reload boundaries via globalThis.
+  // This guard must match the storage guard below to avoid stale reads.
+  if (getBaseConfig().NODE_ENV !== 'production' && globalForMeta.metaDb) {
     _metaDb = globalForMeta.metaDb;
     return _metaDb;
   }
 
+  const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
+  const metaDbUrl = getBaseConfig().META_DATABASE_URL;
   const metaDbName = extractDatabaseName(metaDbUrl);
 
   const url = new URL(pgbouncerUrl);

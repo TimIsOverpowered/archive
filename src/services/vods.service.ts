@@ -22,8 +22,8 @@ function applyVolatileData(
   });
 }
 
-function buildCacheKey(...parts: (string | number | boolean | undefined | null)[]): string {
-  return parts.filter((p) => p !== undefined && p !== null && p !== '').join(':');
+function buildCacheKey(...parts: (string | number | undefined | null)[]): string {
+  return parts.filter((p): p is string | number => p !== undefined && p !== null && p !== '').join(':');
 }
 
 function buildQueryCacheKey(tenantId: string, query: VodQuery, page: number, limit: number): string {
