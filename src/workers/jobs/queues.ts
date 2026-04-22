@@ -146,8 +146,8 @@ export const QUEUES_VALUES = Object.values(QUEUE_NAMES);
 export const defaultJobOptions = {
   attempts: 3,
   backoff: { type: 'exponential' as const, delay: 5000 },
-  removeOnComplete: true,
-  removeOnFail: true,
+  removeOnComplete: { count: 0 },
+  removeOnFail: { count: 50 },
 };
 
 const queueCache = new Map<string, Queue<QueueJob, QueueJob, string>>();
