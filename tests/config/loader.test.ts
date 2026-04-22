@@ -14,6 +14,7 @@ describe('API Config Loader', () => {
     Object.keys(process.env).forEach((key) => delete process.env[key]);
     process.env.REDIS_URL = 'redis://localhost';
     process.env.META_DATABASE_URL = 'postgresql://meta';
+    process.env.PGBOUNCER_URL = 'postgresql://bouncer';
     process.env.ENCRYPTION_MASTER_KEY = validKey;
     clearConfigCache();
   };
