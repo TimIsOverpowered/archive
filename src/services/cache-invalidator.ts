@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify';
 import { RedisService } from '../utils/redis-service.js';
-import { getDisableRedisCache } from '../config/env.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { invalidateVodVolatileCache } from './cache-tags.js';
@@ -18,8 +17,8 @@ interface VodUpdateEvent {
 }
 
 export async function publishVodUpdate(tenantId: string, dbId: number): Promise<void> {
-  const client = RedisService.instance?.getClient() ?? null;
-  if (!client || getDisableRedisCache()) return;
+  const client = RedisService.getActiveClient();
+  if (!client) return;
 
   const event: VodUpdateEvent = { type: 'VOD_UPDATED', tenantId, dbId };
 
@@ -37,8 +36,8 @@ export async function publishVodDurationUpdate(
   duration: number,
   isLive: boolean
 ): Promise<void> {
-  const client = RedisService.instance?.getClient() ?? null;
-  if (!client || getDisableRedisCache()) return;
+  const client = RedisService.getActiveClient();
+  if (!client) return;
 
   const event: VodUpdateEvent = { type: 'VOD_DURATION_UPDATED', tenantId, dbId, duration, is_live: isLive };
 
@@ -51,8 +50,8 @@ export async function publishVodDurationUpdate(
 }
 
 export function registerCacheSubscriber(fastify: FastifyInstance): void {
-  const mainClient = RedisService.instance?.getClient() ?? null;
-  if (!mainClient || getDisableRedisCache()) return;
+  const mainClient = RedisService.getActiveClient();
+  if (!mainClient) return;
 
   const subClient = mainClient.duplicate();
   const log = getLogger().child({ module: 'cache-subscriber' });

@@ -1,5 +1,4 @@
 import { RedisService } from '../utils/redis-service.js';
-import { getDisableRedisCache } from '../config/env.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { invalidateVodTags, invalidateVodVolatileCache } from './cache-tags.js';
@@ -22,8 +21,8 @@ function getVolatileCacheKey(tenantId: string, dbId: number): string {
 }
 
 export async function getVodStaticCache(tenantId: string, dbId: number): Promise<string | null> {
-  const client = RedisService.instance?.getClient() ?? null;
-  if (!client || getDisableRedisCache()) return null;
+  const client = RedisService.getActiveClient();
+  if (!client) return null;
 
   try {
     return await client.get(getStaticCacheKey(tenantId, dbId));
@@ -33,8 +32,8 @@ export async function getVodStaticCache(tenantId: string, dbId: number): Promise
 }
 
 export async function setVodStaticCache(tenantId: string, dbId: number, data: string, ttl: number): Promise<void> {
-  const client = RedisService.instance?.getClient() ?? null;
-  if (!client || getDisableRedisCache()) return;
+  const client = RedisService.getActiveClient();
+  if (!client) return;
 
   try {
     await client.set(getStaticCacheKey(tenantId, dbId), data, 'EX', ttl);
@@ -45,8 +44,8 @@ export async function setVodStaticCache(tenantId: string, dbId: number, data: st
 }
 
 export async function getVodVolatileCache(tenantId: string, dbId: number): Promise<VodVolatileData | null> {
-  const client = RedisService.instance?.getClient() ?? null;
-  if (!client || getDisableRedisCache()) return null;
+  const client = RedisService.getActiveClient();
+  if (!client) return null;
 
   try {
     const cached = await client.get(getVolatileCacheKey(tenantId, dbId));
@@ -65,8 +64,8 @@ export async function setVodVolatileCache(
   data: VodVolatileData,
   ttl: number
 ): Promise<void> {
-  const client = RedisService.instance?.getClient() ?? null;
-  if (!client || getDisableRedisCache()) return;
+  const client = RedisService.getActiveClient();
+  if (!client) return;
 
   try {
     await client.set(getVolatileCacheKey(tenantId, dbId), JSON.stringify(data), 'EX', ttl);
@@ -84,8 +83,8 @@ export async function getVodVolatileCacheBatch(
 
   if (dbIds.length === 0) return result;
 
-  const client = RedisService.instance?.getClient() ?? null;
-  if (!client || getDisableRedisCache()) return result;
+  const client = RedisService.getActiveClient();
+  if (!client) return result;
 
   const keys = dbIds.map((id) => getVolatileCacheKey(tenantId, id));
 
@@ -111,8 +110,8 @@ export async function getVodVolatileCacheBatch(
 }
 
 export async function invalidateVodStaticCache(tenantId: string, dbId: number): Promise<void> {
-  const client = RedisService.instance?.getClient() ?? null;
-  if (getDisableRedisCache() || !client) return;
+  const client = RedisService.getActiveClient();
+  if (!client) return;
 
   try {
     await client.unlink(getStaticCacheKey(tenantId, dbId));
@@ -136,8 +135,8 @@ export async function invalidateVodStaticCache(tenantId: string, dbId: number): 
 }
 
 export async function invalidateEmoteCache(tenantId: string, vodId: number): Promise<void> {
-  const client = RedisService.instance?.getClient() ?? null;
-  if (getDisableRedisCache() || !client) return;
+  const client = RedisService.getActiveClient();
+  if (!client) return;
 
   const cacheKey = `emotes:{${tenantId}}:${vodId}`;
 

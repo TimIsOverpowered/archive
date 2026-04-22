@@ -13,7 +13,6 @@ import {
 } from '../constants.js';
 import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
 import { RedisService } from '../utils/redis-service.js';
-import { getDisableRedisCache } from '../config/env.js';
 import { registerVodTags } from './cache-tags.js';
 import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.js';
 
@@ -177,8 +176,8 @@ export async function getVods(
   const cacheKey = buildQueryCacheKey(tenantId, query, page, limit);
   const { where, orderBy } = buildVodQuery(query);
 
-  const redisClient = RedisService.instance?.getClient() ?? null;
-  const disabled = !redisClient || getDisableRedisCache();
+  const redisClient = RedisService.getActiveClient();
+  const disabled = !redisClient;
 
   if (!disabled) {
     try {

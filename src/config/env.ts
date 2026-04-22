@@ -110,11 +110,6 @@ export function getBaseConfig(): BaseConfig {
 
 // --- Lazy accessor helpers (consolidated from env-accessors.ts) ---
 
-// Values from cached configs
-export function getDisableRedisCache(): boolean {
-  return getApiConfig().DISABLE_REDIS_CACHE;
-}
-
 // ENCRYPTION_MASTER_KEY read directly (works even when full config can't load)
 let _keyBuffer: Buffer | null = null;
 
