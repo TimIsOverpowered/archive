@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import fs from 'fs/promises';
+import type { Stats as FsStats } from 'fs';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import {
@@ -73,24 +74,19 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
       const log = createAutoLogger(tenantId);
 
       // Validate file path exists and is accessible
+      const exists = await fileExists(request.body.path);
+      if (!exists) {
+        badRequest(`File at ${request.body.path} does not exist`);
+      }
+
+      let stats: FsStats;
       try {
-        const exists = await fileExists(request.body.path);
-
-        if (!exists) {
-          badRequest(`File at ${request.body.path} does not exist`);
-        }
-
-        const stats = await fs.stat(request.body.path);
-        if (!stats.isFile() || stats.size === 0) {
-          badRequest(`File at ${request.body.path} is invalid (not a regular file or empty)`);
-        }
-
-        log.info(`Validated recording file: ${request.body.path} (${(stats.size / (1024 * 1024)).toFixed(2)} MB)`);
-      } catch (accessError) {
-        const errorMessage = accessError instanceof Error ? accessError.message : String(accessError);
-        log.error(`File validation failed for ${request.body.path}: ${errorMessage}`);
-
+        stats = await fs.stat(request.body.path);
+      } catch {
         notFound('Recording file not found or inaccessible');
+      }
+      if (!stats.isFile() || stats.size === 0) {
+        badRequest(`File at ${request.body.path} is invalid (not a regular file or empty)`);
       }
 
       // Look up VOD record by stream_id or id
