@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { jsonArrayFrom } from 'kysely/helpers/postgres';
-import type { Kysely, ExpressionBuilder } from 'kysely';
+import { sql } from 'kysely';
+import type { Expression, ExpressionBuilder, Kysely, SqlBool } from 'kysely';
 import type { StreamerDB, DBClient } from '../db/streamer-types.js';
 import { withStaleWhileRevalidate } from '../utils/cache.js';
 import { deduplicate } from '../utils/deduplicate.js';
@@ -49,7 +50,7 @@ export interface VodResponse {
     part: number;
     status: string;
     thumbnail_url: string | null;
-    created_at: Date;
+    created_at: string;
   }>;
   chapters: Array<{
     name: string | null;
@@ -71,6 +72,39 @@ export interface VodResponse {
   }>;
 }
 
+function selectVodRelations(eb: ExpressionBuilder<StreamerDB, 'vods'>) {
+  return [
+    jsonArrayFrom(
+      eb
+        .selectFrom('vod_uploads')
+        .select(['upload_id', 'type', 'duration', 'part', 'status', 'thumbnail_url', 'created_at'])
+        .whereRef('vod_uploads.vod_id', '=', 'vods.id')
+    ).as('vod_uploads'),
+    jsonArrayFrom(
+      eb
+        .selectFrom('chapters')
+        .select(['name', 'image', 'duration', 'start', 'end'])
+        .whereRef('chapters.vod_id', '=', 'vods.id')
+    ).as('chapters'),
+    jsonArrayFrom(
+      eb
+        .selectFrom('games')
+        .select([
+          'start_time',
+          'end_time',
+          'video_provider',
+          'video_id',
+          'thumbnail_url',
+          'game_id',
+          'game_name',
+          'title',
+          'chapter_image',
+        ])
+        .whereRef('games.vod_id', '=', 'vods.id')
+    ).as('games'),
+  ] as const;
+}
+
 export const VodQuerySchema = z.object({
   platform: z.enum(PLATFORM_VALUES as [string, ...string[]]).optional(),
   from: z.string().datetime().optional(),
@@ -85,12 +119,14 @@ export const VodQuerySchema = z.object({
 
 export type VodQuery = z.infer<typeof VodQuerySchema>;
 
+type VodsOrderByCol = 'created_at' | 'duration';
+
 export function buildVodQuery(query: VodQuery): {
-  where: (eb: ExpressionBuilder<StreamerDB, 'vods'>) => unknown;
-  orderBy: { col: string; dir: 'asc' | 'desc' };
+  where: (eb: ExpressionBuilder<StreamerDB, 'vods'>) => Expression<SqlBool>;
+  orderBy: { col: VodsOrderByCol; dir: 'asc' | 'desc' };
 } {
   const where = (eb: ExpressionBuilder<StreamerDB, 'vods'>) => {
-    const conditions: unknown[] = [];
+    const conditions: Expression<SqlBool>[] = [];
 
     if (query.platform) {
       conditions.push(eb('platform', '=', query.platform));
@@ -113,13 +149,12 @@ export function buildVodQuery(query: VodQuery): {
       );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return eb.and(conditions as any);
+    return eb.and(conditions);
   };
 
   const orderBy = {
-    col: (query.sort === 'uploaded_at' ? 'created_at' : query.sort) || 'created_at',
-    dir: query.order || 'desc',
+    col: ((query.sort === 'uploaded_at' ? 'created_at' : query.sort) ?? 'created_at') as VodsOrderByCol,
+    dir: query.order ?? 'desc',
   };
 
   return { where, orderBy };
@@ -160,53 +195,22 @@ export async function getVods(
       db
         .selectFrom('vods')
         .selectAll('vods')
-        .select((eb) => [
-          jsonArrayFrom(
-            eb
-              .selectFrom('vod_uploads')
-              .select(['upload_id', 'type', 'duration', 'part', 'status', 'thumbnail_url', 'created_at'])
-              .whereRef('vod_uploads.vod_id', '=', 'vods.id')
-          ).as('vod_uploads'),
-          jsonArrayFrom(
-            eb
-              .selectFrom('chapters')
-              .select(['name', 'image', 'duration', 'start', 'end'])
-              .whereRef('chapters.vod_id', '=', 'vods.id')
-          ).as('chapters'),
-          jsonArrayFrom(
-            eb
-              .selectFrom('games')
-              .select([
-                'start_time',
-                'end_time',
-                'video_provider',
-                'video_id',
-                'thumbnail_url',
-                'game_id',
-                'game_name',
-                'title',
-                'chapter_image',
-              ])
-              .whereRef('games.vod_id', '=', 'vods.id')
-          ).as('games'),
-        ])
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .where(where as any)
-        .orderBy(orderBy.col as 'created_at' | 'duration', orderBy.dir)
+        .select((eb) => selectVodRelations(eb))
+        .where(where)
+        .orderBy(sql.ref(orderBy.col), orderBy.dir)
         .limit(limit + 1)
         .offset(offset)
         .execute(),
       db
         .selectFrom('vods')
         .select((eb) => [eb.fn.count('id').as('cnt')])
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .where(where as any)
+        .where(where)
         .executeTakeFirst(),
     ]);
 
     const total = Number(totalRow?.cnt ?? 0);
     const hasMore = result.length > limit;
-    const resultVods = (hasMore ? result.slice(0, limit) : result) as unknown as VodResponse[];
+    const resultVods = (hasMore ? result.slice(0, limit) : result) as VodResponse[];
     const dbIds = resultVods.map((v) => v.id);
     const volatileMap = await getVodVolatileCacheBatch(tenantId, dbIds);
 
@@ -232,41 +236,12 @@ export async function getVodById(db: DBClient, tenantId: string, vodId: number):
     const vod = await db
       .selectFrom('vods')
       .selectAll('vods')
-      .select((eb) => [
-        jsonArrayFrom(
-          eb
-            .selectFrom('vod_uploads')
-            .select(['upload_id', 'type', 'duration', 'part', 'status', 'thumbnail_url', 'created_at'])
-            .whereRef('vod_uploads.vod_id', '=', 'vods.id')
-        ).as('vod_uploads'),
-        jsonArrayFrom(
-          eb
-            .selectFrom('chapters')
-            .select(['name', 'image', 'duration', 'start', 'end'])
-            .whereRef('chapters.vod_id', '=', 'vods.id')
-        ).as('chapters'),
-        jsonArrayFrom(
-          eb
-            .selectFrom('games')
-            .select([
-              'start_time',
-              'end_time',
-              'video_provider',
-              'video_id',
-              'thumbnail_url',
-              'game_id',
-              'game_name',
-              'title',
-              'chapter_image',
-            ])
-            .whereRef('games.vod_id', '=', 'vods.id')
-        ).as('games'),
-      ])
+      .select((eb) => selectVodRelations(eb))
       .where('id', '=', vodId)
       .executeTakeFirst();
 
     if (!vod) return null;
-    return vod as unknown as VodResponse;
+    return vod as VodResponse;
   };
 
   const staticData = await withStaleWhileRevalidate(
@@ -298,48 +273,19 @@ export async function getVodByPlatformId(
     const vod = await db
       .selectFrom('vods')
       .selectAll('vods')
-      .select((eb) => [
-        jsonArrayFrom(
-          eb
-            .selectFrom('vod_uploads')
-            .select(['upload_id', 'type', 'duration', 'part', 'status', 'thumbnail_url', 'created_at'])
-            .whereRef('vod_uploads.vod_id', '=', 'vods.id')
-        ).as('vod_uploads'),
-        jsonArrayFrom(
-          eb
-            .selectFrom('chapters')
-            .select(['name', 'image', 'duration', 'start', 'end'])
-            .whereRef('chapters.vod_id', '=', 'vods.id')
-        ).as('chapters'),
-        jsonArrayFrom(
-          eb
-            .selectFrom('games')
-            .select([
-              'start_time',
-              'end_time',
-              'video_provider',
-              'video_id',
-              'thumbnail_url',
-              'game_id',
-              'game_name',
-              'title',
-              'chapter_image',
-            ])
-            .whereRef('games.vod_id', '=', 'vods.id')
-        ).as('games'),
-      ])
+      .select((eb) => selectVodRelations(eb))
       .where('platform', '=', platform)
       .where('vod_id', '=', platformVodId)
       .executeTakeFirst();
 
     if (!vod) return null;
-    return vod as unknown as VodResponse;
+    return vod as VodResponse;
   };
 
   const staticData = await withStaleWhileRevalidate(
     cacheKey,
-    VOD_DETAILS_CACHE_TTL,
-    VOD_DETAILS_CACHE_TTL * 0.8,
+    VOD_VOLATILE_CACHE_TTL,
+    VOD_VOLATILE_CACHE_TTL * 0.8,
     fetcher
   );
 
