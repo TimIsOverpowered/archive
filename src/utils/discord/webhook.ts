@@ -75,10 +75,7 @@ export async function sendRichAlert(data: import('./embed.js').RichEmbedData): P
   }
 }
 
-export async function updateDiscordEmbed(
-  messageId: string,
-  data: import('./embed.js').RichEmbedData
-): Promise<void> {
+export async function updateDiscordEmbed(messageId: string, data: import('./embed.js').RichEmbedData): Promise<void> {
   if (!isAlertsEnabled()) {
     return;
   }

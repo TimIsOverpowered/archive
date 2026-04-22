@@ -127,7 +127,10 @@ export async function invalidateVodStaticCache(tenantId: string, dbId: number): 
   } catch (error) {
     if (!isConnectionFailed(tenantId) && isConnectionError(error)) {
       markConnectionFailed(tenantId);
-      getLogger().warn({ tenantId, dbId, error: extractErrorDetails(error) }, 'Redis connection lost, cache invalidation suspended');
+      getLogger().warn(
+        { tenantId, dbId, error: extractErrorDetails(error) },
+        'Redis connection lost, cache invalidation suspended'
+      );
     }
   }
 }
