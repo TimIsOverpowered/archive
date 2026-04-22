@@ -24,9 +24,9 @@ export async function waitForWorkersReady(workerInstances: Worker[]): Promise<vo
 }
 
 export function createWorker(config: WorkerConfig & { connection: Redis }): Worker<Record<string, unknown>, unknown> {
-  const { name, queueName, processor, connection, concurrency = 1, useWorkerThreads = false } = config;
+  const { name, processor, connection, concurrency = 1, useWorkerThreads = false } = config;
 
-  const worker = new Worker<Record<string, unknown>, unknown>(queueName, processor, {
+  const worker = new Worker<Record<string, unknown>, unknown>(name, processor, {
     connection,
     concurrency,
     useWorkerThreads,
@@ -67,7 +67,7 @@ export function createWorker(config: WorkerConfig & { connection: Redis }): Work
     (async () => {
       const jobId = _jobId;
       getLogger().warn(
-        { jobId, queueName: queueName.toString() },
+        { jobId, queueName: name },
         `[${name}] Job stalled - lock may have expired. This typically happens when a job takes longer than the lock duration (default: 30s). Check if event loop is blocked.`
       );
     })();
