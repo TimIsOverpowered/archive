@@ -2,12 +2,12 @@ import 'dotenv/config';
 import { pathToFileURL } from 'node:url';
 import { extractErrorDetails } from '../utils/error.js';
 import { loadTenantConfigs, clearConfigCache } from '../config/loader.js';
-import { QUEUE_NAMES, getQueue, closeQueues } from './jobs/queues.js';
+import { QUEUE_NAMES, getQueue, closeQueues, QUEUES_VALUES } from './jobs/queues.js';
 import { initWorkersRedis, getRedisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
 import { startTokenHealthCron } from '../cron/token-health.js';
 import { startMonitorService, stopMonitorService } from './monitor/index.js';
 import { getLogger, setLoggerConfig } from '../utils/logger.js';
-import { WORKER_DEFINITIONS } from './worker-definitions.js';
+import { getWorkerDefinitions } from './worker-definitions.js';
 import { createWorker, waitForWorkersReady, workers } from './create-worker.js';
 import { loadWorkersConfig } from '../config/env.js';
 import { VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY, SHUTDOWN_TIMEOUT_MS } from '../constants.js';
@@ -24,22 +24,13 @@ async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkers
 
   getLogger().warn('[Queues] CLEAR_QUEUES_ON_STARTUP=true — all queued jobs will be permanently deleted');
 
-  const queueNames = [
-    QUEUE_NAMES.VOD_LIVE,
-    QUEUE_NAMES.VOD_STANDARD,
-    QUEUE_NAMES.CHAT_DOWNLOAD,
-    QUEUE_NAMES.YOUTUBE_UPLOAD,
-    QUEUE_NAMES.DMCA_PROCESSING,
-    QUEUE_NAMES.MONITOR,
-  ];
-
-  for (const name of queueNames) {
+  for (const name of QUEUES_VALUES) {
     const queue = getQueue(name);
     await queue.pause();
     await queue.obliterate({ force: true });
     await queue.resume();
 
-    getLogger().info({ queue: name }, 'Queue obliterated and reset');
+    getLogger().warn({ queue: name }, 'Queue obliterated and reset');
   }
 
   getLogger().warn('[Queues] All queues cleared and reset');
@@ -59,7 +50,7 @@ export async function bootstrap() {
     startTokenHealthCron();
     await clearAllJobsOnStartup(workerConfig);
 
-    const workerInstances = WORKER_DEFINITIONS.map((def) => {
+    const workerInstances = getWorkerDefinitions().map((def) => {
       if (def.name === QUEUE_NAMES.VOD_LIVE) {
         const liveTenants = configs.filter((c) => c.settings.vodDownload && (c.twitch?.enabled || c.kick?.enabled));
         const liveConcurrency = Math.max(liveTenants.length * 2 * VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY);

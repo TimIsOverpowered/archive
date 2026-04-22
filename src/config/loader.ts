@@ -4,13 +4,13 @@ import { getAllTenants, getTenantById } from '../services/meta-tenants.service.j
 import { decryptScalar } from '../utils/encryption.js';
 import { SettingsSchema, YoutubeSchema, TwitchSchema, KickSchema } from './schemas.js';
 import { TenantConfig } from './types.js';
-import { getConfigCacheTtl } from './env.js';
+import { getBaseConfig } from './env.js';
 import type { TenantResult } from '../db/meta-types.js';
 
 let configCache: LRUCache<string, TenantConfig> | null = null;
 
 function createConfigCache(): LRUCache<string, TenantConfig> {
-  const ttl = getConfigCacheTtl() * 1000;
+  const ttl = getBaseConfig().CONFIG_CACHE_TTL * 1000;
   return new LRUCache({
     max: 500,
     ttl,

@@ -1,6 +1,6 @@
-import { Worker, BaseJobOptions } from 'bullmq';
+import { Worker, BaseJobOptions, Processor } from 'bullmq';
 import { getLogger } from '../utils/logger.js';
-import { WorkerConfig, WorkerName } from './worker-definitions.js';
+import { WorkerName, AnyWorkerConfig } from './worker-definitions.js';
 import type { Redis } from 'ioredis';
 
 export const workers = new Map<WorkerName, Worker<Record<string, unknown>, unknown>>();
@@ -23,12 +23,12 @@ export async function waitForWorkersReady(workerInstances: Worker[]): Promise<vo
   await Promise.all(readyPromises);
 }
 
-export function createWorker<TData extends object, TResult>(
-  config: WorkerConfig<TData, TResult> & { connection: Redis }
-): Worker<TData, TResult> {
+export function createWorker(
+  config: AnyWorkerConfig & { connection: Redis }
+): Worker<Record<string, unknown>, unknown> {
   const { name, queueName, processor, connection, concurrency = 1, useWorkerThreads = false } = config;
 
-  const worker = new Worker<TData, TResult>(queueName, processor, {
+  const worker = new Worker<Record<string, unknown>, unknown>(queueName, processor as unknown as Processor<Record<string, unknown>, unknown, string>, {
     connection,
     concurrency,
     useWorkerThreads,

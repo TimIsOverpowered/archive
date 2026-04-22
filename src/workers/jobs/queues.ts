@@ -143,6 +143,8 @@ export const QUEUE_NAMES = {
   MONITOR: 'monitor',
 } as const;
 
+export const QUEUES_VALUES = Object.values(QUEUE_NAMES);
+
 export const defaultJobOptions = {
   attempts: 3,
   backoff: { type: 'exponential' as const, delay: 5000 },
