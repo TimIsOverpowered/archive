@@ -15,9 +15,12 @@ export interface TenantPlatformContext extends TenantContext {
 
 /**
  * Cast TenantContext to TenantPlatformContext after platformValidationMiddleware runs.
- * Safe because platformValidationMiddleware always sets request.tenant.platform.
+ * Throws if platform is not set — platformValidationMiddleware must have run first.
  */
 export function asTenantPlatformContext(ctx: TenantContext): TenantPlatformContext {
+  if (!ctx.platform) {
+    throw new Error('platformValidationMiddleware must run before asTenantPlatformContext');
+  }
   return ctx as TenantPlatformContext;
 }
 
