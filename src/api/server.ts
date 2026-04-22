@@ -17,6 +17,8 @@ import logsRoutes from './routes/logs.js';
 import badgesRoutes from './routes/badges.js';
 import { globalAdminRoutes, default as adminRoutes } from './routes/admin/index.js';
 import { registerCacheSubscriber } from '../services/cache-invalidator.js';
+import { BODY_LIMIT, COMPRESSION_THRESHOLD } from '../constants.js';
+import { randomUUID } from 'node:crypto';
 
 function hasStatusCode(e: unknown): e is { statusCode: number } {
   return (
@@ -48,9 +50,15 @@ function formatErrorResponse(error: unknown): {
 
 export async function buildServer() {
   const fastify = Fastify({
-    bodyLimit: 25 * 1024 * 1024,
+    bodyLimit: BODY_LIMIT,
     exposeHeadRoutes: true,
-    logger: false,
+    logger: {
+      transport: {
+        target: 'pino-pretty',
+        options: { translateTime: 'HH:MM:ss Z', ignore: 'pid,hostname' },
+      },
+      redact: ['headers.authorization', 'headers.cookie'],
+    },
     trustProxy: true,
     routerOptions: {
       ignoreTrailingSlash: true,
@@ -93,6 +101,13 @@ export async function buildServer() {
     exitTenantContext();
   });
 
+  // Request ID propagation
+  fastify.addHook('preHandler', (request, reply, done) => {
+    const requestId = (request.headers['x-request-id'] as string | undefined) ?? randomUUID();
+    reply.header('X-Request-ID', requestId);
+    done();
+  });
+
   // Security headers
   await fastify.register(helmet, {
     contentSecurityPolicy: false,
@@ -102,7 +117,7 @@ export async function buildServer() {
 
   // Compression for large responses (>10KB)
   await fastify.register(compress, {
-    threshold: 10240,
+    threshold: COMPRESSION_THRESHOLD,
   });
 
   // Load streamer configs and initialize database clients

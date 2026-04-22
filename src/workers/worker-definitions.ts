@@ -30,10 +30,10 @@ export interface WorkerConfig<TData extends object = object, TResult = unknown> 
   useWorkerThreads?: boolean | undefined;
 }
 
-export function defineWorker<TData extends object, TResult>(
+export function defineWorker<TData extends object = object, TResult = unknown>(
   def: WorkerConfig<TData, TResult>
-): WorkerConfig<object, unknown> {
-  return def as WorkerConfig<object, unknown>;
+): WorkerConfig<TData, TResult> {
+  return def;
 }
 
 export const WORKER_DEFINITIONS = [

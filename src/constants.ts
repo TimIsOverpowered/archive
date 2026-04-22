@@ -93,6 +93,11 @@ export const HTTP_DEFAULT_MAX_DELAY_MS = 30_000;
 export const SEGMENT_DOWNLOAD_MAX_CONNECTIONS = 5000;
 export const SEGMENT_DOWNLOAD_PIPELINING = 1;
 
-// ── Math / Misc ──────────────────────────────────────────────────────────────
+// ── HTTP / Misc ──────────────────────────────────────────────────────────────
 export const PERCENTAGE_PRECISION_MULTIPLIER = 1_000;
 export const PERCENTAGE_PRECISION_DIVISOR = 10;
+
+// ── HTTP / Server ────────────────────────────────────────────────────────────
+export const BODY_LIMIT = 25 * 1024 * 1024; // 25MB request body limit
+export const COMPRESSION_THRESHOLD = 10240; // 10KB response compression threshold
+export const SHUTDOWN_TIMEOUT_MS = 100; // Grace period before force-exit on SIGTERM/SIGINT
