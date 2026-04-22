@@ -4,6 +4,7 @@ import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
 import { MAX_CACHE_PAGES } from '../constants.js';
+import { isConnectionError } from '../db/client.js';
 
 function extractPageFromKey(key: string): number | null {
   const parts = key.split(':');
@@ -53,8 +54,7 @@ export async function registerVodTags(
       throw firstErr ?? new Error('Pipeline command failed');
     }
   } catch (error) {
-    const { message } = extractErrorDetails(error);
-    if (message.includes('ECONNREFUSED')) {
+    if (isConnectionError(error)) {
       markConnectionFailed(tenantId);
     }
     getLogger().warn({ tenantId, cacheKey, error: extractErrorDetails(error) }, 'Tag registration failed');
@@ -81,8 +81,7 @@ export async function invalidateVodTags(tenantId: string, dbId: number): Promise
 
     await client.del(tagKey);
   } catch (error) {
-    const { message } = extractErrorDetails(error);
-    if (message.includes('ECONNREFUSED')) {
+    if (isConnectionError(error)) {
       markConnectionFailed(tenantId);
     }
   }
@@ -102,11 +101,9 @@ export async function invalidateVodVolatileCache(tenantId: string, dbId: number)
 
     getLogger().debug({ tenantId, dbId }, 'VOD volatile cache invalidated');
   } catch (error) {
-    const { message } = extractErrorDetails(error);
-
-    if (!isConnectionFailed(tenantId) && message.includes('ECONNREFUSED')) {
+    if (!isConnectionFailed(tenantId) && isConnectionError(error)) {
       markConnectionFailed(tenantId);
-      getLogger().warn({ tenantId, dbId, error: message }, 'Redis connection lost, cache invalidation suspended');
+      getLogger().warn({ tenantId, dbId, error: extractErrorDetails(error) }, 'Redis connection lost, cache invalidation suspended');
     }
   }
 }
