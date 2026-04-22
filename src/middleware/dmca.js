@@ -415,7 +415,7 @@ module.exports = function (app) {
     const duration = await getDuration(newVodPath ? newVodPath : blackoutPath);
 
     if (duration > config.youtube.splitDuration) {
-      let paths = await vod.splitVideo(newVodPath, duration, vodId);
+      let paths = await vod.splitVideo(newVodPath ? newVodPath : blackoutPath, duration, vodId);
 
       if (!paths) {
         console.error('Something went wrong trying to split the trimmed video');
@@ -460,7 +460,7 @@ module.exports = function (app) {
     } else {
       await youtube.upload(
         {
-          path: newVodPath,
+          path: newVodPath ? newVodPath : blackoutPath,
           title:
             type === 'vod'
               ? `${config.channel} ${
