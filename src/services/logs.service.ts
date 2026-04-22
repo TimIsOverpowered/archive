@@ -39,15 +39,15 @@ async function getVodBucketSize(db: Kysely<StreamerDB>, tenantId: string, vodId:
     }
   }
 
-  const rawResult = await sql`
-    SELECT
-      COUNT(*) / NULLIF((MAX(content_offset_seconds) - MIN(content_offset_seconds)), 0) * 100 AS comments_per_100s
-    FROM chat_messages
-    WHERE vod_id = ${vodId}
-  `.execute(db);
+  const result = await db
+    .selectFrom('chat_messages')
+    .select(sql<number>`
+      COUNT(*) / NULLIF(MAX(content_offset_seconds) - MIN(content_offset_seconds), 0) * 100
+    `.as('comments_per_100s'))
+    .where('vod_id', '=', vodId)
+    .executeTakeFirst();
 
-  const row = (rawResult.rows as unknown[])[0] as { comments_per_100s?: unknown };
-  const commentsPer100sValue = parseFloat(String(row?.comments_per_100s ?? ''));
+  const commentsPer100sValue = parseFloat(String(result?.comments_per_100s ?? ''));
   const bucketSize = isFinite(commentsPer100sValue)
     ? computeBucketSize(commentsPer100sValue)
     : LOGS_DEFAULT_BUCKET_SIZE;

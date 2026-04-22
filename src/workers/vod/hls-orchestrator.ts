@@ -15,7 +15,8 @@ import {
 } from './hls-utils.js';
 import { sleep, getRetryDelay } from '../../utils/delay.js';
 import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
-import { updateFfmpegProgress } from '../../utils/discord-alerts.js';
+import { createVodWorkerAlerts } from '../utils/alert-factories.js';
+import { updateAlert } from '../../utils/discord-alerts.js';
 import { cleanupHlsFiles } from './hls-cleanup.js';
 import {
   HLS_MAX_CONSECUTIVE_ERRORS,
@@ -102,12 +103,13 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
     const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
 
     log.info({ vodId, isFmp4 }, 'Converting HLS to MP4');
+    const alerts = createVodWorkerAlerts();
     await convertHlsToMp4(m3u8Path, finalMp4Path, {
       vodId,
       isFmp4,
       onProgress: (percent) => {
-        if (options.discordMessageId && options.streamerName) {
-          void updateFfmpegProgress(options.discordMessageId, platform, vodId, percent, options.streamerName);
+        if (options.discordMessageId) {
+          void updateAlert(options.discordMessageId, alerts.progress(vodId, `Converting ${vodId} (${percent}%)`));
         }
       },
     });

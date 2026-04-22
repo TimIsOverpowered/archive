@@ -1,16 +1,12 @@
 import { getVodTokenSig } from '../../services/twitch/index.js';
 import { getVod as getKickVod, getKickParsedM3u8ForFfmpeg } from '../../services/kick/index.js';
 import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
+import { createVodWorkerAlerts } from '../utils/alert-factories.js';
+import { initRichAlert, updateAlert } from '../../utils/discord-alerts.js';
 import type { AppLogger } from '../../utils/logger.js';
 import type { TenantConfig } from '../../config/types.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { request } from '../../utils/http-client.js';
-import {
-  sendVodDownloadFailed,
-  sendVodDownloadStarted,
-  sendVodDownloadSuccess,
-  updateFfmpegProgress,
-} from '../../utils/discord-alerts.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { TWITCH_USHER_BASE_URL } from '../../constants.js';
 
@@ -63,11 +59,12 @@ async function downloadKickVodWithFfmpeg(
     throw new Error('Failed to parse Kick HLS playlist');
   }
 
+  const alerts = createVodWorkerAlerts();
   let messageId: string | null = null;
 
   try {
     const streamerName = config.displayName || config.id;
-    messageId = await sendVodDownloadStarted(PLATFORMS.KICK, config.id, vodId, streamerName);
+    messageId = await initRichAlert(alerts.init(vodId, PLATFORMS.KICK, streamerName));
 
     // Download directly to MP4 using ffmpeg HLS streaming
     await convertHlsToMp4(m3u8Url, finalPath, {
@@ -75,7 +72,7 @@ async function downloadKickVodWithFfmpeg(
       isFmp4: false,
       onProgress: (percent) => {
         if (messageId) {
-          void updateFfmpegProgress(messageId, PLATFORMS.KICK, vodId, percent, streamerName);
+          void updateAlert(messageId, alerts.progress(vodId, `Converting ${vodId} (${percent}%)`));
         }
       },
     });
@@ -84,7 +81,7 @@ async function downloadKickVodWithFfmpeg(
 
     // Success alert
     if (messageId) {
-      await sendVodDownloadSuccess(messageId, PLATFORMS.KICK, vodId, finalPath, streamerName);
+      await updateAlert(messageId, alerts.complete(vodId, PLATFORMS.KICK, finalPath));
     }
   } catch (error) {
     const details = extractErrorDetails(error);
@@ -94,7 +91,7 @@ async function downloadKickVodWithFfmpeg(
 
     // Failure alert
     if (messageId) {
-      await sendVodDownloadFailed(messageId, PLATFORMS.KICK, vodId, errorMsg, config.id);
+      await updateAlert(messageId, alerts.error(vodId, PLATFORMS.KICK, errorMsg));
     }
 
     throw error;
@@ -112,6 +109,7 @@ async function downloadTwitchVodWithFfmpeg(
     throw new Error(`No vodPath configured for streamer ${tenantId}`);
   }
 
+  const alerts = createVodWorkerAlerts();
   let messageId: string | null = null;
 
   try {
@@ -124,7 +122,7 @@ async function downloadTwitchVodWithFfmpeg(
     const m3u8Url = `${TWITCH_USHER_BASE_URL}/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h264,hevc&playlist_include_framerate=true&nauthsig=${tokenSig.signature}&nauth=${tokenSig.value}`;
 
     const streamerName = config.displayName || tenantId;
-    messageId = await sendVodDownloadStarted(PLATFORMS.TWITCH, tenantId, vodId, streamerName);
+    messageId = await initRichAlert(alerts.init(vodId, PLATFORMS.TWITCH, streamerName));
 
     const m3u8Content = await request(m3u8Url, {
       responseType: 'text',
@@ -137,7 +135,7 @@ async function downloadTwitchVodWithFfmpeg(
       isFmp4,
       onProgress: (percent) => {
         if (messageId) {
-          void updateFfmpegProgress(messageId, PLATFORMS.TWITCH, vodId, percent, streamerName);
+          void updateAlert(messageId, alerts.progress(vodId, `Converting ${vodId} (${percent}%)`));
         }
       },
     });
@@ -145,7 +143,7 @@ async function downloadTwitchVodWithFfmpeg(
     log.info(`Downloaded ${vodId}.mp4`);
 
     if (messageId) {
-      await sendVodDownloadSuccess(messageId, PLATFORMS.TWITCH, vodId, finalPath, streamerName);
+      await updateAlert(messageId, alerts.complete(vodId, PLATFORMS.TWITCH, finalPath));
     }
   } catch (error) {
     const details = extractErrorDetails(error);
@@ -154,7 +152,7 @@ async function downloadTwitchVodWithFfmpeg(
     log.error(`ffmpeg error occurred: ${errorMsg}`);
 
     if (messageId) {
-      await sendVodDownloadFailed(messageId, PLATFORMS.TWITCH, vodId, errorMsg, tenantId);
+      await updateAlert(messageId, alerts.error(vodId, PLATFORMS.TWITCH, errorMsg));
     }
 
     throw error;
