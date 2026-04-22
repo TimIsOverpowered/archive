@@ -9,6 +9,7 @@ import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { triggerChatDownload } from '../../../../workers/jobs/chat.job.js';
 
 import { getStrategy } from '../../../../services/platforms/index.js';
+import { getPlatformConfig, type PlatformConfig } from '../../../../config/types.js';
 
 /**
  * Validates and extracts platform configuration from context
@@ -17,16 +18,16 @@ import { getStrategy } from '../../../../services/platforms/index.js';
 function validatePlatformConfig(
   ctx: TenantPlatformContext,
   platform: Platform
-): { platformUserId: string; platformUsername: string } | null {
-  const config = ctx.config?.[platform];
-  const platformUserId = config?.id;
-  const platformUsername = config?.username;
+): { platformUserId: string; platformUsername: string; platformCfg: PlatformConfig } | null {
+  const platformCfg = getPlatformConfig(ctx.config, platform);
+  const platformUserId = platformCfg?.id;
+  const platformUsername = platformCfg?.username;
 
   if (!platformUserId || !platformUsername) {
     return null;
   }
 
-  return { platformUserId, platformUsername };
+  return { platformUserId, platformUsername, platformCfg };
 }
 
 /**
@@ -74,13 +75,13 @@ export async function ensureVodRecord(
   vodId: string,
   log: AppLogger
 ): Promise<VodRecord | null> {
-  const { db, tenantId, config, platform } = ctx;
+  const { db, tenantId, platform } = ctx;
 
   const platformConfig = validatePlatformConfig(ctx, platform);
   if (!platformConfig) {
     return null;
   }
-  const { platformUserId } = platformConfig;
+  const { platformUserId, platformCfg } = platformConfig;
 
   const rawVodRecord = await findVodRecord(db, vodId, platform);
 
@@ -119,7 +120,7 @@ export async function ensureVodRecord(
       vodId,
       platform,
       Math.round(vodRecord.duration),
-      config?.[platform]?.username
+      platformCfg?.username
     );
   }
 

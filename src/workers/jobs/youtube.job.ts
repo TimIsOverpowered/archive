@@ -7,6 +7,7 @@ import { UPLOAD_MODES } from '../../types/platforms.js';
 import { TenantContext } from '../../types/context.js';
 import { withDbRetry } from '../../db/client.js';
 import { extractErrorDetails } from '../../utils/error.js';
+import { getPlatformConfig } from '../../config/types.js';
 
 const log = childLogger({ module: 'youtube-job' });
 
@@ -52,7 +53,8 @@ export async function createGameUploadJob(
     throw new Error(`YouTube upload not enabled for tenant ${tenantId}`);
   }
 
-  if (!config?.[platform]?.mainPlatform) {
+  const platformCfg = getPlatformConfig(config, platform);
+  if (!platformCfg?.mainPlatform) {
     throw new Error(`Skipping upload because ${platform} mainPlatform is false`);
   }
 
@@ -131,7 +133,8 @@ export async function createGameUploadJobsForVod(
     throw new Error(`YouTube upload not enabled for tenant ${tenantId}`);
   }
 
-  if (!config?.[platform]?.mainPlatform) {
+  const platformCfg = getPlatformConfig(config, platform);
+  if (!platformCfg?.mainPlatform) {
     throw new Error(`Skipping upload because ${platform} mainPlatform is false`);
   }
 

@@ -3,6 +3,7 @@ import path from 'path';
 import type { Kysely } from 'kysely';
 import type { StreamerDB, InsertableVods, SelectableVods } from '../../db/streamer-types';
 import type { TenantConfig } from '../../config/types.js';
+import { getPlatformConfig } from '../../config/types.js';
 import type { Platform } from '../../types/platforms.js';
 import { getStrategy, type PlatformStreamStatus, type PlatformVodMetadata } from '../../services/platforms/index.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
@@ -14,6 +15,30 @@ import { getTenantConfig } from '../../config/loader.js';
 import { publishVodUpdate } from '../../services/cache-invalidator.js';
 
 type StreamerDbClient = Kysely<StreamerDB>;
+
+interface LiveStreamContext {
+  db: StreamerDbClient;
+  streamStatus: PlatformStreamStatus;
+  platform: Platform;
+  platformUserId: string;
+  platformUsername: string;
+  config: TenantConfig;
+  strategy: NonNullable<ReturnType<typeof getStrategy>>;
+  tenantId: string;
+  log: ReturnType<typeof createAutoLogger>;
+}
+
+interface ExistingVodInfo {
+  id: number;
+  vod_id: string;
+  started_at?: Date | null;
+}
+
+type NewLiveContext = LiveStreamContext;
+
+type ExistingVodLiveContext = LiveStreamContext & { existingVod: { id: number; vod_id: string } };
+
+type AlreadyLiveContext = LiveStreamContext & { existingVod: ExistingVodInfo };
 
 export async function handlePlatformLiveCheck(
   db: StreamerDbClient,
@@ -30,8 +55,9 @@ export async function handlePlatformLiveCheck(
     return;
   }
 
-  const platformUsername = config?.[platform]?.username;
-  const platformUserId = config?.[platform]?.id;
+  const platformCfg = getPlatformConfig(config, platform);
+  const platformUsername = platformCfg?.username;
+  const platformUserId = platformCfg?.id;
 
   if (!platformUserId || !platformUsername) {
     log.debug({ platform, username: platformUsername }, '[Monitor]: Platform not fully configured');
@@ -62,17 +88,17 @@ export async function handlePlatformLiveCheck(
     return;
   }
 
-  await handleLiveStream(
+  await handleLiveStream({
     db,
     streamStatus,
     platform,
     platformUserId,
     platformUsername,
     config,
-    strategy as NonNullable<ReturnType<typeof getStrategy>>,
+    strategy: strategy as NonNullable<ReturnType<typeof getStrategy>>,
     tenantId,
-    log
-  );
+    log,
+  });
 }
 
 async function handleOfflineStream(
@@ -103,194 +129,139 @@ async function handleOfflineStream(
   }
 }
 
-async function handleLiveStream(
-  db: StreamerDbClient,
-  streamStatus: PlatformStreamStatus,
-  platform: Platform,
-  platformUserId: string,
-  platformUsername: string,
-  config: TenantConfig,
-  strategy: NonNullable<ReturnType<typeof getStrategy>>,
-  tenantId: string,
-  log: ReturnType<typeof createAutoLogger>
-): Promise<void> {
-  const existingVod = await db
+async function handleLiveStream(ctx: LiveStreamContext): Promise<void> {
+  const existingVod = await ctx.db
     .selectFrom('vods')
     .selectAll()
-    .where('stream_id', '=', streamStatus.id)
-    .where('platform', '=', platform)
+    .where('stream_id', '=', ctx.streamStatus.id)
+    .where('platform', '=', ctx.platform)
     .executeTakeFirst();
 
   if (!existingVod) {
-    await handleNewLiveStream(
-      db,
-      streamStatus,
-      platform,
-      platformUserId,
-      platformUsername,
-      config,
-      strategy,
-      tenantId,
-      log
-    );
+    await handleNewLiveStream(ctx);
     return;
   }
 
   if (!existingVod.is_live) {
-    await handleExistingVodBecameLive(
-      db,
-      existingVod,
-      streamStatus,
-      platform,
-      platformUserId,
-      platformUsername,
-      tenantId,
-      log
-    );
+    await handleExistingVodBecameLive({ ...ctx, existingVod: { id: existingVod.id, vod_id: existingVod.vod_id } });
     return;
   }
 
-  await handleAlreadyLiveStream(
-    { id: existingVod.id, vod_id: existingVod.vod_id, started_at: existingVod.started_at ?? undefined },
-    streamStatus,
-    platform,
-    platformUserId,
-    platformUsername,
-    tenantId,
-    log
-  );
+  await handleAlreadyLiveStream({
+    ...ctx,
+    existingVod: { id: existingVod.id, vod_id: existingVod.vod_id, started_at: existingVod.started_at },
+  });
 }
 
-async function handleNewLiveStream(
-  db: StreamerDbClient,
-  streamStatus: PlatformStreamStatus,
-  platform: Platform,
-  platformUserId: string,
-  platformUsername: string,
-  config: TenantConfig,
-  strategy: NonNullable<ReturnType<typeof getStrategy>>,
-  tenantId: string,
-  log: ReturnType<typeof createAutoLogger>
-): Promise<void> {
-  log.info({ streamId: streamStatus.id }, '[Monitor]: New live detected, checking for VOD object');
+async function handleNewLiveStream(ctx: NewLiveContext): Promise<void> {
+  ctx.log.info({ streamId: ctx.streamStatus.id }, '[Monitor]: New live detected, checking for VOD object');
 
-  const ctx = { tenantId, config, platform };
+  const metadataCtx = { tenantId: ctx.tenantId, config: ctx.config, platform: ctx.platform };
   let vodMetadata: PlatformVodMetadata | null = null;
 
-  if (strategy.fetchVodObjectForLiveStream) {
-    vodMetadata = await strategy.fetchVodObjectForLiveStream(streamStatus.id, ctx);
+  if (ctx.strategy.fetchVodObjectForLiveStream) {
+    vodMetadata = await ctx.strategy.fetchVodObjectForLiveStream(ctx.streamStatus.id, metadataCtx);
   }
 
   if (!vodMetadata) {
-    log.debug('[Monitor]: No VOD object found yet');
+    ctx.log.debug('[Monitor]: No VOD object found yet');
     return;
   }
 
-  const existingVod = await db
+  const existingVod = await ctx.db
     .selectFrom('vods')
     .selectAll()
     .where('vod_id', '=', vodMetadata.id)
-    .where('platform', '=', platform)
+    .where('platform', '=', ctx.platform)
     .executeTakeFirst();
 
   if (existingVod) {
-    log.debug({ vodId: vodMetadata.id }, '[Monitor]: VOD was created by concurrent poll');
+    ctx.log.debug({ vodId: vodMetadata.id }, '[Monitor]: VOD was created by concurrent poll');
     return;
   }
 
-  log.info(
-    { vodId: vodMetadata.id, startedAt: streamStatus.startedAt },
+  ctx.log.info(
+    { vodId: vodMetadata.id, startedAt: ctx.streamStatus.startedAt },
     '[Monitor]: Creating VOD record for live stream'
   );
 
-  const [createdVod] = await db
+  const [createdVod] = await ctx.db
     .insertInto('vods')
     .values({
-      ...strategy.createVodData(vodMetadata),
+      ...ctx.strategy.createVodData(vodMetadata),
       is_live: true,
-      started_at: new Date(streamStatus.startedAt),
+      started_at: new Date(ctx.streamStatus.startedAt),
     } as InsertableVods)
     .returning('id')
     .execute();
 
   if (!createdVod) {
-    log.error({ vodId: vodMetadata.id }, '[Monitor]: Failed to create VOD record');
+    ctx.log.error({ vodId: vodMetadata.id }, '[Monitor]: Failed to create VOD record');
     return;
   }
 
-  await publishVodUpdate(tenantId, createdVod.id);
+  await publishVodUpdate(ctx.tenantId, createdVod.id);
 
-  await sendStreamLiveAlert(platform, vodMetadata.id, streamStatus.title, platformUsername, config.displayName);
+  await sendStreamLiveAlert(
+    ctx.platform,
+    vodMetadata.id,
+    ctx.streamStatus.title,
+    ctx.platformUsername,
+    ctx.config.displayName
+  );
 
-  log.info({ vodId: vodMetadata.id }, '[Monitor]: Queuing HLS download');
+  ctx.log.info({ vodId: vodMetadata.id }, '[Monitor]: Queuing HLS download');
 
   await enqueueLiveHlsDownload({
     dbId: createdVod.id,
     vodId: vodMetadata.id,
-    platform,
-    tenantId,
-    platformUserId,
-    platformUsername,
-    startedAt: new Date(streamStatus.startedAt),
+    platform: ctx.platform,
+    tenantId: ctx.tenantId,
+    platformUserId: ctx.platformUserId,
+    platformUsername: ctx.platformUsername,
+    startedAt: new Date(ctx.streamStatus.startedAt),
     sourceUrl: vodMetadata.sourceUrl ?? undefined,
   });
 }
 
-async function handleExistingVodBecameLive(
-  db: StreamerDbClient,
-  existingVod: { id: number; vod_id: string },
-  streamStatus: PlatformStreamStatus,
-  platform: Platform,
-  platformUserId: string,
-  platformUsername: string,
-  tenantId: string,
-  log: ReturnType<typeof createAutoLogger>
-): Promise<void> {
-  log.info({ vodId: existingVod.vod_id }, '[Monitor]: Existing VOD is now active');
+async function handleExistingVodBecameLive(ctx: ExistingVodLiveContext): Promise<void> {
+  ctx.log.info({ vodId: ctx.existingVod.vod_id }, '[Monitor]: Existing VOD is now active');
 
-  await db
+  await ctx.db
     .updateTable('vods')
     .set({
       is_live: true,
-      started_at: new Date(streamStatus.startedAt),
+      started_at: new Date(ctx.streamStatus.startedAt),
     })
-    .where('id', '=', existingVod.id)
+    .where('id', '=', ctx.existingVod.id)
     .execute();
 
-  await publishVodUpdate(tenantId, existingVod.id);
+  await publishVodUpdate(ctx.tenantId, ctx.existingVod.id);
 
-  log.info({ vodId: existingVod.vod_id }, '[Monitor]: Queuing HLS download');
+  ctx.log.info({ vodId: ctx.existingVod.vod_id }, '[Monitor]: Queuing HLS download');
 
   await enqueueLiveHlsDownload({
-    dbId: existingVod.id,
-    vodId: existingVod.vod_id,
-    platform,
-    tenantId,
-    platformUserId,
-    platformUsername,
-    startedAt: new Date(streamStatus.startedAt),
+    dbId: ctx.existingVod.id,
+    vodId: ctx.existingVod.vod_id,
+    platform: ctx.platform,
+    tenantId: ctx.tenantId,
+    platformUserId: ctx.platformUserId,
+    platformUsername: ctx.platformUsername,
+    startedAt: new Date(ctx.streamStatus.startedAt),
   });
 }
 
-async function handleAlreadyLiveStream(
-  existingVod: { id: number; vod_id: string; started_at?: Date | null | undefined },
-  streamStatus: PlatformStreamStatus,
-  platform: Platform,
-  platformUserId: string,
-  platformUsername: string,
-  tenantId: string,
-  log: ReturnType<typeof createAutoLogger>
-): Promise<void> {
-  log.debug({ vodId: existingVod.vod_id }, '[Monitor]: VOD is live, ensuring download queued');
+async function handleAlreadyLiveStream(ctx: AlreadyLiveContext): Promise<void> {
+  ctx.log.debug({ vodId: ctx.existingVod.vod_id }, '[Monitor]: VOD is live, ensuring download queued');
 
   await enqueueLiveHlsDownload({
-    dbId: existingVod.id,
-    vodId: existingVod.vod_id,
-    platform,
-    tenantId,
-    platformUserId,
-    platformUsername,
-    startedAt: existingVod.started_at ?? new Date(streamStatus.startedAt),
+    dbId: ctx.existingVod.id,
+    vodId: ctx.existingVod.vod_id,
+    platform: ctx.platform,
+    tenantId: ctx.tenantId,
+    platformUserId: ctx.platformUserId,
+    platformUsername: ctx.platformUsername,
+    startedAt: ctx.existingVod.started_at ?? new Date(ctx.streamStatus.startedAt),
     skipValidation: true,
   });
 }

@@ -7,15 +7,18 @@ import type {
   VodUpdateData,
 } from '../platforms/strategy.js';
 import { getLogger } from '../../utils/logger.js';
+import { getPlatformConfig } from '../../config/types.js';
 export const strategy: PlatformStrategy = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
     const { config, platform } = ctx;
 
-    if (!config?.[platform]?.enabled) {
+    const platformCfg = getPlatformConfig(config, platform);
+
+    if (!platformCfg?.enabled) {
       return null;
     }
 
-    const username = config?.kick?.username;
+    const username = platformCfg?.username;
     if (!username) {
       return null;
     }
@@ -31,7 +34,7 @@ export const strategy: PlatformStrategy = {
       title: streamStatus.session_title || '',
       startedAt: streamStatus.created_at,
       streamId: streamStatus.id,
-      platformUserId: config?.kick?.id ?? undefined,
+      platformUserId: platformCfg?.id ?? undefined,
       platformUsername: username,
     };
   },
@@ -39,7 +42,8 @@ export const strategy: PlatformStrategy = {
   async fetchVodMetadata(vodId: string, ctx): Promise<PlatformVodMetadata | null> {
     const { config, platform } = ctx;
 
-    const username = config?.[platform]?.username;
+    const platformCfg = getPlatformConfig(config, platform);
+    const username = platformCfg?.username;
     if (!username) {
       return null;
     }
@@ -59,7 +63,8 @@ export const strategy: PlatformStrategy = {
   async fetchVodObjectForLiveStream(streamId: string, ctx): Promise<PlatformVodMetadata | null> {
     const { config, platform } = ctx;
 
-    const username = config?.[platform]?.username;
+    const platformCfg = getPlatformConfig(config, platform);
+    const username = platformCfg?.username;
     if (!username) {
       return null;
     }

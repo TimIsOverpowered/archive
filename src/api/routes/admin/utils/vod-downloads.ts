@@ -8,6 +8,7 @@ import { VOD_DURATION_TOLERANCE_SECONDS } from '../../../../constants.js';
 import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
 import { refreshVodRecord } from './vod-records.js';
+import { getPlatformConfig } from '../../../../config/types.js';
 
 export interface EnsureVodDownloadOptions {
   ctx: TenantPlatformContext;
@@ -107,9 +108,9 @@ function validatePlatformConfig(
   ctx: TenantPlatformContext,
   platform: Platform
 ): { platformUserId: string; platformUsername: string } | null {
-  const config = ctx.config?.[platform];
-  const platformUserId = config?.id;
-  const platformUsername = config?.username;
+  const platformCfg = getPlatformConfig(ctx.config, platform);
+  const platformUserId = platformCfg?.id;
+  const platformUsername = platformCfg?.username;
 
   if (!platformUserId || !platformUsername) {
     return null;
