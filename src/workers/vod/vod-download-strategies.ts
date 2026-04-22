@@ -83,7 +83,9 @@ async function downloadKickVodWithFfmpeg(
     log.info(`Downloaded ${vodId}.mp4`);
 
     // Success alert
-    await sendVodDownloadSuccess(messageId!, PLATFORMS.KICK, vodId, finalPath, streamerName);
+    if (messageId) {
+      await sendVodDownloadSuccess(messageId, PLATFORMS.KICK, vodId, finalPath, streamerName);
+    }
   } catch (error) {
     const details = extractErrorDetails(error);
     const errorMsg = details.message.substring(0, 500);
@@ -91,7 +93,9 @@ async function downloadKickVodWithFfmpeg(
     log.error(`ffmpeg error occurred: ${errorMsg}`);
 
     // Failure alert
-    await sendVodDownloadFailed(messageId!, PLATFORMS.KICK, vodId, errorMsg, config.id);
+    if (messageId) {
+      await sendVodDownloadFailed(messageId, PLATFORMS.KICK, vodId, errorMsg, config.id);
+    }
 
     throw error;
   }
@@ -140,7 +144,9 @@ async function downloadTwitchVodWithFfmpeg(
 
     log.info(`Downloaded ${vodId}.mp4`);
 
-    await sendVodDownloadSuccess(messageId!, PLATFORMS.TWITCH, vodId, finalPath, streamerName);
+    if (messageId) {
+      await sendVodDownloadSuccess(messageId, PLATFORMS.TWITCH, vodId, finalPath, streamerName);
+    }
   } catch (error) {
     const details = extractErrorDetails(error);
     const errorMsg = details.message.substring(0, 500);
