@@ -1,6 +1,6 @@
 import { extractErrorDetails } from './error.js';
 import { getLogger } from './logger.js';
-import { getFlareSolverrBaseUrl } from '../config/env.js';
+import { getBaseConfig } from '../config/env.js';
 import { FLARESOLVERR_HEALTH_CACHE_TTL_MS } from '../constants.js';
 import { LRUCache } from 'lru-cache';
 
@@ -33,7 +33,7 @@ export async function checkFlareSolverrHealth(): Promise<FlareSolverrHealthResul
   }
 
   try {
-    const baseURL = getFlareSolverrBaseUrl();
+    const baseURL = getBaseConfig().FLARESOLVERR_BASE_URL;
     const response = await fetch(`${baseURL}/v1`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

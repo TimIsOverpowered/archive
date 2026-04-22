@@ -5,10 +5,10 @@ import { getLogger } from './logger.js';
 import { LRUCache } from 'lru-cache';
 import { getTenantDisplayName } from '../config/loader.js';
 import { capitalizePlatform, Platform } from '../types/platforms.js';
-import { getDiscordAlertsEnabled, getDiscordAlertWebhookUrl } from '../config/env.js';
+import { getBaseConfig, getDiscordAlertWebhookUrl } from '../config/env.js';
 
 export function isAlertsEnabled(): boolean {
-  return getDiscordAlertsEnabled();
+  return getBaseConfig().DISCORD_ALERTS_ENABLED;
 }
 
 export type AlertStatus = 'success' | 'warning' | 'error';

@@ -11,6 +11,10 @@ import { getCachedRangeInfo, getCloudflareIpRanges } from './utils/cloudflare-ip
 import { registerPlatformStrategies } from './services/platforms/index.js';
 import { closeMetaClient } from './db/meta-client.js';
 
+process.on('unhandledRejection', (reason) => {
+  getLogger().error({ error: extractErrorDetails(reason) }, 'Unhandled promise rejection');
+});
+
 const config = loadApiConfig();
 setLoggerConfig({ level: config.LOG_LEVEL, isProduction: config.NODE_ENV === 'production' });
 

@@ -18,6 +18,10 @@ export const BaseConfigSchema = z.object({
   FLARESOLVERR_CONCURRENCY: z.coerce.number().int().positive().default(3),
   CONFIG_CACHE_TTL: z.coerce.number().int().positive().default(3600),
   PGBOUNCER_URL: z.string().min(1, 'PGBOUNCER_URL is required'),
+  DISCORD_ALERTS_ENABLED: z.preprocess((val) => String(val).toLowerCase() !== 'false', z.boolean()).default(true),
+  FLARESOLVERR_BASE_URL: z.string().url().default('http://localhost:8191'),
+  FLARESOLVERR_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
+  FLARESOLVERR_SESSION_TTL: z.coerce.number().int().positive().default(3600),
 });
 
 // API-specific schema (extends base + API-only fields)
@@ -151,49 +155,10 @@ export function getHealthToken(): string | undefined {
   return getApiConfig().HEALTH_TOKEN;
 }
 
-// Values NOT in Zod schemas (read directly from process.env with defaults)
-let _discordAlertsEnabled: boolean | null = null;
-
-export function getDiscordAlertsEnabled(): boolean {
-  if (_discordAlertsEnabled !== null) return _discordAlertsEnabled;
-  _discordAlertsEnabled = process.env.DISCORD_ALERTS_ENABLED !== 'false';
-  return _discordAlertsEnabled;
-}
-
-let _flaresolverrBaseUrl: string | null = null;
-
-export function getFlareSolverrBaseUrl(): string {
-  if (_flaresolverrBaseUrl !== null) return _flaresolverrBaseUrl;
-  _flaresolverrBaseUrl = process.env.FLARESOLVERR_BASE_URL || 'http://localhost:8191';
-  return _flaresolverrBaseUrl;
-}
-
-let _flaresolverrTimeoutMs: number | null = null;
-
-export function getFlareSolverrTimeoutMs(): number {
-  if (_flaresolverrTimeoutMs !== null) return _flaresolverrTimeoutMs;
-  const parsed = z.coerce.number().int().positive().safeParse(process.env.FLARESOLVERR_TIMEOUT_MS);
-  _flaresolverrTimeoutMs = parsed.success ? parsed.data : 300_000;
-  return _flaresolverrTimeoutMs;
-}
-
-let _flaresolverrSessionTtl: number | null = null;
-
-export function getFlareSolverrSessionTtl(): number {
-  if (_flaresolverrSessionTtl !== null) return _flaresolverrSessionTtl;
-  const parsed = z.coerce.number().int().positive().safeParse(process.env.FLARESOLVERR_SESSION_TTL);
-  _flaresolverrSessionTtl = parsed.success ? parsed.data : 3600;
-  return _flaresolverrSessionTtl;
-}
-
 // Clear cache (used by both)
 export function resetEnvConfig(): void {
   apiConfigCache = null;
   workersConfigCache = null;
   baseConfigCache = null;
   _configCacheTtl = null;
-  _discordAlertsEnabled = null;
-  _flaresolverrBaseUrl = null;
-  _flaresolverrTimeoutMs = null;
-  _flaresolverrSessionTtl = null;
 }

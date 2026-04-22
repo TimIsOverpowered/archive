@@ -1,6 +1,6 @@
 import { extractErrorDetails } from './error.js';
 import { childLogger } from './logger.js';
-import { getFlareSolverrBaseUrl, getFlareSolverrSessionTtl } from '../config/env.js';
+import { getBaseConfig } from '../config/env.js';
 import { FLARESOLVERR_TIMEOUT_MS } from '../constants.js';
 import { retryWithBackoff } from './retry.js';
 
@@ -50,7 +50,7 @@ async function fetchFromFlareSolverr(
   timeoutMs: number,
   sessionTTL: number
 ): Promise<FetchUrlResult<unknown>> {
-  const baseURL = getFlareSolverrBaseUrl();
+  const baseURL = getBaseConfig().FLARESOLVERR_BASE_URL;
 
   const response = await fetch(`${baseURL}/v1`, {
     method: 'POST',
@@ -100,7 +100,7 @@ async function fetchFromFlareSolverr(
 export async function fetchUrl<T = unknown>(url: string, options?: FetchUrlOptions): Promise<FetchUrlResult<T>> {
   const timeoutMs = options?.timeoutMs ?? FLARESOLVERR_TIMEOUT_MS;
   const maxRetries = options?.maxRetries ?? 3;
-  const sessionTTL = getFlareSolverrSessionTtl();
+  const sessionTTL = getBaseConfig().FLARESOLVERR_SESSION_TTL;
 
   try {
     const result = await retryWithBackoff<FetchUrlResult<T>>(

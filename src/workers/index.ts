@@ -10,10 +10,14 @@ import { getLogger, setLoggerConfig } from '../utils/logger.js';
 import { WORKER_DEFINITIONS } from './worker-definitions.js';
 import { createWorker, waitForWorkersReady, workers } from './create-worker.js';
 import { loadWorkersConfig } from '../config/env.js';
-import { VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY } from '../constants.js';
+import { VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY, SHUTDOWN_TIMEOUT_MS } from '../constants.js';
 import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/client.js';
 import { registerPlatformStrategies } from '../services/platforms/index.js';
 import { closeMetaClient } from '../db/meta-client.js';
+
+process.on('unhandledRejection', (reason) => {
+  getLogger().error({ error: extractErrorDetails(reason) }, 'Unhandled promise rejection');
+});
 
 async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkersConfig>) {
   if (!workerConfig.CLEAR_QUEUES_ON_STARTUP) return;
@@ -101,7 +105,7 @@ function registerShutdownHandlers() {
     await closeMetaClient();
     await closeWorkersRedis();
     clearConfigCache();
-    setTimeout(() => process.exit(0), 100);
+    setTimeout(() => process.exit(0), SHUTDOWN_TIMEOUT_MS);
   };
 
   process.on('SIGTERM', () => {
