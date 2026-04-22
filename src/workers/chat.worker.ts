@@ -174,6 +174,25 @@ async function isCompleteByLastMessage(
   return await countChatMessages(db, dbId);
 }
 
+function markComplete(
+  tenantId: string,
+  vodId: string,
+  messageId: string,
+  chatAlerts: ReturnType<typeof createChatWorkerAlerts>,
+  totalMessages: number,
+  effectiveOffset: number,
+  log: ReturnType<typeof createAutoLogger>
+): ChatDownloadResult {
+  resetFailures(tenantId);
+  updateAlert(
+    messageId,
+    chatAlerts.alreadyComplete(tenantId, vodId, PLATFORMS.TWITCH, totalMessages, effectiveOffset)
+  ).catch((err) => {
+    log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
+  });
+  return { success: true, totalMessages, skipped: true };
+}
+
 async function checkAlreadyComplete(
   db: Kysely<StreamerDB>,
   dbId: number,
@@ -192,14 +211,7 @@ async function checkAlreadyComplete(
       { vodId, effectiveOffset, duration, msgCountByOffset },
       'Chat download already complete (offset exceeds duration)'
     );
-    resetFailures(tenantId);
-    updateAlert(
-      messageId,
-      chatAlerts.alreadyComplete(tenantId, vodId, PLATFORMS.TWITCH, msgCountByOffset, effectiveOffset)
-    ).catch((err) => {
-      log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
-    });
-    return { success: true, totalMessages: msgCountByOffset, skipped: true };
+    return markComplete(tenantId, vodId, messageId, chatAlerts, msgCountByOffset, effectiveOffset, log);
   }
 
   const msgCountByLastMessage = await isCompleteByLastMessage(
@@ -212,14 +224,7 @@ async function checkAlreadyComplete(
   );
   if (msgCountByLastMessage !== null) {
     log.info({ vodId, lastMessageId, msgCountByLastMessage }, 'Chat download already complete');
-    resetFailures(tenantId);
-    updateAlert(
-      messageId,
-      chatAlerts.alreadyComplete(tenantId, vodId, PLATFORMS.TWITCH, msgCountByLastMessage, effectiveOffset)
-    ).catch((err) => {
-      log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
-    });
-    return { success: true, totalMessages: msgCountByLastMessage, skipped: true };
+    return markComplete(tenantId, vodId, messageId, chatAlerts, msgCountByLastMessage, effectiveOffset, log);
   }
 
   return null;

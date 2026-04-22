@@ -75,17 +75,16 @@ export async function withStaleWhileRevalidate<T>(
       const entry: CacheEntry<T> = JSON.parse(cached);
       const isStale = now - entry.timestamp > staleAfter * 1000;
 
-      if (isStale) {
-        if (!inflightPromises.get(key)) {
-          const revalidatePromise = withTimeout(
-            revalidateWithRetry(client, key, ttl, fetcher).catch(() => inflightPromises.delete(key)),
-            INFIGHT_TIMEOUT_MS
-          );
+      if (!isStale) return entry.data;
 
-          inflightPromises.set(key, revalidatePromise);
-        }
+      // Stale — serve immediately, revalidate in background
+      if (!inflightPromises.get(key)) {
+        const revalidatePromise = withTimeout(
+          revalidateWithRetry(client, key, ttl, fetcher).catch(() => inflightPromises.delete(key)),
+          INFIGHT_TIMEOUT_MS
+        );
 
-        return entry.data;
+        inflightPromises.set(key, revalidatePromise);
       }
 
       return entry.data;
