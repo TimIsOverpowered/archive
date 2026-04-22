@@ -3,6 +3,7 @@ import { RateLimiterRedis, RateLimiterMemory } from 'rate-limiter-flexible';
 import { getLogger } from './logger.js';
 import { extractErrorDetails } from './error.js';
 import { getBaseConfig } from '../config/env.js';
+import { clearAllConnectionFailures } from './cache-state.js';
 
 export interface RateLimiterConfig {
   keyPrefix: string;
@@ -109,6 +110,11 @@ export class RedisService {
     try {
       await this.client.connect();
       getLogger().info('Redis connection established');
+
+      this.client.on('ready', () => {
+        getLogger().info('Redis connection ready, clearing cached failure flags');
+        clearAllConnectionFailures();
+      });
     } catch (error) {
       if (this.isProduction) {
         const details = extractErrorDetails(error);

@@ -53,11 +53,16 @@ export async function buildServer() {
     bodyLimit: BODY_LIMIT,
     exposeHeadRoutes: true,
     logger: {
-      transport: {
-        target: 'pino-pretty',
-        options: { translateTime: 'HH:MM:ss Z', ignore: 'pid,hostname' },
-      },
+      level: getApiConfig().LOG_LEVEL,
       redact: ['headers.authorization', 'headers.cookie'],
+      ...(getApiConfig().NODE_ENV !== 'production'
+        ? {
+            transport: {
+              target: 'pino-pretty',
+              options: { translateTime: 'HH:MM:ss Z', ignore: 'pid,hostname' },
+            },
+          }
+        : {}),
     },
     trustProxy: true,
     routerOptions: {
