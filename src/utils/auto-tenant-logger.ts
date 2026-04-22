@@ -28,7 +28,8 @@ export function createAutoLogger(tenantId?: string | null): AppLogger {
 
       if (typeof firstArg === 'string') {
         const msg = prefix(firstArg);
-        return log.call(childLog, msg, ...rest);
+        log.call(childLog, msg, ...rest);
+        return;
       }
 
       if (typeof firstArg === 'object' && firstArg !== null) {
@@ -43,13 +44,15 @@ export function createAutoLogger(tenantId?: string | null): AppLogger {
         const secondArg = rest[0];
         if (typeof secondArg === 'string') {
           const msg = prefix(secondArg);
-          return log.call(childLog, obj, msg, ...rest.slice(1));
+          log.call(childLog, obj, msg, ...rest.slice(1));
+          return;
         }
 
-        return log.call(childLog, obj, ...rest);
+        log.call(childLog, obj, ...rest);
+        return;
       }
 
-      return log.call(childLog, firstArg, ...rest);
+      log.call(childLog, firstArg, ...rest);
     };
   }
 

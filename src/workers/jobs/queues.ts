@@ -10,9 +10,9 @@ export interface LiveDownloadJob {
   platform: Platform;
   tenantId: string;
   platformUserId: string;
-  platformUsername?: string;
-  startedAt?: string;
-  sourceUrl?: string;
+  platformUsername?: string | undefined;
+  startedAt?: string | undefined;
+  sourceUrl?: string | undefined;
 }
 
 export interface StandardVodJob {
@@ -22,46 +22,46 @@ export interface StandardVodJob {
   platform: Platform;
   platformUserId: string;
   platformUsername: string;
-  sourceUrl?: string;
-  downloadMethod?: DownloadMethod;
+  sourceUrl?: string | undefined;
+  downloadMethod?: DownloadMethod | undefined;
 }
 
 export interface ChatDownloadJob {
   tenantId: string;
-  platformUserId?: string;
-  platformUsername?: string;
+  platformUserId?: string | undefined;
+  platformUsername?: string | undefined;
   dbId: number;
   vodId: string;
   platform: Platform;
   duration: number;
-  startOffset?: number;
-  forceRerun?: boolean;
+  startOffset?: number | undefined;
+  forceRerun?: boolean | undefined;
 }
 
 export interface YoutubeVodUploadJob {
   tenantId: string;
   dbId: number;
   vodId: string;
-  filePath?: string;
+  filePath?: string | undefined;
   type: SourceType;
   platform: Platform;
-  dmcaProcessed?: boolean;
+  dmcaProcessed?: boolean | undefined;
   vodRecord: VodRecord;
-  part?: number;
+  part?: number | undefined;
 }
 
 export interface YoutubeGameUploadJob {
   tenantId: string;
   dbId: number;
   vodId: string;
-  filePath?: string;
+  filePath?: string | undefined;
   type: UploadType;
   platform: Platform;
   chapterId: number;
   chapterName: string;
   chapterStart: number;
   chapterEnd: number;
-  chapterGameId?: string;
+  chapterGameId?: string | undefined;
   title: string;
   description: string;
 }
@@ -75,8 +75,8 @@ export interface DmcaProcessingJob {
   receivedClaims: DMCAClaim[];
   type: SourceType;
   platform: Platform;
-  part?: number;
-  filePath?: string;
+  part?: number | undefined;
+  filePath?: string | undefined;
 }
 
 export interface MonitorJob {

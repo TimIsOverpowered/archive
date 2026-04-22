@@ -262,6 +262,7 @@ async function completeOAuth(streamerId: string, expectedState: string, urlOrCod
         .split('&')
         .reduce<Record<string, string>>((acc, pair) => {
           const [key, value] = pair.split('=');
+          if (!key) return acc;
           acc[decodeURIComponent(key)] = decodeURIComponent(value || '');
           return acc;
         }, {});

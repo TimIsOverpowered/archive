@@ -8,11 +8,11 @@ export interface YoutubeMetadataOptions {
   platform: Platform;
   domainName: string;
   timezone: string;
-  youtubeDescription?: string;
-  part?: number;
+  youtubeDescription?: string | undefined;
+  part?: number | undefined;
   type: SourceType;
-  gameName?: string;
-  epNumber?: number;
+  gameName?: string | undefined;
+  epNumber?: number | undefined;
   vodRecord: VodRecord;
 }
 

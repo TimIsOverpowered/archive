@@ -4,7 +4,7 @@ import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import {
   tenantMiddleware,
   platformValidationMiddleware,
-  type TenantPlatformContext,
+  asTenantPlatformContext,
 } from '../../middleware/tenant-platform.js';
 import { saveVodChapters } from '../../../services/twitch/index.js';
 import { RedisService } from '../../../utils/redis-service.js';
@@ -62,12 +62,12 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { db, platform } = request.tenant as TenantPlatformContext;
+      const { db, platform } = asTenantPlatformContext(request.tenant);
       const { vodId } = request.body;
 
       const vodRecord = await findVodRecord(db, vodId, platform);
 
-      if (!vodRecord) notFound(`VOD ${vodId} not found`);
+      if (!vodRecord) throw notFound(`VOD ${vodId} not found`);
 
       if (platform !== PLATFORMS.TWITCH) {
         return { data: { message: `Chapter fetching only supported for Twitch VODs`, vodId, platform } };
@@ -75,7 +75,7 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
 
       const durationSeconds = vodRecord.duration ? parseInt(vodRecord.duration.toString()) : 0;
       const savedCount = await saveVodChapters(
-        request.tenant as TenantPlatformContext,
+        asTenantPlatformContext(request.tenant),
         vodRecord.id,
         vodId,
         durationSeconds
@@ -115,19 +115,19 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { db, platform, config } = request.tenant as TenantPlatformContext;
+      const { db, platform, config } = asTenantPlatformContext(request.tenant);
       const { vodId } = request.body;
 
       const vodRecord = await findVodRecord(db, vodId, platform);
 
-      if (!vodRecord) notFound(`VOD ${vodId} not found`);
+      if (!vodRecord) throw notFound(`VOD ${vodId} not found`);
 
       // Queue emote save job (fire-and-forget within request context)
       const platformId = config?.[platform]?.id;
 
-      if (!platformId) badRequest(`No platform ID available for ${platform} ${vodId}`);
+      if (!platformId) throw badRequest(`No platform ID available for ${platform} ${vodId}`);
 
-      await fetchAndSaveEmotes(request.tenant as TenantPlatformContext, vodRecord.id, platform, platformId);
+      await fetchAndSaveEmotes(asTenantPlatformContext(request.tenant), vodRecord.id, platform, platformId);
 
       return { data: { message: `Emote saving completed for ${vodId}`, vodId, platform } };
     }
@@ -160,17 +160,17 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { db, platform, config, tenantId } = request.tenant as TenantPlatformContext;
+      const { db, platform, config, tenantId } = asTenantPlatformContext(request.tenant);
       const { vodId, forceRerun = false } = request.body;
 
       const vodRecord = await findVodRecord(db, vodId, platform);
 
-      if (!vodRecord) notFound(`VOD ${vodId} not found`);
+      if (!vodRecord) throw notFound(`VOD ${vodId} not found`);
 
       // Queue emote save job (fire-and-forget within request context)
       const platformId = config?.[platform]?.id;
 
-      if (!platformId) badRequest(`No platform ID available for ${platform} ${vodId}`);
+      if (!platformId) throw badRequest(`No platform ID available for ${platform} ${vodId}`);
 
       const jobId = await triggerChatDownload(
         tenantId,

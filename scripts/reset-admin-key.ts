@@ -50,6 +50,10 @@ async function main(): Promise<void> {
   }
 
   const [username] = args;
+  if (!username) {
+    console.error('Usage: npm run reset-admin-key <username>');
+    process.exit(1);
+  }
 
   try {
     await resetAdminKey(username);

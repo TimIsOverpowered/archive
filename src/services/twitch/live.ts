@@ -13,15 +13,15 @@ export interface TwitchStreamStatus {
   user_id: string;
   user_login: string;
   user_name: string;
-  game_id?: string | null;
-  game_name?: string | null;
+  game_id?: string | null | undefined;
+  game_name?: string | null | undefined;
   type: string;
   title: string;
-  tags?: string[] | null;
+  tags?: (string[] | null) | undefined;
   viewer_count: number;
   started_at: string;
   language: string;
-  thumbnail_url?: string | null;
+  thumbnail_url?: string | null | undefined;
 }
 
 export async function getTwitchStreamStatus(userId: string, tenantId: string): Promise<TwitchStreamStatus | null> {
@@ -51,6 +51,7 @@ export async function getTwitchStreamStatus(userId: string, tenantId: string): P
     }
 
     const streamData = data.data[0];
+    if (!streamData) return null;
 
     return {
       id: streamData.id,
@@ -106,6 +107,7 @@ export async function getLatestTwitchVodObject(
     }
 
     const latestVod = data.data[0];
+    if (!latestVod) return null;
 
     if (latestVod.stream_id !== expectedStreamId || !latestVod.id) {
       return null;

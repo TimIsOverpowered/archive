@@ -71,6 +71,7 @@ export async function getGameData(gameId: string, tenantId: string): Promise<Rec
   }
 
   const result = data.data[0];
+  if (!result) return null;
   gameDataCache.set(gameId, result);
   return result;
 }

@@ -1,6 +1,6 @@
 import { extractErrorDetails } from './error.js';
 import { childLogger } from './logger.js';
-import { getFlareSolverrBaseUrl, getFlareSolverrSessionTtl } from '../config/env-accessors.js';
+import { getFlareSolverrBaseUrl, getFlareSolverrSessionTtl } from '../config/env.js';
 import { FLARESOLVERR_TIMEOUT_MS } from '../constants.js';
 import { retryWithBackoff } from './retry.js';
 

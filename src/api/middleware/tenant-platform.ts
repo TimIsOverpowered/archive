@@ -14,6 +14,14 @@ export interface TenantPlatformContext extends TenantContext {
 }
 
 /**
+ * Cast TenantContext to TenantPlatformContext after platformValidationMiddleware runs.
+ * Safe because platformValidationMiddleware always sets request.tenant.platform.
+ */
+export function asTenantPlatformContext(ctx: TenantContext): TenantPlatformContext {
+  return ctx as TenantPlatformContext;
+}
+
+/**
  * Generic tenant middleware - validates tenant exists and database is available.
  * Safe for both public and admin routes (no auth checks).
  * Use this for all routes that need tenant validation.

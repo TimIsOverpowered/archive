@@ -14,7 +14,7 @@ export interface EnsureVodDownloadOptions {
   dbId: number;
   vodId: string;
   type: SourceType;
-  downloadMethod?: DownloadMethod;
+  downloadMethod?: DownloadMethod | undefined;
   log: AppLogger;
 }
 

@@ -84,6 +84,7 @@ export function isFromCloudflare(ip: string, ranges?: CloudflareIpRanges): boole
     return cidrList.some((cidr) => {
       try {
         const [rangeIp, rangeMask] = cidr.split('/');
+        if (!rangeIp) return false;
         const rangeParsed = ipaddr.parse(rangeIp);
         if (rangeParsed.kind() !== ipKind) {
           return false;
@@ -102,8 +103,8 @@ export function isFromCloudflare(ip: string, ranges?: CloudflareIpRanges): boole
 /** Validate request is actually from Cloudflare */
 export async function validateCloudflareRequest(request: {
   headers: Record<string, string | string[] | undefined>;
-  raw: { socket?: { remoteAddress?: string } };
-  url?: string;
+  raw: { socket?: { remoteAddress?: string | undefined } };
+  url?: string | undefined;
 }): Promise<boolean> {
   if (getBaseConfig().NODE_ENV !== 'production') {
     return true;

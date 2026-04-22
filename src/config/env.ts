@@ -113,10 +113,87 @@ export function getConfigCacheTtl(): number {
   return _configCacheTtl;
 }
 
+// --- Lazy accessor helpers (consolidated from env-accessors.ts) ---
+
+// Values from cached configs
+export function getDisableRedisCache(): boolean {
+  return getApiConfig().DISABLE_REDIS_CACHE;
+}
+
+// ENCRYPTION_MASTER_KEY read directly (works even when full config can't load)
+let _keyBuffer: Buffer | null = null;
+
+export function getEncryptionKeyBuffer(): Buffer {
+  if (_keyBuffer) return _keyBuffer;
+  const raw = process.env.ENCRYPTION_MASTER_KEY;
+  if (!raw) throw new Error('ENCRYPTION_MASTER_KEY is not set');
+  _keyBuffer = Buffer.from(raw, 'hex');
+  return _keyBuffer;
+}
+
+export function getDiscordAlertWebhookUrl(): string | undefined {
+  return getBaseConfig().DISCORD_ALERT_WEBHOOK_URL;
+}
+
+export function getFlareSolverrConcurrency(): number {
+  return getBaseConfig().FLARESOLVERR_CONCURRENCY;
+}
+
+export function getRedisChatCompression(): 'brotli' | 'gzip' | 'none' {
+  return getBaseConfig().REDIS_CHAT_COMPRESSION;
+}
+
+export function getRedisCompressionLevel(): number {
+  return getBaseConfig().REDIS_COMPRESSION_LEVEL;
+}
+
+export function getHealthToken(): string | undefined {
+  return getApiConfig().HEALTH_TOKEN;
+}
+
+// Values NOT in Zod schemas (read directly from process.env with defaults)
+let _discordAlertsEnabled: boolean | null = null;
+
+export function getDiscordAlertsEnabled(): boolean {
+  if (_discordAlertsEnabled !== null) return _discordAlertsEnabled;
+  _discordAlertsEnabled = process.env.DISCORD_ALERTS_ENABLED !== 'false';
+  return _discordAlertsEnabled;
+}
+
+let _flaresolverrBaseUrl: string | null = null;
+
+export function getFlareSolverrBaseUrl(): string {
+  if (_flaresolverrBaseUrl !== null) return _flaresolverrBaseUrl;
+  _flaresolverrBaseUrl = process.env.FLARESOLVERR_BASE_URL || 'http://localhost:8191';
+  return _flaresolverrBaseUrl;
+}
+
+let _flaresolverrTimeoutMs: number | null = null;
+
+export function getFlareSolverrTimeoutMs(): number {
+  if (_flaresolverrTimeoutMs !== null) return _flaresolverrTimeoutMs;
+  const parsed = z.coerce.number().int().positive().safeParse(process.env.FLARESOLVERR_TIMEOUT_MS);
+  _flaresolverrTimeoutMs = parsed.success ? parsed.data : 300_000;
+  return _flaresolverrTimeoutMs;
+}
+
+let _flaresolverrSessionTtl: number | null = null;
+
+export function getFlareSolverrSessionTtl(): number {
+  if (_flaresolverrSessionTtl !== null) return _flaresolverrSessionTtl;
+  const parsed = z.coerce.number().int().positive().safeParse(process.env.FLARESOLVERR_SESSION_TTL);
+  _flaresolverrSessionTtl = parsed.success ? parsed.data : 3600;
+  return _flaresolverrSessionTtl;
+}
+
 // Clear cache (used by both)
 export function resetEnvConfig(): void {
   apiConfigCache = null;
   workersConfigCache = null;
   baseConfigCache = null;
   _configCacheTtl = null;
+  _discordAlertsEnabled = null;
+  _flaresolverrBaseUrl = null;
+  _flaresolverrTimeoutMs = null;
+  _flaresolverrSessionTtl = null;
 }

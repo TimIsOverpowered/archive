@@ -49,7 +49,12 @@ program
         process.exit(1);
       }
 
-      tenantId = tenants[0].id;
+      const firstTenant = tenants[0];
+      if (!firstTenant) {
+        console.error('No tenant found');
+        process.exit(1);
+      }
+      tenantId = firstTenant.id;
       console.log(`Using tenant: ${tenantId}`);
     }
 

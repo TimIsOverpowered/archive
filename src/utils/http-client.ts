@@ -14,19 +14,21 @@ import { Agent } from 'undici';
 export type ResponseType = 'json' | 'text' | 'blob' | 'arrayBuffer' | 'response';
 
 export interface RequestOptions<R extends ResponseType = 'json'> {
-  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  headers?: Record<string, string>;
-  body?: unknown;
-  timeoutMs?: number;
-  responseType?: R;
-  retryOptions?: {
-    attempts?: number;
-    baseDelayMs?: number;
-    maxDelayMs?: number;
-  };
-  logContext?: Record<string, unknown>;
-  signal?: AbortSignal;
-  dispatcher?: Agent;
+  method?: ('GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE') | undefined;
+  headers?: Record<string, string> | undefined;
+  body?: unknown | undefined;
+  timeoutMs?: number | undefined;
+  responseType?: R | undefined;
+  retryOptions?:
+    | {
+        attempts?: number | undefined;
+        baseDelayMs?: number | undefined;
+        maxDelayMs?: number | undefined;
+      }
+    | undefined;
+  logContext?: Record<string, unknown> | undefined;
+  signal?: AbortSignal | undefined;
+  dispatcher?: Agent | undefined;
 }
 
 export type RequestResult<T, R extends ResponseType> = R extends 'json'
@@ -141,10 +143,10 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
         if (options?.signal) signals.push(options.signal);
         const combinedSignal = AbortSignal.any(signals);
 
-        const fetchInit: RequestInit & { dispatcher?: Agent } = {
+        const fetchInit: RequestInit & { dispatcher?: Agent | undefined } = {
           method,
           headers: finalHeaders,
-          body: preparedBody,
+          ...(preparedBody !== undefined && { body: preparedBody }),
           signal: combinedSignal,
           dispatcher,
         };

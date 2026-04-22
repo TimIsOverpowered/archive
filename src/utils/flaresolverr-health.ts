@@ -1,6 +1,6 @@
 import { extractErrorDetails } from './error.js';
 import { getLogger } from './logger.js';
-import { getFlareSolverrBaseUrl } from '../config/env-accessors.js';
+import { getFlareSolverrBaseUrl } from '../config/env.js';
 import { FLARESOLVERR_HEALTH_CACHE_TTL_MS } from '../constants.js';
 import { LRUCache } from 'lru-cache';
 

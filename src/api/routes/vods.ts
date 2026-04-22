@@ -17,10 +17,10 @@ interface VodRoutesOptions {
 async function fetchVodByIdSafe(vodId: string, db: Kysely<StreamerDB>, tenantId: string) {
   const vodIdNum = Number(vodId);
   if (isNaN(vodIdNum) || vodIdNum < 0 || vodIdNum > INT32_MAX) {
-    notFound('VOD not found');
+    throw notFound('VOD not found');
   }
   const vod = await getVodById(db, tenantId, vodIdNum);
-  if (!vod) notFound('VOD not found');
+  if (!vod) throw notFound('VOD not found');
   return vod;
 }
 
@@ -135,7 +135,7 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
       const vod = await getVodByPlatformId(db, tenantId, platform, platformVodId);
 
       if (!vod) {
-        notFound('VOD not found');
+        throw notFound('VOD not found');
       }
 
       return { data: vod };
@@ -166,7 +166,7 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
       const emotes = await getEmotesByVodId(db, tenantId, Number(vodId));
 
       if (!emotes) {
-        notFound('Emotes not found for this VOD');
+        throw notFound('Emotes not found for this VOD');
       }
 
       return { data: emotes };

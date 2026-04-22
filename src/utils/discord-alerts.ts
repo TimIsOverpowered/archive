@@ -5,7 +5,7 @@ import { getLogger } from './logger.js';
 import { LRUCache } from 'lru-cache';
 import { getTenantDisplayName } from '../config/loader.js';
 import { capitalizePlatform, Platform } from '../types/platforms.js';
-import { getDiscordAlertsEnabled, getDiscordAlertWebhookUrl } from '../config/env-accessors.js';
+import { getDiscordAlertsEnabled, getDiscordAlertWebhookUrl } from '../config/env.js';
 
 export function isAlertsEnabled(): boolean {
   return getDiscordAlertsEnabled();
@@ -15,14 +15,14 @@ export type AlertStatus = 'success' | 'warning' | 'error';
 
 export interface RichEmbedData {
   title: string;
-  description?: string;
+  description?: string | undefined;
   status: AlertStatus;
   fields?: Array<{ name: string; value: string; inline?: boolean }>;
-  timestamp?: string;
-  updatedTimestamp?: string;
-  mention?: 'everyone' | 'here' | string;
-  thumbnailUrl?: string;
-  url?: string;
+  timestamp?: string | undefined;
+  updatedTimestamp?: string | undefined;
+  mention?: ('everyone' | 'here' | string) | undefined;
+  thumbnailUrl?: string | undefined;
+  url?: string | undefined;
 }
 
 interface DiscordEmbed {

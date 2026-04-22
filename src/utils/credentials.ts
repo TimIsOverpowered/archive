@@ -7,8 +7,8 @@ import type { TwitchAuthObject } from '../config/schemas.js';
 export interface TwitchCredentials {
   clientId: string;
   clientSecret: string;
-  accessToken?: string;
-  expiryDate?: number;
+  accessToken?: string | undefined;
+  expiryDate?: number | undefined;
 }
 
 /**

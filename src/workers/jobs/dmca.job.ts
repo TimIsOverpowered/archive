@@ -13,9 +13,9 @@ export interface QueueDmcaProcessingOptions {
   claims: unknown[];
   type: SourceType;
   platform: Platform;
-  part?: number;
-  downloadJobId?: string;
-  filePath?: string;
+  part?: number | undefined;
+  downloadJobId?: string | undefined;
+  filePath?: string | undefined;
 }
 
 export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): Promise<string | null> {

@@ -5,7 +5,7 @@ import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import {
   tenantMiddleware,
   platformValidationMiddleware,
-  type TenantPlatformContext,
+  asTenantPlatformContext,
 } from '../../middleware/tenant-platform.js';
 import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
@@ -80,13 +80,13 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, db, platform } = request.tenant as TenantPlatformContext;
+      const { tenantId, db, platform } = asTenantPlatformContext(request.tenant);
       const { vodId, title, createdAt, duration } = request.body;
       const log = createAutoLogger(tenantId);
 
       // Validate vodId is provided
       if (!vodId) {
-        badRequest('vodId is required');
+        throw badRequest('vodId is required');
       }
 
       const vodRecord = await findVodRecord(db, vodId, platform);
@@ -161,13 +161,13 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, db, platform } = request.tenant as TenantPlatformContext;
+      const { tenantId, db, platform } = asTenantPlatformContext(request.tenant);
       const { vodId } = request.body;
       const log = createAutoLogger(tenantId);
 
       const vodRecord = await findVodRecord(db, vodId, platform);
 
-      if (!vodRecord) notFound(`VOD ${vodId} not found`);
+      if (!vodRecord) throw notFound(`VOD ${vodId} not found`);
 
       await db.deleteFrom('vods').where('platform', '=', platform).where('vod_id', '=', vodId).execute();
 

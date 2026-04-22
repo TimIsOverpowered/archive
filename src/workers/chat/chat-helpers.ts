@@ -71,7 +71,7 @@ export async function calculateResumeOffset(
 
 export function extractMessageData(node: TwitchChatMessageNode | null | undefined): {
   message: Record<string, unknown>;
-  userBadges?: Record<string, unknown>;
+  userBadges?: Record<string, unknown> | undefined;
 } {
   if (!node || !node.message) {
     return { message: { content: '', fragments: [] }, userBadges: undefined };

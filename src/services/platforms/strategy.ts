@@ -25,9 +25,9 @@ export interface PlatformStreamStatus {
   id: string;
   title: string;
   startedAt: string;
-  streamId?: string | null;
-  platformUserId?: string | null;
-  platformUsername?: string | null;
+  streamId?: string | null | undefined;
+  platformUserId?: string | null | undefined;
+  platformUsername?: string | null | undefined;
 }
 
 export interface PlatformVodMetadata {
@@ -35,8 +35,8 @@ export interface PlatformVodMetadata {
   title: string;
   createdAt: string;
   duration: number;
-  streamId?: string | null;
-  sourceUrl?: string | null;
+  streamId?: string | null | undefined;
+  sourceUrl?: string | null | undefined;
 }
 
 export interface PlatformStrategyContext {

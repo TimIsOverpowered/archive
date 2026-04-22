@@ -8,7 +8,7 @@ export interface RateLimiterConfig {
   keyPrefix: string;
   points: number;
   duration: number;
-  blockDuration?: number;
+  blockDuration?: number | undefined;
 }
 
 export interface RedisServiceOptions {
@@ -153,7 +153,7 @@ export class RedisService {
             keyPrefix: rlConfig.keyPrefix,
             points: rlConfig.points,
             duration: rlConfig.duration,
-            blockDuration: rlConfig.blockDuration,
+            ...(rlConfig.blockDuration !== undefined && { blockDuration: rlConfig.blockDuration }),
           }),
           isFallback: false,
         });

@@ -1,5 +1,5 @@
 import { RedisService } from '../utils/redis-service.js';
-import { getDisableRedisCache } from '../config/env-accessors.js';
+import { getDisableRedisCache } from '../config/env.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
@@ -9,7 +9,9 @@ function extractPageFromKey(key: string): number | null {
   const parts = key.split(':');
   const pageIdx = parts.indexOf('page');
   if (pageIdx === -1 || pageIdx + 1 >= parts.length) return null;
-  const page = parseInt(parts[pageIdx + 1], 10);
+  const pageStr = parts[pageIdx + 1];
+  if (!pageStr) return null;
+  const page = parseInt(pageStr, 10);
   return isNaN(page) ? null : page;
 }
 

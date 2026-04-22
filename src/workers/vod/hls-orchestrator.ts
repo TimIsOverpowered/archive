@@ -34,13 +34,13 @@ export interface HlsDownloadOptions {
   vodId: string;
   platform: Platform;
   platformUserId: string;
-  platformUsername?: string;
-  startedAt?: string;
-  sourceUrl?: string;
-  isLive?: boolean;
-  discordMessageId?: string | null;
-  streamerName?: string;
-  onProgress?: (segmentsDownloaded: number) => void;
+  platformUsername?: string | undefined;
+  startedAt?: string | undefined;
+  sourceUrl?: string | undefined;
+  isLive?: boolean | undefined;
+  discordMessageId?: string | null | undefined;
+  streamerName?: string | undefined;
+  onProgress?: ((segmentsDownloaded: number) => void) | undefined;
 }
 
 export interface HlsDownloadResult {
@@ -139,13 +139,13 @@ interface LivePollingContext {
   vodId: string;
   platform: Platform;
   dbId: number;
-  sourceUrl?: string;
-  startedAt?: string;
+  sourceUrl?: string | undefined;
+  startedAt?: string | undefined;
   vodDir: string;
   m3u8Path: string;
   cycleTLS: CycleTLSSession | null;
   log: AppLogger;
-  onProgress?: (segmentsDownloaded: number) => void;
+  onProgress?: ((segmentsDownloaded: number) => void) | undefined;
   concurrency: number;
 }
 
@@ -238,7 +238,7 @@ interface ArchivedVodContext {
   ctx: TenantContext;
   vodId: string;
   platform: Platform;
-  sourceUrl?: string;
+  sourceUrl?: string | undefined;
   vodDir: string;
   m3u8Path: string;
   cycleTLS: CycleTLSSession | null;

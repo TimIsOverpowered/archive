@@ -34,7 +34,9 @@ export async function saveChaptersAndLinkParts(
   let videosWithLinks = 0;
 
   for (let i = 0; i < sortedParts.length; i++) {
-    const { id: videoId, part: partNum } = sortedParts[i];
+    const videoPart = sortedParts[i];
+    if (!videoPart) continue;
+    const { id: videoId, part: partNum } = videoPart;
 
     const currentVideo = await youtube.videos.list({
       id: [videoId],
@@ -67,9 +69,9 @@ export async function saveChaptersAndLinkParts(
       requestBody: {
         id: videoId,
         snippet: {
-          title: currentSnippet.title,
+          title: currentSnippet.title ?? null,
           description: newDescription,
-          categoryId: currentSnippet.categoryId,
+          categoryId: currentSnippet.categoryId ?? null,
         },
       },
     });
@@ -117,6 +119,7 @@ function buildPartNavigationLinks(sortedParts: { id: string; part: number }[], c
 
   for (let i = 0; i < sortedParts.length; i++) {
     const part = sortedParts[i];
+    if (!part) continue;
 
     if (part.id === currentVideoId) {
       continue;

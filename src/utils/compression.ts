@@ -1,6 +1,6 @@
 import * as zlib from 'zlib';
 import { promisify } from 'util';
-import { getRedisChatCompression, getRedisCompressionLevel } from '../config/env-accessors.js';
+import { getRedisChatCompression, getRedisCompressionLevel } from '../config/env.js';
 
 const brotliCompress = promisify(zlib.brotliCompress);
 const brotliDecompress = promisify(zlib.brotliDecompress);

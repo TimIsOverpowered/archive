@@ -96,7 +96,7 @@ function registerShutdownHandlers() {
 
     await closeQueues();
 
-    await stopClientCleanup();
+    stopClientCleanup();
     await closeAllClients();
     await closeMetaClient();
     await closeWorkersRedis();
@@ -108,6 +108,7 @@ function registerShutdownHandlers() {
   process.on('SIGINT', shutdown);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+const scriptPath = process.argv[1];
+if (scriptPath && import.meta.url === pathToFileURL(scriptPath).href) {
   bootstrap();
 }

@@ -30,7 +30,7 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
 
       const config = getTenantConfig(tenantId);
 
-      if (!config?.twitch?.id) notFound('Twitch not configured for this tenant');
+      if (!config?.twitch?.id) throw notFound('Twitch not configured for this tenant');
 
       const redis = RedisService.instance?.getClient() ?? null;
       // Check Redis cache first (60-minute TTL)

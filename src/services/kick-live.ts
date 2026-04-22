@@ -25,22 +25,28 @@ interface KickApiResponse {
 
 export interface KickStreamStatus {
   id: string;
-  session_title?: string | null;
+  session_title?: string | null | undefined;
   created_at: string;
-  playback_url?: string | null;
-  viewers?: number | null;
-  slug?: string | null;
-  language?: string | null;
-  is_mature?: boolean | null;
-  category?: {
-    id: number;
-    name?: string | null;
-    slug?: string | null;
-  } | null;
-  thumbnail?: {
-    src?: string | null;
-    srcset?: string | null;
-  } | null;
+  playback_url?: string | null | undefined;
+  viewers?: number | null | undefined;
+  slug?: string | null | undefined;
+  language?: string | null | undefined;
+  is_mature?: boolean | null | undefined;
+  category?:
+    | {
+        id: number;
+        name?: string | null | undefined;
+        slug?: string | null | undefined;
+      }
+    | null
+    | undefined;
+  thumbnail?:
+    | {
+        src?: string | null | undefined;
+        srcset?: string | null | undefined;
+      }
+    | null
+    | undefined;
 }
 
 /**
@@ -167,7 +173,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
 export async function getLatestKickVodObject(
   username: string,
   expectedStreamId: string
-): Promise<{ id: string; title?: string; source?: string } | null> {
+): Promise<{ id: string; title?: string | undefined; source?: string | undefined } | null> {
   try {
     const videosUrl = `https://kick.com/api/v2/channels/${username}/videos`;
 
