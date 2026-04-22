@@ -5,6 +5,15 @@ import { getLogger } from '../utils/logger.js';
 import { LRUCache } from 'lru-cache';
 import { retryWithBackoff } from './retry.js';
 
+// NOTE: SWR_FAILURES is in-memory only. In multi-instance deployments (multiple
+// worker/api processes), failure counts are per-instance, not global. This means
+// a fetcher that fails on instance A won't trigger the MAX_SWR_FAILURES limit on
+// instance B, potentially causing redundant failures across instances.
+//
+// If multi-instance deployment is planned, migrate failure tracking to Redis:
+//   - Use a Redis key like `swr:failures:{key}` with INCR/EXPIRE pattern
+//   - Check the count before each revalidation attempt
+//   - This ensures all instances share the same failure threshold
 const SWR_FAILURES = new LRUCache<string, number>({
   max: 5000,
   ttl: 5 * 60 * 1000,
