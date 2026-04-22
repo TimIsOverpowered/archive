@@ -37,7 +37,7 @@ const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job
   const messageId = await initRichAlert(alerts.init(vodId, platform, streamerName));
 
   try {
-    if (downloadMethod === 'ffmpeg') {
+    if (downloadMethod === DOWNLOAD_METHODS.FFMPEG) {
       await downloadVodWithFfmpeg(platform, vodId, finalPath, config, log);
     } else {
       const vodDirPath = getVodDirPath({ config, vodId });

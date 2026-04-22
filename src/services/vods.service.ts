@@ -15,6 +15,7 @@ import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
 import { RedisService } from '../utils/redis-service.js';
 import { registerVodTags } from './cache-tags.js';
 import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.js';
+import { CacheKeys } from '../utils/cache-keys.js';
 
 function applyVolatileData(
   vods: VodResponse[],
@@ -26,14 +27,8 @@ function applyVolatileData(
   });
 }
 
-function buildCacheKey(...parts: (string | number | undefined | null)[]): string {
-  return parts.filter((p): p is string | number => p !== undefined && p !== null && p !== '').join(':');
-}
-
 function buildQueryCacheKey(tenantId: string, query: VodQuery, page: number, limit: number): string {
-  const sorted = Object.keys(query).sort() as (keyof VodQuery)[];
-  const queryParts = sorted.map((k) => `${k}:${query[k]}`).filter(Boolean);
-  return buildCacheKey('vods', `{${tenantId}}`, ...queryParts, String(page), String(limit));
+  return CacheKeys.vodQuery(tenantId, query as Record<string, string | number | undefined>, page, limit);
 }
 
 export interface VodResponse {
@@ -230,7 +225,7 @@ export async function getVods(
 }
 
 export async function getVodById(db: DBClient, tenantId: string, vodId: number): Promise<VodResponse | null> {
-  const cacheKey = `vod:{${tenantId}}:${vodId}`;
+  const cacheKey = CacheKeys.vodStatic(tenantId, vodId);
 
   const fetcher = async () => {
     const vod = await db
@@ -267,7 +262,7 @@ export async function getVodByPlatformId(
   platform: Platform,
   platformVodId: string
 ): Promise<VodResponse | null> {
-  const cacheKey = `vod:platform:{${tenantId}}:${platform}:${platformVodId}`;
+  const cacheKey = CacheKeys.vodPlatform(tenantId, platform, platformVodId);
 
   const fetcher = async () => {
     const vod = await db

@@ -4,6 +4,7 @@ import { extractErrorDetails } from '../utils/error.js';
 import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
 import { MAX_CACHE_PAGES } from '../constants.js';
 import { isConnectionError } from '../db/client.js';
+import { CacheKeys } from '../utils/cache-keys.js';
 
 function extractPageFromKey(key: string): number | null {
   const parts = key.split(':');
@@ -41,7 +42,7 @@ export async function registerVodTags(
     pipeline.set(cacheKey, data, 'EX', ttl);
 
     for (const vod of vods) {
-      const tagKey = `vods:tags:{${tenantId}}:${vod.id}`;
+      const tagKey = CacheKeys.vodTags(tenantId, vod.id);
       pipeline.sadd(tagKey, cacheKey);
       pipeline.pexpire(tagKey, tagTtlMs);
     }
@@ -65,7 +66,7 @@ export async function invalidateVodTags(tenantId: string, dbId: number): Promise
   if (!client) return;
 
   try {
-    const tagKey = `vods:tags:{${tenantId}}:${dbId}`;
+    const tagKey = CacheKeys.vodTags(tenantId, dbId);
     let cursor = '0';
 
     do {
@@ -91,7 +92,7 @@ export async function invalidateVodVolatileCache(tenantId: string, dbId: number)
   if (!client) return;
 
   try {
-    await client.unlink(`vod:volatile:{${tenantId}}:${dbId}`);
+    await client.unlink(CacheKeys.vodVolatile(tenantId, dbId));
 
     if (isConnectionFailed(tenantId)) {
       markConnectionRestored(tenantId);

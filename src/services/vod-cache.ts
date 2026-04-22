@@ -4,6 +4,7 @@ import { extractErrorDetails } from '../utils/error.js';
 import { invalidateVodTags, invalidateVodVolatileCache } from './cache-tags.js';
 import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
 import { isConnectionError } from '../db/client.js';
+import { CacheKeys } from '../utils/cache-keys.js';
 
 export { invalidateVodVolatileCache };
 
@@ -12,20 +13,12 @@ export interface VodVolatileData {
   is_live: boolean;
 }
 
-function getStaticCacheKey(tenantId: string, dbId: number): string {
-  return `vod:{${tenantId}}:${dbId}`;
-}
-
-function getVolatileCacheKey(tenantId: string, dbId: number): string {
-  return `vod:volatile:{${tenantId}}:${dbId}`;
-}
-
 export async function getVodStaticCache(tenantId: string, dbId: number): Promise<string | null> {
   const client = RedisService.getActiveClient();
   if (!client) return null;
 
   try {
-    return await client.get(getStaticCacheKey(tenantId, dbId));
+    return await client.get(CacheKeys.vodStatic(tenantId, dbId));
   } catch {
     return null;
   }
@@ -36,7 +29,7 @@ export async function setVodStaticCache(tenantId: string, dbId: number, data: st
   if (!client) return;
 
   try {
-    await client.set(getStaticCacheKey(tenantId, dbId), data, 'EX', ttl);
+    await client.set(CacheKeys.vodStatic(tenantId, dbId), data, 'EX', ttl);
   } catch (error) {
     const details = extractErrorDetails(error);
     getLogger().warn({ err: details, tenantId, dbId }, 'Static cache write failed');
@@ -48,7 +41,7 @@ export async function getVodVolatileCache(tenantId: string, dbId: number): Promi
   if (!client) return null;
 
   try {
-    const cached = await client.get(getVolatileCacheKey(tenantId, dbId));
+    const cached = await client.get(CacheKeys.vodVolatile(tenantId, dbId));
     if (!cached) return null;
     return JSON.parse(cached) as VodVolatileData;
   } catch (err) {
@@ -68,7 +61,7 @@ export async function setVodVolatileCache(
   if (!client) return;
 
   try {
-    await client.set(getVolatileCacheKey(tenantId, dbId), JSON.stringify(data), 'EX', ttl);
+    await client.set(CacheKeys.vodVolatile(tenantId, dbId), JSON.stringify(data), 'EX', ttl);
   } catch (error) {
     const details = extractErrorDetails(error);
     getLogger().warn({ err: details, tenantId, dbId }, 'Volatile cache write failed');
@@ -86,7 +79,7 @@ export async function getVodVolatileCacheBatch(
   const client = RedisService.getActiveClient();
   if (!client) return result;
 
-  const keys = dbIds.map((id) => getVolatileCacheKey(tenantId, id));
+  const keys = dbIds.map((id) => CacheKeys.vodVolatile(tenantId, id));
 
   try {
     const values = await client.mget(...keys);
@@ -114,7 +107,7 @@ export async function invalidateVodStaticCache(tenantId: string, dbId: number): 
   if (!client) return;
 
   try {
-    await client.unlink(getStaticCacheKey(tenantId, dbId));
+    await client.unlink(CacheKeys.vodStatic(tenantId, dbId));
     await invalidateVodTags(tenantId, dbId);
 
     if (isConnectionFailed(tenantId)) {
@@ -138,7 +131,7 @@ export async function invalidateEmoteCache(tenantId: string, vodId: number): Pro
   const client = RedisService.getActiveClient();
   if (!client) return;
 
-  const cacheKey = `emotes:{${tenantId}}:${vodId}`;
+  const cacheKey = CacheKeys.emotes(tenantId, vodId);
 
   try {
     await client.unlink(cacheKey);

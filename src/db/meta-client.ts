@@ -4,6 +4,7 @@ import type { MetaDB } from './meta-types.js';
 import { getLogger } from '../utils/logger.js';
 import { getBaseConfig } from '../config/env.js';
 import { extractDatabaseName } from '../utils/formatting.js';
+import { buildPgBouncerUrl } from './utils.js';
 
 const globalForMeta = globalThis as unknown as { metaDb: Kysely<MetaDB> | undefined };
 
@@ -28,10 +29,9 @@ export async function initMetaClient(): Promise<Kysely<MetaDB>> {
   const metaDbUrl = getBaseConfig().META_DATABASE_URL;
   const metaDbName = extractDatabaseName(metaDbUrl);
 
-  const url = new URL(pgbouncerUrl);
-  url.pathname = `/${metaDbName}`;
+  const url = buildPgBouncerUrl(pgbouncerUrl, metaDbName);
 
-  const pool = new Pool({ connectionString: url.toString() });
+  const pool = new Pool({ connectionString: url });
   const dialect = new PostgresDialect({ pool });
   const db = new Kysely<MetaDB>({ dialect });
 
