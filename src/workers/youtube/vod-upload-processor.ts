@@ -14,9 +14,6 @@ import { UPLOAD_TYPES } from '../../types/platforms.js';
 import type { VodRecord } from '../../types/db.js';
 import { deleteFileIfExists } from '../../utils/path.js';
 import { extractErrorDetails } from '../../utils/error.js';
-import { childLogger } from '../../utils/logger.js';
-
-const log = childLogger({ module: 'vod-upload-processor' });
 
 export interface VodUploadContext {
   tenantId: string;
@@ -312,7 +309,8 @@ export async function linkVodPartsAfterDelay(
   dbId: number,
   uploadedVideos: Array<{ id: string; part: number; duration: number }>,
   splitDuration: number,
-  db: Kysely<StreamerDB>
+  db: Kysely<StreamerDB>,
+  log: AppLogger
 ): Promise<void> {
   if (uploadedVideos.length > 0) {
     setTimeout(() => {

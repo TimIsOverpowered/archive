@@ -86,19 +86,20 @@ class PoolManager {
   }
 
   async evictOldestIdleClient(): Promise<void> {
-    let oldestTenantId: string | null = null;
+    let candidate: string | null = null;
     let oldestTimestamp = Infinity;
 
     for (const [tenantId, entry] of this.pools.entries()) {
-      if (entry.lastAccessedAt < oldestTimestamp) {
+      const isFullyIdle = entry.pool.idleCount === entry.pool.totalCount;
+      if (isFullyIdle && entry.lastAccessedAt < oldestTimestamp) {
         oldestTimestamp = entry.lastAccessedAt;
-        oldestTenantId = tenantId;
+        candidate = tenantId;
       }
     }
 
-    if (oldestTenantId) {
-      await this.closeClient(oldestTenantId);
-      getLogger().info({ tenantId: oldestTenantId }, 'Evicted oldest idle client due to MAX_CLIENTS limit');
+    if (candidate) {
+      await this.closeClient(candidate);
+      getLogger().info({ tenantId: candidate }, 'Evicted oldest idle client due to MAX_CLIENTS limit');
     }
   }
 
@@ -107,7 +108,8 @@ class PoolManager {
     const cutoff = now - DB_POOL_IDLE_TIMEOUT_MS;
 
     for (const [tenantId, entry] of this.pools.entries()) {
-      if (entry.lastAccessedAt < cutoff) {
+      const isFullyIdle = entry.pool.idleCount === entry.pool.totalCount;
+      if (entry.lastAccessedAt < cutoff && isFullyIdle) {
         const idleDuration = now - entry.lastAccessedAt;
 
         try {
@@ -171,6 +173,14 @@ class PoolManager {
     this.stopCleanup();
 
     for (const [tenantId, entry] of this.pools.entries()) {
+      const isFullyIdle = entry.pool.idleCount === entry.pool.totalCount;
+      if (!isFullyIdle) {
+        getLogger().info(
+          { tenantId, active: entry.pool.totalCount - entry.pool.idleCount },
+          'Skipping pool shutdown (active connections)'
+        );
+        continue;
+      }
       try {
         await entry.pool.end();
       } catch (error) {

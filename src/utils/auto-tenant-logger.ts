@@ -1,6 +1,7 @@
 import type { LogFn } from 'pino';
 import { getTenantDisplayName } from '../config/loader.js';
 import { type AppLogger, getLogger } from './logger.js';
+import { asJsonObject } from './object.js';
 
 // Define a specific call signature for the wrapper to satisfy ESLint
 type InternalLogCall = (arg1: unknown, ...args: unknown[]) => void;
@@ -32,9 +33,8 @@ export function createAutoLogger(tenantId?: string | null): AppLogger {
         return;
       }
 
-      if (typeof firstArg === 'object' && firstArg !== null) {
-        const obj = { ...(firstArg as Record<string, unknown>) };
-
+      const obj = asJsonObject(firstArg);
+      if (obj) {
         if (typeof obj.msg === 'string') {
           obj.msg = prefix(obj.msg);
         } else if (typeof obj.message === 'string') {

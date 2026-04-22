@@ -13,13 +13,7 @@ export { constructEmbed, createProgressBar, formatProgressMessage } from './disc
 export { trackFailure, resetFailures } from './discord/failures.js';
 
 // Webhook operations
-export {
-  sendDiscordAlert,
-  sendRichAlert,
-  updateDiscordEmbed,
-  initRichAlert,
-  updateAlert,
-} from './discord/webhook.js';
+export { sendDiscordAlert, sendRichAlert, updateDiscordEmbed, initRichAlert, updateAlert } from './discord/webhook.js';
 
 // Stream alerts
 export type { StreamAlertData } from './discord/alerts/stream.js';

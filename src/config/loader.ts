@@ -2,6 +2,7 @@ import { LRUCache } from 'lru-cache';
 import { initMetaClient } from '../db/meta-client.js';
 import { getAllTenants, getTenantById } from '../services/meta-tenants.service.js';
 import { decryptScalar } from '../utils/encryption.js';
+import { asJsonObject } from '../utils/object.js';
 import { SettingsSchema, YoutubeSchema, TwitchSchema, KickSchema } from './schemas.js';
 import { TenantConfig } from './types.js';
 import { getBaseConfig } from './env.js';
@@ -24,10 +25,6 @@ function getCache(): LRUCache<string, TenantConfig> {
     configCache = createConfigCache();
   }
   return configCache;
-}
-
-function asJsonObject(val: unknown): Record<string, unknown> | null {
-  return val && typeof val === 'object' && !Array.isArray(val) ? (val as Record<string, unknown>) : null;
 }
 
 function buildTenantConfig(tenant: TenantResult): TenantConfig | null {

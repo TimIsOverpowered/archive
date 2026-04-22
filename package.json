@@ -19,7 +19,7 @@
     "npm": ">=11.0.0"
   },
   "scripts": {
-    "tests": "node --test --import tsx --import ./tests/setup.ts --test-timeout 10000 --test-concurrency true \"tests/**/*.test.ts\"",
+    "test": "node --test --import tsx --import ./tests/setup.ts --test-timeout 10000 --test-concurrency true \"tests/**/*.test.ts\"",
     "lint": "eslint \"src/**/*.ts\" --fix",
     "fix": "npm run format && npm run lint",
     "format": "prettier --write \"src/**/*.ts\" \"scripts/**/*.ts\"",

@@ -23,3 +23,5 @@ export function markConnectionRestored(tenantId: string): void {
 export function clearAllConnectionFailures(): void {
   _state.clear();
 }
+
+export const resetCacheState = clearAllConnectionFailures;

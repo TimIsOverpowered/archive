@@ -7,7 +7,6 @@ import { closeRedisClient } from './api/plugins/redis.plugin.js';
 import { extractErrorDetails } from './utils/error.js';
 import { startCloudflareIpRangesCron } from './cron/cloudflare-ip-ranges.js';
 import { getCachedRangeInfo, getCloudflareIpRanges } from './utils/cloudflare-ip-validator.js';
-
 import { registerPlatformStrategies } from './services/platforms/index.js';
 import { closeMetaClient } from './db/meta-client.js';
 

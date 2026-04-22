@@ -155,7 +155,7 @@ async function processVodUploadJob(
   await publishVodUpdate(tenantId, dbId);
 
   const splitDuration = getEffectiveSplitDuration(config.youtube!.splitDuration);
-  await linkVodPartsAfterDelay(tenantId, dbId, result.uploadedVideos, splitDuration, db);
+  await linkVodPartsAfterDelay(tenantId, dbId, result.uploadedVideos, splitDuration, db, log);
 
   return { success: true, videos: result.uploadedVideos };
 }
