@@ -189,6 +189,6 @@ export async function convertHlsToMp4(source: string, outputPath: string, option
       ffmpegProcess.kill('SIGKILL');
       reject(err || new Error(stderr?.toString() || 'Unknown error'));
     });
-    ffmpegProcess.on('end', () => resolve());
+    ffmpegProcess.on('end', () => { resolve(); });
   });
 }
