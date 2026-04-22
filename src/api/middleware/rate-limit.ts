@@ -23,7 +23,7 @@ export default function createRateLimitMiddleware(options: RateLimitOptions) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     const { limiter: readLimiter, writeLimiter } = options;
     const method = request.method;
-    const activeLimiter = method === 'GET' ? readLimiter : writeLimiter ?? readLimiter;
+    const activeLimiter = method === 'GET' ? readLimiter : (writeLimiter ?? readLimiter);
 
     const isValidCfRequest = await validateCloudflareRequest(request);
     if (!isValidCfRequest) {
