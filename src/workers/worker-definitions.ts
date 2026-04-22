@@ -7,68 +7,85 @@ import dmcaProcessor from './dmca.worker.js';
 import monitorProcessor from './monitor/processor.js';
 import { QUEUE_NAMES, QUEUES_VALUES } from './jobs/queues.js';
 import type {
+  LiveDownloadJob,
   StandardVodJob,
   ChatDownloadJob,
   YoutubeUploadJob,
   DmcaProcessingJob,
   MonitorJob,
+  ChatDownloadResult,
+  YoutubeUploadResult,
+  DmcaProcessingResult,
 } from './jobs/queues.js';
 import type { Redis } from 'ioredis';
 import type { TenantConfig } from '../config/types.js';
-import { getWorkersConfig, type WorkersConfig } from '../config/env.js';
-import { createWorker } from './create-worker.js';
+import { getWorkersConfig } from '../config/env.js';
+import { createWorker, type WorkerConfig } from './create-worker.js';
 
 export type WorkerName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
-export type AllJobData = StandardVodJob | ChatDownloadJob | YoutubeUploadJob | DmcaProcessingJob | MonitorJob;
+export type AllJobData =
+  | LiveDownloadJob
+  | StandardVodJob
+  | ChatDownloadJob
+  | YoutubeUploadJob
+  | DmcaProcessingJob
+  | MonitorJob;
 
-export interface WorkerConfig {
+// Typed per-worker definition — no type erasure here
+interface WorkerDef<TData, TResult = unknown> {
   name: WorkerName;
-  processor: Processor<Record<string, unknown>, unknown, string>;
+  processor: Processor<TData, TResult, string>;
   concurrency?: number;
   useWorkerThreads?: boolean;
 }
 
-const workerDefs: Record<WorkerName, Omit<WorkerConfig, 'concurrency'>> = {
-  vod_live: {
+const workerDefs = {
+  [QUEUE_NAMES.VOD_LIVE]: {
     name: QUEUE_NAMES.VOD_LIVE,
-    processor: liveProcessor as unknown as Processor<Record<string, unknown>, unknown, string>,
+    processor: liveProcessor,
     useWorkerThreads: true,
-  },
-  vod_standard: {
+  } satisfies WorkerDef<LiveDownloadJob>,
+
+  [QUEUE_NAMES.VOD_STANDARD]: {
     name: QUEUE_NAMES.VOD_STANDARD,
-    processor: standardVodProcessor as unknown as Processor<Record<string, unknown>, unknown, string>,
+    processor: standardVodProcessor,
     useWorkerThreads: true,
-  },
-  chat_download: {
+  } satisfies WorkerDef<StandardVodJob>,
+
+  [QUEUE_NAMES.CHAT_DOWNLOAD]: {
     name: QUEUE_NAMES.CHAT_DOWNLOAD,
-    processor: chatProcessor as unknown as Processor<Record<string, unknown>, unknown, string>,
+    processor: chatProcessor,
     useWorkerThreads: true,
-  },
-  youtube_upload: {
+  } satisfies WorkerDef<ChatDownloadJob, ChatDownloadResult>,
+
+  [QUEUE_NAMES.YOUTUBE_UPLOAD]: {
     name: QUEUE_NAMES.YOUTUBE_UPLOAD,
-    processor: youtubeProcessor as unknown as Processor<Record<string, unknown>, unknown, string>,
+    processor: youtubeProcessor,
     useWorkerThreads: true,
-  },
-  dmca_processing: {
+  } satisfies WorkerDef<YoutubeUploadJob, YoutubeUploadResult>,
+
+  [QUEUE_NAMES.DMCA_PROCESSING]: {
     name: QUEUE_NAMES.DMCA_PROCESSING,
-    processor: dmcaProcessor as unknown as Processor<Record<string, unknown>, unknown, string>,
+    processor: dmcaProcessor,
     useWorkerThreads: true,
-  },
-  monitor: {
+  } satisfies WorkerDef<DmcaProcessingJob, DmcaProcessingResult>,
+
+  [QUEUE_NAMES.MONITOR]: {
     name: QUEUE_NAMES.MONITOR,
-    processor: monitorProcessor as unknown as Processor<Record<string, unknown>, unknown, string>,
+    processor: monitorProcessor,
     useWorkerThreads: true,
-  },
+  } satisfies WorkerDef<MonitorJob>,
 };
 
-const CONCURRENCY_KEYS: Record<WorkerName, keyof WorkersConfig | undefined> = {
-  vod_live: undefined,
-  vod_standard: 'VOD_STANDARD_CONCURRENCY',
-  chat_download: 'CHAT_DOWNLOAD_CONCURRENCY',
-  youtube_upload: 'YOUTUBE_UPLOAD_CONCURRENCY',
-  dmca_processing: undefined,
-  monitor: 'MONITOR_CONCURRENCY',
-};
+// Type erasure happens here, at the boundary — intentional and isolated
+function toRawDef(def: WorkerDef<unknown, unknown>): {
+  name: WorkerName;
+  processor: Processor<Record<string, unknown>, unknown, string>;
+  concurrency?: number;
+  useWorkerThreads?: boolean;
+} {
+  return def as ReturnType<typeof toRawDef>;
+}
 
 export function registerWorkers(
   connection: Redis,
@@ -78,20 +95,29 @@ export function registerWorkers(
 ): void {
   const workerConfig = getWorkersConfig();
 
+  const concurrencyMap: Partial<Record<WorkerName, number>> = {
+    [QUEUE_NAMES.VOD_STANDARD]: workerConfig.VOD_STANDARD_CONCURRENCY,
+    [QUEUE_NAMES.CHAT_DOWNLOAD]: workerConfig.CHAT_DOWNLOAD_CONCURRENCY,
+    [QUEUE_NAMES.YOUTUBE_UPLOAD]: workerConfig.YOUTUBE_UPLOAD_CONCURRENCY,
+    [QUEUE_NAMES.MONITOR]: workerConfig.MONITOR_CONCURRENCY,
+  };
+
   for (const name of QUEUES_VALUES) {
-    const def = workerDefs[name];
-    const concurrencyKey = CONCURRENCY_KEYS[name];
-    const workerConfigResolved: WorkerConfig & { connection: Redis } = {
-      ...def,
-      connection,
-      ...(concurrencyKey && { concurrency: workerConfig[concurrencyKey] as number }),
-    };
+    const def = toRawDef(workerDefs[name] as WorkerDef<unknown, unknown>);
+    const concurrency =
+      name === QUEUE_NAMES.VOD_LIVE
+        ? Math.max(
+            tenantConfigs.filter((c) => c.settings.vodDownload && (c.twitch?.enabled || c.kick?.enabled)).length *
+              2 *
+              vodLiveHeadroom,
+            vodMinConcurrency
+          )
+        : concurrencyMap[name];
 
-    if (name === QUEUE_NAMES.VOD_LIVE) {
-      const liveTenants = tenantConfigs.filter((c) => c.settings.vodDownload && (c.twitch?.enabled || c.kick?.enabled));
-      workerConfigResolved.concurrency = Math.max(liveTenants.length * 2 * vodLiveHeadroom, vodMinConcurrency);
+    const workerConfig: WorkerConfig = { ...def, connection };
+    if (concurrency !== undefined) {
+      workerConfig.concurrency = concurrency;
     }
-
-    createWorker(workerConfigResolved);
+    createWorker(workerConfig);
   }
 }
