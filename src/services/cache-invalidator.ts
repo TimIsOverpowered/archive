@@ -65,8 +65,8 @@ export function registerCacheSubscriber(fastify: FastifyInstance): void {
     log.debug({ channel }, 'Cache subscriber connected');
   });
 
-  subClient.on('message', async (channel, message) => {
-    if (channel !== CACHE_CHANNEL) return;
+  subClient.on('message', (_channel: string, message: string) => {
+    if (_channel !== CACHE_CHANNEL) return;
 
     let event: VodUpdateEvent;
     try {
@@ -76,22 +76,24 @@ export function registerCacheSubscriber(fastify: FastifyInstance): void {
       return;
     }
 
-    try {
-      if (event.type === 'VOD_DURATION_UPDATED' && event.duration !== undefined) {
-        await setVodVolatileCache(
-          event.tenantId,
-          event.dbId,
-          { duration: event.duration, is_live: event.is_live ?? false },
-          VOD_VOLATILE_CACHE_TTL
-        );
-      } else {
-        await invalidateVodStaticCache(event.tenantId, event.dbId);
-        await invalidateVodVolatileCache(event.tenantId, event.dbId);
+    (async () => {
+      try {
+        if (event.type === 'VOD_DURATION_UPDATED' && event.duration !== undefined) {
+          await setVodVolatileCache(
+            event.tenantId,
+            event.dbId,
+            { duration: event.duration, is_live: event.is_live ?? false },
+            VOD_VOLATILE_CACHE_TTL
+          );
+        } else {
+          await invalidateVodStaticCache(event.tenantId, event.dbId);
+          await invalidateVodVolatileCache(event.tenantId, event.dbId);
+        }
+      } catch (error) {
+        const details = extractErrorDetails(error);
+        log.warn({ err: details, event }, 'Failed to process cache event');
       }
-    } catch (error) {
-      const details = extractErrorDetails(error);
-      log.warn({ err: details, event }, 'Failed to process cache event');
-    }
+    })();
   });
 
   void subClient.subscribe(CACHE_CHANNEL);
