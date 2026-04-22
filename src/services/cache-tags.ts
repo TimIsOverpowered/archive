@@ -37,12 +37,20 @@ export async function registerVodTags(
   const tagTtlMs = ttl * 1000 + 60_000;
 
   try {
-    await client.set(cacheKey, data, 'EX', ttl);
+    const pipeline = client.pipeline();
+    pipeline.set(cacheKey, data, 'EX', ttl);
 
     for (const vod of vods) {
       const tagKey = `vods:tags:{${tenantId}}:${vod.id}`;
-      await client.sadd(tagKey, cacheKey);
-      await client.pexpire(tagKey, tagTtlMs);
+      pipeline.sadd(tagKey, cacheKey);
+      pipeline.pexpire(tagKey, tagTtlMs);
+    }
+
+    const results = await pipeline.exec();
+
+    if (results?.some(([err]) => err)) {
+      const firstErr = results.find(([err]) => err)?.[1] ?? null;
+      throw firstErr ?? new Error('Pipeline command failed');
     }
   } catch (error) {
     const { message } = extractErrorDetails(error);

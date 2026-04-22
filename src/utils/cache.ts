@@ -26,6 +26,12 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
+const inflightSimple = new LRUCache<string, Promise<unknown>>({
+  max: 5000,
+  ttl: 30_000,
+  allowStale: false,
+});
+
 export async function withCache<T>(key: string, ttl: number, fetcher: () => Promise<T>): Promise<T> {
   const client = getDisableRedisCache() ? null : (RedisService.instance?.getClient() ?? null);
   if (!client) return fetcher();
@@ -38,16 +44,25 @@ export async function withCache<T>(key: string, ttl: number, fetcher: () => Prom
     getLogger().warn({ err: details, key }, 'Cache read failed, falling back to DB');
   }
 
-  const result = await fetcher();
+  const inflight = inflightSimple.get(key) as Promise<T> | undefined;
+  if (inflight) return inflight;
 
-  try {
-    await client.set(key, JSON.stringify(result), 'EX', ttl);
-  } catch (err) {
-    const details = extractErrorDetails(err);
-    getLogger().warn({ err: details, key }, 'Cache write failed');
-  }
+  const promise = fetcher().then(async (result) => {
+    inflightSimple.delete(key);
+    try {
+      await client.set(key, JSON.stringify(result), 'EX', ttl);
+    } catch (err) {
+      const details = extractErrorDetails(err);
+      getLogger().warn({ err: details, key }, 'Cache write failed');
+    }
+    return result;
+  }).catch((err) => {
+    inflightSimple.delete(key);
+    throw err;
+  });
 
-  return result;
+  inflightSimple.set(key, promise as Promise<unknown>);
+  return promise;
 }
 
 const inflightPromises = new LRUCache<string, Promise<unknown>>({
