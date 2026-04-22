@@ -108,15 +108,6 @@ export function getBaseConfig(): BaseConfig {
   return baseConfigCache;
 }
 
-let _configCacheTtl: number | null = null;
-
-export function getConfigCacheTtl(): number {
-  if (_configCacheTtl !== null) return _configCacheTtl;
-  const parsed = z.coerce.number().int().positive().safeParse(process.env.CONFIG_CACHE_TTL);
-  _configCacheTtl = parsed.success ? parsed.data : 3600;
-  return _configCacheTtl;
-}
-
 // --- Lazy accessor helpers (consolidated from env-accessors.ts) ---
 
 // Values from cached configs
@@ -160,5 +151,4 @@ export function resetEnvConfig(): void {
   apiConfigCache = null;
   workersConfigCache = null;
   baseConfigCache = null;
-  _configCacheTtl = null;
 }
