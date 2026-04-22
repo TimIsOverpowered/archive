@@ -3,22 +3,16 @@ import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import { resetEnvConfig } from '../../src/config/env.js';
 import {
-  getClient,
-  createClient,
-  closeClient,
-  closeAllClients,
-  startClientCleanup,
   stopClientCleanup,
-  getClientCount,
-  resetClientManager,
-  _setPoolCtor,
+  createPoolManager,
 } from '../../src/db/client.js';
+import type { Pool } from 'pg';
+import { TenantConfig } from '../../src/config/types.js';
 
 process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.META_DATABASE_URL = 'postgresql://localhost/test';
 process.env.ENCRYPTION_MASTER_KEY = '0000000000000000000000000000000000000000000000000000000000000000';
 process.env.PGBOUNCER_URL = 'postgresql://localhost/placeholder';
-import { TenantConfig } from '../../src/config/types.js';
 
 const createMockConfig = (id: string): TenantConfig => ({
   id,
@@ -57,34 +51,36 @@ class MockPool extends EventEmitter {
   end = mock.fn(() => Promise.resolve());
   connect = mock.fn(() => Promise.resolve({ release: () => {} }));
   on = mock.fn(() => this);
+  idleCount = 0;
+  totalCount = 0;
 }
 
 describe('DB Client Manager', () => {
+  let pm: ReturnType<typeof createPoolManager>;
+
   beforeEach(() => {
-    _setPoolCtor(MockPool as unknown as typeof import('pg').Pool);
-    resetClientManager();
+    pm = createPoolManager(MockPool as unknown as typeof Pool);
     resetEnvConfig();
   });
 
   afterEach(() => {
     stopClientCleanup();
-    resetClientManager();
     mock.restoreAll();
   });
 
   describe('getClient', () => {
     it('should return undefined for non-existent tenant', () => {
-      const client = getClient('non-existent');
+      const client = pm.getClient('non-existent');
       assert.strictEqual(client, undefined);
     });
 
     it('should return existing client and update lastAccessedAt', async () => {
       const config = createMockConfig('tenant-1');
-      const client = await createClient(config);
+      const client = await pm.createClient(config);
       assert.ok(client !== undefined);
 
-      const client1 = getClient('tenant-1');
-      const client2 = getClient('tenant-1');
+      const client1 = pm.getClient('tenant-1');
+      const client2 = pm.getClient('tenant-1');
       assert.strictEqual(client1, client2);
       assert.strictEqual(client1, client);
     });
@@ -93,40 +89,40 @@ describe('DB Client Manager', () => {
   describe('createClient', () => {
     it('should create a new client for a tenant', async () => {
       const config = createMockConfig('tenant-create-test');
-      const client = await createClient(config);
+      const client = await pm.createClient(config);
       assert.ok(client !== undefined);
-      assert.strictEqual(getClientCount(), 1);
+      assert.strictEqual(pm.getCount(), 1);
     });
 
     it('should return existing client when called twice for same tenant', async () => {
       const config = createMockConfig('tenant-existing');
-      const client1 = await createClient(config);
-      const client2 = await createClient(config);
+      const client1 = await pm.createClient(config);
+      const client2 = await pm.createClient(config);
       assert.strictEqual(client1, client2);
-      assert.strictEqual(getClientCount(), 1);
+      assert.strictEqual(pm.getCount(), 1);
     });
 
     it('should handle race condition when called simultaneously', async () => {
       const config = createMockConfig('tenant-race');
-      const [client1, client2] = await Promise.all([createClient(config), createClient(config)]);
+      const [client1, client2] = await Promise.all([pm.createClient(config), pm.createClient(config)]);
       assert.strictEqual(client1, client2);
-      assert.strictEqual(getClientCount(), 1);
+      assert.strictEqual(pm.getCount(), 1);
     });
   });
 
   describe('closeClient', () => {
     it('should remove client from map after closing', async () => {
       const config = createMockConfig('tenant-close');
-      await createClient(config);
-      assert.strictEqual(getClientCount(), 1);
+      await pm.createClient(config);
+      assert.strictEqual(pm.getCount(), 1);
 
-      await closeClient('tenant-close');
-      assert.strictEqual(getClientCount(), 0);
+      await pm.closeClient('tenant-close');
+      assert.strictEqual(pm.getCount(), 0);
     });
 
     it('should handle closing non-existent client gracefully', async () => {
-      await closeClient('non-existent');
-      assert.strictEqual(getClientCount(), 0);
+      await pm.closeClient('non-existent');
+      assert.strictEqual(pm.getCount(), 0);
     });
   });
 
@@ -135,80 +131,77 @@ describe('DB Client Manager', () => {
       const config1 = createMockConfig('tenant-all-1');
       const config2 = createMockConfig('tenant-all-2');
 
-      await createClient(config1);
-      await createClient(config2);
-      assert.strictEqual(getClientCount(), 2);
+      await pm.createClient(config1);
+      await pm.createClient(config2);
+      assert.strictEqual(pm.getCount(), 2);
 
-      await closeAllClients();
-      assert.strictEqual(getClientCount(), 0);
+      await pm.closeAll();
+      assert.strictEqual(pm.getCount(), 0);
     });
   });
 
   describe('getClientCount', () => {
     it('should return 0 when no clients exist', () => {
-      assert.strictEqual(getClientCount(), 0);
+      assert.strictEqual(pm.getCount(), 0);
     });
 
     it('should return correct count after creating clients', async () => {
       const config1 = createMockConfig('tenant-count-1');
       const config2 = createMockConfig('tenant-count-2');
 
-      await createClient(config1);
-      assert.strictEqual(getClientCount(), 1);
+      await pm.createClient(config1);
+      assert.strictEqual(pm.getCount(), 1);
 
-      await createClient(config2);
-      assert.strictEqual(getClientCount(), 2);
+      await pm.createClient(config2);
+      assert.strictEqual(pm.getCount(), 2);
     });
   });
 
-  describe('resetClientManager', () => {
+  describe('reset', () => {
     it('should clear all clients and locks', async () => {
       const config = createMockConfig('tenant-reset');
-      await createClient(config);
-      assert.strictEqual(getClientCount(), 1);
+      await pm.createClient(config);
+      assert.strictEqual(pm.getCount(), 1);
 
-      resetClientManager();
-      assert.strictEqual(getClientCount(), 0);
+      pm.reset();
+      assert.strictEqual(pm.getCount(), 0);
     });
   });
 
-  describe('startClientCleanup and stopClientCleanup', () => {
-    it('should allow multiple calls to startClientCleanup without creating duplicate intervals', () => {
-      startClientCleanup();
-      startClientCleanup();
-      startClientCleanup();
+  describe('startCleanup and stopCleanup', () => {
+    it('should allow multiple calls to startCleanup without creating duplicate intervals', () => {
+      pm.startCleanup();
+      pm.startCleanup();
+      pm.startCleanup();
 
-      stopClientCleanup();
+      pm.stopCleanup();
       assert.ok(true);
     });
 
     it('should stop cleanup after start', () => {
-      startClientCleanup();
-      stopClientCleanup();
+      pm.startCleanup();
+      pm.stopCleanup();
       assert.ok(true);
     });
   });
 
   describe('LRU eviction at MAX_CLIENTS', () => {
     it('should evict oldest idle client when MAX_CLIENTS is reached', async () => {
-      // DB_POOL_MAX_CLIENTS = 10, so creating 11 should evict the oldest
       const configs: TenantConfig[] = [];
       for (let i = 0; i < 11; i++) {
         configs.push(createMockConfig(`tenant-lru-${i}`));
       }
 
       for (const config of configs) {
-        await createClient(config);
+        await pm.createClient(config);
       }
 
-      assert.strictEqual(getClientCount(), 10);
+      assert.strictEqual(pm.getCount(), 10);
 
-      // The oldest client (tenant-lru-0) should have been evicted
-      assert.strictEqual(getClient('tenant-lru-0'), undefined);
+      assert.strictEqual(pm.getClient('tenant-lru-0'), undefined);
 
-      // The newest 10 should still exist
       for (let i = 1; i <= 10; i++) {
-        assert.ok(getClient(`tenant-lru-${i}`), `tenant-lru-${i} should exist`);
+        assert.ok(pm.getClient(`tenant-lru-${i}`), `tenant-lru-${i} should exist`);
       }
     });
   });
@@ -216,23 +209,19 @@ describe('DB Client Manager', () => {
   describe('idle timeout eviction', () => {
     it('should evict clients that have been idle for longer than IDLE_TIMEOUT', async () => {
       const config = createMockConfig('tenant-idle');
-      await createClient(config);
-      assert.strictEqual(getClientCount(), 1);
+      await pm.createClient(config);
+      assert.strictEqual(pm.getCount(), 1);
 
       const originalNow = Date.now;
-      // Set the client's lastAccessedAt to 31 minutes ago
       const oldTime = originalNow() - 31 * 60 * 1000;
 
-      // Manually touch the pool to simulate it being idle
-      const { poolManager } = await import('../../src/db/client.js');
-      const entry = poolManager['pools'].get('tenant-idle') as { lastAccessedAt: number };
+      const entry = pm['pools'].get('tenant-idle') as { lastAccessedAt: number };
       entry.lastAccessedAt = oldTime;
 
-      // Run eviction manually
-      await poolManager.evictIdleClients();
+      await pm.evictIdleClients();
 
-      assert.strictEqual(getClientCount(), 0);
-      assert.strictEqual(getClient('tenant-idle'), undefined);
+      assert.strictEqual(pm.getCount(), 0);
+      assert.strictEqual(pm.getClient('tenant-idle'), undefined);
 
       Date.now = originalNow;
     });
@@ -242,20 +231,20 @@ describe('DB Client Manager', () => {
     it('should handle full lifecycle: create, access, close', async () => {
       const config = createMockConfig('tenant-lifecycle');
 
-      assert.strictEqual(getClientCount(), 0);
+      assert.strictEqual(pm.getCount(), 0);
 
-      const client = await createClient(config);
+      const client = await pm.createClient(config);
       assert.ok(client !== undefined);
-      assert.strictEqual(getClientCount(), 1);
+      assert.strictEqual(pm.getCount(), 1);
 
-      const retrievedClient = getClient('tenant-lifecycle');
+      const retrievedClient = pm.getClient('tenant-lifecycle');
       assert.ok(retrievedClient !== undefined);
       assert.strictEqual(retrievedClient, client);
 
-      await closeClient('tenant-lifecycle');
-      assert.strictEqual(getClientCount(), 0);
+      await pm.closeClient('tenant-lifecycle');
+      assert.strictEqual(pm.getCount(), 0);
 
-      const afterClose = getClient('tenant-lifecycle');
+      const afterClose = pm.getClient('tenant-lifecycle');
       assert.strictEqual(afterClose, undefined);
     });
 
@@ -264,21 +253,21 @@ describe('DB Client Manager', () => {
       const config2 = createMockConfig('tenant-state-2');
       const config3 = createMockConfig('tenant-state-3');
 
-      await createClient(config1);
-      await createClient(config2);
-      assert.strictEqual(getClientCount(), 2);
+      await pm.createClient(config1);
+      await pm.createClient(config2);
+      assert.strictEqual(pm.getCount(), 2);
 
-      getClient('tenant-state-1');
-      assert.strictEqual(getClientCount(), 2);
+      pm.getClient('tenant-state-1');
+      assert.strictEqual(pm.getCount(), 2);
 
-      await closeClient('tenant-state-2');
-      assert.strictEqual(getClientCount(), 1);
+      await pm.closeClient('tenant-state-2');
+      assert.strictEqual(pm.getCount(), 1);
 
-      await createClient(config3);
-      assert.strictEqual(getClientCount(), 2);
+      await pm.createClient(config3);
+      assert.strictEqual(pm.getCount(), 2);
 
-      await closeAllClients();
-      assert.strictEqual(getClientCount(), 0);
+      await pm.closeAll();
+      assert.strictEqual(pm.getCount(), 0);
     });
   });
 });

@@ -10,14 +10,8 @@ import { sleep } from '../utils/delay.js';
 import type { StreamerDB } from './streamer-types.js';
 import { buildPgBouncerUrl } from './utils.js';
 
-let PoolCtor: typeof Pool = Pool;
-
-export function _setPoolCtor(ctor: typeof Pool): void {
-  PoolCtor = ctor;
-}
-
 interface PgPoolEntry {
-  pool: Pool;
+  pool: InstanceType<typeof Pool>;
   db: Kysely<StreamerDB>;
   lastAccessedAt: number;
   createdAt: number;
@@ -25,6 +19,8 @@ interface PgPoolEntry {
 
 class PoolManager {
   private pools = new Map<string, PgPoolEntry>();
+
+  constructor(private readonly PoolCtor: typeof Pool = Pool) {}
   private cleanupIntervalId: NodeJS.Timeout | null = null;
   private creationLocks = new Map<string, Promise<Kysely<StreamerDB>>>();
 
@@ -60,7 +56,7 @@ class PoolManager {
 
     const url = buildPgBouncerUrl(pgbouncerUrl, tenantDbName);
 
-    const pool = new PoolCtor({ connectionString: url, max: connectionLimit });
+    const pool = new this.PoolCtor({ connectionString: url, max: connectionLimit });
     const db = new Kysely<StreamerDB>({ dialect: new PostgresDialect({ pool }) });
 
     this.pools.set(config.id, {
@@ -196,6 +192,10 @@ class PoolManager {
 const poolManager = new PoolManager();
 
 export { poolManager };
+
+export function createPoolManager(PoolCtor: typeof Pool = Pool): PoolManager {
+  return new PoolManager(PoolCtor);
+}
 
 export function getClient(tenantId: string): Kysely<StreamerDB> | undefined {
   return poolManager.getClient(tenantId);
