@@ -47,19 +47,21 @@ export async function withCache<T>(key: string, ttl: number, fetcher: () => Prom
   const inflight = inflightSimple.get(key) as Promise<T> | undefined;
   if (inflight) return inflight;
 
-  const promise = fetcher().then(async (result) => {
-    inflightSimple.delete(key);
-    try {
-      await client.set(key, JSON.stringify(result), 'EX', ttl);
-    } catch (err) {
-      const details = extractErrorDetails(err);
-      getLogger().warn({ err: details, key }, 'Cache write failed');
-    }
-    return result;
-  }).catch((err) => {
-    inflightSimple.delete(key);
-    throw err;
-  });
+  const promise = fetcher()
+    .then(async (result) => {
+      inflightSimple.delete(key);
+      try {
+        await client.set(key, JSON.stringify(result), 'EX', ttl);
+      } catch (err) {
+        const details = extractErrorDetails(err);
+        getLogger().warn({ err: details, key }, 'Cache write failed');
+      }
+      return result;
+    })
+    .catch((err) => {
+      inflightSimple.delete(key);
+      throw err;
+    });
 
   inflightSimple.set(key, promise as Promise<unknown>);
   return promise;
