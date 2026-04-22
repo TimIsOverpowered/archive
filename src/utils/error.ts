@@ -6,7 +6,7 @@ import { ZodError } from 'zod';
 
 export interface ErrorDetails {
   message: string;
-  stack?: string;
+  stack?: string | undefined;
 }
 
 /**

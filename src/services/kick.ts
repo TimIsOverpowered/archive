@@ -30,6 +30,7 @@ function getKickParsedM3u8(m3u8: string, baseURL: string): string | null {
     }
 
     const bestVariant = parsed.variants[0];
+    if (!bestVariant) return null;
 
     if (!bestVariant.uri) {
       return null;

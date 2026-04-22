@@ -2,7 +2,7 @@ import { sql } from 'kysely';
 import type { Kysely } from 'kysely';
 import type { StreamerDB, SelectableChatMessages } from '../db/streamer-types.js';
 import { RedisService } from '../utils/redis-service.js';
-import { getDisableRedisCache } from '../config/env-accessors.js';
+import { getDisableRedisCache } from '../config/env.js';
 import { getApiConfig } from '../config/env.js';
 import { compressChatData, decompressChatData } from '../utils/compression.js';
 import { getLogger } from '../utils/logger.js';
@@ -68,7 +68,7 @@ export async function getLogsByOffset(
   tenantId: string,
   vodId: number,
   offsetSeconds: number
-): Promise<{ comments: SelectableChatMessages[]; cursor?: string }> {
+): Promise<{ comments: SelectableChatMessages[]; cursor?: string | undefined }> {
   const bucketSize = await getVodBucketSize(db, tenantId, vodId);
   const bucket = Math.floor(offsetSeconds / bucketSize) * bucketSize;
   const cacheKey = `${tenantId}:${vodId}:bucket:${bucket}`;
@@ -79,7 +79,10 @@ export async function getLogsByOffset(
       const cached = await redis.getBuffer(cacheKey);
       if (cached) {
         getLogger().debug({ vodId, bucket }, '[CACHE HIT] bucket');
-        const data = (await decompressChatData(cached)) as { comments: SelectableChatMessages[]; cursor?: string };
+        const data = (await decompressChatData(cached)) as {
+          comments: SelectableChatMessages[];
+          cursor?: string | undefined;
+        };
         return data;
       }
     } catch (error) {
@@ -126,6 +129,7 @@ export async function getLogsByOffset(
   let cursor: string | undefined;
   if (data.length === LOGS_PAGE_SIZE + 1) {
     const lastMsg = data[LOGS_PAGE_SIZE];
+    if (!lastMsg) throw new Error('Missing last message in data array');
     if (!lastMsg.created_at) {
       throw new Error(`Missing created_at on message ${lastMsg.id}`);
     }
@@ -157,7 +161,7 @@ export async function getLogsByCursor(
   tenantId: string,
   vodId: number,
   cursor: string
-): Promise<{ comments: SelectableChatMessages[]; cursor?: string }> {
+): Promise<{ comments: SelectableChatMessages[]; cursor?: string | undefined }> {
   const cacheKey = `${tenantId}:${vodId}:cursor:${cursor}`;
   const redis = RedisService.instance?.getClient() ?? null;
 
@@ -167,7 +171,10 @@ export async function getLogsByCursor(
       if (cached) {
         getLogger().debug({ vodId }, '[CACHE HIT] cursor');
 
-        const data = (await decompressChatData(cached)) as { comments: SelectableChatMessages[]; cursor?: string };
+        const data = (await decompressChatData(cached)) as {
+          comments: SelectableChatMessages[];
+          cursor?: string | undefined;
+        };
         return data;
       }
     } catch (error) {
@@ -240,6 +247,7 @@ export async function getLogsByCursor(
   let nextCursor: string | undefined;
   if (data.length === LOGS_PAGE_SIZE + 1) {
     const lastMsg = data[LOGS_PAGE_SIZE];
+    if (!lastMsg) throw new Error('Missing last message in data array');
     if (!lastMsg.created_at) {
       throw new Error(`Missing created_at on message ${lastMsg.id}`);
     }

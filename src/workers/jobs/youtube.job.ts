@@ -54,7 +54,7 @@ export async function createGameUploadJob(
   vodId: string,
   filePath: string | undefined,
   platform: Platform,
-  chapter: { id: number; name: string; start: number; end: number; gameId?: string }
+  chapter: { id: number; name: string; start: number; end: number; gameId?: string | undefined }
 ): Promise<YoutubeGameUploadJob> {
   const { config, tenantId } = ctx;
   if (!config?.youtube?.upload) {
@@ -370,14 +370,14 @@ export interface QueueYoutubeUploadsOptions {
   ctx: TenantContext;
   dbId: number;
   vodId: string;
-  filePath?: string;
+  filePath?: string | undefined;
   platform: Platform;
-  uploadMode?: UploadMode;
+  uploadMode?: UploadMode | undefined;
   /**
    * Optional download job ID. If provided, uploads are chained to wait for
    * download completion. If undefined, uploads are queued immediately (file exists).
    */
-  downloadJobId?: string;
+  downloadJobId?: string | undefined;
   type: SourceType;
 }
 

@@ -1,5 +1,5 @@
 import { RedisService } from '../utils/redis-service.js';
-import { getDisableRedisCache } from '../config/env-accessors.js';
+import { getDisableRedisCache } from '../config/env.js';
 import { extractErrorDetails } from './error.js';
 import { getLogger } from '../utils/logger.js';
 import { LRUCache } from 'lru-cache';
@@ -47,6 +47,8 @@ const inflightPromises = new LRUCache<string, Promise<unknown>>({
   allowStale: false,
 });
 
+const INFIGHT_TIMEOUT_MS = 30_000;
+
 export async function withStaleWhileRevalidate<T>(
   key: string,
   ttl: number,
@@ -66,8 +68,9 @@ export async function withStaleWhileRevalidate<T>(
 
       if (isStale) {
         if (!inflightPromises.get(key)) {
-          const revalidatePromise = revalidateWithRetry(client, key, ttl, fetcher).catch(() =>
-            inflightPromises.delete(key)
+          const revalidatePromise = withTimeout(
+            revalidateWithRetry(client, key, ttl, fetcher).catch(() => inflightPromises.delete(key)),
+            INFIGHT_TIMEOUT_MS
           );
 
           inflightPromises.set(key, revalidatePromise);
@@ -87,13 +90,27 @@ export async function withStaleWhileRevalidate<T>(
     return (await inflightPromises.get(key)) as T;
   }
 
-  const fetchPromise = revalidateWithRetry(client, key, ttl, fetcher).catch((err) => {
-    inflightPromises.delete(key);
-    throw err;
-  });
+  const fetchPromise = withTimeout(
+    revalidateWithRetry(client, key, ttl, fetcher).catch((err) => {
+      inflightPromises.delete(key);
+      throw err;
+    }),
+    INFIGHT_TIMEOUT_MS
+  );
 
   inflightPromises.set(key, fetchPromise);
   return await fetchPromise;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`In-flight fetch timed out after ${ms}ms`));
+      }, ms);
+    }),
+  ]);
 }
 
 async function revalidateWithRetry<T>(

@@ -16,7 +16,7 @@ export interface UploadProgressCallbackData {
   totalBytes?: number;
   uploadSpeedBps?: number;
   etaSeconds?: number;
-  videoDuration?: number;
+  videoDuration?: number | undefined;
   privacyStatus?: string;
 }
 

@@ -13,7 +13,7 @@ import {
 } from '../constants.js';
 import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
 import { RedisService } from '../utils/redis-service.js';
-import { getDisableRedisCache } from '../config/env-accessors.js';
+import { getDisableRedisCache } from '../config/env.js';
 import { registerVodTags } from './cache-tags.js';
 import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.js';
 

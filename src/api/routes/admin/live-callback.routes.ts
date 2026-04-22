@@ -6,7 +6,7 @@ import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import {
   tenantMiddleware,
   platformValidationMiddleware,
-  type TenantPlatformContext,
+  asTenantPlatformContext,
 } from '../../middleware/tenant-platform.js';
 import { fileExists } from '../../../utils/path.js';
 import { RedisService } from '../../../utils/redis-service.js';
@@ -71,28 +71,28 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
     onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
     preValidation: [platformValidationMiddleware],
     handler: async (request) => {
-      const { tenantId, config, db, platform } = request.tenant as TenantPlatformContext;
+      const { tenantId, config, db, platform } = asTenantPlatformContext(request.tenant);
       const { streamId, path, durationSecs } = request.body;
       const log = createAutoLogger(tenantId);
 
       // Validate file path exists and is accessible
       const exists = await fileExists(path);
       if (!exists) {
-        badRequest(`File at ${path} does not exist`);
+        throw badRequest(`File at ${path} does not exist`);
       }
 
       let stats: FsStats;
       try {
         stats = await fs.stat(path);
       } catch {
-        notFound('Recording file not found or inaccessible');
+        throw notFound('Recording file not found or inaccessible');
       }
       if (!stats.isFile() || stats.size === 0) {
-        badRequest(`File at ${path} is invalid (not a regular file or empty)`);
+        throw badRequest(`File at ${path} is invalid (not a regular file or empty)`);
       }
 
       const vodRecord = await findStreamRecord(db, streamId, platform);
-      if (!vodRecord) notFound(`VOD ${streamId} not found`);
+      if (!vodRecord) throw notFound(`VOD ${streamId} not found`);
 
       // Update duration if provided and different from current value
       if (durationSecs && vodRecord.duration !== durationSecs) {
@@ -118,7 +118,7 @@ export default async function liveCallbackRoutes(fastify: FastifyInstance, _opti
       }
 
       const { gameJobIds, vodJobId } = await queueYoutubeUploads({
-        ctx: request.tenant as TenantPlatformContext,
+        ctx: asTenantPlatformContext(request.tenant),
         dbId: vodRecord.id,
         vodId: vodRecord.vod_id,
         filePath: path,

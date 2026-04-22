@@ -218,6 +218,11 @@ async function main(): Promise<void> {
 
   const [channelName, dbUrl] = args;
 
+  if (!channelName) {
+    console.error('Channel name is required');
+    process.exit(1);
+  }
+
   if (!dbUrl) {
     console.error('Database URL is required');
     process.exit(1);

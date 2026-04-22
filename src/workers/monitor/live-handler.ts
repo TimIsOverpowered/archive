@@ -213,6 +213,11 @@ async function handleNewLiveStream(
     .returning('id')
     .execute();
 
+  if (!createdVod) {
+    log.error({ vodId: vodMetadata.id }, '[Monitor]: Failed to create VOD record');
+    return;
+  }
+
   await publishVodUpdate(tenantId, createdVod.id);
 
   await sendStreamLiveAlert(platform, vodMetadata.id, streamStatus.title, platformUsername, config.displayName);
@@ -268,7 +273,7 @@ async function handleExistingVodBecameLive(
 }
 
 async function handleAlreadyLiveStream(
-  existingVod: { id: number; vod_id: string; started_at?: Date | null },
+  existingVod: { id: number; vod_id: string; started_at?: Date | null | undefined },
   streamStatus: PlatformStreamStatus,
   platform: Platform,
   platformUserId: string,
@@ -346,10 +351,10 @@ export async function enqueueLiveHlsDownload(params: {
   platform: Platform;
   tenantId: string;
   platformUserId: string;
-  platformUsername?: string;
+  platformUsername?: string | undefined;
   startedAt: Date;
-  sourceUrl?: string;
-  skipValidation?: boolean;
+  sourceUrl?: string | undefined;
+  skipValidation?: boolean | undefined;
 }): Promise<void> {
   const log = createAutoLogger(params.tenantId);
 

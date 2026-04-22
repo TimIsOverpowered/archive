@@ -4,7 +4,7 @@ import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import {
   tenantMiddleware,
   platformValidationMiddleware,
-  type TenantPlatformContext,
+  asTenantPlatformContext,
 } from '../../middleware/tenant-platform.js';
 import { ensureVodDownload, ensureVodRecord, findVodRecord } from './utils/vod-helpers.js';
 import { RedisService } from '../../../utils/redis-service.js';
@@ -78,22 +78,22 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, platform } = request.tenant as TenantPlatformContext;
+      const { tenantId, platform } = asTenantPlatformContext(request.tenant);
       const { vodId, type, downloadMethod, uploadMode } = request.body;
       const log = createAutoLogger(tenantId);
 
       // Ensure VOD record exists or create it from platform API metadata
-      const vodRecord = await ensureVodRecord(request.tenant as TenantPlatformContext, vodId, log);
+      const vodRecord = await ensureVodRecord(asTenantPlatformContext(request.tenant), vodId, log);
 
       if (!vodRecord) {
-        notFound(`VOD ${vodId} not found on ${platform}`);
+        throw notFound(`VOD ${vodId} not found on ${platform}`);
       }
 
       const dbId = vodRecord.id;
 
       // Ensure vod download
       const { jobId, filePath } = await ensureVodDownload({
-        ctx: request.tenant as TenantPlatformContext,
+        ctx: asTenantPlatformContext(request.tenant),
         dbId,
         vodId,
         type,
@@ -103,7 +103,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
       // Queue Youtube upload
       await queueYoutubeUploads({
-        ctx: request.tenant as TenantPlatformContext,
+        ctx: asTenantPlatformContext(request.tenant),
         dbId,
         vodId,
         filePath,
@@ -171,7 +171,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, platform, db } = request.tenant as TenantPlatformContext;
+      const { tenantId, platform, db } = asTenantPlatformContext(request.tenant);
       const { vodId, type, downloadMethod } = request.body;
       const log = createAutoLogger(tenantId);
 
@@ -179,14 +179,14 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       const vodRecord = await findVodRecord(db, vodId, platform);
 
       if (!vodRecord) {
-        notFound(`VOD ${vodId} not found on ${platform}`);
+        throw notFound(`VOD ${vodId} not found on ${platform}`);
       }
 
       const dbId = vodRecord.id;
 
       // Ensure vod download
       const { jobId, filePath } = await ensureVodDownload({
-        ctx: request.tenant as TenantPlatformContext,
+        ctx: asTenantPlatformContext(request.tenant),
         dbId,
         vodId,
         type,

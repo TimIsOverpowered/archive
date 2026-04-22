@@ -21,8 +21,8 @@ const accessTokenCache = new LRUCache<string, { token: string; expiresAt: number
 interface TwitchAuth {
   client_id: string;
   client_secret: string;
-  access_token?: string;
-  expiry_date?: number;
+  access_token?: string | undefined;
+  expiry_date?: number | undefined;
 }
 
 export async function getAppAccessToken(tenantId: string): Promise<string> {

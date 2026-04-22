@@ -10,8 +10,8 @@ export interface LastFailedJob {
   errorMessage: string;
   attemptsMade: number;
   maxAttempts: number;
-  vodId?: number;
-  failedAt?: Date;
+  vodId?: number | undefined;
+  failedAt?: Date | undefined;
 }
 
 export interface WorkerHealthStatus {

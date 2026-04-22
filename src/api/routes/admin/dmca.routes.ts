@@ -4,7 +4,7 @@ import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import {
   tenantMiddleware,
   platformValidationMiddleware,
-  type TenantPlatformContext,
+  asTenantPlatformContext,
 } from '../../middleware/tenant-platform.js';
 import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
@@ -84,17 +84,17 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, db, platform } = request.tenant as TenantPlatformContext;
+      const { tenantId, db, platform } = asTenantPlatformContext(request.tenant);
       const { vodId, claims, type = SOURCE_TYPES.VOD, part, downloadMethod = DOWNLOAD_METHODS.HLS } = request.body;
       const log = createAutoLogger(tenantId);
 
       // Step 1: Ensure VOD record exists
       const vodRecord = await findVodRecord(db, vodId, platform);
-      if (!vodRecord) notFound('VOD not found');
+      if (!vodRecord) throw notFound('VOD not found');
 
       // Step 2: Ensure VOD download (like /upload does)
       const { jobId: downloadJobId, filePath } = await ensureVodDownload({
-        ctx: request.tenant as TenantPlatformContext,
+        ctx: asTenantPlatformContext(request.tenant),
         dbId: vodRecord.id,
         vodId,
         type,

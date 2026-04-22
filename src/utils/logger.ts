@@ -12,7 +12,7 @@ export function setLoggerConfig(opts: { level: string; isProduction: boolean }):
   _logger = null;
 }
 
-export function getLogger(): AppLogger {
+export function getLogger(): pino.Logger {
   if (!_logger) {
     if (!_loggerConfig) _loggerConfig = { level: 'info', isProduction: false };
     _logger = pino(
@@ -32,9 +32,9 @@ export function getLogger(): AppLogger {
             ignore: 'pid,hostname,tenant,reqId',
             singleLine: false,
           })
-    ) as unknown as AppLogger;
+    ) as unknown as pino.Logger;
   }
-  return _logger as AppLogger;
+  return _logger!;
 }
 
 interface LogContext {

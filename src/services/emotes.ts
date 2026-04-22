@@ -5,7 +5,7 @@ import { TenantContext } from '../types/context.js';
 import { withDbRetry } from '../db/client.js';
 import { safeRequest } from '../utils/http-client.js';
 import { RedisService } from '../utils/redis-service.js';
-import { getDisableRedisCache } from '../config/env-accessors.js';
+import { getDisableRedisCache } from '../config/env.js';
 import { compressChatData, decompressChatData } from '../utils/compression.js';
 import { EMOTE_CACHE_TTL, FFZ_API_BASE, BTTV_API_BASE, SEVENTV_API_BASE } from '../constants.js';
 import { EmoteUpsertSchema } from '../config/schemas.js';

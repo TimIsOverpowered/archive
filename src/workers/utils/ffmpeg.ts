@@ -1,5 +1,6 @@
 import ffmpeg from 'fluent-ffmpeg';
 import path from 'path';
+import events from 'events';
 import { childLogger } from '../../utils/logger.js';
 
 const logger = childLogger({ module: 'ffmpeg' });
@@ -107,22 +108,19 @@ export async function trimVideo(
   const outputFile = path.join(outputDir, `${vodId}-${start}-${end}.mp4`);
 
   return new Promise((resolve, reject) => {
-    ffmpeg(filePath)
-      .seekInput(start)
-      .duration(duration)
-      .outputOptions('-c copy')
-      .save(outputFile)
-      .on('progress', (progress: ProgressEvent) => {
-        if (onProgress && progress.percent != null) {
-          onProgress(Math.round(progress.percent));
-        }
-      })
-      .on('end', () => {
-        resolve(outputFile);
-      })
-      .on('error', (err: Error) => {
-        reject(err);
-      });
+    const proc = ffmpeg(filePath).seekInput(start).duration(duration).outputOptions('-c copy').save(outputFile);
+
+    (proc as events.EventEmitter).on('progress', (progress: ProgressEvent) => {
+      if (onProgress && progress.percent != null) {
+        onProgress(Math.round(progress.percent));
+      }
+    });
+    proc.on('end', () => {
+      resolve(outputFile);
+    });
+    proc.on('error', (err: Error) => {
+      reject(err);
+    });
   });
 }
 
@@ -170,30 +168,27 @@ export async function convertHlsToMp4(source: string, outputPath: string, option
       .audioCodec('copy')
       .outputOptions(baseOptions)
       .toFormat('mp4')
-      // Progress callback with 25% throttling
-      .on('progress', (progress: ProgressEvent) => {
-        const percent = progress.percent != null ? Math.round(progress.percent) : 0;
-        const threshold = Math.floor(percent / 25) * 25;
-        const lastReported = lastFfmpegProgressBySource.get(source) ?? -1;
-
-        if (threshold > lastReported) {
-          lastFfmpegProgressBySource.set(source, threshold);
-          options?.onProgress?.(threshold);
-        }
-      })
-      // Start logging with format context
-      .on('start', () => {
-        const ctx = options?.vodId ? `VOD ${options.vodId}` : source.substring(0, 40);
-
-        logger.info({ isFmp4 }, `${ctx} - Converting HLS to MP4${isFmp4 ? ' (fMP4)' : ''}`);
-      })
-      // Error handling with process cleanup
-      .on('error', (err: Error, _stdout: string | null, stderr: string | null) => {
-        ffmpegProcess.kill('SIGKILL');
-        reject(err || new Error(stderr?.toString() || 'Unknown error'));
-      })
-      // Success completion
-      .on('end', () => resolve())
       .saveToFile(outputPath);
+
+    (ffmpegProcess as events.EventEmitter).on('progress', (progress: ProgressEvent) => {
+      const percent = progress.percent != null ? Math.round(progress.percent) : 0;
+      const threshold = Math.floor(percent / 25) * 25;
+      const lastReported = lastFfmpegProgressBySource.get(source) ?? -1;
+
+      if (threshold > lastReported) {
+        lastFfmpegProgressBySource.set(source, threshold);
+        options?.onProgress?.(threshold);
+      }
+    });
+    ffmpegProcess.on('start', () => {
+      const ctx = options?.vodId ? `VOD ${options.vodId}` : source.substring(0, 40);
+
+      logger.info({ isFmp4 }, `${ctx} - Converting HLS to MP4${isFmp4 ? ' (fMP4)' : ''}`);
+    });
+    ffmpegProcess.on('error', (err: Error, _stdout: string | null, stderr: string | null) => {
+      ffmpegProcess.kill('SIGKILL');
+      reject(err || new Error(stderr?.toString() || 'Unknown error'));
+    });
+    ffmpegProcess.on('end', () => resolve());
   });
 }

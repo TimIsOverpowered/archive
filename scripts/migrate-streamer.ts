@@ -42,9 +42,16 @@ const parseDuration = (durationStr: string): number => {
   if (!durationStr || durationStr === '00:00:00') return 0;
   const parts = durationStr.split(':').map(Number);
   if (parts.length === 3) {
-    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    const h = parts[0];
+    const m = parts[1];
+    const s = parts[2];
+    if (h == null || m == null || s == null) return 0;
+    return h * 3600 + m * 60 + s;
   } else if (parts.length === 2) {
-    return parts[0] * 60 + parts[1];
+    const m = parts[0];
+    const s = parts[1];
+    if (m == null || s == null) return 0;
+    return m * 60 + s;
   }
   return 0;
 };
@@ -609,7 +616,7 @@ const main = async () => {
           throw schemaError;
         }
 
-        let streamsMap = new Map<string, Date>();
+        const streamsMap = new Map<string, Date>();
         try {
           const streamsResult = await oldPool.query('SELECT id, started_at FROM streams WHERE started_at IS NOT NULL');
           for (const stream of streamsResult.rows) {
@@ -951,7 +958,9 @@ const main = async () => {
 
         if (errors.length > 0) {
           console.log('\n⚠️  Migration completed with warnings:\n');
-          errors.forEach((err, i) => console.log(`   ${i + 1}. ${err}`));
+          errors.forEach((err, i) => {
+            console.log(`   ${i + 1}. ${err}`);
+          });
           console.log('');
         } else {
           console.log('🎉 Migration completed successfully!\n');
@@ -963,7 +972,9 @@ const main = async () => {
 
         if (errors.length > 0) {
           console.log('\n❌ Errors encountered:\n');
-          errors.forEach((err, i) => console.log(`   ${i + 1}. ${err}`));
+          errors.forEach((err, i) => {
+            console.log(`   ${i + 1}. ${err}`);
+          });
           console.log('');
         }
 
@@ -978,7 +989,9 @@ const main = async () => {
 
       if (errors.length > 0) {
         console.log('\n❌ Errors encountered:\n');
-        errors.forEach((err, i) => console.log(`   ${i + 1}. ${err}`));
+        errors.forEach((err, i) => {
+          console.log(`   ${i + 1}. ${err}`);
+        });
         console.log('');
       }
 
@@ -993,7 +1006,9 @@ const main = async () => {
 
     if (errors.length > 0) {
       console.log('\n❌ Errors encountered:\n');
-      errors.forEach((err, i) => console.log(`   ${i + 1}. ${err}`));
+      errors.forEach((err, i) => {
+        console.log(`   ${i + 1}. ${err}`);
+      });
       console.log('');
     }
 

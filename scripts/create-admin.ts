@@ -51,6 +51,10 @@ async function main(): Promise<void> {
   }
 
   const [username] = args;
+  if (!username) {
+    console.error('Usage: npm run create-admin <username>');
+    process.exit(1);
+  }
 
   try {
     await createAdminUser(username);

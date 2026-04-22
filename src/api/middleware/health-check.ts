@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { getHealthToken } from '../../config/env-accessors.js';
+import { getHealthToken } from '../../config/env.js';
 
 export default async function healthCheckMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const token = request.headers['x-health-token'];

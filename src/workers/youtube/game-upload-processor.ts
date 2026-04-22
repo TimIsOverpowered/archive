@@ -20,7 +20,7 @@ export interface GameUploadContext {
   chapterStart: number;
   chapterEnd: number;
   chapterName: string;
-  chapterGameId?: string;
+  chapterGameId?: string | undefined;
   title: string;
   description: string;
   db: Kysely<StreamerDB>;
@@ -144,7 +144,7 @@ async function processSplitGameUpload(
   trimmedPath: string,
   trimmedDuration: number
 ): Promise<GameUploadResult> {
-  const { tenantId, dbId, chapterStart, chapterGameId, chapterName, title, description, config, db, vodId } = ctx;
+  const { tenantId, dbId, chapterStart, chapterGameId, chapterName, title, description, config, db, vodId, log } = ctx;
   const channelName = config.displayName || tenantId;
   const totalParts = Math.ceil(trimmedDuration / YOUTUBE_MAX_DURATION);
 
@@ -187,6 +187,12 @@ async function processSplitGameUpload(
     const partDuration = endTime - startTime;
     const partTitle = i > 0 ? `${title} PART ${i + 1}` : title;
 
+    const splitPath = splitPaths[i];
+    if (!splitPath) {
+      log.warn({ part: currentPartNum, totalParts }, `Missing split path for part ${currentPartNum}`);
+      continue;
+    }
+
     const uploadAlertMessageId = await initRichAlert({
       title: `🎮 Game Upload (Part ${currentPartNum}/${totalParts})`,
       description: `${channelName} - Uploading game clip part to YouTube...`,
@@ -215,7 +221,7 @@ async function processSplitGameUpload(
     const result = await uploadVideo(
       tenantId,
       config.displayName || tenantId,
-      splitPaths[i],
+      splitPath,
       partTitle,
       description,
       'public',
@@ -264,7 +270,7 @@ async function processSplitGameUpload(
     });
 
     if (!config.settings.saveMP4) {
-      await deleteFileIfExists(splitPaths[i]);
+      await deleteFileIfExists(splitPath);
     }
   }
 

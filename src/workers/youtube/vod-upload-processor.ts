@@ -22,14 +22,14 @@ export interface VodUploadContext {
   tenantId: string;
   dbId: number;
   vodId: string;
-  filePath?: string;
+  filePath?: string | undefined;
   db: Kysely<StreamerDB>;
   config: TenantConfig;
   vodRecord: VodRecord;
-  dmcaProcessed?: boolean;
+  dmcaProcessed?: boolean | undefined;
   log: AppLogger;
   type: SourceType;
-  part?: number;
+  part?: number | undefined;
 }
 
 export interface VodUploadResult {
@@ -141,6 +141,8 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
 
   for (let i = 0; i < parts.length; i++) {
     const currentPartNum = i + 1;
+    const partPath = parts[i];
+    if (!partPath) continue;
 
     const partDuration = i === parts.length - 1 ? duration - i * splitDuration : splitDuration;
 
@@ -182,7 +184,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
     const result = await uploadVideo(
       tenantId,
       channelName,
-      parts[i],
+      partPath,
       partTitle,
       youtubeDescription,
       privacyStatus as 'public' | 'unlisted' | 'private',
@@ -192,7 +194,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
 
     uploadedVideos.push({ id: result.videoId, part: i + 1, duration: partDuration });
 
-    await deleteFileIfExists(parts[i]);
+    await deleteFileIfExists(partPath);
   }
 
   void updateAlert(splitAlertMessageId, {

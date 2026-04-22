@@ -26,8 +26,8 @@ export interface WorkerConfig<TData extends object = object, TResult = unknown> 
   name: WorkerName;
   queueName: string;
   processor: Processor<TData, TResult, string>;
-  concurrency?: number;
-  useWorkerThreads?: boolean;
+  concurrency?: number | undefined;
+  useWorkerThreads?: boolean | undefined;
 }
 
 export function defineWorker<TData extends object, TResult>(

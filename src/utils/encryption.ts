@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { getEncryptionKeyBuffer } from '../config/env-accessors.js';
+import { getEncryptionKeyBuffer } from '../config/env.js';
 import { ENCRYPTION_KEY_LENGTH, ENCRYPTION_IV_LENGTH, ENCRYPTION_AUTH_TAG_LENGTH } from '../constants.js';
 
 const ALGORITHM = 'aes-256-gcm';

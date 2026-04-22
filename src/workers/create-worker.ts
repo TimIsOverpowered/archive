@@ -14,7 +14,9 @@ export async function waitForWorkersReady(workerInstances: Worker[]): Promise<vo
     if (worker.isRunning()) return Promise.resolve();
 
     return new Promise<void>((resolve) => {
-      worker.once('ready', () => resolve());
+      worker.once('ready', () => {
+        resolve();
+      });
     });
   });
 

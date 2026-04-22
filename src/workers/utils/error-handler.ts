@@ -3,11 +3,11 @@ import type { AppLogger } from '../../utils/logger.js';
 import type { Platform } from '../../types/platforms.js';
 
 export interface WorkerErrorContext {
-  vodId?: string;
-  jobId?: string;
-  platform?: Platform;
-  tenantId?: string;
-  dbId?: number;
+  vodId?: string | undefined;
+  jobId?: string | undefined;
+  platform?: Platform | undefined;
+  tenantId?: string | undefined;
+  dbId?: number | undefined;
   [key: string]: unknown;
 }
 

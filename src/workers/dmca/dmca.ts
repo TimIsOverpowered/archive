@@ -56,7 +56,9 @@ export async function muteAudioSections(
 
     ffmpegProcess
       .toFormat('mp4')
-      .on('end', () => resolve(outputPath))
+      .on('end', () => {
+        resolve(outputPath);
+      })
       .on('error', (err) => {
         log.error(`FFmpeg mute error: ${err.message}`);
         resolve(null);
@@ -90,13 +92,19 @@ export async function blackoutVideoSections(
   if (sortedSections.length === 1) {
     return new Promise<string | null>((resolve) => {
       const section = sortedSections[0];
+      if (!section) {
+        resolve(null);
+        return;
+      }
 
       ffmpeg(videoPath)
         .input('color=c=black:s=hd1080')
         .videoFilters(`[1:v]overlay=0:0:enable='between(t,${section.startSeconds},${section.endSeconds})'[v_out]`)
         .outputOptions(['-map', '[v_out]', '-map', '0:a'])
         .toFormat('mp4')
-        .on('end', () => resolve(outputPath))
+        .on('end', () => {
+          resolve(outputPath);
+        })
         .on('error', (err) => {
           log.error(`FFmpeg blackout error: ${err.message}`);
           resolve(null);
@@ -117,6 +125,7 @@ export async function blackoutVideoSections(
 
     for (let i = 0; i < sortedSections.length; i++) {
       const section = sortedSections[i];
+      if (!section) continue;
       const inputLabel = i === 0 ? '0:v' : `v_${i - 1}`;
       const colorInput = `${i + 1}:v`;
       const outputLabel = i === sortedSections.length - 1 ? '[v_final]' : `[v_${i}]`;
@@ -128,7 +137,9 @@ export async function blackoutVideoSections(
       .videoFilters(filterComplex)
       .outputOptions(['-map', '[v_final]', '-map', '0:a'])
       .toFormat('mp4')
-      .on('end', () => resolve(outputPath))
+      .on('end', () => {
+        resolve(outputPath);
+      })
       .on('error', (err) => {
         log.error(`FFmpeg blackout error: ${err.message}`);
         resolve(null);
