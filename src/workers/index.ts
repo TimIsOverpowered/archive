@@ -2,13 +2,13 @@ import 'dotenv/config';
 import { pathToFileURL } from 'node:url';
 import { extractErrorDetails } from '../utils/error.js';
 import { loadTenantConfigs, clearConfigCache } from '../config/loader.js';
-import { QUEUE_NAMES, getQueue, closeQueues, QUEUES_VALUES } from './jobs/queues.js';
+import { QUEUE_NAMES, getQueue, closeQueues } from './jobs/queues.js';
 import { initWorkersRedis, getRedisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
 import { startTokenHealthCron } from '../cron/token-health.js';
 import { startMonitorService, stopMonitorService } from './monitor/index.js';
 import { getLogger, setLoggerConfig } from '../utils/logger.js';
-import { getWorkerDefinitions } from './worker-definitions.js';
-import { createWorker, waitForWorkersReady, workers } from './create-worker.js';
+import { registerWorkers } from './worker-definitions.js';
+import { waitForWorkersReady, workers } from './create-worker.js';
 import { loadWorkersConfig } from '../config/env.js';
 import { VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY, SHUTDOWN_TIMEOUT_MS } from '../constants.js';
 import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/client.js';
@@ -24,7 +24,7 @@ async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkers
 
   getLogger().warn('[Queues] CLEAR_QUEUES_ON_STARTUP=true — all queued jobs will be permanently deleted');
 
-  for (const name of QUEUES_VALUES) {
+  for (const name of Object.values(QUEUE_NAMES)) {
     const queue = getQueue(name);
     await queue.pause();
     await queue.obliterate({ force: true });
@@ -50,20 +50,9 @@ export async function bootstrap() {
     startTokenHealthCron();
     await clearAllJobsOnStartup(workerConfig);
 
-    const workerInstances = getWorkerDefinitions().map((def) => {
-      if (def.name === QUEUE_NAMES.VOD_LIVE) {
-        const liveTenants = configs.filter((c) => c.settings.vodDownload && (c.twitch?.enabled || c.kick?.enabled));
-        const liveConcurrency = Math.max(liveTenants.length * 2 * VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY);
-        def.concurrency = liveConcurrency;
-        getLogger().info(
-          { liveTenants: liveTenants.length, concurrency: liveConcurrency },
-          'vod_live concurrency calculated'
-        );
-      }
-      return createWorker({ ...def, connection: getRedisInstance() });
-    });
+    registerWorkers(getRedisInstance(), configs, VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY);
 
-    await waitForWorkersReady(workerInstances);
+    await waitForWorkersReady(Array.from(workers.values()));
 
     registerShutdownHandlers();
 
