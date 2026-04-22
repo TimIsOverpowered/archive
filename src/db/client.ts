@@ -37,53 +37,40 @@ class PoolManager {
   }
 
   async createClient(config: TenantConfig): Promise<Kysely<StreamerDB>> {
-    if (this.pools.has(config.id)) {
-      return this.pools.get(config.id)!.db;
-    }
+    const existing = this.pools.get(config.id);
+    if (existing) return existing.db;
 
-    if (this.creationLocks.has(config.id)) {
-      await this.creationLocks.get(config.id)!;
-      const existing = this.pools.get(config.id);
-      if (!existing) throw new Error(`Client creation failed for ${config.id}`);
-      return existing.db;
-    }
+    const inflight = this.creationLocks.get(config.id);
+    if (inflight) return inflight;
 
     if (this.pools.size >= DB_POOL_MAX_CLIENTS) {
       await this.evictOldestIdleClient();
     }
 
-    const creationPromise = (async (): Promise<Kysely<StreamerDB>> => {
-      let db: Kysely<StreamerDB>;
-      try {
-        const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
-        const connectionLimit = config.database.connectionLimit || 2;
-        const tenantDbName = extractDatabaseName(config.database.url);
-
-        const url = new URL(pgbouncerUrl);
-        url.pathname = `/${tenantDbName}`;
-
-        const pool = new PoolCtor({
-          connectionString: url.toString(),
-          max: connectionLimit,
-        });
-        const dialect = new PostgresDialect({ pool });
-        db = new Kysely<StreamerDB>({ dialect });
-
-        this.pools.set(config.id, {
-          pool,
-          db,
-          lastAccessedAt: Date.now(),
-          createdAt: Date.now(),
-        });
-
-        return db;
-      } finally {
-        this.creationLocks.delete(config.id);
-      }
-    })();
-
+    const creationPromise = this._doCreate(config).finally(() => this.creationLocks.delete(config.id));
     this.creationLocks.set(config.id, creationPromise);
     return creationPromise;
+  }
+
+  private async _doCreate(config: TenantConfig): Promise<Kysely<StreamerDB>> {
+    const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
+    const connectionLimit = config.database.connectionLimit ?? 2;
+    const tenantDbName = extractDatabaseName(config.database.url);
+
+    const url = new URL(pgbouncerUrl);
+    url.pathname = `/${tenantDbName}`;
+
+    const pool = new PoolCtor({ connectionString: url.toString(), max: connectionLimit });
+    const db = new Kysely<StreamerDB>({ dialect: new PostgresDialect({ pool }) });
+
+    this.pools.set(config.id, {
+      pool,
+      db,
+      lastAccessedAt: Date.now(),
+      createdAt: Date.now(),
+    });
+
+    return db;
   }
 
   async closeClient(tenantId: string): Promise<void> {
