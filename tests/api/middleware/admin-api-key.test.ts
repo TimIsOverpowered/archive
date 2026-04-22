@@ -12,7 +12,7 @@ function createMockReply(): any {
       return {
         send: (body: any) => {
           sentBody = body;
-          return this;
+          return { send: () => {} };
         },
       };
     },

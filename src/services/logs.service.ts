@@ -41,9 +41,11 @@ async function getVodBucketSize(db: Kysely<StreamerDB>, tenantId: string, vodId:
 
   const result = await db
     .selectFrom('chat_messages')
-    .select(sql<number>`
+    .select(
+      sql<number>`
       COUNT(*) / NULLIF(MAX(content_offset_seconds) - MIN(content_offset_seconds), 0) * 100
-    `.as('comments_per_100s'))
+    `.as('comments_per_100s')
+    )
     .where('vod_id', '=', vodId)
     .executeTakeFirst();
 
