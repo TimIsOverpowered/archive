@@ -233,26 +233,16 @@ export function touchClient(tenantId: string): boolean {
   return poolManager.touchPool(tenantId);
 }
 
+const PG_CONNECTION_ERROR_CODES = new Set(['57P01', '08006', '08007', '08001']);
+const NODE_CONNECTION_ERROR_CODES = new Set(['ECONNRESET', 'ETIMEDOUT', 'EPIPE', 'ECONNREFUSED']);
+
 /**
- * Detect connection errors from PostgreSQL
+ * Detect connection errors from PostgreSQL and Node.js
  */
 export function isConnectionError(error: unknown): boolean {
-  const msg = error instanceof Error ? error.message : String(error);
   const code = (error as { code?: string }).code;
-
-  if (code) {
-    return ['57P01', '08006', '08007', '08001', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE'].includes(code);
-  }
-
-  return (
-    msg.includes('terminated unexpectedly') ||
-    msg.includes('connection closed') ||
-    msg.includes('connection lost') ||
-    msg.includes('ETIMEDOUT') ||
-    msg.includes('ECONNRESET') ||
-    msg.includes('The socket has been closed') ||
-    msg.includes('client network socket closed')
-  );
+  if (!code) return false;
+  return PG_CONNECTION_ERROR_CODES.has(code) || NODE_CONNECTION_ERROR_CODES.has(code);
 }
 
 /**

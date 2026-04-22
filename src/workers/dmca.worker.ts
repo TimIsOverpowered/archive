@@ -9,6 +9,7 @@ import {
   blackoutVideoSections,
   cleanupTempFiles,
   BlackoutSection,
+  CLAIM_TYPES,
 } from './dmca/dmca.js';
 import { trimVideo as ffmpegTrim } from './utils/ffmpeg.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
@@ -114,9 +115,9 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       );
     }
 
-    const audioClaims = blockingClaims.filter((claim) => claim.type === 'CLAIM_TYPE_AUDIO');
+    const audioClaims = blockingClaims.filter((claim) => claim.type === CLAIM_TYPES.AUDIO);
     const visualClaims = blockingClaims.filter(
-      (claim) => claim.type === 'CLAIM_TYPE_VISUAL' || claim.type === 'CLAIM_TYPE_AUDIOVISUAL'
+      (claim) => claim.type === CLAIM_TYPES.VISUAL || claim.type === CLAIM_TYPES.AUDIOVISUAL
     );
 
     let intermediateMutedPath: string | null = null;

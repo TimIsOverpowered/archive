@@ -219,17 +219,15 @@ export function safeRequest(
   defaultValue: Response,
   options?: SafeRequestOptions<'response'>
 ): Promise<Response>;
-export function safeRequest(
+export async function safeRequest(
   url: string | URL,
   defaultValue: unknown,
   options?: SafeRequestOptions<ResponseType>
 ): Promise<unknown> {
-  return (async () => {
-    try {
-      return await request(url, options as RequestOptions<'json'> | undefined);
-    } catch (error) {
-      options?.onError?.(error, url.toString());
-      return defaultValue;
-    }
-  })();
+  try {
+    return await request(url, options as RequestOptions<'json'> | undefined);
+  } catch (error) {
+    options?.onError?.(error, url.toString());
+    return defaultValue;
+  }
 }

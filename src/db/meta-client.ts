@@ -54,5 +54,8 @@ export async function closeMetaClient(): Promise<void> {
   if (!_metaDb) return;
   await _metaDb.destroy();
   _metaDb = null;
+  if (getBaseConfig().NODE_ENV !== 'production') {
+    globalForMeta.metaDb = undefined;
+  }
   getLogger().info('[meta-client] Closed');
 }

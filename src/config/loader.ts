@@ -16,9 +16,6 @@ function createConfigCache(): LRUCache<string, TenantConfig> {
     ttl,
     allowStale: false,
     updateAgeOnGet: true,
-    dispose: (_value, _key) => {
-      // No cleanup needed — TenantConfig is just plain data
-    },
   });
 }
 

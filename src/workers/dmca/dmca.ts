@@ -5,8 +5,16 @@ import { childLogger } from '../../utils/logger.js';
 
 const log = childLogger({ module: 'dmca' });
 
+export const CLAIM_TYPES = {
+  AUDIO: 'CLAIM_TYPE_AUDIO',
+  VISUAL: 'CLAIM_TYPE_VISUAL',
+  AUDIOVISUAL: 'CLAIM_TYPE_AUDIOVISUAL',
+} as const;
+
+export type ClaimType = (typeof CLAIM_TYPES)[keyof typeof CLAIM_TYPES];
+
 export interface DMCAClaim {
-  type: 'CLAIM_TYPE_AUDIO' | 'CLAIM_TYPE_VISUAL' | 'CLAIM_TYPE_AUDIOVISUAL';
+  type: ClaimType;
   claimPolicy: { primaryPolicy: { policyType: string } };
   matchDetails: { longestMatchStartTimeSeconds: number; longestMatchDurationSeconds: string };
 }
