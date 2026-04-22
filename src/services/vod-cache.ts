@@ -4,6 +4,7 @@ import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { invalidateVodTags, invalidateVodVolatileCache } from './cache-tags.js';
 import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
+import { isConnectionError } from '../db/client.js';
 
 export { invalidateVodVolatileCache };
 
@@ -124,11 +125,9 @@ export async function invalidateVodStaticCache(tenantId: string, dbId: number): 
 
     getLogger().debug({ tenantId, dbId }, 'VOD static cache invalidated');
   } catch (error) {
-    const { message } = extractErrorDetails(error);
-
-    if (!isConnectionFailed(tenantId) && message.includes('ECONNREFUSED')) {
+    if (!isConnectionFailed(tenantId) && isConnectionError(error)) {
       markConnectionFailed(tenantId);
-      getLogger().warn({ tenantId, dbId, error: message }, 'Redis connection lost, cache invalidation suspended');
+      getLogger().warn({ tenantId, dbId, error: extractErrorDetails(error) }, 'Redis connection lost, cache invalidation suspended');
     }
   }
 }
@@ -149,12 +148,10 @@ export async function invalidateEmoteCache(tenantId: string, vodId: number): Pro
 
     getLogger().debug({ tenantId, vodId }, 'Emote cache invalidated');
   } catch (error) {
-    const { message } = extractErrorDetails(error);
-
-    if (!isConnectionFailed(tenantId) && message.includes('ECONNREFUSED')) {
+    if (!isConnectionFailed(tenantId) && isConnectionError(error)) {
       markConnectionFailed(tenantId);
       getLogger().warn(
-        { tenantId, vodId, error: message },
+        { tenantId, vodId, error: extractErrorDetails(error) },
         'Redis connection lost, emote cache invalidation suspended'
       );
     }
