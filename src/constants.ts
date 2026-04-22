@@ -33,6 +33,10 @@ export const MAX_CACHE_PAGES = 10; // cap paginated list cache to prevent tag ex
 // ── Cache Stale-While-Revalidate ────────────────────────────────────────────
 export const VOD_DETAILS_STALE_RATIO = 0.8; // Revalidate when 80% of TTL has elapsed
 
+// ── Cache SWR Failure Tracking ──────────────────────────────────────────────
+export const SWR_FAILURES_TTL_MS = 5 * 60 * 1000; // 5 minutes
+export const MAX_SWR_FAILURES = 3; // Max revalidation failures before skipping retries
+
 // ── Database ─────────────────────────────────────────────────────────────────
 export const INT32_MAX = 2_147_483_647; // PostgreSQL integer column limit
 export const DB_POOL_IDLE_TIMEOUT_MS = 30 * 60 * 1_000;

@@ -3,22 +3,16 @@ import { extractErrorDetails } from './error.js';
 import { getLogger } from '../utils/logger.js';
 import { LRUCache } from 'lru-cache';
 import { retryWithBackoff } from './retry.js';
+import { MAX_SWR_FAILURES, SWR_FAILURES_TTL_MS } from '../constants.js';
 
-// NOTE: SWR_FAILURES is in-memory only. In multi-instance deployments (multiple
-// worker/api processes), failure counts are per-instance, not global. This means
-// a fetcher that fails on instance A won't trigger the MAX_SWR_FAILURES limit on
-// instance B, potentially causing redundant failures across instances.
-//
-// If multi-instance deployment is planned, migrate failure tracking to Redis:
-//   - Use a Redis key like `swr:failures:{key}` with INCR/EXPIRE pattern
-//   - Check the count before each revalidation attempt
-//   - This ensures all instances share the same failure threshold
+// SWR failure tracking uses Redis (`swr:failures:{key}`) with INCR/EXPIRE (5min TTL)
+// for cross-instance consistency. All instances share the same failure threshold.
+// Falls back to in-memory LRU if Redis is unavailable during revalidation.
 const SWR_FAILURES = new LRUCache<string, number>({
   max: 5000,
-  ttl: 5 * 60 * 1000,
+  ttl: SWR_FAILURES_TTL_MS,
   allowStale: false,
 });
-const MAX_SWR_FAILURES = 3;
 
 interface CacheEntry<T> {
   data: T;
@@ -144,7 +138,8 @@ async function revalidateWithRetry<T>(
   fetcher: () => Promise<T>
 ): Promise<T> {
   const log = getLogger().child({ key });
-  const failures = SWR_FAILURES.get(key) ?? 0;
+  const failureKey = `swr:failures:${key}`;
+  const failures = await getSwrFailureCount(client, failureKey);
 
   if (failures >= MAX_SWR_FAILURES) {
     SWR_FAILURES.delete(key);
@@ -155,14 +150,55 @@ async function revalidateWithRetry<T>(
 
   try {
     const data = await retryWithBackoff(fetcher, { attempts: 2, baseDelayMs: 2000 });
+    await clearSwrFailureCount(client, failureKey);
     SWR_FAILURES.delete(key);
     await client.set(key, JSON.stringify({ data, timestamp: Date.now() }), 'EX', ttl);
     inflightPromises.delete(key);
     return data;
   } catch (err) {
+    await incrementSwrFailureCount(client, failureKey);
     SWR_FAILURES.set(key, failures + 1);
     inflightPromises.delete(key);
     log.error({ err: extractErrorDetails(err) }, 'SWR revalidation exhausted retries');
     throw err;
+  }
+}
+
+async function getSwrFailureCount(
+  client: ReturnType<typeof RedisService.getClient>,
+  failureKey: string
+): Promise<number> {
+  try {
+    const val = await client.get(failureKey);
+    if (val) return parseInt(val, 10);
+    return 0;
+  } catch {
+    return SWR_FAILURES.get(failureKey) ?? 0;
+  }
+}
+
+async function incrementSwrFailureCount(
+  client: ReturnType<typeof RedisService.getClient>,
+  failureKey: string
+): Promise<void> {
+  try {
+    const pipeline = client.pipeline();
+    pipeline.incr(failureKey);
+    pipeline.expire(failureKey, Math.ceil(SWR_FAILURES_TTL_MS / 1000));
+    await pipeline.exec();
+  } catch {
+    const current = SWR_FAILURES.get(failureKey) ?? 0;
+    SWR_FAILURES.set(failureKey, current + 1);
+  }
+}
+
+async function clearSwrFailureCount(
+  client: ReturnType<typeof RedisService.getClient>,
+  failureKey: string
+): Promise<void> {
+  try {
+    await client.del(failureKey);
+  } catch {
+    SWR_FAILURES.delete(failureKey);
   }
 }

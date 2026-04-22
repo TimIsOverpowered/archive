@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import type { Kysely } from 'kysely';
-import type { StreamerDB, InsertableVods, SelectableVods } from '../../db/streamer-types';
+import type { StreamerDB, InsertableVods, SelectableVods } from '../../db/streamer-types.js';
 import type { TenantConfig } from '../../config/types.js';
 import { getPlatformConfig } from '../../config/types.js';
 import type { Platform } from '../../types/platforms.js';
