@@ -18,11 +18,3 @@ export { sendDiscordAlert, sendRichAlert, updateDiscordEmbed, initRichAlert, upd
 // Stream alerts
 export type { StreamAlertData } from './discord/alerts/stream.js';
 export { sendStreamAlert } from './discord/alerts/stream.js';
-
-// VOD download alerts
-export {
-  sendVodDownloadStarted,
-  sendVodDownloadSuccess,
-  sendVodDownloadFailed,
-  updateFfmpegProgress,
-} from './discord/alerts/vod.js';
