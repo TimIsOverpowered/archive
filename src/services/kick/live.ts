@@ -1,7 +1,7 @@
-import { fetchUrl } from '../utils/flaresolverr-client.js';
-import { extractErrorDetails } from '../utils/error.js';
-import { getLogger } from '../utils/logger.js';
-import { KICK_LIVE_API_TIMEOUT_MS } from '../constants.js';
+import { fetchUrl } from '../../utils/flaresolverr-client.js';
+import { extractErrorDetails } from '../../utils/error.js';
+import { getLogger } from '../../utils/logger.js';
+import { KICK_LIVE_API_TIMEOUT_MS } from '../../constants.js';
 import { LRUCache } from 'lru-cache';
 
 const kickStreamCache = new LRUCache<string, KickStreamStatus>({
@@ -49,9 +49,6 @@ export interface KickStreamStatus {
     | undefined;
 }
 
-/**
- * Check if a Kick user is currently live via Puppeteer scraping with real-browser protection
- */
 export async function getKickStreamStatus(username: string): Promise<KickStreamStatus | null> {
   const cached = kickStreamCache.get(username);
   if (cached !== undefined) {
@@ -82,7 +79,6 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
       return null;
     }
 
-    // Check for API error/blocked responses
     if ('error' in response && typeof response.error === 'string') {
       getLogger().warn(
         { username, error: response.error },
@@ -111,7 +107,6 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
       return null;
     }
 
-    // Safe extraction with type guards
     const sessionTitle = typeof data.session_title === 'string' ? data.session_title : '';
     const createdAt = typeof data.created_at === 'string' ? data.created_at : '';
     const playbackUrl =
@@ -167,9 +162,6 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
   }
 }
 
-/**
- * Immediate check for Kick VOD/video object matching current stream (NON-BLOCKING)
- */
 export async function getLatestKickVodObject(
   username: string,
   expectedStreamId: string
@@ -193,10 +185,9 @@ export async function getLatestKickVodObject(
 
     if (!dataArray || !Array.isArray(dataArray)) {
       getLogger().debug({ username }, `[Kick] No video data found for ${username}`);
-      return null; // No videos exist yet
+      return null;
     }
 
-    // Find matching VOD by ID (Kick uses same ID for stream and video)
     const vodObject = dataArray.find((v: unknown) => {
       if (!v || typeof v !== 'object') return false;
       const vid = (v as Record<string, unknown>).id;
@@ -208,7 +199,7 @@ export async function getLatestKickVodObject(
         { username, expectedStreamId },
         `[Kick] Video object not found yet for stream ${expectedStreamId}`
       );
-      return null; // Not ready - caller should retry later
+      return null;
     }
 
     const vod = vodObject as Record<string, unknown>;

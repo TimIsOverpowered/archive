@@ -1,18 +1,18 @@
-import { getTwitchStreamStatus, getLatestTwitchVodObject } from '../twitch/live.js';
-import { getVodData } from '../twitch/vod.js';
-import { saveVodChapters } from '../twitch/chapters.js';
+import { getTwitchStreamStatus, getLatestTwitchVodObject } from './live.js';
+import { getVodData } from './vod.js';
+import { saveVodChapters } from './chapters.js';
 import type {
   PlatformStrategy,
   PlatformStreamStatus,
   PlatformVodMetadata,
   VodCreateData,
   VodUpdateData,
-} from './strategy.js';
+} from '../platforms/strategy.js';
 import { parseTwitchDuration } from '../../utils/formatting.js';
 import { createErrorContext } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
 
-export const twitchStrategy: PlatformStrategy = {
+export const strategy: PlatformStrategy = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
     const { tenantId, config, platform } = ctx;
     if (!config[platform]?.enabled) {

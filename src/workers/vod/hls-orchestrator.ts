@@ -6,7 +6,7 @@ import { getVodDirPath, getVodFilePath } from '../../utils/path.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import type { AppLogger } from '../../utils/logger.js';
 import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
-import { updateChapterDuringDownload } from '../../services/kick.js';
+import { updateChapterDuringDownload } from '../../services/kick/index.js';
 import {
   downloadSegmentsParallel,
   fetchTwitchPlaylist,
