@@ -71,3 +71,7 @@ export function getPlatformConfig(config: TenantConfig, platform: Platform): Pla
       return undefined;
   }
 }
+
+export function getDisplayName(config: TenantConfig): string {
+  return config.displayName ?? config.id;
+}

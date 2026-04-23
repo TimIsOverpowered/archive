@@ -1,4 +1,3 @@
-import fsPromises from 'fs/promises';
 import { extractErrorDetails, createErrorContext } from '../../utils/error.js';
 import fs from 'fs';
 import pathMod from 'path';
@@ -88,7 +87,7 @@ export async function downloadSegmentsParallel(
           }
         });
 
-        await fsPromises.rename(tempPath, outputPath);
+        await fs.promises.rename(tempPath, outputPath);
         completedCount++;
 
         log.debug({ uri: segment.uri, current: completedCount, total: totalSegments }, `Segment downloaded`);
@@ -100,7 +99,7 @@ export async function downloadSegmentsParallel(
         const lastError = error instanceof Error ? error : new Error(String(error));
 
         try {
-          await fsPromises.unlink(tempPath).catch(() => {});
+          await fs.promises.unlink(tempPath).catch(() => {});
         } catch {}
 
         log.debug({ uri: segment.uri, error: lastError.message }, `Failed to download segment`);
@@ -119,14 +118,14 @@ export async function downloadSegmentsParallel(
 
 export async function cleanupOrphanedTmpFiles(vodDir: string, log: AppLogger): Promise<void> {
   try {
-    const files = await fsPromises.readdir(vodDir);
+    const files = await fs.promises.readdir(vodDir);
 
     for (const file of files) {
       if (file.endsWith('.tmp')) {
         const filePath = pathMod.join(vodDir, file);
 
         try {
-          await fsPromises.unlink(filePath);
+          await fs.promises.unlink(filePath);
           log.debug(`Cleaned up orphaned .tmp file: ${file}`);
         } catch (error) {
           log.warn({ error: extractErrorDetails(error).message }, `Failed to clean up orphaned .tmp file: ${file}`);

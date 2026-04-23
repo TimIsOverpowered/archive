@@ -2,12 +2,8 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { getTenantConfig } from '../../config/loader.js';
 import { ensureClient } from '../../db/client.js';
 import { extractErrorDetails } from '../../utils/error.js';
-import { TenantContext as BaseTenantContext } from '../../types/context.js';
+import type { TenantContext } from '../../types/context.js';
 import { type Platform } from '../../types/platforms.js';
-
-export interface TenantContext extends BaseTenantContext {
-  platform?: Platform;
-}
 
 export interface TenantPlatformContext extends TenantContext {
   platform: Platform;

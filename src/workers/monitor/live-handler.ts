@@ -9,7 +9,7 @@ import { getStrategy, type PlatformStreamStatus, type PlatformVodMetadata } from
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { sendStreamOfflineAlert, sendStreamLiveAlert } from './alert-helpers.js';
-import { getLiveDownloadQueue, enqueueJobWithLogging } from '../jobs/queues.js';
+import { getLiveDownloadQueue, enqueueJobWithLogging, LIVE_JOB_ID_PREFIX } from '../jobs/queues.js';
 import type { LiveDownloadJob } from '../jobs/queues.js';
 import { getTenantConfig } from '../../config/loader.js';
 import { publishVodUpdate } from '../../services/cache-invalidator.js';
@@ -350,7 +350,7 @@ export async function enqueueLiveHlsDownload(params: {
 
     const { jobId, isNew } = await enqueueJobWithLogging(
       queue,
-      'live_hls_download',
+      `${LIVE_JOB_ID_PREFIX}download`,
       {
         dbId: params.dbId,
         vodId: params.vodId,
@@ -362,10 +362,10 @@ export async function enqueueLiveHlsDownload(params: {
         sourceUrl: params.sourceUrl,
       } satisfies LiveDownloadJob,
       {
-        jobId: `live_hls_${params.vodId}`,
+        jobId: `${LIVE_JOB_ID_PREFIX}${params.vodId}`,
         attempts: 10,
         backoff: { type: 'exponential' as const, delay: 5000 },
-        deduplication: { id: `live_hls_${params.vodId}` },
+        deduplication: { id: `${LIVE_JOB_ID_PREFIX}${params.vodId}` },
         removeOnComplete: true,
         removeOnFail: true,
       },

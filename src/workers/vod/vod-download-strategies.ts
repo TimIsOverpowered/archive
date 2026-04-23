@@ -5,6 +5,7 @@ import { createVodWorkerAlerts } from '../utils/alert-factories.js';
 import { initRichAlert, updateAlert } from '../../utils/discord-alerts.js';
 import type { AppLogger } from '../../utils/logger.js';
 import type { TenantConfig } from '../../config/types.js';
+import { getDisplayName } from '../../config/types.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { request } from '../../utils/http-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
@@ -63,7 +64,7 @@ async function downloadKickVodWithFfmpeg(
   let messageId: string | null = null;
 
   try {
-    const streamerName = config.displayName || config.id;
+    const streamerName = getDisplayName(config);
     messageId = await initRichAlert(alerts.init(vodId, PLATFORMS.KICK, streamerName));
 
     // Download directly to MP4 using ffmpeg HLS streaming
@@ -118,7 +119,7 @@ async function downloadTwitchVodWithFfmpeg(
 
     const m3u8Url = `${TWITCH_USHER_BASE_URL}/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h264,hevc&playlist_include_framerate=true&nauthsig=${tokenSig.signature}&nauth=${tokenSig.value}`;
 
-    const streamerName = config.displayName || tenantId;
+    const streamerName = getDisplayName(config);
     messageId = await initRichAlert(alerts.init(vodId, PLATFORMS.TWITCH, streamerName));
 
     const m3u8Content = await request(m3u8Url, {

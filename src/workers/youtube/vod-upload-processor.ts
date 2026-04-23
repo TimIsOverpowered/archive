@@ -9,6 +9,7 @@ import { getEffectiveSplitDuration } from './validation.js';
 import { buildYoutubeMetadata } from './metadata-builder.js';
 import { createYoutubeUploadProgressHandler as createVodUploadProgressHandler } from './youtube-upload-progress.js';
 import type { TenantConfig } from '../../config/types.js';
+import { getDisplayName } from '../../config/types.js';
 import type { SourceType, Platform } from '../../types/platforms.js';
 import { UPLOAD_TYPES } from '../../types/platforms.js';
 import type { VodRecord } from '../../types/db.js';
@@ -34,7 +35,7 @@ export interface VodUploadResult {
 }
 
 export async function processVodUpload(ctx: VodUploadContext): Promise<VodUploadResult> {
-  const { tenantId, filePath, config, db, dbId } = ctx;
+  const { filePath, config, db, dbId } = ctx;
 
   if (!filePath) {
     throw new Error('File path is required for VOD upload');
@@ -46,7 +47,7 @@ export async function processVodUpload(ctx: VodUploadContext): Promise<VodUpload
     throw new Error(`VOD record not found for dbId ${dbId}`);
   }
 
-  const channelName = config.displayName || tenantId;
+  const channelName = getDisplayName(config);
   const domainName = config.settings?.domainName || 'localhost';
   const privacyStatus = config.youtube!.public ? 'public' : 'unlisted';
   const splitDuration = getEffectiveSplitDuration(config.youtube!.splitDuration);

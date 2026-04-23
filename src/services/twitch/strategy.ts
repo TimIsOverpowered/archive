@@ -11,15 +11,18 @@ import type {
 import { parseTwitchDuration } from '../../utils/formatting.js';
 import { createErrorContext } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
+import { getPlatformConfig } from '../../config/types.js';
 
 export const strategy: PlatformStrategy = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
     const { tenantId, config, platform } = ctx;
-    if (!config[platform]?.enabled) {
+    const platformCfg = getPlatformConfig(config, platform);
+
+    if (!platformCfg?.enabled) {
       return null;
     }
 
-    const userId = config[platform]?.id;
+    const userId = platformCfg?.id;
     if (!userId) {
       return null;
     }
@@ -56,7 +59,8 @@ export const strategy: PlatformStrategy = {
 
   async fetchVodObjectForLiveStream(streamId: string, ctx): Promise<PlatformVodMetadata | null> {
     const { tenantId, config, platform } = ctx;
-    const userId = config[platform]?.id;
+    const platformCfg = getPlatformConfig(config, platform);
+    const userId = platformCfg?.id;
     if (!userId) {
       return null;
     }

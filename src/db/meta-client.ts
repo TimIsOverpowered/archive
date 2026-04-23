@@ -4,8 +4,13 @@ import type { MetaDB } from './meta-types.js';
 import { getLogger } from '../utils/logger.js';
 import { getBaseConfig } from '../config/env.js';
 import { extractDatabaseName } from '../utils/formatting.js';
-import { buildPgBouncerUrl } from './utils.js';
 import { DB_STATEMENT_TIMEOUT_MS } from '../constants.js';
+
+function buildPgBouncerUrl(pgbouncerUrl: string, dbName: string): string {
+  const url = new URL(pgbouncerUrl);
+  url.pathname = `/${dbName}`;
+  return url.toString();
+}
 
 // Double-cast pattern: globalThis is `object`-typed, so we cast through `unknown` first
 // to avoid type conflicts. This enables sharing the Kysely instance across hot-reload

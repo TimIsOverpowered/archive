@@ -22,6 +22,19 @@
  * 1. archive-api - HTTP REST endpoints (Fastify/Feathers)
  * 2. archive-worker - Background job processors + stream detection monitoring (BullMQ + FlareSolverr via HTTP)
  *
+ * Required environment variables (set in .env or PM2 runtime env):
+ *   DATABASE_URL          - Primary PostgreSQL connection string (used by both processes)
+ *   PGBOUNCER_URL         - PgBouncer connection string (used by both processes)
+ *   REDIS_URL             - Redis connection string (used by both processes)
+ *   TWITCH_CLIENT_ID      - Twitch OAuth client ID (used by both processes)
+ *   TWITCH_CLIENT_SECRET  - Twitch OAuth client secret (used by both processes)
+ *   KICK_AUTH_TOKEN       - Kick API auth token (used by both processes)
+ *   YOUTUBE_API_KEY       - YouTube Data API v3 key (used by both processes)
+ *   DISCORD_WEBHOOK_URL   - Discord alert webhook URL (used by both processes)
+ *   FLARESOLVERR_BASE_URL - FlareSolverr URL for Kick anti-bot (worker only, default: http://localhost:8191)
+ *   NODE_ENV              - "production" or "development"
+ *   PORT                  - API server port (default: 3030, API only)
+ *
  * Deployment on Linux:
  *   npm install && npm run start:pm2
  */
