@@ -74,15 +74,14 @@ export function recordFailure(key: string, opts?: Partial<CircuitBreakerOptions>
 
   state.failureCount++;
   state.lastFailureTime = Date.now();
-  state.state = 'open';
-
   if (state.failureCount >= (opts?.failureThreshold ?? DEFAULT_OPTIONS.failureThreshold)) {
     state.state = 'open';
   }
 }
 
 export function isCircuitOpen(key: string, opts?: Partial<CircuitBreakerOptions>): boolean {
-  return getCircuitState(key, opts) === 'open';
+  const state = getCircuitState(key, opts);
+  return state === 'open' || state === 'half-open';
 }
 
 export function clearCircuit(key: string): void {
