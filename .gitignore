@@ -108,7 +108,23 @@ $RECYCLE.BIN/
 lib/
 data/
 
+# Build output (never commit compiled code)
+dist/
+
+# Prisma generated clients - platform-specific binaries regenerated on each deploy
+generated/
+prisma/generated/meta/
+
 config/*
-!config/template_config.json
-!config/template_default.json
-*.opencode
+!config/example.config.json
+
+.env*
+!.env.example
+
+# PM2 logs and runtime state  
+logs/
+.pm2/
+pm2-debug.log
+
+*.opencode*
+AGENTS.md
