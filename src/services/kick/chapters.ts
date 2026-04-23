@@ -4,7 +4,7 @@ import { getKickCategoryInfo } from './category.js';
 import { extractErrorDetails, createErrorContext } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
 import { TenantContext } from '../../types/context.js';
-import { withDbRetry } from '../../db/client.js';
+import { withDbRetry } from '../../db/streamer-client.js';
 import { ChapterCreateSchema, ChapterUpdateSchema } from '../../config/schemas.js';
 import { publishVodUpdate } from '../cache-invalidator.js';
 

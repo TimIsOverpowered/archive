@@ -1,7 +1,7 @@
 import { Platform } from '../types/platforms.js';
 import { getStrategy } from './platforms/strategy.js';
 import { TenantContext } from '../types/context.js';
-import { withDbRetry } from '../db/client.js';
+import { withDbRetry } from '../db/streamer-client.js';
 import { VodUpdateSchema } from '../config/schemas.js';
 import { publishVodDurationUpdate } from './cache-invalidator.js';
 

@@ -8,7 +8,7 @@ function buildVodQueryKey(
   const queryParts = sorted
     .filter((k) => query[k] !== undefined && query[k] !== null && query[k] !== '')
     .map((k) => `${k}:${encodeURIComponent(String(query[k]))}`);
-  return ['vods', `{${tenantId}}`, ...queryParts, String(page), String(limit)].join(':');
+  return ['vods', `{${tenantId}}`, ...queryParts, `page:${page}`, `limit:${limit}`].join(':');
 }
 
 export const CacheKeys = {

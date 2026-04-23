@@ -102,7 +102,7 @@ describe('CacheKeys', () => {
 
     it('should include page and limit', () => {
       const key = CacheKeys.vodQuery('tenant-1', { title: 'test' }, 5, 100);
-      assert.ok(key.includes(':5:100'));
+      assert.ok(key.includes(':page:5:limit:100'));
     });
 
     it('should include tenant ID', () => {
@@ -142,12 +142,12 @@ describe('CacheKeys', () => {
 
     it('should handle empty query object', () => {
       const key = CacheKeys.vodQuery('tenant-1', {}, 1, 20);
-      assert.strictEqual(key, 'vods:{tenant-1}:1:20');
+      assert.strictEqual(key, 'vods:{tenant-1}:page:1:limit:20');
     });
 
     it('should handle all undefined values', () => {
       const key = CacheKeys.vodQuery('tenant-1', { a: undefined, b: undefined }, 1, 20);
-      assert.strictEqual(key, 'vods:{tenant-1}:1:20');
+      assert.strictEqual(key, 'vods:{tenant-1}:page:1:limit:20');
     });
   });
 });

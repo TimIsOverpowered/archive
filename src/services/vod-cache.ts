@@ -3,7 +3,7 @@ import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { invalidateVodTags, invalidateVodVolatileCache } from './cache-tags.js';
 import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
-import { isConnectionError } from '../db/client.js';
+import { isConnectionError } from '../db/streamer-client.js';
 import { CacheKeys } from '../utils/cache-keys.js';
 
 export { invalidateVodVolatileCache };
