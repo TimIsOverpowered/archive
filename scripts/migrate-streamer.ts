@@ -5,7 +5,6 @@ import readline from 'readline';
 import { extractErrorDetails } from '../src/utils/error.js';
 import { decryptScalar } from '../src/utils/encryption.js';
 import pg, { type Pool, type PoolClient } from 'pg';
-import os from 'os';
 
 const META_DB_URL = process.env.META_DATABASE_URL;
 if (!META_DB_URL) {
@@ -539,9 +538,7 @@ const main = async () => {
   let poolEnded = false;
 
   try {
-    const availableMemoryMB = Math.floor(os.freemem() / 1024 / 1024);
-    const suggestedWorkers = Math.min(chatWorkers, Math.floor(availableMemoryMB / 200), 8);
-    const actualWorkerCount = Math.max(1, suggestedWorkers);
+    const actualWorkerCount = Math.max(1, chatWorkers);
 
     const oldPool = new pg.Pool({
       connectionString: dbUrl,
@@ -652,10 +649,11 @@ const main = async () => {
           vodIdMap.set(legacyVodId, newId);
 
           if (vod.youtube && Array.isArray(vod.youtube) && vod.youtube.length > 0) {
+            let nextPart = 1;
             for (const upload of vod.youtube) {
               const uploadId = `${legacyVodId}-${upload.id}`;
               const uploadDuration = Math.round(Number(upload.duration) || 0);
-              const part = Number(upload.part) || 1;
+              const part = upload.part ? Number(upload.part) : nextPart++;
 
               await schemaClient.query(
                 `INSERT INTO "vod_uploads" (vod_id, upload_id, type, duration, part, status, thumbnail_url)
@@ -675,7 +673,16 @@ const main = async () => {
           if (vod.chapters && Array.isArray(vod.chapters) && vod.chapters.length > 0) {
             for (const chapter of vod.chapters) {
               const start = Math.round(Number(chapter.start) || 0);
-              const end = chapter.end ? Math.round(Number(chapter.end)) : null;
+              let end = chapter.end ? Math.round(Number(chapter.end)) : null;
+              if (!end && vod.chapters.length === 1) {
+                end = duration;
+              }
+
+              let image = chapter.image || null;
+              if (!image && platform?.toLowerCase() === 'twitch' && chapter.name) {
+                const encodedGame = encodeURIComponent(chapter.name);
+                image = `https://static-cdn.jtvnw.net/ttv-boxart/${encodedGame}-40x53.jpg`;
+              }
 
               await schemaClient.query(
                 `INSERT INTO "chapters" (vod_id, game_id, name, image, duration, start, "end")
@@ -690,7 +697,7 @@ const main = async () => {
                   newId,
                   chapter.gameId || null,
                   chapter.name || null,
-                  chapter.image || null,
+                  image,
                   chapter.duration || null,
                   start,
                   end,
@@ -800,17 +807,6 @@ const main = async () => {
       // PHASE 2: Parallel chat migration (ctid scan)
       console.log('📌 PHASE 2: Migrating chat messages (parallel ctid scan)...\n');
 
-      const orphanedChatCheck = await oldPool.query(`
-        SELECT COUNT(*) FROM logs cm
-        WHERE NOT EXISTS (SELECT 1 FROM vods v WHERE v.id = cm.vod_id)
-      `);
-
-      if (Number(orphanedChatCheck.rows[0].count) > 0) {
-        throw new Error(
-          `${orphanedChatCheck.rows[0].count} chat messages reference non-existent VODs - FK integrity failed`
-        );
-      }
-
       const totalChatMessages = await oldPool.query(`
         SELECT COUNT(*) FROM logs cm
         INNER JOIN "vods_new" vn ON cm.vod_id = vn.vod_id
@@ -818,7 +814,6 @@ const main = async () => {
       const totalChat = Number(totalChatMessages.rows[0].count);
 
       console.log(`📊 Migrating chat messages (${totalChat.toLocaleString()} total)`);
-      console.log(`   Available memory: ${availableMemoryMB} MB`);
       console.log(`   Using ${actualWorkerCount} worker(s) with batch size ${chatBatchSize.toLocaleString()}\n`);
 
       // Disable autovacuum on destination for duration of bulk load
