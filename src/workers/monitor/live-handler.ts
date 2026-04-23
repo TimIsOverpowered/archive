@@ -11,7 +11,7 @@ import { extractErrorDetails } from '../../utils/error.js';
 import { sendStreamOfflineAlert, sendStreamLiveAlert } from './alert-helpers.js';
 import { getLiveDownloadQueue, enqueueJobWithLogging, LIVE_JOB_ID_PREFIX } from '../jobs/queues.js';
 import type { LiveDownloadJob } from '../jobs/queues.js';
-import { getTenantConfig } from '../../config/loader.js';
+import { configService } from '../../config/tenant-config.js';
 import { publishVodUpdate } from '../../services/cache-invalidator.js';
 
 type StreamerDbClient = Kysely<StreamerDB>;
@@ -273,7 +273,7 @@ export async function validateVodPath(tenantId: string): Promise<{ valid: boolea
   const log = createAutoLogger(tenantId);
 
   try {
-    const streamerConfig = getTenantConfig(tenantId);
+    const streamerConfig = configService.get(tenantId);
 
     if (!streamerConfig?.settings.vodPath) {
       log.error({ tenantId }, `[Monitor] VOD path not configured for tenant - cannot queue downloads`);

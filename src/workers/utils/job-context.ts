@@ -1,4 +1,4 @@
-import { getTenantConfig } from '../../config/loader.js';
+import { configService } from '../../config/tenant-config.js';
 import { ensureClient } from '../../db/streamer-client.js';
 import type { TenantConfig } from '../../config/types.js';
 import type { Kysely } from 'kysely';
@@ -11,7 +11,7 @@ export interface JobContext {
 }
 
 export async function getJobContext(tenantId: string): Promise<JobContext> {
-  const config = getTenantConfig(tenantId);
+  const config = configService.get(tenantId);
 
   if (!config) {
     throw new Error(`Config not found for tenant ${tenantId}`);

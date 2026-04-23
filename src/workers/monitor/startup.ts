@@ -1,4 +1,4 @@
-import { getConfigs } from '../../config/loader.js';
+import { configService } from '../../config/tenant-config.js';
 import type { TenantConfig } from '../../config/types.js';
 import { getMonitorQueue } from '../jobs/queues.js';
 import { getLogger } from '../../utils/logger.js';
@@ -55,5 +55,5 @@ export async function removeMonitorRepeatJob(tenantId: string): Promise<void> {
 }
 
 function getTenantConfigsForMonitoring(): TenantConfig[] {
-  return getConfigs().filter((config) => config.settings.vodDownload);
+  return configService.getAll().filter((config) => config.settings.vodDownload);
 }

@@ -1,6 +1,6 @@
 import { getTwitchClient } from './auth.js';
 import { getTwitchCredentials } from '../../utils/credentials.js';
-import { getTenantConfig } from '../../config/loader.js';
+import { configService } from '../../config/tenant-config.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { HttpError } from '../../utils/http-error.js';
@@ -27,7 +27,7 @@ export async function getChannelBadges(tenantId: string): Promise<Record<string,
   }
 
   const creds = getTwitchCredentials(tenantId);
-  const config = getTenantConfig(tenantId);
+  const config = configService.get(tenantId);
   if (!creds?.clientId || !config?.twitch?.id) {
     log.warn({ tenantId }, 'Twitch credentials not configured for streamer');
     return null;

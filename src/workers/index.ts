@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { pathToFileURL } from 'node:url';
 import { extractErrorDetails } from '../utils/error.js';
-import { loadTenantConfigs, clearConfigCache } from '../config/loader.js';
+import { configService } from '../config/tenant-config.js';
 import { QUEUE_NAMES, getQueue, closeQueues } from './jobs/queues.js';
 import { initWorkersRedis, getRedisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
 import { startTokenHealthCron } from '../cron/token-health.js';
@@ -50,7 +50,7 @@ export async function bootstrap() {
 
   try {
     registerPlatformStrategies();
-    const configs = await loadTenantConfigs();
+    const configs = await configService.loadAll();
     await waitForRedisReady();
     startTokenHealthCron();
     await clearAllJobsOnStartup(workerConfig);
@@ -89,7 +89,7 @@ function registerShutdownHandlers() {
     await closeAllClients();
     await closeMetaClient();
     await closeWorkersRedis();
-    clearConfigCache();
+    configService.reset();
     setTimeout(() => process.exit(0), SHUTDOWN_TIMEOUT_MS);
   };
 

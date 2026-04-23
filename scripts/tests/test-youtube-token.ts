@@ -4,7 +4,7 @@ import { program } from 'commander';
 import { initMetaClient, closeMetaClient } from '../../src/db/meta-client.js';
 import { extractErrorDetails } from '../../src/utils/error.js';
 import { decryptScalar, decryptObject } from '../../src/utils/encryption.js';
-import { loadTenantConfigs } from '../../src/config/loader.js';
+import { configService } from '../../src/config/tenant-config.js';
 import { createYoutubeClient } from '../../src/services/youtube/client.js';
 import { humanizeDuration } from '../../src/utils/formatting.js';
 import { getAllTenants, getTenantById } from '../../src/services/meta-tenants.service.js';
@@ -94,7 +94,7 @@ program
         try {
           // Load configs first to populate cache for youtube service (critical!)
           console.log('Loading streamer configs from DB...');
-          await loadTenantConfigs();
+          await configService.loadAll();
 
           // Use createYoutubeClient which will validate/refresh tokens internally
           if (decrypted.refresh_token) {

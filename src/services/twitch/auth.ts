@@ -1,6 +1,6 @@
 import { getTwitchCredentials } from '../../utils/credentials.js';
 import { extractErrorDetails } from '../../utils/error.js';
-import { getTenantConfig, updateTenantTwitchAuth } from '../../config/loader.js';
+import { configService } from '../../config/tenant-config.js';
 import { encryptObject, decryptObject } from '../../utils/encryption.js';
 import { getMetaClient } from '../../db/meta-client.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
@@ -72,7 +72,7 @@ export async function getAppAccessToken(tenantId: string): Promise<string> {
 }
 
 export async function updateTwitchTokenInDb(tenantId: string, newToken: string, expiryDate: number): Promise<void> {
-  const config = getTenantConfig(tenantId);
+  const config = configService.get(tenantId);
   if (!config?.twitch?.auth) {
     return;
   }
@@ -95,7 +95,7 @@ export async function updateTwitchTokenInDb(tenantId: string, newToken: string, 
       .where('id', '=', tenantId)
       .execute();
 
-    updateTenantTwitchAuth(tenantId, encryptedAuth);
+    configService.updateTwitchAuth(tenantId, encryptedAuth);
 
     log.info({ tenantId, expiry_date: expiryDate }, 'Updated Twitch token');
   } catch (err) {

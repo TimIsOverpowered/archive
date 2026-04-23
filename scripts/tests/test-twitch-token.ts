@@ -3,7 +3,7 @@ import 'dotenv/config';
 import { program } from 'commander';
 import { initMetaClient, closeMetaClient } from '../../src/db/meta-client.js';
 import { extractErrorDetails } from '../../src/utils/error.js';
-import { loadTenantConfigs } from '../../src/config/loader.js';
+import { configService } from '../../src/config/tenant-config.js';
 import { getAppAccessToken } from '../../src/services/twitch/index.js';
 import { getTwitchCredentials } from '../../src/utils/credentials.js';
 import { humanizeDuration } from '../../src/utils/formatting.js';
@@ -79,7 +79,7 @@ program
           console.log('\nForcing token refresh...');
 
           console.log('Loading streamer configs from DB...');
-          await loadTenantConfigs();
+          await configService.loadAll();
 
           try {
             const newToken = await getAppAccessToken(tenantId);
@@ -130,7 +130,7 @@ program
         } else if (options.validateToken) {
           console.log('\nValidating current token...');
 
-          await loadTenantConfigs();
+          await configService.loadAll();
 
           try {
             const accessToken = await getAppAccessToken(tenantId);

@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { getTenantConfig } from '../../config/loader.js';
+import { configService } from '../../config/tenant-config.js';
 import { ensureClient } from '../../db/streamer-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import type { TenantContext } from '../../types/context.js';
@@ -37,7 +37,7 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
     });
   }
 
-  const config = getTenantConfig(tenantId);
+  const config = configService.get(tenantId);
 
   if (!config) {
     return reply.status(404).send({

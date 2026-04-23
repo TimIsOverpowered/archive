@@ -68,8 +68,7 @@ describe('tenantMiddleware', () => {
 
   it('should return 503 when database client fails to initialize', async () => {
     // Register a tenant config first
-    const { clearConfigCache } = await import('../../../src/config/loader.js');
-    const { loadTenantConfigs } = await import('../../../src/config/loader.js');
+    const { configService } = await import('../../../src/config/tenant-config.js');
 
     // This test will skip since we can't easily mock the DB without a real config
     // The 404 case above covers the main path for unregistered tenants

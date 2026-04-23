@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { RedisService } from '../../utils/redis-service.js';
-import { getTenantConfig } from '../../config/loader.js';
+import { configService } from '../../config/tenant-config.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { notFound } from '../../utils/http-error.js';
 import { extractErrorDetails } from '../../utils/error.js';
@@ -45,7 +45,7 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
       const tenantId = request.params.tenantId;
       const log = createAutoLogger(tenantId);
 
-      const config = getTenantConfig(tenantId);
+      const config = configService.get(tenantId);
 
       if (!config?.twitch?.id) throw notFound('Twitch not configured for this tenant');
 
