@@ -25,6 +25,7 @@ interface ChatProcessorState {
   chatAlerts: ReturnType<typeof createChatWorkerAlerts>;
   messageId: string;
   db: Kysely<StreamerDB>;
+  job: Job<ChatDownloadJob>;
 }
 
 const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
@@ -94,6 +95,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
     chatAlerts,
     messageId,
     db,
+    job,
   };
   const result = await processChatDownload(state, effectiveOffset);
 
@@ -262,6 +264,12 @@ async function processChatDownload(
   let lastOffset = effectiveOffset;
 
   log.info({ vodId, effectiveOffset }, 'Starting chat download');
+  const reportProgress = (offset: number) => {
+    if (duration > 0) {
+      const pct = Math.min(Math.round((offset / duration) * 100), 100);
+      void state.job.updateProgress(pct);
+    }
+  };
 
   for await (const rawPage of paginateChatComments(vodId, effectiveOffset, tenantId)) {
     const commentsObj = rawPage.comments;
@@ -307,6 +315,7 @@ async function processChatDownload(
         log,
         vodId,
         onProgress: (offset, batchNumber, messagesInBatch) => {
+          reportProgress(offset);
           updateAlert(
             messageId,
             chatAlerts.progress(tenantId, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)
@@ -332,6 +341,7 @@ async function processChatDownload(
       log,
       vodId,
       onProgress: (offset, batchNumber, messagesInBatch) => {
+        reportProgress(offset);
         updateAlert(
           messageId,
           chatAlerts.progress(tenantId, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)

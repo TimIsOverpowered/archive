@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { Queue } from 'bullmq';
 import { sql } from 'kysely';
 import { loadTenantConfigs } from '../../config/loader.js';
 import { getClient } from '../../db/client.js';
@@ -7,6 +8,8 @@ import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator.js';
 import healthCheckMiddleware from '../middleware/health-check.js';
 import { RedisService } from '../../utils/redis-service.js';
 import { getCacheMetrics } from '../../utils/cache.js';
+import { QUEUES_VALUES, type QueueJob } from '../../workers/jobs/queues.js';
+import { getRedisInstance } from '../../workers/redis.js';
 
 interface HealthRouteOptions {
   prefix: string;
@@ -83,6 +86,8 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
         admin: { fallback: RedisService.isLimiterFallback('rate:admin') },
       };
 
+      const workerQueues = await getQueueMetrics();
+
       const response = {
         data: {
           status: redisStatus === 'error' ? 'degraded' : 'ok',
@@ -103,10 +108,37 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
             },
           }),
           cache: getCacheMetrics(),
+          workerQueues,
         },
       };
 
       return response;
     }
   );
+}
+
+async function getQueueMetrics(): Promise<
+  Record<string, { waiting: number; active: number; failed: number; delayed: number }>
+> {
+  const result: Record<string, { waiting: number; active: number; failed: number; delayed: number }> = {};
+  try {
+    const redis = getRedisInstance();
+    for (const queueName of QUEUES_VALUES) {
+      const queue = new Queue<QueueJob, QueueJob, string>(queueName, { connection: redis });
+      try {
+        const counts = await queue.getJobCounts();
+        result[queueName] = {
+          waiting: counts.waiting ?? 0,
+          active: counts.active ?? 0,
+          failed: counts.failed ?? 0,
+          delayed: counts.delayed ?? 0,
+        };
+      } catch {
+        result[queueName] = { waiting: -1, active: -1, failed: -1, delayed: -1 };
+      }
+    }
+  } catch {
+    // Redis unavailable — return empty metrics
+  }
+  return result;
 }
