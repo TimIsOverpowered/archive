@@ -39,6 +39,7 @@ export const ApiConfigSchema = BaseConfigSchema.extend({
   RATE_LIMIT_VODS: z.coerce.number().int().positive().default(60),
   RATE_LIMIT_CHAT: z.coerce.number().int().positive().default(30),
   RATE_LIMIT_ADMIN_GET: z.coerce.number().int().positive().default(60),
+  RATE_LIMIT_ADMIN_AUTH: z.coerce.number().int().positive().default(20),
   RATE_LIMIT_BLOCK_DURATION: z.coerce.number().int().positive().default(60),
   CHAT_CURSOR_TTL: z.coerce.number().int().positive().default(259200),
   CHAT_OFFSET_TTL: z.coerce.number().int().positive().default(259200),

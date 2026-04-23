@@ -14,12 +14,14 @@ const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, opti
   const vodLimit = config.RATE_LIMIT_VODS;
   const chatLimit = config.RATE_LIMIT_CHAT;
   const adminGetLimit = config.RATE_LIMIT_ADMIN_GET;
+  const adminAuthLimit = config.RATE_LIMIT_ADMIN_AUTH;
   const blockDuration = config.RATE_LIMIT_BLOCK_DURATION;
 
   const rateLimiters: RateLimiterConfig[] = [
     { keyPrefix: 'rate:vods', points: vodLimit, duration: 60 },
     { keyPrefix: 'rate:chat', points: chatLimit, duration: 60, blockDuration: blockDuration * 2 },
     { keyPrefix: 'rate:admin', points: adminGetLimit, duration: 60, blockDuration: blockDuration * 5 },
+    { keyPrefix: 'rate:admin:auth', points: adminAuthLimit, duration: 1 },
   ];
 
   await RedisService.init({ url, rateLimiters }).connect();

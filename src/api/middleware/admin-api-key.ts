@@ -1,6 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { findAdminByApiKey } from '../../services/admin.service.js';
-import { RateLimiterRedis, RateLimiterMemory } from 'rate-limiter-flexible';
 import { RedisService } from '../../utils/redis-service.js';
 import { getLogger } from '../../utils/logger.js';
 import { getClientIp } from './ip.js';
@@ -10,28 +9,6 @@ export interface AdminContext {
   adminId: number;
   username: string;
 }
-
-const createAdminAuthLimiter = (): RateLimiterRedis | RateLimiterMemory => {
-  const redis = RedisService.getActiveClient();
-  if (!redis) {
-    return new RateLimiterMemory({ points: 20, duration: 1 });
-  }
-  return new RateLimiterRedis({
-    storeClient: redis,
-    keyPrefix: 'rate:admin:auth',
-    points: 20,
-    duration: 1,
-  });
-};
-
-let _adminAuthLimiter: RateLimiterRedis | RateLimiterMemory | null = null;
-
-const getAdminAuthLimiter = (): RateLimiterRedis | RateLimiterMemory => {
-  if (!_adminAuthLimiter) {
-    _adminAuthLimiter = createAdminAuthLimiter();
-  }
-  return _adminAuthLimiter;
-};
 
 /**
  * Admin API key authentication middleware.
@@ -60,7 +37,16 @@ export default async function adminApiKeyMiddleware(request: FastifyRequest, rep
     });
   }
 
-  const limiter = getAdminAuthLimiter();
+  const limiter = RedisService.getLimiter('rate:admin:auth');
+  if (!limiter) {
+    return reply.status(503).send({
+      error: {
+        message: 'Service unavailable',
+        code: 'SERVICE_UNAVAILABLE',
+        statusCode: 503,
+      },
+    });
+  }
   const ip = getClientIp(request);
 
   try {
