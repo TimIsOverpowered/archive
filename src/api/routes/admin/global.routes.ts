@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { getAllTenants } from '../../../services/tenants.service';
+import { getAllTenants } from '../../../services/tenants.service.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import { RedisService } from '../../../utils/redis-service.js';

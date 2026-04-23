@@ -1,5 +1,5 @@
 import type { Kysely } from 'kysely';
-import type { StreamerDB } from '../../db/streamer-types';
+import type { StreamerDB } from '../../db/streamer-types.js';
 import type { AppLogger } from '../../utils/logger.js';
 import { trimVideo, splitVideo, getDuration } from '../utils/ffmpeg.js';
 import { uploadVideo } from '../../services/youtube/index.js';

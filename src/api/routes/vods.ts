@@ -8,7 +8,7 @@ import { tenantMiddleware } from '../middleware/tenant-platform.js';
 import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
 import { INT32_MAX } from '../../constants.js';
 import type { Kysely } from 'kysely';
-import type { StreamerDB } from '../../db/streamer-types';
+import type { StreamerDB } from '../../db/streamer-types.js';
 
 /** Options for registering the VODs routes plugin. */
 interface VodRoutesOptions {

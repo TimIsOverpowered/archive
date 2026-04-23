@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach } from 'node:test';
-import { encrypt, decrypt, encryptScalar, decryptScalar, encryptObject, decryptObject, validateEncryptionKey } from '../../src/utils/encryption';
+import { encrypt, decrypt, encryptScalar, decryptScalar, encryptObject, decryptObject, validateEncryptionKey } from '../../src/utils/encryption.js';
 
 describe('Encryption', () => {
   const originalEnv = process.env;

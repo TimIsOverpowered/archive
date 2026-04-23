@@ -13,7 +13,7 @@ import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
 import { findVodRecord } from './utils/vod-helpers.js';
 import { fetchAndSaveEmotes } from '../../../services/emotes.js';
-import { triggerChatDownload } from '../../../workers/jobs/chat.job';
+import { triggerChatDownload } from '../../../workers/jobs/chat.job.js';
 import { getPlatformConfig } from '../../../config/types.js';
 
 /** Route params shared by metadata endpoints. */

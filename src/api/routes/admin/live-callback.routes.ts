@@ -15,7 +15,7 @@ import { notFound, badRequest } from '../../../utils/http-error.js';
 import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
 import { findStreamRecord } from './utils/vod-helpers.js';
-import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job';
+import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
 import { VodUpdateSchema } from '../../../config/schemas.js';
 import { publishVodDurationUpdate } from '../../../services/cache-invalidator.js';
 

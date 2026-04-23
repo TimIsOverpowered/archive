@@ -20,7 +20,7 @@ import {
   DOWNLOAD_METHODS_VALUES,
   SOURCE_TYPES_VALUES,
 } from '../../../types/platforms.js';
-import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job';
+import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
 
 /** Route params for download job endpoints. */
 interface Params {

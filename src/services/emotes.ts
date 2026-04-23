@@ -1,5 +1,5 @@
 import { getLogger } from '../utils/logger.js';
-import type { DBClient } from '../db/streamer-types';
+import type { DBClient } from '../db/streamer-types.js';
 import { Platform, PLATFORMS } from '../types/platforms.js';
 import { TenantContext } from '../types/context.js';
 import { withDbRetry } from '../db/streamer-client.js';

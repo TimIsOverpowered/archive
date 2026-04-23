@@ -19,7 +19,7 @@ import {
   UPLOAD_MODES,
 } from '../../../types/platforms.js';
 import { ensureVodDownload, findVodRecord } from './utils/vod-helpers.js';
-import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job';
+import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 
 /** Route params for YouTube re-upload endpoint. */

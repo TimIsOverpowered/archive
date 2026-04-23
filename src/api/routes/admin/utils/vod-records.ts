@@ -3,7 +3,7 @@ import { type AppLogger } from '../../../../utils/logger.js';
 import type { VodRecord } from '../../../../types/db.js';
 import type { Platform } from '../../../../types/platforms.js';
 import type { Kysely } from 'kysely';
-import type { StreamerDB, InsertableVods, UpdateableVods } from '../../../../db/streamer-types';
+import type { StreamerDB, InsertableVods, UpdateableVods } from '../../../../db/streamer-types.js';
 import { fetchAndSaveEmotes } from '../../../../services/emotes.js';
 import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { triggerChatDownload } from '../../../../workers/jobs/chat.job.js';
