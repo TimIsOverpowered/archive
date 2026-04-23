@@ -13,9 +13,9 @@ function normalizePathForSchema(basePath?: string): string | undefined {
  */
 export const SettingsSchema = z.object({
   /** Domain name associated with the tenant */
-  domainName: z.string(),
+  domainName: z.string().min(1, 'domainName is required'),
   /** IANA timezone identifier (e.g. 'America/New_York') */
-  timezone: z.string(),
+  timezone: z.string().min(1, 'timezone is required'),
   /** Whether to save the final MP4 file (default: false) */
   saveMP4: z.boolean().default(false),
   /** Whether to save raw HLS segments (default: false) */

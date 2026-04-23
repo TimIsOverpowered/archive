@@ -50,14 +50,19 @@ export const segmentDownloadAgent = new Agent({
   pipelining: SEGMENT_DOWNLOAD_PIPELINING,
 });
 
+const SENSITIVE_PARAM_PATTERNS = [/^nauthsig$/i, /^nauth$/i, /token/i, /secret/i, /_key$/i];
+
+function isSensitiveParam(name: string): boolean {
+  return SENSITIVE_PARAM_PATTERNS.some((pattern) => pattern.test(name));
+}
+
 function scrubSensitiveParams(url: string): string {
   try {
     const urlObj = new URL(url);
-    const sensitiveParams = ['nauth', 'nauthsig', 'access_token'];
 
-    for (const param of sensitiveParams) {
-      if (urlObj.searchParams.has(param)) {
-        urlObj.searchParams.set(param, 'REDACTED');
+    for (const [name] of urlObj.searchParams) {
+      if (isSensitiveParam(name)) {
+        urlObj.searchParams.set(name, 'REDACTED');
       }
     }
 

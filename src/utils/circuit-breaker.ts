@@ -27,14 +27,14 @@ const DEFAULT_OPTIONS: CircuitBreakerOptions = {
   stateTtl: 120_000,
 };
 
-const _breakers = new LRUCache<string, CircuitBreakerState>({
+const breakerCache = new LRUCache<string, CircuitBreakerState>({
   max: 5000,
   ttl: 120_000,
   allowStale: false,
 });
 
 function getOrCreateBreaker(key: string, _opts?: Partial<CircuitBreakerOptions>): CircuitBreakerState {
-  let state = _breakers.get(key);
+  let state = breakerCache.get(key);
 
   if (!state) {
     state = {
@@ -43,7 +43,7 @@ function getOrCreateBreaker(key: string, _opts?: Partial<CircuitBreakerOptions>)
       lastFailureTime: null,
       lastSuccessTime: null,
     };
-    _breakers.set(key, state);
+    breakerCache.set(key, state);
   }
 
   return state;
@@ -85,9 +85,9 @@ export function isCircuitOpen(key: string, opts?: Partial<CircuitBreakerOptions>
 }
 
 export function clearCircuit(key: string): void {
-  _breakers.delete(key);
+  breakerCache.delete(key);
 }
 
 export function clearAllCircuits(): void {
-  _breakers.clear();
+  breakerCache.clear();
 }
