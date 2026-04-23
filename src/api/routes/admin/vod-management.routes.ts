@@ -49,6 +49,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
+      // Non-null assertion safe: tenantMiddleware runs in onRequest and always sets request.tenant
       const { tenantId, db } = request.tenant!;
 
       const stats = await getTenantStats(db, tenantId, getApiConfig().STATS_CACHE_TTL);

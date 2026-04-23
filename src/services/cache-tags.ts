@@ -42,20 +42,25 @@ export async function registerVodTags(
   const tagTtlMs = ttl * 1000 + 60_000;
 
   try {
-    const pipeline = client.pipeline();
-    pipeline.set(cacheKey, data, 'EX', ttl);
+    const CHUNK_SIZE = 50;
 
-    for (const vod of vods) {
-      const tagKey = CacheKeys.vodTags(tenantId, vod.id);
-      pipeline.sadd(tagKey, cacheKey);
-      pipeline.pexpire(tagKey, tagTtlMs);
-    }
+    for (let i = 0; i < vods.length; i += CHUNK_SIZE) {
+      const chunk = client.pipeline();
+      if (i === 0) {
+        chunk.set(cacheKey, data, 'EX', ttl);
+      }
 
-    const results = await pipeline.exec();
+      for (const vod of vods.slice(i, i + CHUNK_SIZE)) {
+        const tagKey = CacheKeys.vodTags(tenantId, vod.id);
+        chunk.sadd(tagKey, cacheKey);
+        chunk.pexpire(tagKey, tagTtlMs);
+      }
 
-    if (results?.some(([err]) => err)) {
-      const firstErr = results.find(([err]) => err)?.[1] ?? null;
-      throw firstErr ?? new Error('Pipeline command failed');
+      const results = await chunk.exec();
+      if (results?.some(([err]) => err)) {
+        const firstErr = results.find(([err]) => err)?.[1] ?? null;
+        throw firstErr ?? new Error('Pipeline command failed');
+      }
     }
 
     if (isConnectionFailed(tenantId)) {
