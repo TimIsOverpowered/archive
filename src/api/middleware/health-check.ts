@@ -1,11 +1,21 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { getHealthToken } from '../../config/env.js';
 
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
 export default async function healthCheckMiddleware(request: FastifyRequest, reply: FastifyReply) {
-  const token = request.headers['x-health-token'];
+  const rawToken = request.headers['x-health-token'];
+  const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
   const expectedToken = getHealthToken();
 
-  if (!token || !expectedToken || token !== expectedToken) {
+  if (!token || !expectedToken || !timingSafeEqual(token, expectedToken)) {
     return reply.status(401).send({
       error: {
         message: 'Invalid health check token',
