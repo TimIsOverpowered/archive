@@ -24,11 +24,9 @@ export default function createRateLimitMiddleware(options: RateLimitOptions) {
     const isValidCfRequest = await validateCloudflareRequest(request);
     if (!isValidCfRequest) {
       return reply.status(403).send({
-        error: {
-          message: 'Forbidden',
-          code: 'FORBIDDEN',
-          statusCode: 403,
-        },
+        statusCode: 403,
+        message: 'Forbidden',
+        code: 'FORBIDDEN',
       });
     }
 
@@ -46,21 +44,17 @@ export default function createRateLimitMiddleware(options: RateLimitOptions) {
         const retryAfter = Math.ceil(error.msBeforeNext / 1000);
 
         return reply.status(429).send({
-          error: {
-            message: 'Too Many Requests',
-            code: 'RATE_LIMITED',
-            statusCode: 429,
-            retryAfter,
-          },
+          statusCode: 429,
+          message: 'Too Many Requests',
+          code: 'RATE_LIMITED',
+          retryAfter,
         });
       }
 
       return reply.status(500).send({
-        error: {
-          message: 'Internal server error',
-          code: 'INTERNAL_ERROR',
-          statusCode: 500,
-        },
+        statusCode: 500,
+        message: 'Internal server error',
+        code: 'INTERNAL_ERROR',
       });
     }
   };

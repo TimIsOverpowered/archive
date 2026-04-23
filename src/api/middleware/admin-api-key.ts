@@ -29,22 +29,18 @@ export default async function adminApiKeyMiddleware(request: FastifyRequest, rep
 
   if (!apiKey || !apiKey.startsWith('archive_')) {
     return reply.status(401).send({
-      error: {
-        message: 'Missing or invalid API key',
-        code: 'UNAUTHORIZED',
-        statusCode: 401,
-      },
+      statusCode: 401,
+      message: 'Missing or invalid API key',
+      code: 'UNAUTHORIZED',
     });
   }
 
   const limiter = RedisService.getLimiter('rate:admin:auth');
   if (!limiter) {
     return reply.status(503).send({
-      error: {
-        message: 'Service unavailable',
-        code: 'SERVICE_UNAVAILABLE',
-        statusCode: 503,
-      },
+      statusCode: 503,
+      message: 'Service unavailable',
+      code: 'SERVICE_UNAVAILABLE',
     });
   }
   const ip = getClientIp(request);
@@ -53,11 +49,9 @@ export default async function adminApiKeyMiddleware(request: FastifyRequest, rep
     await limiter.consume(ip);
   } catch {
     return reply.status(429).send({
-      error: {
-        message: 'Too Many Requests',
-        code: 'RATE_LIMITED',
-        statusCode: 429,
-      },
+      statusCode: 429,
+      message: 'Too Many Requests',
+      code: 'RATE_LIMITED',
     });
   }
 
@@ -66,11 +60,9 @@ export default async function adminApiKeyMiddleware(request: FastifyRequest, rep
   if (!admin) {
     getLogger().warn({ ip, apiKeyPrefix: apiKey.substring(0, 8) }, 'Invalid admin API key used');
     return reply.status(401).send({
-      error: {
-        message: 'Invalid API key',
-        code: 'UNAUTHORIZED',
-        statusCode: 401,
-      },
+      statusCode: 401,
+      message: 'Invalid API key',
+      code: 'UNAUTHORIZED',
     });
   }
 
