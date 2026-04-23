@@ -1,5 +1,6 @@
 import { Processor, Worker, BaseJobOptions } from 'bullmq';
 import { getLogger } from '../utils/logger.js';
+import { extractErrorDetails } from '../utils/error.js';
 import { WorkerName } from './worker-definitions.js';
 import type { Redis } from 'ioredis';
 
@@ -79,6 +80,11 @@ export function createWorker(config: WorkerConfig): Worker<Record<string, unknow
         `[${name}] Job stalled - lock may have expired. This typically happens when a job takes longer than the lock duration (default: 30s). Check if event loop is blocked.`
       );
     })();
+  });
+
+  worker.on('error', (err) => {
+    const details = extractErrorDetails(err);
+    getLogger().error({ workerName: name, err: details }, `[${name}] worker error`);
   });
 
   registerWorker(name, worker as Worker);

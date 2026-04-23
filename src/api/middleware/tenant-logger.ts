@@ -38,6 +38,10 @@ export default function createTenantLoggerMiddleware() {
     const context: TenantContextData = { displayName, tenantId, reqId };
 
     enterTenantContext(context);
+
+    reply.raw.on('finish', () => {
+      exitTenantContext();
+    });
   };
 }
 

@@ -1,8 +1,10 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { RedisService } from '../../utils/redis-service.js';
 import { getTenantConfig } from '../../config/loader.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { notFound } from '../../utils/http-error.js';
+import { extractErrorDetails } from '../../utils/error.js';
 import { getChannelBadges, getGlobalBadges } from '../../services/twitch/index.js';
 
 interface BadgesRoutesOptions {
@@ -10,6 +12,15 @@ interface BadgesRoutesOptions {
 }
 
 export default async function badgesRoutes(fastify: FastifyInstance, _options: BadgesRoutesOptions) {
+  const badgesRateLimiter = RedisService.getLimiter('rate:vods');
+  if (!badgesRateLimiter) {
+    throw new Error('Rate limiter not initialized');
+  }
+
+  const rateLimitMiddleware = createRateLimitMiddleware({
+    limiter: badgesRateLimiter,
+  });
+
   // Get Twitch badges for a channel (global + subscriber) with Redis caching
   fastify.get(
     '/:tenantId/badges/twitch',
@@ -23,6 +34,7 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
           required: ['tenantId'],
         },
       },
+      onRequest: [rateLimitMiddleware],
     },
     async (request: FastifyRequest<{ Params: { tenantId: string }; Body?: unknown }>): Promise<unknown> => {
       const tenantId = request.params.tenantId;
@@ -43,8 +55,9 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
 
             return { data: JSON.parse(cachedBadges) };
           }
-        } catch {
-          // Cache miss or Redis error - continue to fetch from API
+        } catch (err) {
+          const details = extractErrorDetails(err);
+          log.warn({ err: details }, 'Redis cache read failed for Twitch badges, continuing to API fetch');
         }
       }
 
@@ -70,8 +83,9 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
         log.info('Fetched and cached Twitch badges');
 
         return { data: badgesData };
-      } catch {
-        log.info('Fetched Twitch badges (cache unavailable)');
+      } catch (err) {
+        const details = extractErrorDetails(err);
+        log.error({ err: details }, 'Failed to fetch Twitch badges');
 
         return { data: { channel: null, global: null } };
       }

@@ -204,7 +204,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           },
         };
       } else {
-        return badRequest(`File already exists at ${filePath}`);
+        throw badRequest(`File already exists at ${filePath}`);
       }
     }
   );
