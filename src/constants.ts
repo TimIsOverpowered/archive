@@ -42,6 +42,7 @@ export const INT32_MAX = 2_147_483_647; // PostgreSQL integer column limit
 export const DB_POOL_IDLE_TIMEOUT_MS = 30 * 60 * 1_000;
 export const DB_POOL_MAX_CLIENTS = 10;
 export const DB_POOL_CLEANUP_INTERVAL_MS = 5 * 60 * 1_000;
+export const DB_STATEMENT_TIMEOUT_MS = 30_000;
 
 // ── Kick API ─────────────────────────────────────────────────────────────────
 export const KICK_API_TIMEOUT_MS = 10_000;

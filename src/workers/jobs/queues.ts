@@ -150,6 +150,12 @@ export const defaultJobOptions = {
   removeOnFail: { count: 50 },
 };
 
+export const queueRetryOptions: Record<string, QueueOptions['defaultJobOptions']> = {
+  [QUEUE_NAMES.CHAT_DOWNLOAD]: { attempts: 5, backoff: { type: 'exponential' as const, delay: 3000 } },
+  [QUEUE_NAMES.YOUTUBE_UPLOAD]: { attempts: 3, backoff: { type: 'exponential' as const, delay: 10000 } },
+  [QUEUE_NAMES.DMCA_PROCESSING]: { attempts: 3, backoff: { type: 'exponential' as const, delay: 10000 } },
+};
+
 const queueCache = new Map<string, Queue<QueueJob, QueueJob, string>>();
 
 function normalizeOptions(options: unknown): string {
@@ -200,15 +206,15 @@ export function getStandardVodQueue(): Queue<StandardVodJob, StandardVodJob, str
 }
 
 export function getChatDownloadQueue(): Queue<ChatDownloadJob, ChatDownloadJob, string> {
-  return getQueue(QUEUE_NAMES.CHAT_DOWNLOAD);
+  return getQueue(QUEUE_NAMES.CHAT_DOWNLOAD, queueRetryOptions[QUEUE_NAMES.CHAT_DOWNLOAD]);
 }
 
 export function getYoutubeUploadQueue(): Queue<YoutubeUploadJob, YoutubeUploadJob, string> {
-  return getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD);
+  return getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD, queueRetryOptions[QUEUE_NAMES.YOUTUBE_UPLOAD]);
 }
 
 export function getDmcaProcessingQueue(): Queue<DmcaProcessingJob, DmcaProcessingJob, string> {
-  return getQueue(QUEUE_NAMES.DMCA_PROCESSING);
+  return getQueue(QUEUE_NAMES.DMCA_PROCESSING, queueRetryOptions[QUEUE_NAMES.DMCA_PROCESSING]);
 }
 
 export function getMonitorQueue(): Queue<MonitorJob, MonitorJob, string> {

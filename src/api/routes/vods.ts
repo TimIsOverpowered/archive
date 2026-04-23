@@ -81,7 +81,7 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
     }
   );
 
-  fastify.get(
+  fastify.get<{ Params: { tenantId: string; vodId: string } }>(
     '/:tenantId/vods/:vodId',
     {
       schema: {
@@ -99,14 +99,14 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const { tenantId, vodId } = request.params as { tenantId: string; vodId: string };
+      const { tenantId, vodId } = request.params;
       const { db } = request.tenant;
       const vod = await fetchVodByIdSafe(vodId, db, tenantId);
       return { data: vod };
     }
   );
 
-  fastify.get(
+  fastify.get<{ Params: { tenantId: string; platform: Platform; platformVodId: string } }>(
     '/:tenantId/vods/:platform/:platformVodId',
     {
       schema: {
@@ -125,11 +125,7 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const { tenantId, platform, platformVodId } = request.params as {
-        tenantId: string;
-        platform: Platform;
-        platformVodId: string;
-      };
+      const { tenantId, platform, platformVodId } = request.params;
       const { db } = request.tenant;
 
       const vod = await getVodByPlatformId(db, tenantId, platform, platformVodId);
@@ -142,7 +138,7 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
     }
   );
 
-  fastify.get(
+  fastify.get<{ Params: { tenantId: string; vodId: string } }>(
     '/:tenantId/vods/:vodId/emotes',
     {
       schema: {
@@ -160,7 +156,7 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const { tenantId, vodId } = request.params as { tenantId: string; vodId: string };
+      const { tenantId, vodId } = request.params;
       const { db } = request.tenant;
       await fetchVodByIdSafe(vodId, db, tenantId);
       const emotes = await getEmotesByVodId(db, tenantId, Number(vodId));
