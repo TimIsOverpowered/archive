@@ -2,10 +2,7 @@ import { z } from 'zod';
 
 function envBool(defaultsTo: boolean) {
   return z.preprocess(
-    (val) =>
-      defaultsTo
-        ? String(val).toLowerCase() !== 'false'
-        : String(val).toLowerCase() === 'true',
+    (val) => (defaultsTo ? String(val).toLowerCase() !== 'false' : String(val).toLowerCase() === 'true'),
     z.boolean()
   );
 }
