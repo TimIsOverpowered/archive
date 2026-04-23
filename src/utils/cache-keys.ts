@@ -2,7 +2,7 @@ function buildVodQueryKey(
   tenantId: string,
   query: Record<string, string | number | undefined>,
   page: number,
-  limit: number,
+  limit: number
 ): string {
   const sorted = Object.keys(query).sort() as (keyof typeof query)[];
   const queryParts = sorted

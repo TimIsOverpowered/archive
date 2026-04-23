@@ -57,9 +57,7 @@ export async function waitForWorkersReady(workerInstances: Worker[], timeoutMs =
   await Promise.all(readyPromises);
 }
 
-export function createWorker<TData>(
-  config: WorkerConfig<TData>
-): Worker<TData, unknown> {
+export function createWorker<TData>(config: WorkerConfig<TData>): Worker<TData, unknown> {
   const { name, processor, connection, concurrency = 1, useWorkerThreads = false } = config;
 
   const worker = new Worker<TData, unknown>(name, processor, {

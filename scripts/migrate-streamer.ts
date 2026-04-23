@@ -692,14 +692,7 @@ const main = async () => {
                      name = EXCLUDED.name,
                      image = EXCLUDED.image,
                      "end" = EXCLUDED."end"`,
-                [
-                  newId,
-                  chapter.gameId || null,
-                  chapter.name || null,
-                  image,
-                  start,
-                  end,
-                ]
+                [newId, chapter.gameId || null, chapter.name || null, image, start, end]
               );
             }
           }
