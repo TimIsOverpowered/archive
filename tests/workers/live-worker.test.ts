@@ -3,7 +3,7 @@ import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import liveProcessor from '../../src/workers/live.worker.js';
 import { getJobContext } from '../../src/workers/utils/job-context.js';
 import { RedisService } from '../../src/utils/redis-service.js';
-import { poolManager, resetClientManager } from '../../src/db/client.js';
+import { poolManager, resetClientManager } from '../../src/db/streamer-client.js';
 import { resetEnvConfig } from '../../src/config/env.js';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';

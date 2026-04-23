@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { Queue } from 'bullmq';
 import { sql } from 'kysely';
 import { loadTenantConfigs } from '../../config/loader.js';
-import { getClient } from '../../db/client.js';
+import { getClient } from '../../db/streamer-client.js';
 import { checkFlareSolverrHealth } from '../../utils/flaresolverr-health.js';
 import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator.js';
 import healthCheckMiddleware from '../middleware/health-check.js';

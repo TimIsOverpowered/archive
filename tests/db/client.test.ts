@@ -5,7 +5,7 @@ import { resetEnvConfig } from '../../src/config/env.js';
 import {
   stopClientCleanup,
   createPoolManager,
-} from '../../src/db/client.js';
+} from '../../src/db/streamer-client.js';
 import type { Pool } from 'pg';
 import { TenantConfig } from '../../src/config/types.js';
 

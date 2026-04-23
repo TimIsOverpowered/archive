@@ -13,12 +13,7 @@ import {
 } from '../constants.js';
 import { sleep } from '../utils/delay.js';
 import type { StreamerDB } from './streamer-types.js';
-
-function buildPgBouncerUrl(pgbouncerUrl: string, dbName: string): string {
-  const url = new URL(pgbouncerUrl);
-  url.pathname = `/${dbName}`;
-  return url.toString();
-}
+import { buildPgBouncerUrl } from './utils/pg-bouncer.js';
 
 interface PgPoolEntry {
   pool: InstanceType<typeof Pool>;
@@ -96,8 +91,7 @@ class PoolManager {
   }
 
   async evictOldestIdleClient(): Promise<void> {
-    const entries = Array.from(this.pools.entries())
-      .sort((a, b) => a[1].lastAccessedAt - b[1].lastAccessedAt);
+    const entries = Array.from(this.pools.entries()).sort((a, b) => a[1].lastAccessedAt - b[1].lastAccessedAt);
 
     for (const [tenantId, entry] of entries) {
       if (entry.pool.idleCount === entry.pool.totalCount) {

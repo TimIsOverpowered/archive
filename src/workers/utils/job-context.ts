@@ -1,5 +1,5 @@
 import { getTenantConfig } from '../../config/loader.js';
-import { ensureClient } from '../../db/client.js';
+import { ensureClient } from '../../db/streamer-client.js';
 import type { TenantConfig } from '../../config/types.js';
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../../db/streamer-types.js';

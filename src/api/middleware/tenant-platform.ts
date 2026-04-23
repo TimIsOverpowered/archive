@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { getTenantConfig } from '../../config/loader.js';
-import { ensureClient } from '../../db/client.js';
+import { ensureClient } from '../../db/streamer-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import type { TenantContext } from '../../types/context.js';
 import { type Platform } from '../../types/platforms.js';

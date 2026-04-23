@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
-import { isConnectionError, resetClientManager, createPoolManager } from '../../src/db/client.js';
+import { isConnectionError, resetClientManager, createPoolManager } from '../../src/db/streamer-client.js';
 import { resetEnvConfig } from '../../src/config/env.js';
 import type { Pool } from 'pg';
 import { TenantConfig } from '../../src/config/types.js';
@@ -116,7 +116,7 @@ describe('withDbRetry integration', () => {
 
     resetEnvConfig();
 
-    const { withDbRetry } = await import('../../src/db/client.js');
+    const { withDbRetry } = await import('../../src/db/streamer-client.js');
 
     const result = await withDbRetry('tenant-integration-1', config, async (db) => {
       return { success: true, dbReceived: db !== null };
@@ -143,7 +143,7 @@ describe('withDbRetry integration', () => {
 
     resetEnvConfig();
 
-    const { withDbRetry } = await import('../../src/db/client.js');
+    const { withDbRetry } = await import('../../src/db/streamer-client.js');
 
     await withDbRetry('tenant-integration-2', config, async (db) => {
       receivedDb = db;
@@ -170,7 +170,7 @@ describe('withDbRetry integration', () => {
 
     resetEnvConfig();
 
-    const { withDbRetry } = await import('../../src/db/client.js');
+    const { withDbRetry } = await import('../../src/db/streamer-client.js');
 
     const result = await withDbRetry('tenant-integration-3', config, async () => expectedData);
 
@@ -193,7 +193,7 @@ describe('withDbRetry integration', () => {
 
     resetEnvConfig();
 
-    const { withDbRetry } = await import('../../src/db/client.js');
+    const { withDbRetry } = await import('../../src/db/streamer-client.js');
 
     let errorThrown: Error | null = null;
     try {

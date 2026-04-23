@@ -11,12 +11,17 @@ import { registerWorkers } from './worker-definitions.js';
 import { waitForWorkersReady, workerRegistry } from './create-worker.js';
 import { loadWorkersConfig } from '../config/env.js';
 import { VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY, SHUTDOWN_TIMEOUT_MS } from '../constants.js';
-import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/client.js';
+import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/streamer-client.js';
 import { registerPlatformStrategies } from '../services/platforms/index.js';
 import { closeMetaClient } from '../db/meta-client.js';
 
 process.on('unhandledRejection', (reason) => {
   getLogger().error({ error: extractErrorDetails(reason) }, 'Unhandled promise rejection');
+});
+
+process.on('uncaughtException', (err) => {
+  getLogger().fatal({ error: extractErrorDetails(err) }, 'Uncaught exception');
+  process.exit(1);
 });
 
 async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkersConfig>) {

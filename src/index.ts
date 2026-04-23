@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { loadApiConfig } from './config/env.js';
 import { buildServer } from './api/server.js';
-import { closeAllClients, startClientCleanup, stopClientCleanup } from './db/client.js';
+import { closeAllClients, startClientCleanup, stopClientCleanup } from './db/streamer-client.js';
 import { getLogger, setLoggerConfig } from './utils/logger.js';
 import { closeRedisClient } from './api/plugins/redis.plugin.js';
 import { extractErrorDetails } from './utils/error.js';
@@ -9,9 +9,15 @@ import { startCloudflareIpRangesCron } from './cron/cloudflare-ip-ranges.js';
 import { getCachedRangeInfo, getCloudflareIpRanges } from './utils/cloudflare-ip-validator.js';
 import { registerPlatformStrategies } from './services/platforms/index.js';
 import { closeMetaClient } from './db/meta-client.js';
+import { SHUTDOWN_TIMEOUT_MS } from './constants.js';
 
 process.on('unhandledRejection', (reason) => {
   getLogger().error({ error: extractErrorDetails(reason) }, 'Unhandled promise rejection');
+});
+
+process.on('uncaughtException', (err) => {
+  getLogger().fatal({ error: extractErrorDetails(err) }, 'Uncaught exception');
+  process.exit(1);
 });
 
 const config = loadApiConfig();
@@ -65,9 +71,9 @@ async function shutdown(signal: string) {
   getLogger().info({ signal }, 'Received shutdown signal');
 
   const shutdownTimeout = setTimeout(() => {
-    getLogger().error('Forced shutdown after 5 second timeout');
+    getLogger().error('Forced shutdown after timeout');
     process.exit(1);
-  }, 5000);
+  }, SHUTDOWN_TIMEOUT_MS);
 
   if (!server) {
     clearTimeout(shutdownTimeout);

@@ -4,7 +4,7 @@ import { BACKUP_GQL_TWITCH_CLIENT_ID } from '../../constants.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { TenantContext } from '../../types/context.js';
-import { withDbRetry } from '../../db/client.js';
+import { withDbRetry } from '../../db/streamer-client.js';
 import { LRUCache } from 'lru-cache';
 import { ChapterCreateSchema } from '../../config/schemas.js';
 import { publishVodUpdate } from '../cache-invalidator.js';

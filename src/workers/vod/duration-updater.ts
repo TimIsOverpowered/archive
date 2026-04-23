@@ -1,4 +1,4 @@
-import { withDbRetry } from '../../db/client.js';
+import { withDbRetry } from '../../db/streamer-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';

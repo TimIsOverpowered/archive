@@ -22,7 +22,6 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
   }
 
   const liveQueue = getLiveDownloadQueue();
-  const activeLiveJobs = await liveQueue.getActive();
 
   for (const platform of PLATFORM_VALUES) {
     const platformConfig = getPlatformConfig(config, platform);
@@ -33,7 +32,9 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
     const activeLiveVod = await findActiveLiveVod(db, platform);
 
     if (activeLiveVod) {
-      const hasActiveJob = activeLiveJobs.some((j) => j.opts.jobId === `${LIVE_JOB_ID_PREFIX}${activeLiveVod.vod_id}`);
+      const jobId = `${LIVE_JOB_ID_PREFIX}${activeLiveVod.vod_id}`;
+      const job = await liveQueue.getJob(jobId);
+      const hasActiveJob = job !== undefined && (await job.isActive());
       if (hasActiveJob) {
         log.debug({ platform, vodId: activeLiveVod.vod_id }, '[Monitor] Skipping - live worker active');
         continue;

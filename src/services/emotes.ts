@@ -2,7 +2,7 @@ import { getLogger } from '../utils/logger.js';
 import type { DBClient } from '../db/streamer-types';
 import { Platform, PLATFORMS } from '../types/platforms.js';
 import { TenantContext } from '../types/context.js';
-import { withDbRetry } from '../db/client.js';
+import { withDbRetry } from '../db/streamer-client.js';
 import { safeRequest } from '../utils/http-client.js';
 import { RedisService } from '../utils/redis-service.js';
 import { compressChatData, decompressChatData } from '../utils/compression.js';

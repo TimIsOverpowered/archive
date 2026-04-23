@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { RateLimiterRedis, RateLimiterMemory } from 'rate-limiter-flexible';
+import { RateLimiterRedis, RateLimiterMemory, RateLimiterRes } from 'rate-limiter-flexible';
 import { validateCloudflareRequest } from '../../utils/cloudflare-ip-validator.js';
 import { getClientIp } from './ip.js';
 
@@ -38,13 +38,8 @@ export default function createRateLimitMiddleware(options: RateLimitOptions) {
       reply.header('X-RateLimit-Limit', activeLimiter.points);
       reply.header('X-RateLimit-Remaining', String(consumeResult.remainingPoints));
     } catch (rateLimitError) {
-      if (
-        typeof rateLimitError === 'object' &&
-        rateLimitError !== null &&
-        'msBeforeNext' in rateLimitError &&
-        typeof (rateLimitError as { msBeforeNext: unknown }).msBeforeNext === 'number'
-      ) {
-        const retryAfter = Math.ceil((rateLimitError as { msBeforeNext: number }).msBeforeNext / 1000);
+      if (rateLimitError instanceof RateLimiterRes) {
+        const retryAfter = Math.ceil(rateLimitError.msBeforeNext / 1000);
 
         return reply.status(429).send({
           statusCode: 429,
