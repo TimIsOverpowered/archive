@@ -13,7 +13,7 @@ import { PLATFORMS, isTwitchPlatform, type Platform } from '../types/platforms.j
 import { flushChatBatch } from './chat/chat-batch-processor.js';
 import { createChatWorkerAlerts } from './utils/alert-factories.js';
 import type { Kysely } from 'kysely';
-import type { StreamerDB } from '../db/streamer-types';
+import type { StreamerDB } from '../db/streamer-types.js';
 
 interface ChatProcessorState {
   tenantId: string;

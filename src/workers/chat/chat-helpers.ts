@@ -1,6 +1,6 @@
 import type { TwitchChatEdge, TwitchChatMessageNode, TwitchCommentsConnection } from '../../services/twitch/index.js';
 import type { Kysely } from 'kysely';
-import type { StreamerDB } from '../../db/streamer-types';
+import type { StreamerDB } from '../../db/streamer-types.js';
 
 /**
  * Removes __typename fields from GraphQL response objects recursively.

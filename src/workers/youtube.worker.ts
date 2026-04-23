@@ -17,7 +17,7 @@ import { resetFailures } from '../utils/discord-alerts.js';
 import { UPLOAD_TYPES } from '../types/platforms.js';
 import { TenantConfig } from '../config/types.js';
 import type { Kysely } from 'kysely';
-import type { StreamerDB } from '../db/streamer-types';
+import type { StreamerDB } from '../db/streamer-types.js';
 import { publishVodUpdate } from '../services/cache-invalidator.js';
 import type { VodRecord } from '../types/db.js';
 

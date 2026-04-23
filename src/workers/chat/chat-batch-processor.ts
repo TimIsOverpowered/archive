@@ -1,5 +1,5 @@
 import type { Kysely } from 'kysely';
-import type { StreamerDB, InsertableChatMessages } from '../../db/streamer-types';
+import type { StreamerDB, InsertableChatMessages } from '../../db/streamer-types.js';
 import type { ChatMessageCreateInput } from './chat-types.js';
 import type { AppLogger } from '../../utils/logger.js';
 import { retryWithBackoff } from '../../utils/retry.js';

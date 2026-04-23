@@ -37,7 +37,7 @@ export default tseslint.config(
       'no-unused-expressions': 'off',
       'import-x/no-duplicates': 'error',
       'no-empty-function': 'off',
-      'import-x/extensions': ['error', 'ignorePackages', { ts: 'never', js: 'always' }],
+      'import-x/extensions': ['error', 'ignorePackages', { ts: 'always', js: 'always', checkTypeImports: true }],
     },
   },
   prettier

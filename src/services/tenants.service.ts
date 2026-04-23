@@ -6,7 +6,7 @@ import { PLATFORMS } from '../types/platforms.js';
 import { PERCENTAGE_PRECISION_MULTIPLIER, PERCENTAGE_PRECISION_DIVISOR } from '../constants.js';
 import type { TenantConfig } from '../config/types.js';
 import type { Kysely } from 'kysely';
-import type { StreamerDB } from '../db/streamer-types';
+import type { StreamerDB } from '../db/streamer-types.js';
 
 /** Return the list of enabled platform names for a tenant config. */
 export function getEnabledPlatforms(config: Pick<TenantConfig, 'twitch' | 'kick'>): string[] {
