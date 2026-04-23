@@ -10,7 +10,9 @@ export const CacheKeys = {
     `vod:platform:{${tenantId}}:${platform}:${platformVodId}`,
   vodQuery: (tenantId: string, query: Record<string, string | number | undefined>, page: number, limit: number) => {
     const sorted = Object.keys(query).sort() as (keyof typeof query)[];
-    const queryParts = sorted.filter((k) => query[k] !== undefined && query[k] !== null && query[k] !== '').map((k) => `${k}:${query[k]}`);
+    const queryParts = sorted
+      .filter((k) => query[k] !== undefined && query[k] !== null && query[k] !== '')
+      .map((k) => `${k}:${query[k]}`);
     return ['vods', `{${tenantId}}`, ...queryParts, String(page), String(limit)].join(':');
   },
 } as const;

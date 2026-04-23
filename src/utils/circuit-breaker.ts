@@ -7,10 +7,6 @@ export interface CircuitBreakerOptions {
   failureThreshold: number;
   /** Time in ms to wait before testing recovery (half-open) */
   recoveryTimeout: number;
-  /** Maximum number of circuits to track */
-  maxCacheSize?: number;
-  /** TTL for circuit state entries */
-  stateTtl?: number;
 }
 
 export interface CircuitBreakerState {
@@ -23,8 +19,6 @@ export interface CircuitBreakerState {
 const DEFAULT_OPTIONS: CircuitBreakerOptions = {
   failureThreshold: 5,
   recoveryTimeout: 30_000,
-  maxCacheSize: 5000,
-  stateTtl: 120_000,
 };
 
 const breakerCache = new LRUCache<string, CircuitBreakerState>({
