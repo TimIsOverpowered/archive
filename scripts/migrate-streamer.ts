@@ -670,10 +670,11 @@ const main = async () => {
           }
 
           if (vod.chapters && Array.isArray(vod.chapters) && vod.chapters.length > 0) {
-            for (const chapter of vod.chapters) {
+            for (let i = 0; i < vod.chapters.length; i++) {
+              const chapter = vod.chapters[i];
               const start = Math.round(Number(chapter.start) || 0);
               let end = chapter.end ? Math.round(Number(chapter.end)) : null;
-              if (!end && vod.chapters.length === 1) {
+              if (!end && i === vod.chapters.length - 1) {
                 end = duration;
               }
 
