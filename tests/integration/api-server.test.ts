@@ -16,7 +16,7 @@ describe('Integration: API Server', () => {
     });
 
     server.setNotFoundHandler((_request, reply) => {
-      return reply.status(404).send({ error: { message: 'Route not found', statusCode: 404 } });
+      return reply.status(404).send({ statusCode: 404, message: 'Route not found', code: 'NOT_FOUND' });
     });
 
     await server.ready();
@@ -36,13 +36,13 @@ describe('Integration: API Server', () => {
     const res = await server.inject({ method: 'GET', url: '/nonexistent' });
     assert.strictEqual(res.statusCode, 404);
     const body = JSON.parse(res.body);
-    assert.strictEqual(body.error.message, 'Route not found');
+    assert.strictEqual(body.message, 'Route not found');
   });
 
   it('should handle errors via error handler', async () => {
     const res = await server.inject({ method: 'GET', url: '/test/error' });
     assert.strictEqual(res.statusCode, 500);
     const body = JSON.parse(res.body);
-    assert.strictEqual(body.error.message, 'Internal server error');
+    assert.strictEqual(body.message, 'Internal server error');
   });
 });

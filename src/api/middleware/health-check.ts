@@ -22,11 +22,9 @@ export default async function healthCheckMiddleware(request: FastifyRequest, rep
 
   if (!token || !expectedToken || !timingSafeEqual(token, expectedToken)) {
     return reply.status(401).send({
-      error: {
-        message: 'Invalid health check token',
-        code: 'UNAUTHORIZED',
-        statusCode: 401,
-      },
+      statusCode: 401,
+      message: 'Invalid health check token',
+      code: 'UNAUTHORIZED',
     });
   }
 }

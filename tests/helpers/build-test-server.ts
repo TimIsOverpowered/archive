@@ -26,10 +26,9 @@ export async function buildTestServer(_options: TestServerOptions = {}): Promise
   server.setErrorHandler((error, _request, reply) => {
     const statusCode = error.statusCode ?? 500;
     return reply.status(statusCode).send({
-      error: {
-        message: 'Internal server error',
-        statusCode,
-      },
+      statusCode,
+      message: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR',
     });
   });
 

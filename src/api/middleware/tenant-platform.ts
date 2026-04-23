@@ -35,11 +35,9 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
 
   if (!tenantId) {
     return reply.status(404).send({
-      error: {
-        message: 'Tenant ID not provided',
-        code: 'NOT_FOUND',
-        statusCode: 404,
-      },
+      statusCode: 404,
+      message: 'Tenant ID not provided',
+      code: 'NOT_FOUND',
     });
   }
 
@@ -47,11 +45,9 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
 
   if (!config) {
     return reply.status(404).send({
-      error: {
-        message: 'Tenant not found',
-        code: 'NOT_FOUND',
-        statusCode: 404,
-      },
+      statusCode: 404,
+      message: 'Tenant not found',
+      code: 'NOT_FOUND',
     });
   }
 
@@ -64,11 +60,9 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
       'Failed to initialize database client during request'
     );
     return reply.status(503).send({
-      error: {
-        message: 'Database not available',
-        code: 'SERVICE_UNAVAILABLE',
-        statusCode: 503,
-      },
+      statusCode: 503,
+      message: 'Database not available',
+      code: 'SERVICE_UNAVAILABLE',
     });
   }
 
@@ -89,11 +83,9 @@ export async function platformValidationMiddleware(request: FastifyRequest, repl
 
   if (!requestPlatform) {
     return reply.status(400).send({
-      error: {
-        message: 'Platform is required',
-        code: 'BAD_REQUEST',
-        statusCode: 400,
-      },
+      statusCode: 400,
+      message: 'Platform is required',
+      code: 'BAD_REQUEST',
     });
   }
 
@@ -101,17 +93,17 @@ export async function platformValidationMiddleware(request: FastifyRequest, repl
 
   if (!config) {
     return reply.status(500).send({
-      error: {
-        message: 'Tenant context not found',
-        code: 'INTERNAL_SERVER_ERROR',
-        statusCode: 500,
-      },
+      statusCode: 500,
+      message: 'Tenant context not found',
+      code: 'INTERNAL_SERVER_ERROR',
     });
   }
 
   if (!config[requestPlatform]?.enabled) {
     return reply.status(400).send({
-      error: { message: `${requestPlatform} is not enabled for this tenant`, code: 'BAD_REQUEST', statusCode: 400 },
+      statusCode: 400,
+      message: `${requestPlatform} is not enabled for this tenant`,
+      code: 'BAD_REQUEST',
     });
   }
 
