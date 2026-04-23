@@ -76,7 +76,6 @@ export interface ChaptersTable {
   game_id: string | null;
   name: string | null;
   image: string | null;
-  duration: string | null;
   start: number;
   end: number | null;
 }

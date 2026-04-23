@@ -401,7 +401,6 @@ const createNormalizedSchema = async (client: PoolClient) => {
       "game_id" TEXT,
       "name" TEXT,
       "image" TEXT,
-      "duration" TEXT,
       "start" INTEGER DEFAULT 0 NOT NULL,
       "end" INTEGER,
       CONSTRAINT "chapters_pkey" PRIMARY KEY ("id"),
@@ -685,20 +684,18 @@ const main = async () => {
               }
 
               await schemaClient.query(
-                `INSERT INTO "chapters" (vod_id, game_id, name, image, duration, start, "end")
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)
+                `INSERT INTO "chapters" (vod_id, game_id, name, image, start, "end")
+                 VALUES ($1, $2, $3, $4, $5, $6)
                  ON CONFLICT (vod_id, start) DO UPDATE
                  SET game_id = EXCLUDED.game_id,
                      name = EXCLUDED.name,
                      image = EXCLUDED.image,
-                     duration = EXCLUDED.duration,
                      "end" = EXCLUDED."end"`,
                 [
                   newId,
                   chapter.gameId || null,
                   chapter.name || null,
                   image,
-                  chapter.duration || null,
                   start,
                   end,
                 ]

@@ -66,7 +66,6 @@ CREATE TABLE "chapters" (
     "game_id" TEXT,
     "name" TEXT,
     "image" TEXT,
-    "duration" TEXT,
     "start" INTEGER NOT NULL DEFAULT 0,
     "end" INTEGER,
 

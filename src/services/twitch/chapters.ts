@@ -3,7 +3,6 @@ import { createTwitchGqlClient } from './client.js';
 import { BACKUP_GQL_TWITCH_CLIENT_ID } from '../../constants.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
-import { toHHMMSS } from '../../utils/formatting.js';
 import { TenantContext } from '../../types/context.js';
 import { withDbRetry } from '../../db/client.js';
 import { LRUCache } from 'lru-cache';
@@ -111,7 +110,6 @@ export async function saveVodChapters(
           vod_id: dbId,
           start: 0,
           end: finalDurationSeconds,
-          duration: '00:00:00',
           title: typeof game.displayName === 'string' ? game.displayName : null,
           game_id: gameId,
         });
@@ -125,7 +123,6 @@ export async function saveVodChapters(
               gameData && typeof gameData.box_art_url === 'string'
                 ? gameData.box_art_url.replace('{width}x{height}', '40x53')
                 : null,
-            duration: validatedChapter.duration,
             start: validatedChapter.start,
             end: validatedChapter.end,
           })
@@ -164,13 +161,11 @@ export async function saveVodChapters(
 
             const startSeconds = Math.floor(positionMs / 1000);
             const endSeconds = durationMs === 0 ? finalDurationSeconds - startSeconds : Math.floor(durationMs / 1000);
-            const durationFormatted = toHHMMSS(startSeconds);
 
             const validatedChapter = ChapterCreateSchema.parse({
               vod_id: dbId,
               start: startSeconds,
               end: endSeconds,
-              duration: durationFormatted,
               title: gameName,
               game_id: gameId,
             });
@@ -180,7 +175,6 @@ export async function saveVodChapters(
               game_id: validatedChapter.game_id,
               name: validatedChapter.title,
               image: gameImage,
-              duration: validatedChapter.duration,
               start: validatedChapter.start,
               end: validatedChapter.end,
             });
