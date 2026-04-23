@@ -1,4 +1,4 @@
-import { isCircuitOpen, recordFailure, recordSuccess, breakerCache  } from './circuit-breaker.js';
+import { isCircuitOpen, recordFailure, recordSuccess, breakerCache } from './circuit-breaker.js';
 
 const CACHE_STATE_KEY = '__cache_connection__';
 
@@ -21,4 +21,3 @@ export function clearAllConnectionFailures(): void {
     }
   }
 }
-

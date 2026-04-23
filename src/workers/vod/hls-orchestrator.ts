@@ -268,7 +268,15 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
   const strategy: DownloadStrategy =
     platform === PLATFORMS.KICK && cycleTLS ? { type: 'cycletls', session: cycleTLS } : { type: 'fetch' };
 
-  await downloadSegmentsParallel(segments, vodDir, baseURL, strategy, HLS_SEGMENT_CONCURRENCY, HLS_SEGMENT_RETRY_ATTEMPTS, log);
+  await downloadSegmentsParallel(
+    segments,
+    vodDir,
+    baseURL,
+    strategy,
+    HLS_SEGMENT_CONCURRENCY,
+    HLS_SEGMENT_RETRY_ATTEMPTS,
+    log
+  );
 }
 
 async function fetchPlaylist(ctx: LivePollingContext, retryCount: number) {

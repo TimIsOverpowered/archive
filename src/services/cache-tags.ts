@@ -70,7 +70,10 @@ export async function registerVodTags(
   } catch (error) {
     if (!isConnectionFailed(tenantId) && isConnectionError(error)) {
       markConnectionFailed(tenantId);
-      getLogger().warn({ tenantId, cacheKey, error: extractErrorDetails(error) }, 'Redis connection lost, tag registration suspended');
+      getLogger().warn(
+        { tenantId, cacheKey, error: extractErrorDetails(error) },
+        'Redis connection lost, tag registration suspended'
+      );
     }
   }
 }
@@ -106,7 +109,10 @@ export async function invalidateVodTags(tenantId: string, dbId: number): Promise
   } catch (error) {
     if (!isConnectionFailed(tenantId) && isConnectionError(error)) {
       markConnectionFailed(tenantId);
-      getLogger().warn({ tenantId, dbId, error: extractErrorDetails(error) }, 'Redis connection lost, tag invalidation suspended');
+      getLogger().warn(
+        { tenantId, dbId, error: extractErrorDetails(error) },
+        'Redis connection lost, tag invalidation suspended'
+      );
     }
   }
 }
