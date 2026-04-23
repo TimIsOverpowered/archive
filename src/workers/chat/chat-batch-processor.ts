@@ -59,12 +59,13 @@ export async function flushChatBatch(options: FlushBatchOptions): Promise<FlushB
 
   log.debug(
     {
+      component: 'chat-worker',
       vodId,
       batchNumber: newBatchCount,
       messagesInBatch: buffer.length,
       totalMessages: newTotalMessages,
     },
-    '[Chat] Batch flushed to database'
+    'Batch flushed to database'
   );
 
   onProgress?.(lastOffset, newBatchCount, buffer.length);

@@ -89,7 +89,6 @@ export async function withCache<T>(key: string, ttl: number, fetcher: () => Prom
 
   const promise = fetcher()
     .then(async (result) => {
-      inflightSimple.delete(key);
       try {
         await client.set(key, JSON.stringify(result), 'EX', ttl);
       } catch (err) {
@@ -98,10 +97,7 @@ export async function withCache<T>(key: string, ttl: number, fetcher: () => Prom
       }
       return result;
     })
-    .catch((err) => {
-      inflightSimple.delete(key);
-      throw err;
-    });
+    .finally(() => inflightSimple.delete(key));
 
   inflightSimple.set(key, promise as Promise<unknown>);
   return promise;

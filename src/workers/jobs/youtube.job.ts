@@ -28,6 +28,7 @@ export async function createVodUploadJob(
   }
 
   return {
+    kind: 'vod',
     tenantId,
     dbId,
     vodId,
@@ -99,6 +100,7 @@ export async function createGameUploadJob(
   const description = `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description}`;
 
   return {
+    kind: 'game',
     tenantId,
     dbId,
     vodId,

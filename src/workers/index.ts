@@ -27,7 +27,7 @@ process.on('uncaughtException', (err) => {
 async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkersConfig>) {
   if (!workerConfig.CLEAR_QUEUES_ON_STARTUP) return;
 
-  getLogger().warn('[Queues] CLEAR_QUEUES_ON_STARTUP=true — all queued jobs will be permanently deleted');
+  getLogger().warn({ component: 'queues' }, 'CLEAR_QUEUES_ON_STARTUP=true — all queued jobs will be permanently deleted');
 
   for (const name of Object.values(QUEUE_NAMES)) {
     const queue = getQueue(name);
@@ -38,7 +38,7 @@ async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkers
     getLogger().warn({ queue: name }, 'Queue obliterated and reset');
   }
 
-  getLogger().warn('[Queues] All queues cleared and reset');
+  getLogger().warn({ component: 'queues' }, 'All queues cleared and reset');
 }
 
 export async function bootstrap() {

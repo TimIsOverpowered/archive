@@ -14,7 +14,6 @@ import { processGameUpload } from './youtube/game-upload-processor.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import type { AppLogger } from '../utils/logger.js';
 import { resetFailures } from '../utils/discord-alerts.js';
-import { UPLOAD_TYPES } from '../types/platforms.js';
 import { TenantConfig } from '../config/types.js';
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../db/streamer-types.js';
@@ -51,7 +50,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
   }
 
   try {
-    if (type === UPLOAD_TYPES.VOD) {
+    if (job.data.kind === 'vod') {
       const vodResult = await processVodUploadJob(
         { ...job.data, filePath: actualFilePath } as YoutubeVodUploadJob & { filePath: string },
         config,
@@ -61,7 +60,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
       const duration = Date.now() - startTime;
       log.info(
         { vodId, jobId, duration, uploadedVideosCount: (vodResult as YoutubeUploadVodResult).videos?.length },
-        '[youtube-upload] Job completed successfully'
+        'Job completed successfully'
       );
       return vodResult;
     } else {
@@ -72,7 +71,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
         log
       );
       const duration = Date.now() - startTime;
-      log.info({ vodId, jobId, duration }, '[youtube-upload] Game upload completed successfully');
+      log.info({ component: 'youtube-upload', vodId, jobId, duration }, 'Game upload completed successfully');
       return result;
     }
   } catch (error) {
@@ -99,7 +98,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
     await publishVodUpdate(tenantId, dbId);
 
-    log.error({ vodId, jobId, duration, stateAtFailure, errorMsg }, '[youtube-upload] Job failed');
+    log.error({ component: 'youtube-upload', vodId, jobId, duration, stateAtFailure, errorMsg }, 'Job failed');
 
     throw error;
   }

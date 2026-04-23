@@ -49,7 +49,9 @@ export function getCircuitState(key: string, opts?: Partial<CircuitBreakerOption
   if (state.state === 'open' && state.lastFailureTime) {
     const elapsed = Date.now() - state.lastFailureTime;
     if (elapsed >= (opts?.recoveryTimeout ?? DEFAULT_OPTIONS.recoveryTimeout)) {
-      state.state = 'half-open';
+      const nextState: CircuitBreakerState = { ...state, state: 'half-open' };
+      breakerCache.set(key, nextState);
+      return 'half-open';
     }
   }
 
@@ -58,24 +60,31 @@ export function getCircuitState(key: string, opts?: Partial<CircuitBreakerOption
 
 export function recordSuccess(key: string, opts?: Partial<CircuitBreakerOptions>): void {
   const state = getOrCreateBreaker(key, opts);
-  state.failureCount = 0;
-  state.lastSuccessTime = Date.now();
-  state.state = 'closed';
+  const nextState: CircuitBreakerState = {
+    ...state,
+    failureCount: 0,
+    lastSuccessTime: Date.now(),
+    state: 'closed',
+  };
+  breakerCache.set(key, nextState);
 }
 
 export function recordFailure(key: string, opts?: Partial<CircuitBreakerOptions>): void {
   const state = getOrCreateBreaker(key, opts);
 
-  state.failureCount++;
-  state.lastFailureTime = Date.now();
-  if (state.failureCount >= (opts?.failureThreshold ?? DEFAULT_OPTIONS.failureThreshold)) {
-    state.state = 'open';
-  }
+  const newFailureCount = state.failureCount + 1;
+  const threshold = opts?.failureThreshold ?? DEFAULT_OPTIONS.failureThreshold;
+  const nextState: CircuitBreakerState = {
+    ...state,
+    failureCount: newFailureCount,
+    lastFailureTime: Date.now(),
+    state: newFailureCount >= threshold ? 'open' : state.state,
+  };
+  breakerCache.set(key, nextState);
 }
 
 export function isCircuitOpen(key: string, opts?: Partial<CircuitBreakerOptions>): boolean {
-  const state = getCircuitState(key, opts);
-  return state === 'open' || state === 'half-open';
+  return getCircuitState(key, opts) === 'open';
 }
 
 export function clearCircuit(key: string): void {

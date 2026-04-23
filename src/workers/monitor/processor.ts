@@ -12,12 +12,12 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
   const { tenantId } = job.data;
   const log = createAutoLogger(tenantId);
 
-  log.info({ jobId: job.id, tenantId }, '[Monitor] Starting poll cycle');
+  log.info({ component: 'monitor', jobId: job.id, tenantId }, 'Starting poll cycle');
 
   const { config, db } = await getJobContext(tenantId);
 
   if (!config?.settings.vodDownload) {
-    log.debug({ tenantId }, '[Monitor] VOD download disabled, skipping');
+    log.debug({ component: 'monitor', tenantId }, 'VOD download disabled, skipping');
     return { success: true };
   }
 
@@ -33,13 +33,13 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
 
     if (activeLiveVod) {
       const jobId = `${LIVE_JOB_ID_PREFIX}${activeLiveVod.vod_id}`;
-      const job = await liveQueue.getJob(jobId);
-      const hasActiveJob = job !== undefined && (await job.isActive());
+      const queuedJob = await liveQueue.getJob(jobId);
+      const hasActiveJob = queuedJob !== undefined && (await queuedJob.isActive());
       if (hasActiveJob) {
-        log.debug({ platform, vodId: activeLiveVod.vod_id }, '[Monitor] Skipping - live worker active');
+        log.debug({ component: 'monitor', platform, vodId: activeLiveVod.vod_id }, 'Skipping - live worker active');
         continue;
       }
-      log.debug({ platform, vodId: activeLiveVod.vod_id }, '[Monitor] No active job found, rechecking');
+      log.debug({ component: 'monitor', platform, vodId: activeLiveVod.vod_id }, 'No active job found, rechecking');
     }
 
     try {
@@ -49,7 +49,7 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
     }
   }
 
-  log.debug({ jobId: job.id, tenantId }, '[Monitor] Poll cycle completed');
+  log.debug({ component: 'monitor', jobId: job.id, tenantId }, 'Poll cycle completed');
   return { success: true };
 };
 

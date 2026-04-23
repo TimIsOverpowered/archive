@@ -135,7 +135,7 @@ export function createSession(): CycleTLSSession {
  */
 export async function closeCycleTLS(): Promise<void> {
   if (cycleTLSInstance?.exit) {
-    getLogger().debug('[CycleTLS] Force closing all sessions');
+    getLogger().debug({ component: 'cycletls' }, 'Force closing all sessions');
     await cycleTLSInstance.exit().catch(() => {});
     cycleTLSInstance = null;
   }

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-function envBool(defaultsTo: boolean) {
+function envBoolWithDefault(defaultsTo: boolean) {
   return z.preprocess(
     (val) => (defaultsTo ? String(val).toLowerCase() !== 'false' : String(val).toLowerCase() === 'true'),
     z.boolean()
@@ -21,11 +21,11 @@ export const BaseConfigSchema = z.object({
   DISCORD_ALERT_WEBHOOK_URL: z.string().url().optional(),
   REDIS_CHAT_COMPRESSION: z.enum(['brotli', 'gzip', 'none']).default('brotli'),
   REDIS_COMPRESSION_LEVEL: z.coerce.number().int().min(0).max(11).default(6),
-  DISABLE_REDIS_CACHE: envBool(false).default(false),
+  DISABLE_REDIS_CACHE: envBoolWithDefault(false).default(false),
   FLARESOLVERR_CONCURRENCY: z.coerce.number().int().positive().default(3),
   CONFIG_CACHE_TTL: z.coerce.number().int().positive().default(3600),
   PGBOUNCER_URL: z.string().min(1, 'PGBOUNCER_URL is required'),
-  DISCORD_ALERTS_ENABLED: envBool(true).default(true),
+  DISCORD_ALERTS_ENABLED: envBoolWithDefault(true).default(true),
   FLARESOLVERR_BASE_URL: z.string().url().default('http://localhost:8191'),
   FLARESOLVERR_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
   FLARESOLVERR_SESSION_TTL: z.coerce.number().int().positive().default(3600),
@@ -49,7 +49,7 @@ export const ApiConfigSchema = BaseConfigSchema.extend({
 
 // Workers-specific schema (extends base + workers-only fields)
 export const WorkersConfigSchema = BaseConfigSchema.extend({
-  CLEAR_QUEUES_ON_STARTUP: envBool(false).default(false),
+  CLEAR_QUEUES_ON_STARTUP: envBoolWithDefault(false).default(false),
   VOD_STANDARD_CONCURRENCY: z.coerce.number().int().positive().default(1),
   YOUTUBE_UPLOAD_CONCURRENCY: z.coerce.number().int().positive().default(1),
   CHAT_DOWNLOAD_CONCURRENCY: z.coerce.number().int().positive().default(1),

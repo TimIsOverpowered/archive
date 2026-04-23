@@ -128,7 +128,7 @@ export async function validateCloudflareRequest(request: {
   const isValid = isFromCloudflare(remoteAddress, ranges);
 
   if (!isValid) {
-    getLogger().warn({ ip: cfIp }, '[Cloudflare IP Validator] Request not from Cloudflare IP range');
+    getLogger().warn({ component: 'cloudflare-ip-validator', ip: cfIp }, 'Request not from Cloudflare IP range');
   }
 
   return isValid;

@@ -60,22 +60,18 @@ export function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
  * Call configService.reset() in tests between cases.
  */
 export class ConfigService {
-  private cache: LRUCache<string, TenantConfig> | null = null;
-  private ttl: number;
+  private cache: LRUCache<string, TenantConfig>;
 
   constructor(ttlSeconds: number = 3600) {
-    this.ttl = ttlSeconds * 1000;
+    this.cache = new LRUCache({
+      max: 500,
+      ttl: ttlSeconds * 1000,
+      allowStale: false,
+      updateAgeOnGet: true,
+    });
   }
 
   private getCache(): LRUCache<string, TenantConfig> {
-    if (!this.cache) {
-      this.cache = new LRUCache({
-        max: 500,
-        ttl: this.ttl,
-        allowStale: false,
-        updateAgeOnGet: true,
-      });
-    }
     return this.cache;
   }
 
@@ -108,8 +104,7 @@ export class ConfigService {
    * but primarily intended for test isolation.
    */
   reset(): void {
-    this.cache?.clear();
-    this.cache = null;
+    this.cache.clear();
   }
 
   /**

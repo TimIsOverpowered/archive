@@ -25,7 +25,7 @@ const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job
   } = job.data;
   const log = createAutoLogger(tenantId);
 
-  log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[Standard VOD Worker] Starting job');
+  log.info({ component: 'vod-worker', jobId: job.id, dbId, vodId, platform, tenantId }, 'Starting job');
   await job.updateProgress(0);
 
   const ctx = await getJobContext(tenantId);
@@ -73,7 +73,7 @@ const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job
     await job.updateProgress(100);
     await updateAlert(messageId, alerts.complete(vodId, platform, finalPath));
 
-    log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[Standard VOD Worker] Job completed successfully');
+    log.info({ component: 'vod-worker', jobId: job.id, dbId, vodId, platform, tenantId }, 'Job completed successfully');
     return { success: true, finalPath };
   } catch (error) {
     const errorMsg = handleWorkerError(error, log, { vodId, platform, jobId: job.id, dbId, tenantId });

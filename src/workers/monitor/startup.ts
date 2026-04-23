@@ -18,20 +18,20 @@ export async function registerMonitorRepeatJob(config: TenantConfig): Promise<vo
         deduplication: { id: jobId },
       }
     );
-    getLogger().info({ jobId, tenantId: config.id }, '[Monitor] Registered repeat job');
+    getLogger().info({ component: 'monitor', jobId, tenantId: config.id }, 'Registered repeat job');
   } catch (error) {
     const details = extractErrorDetails(error);
-    getLogger().error({ jobId, tenantId: config.id, ...details }, '[Monitor] Failed to register repeat job');
+    getLogger().error({ component: 'monitor', jobId, tenantId: config.id, ...details }, 'Failed to register repeat job');
   }
 }
 
 export async function registerAllMonitorRepeatJobs(): Promise<void> {
-  getLogger().info('[Monitor] Registering monitor repeat jobs for all tenants...');
+  getLogger().info({ component: 'monitor' }, 'Registering monitor repeat jobs for all tenants...');
 
   const configs = getTenantConfigsForMonitoring();
 
   if (configs.length === 0) {
-    getLogger().warn('[Monitor] No tenants with VOD download enabled found');
+    getLogger().warn({ component: 'monitor' }, 'No tenants with VOD download enabled found');
     return;
   }
 
@@ -47,10 +47,10 @@ export async function removeMonitorRepeatJob(tenantId: string): Promise<void> {
 
   try {
     await queue.removeRepeatableByKey(jobId);
-    getLogger().info({ tenantId }, '[Monitor] Removed repeat job');
+    getLogger().info({ component: 'monitor', tenantId }, 'Removed repeat job');
   } catch (error) {
     const details = extractErrorDetails(error);
-    getLogger().warn({ tenantId, ...details }, '[Monitor] Failed to remove repeat job (may not exist)');
+    getLogger().warn({ component: 'monitor', tenantId, ...details }, 'Failed to remove repeat job (may not exist)');
   }
 }
 
