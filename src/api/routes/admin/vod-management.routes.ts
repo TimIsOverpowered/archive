@@ -20,6 +20,10 @@ import { invalidateVodVolatileCache } from '../../../services/cache-tags.js';
 import type { StatsParams, CreateVodParams, DeleteVodParams, CreateVodBody, DeleteVodBody } from './types.js';
 import type { InsertableVods, SelectableVods } from '../../../db/streamer-types.js';
 
+/**
+ * Register VOD management routes: stats, create VOD, delete VOD.
+ * Requires admin API key authentication, tenant middleware, and rate limiting.
+ */
 export default async function vodManagementRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const adminRateLimiter = RedisService.getLimiter('rate:admin');
   if (!adminRateLimiter) {

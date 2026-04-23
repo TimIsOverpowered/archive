@@ -11,10 +11,15 @@ const LogsQuerySchema = z.object({
   cursor: z.string().optional(),
 });
 
+/** Options for registering the logs routes plugin. */
 interface LogsRoutesOptions {
   prefix: string;
 }
 
+/**
+ * Register chat logs routes: fetch comments for a VOD with offset or cursor pagination.
+ * Requires tenant middleware and rate limiting.
+ */
 export default async function logsRoutes(fastify: FastifyInstance, _options: LogsRoutesOptions) {
   const chatRateLimiter = RedisService.getLimiter('rate:chat');
   if (!chatRateLimiter) {

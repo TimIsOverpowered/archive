@@ -10,10 +10,14 @@ import { INT32_MAX } from '../../constants.js';
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../../db/streamer-types';
 
+/** Options for registering the VODs routes plugin. */
 interface VodRoutesOptions {
   prefix: string;
 }
 
+/**
+ * Validate and fetch a VOD by numeric ID, throwing 404 on invalid/missing.
+ */
 async function fetchVodByIdSafe(vodId: string, db: Kysely<StreamerDB>, tenantId: string) {
   const vodIdNum = Number(vodId);
   if (isNaN(vodIdNum) || vodIdNum < 0 || vodIdNum > INT32_MAX) {
@@ -24,6 +28,10 @@ async function fetchVodByIdSafe(vodId: string, db: Kysely<StreamerDB>, tenantId:
   return vod;
 }
 
+/**
+ * Register VODs routes: list VODs, get by ID, get by platform ID, get emotes.
+ * All routes require tenant middleware and rate limiting.
+ */
 export default async function vodsRoutes(fastify: FastifyInstance, _options: VodRoutesOptions) {
   const publicRateLimiter = RedisService.getLimiter('rate:vods');
   if (!publicRateLimiter) {

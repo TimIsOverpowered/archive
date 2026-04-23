@@ -4,6 +4,10 @@ import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import { RedisService } from '../../../utils/redis-service.js';
 
+/**
+ * Register global admin routes: list all tenants.
+ * Requires admin API key authentication and rate limiting.
+ */
 export default async function globalAdminRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const adminRateLimiter = RedisService.getLimiter('rate:admin');
   if (!adminRateLimiter) {

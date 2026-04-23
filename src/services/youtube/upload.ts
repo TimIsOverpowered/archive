@@ -6,6 +6,7 @@ import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { ProgressStream } from '../../utils/progress-stream.js';
 import { YOUTUBE_CATEGORY_ID } from '../../constants.js';
 
+/** Progress callback data for YouTube video upload events. */
 export interface UploadProgressCallbackData {
   milestone: 'starting' | 'uploading' | 'processing_metadata' | 'success' | 'error';
   videoId?: string;
@@ -20,8 +21,13 @@ export interface UploadProgressCallbackData {
   privacyStatus?: string;
 }
 
+/** Callback type for receiving YouTube upload progress updates. */
 export type YoutubeUploadProgress = (data: UploadProgressCallbackData) => void | Promise<void>;
 
+/**
+ * Upload a video file to YouTube with progress callbacks.
+ * Returns the video ID and thumbnail URL on success.
+ */
 export async function uploadVideo(
   tenantId: string,
   displayName: string,

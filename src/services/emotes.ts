@@ -12,12 +12,14 @@ import { invalidateEmoteCache } from './vod-cache.js';
 import { publishVodUpdate } from './cache-invalidator.js';
 import { CacheKeys } from '../utils/cache-keys.js';
 
+/** Single emote from a third-party provider (FFZ, BTTV, 7TV). */
 export interface EmoteData {
   id: string;
   code: string;
   flags?: number;
 }
 
+/** Emotes aggregated for a VOD from all third-party providers. */
 export interface VodEmotes {
   vodId: number;
   ffz_emotes: EmoteData[];
@@ -59,6 +61,10 @@ interface SevenTVResponse {
   }>;
 }
 
+/**
+ * Fetch emote metadata from FFZ, BTTV, and 7TV APIs, then upsert to the database.
+ * Supports Twitch and Kick platforms. Publishes cache invalidation on success.
+ */
 export async function fetchAndSaveEmotes(
   ctx: TenantContext,
   vodId: number,
@@ -161,6 +167,10 @@ export async function fetchAndSaveEmotes(
   }
 }
 
+/**
+ * Retrieve emotes for a VOD from Redis cache or database.
+ * Compresses and caches results in Redis on cache miss.
+ */
 export async function getEmotesByVodId(db: DBClient, tenantId: string, vodId: number): Promise<VodEmotes | null> {
   const cacheKey = CacheKeys.emotes(tenantId, vodId);
 

@@ -4,6 +4,7 @@ import { RateLimiterRedis, RateLimiterMemory } from 'rate-limiter-flexible';
 import { RedisService } from '../../utils/redis-service.js';
 import { getLogger } from '../../utils/logger.js';
 
+/** Admin identity attached to the request after successful API key authentication. */
 export interface AdminContext {
   adminId: number;
   username: string;
@@ -31,6 +32,11 @@ const getAdminAuthLimiter = (): RateLimiterRedis | RateLimiterMemory => {
   return _adminAuthLimiter;
 };
 
+/**
+ * Admin API key authentication middleware.
+ * Accepts `Authorization: Bearer archive_...` or `X-API-Key: archive_...` headers.
+ * Enforces per-IP auth rate limit (20 attempts/sec) and attaches admin identity to request.
+ */
 export default async function adminApiKeyMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const authHeader = request.headers.authorization;
   const apiKeyHeader = request.headers['x-api-key'];

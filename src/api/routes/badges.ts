@@ -7,10 +7,15 @@ import { notFound } from '../../utils/http-error.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getChannelBadges, getGlobalBadges } from '../../services/twitch/index.js';
 
+/** Options for registering the badges routes plugin. */
 interface BadgesRoutesOptions {
   prefix: string;
 }
 
+/**
+ * Register badges routes: fetch Twitch channel + global badges with Redis caching.
+ * Requires rate limiting.
+ */
 export default async function badgesRoutes(fastify: FastifyInstance, _options: BadgesRoutesOptions) {
   const badgesRateLimiter = RedisService.getLimiter('rate:vods');
   if (!badgesRateLimiter) {

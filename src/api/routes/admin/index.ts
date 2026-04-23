@@ -6,10 +6,14 @@ import metadataFetchingRoutes from './metadata.routes';
 import liveCallbackRoutes from './live-callback.routes';
 import vodManagementRoutes from './vod-management.routes';
 
+/** Options for registering the admin routes plugin. */
 interface AdminRoutesOptions {
   prefix: string;
 }
 
+/**
+ * Register all admin sub-routes: download jobs, YouTube uploads, DMCA, metadata, live callbacks, VOD management.
+ */
 export default async function adminRoutes(fastify: FastifyInstance, _options: AdminRoutesOptions) {
   await fastify.register(downloadJobsRoutes);
 

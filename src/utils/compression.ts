@@ -7,6 +7,10 @@ const brotliDecompress = promisify(zlib.brotliDecompress);
 const gzipCompress = promisify(zlib.gzip);
 const gzipDecompress = promisify(zlib.gunzip);
 
+/**
+ * Compress data using Brotli, Gzip, or no compression (based on config).
+ * Serializes to JSON before compression.
+ */
 export async function compressChatData(data: unknown): Promise<Buffer> {
   const algo = getRedisChatCompression();
   const lvl = getRedisCompressionLevel();
@@ -29,6 +33,10 @@ export async function compressChatData(data: unknown): Promise<Buffer> {
   return buffer;
 }
 
+/**
+ * Decompress data using the configured algorithm (Brotli, Gzip, or none).
+ * Parses JSON after decompression.
+ */
 export async function decompressChatData(compressed: Buffer): Promise<unknown> {
   const algo = getRedisChatCompression();
 

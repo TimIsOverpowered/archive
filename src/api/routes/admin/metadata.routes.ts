@@ -16,19 +16,26 @@ import { fetchAndSaveEmotes } from '../../../services/emotes.js';
 import { triggerChatDownload } from '../../../workers/jobs/chat.job';
 import { getPlatformConfig } from '../../../config/types.js';
 
+/** Route params shared by metadata endpoints. */
 type RouteParams = { tenantId: string };
 
+/** Body for fetching and saving game chapters from Twitch API. */
 interface ChaptersBody {
   vodId: string;
   platform: Platform;
 }
 
+/** Body for fetching and saving emote/chat metadata for a VOD. */
 interface SaveBody {
   vodId: string;
   platform: Platform;
   forceRerun?: boolean;
 }
 
+/**
+ * Register metadata fetching routes: chapters, emotes, chat.
+ * Requires admin API key authentication, tenant middleware, and rate limiting.
+ */
 export default async function metadataFetchingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const adminRateLimiter = RedisService.getLimiter('rate:admin');
   if (!adminRateLimiter) {

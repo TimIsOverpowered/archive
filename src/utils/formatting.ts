@@ -1,5 +1,6 @@
 import dayjs from './dayjs.js';
 
+/** Parse seconds into hours, minutes, seconds components using dayjs. */
 export function parseDuration(seconds: number): { hrs: number; mins: number; secs: number } {
   const dur = dayjs.duration(seconds, 'seconds');
   return {
@@ -9,10 +10,12 @@ export function parseDuration(seconds: number): { hrs: number; mins: number; sec
   };
 }
 
+/** Format seconds as HH:mm:ss string. */
 export function toHHMMSS(seconds: number): string {
   return dayjs.duration(seconds, 'seconds').format('HH:mm:ss');
 }
 
+/** Parse Twitch duration string (e.g. "1h23m45s") into total seconds. */
 export function parseTwitchDuration(durationStr: string): number {
   const str = String(durationStr);
   const hoursMatch = str.match(/(\d+)h/);
@@ -30,10 +33,12 @@ export function parseTwitchDuration(durationStr: string): number {
   return hours * 3600 + minutes * 60 + Math.floor(seconds);
 }
 
+/** Humanize a duration string (e.g. "5 minutes", "2 hours") using dayjs. */
 export function humanizeDuration(seconds: number): string {
   return dayjs.duration(seconds, 'seconds').humanize(true);
 }
 
+/** Extract the database name from a PostgreSQL connection string. */
 export function extractDatabaseName(connectionString: string): string {
   try {
     const parsed = new URL(connectionString);

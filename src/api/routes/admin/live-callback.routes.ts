@@ -19,6 +19,7 @@ import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job';
 import { VodUpdateSchema } from '../../../config/schemas.js';
 import { publishVodDurationUpdate } from '../../../services/cache-invalidator.js';
 
+/** Body of the live callback from external recorder. */
 interface LiveCallbackBody {
   streamId: string;
   path: string;
@@ -26,8 +27,10 @@ interface LiveCallbackBody {
   platform: Platform;
 }
 
+/** Route params for the live callback endpoint. */
 type LiveCallbackParams = { tenantId: string };
 
+/** Response payload for the live callback endpoint. */
 interface LiveCallbackResponseData {
   message: string;
   vodId: number;
@@ -36,6 +39,10 @@ interface LiveCallbackResponseData {
   path: string;
 }
 
+/**
+ * Register live callback routes: handle recording completion webhook from twitch-recorder-go.
+ * Validates recording file, updates duration, queues YouTube upload.
+ */
 export default async function liveCallbackRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const adminRateLimiter = RedisService.getLimiter('rate:admin');
   if (!adminRateLimiter) {

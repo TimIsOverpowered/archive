@@ -46,4 +46,5 @@ export default function createTenantLoggerMiddleware() {
 }
 
 // Export exit helper for cleanup if needed (Fastify handles this via request lifecycle)
+/** Resolve the display name for a tenant ID from the loaded configuration. */
 export { getTenantDisplayName, exitTenantContext };

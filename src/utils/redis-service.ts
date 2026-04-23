@@ -5,6 +5,7 @@ import { extractErrorDetails } from './error.js';
 import { getBaseConfig } from '../config/env.js';
 import { clearAllConnectionFailures } from './cache-state.js';
 
+/** Configuration for a rate limiter instance. */
 export interface RateLimiterConfig {
   keyPrefix: string;
   points: number;
@@ -12,6 +13,7 @@ export interface RateLimiterConfig {
   blockDuration?: number | undefined;
 }
 
+/** Options for initializing the Redis service singleton. */
 export interface RedisServiceOptions {
   url: string;
   rateLimiters?: RateLimiterConfig[];
@@ -23,6 +25,10 @@ interface RateLimiterInstance {
   isFallback: boolean;
 }
 
+/**
+ * Singleton managing Redis connection and rate limiter instances.
+ * Supports in-memory fallback when Redis is unavailable in non-production.
+ */
 export class RedisService {
   private static _instance: RedisService | null = null;
 

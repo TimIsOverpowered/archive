@@ -1,7 +1,12 @@
+/** Pause execution for the specified milliseconds. */
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Calculate a retry delay with linear backoff and optional jitter.
+ * Used for token refresh retries.
+ */
 export function getRetryDelay(
   retryCount: number,
   baseDelayMs: number = 60000,

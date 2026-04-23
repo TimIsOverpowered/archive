@@ -33,6 +33,7 @@ function buildQueryCacheKey(tenantId: string, query: VodQuery, page: number, lim
   return CacheKeys.vodQuery(tenantId, query as Record<string, string | number | undefined>, page, limit);
 }
 
+/** Shape of a VOD record with all its relations (uploads, chapters, games). */
 export interface VodResponse {
   id: number;
   vod_id: string;
@@ -106,6 +107,7 @@ function selectVodRelations(eb: ExpressionBuilder<StreamerDB, 'vods'>) {
   ] as const;
 }
 
+/** Zod schema for validating VOD list query parameters. */
 export const VodQuerySchema = z.object({
   platform: z.enum(PLATFORM_VALUES as [string, ...string[]]).optional(),
   from: z.string().datetime().optional(),
@@ -118,10 +120,15 @@ export const VodQuerySchema = z.object({
   order: z.enum(['asc', 'desc']).default('desc'),
 });
 
+/** Inferred type from VodQuerySchema — query parameters for listing VODs. */
 export type VodQuery = z.infer<typeof VodQuerySchema>;
 
 type VodsOrderByCol = 'created_at' | 'duration';
 
+/**
+ * Build Kysely where clause and order-by config from a VodQuery.
+ * Handles platform, date range, YouTube upload filter, and game name search.
+ */
 export function buildVodQuery(query: VodQuery): {
   where: (eb: ExpressionBuilder<StreamerDB, 'vods'>) => Expression<SqlBool>;
   orderBy: { col: VodsOrderByCol; dir: 'asc' | 'desc' };
@@ -161,6 +168,10 @@ export function buildVodQuery(query: VodQuery): {
   return { where, orderBy };
 }
 
+/**
+ * List VODs for a tenant with filtering, pagination, and Redis caching.
+ * Applies volatile cache data (duration, is_live) on top of cached static data.
+ */
 export async function getVods(
   db: Kysely<StreamerDB>,
   tenantId: string,
@@ -227,6 +238,10 @@ export async function getVods(
   });
 }
 
+/**
+ * Fetch a single VOD by its numeric DB ID with stale-while-revalidate caching.
+ * Merges volatile data (duration, is_live) from Redis on top of cached static data.
+ */
 export async function getVodById(db: DBClient, tenantId: string, vodId: number): Promise<VodResponse | null> {
   const cacheKey = CacheKeys.vodStatic(tenantId, vodId);
 
@@ -259,6 +274,10 @@ export async function getVodById(db: DBClient, tenantId: string, vodId: number):
   return staticData;
 }
 
+/**
+ * Fetch a single VOD by platform-specific ID with stale-while-revalidate caching.
+ * Merges volatile data (duration, is_live) from Redis on top of cached static data.
+ */
 export async function getVodByPlatformId(
   db: Kysely<StreamerDB>,
   tenantId: string,

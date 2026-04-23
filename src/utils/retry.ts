@@ -1,3 +1,4 @@
+/** Configuration for exponential backoff retry logic. */
 export interface RetryOptions {
   attempts: number;
   baseDelayMs: number;
@@ -6,6 +7,10 @@ export interface RetryOptions {
   shouldRetry?: (error: unknown, attempt: number) => boolean;
 }
 
+/**
+ * Execute an async function with exponential backoff retry.
+ * Stops early if shouldRetry returns false for the current error.
+ */
 export async function retryWithBackoff<T>(fn: () => Promise<T>, options: RetryOptions): Promise<T> {
   const { attempts, baseDelayMs, maxDelayMs = 30_000, jitter = true, shouldRetry } = options;
   let lastError: unknown;

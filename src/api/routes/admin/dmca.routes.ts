@@ -20,6 +20,7 @@ import {
 import { findVodRecord, ensureVodDownload } from './utils/vod-helpers.js';
 import { queueDmcaProcessing } from '../../../workers/jobs/dmca.job.js';
 
+/** DMCA claim entry with optional typed fields. */
 interface DmcaClaim {
   type?: string;
   reason?: string;
@@ -27,6 +28,7 @@ interface DmcaClaim {
   [key: string]: unknown;
 }
 
+/** Body for the DMCA processing endpoint. */
 interface DmcaRequestBody {
   vodId: string;
   claims: DmcaClaim[] | string;
@@ -36,6 +38,10 @@ interface DmcaRequestBody {
   downloadMethod?: DownloadMethod;
 }
 
+/**
+ * Register DMCA processing routes: ensure VOD download, queue DMCA processing job.
+ * Requires admin API key authentication, tenant middleware, and rate limiting.
+ */
 export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const adminRateLimiter = RedisService.getLimiter('rate:admin');
   if (!adminRateLimiter) {
