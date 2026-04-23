@@ -12,18 +12,43 @@ export interface WorkerConfig {
   connection: Redis;
 }
 
-export const workers = new Map<WorkerName, Worker<Record<string, unknown>, unknown>>();
+export class WorkerRegistry {
+  private entries = new Map<WorkerName, { name: WorkerName; worker: Worker<Record<string, unknown>, unknown> }>();
 
-export function registerWorker(name: WorkerName, worker: Worker<Record<string, unknown>, unknown>) {
-  workers.set(name, worker);
+  register(name: WorkerName, worker: Worker<Record<string, unknown>, unknown>): void {
+    this.entries.set(name, { name, worker });
+  }
+
+  get(name: WorkerName): Worker<Record<string, unknown>, unknown> | undefined {
+    return this.entries.get(name)?.worker;
+  }
+
+  getAll(): { name: WorkerName; worker: Worker<Record<string, unknown>, unknown> }[] {
+    return Array.from(this.entries.values());
+  }
+
+  clear(): void {
+    this.entries.clear();
+  }
+
+  get size(): number {
+    return this.entries.size;
+  }
 }
 
-export async function waitForWorkersReady(workerInstances: Worker[]): Promise<void> {
+export const workerRegistry = new WorkerRegistry();
+
+export async function waitForWorkersReady(workerInstances: Worker[], timeoutMs = 30_000): Promise<void> {
   const readyPromises = workerInstances.map((worker) => {
     if (worker.isRunning()) return Promise.resolve();
 
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`Worker ${worker.name} did not become ready within ${timeoutMs}ms`));
+      }, timeoutMs);
+
       worker.once('ready', () => {
+        clearTimeout(timer);
         resolve();
       });
     });
@@ -72,14 +97,11 @@ export function createWorker(config: WorkerConfig): Worker<Record<string, unknow
     );
   });
 
-  worker.on('stalled', (_jobId) => {
-    (async () => {
-      const jobId = _jobId;
-      getLogger().warn(
-        { jobId, queueName: name },
-        `[${name}] Job stalled - lock may have expired. This typically happens when a job takes longer than the lock duration (default: 30s). Check if event loop is blocked.`
-      );
-    })();
+  worker.on('stalled', (jobId) => {
+    getLogger().warn(
+      { jobId, queueName: name },
+      `[${name}] Job stalled - lock may have expired. This typically happens when a job takes longer than the lock duration (default: 30s). Check if event loop is blocked.`
+    );
   });
 
   worker.on('error', (err) => {
@@ -87,7 +109,7 @@ export function createWorker(config: WorkerConfig): Worker<Record<string, unknow
     getLogger().error({ workerName: name, err: details }, `[${name}] worker error`);
   });
 
-  registerWorker(name, worker as Worker);
+  workerRegistry.register(name, worker as Worker);
   getLogger().info({ name }, 'Worker created');
 
   return worker;

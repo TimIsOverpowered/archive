@@ -36,12 +36,6 @@ function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
     tenant.settings && typeof tenant.settings === 'object' && !Array.isArray(tenant.settings) ? tenant.settings : {};
   const settings = SettingsSchema.parse(settingsObj);
 
-  if (!settings.domainName || !settings.timezone) {
-    throw new Error(
-      `Tenant ${tenant.id}: Missing required settings. domainName=${!!settings.domainName}, timezone=${!!settings.timezone}`
-    );
-  }
-
   const tenantConfig: TenantConfig = {
     id: tenant.id,
     displayName: tenant.displayName ?? undefined,

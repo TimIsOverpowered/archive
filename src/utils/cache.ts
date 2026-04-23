@@ -43,8 +43,8 @@ export function resetCacheMetrics(): void {
 }
 
 // SWR failure tracking uses Redis (`swr:failures:{key}`) with INCR/EXPIRE (5min TTL)
-// for cross-instance consistency. All instances share the same failure threshold.
-// Falls back to in-memory LRU if Redis is unavailable during revalidation.
+// for cross-instance consistency. Falls back to in-memory LRU if Redis is unavailable
+// during revalidation — each process then tracks failures independently.
 const SWR_FAILURES = new LRUCache<string, number>({
   max: 5000,
   ttl: SWR_FAILURES_TTL_MS,

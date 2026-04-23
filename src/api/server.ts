@@ -51,13 +51,15 @@ function formatErrorResponse(error: unknown): {
 }
 
 export async function buildServer() {
+  const config = getApiConfig();
+
   const fastify = Fastify({
     bodyLimit: BODY_LIMIT,
     exposeHeadRoutes: true,
     logger: {
-      level: getApiConfig().LOG_LEVEL,
+      level: config.LOG_LEVEL,
       redact: ['headers.authorization', 'headers.cookie'],
-      ...(getApiConfig().NODE_ENV !== 'production'
+      ...(config.NODE_ENV !== 'production'
         ? {
             transport: {
               target: 'pino-pretty',
@@ -83,22 +85,18 @@ export async function buildServer() {
     }
 
     return reply.status(statusCode).send({
-      error: {
-        message: isClientError ? message : 'Internal server error',
-        code,
-        statusCode,
-      },
+      statusCode,
+      message: isClientError ? message : 'Internal server error',
+      code,
     });
   });
 
   // Set 404 handler immediately after error handler
   fastify.setNotFoundHandler((_request, reply) => {
     return reply.status(404).send({
-      error: {
-        message: 'Route not found',
-        code: 'NOT_FOUND',
-        statusCode: 404,
-      },
+      statusCode: 404,
+      message: 'Route not found',
+      code: 'NOT_FOUND',
     });
   });
 

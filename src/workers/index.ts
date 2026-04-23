@@ -8,7 +8,7 @@ import { startTokenHealthCron } from '../cron/token-health.js';
 import { startMonitorService, stopMonitorService } from './monitor/index.js';
 import { getLogger, setLoggerConfig } from '../utils/logger.js';
 import { registerWorkers } from './worker-definitions.js';
-import { waitForWorkersReady, workers } from './create-worker.js';
+import { waitForWorkersReady, workerRegistry } from './create-worker.js';
 import { loadWorkersConfig } from '../config/env.js';
 import { VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY, SHUTDOWN_TIMEOUT_MS } from '../constants.js';
 import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/client.js';
@@ -52,7 +52,7 @@ export async function bootstrap() {
 
     registerWorkers(getRedisInstance(), configs, VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY);
 
-    await waitForWorkersReady(Array.from(workers.values()));
+    await waitForWorkersReady(workerRegistry.getAll().map((entry) => entry.worker));
 
     registerShutdownHandlers();
 
@@ -73,7 +73,7 @@ function registerShutdownHandlers() {
     getLogger().info('Shutting down workers...');
     await stopMonitorService();
 
-    for (const [name, worker] of workers.entries()) {
+    for (const { name, worker } of workerRegistry.getAll()) {
       await worker.close(true);
       getLogger().info({ name }, 'Worker closed');
     }

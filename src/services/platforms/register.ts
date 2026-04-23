@@ -4,10 +4,10 @@ import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
 import { strategy as twitchStrategy } from '../twitch/strategy.js';
 import { strategy as kickStrategy } from '../kick/strategy.js';
 
-const strategyMap: Record<Platform, PlatformStrategy> = {
+const strategyMap = {
   twitch: twitchStrategy,
   kick: kickStrategy,
-};
+} satisfies Record<Platform, PlatformStrategy>;
 
 /**
  * Register all platform strategies at application startup.

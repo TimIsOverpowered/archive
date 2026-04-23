@@ -49,12 +49,12 @@ class PoolManager {
       await this.evictOldestIdleClient();
     }
 
-    const creationPromise = this._doCreate(config).finally(() => this.creationLocks.delete(config.id));
+    const creationPromise = this.createConnection(config).finally(() => this.creationLocks.delete(config.id));
     this.creationLocks.set(config.id, creationPromise);
     return creationPromise;
   }
 
-  private async _doCreate(config: TenantConfig): Promise<Kysely<StreamerDB>> {
+  private async createConnection(config: TenantConfig): Promise<Kysely<StreamerDB>> {
     const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
     const connectionLimit = config.database.connectionLimit ?? 2;
     const tenantDbName = extractDatabaseName(config.database.url);
