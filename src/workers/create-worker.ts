@@ -4,9 +4,9 @@ import { extractErrorDetails } from '../utils/error.js';
 import { WorkerName } from './worker-definitions.js';
 import type { Redis } from 'ioredis';
 
-export interface WorkerConfig {
+export interface WorkerConfig<TData> {
   name: WorkerName;
-  processor: Processor<Record<string, unknown>, unknown, string>;
+  processor: Processor<TData, unknown, string>;
   concurrency?: number;
   useWorkerThreads?: boolean;
   connection: Redis;
@@ -57,10 +57,12 @@ export async function waitForWorkersReady(workerInstances: Worker[], timeoutMs =
   await Promise.all(readyPromises);
 }
 
-export function createWorker(config: WorkerConfig): Worker<Record<string, unknown>, unknown> {
+export function createWorker<TData>(
+  config: WorkerConfig<TData>
+): Worker<TData, unknown> {
   const { name, processor, connection, concurrency = 1, useWorkerThreads = false } = config;
 
-  const worker = new Worker<Record<string, unknown>, unknown>(name, processor, {
+  const worker = new Worker<TData, unknown>(name, processor, {
     connection,
     concurrency,
     useWorkerThreads,
@@ -109,7 +111,7 @@ export function createWorker(config: WorkerConfig): Worker<Record<string, unknow
     getLogger().error({ workerName: name, err: details }, `[${name}] worker error`);
   });
 
-  workerRegistry.register(name, worker as Worker);
+  workerRegistry.register(name, worker as Worker<Record<string, unknown>, unknown>);
   getLogger().info({ name }, 'Worker created');
 
   return worker;

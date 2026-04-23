@@ -6,12 +6,9 @@ import { SettingsSchema, YoutubeSchema, TwitchSchema, KickSchema } from './schem
 import { TenantConfig } from './types.js';
 import { getBaseConfig } from './env.js';
 import type { TenantResult } from '../db/meta-types.js';
+import { asJsonObject } from '../utils/object.js';
 
 let configCache: LRUCache<string, TenantConfig> | null = null;
-
-function asJsonObject(val: unknown): Record<string, unknown> | null {
-  return val && typeof val === 'object' && !Array.isArray(val) ? (val as Record<string, unknown>) : null;
-}
 
 function createConfigCache(): LRUCache<string, TenantConfig> {
   const ttl = getBaseConfig().CONFIG_CACHE_TTL * 1000;
@@ -54,16 +51,13 @@ function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
 
   const youtubeObj = asJsonObject(tenant.youtube);
   if (youtubeObj) {
-    const youtubeParsed = YoutubeSchema.parse(youtubeObj);
-    tenantConfig.youtube = youtubeParsed;
-    // auth is stored encrypted in the database and bypasses Zod parsing (schema expects unencrypted string)
     if ('auth' in youtubeObj && youtubeObj.auth) {
-      tenantConfig.youtube.auth = youtubeObj.auth as string;
+      youtubeObj.auth = decryptScalar(youtubeObj.auth as string);
     }
     if ('apiKey' in youtubeObj && youtubeObj.apiKey) {
-      const apiKey = decryptScalar(youtubeObj.apiKey as string);
-      tenantConfig.youtube.apiKey = apiKey;
+      youtubeObj.apiKey = decryptScalar(youtubeObj.apiKey as string);
     }
+    tenantConfig.youtube = YoutubeSchema.parse(youtubeObj);
   }
 
   const kickObj = asJsonObject(tenant.kick);
@@ -134,5 +128,6 @@ export function updateTenantYoutubeAuth(tenantId: string, encryptedAuth: string)
   const cache = getCache();
   const entry = cache.get(tenantId);
   if (!entry?.youtube?.auth) return;
-  cache.set(tenantId, { ...entry, youtube: { ...entry.youtube, auth: encryptedAuth } });
+  const decryptedAuth = decryptScalar(encryptedAuth);
+  cache.set(tenantId, { ...entry, youtube: { ...entry.youtube, auth: decryptedAuth } });
 }

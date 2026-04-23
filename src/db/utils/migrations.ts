@@ -1,8 +1,8 @@
 import { readFileSync, readdirSync } from 'fs';
 import { resolve, join } from 'path';
 import { sql, type Kysely } from 'kysely';
-import { getLogger } from '../utils/logger.js';
-import type { MetaDB } from './meta-types.js';
+import { getLogger } from '../../utils/logger.js';
+import type { MetaDB } from '../meta-types.js';
 
 const MIGRATIONS_DIR = resolve(import.meta.dirname, '..', '..', 'scripts', 'migrations');
 

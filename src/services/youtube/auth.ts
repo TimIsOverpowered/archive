@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { getTenantConfig, updateTenantYoutubeAuth } from '../../config/loader.js';
-import { decryptObject, encryptObject } from '../../utils/encryption.js';
+import { encryptObject } from '../../utils/encryption.js';
 import { getMetaClient } from '../../db/meta-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
@@ -127,7 +127,7 @@ export async function getYoutubeAuth(tenantId: string): Promise<{
     throw new Error(`YouTube auth not configured for ${tenantId}`);
   }
 
-  const authObj = decryptObject<AuthObject>(config.youtube.auth);
+  const authObj = JSON.parse(config.youtube.auth) as AuthObject;
 
   if (!authObj.refresh_token || typeof authObj.refresh_token !== 'string' || !authObj.refresh_token.trim()) {
     throw new Error(`YouTube refresh token not configured for ${tenantId}`);
