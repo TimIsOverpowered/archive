@@ -482,7 +482,7 @@ const main = async () => {
   const workersAnswer = await prompt(`Number of chat migration workers? [${chatWorkers}]:`);
   if (workersAnswer && workersAnswer.trim()) {
     const parsed = parseInt(workersAnswer, 10);
-    if (!isNaN(parsed) && parsed >= 1 && parsed <= 8) {
+    if (!isNaN(parsed) && parsed >= 1) {
       chatWorkers = parsed;
     }
   }
