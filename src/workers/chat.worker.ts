@@ -9,7 +9,7 @@ import { extractErrorDetails } from '../utils/error.js';
 import { CHAT_BATCH_SIZE, CHAT_RATE_LIMIT_MS } from '../constants.js';
 import { extractEdges, calculateResumeOffset, extractMessageData } from './chat/chat-helpers.js';
 import type { ChatMessageCreateInput } from './chat/chat-types.js';
-import { PLATFORMS, type Platform } from '../types/platforms.js';
+import { PLATFORMS, isTwitchPlatform, type Platform } from '../types/platforms.js';
 import { flushChatBatch } from './chat/chat-batch-processor.js';
 import { createChatWorkerAlerts } from './utils/alert-factories.js';
 import type { Kysely } from 'kysely';
@@ -19,6 +19,7 @@ interface ChatProcessorState {
   tenantId: string;
   dbId: number;
   vodId: string;
+  // Narrowed to Twitch by isTwitchPlatform() guard above — chat download only supports Twitch.
   platform: typeof PLATFORMS.TWITCH;
   duration: number;
   log: ReturnType<typeof createAutoLogger>;
@@ -39,7 +40,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
     '[Chat] Job received'
   );
 
-  if (platform !== PLATFORMS.TWITCH) {
+  if (!isTwitchPlatform(platform)) {
     log.info({ platform }, 'Chat download deferred for non-Twitch platform');
     return { success: true, skipped: true };
   }
