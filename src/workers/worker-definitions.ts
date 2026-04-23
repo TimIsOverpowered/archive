@@ -5,7 +5,7 @@ import chatProcessor from './chat.worker.js';
 import youtubeProcessor from './youtube.worker.js';
 import dmcaProcessor from './dmca.worker.js';
 import monitorProcessor from './monitor/processor.js';
-import { QUEUE_NAMES, QUEUES_VALUES } from './jobs/queues.js';
+import { QUEUE_NAMES } from './jobs/queues.js';
 import type {
   LiveDownloadJob,
   StandardVodJob,
@@ -20,7 +20,7 @@ import type {
 import type { Redis } from 'ioredis';
 import type { TenantConfig } from '../config/types.js';
 import { getWorkersConfig } from '../config/env.js';
-import { createWorker, type WorkerConfig } from './create-worker.js';
+import { createWorker } from './create-worker.js';
 
 export type WorkerName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 export type AllJobData =
@@ -77,16 +77,6 @@ const workerDefs = {
   } satisfies WorkerDef<MonitorJob>,
 };
 
-// Type erasure happens here, at the boundary — intentional and isolated
-function toRawDef(def: WorkerDef<unknown, unknown>): {
-  name: WorkerName;
-  processor: Processor<Record<string, unknown>, unknown, string>;
-  concurrency?: number;
-  useWorkerThreads?: boolean;
-} {
-  return def as ReturnType<typeof toRawDef>;
-}
-
 export function registerWorkers(
   connection: Redis,
   tenantConfigs: TenantConfig[],
@@ -102,8 +92,7 @@ export function registerWorkers(
     [QUEUE_NAMES.MONITOR]: workerConfig.MONITOR_CONCURRENCY,
   };
 
-  for (const name of QUEUES_VALUES) {
-    const def = toRawDef(workerDefs[name] as WorkerDef<unknown, unknown>);
+  for (const [name, def] of Object.entries(workerDefs) as Array<[WorkerName, WorkerDef<AllJobData, unknown>]>) {
     const concurrency =
       name === QUEUE_NAMES.VOD_LIVE
         ? Math.max(
@@ -114,10 +103,10 @@ export function registerWorkers(
           )
         : concurrencyMap[name];
 
-    const workerConfig: WorkerConfig = { ...def, connection };
+    const config = { ...def, connection };
     if (concurrency !== undefined) {
-      workerConfig.concurrency = concurrency;
+      config.concurrency = concurrency;
     }
-    createWorker(workerConfig);
+    createWorker<AllJobData>(config);
   }
 }
