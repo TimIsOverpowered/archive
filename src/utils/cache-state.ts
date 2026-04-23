@@ -22,4 +22,3 @@ export function clearAllConnectionFailures(): void {
   }
 }
 
-export const resetCacheState = clearAllConnectionFailures;

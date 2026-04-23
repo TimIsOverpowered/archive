@@ -1,5 +1,3 @@
-import { resetCacheState } from '../src/utils/cache-state.js';
-
 process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.META_DATABASE_URL = 'postgresql://localhost/test';
 process.env.ENCRYPTION_MASTER_KEY = '0000000000000000000000000000000000000000000000000000000000000000';
