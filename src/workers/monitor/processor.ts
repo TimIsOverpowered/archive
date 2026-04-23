@@ -5,6 +5,7 @@ import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { handleWorkerError } from '../utils/error-handler.js';
 import { PLATFORM_VALUES } from '../../types/platforms.js';
 import { getLiveDownloadQueue } from '../jobs/queues.js';
+import { findActiveLiveVod } from '../../services/vods.service.js';
 
 const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async (job: Job<{ tenantId: string }>) => {
   const { tenantId } = job.data;
@@ -28,12 +29,7 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
       continue;
     }
 
-    const activeLiveVod = await db
-      .selectFrom('vods')
-      .selectAll()
-      .where('platform', '=', platform)
-      .where('is_live', '=', true)
-      .executeTakeFirst();
+    const activeLiveVod = await findActiveLiveVod(db, platform);
 
     if (activeLiveVod) {
       const hasActiveJob = activeLiveJobs.some((j) => j.opts.jobId === `live_hls_${activeLiveVod.vod_id}`);

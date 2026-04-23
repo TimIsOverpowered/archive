@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { jsonArrayFrom } from 'kysely/helpers/postgres';
 import { sql } from 'kysely';
-import type { Expression, ExpressionBuilder, Kysely, SqlBool } from 'kysely';
+import type { Expression, ExpressionBuilder, Kysely, Selectable, SqlBool } from 'kysely';
 import type { StreamerDB, DBClient } from '../db/streamer-types.js';
 import { withStaleWhileRevalidate } from '../utils/cache.js';
 import { deduplicate } from '../utils/deduplicate.js';
@@ -313,4 +313,20 @@ export async function getVodByPlatformId(
   }
 
   return staticData;
+}
+
+/**
+ * Find the currently active live VOD for a given platform.
+ * Returns null if no live VOD exists or if the platform has no active stream.
+ */
+export async function findActiveLiveVod(
+  db: Kysely<StreamerDB>,
+  platform: Platform
+): Promise<Selectable<StreamerDB['vods']> | undefined> {
+  return db
+    .selectFrom('vods')
+    .selectAll('vods')
+    .where('platform', '=', platform)
+    .where('is_live', '=', true)
+    .executeTakeFirst();
 }
