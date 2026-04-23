@@ -17,6 +17,7 @@ import type { LiveDownloadJob } from './jobs/queues.js';
 import { triggerChatDownload } from './jobs/chat.job.js';
 import { fetchAndSaveEmotes } from '../services/emotes.js';
 import { SOURCE_TYPES } from '../types/platforms.js';
+import { getDisplayName } from '../config/types.js';
 
 const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (
   job: Job<LiveDownloadJob, unknown, string>
@@ -30,7 +31,7 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (
   const ctx = await getJobContext(tenantId);
   const { config } = ctx;
 
-  const streamerName = config.displayName || tenantId;
+  const streamerName = getDisplayName(config);
   const alerts = createLiveWorkerAlerts();
 
   const messageId = await initRichAlert(alerts.init(vodId, platform, streamerName, startedAt));

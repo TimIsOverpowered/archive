@@ -38,10 +38,13 @@ export default function createRateLimitMiddleware(options: RateLimitOptions) {
       reply.header('X-RateLimit-Limit', activeLimiter.points);
       reply.header('X-RateLimit-Remaining', String(consumeResult.remainingPoints));
     } catch (rateLimitError) {
-      const error = rateLimitError as Error & { msBeforeNext?: number; code?: string };
-
-      if ('msBeforeNext' in error && error.msBeforeNext != null) {
-        const retryAfter = Math.ceil(error.msBeforeNext / 1000);
+      if (
+        typeof rateLimitError === 'object' &&
+        rateLimitError !== null &&
+        'msBeforeNext' in rateLimitError &&
+        typeof (rateLimitError as { msBeforeNext: unknown }).msBeforeNext === 'number'
+      ) {
+        const retryAfter = Math.ceil((rateLimitError as { msBeforeNext: number }).msBeforeNext / 1000);
 
         return reply.status(429).send({
           statusCode: 429,

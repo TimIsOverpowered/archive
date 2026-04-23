@@ -8,6 +8,7 @@ import { toHHMMSS } from '../../utils/formatting.js';
 import { createYoutubeUploadProgressHandler as createGameUploadProgressHandler } from './youtube-upload-progress.js';
 import { YOUTUBE_MAX_DURATION } from '../../constants.js';
 import type { TenantConfig } from '../../config/types.js';
+import { getDisplayName } from '../../config/types.js';
 import { deleteFileIfExists } from '../../utils/path.js';
 import { GameUpsertSchema } from '../../config/schemas.js';
 import { publishVodUpdate } from '../../services/cache-invalidator.js';
@@ -67,7 +68,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     vodId,
     config,
   } = ctx;
-  const channelName = config.displayName || tenantId;
+  const channelName = getDisplayName(config);
   const duration = chapterEnd - chapterStart;
 
   const uploadAlertMessageId = await initRichAlert({
@@ -146,7 +147,7 @@ async function processSplitGameUpload(
   trimmedDuration: number
 ): Promise<GameUploadResult> {
   const { tenantId, dbId, chapterStart, chapterGameId, chapterName, title, description, config, db, vodId, log } = ctx;
-  const channelName = config.displayName || tenantId;
+  const channelName = getDisplayName(config);
   const totalParts = Math.ceil(trimmedDuration / YOUTUBE_MAX_DURATION);
 
   const splitAlertMessageId = await initRichAlert({
@@ -212,7 +213,7 @@ async function processSplitGameUpload(
       ? createGameUploadProgressHandler({
           messageId: uploadAlertMessageId,
           type: 'game',
-          channelName: config.displayName || tenantId,
+          channelName: getDisplayName(config),
           gameName: chapterName,
           videoTitle: partTitle,
           part: currentPartNum,
@@ -223,7 +224,7 @@ async function processSplitGameUpload(
 
     const result = await uploadVideo(
       tenantId,
-      config.displayName || tenantId,
+      getDisplayName(config),
       splitPath,
       partTitle,
       description,

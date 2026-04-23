@@ -21,6 +21,10 @@ export interface FinalizeVodOptions {
 export async function finalizeVod(options: FinalizeVodOptions): Promise<void> {
   const { ctx, dbId, vodId, platform, durationSeconds } = options;
 
+  VodUpdateSchema.parse({
+    duration: durationSeconds ?? undefined,
+  });
+
   await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
     const strategy = getStrategy(platform);
     if (durationSeconds && strategy?.finalizeChapters) {
@@ -31,9 +35,6 @@ export async function finalizeVod(options: FinalizeVodOptions): Promise<void> {
         durationSeconds
       );
     }
-    VodUpdateSchema.parse({
-      duration: durationSeconds ?? undefined,
-    });
     await db
       .updateTable('vods')
       .set({

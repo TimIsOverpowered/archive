@@ -7,7 +7,7 @@ import { UPLOAD_MODES } from '../../types/platforms.js';
 import { TenantContext } from '../../types/context.js';
 import { withDbRetry } from '../../db/client.js';
 import { extractErrorDetails } from '../../utils/error.js';
-import { getPlatformConfig } from '../../config/types.js';
+import { getPlatformConfig, getDisplayName } from '../../config/types.js';
 
 const log = childLogger({ module: 'youtube-job' });
 
@@ -83,7 +83,7 @@ export async function createGameUploadJob(
   });
   const epNumber = gameCount + 1;
 
-  const channelName = config.displayName || tenantId;
+  const channelName = getDisplayName(config);
   const dateFormatted = dayjs(vodRecord.created_at)
     .tz(config.settings?.timezone || 'UTC')
     .format('MMMM DD YYYY')

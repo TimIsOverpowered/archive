@@ -4,7 +4,7 @@ import { handlePlatformLiveCheck } from './live-handler.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { handleWorkerError } from '../utils/error-handler.js';
 import { PLATFORM_VALUES } from '../../types/platforms.js';
-import { getLiveDownloadQueue } from '../jobs/queues.js';
+import { getLiveDownloadQueue, LIVE_JOB_ID_PREFIX } from '../jobs/queues.js';
 import { findActiveLiveVod } from '../../services/vods.service.js';
 import { getPlatformConfig } from '../../config/types.js';
 
@@ -33,7 +33,7 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
     const activeLiveVod = await findActiveLiveVod(db, platform);
 
     if (activeLiveVod) {
-      const hasActiveJob = activeLiveJobs.some((j) => j.opts.jobId === `live_hls_${activeLiveVod.vod_id}`);
+      const hasActiveJob = activeLiveJobs.some((j) => j.opts.jobId === `${LIVE_JOB_ID_PREFIX}${activeLiveVod.vod_id}`);
       if (hasActiveJob) {
         log.debug({ platform, vodId: activeLiveVod.vod_id }, '[Monitor] Skipping - live worker active');
         continue;

@@ -10,6 +10,7 @@ import { downloadVodWithFfmpeg } from './vod/vod-download-strategies.js';
 import { DOWNLOAD_METHODS, PLATFORMS } from '../types/platforms.js';
 import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
+import { getDisplayName } from '../config/types.js';
 
 const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job<StandardVodJob, unknown, string>) => {
   const {
@@ -31,7 +32,7 @@ const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job
   const { config } = ctx;
 
   const finalPath = getVodFilePath({ config, vodId });
-  const streamerName = config.displayName || tenantId;
+  const streamerName = getDisplayName(config);
   const alerts = createVodWorkerAlerts();
 
   const messageId = await initRichAlert(alerts.init(vodId, platform, streamerName));

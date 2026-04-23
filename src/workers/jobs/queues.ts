@@ -141,6 +141,8 @@ export const QUEUE_NAMES = {
   MONITOR: 'monitor',
 } as const;
 
+export const LIVE_JOB_ID_PREFIX = 'live_hls_';
+
 export const QUEUES_VALUES = Object.values(QUEUE_NAMES);
 
 export const defaultJobOptions = {

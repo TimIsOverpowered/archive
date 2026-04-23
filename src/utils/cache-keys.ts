@@ -1,4 +1,4 @@
-export function buildVodQueryKey(
+function buildVodQueryKey(
   tenantId: string,
   query: Record<string, string | number | undefined>,
   page: number,
