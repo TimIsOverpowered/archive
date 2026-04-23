@@ -9,9 +9,16 @@ import type {
   Transaction,
 } from 'kysely';
 
+export interface MigrationsTable {
+  id: Generated<number>;
+  name: string;
+  applied_at: ColumnType<Date, string | undefined, never>;
+}
+
 export interface MetaDB {
   tenants: TenantsTable;
   admins: AdminsTable;
+  migrations: MigrationsTable;
 }
 
 export interface TenantsTable {
@@ -41,6 +48,9 @@ export type UpdateableTenants = Updateable<TenantsTable>;
 export type SelectableAdmins = Selectable<AdminsTable>;
 export type InsertableAdmins = Insertable<AdminsTable>;
 export type UpdateableAdmins = Updateable<AdminsTable>;
+
+export type SelectableMigrations = Selectable<MigrationsTable>;
+export type InsertableMigrations = Insertable<MigrationsTable>;
 
 export interface TenantResult {
   id: string;
