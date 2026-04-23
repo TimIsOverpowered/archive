@@ -3,7 +3,6 @@ import { getKickStreamStatus } from './live.js';
 import { getKickCategoryInfo } from './category.js';
 import { extractErrorDetails, createErrorContext } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
-import { toHHMMSS } from '../../utils/formatting.js';
 import { TenantContext } from '../../types/context.js';
 import { withDbRetry } from '../../db/client.js';
 import { ChapterCreateSchema, ChapterUpdateSchema } from '../../config/schemas.js';
@@ -92,12 +91,9 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
         return;
       }
 
-      const duration = lastChapter ? toHHMMSS(currentTimeSeconds - lastChapter.start) : '00:00:00';
-
       const validatedChapter = ChapterCreateSchema.parse({
         vod_id: dbId,
         start: currentTimeSeconds,
-        duration,
         title: category.name,
         game_id: String(category.id),
       });
@@ -108,7 +104,6 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
           game_id: validatedChapter.game_id,
           name: validatedChapter.title,
           image: bannerImage,
-          duration: validatedChapter.duration,
           start: validatedChapter.start,
         })
         .execute();
@@ -146,13 +141,11 @@ export async function finalizeKickChapters(
 
         ChapterUpdateSchema.parse({
           end: endDuration,
-          duration: toHHMMSS(endDuration),
         });
         await db
           .updateTable('chapters')
           .set({
             end: endDuration,
-            duration: toHHMMSS(endDuration),
           })
           .where('id', '=', incompleteChapter.id)
           .execute();

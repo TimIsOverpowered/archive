@@ -170,8 +170,6 @@ export const ChapterCreateSchema = z.object({
   start: z.number(),
   /** Chapter end time in seconds (nullable for open-ended) */
   end: z.number().nullable().default(null),
-  /** Human-readable duration string (e.g. '1h 30m') */
-  duration: z.string(),
   /** Chapter title (nullable) */
   title: z.string().nullable().default(null),
   /** Game/Category ID (nullable) */
@@ -184,8 +182,6 @@ export const ChapterUpdateSchema = z.object({
   start: z.number().optional(),
   /** Chapter end time in seconds (nullable) */
   end: z.number().nullable().default(null),
-  /** Duration string (optional) */
-  duration: z.string().optional(),
   /** Chapter title (nullable) */
   title: z.string().nullable().default(null),
   /** Game/Category ID (nullable) */

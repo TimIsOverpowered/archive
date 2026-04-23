@@ -86,7 +86,7 @@ function selectVodRelations(eb: ExpressionBuilder<StreamerDB, 'vods'>) {
     jsonArrayFrom(
       eb
         .selectFrom('chapters')
-        .select(['name', 'image', 'duration', 'start', 'end'])
+        .select(['name', 'image', 'start', 'end'])
         .whereRef('chapters.vod_id', '=', 'vods.id')
     ).as('chapters'),
     jsonArrayFrom(
