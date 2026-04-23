@@ -209,7 +209,7 @@ describe('flushChatBatch', () => {
     await flushChatBatch(options);
 
     const calls = log.getCalls();
-    const debugCall = calls.find((c) => c.level === 'debug' && c.msg === '[Chat] Batch flushed to database');
+    const debugCall = calls.find((c) => c.level === 'debug' && c.msg === 'Batch flushed to database');
     assert.ok(debugCall);
     assert.strictEqual(debugCall!.ctx.vodId, 'vod-123');
     assert.strictEqual(debugCall!.ctx.batchNumber, 6);
