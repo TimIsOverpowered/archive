@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { getTenantDisplayName } from '../../config/loader.js';
+import { configService } from '../../config/tenant-config.js';
 import {
   enterTenantContext,
   exitTenantContext,
@@ -26,7 +26,8 @@ export default function createTenantLoggerMiddleware() {
 
     if (!tenantId) return; // No tenant context available for this route (e.g., health check, root paths)
 
-    const displayName = getTenantDisplayName(tenantId);
+    const config = configService.get(tenantId);
+    const displayName = config?.displayName ?? tenantId;
     request.tenantDisplayName = displayName;
 
     // Generate or reuse request ID for tracing across API → workers → DB
@@ -46,5 +47,4 @@ export default function createTenantLoggerMiddleware() {
 }
 
 // Export exit helper for cleanup if needed (Fastify handles this via request lifecycle)
-/** Resolve the display name for a tenant ID from the loaded configuration. */
-export { getTenantDisplayName, exitTenantContext };
+export { exitTenantContext };

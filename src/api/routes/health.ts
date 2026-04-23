@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { Queue } from 'bullmq';
 import { sql } from 'kysely';
-import { loadTenantConfigs } from '../../config/loader.js';
+import { configService } from '../../config/tenant-config.js';
 import { getClient } from '../../db/streamer-client.js';
 import { checkFlareSolverrHealth } from '../../utils/flaresolverr-health.js';
 import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator.js';
@@ -39,7 +39,7 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
     },
     async () => {
       const redis = fastify.redis;
-      const streamerConfigs = await loadTenantConfigs();
+      const streamerConfigs = await configService.loadAll();
       const redisStatusInfo = RedisService.getStatus();
 
       let redisStatus = 'ok';

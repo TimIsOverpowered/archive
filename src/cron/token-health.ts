@@ -4,11 +4,11 @@ import { sendDiscordAlert, trackFailure, resetFailures } from '../utils/discord-
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
-import { getConfigs } from '../config/loader.js';
+import { configService } from '../config/tenant-config.js';
 import { TOKEN_MAX_FAILURES } from '../constants.js';
 
 export async function checkTokenHealth(): Promise<void> {
-  const streamerConfigs: ConfigType[] = getConfigs();
+  const streamerConfigs: ConfigType[] = configService.getAll();
 
   for (const config of streamerConfigs) {
     const tenantId = String(config.id);

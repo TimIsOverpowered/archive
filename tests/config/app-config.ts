@@ -11,3 +11,4 @@ export {
 } from '../../src/config/env.js';
 export { resetEnvConfig as resetEnvAccessorCache } from '../../src/config/env.js';
 export { setLoggerConfig, getLogger } from '../../src/utils/logger.js';
+export { configService } from '../../src/config/tenant-config.js';

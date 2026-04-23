@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { getTenantConfig, updateTenantYoutubeAuth } from '../../config/loader.js';
+import { configService } from '../../config/tenant-config.js';
 import { encryptObject } from '../../utils/encryption.js';
 import { getMetaClient } from '../../db/meta-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
@@ -25,7 +25,7 @@ async function updateYoutubeTokenInDb(
   refreshToken: string
 ): Promise<void> {
   const logger = createAutoLogger('youtube-auth');
-  const config = getTenantConfig(tenantId);
+  const config = configService.get(tenantId);
   if (!config?.youtube?.auth) {
     return;
   }
@@ -45,7 +45,7 @@ async function updateYoutubeTokenInDb(
       .where('id', '=', tenantId)
       .execute();
 
-    updateTenantYoutubeAuth(tenantId, encryptedAuth);
+    configService.updateYoutubeAuth(tenantId, encryptedAuth);
 
     logger.info({ tenantId }, 'Updated YouTube token in database');
   } catch (err) {
@@ -121,7 +121,7 @@ export async function getYoutubeAuth(tenantId: string): Promise<{
   accessToken: string;
 }> {
   const logger = createAutoLogger('youtube-auth');
-  const config = getTenantConfig(tenantId);
+  const config = configService.get(tenantId);
 
   if (!config?.youtube?.auth) {
     throw new Error(`YouTube auth not configured for ${tenantId}`);

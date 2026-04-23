@@ -1,6 +1,6 @@
 import { sql } from 'kysely';
 import dayjs from 'dayjs';
-import { getTenantConfig, getConfigs } from '../config/loader.js';
+import { configService } from '../config/tenant-config.js';
 import { withCache } from '../utils/cache.js';
 import { PLATFORMS } from '../types/platforms.js';
 import { PERCENTAGE_PRECISION_MULTIPLIER, PERCENTAGE_PRECISION_DIVISOR } from '../constants.js';
@@ -54,7 +54,7 @@ interface TenantStats {
  * Includes VOD counts by platform, upload success rate, chapter/game counts.
  */
 export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, cacheTtl = 60): Promise<TenantStats> {
-  const config = getTenantConfig(tenantId);
+  const config = configService.get(tenantId);
 
   if (!config) {
     throw new Error('Tenant not found');
@@ -189,7 +189,7 @@ export async function getAllTenants(): Promise<
     created_at: Date;
   }>
 > {
-  const configs = getConfigs();
+  const configs = configService.getAll();
 
   return configs.map((config) => ({
     id: config.id,
