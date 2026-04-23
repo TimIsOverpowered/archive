@@ -1,9 +1,15 @@
 import { FastifyInstance, FastifySchema } from 'fastify';
+import { z } from 'zod';
 import { getLogsByOffset, getLogsByCursor } from '../../services/logs.service.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { RedisService } from '../../utils/redis-service.js';
 import { badRequest } from '../../utils/http-error.js';
 import { tenantMiddleware } from '../middleware/tenant-platform.js';
+
+const LogsQuerySchema = z.object({
+  content_offset_seconds: z.number().nonnegative().optional(),
+  cursor: z.string().optional(),
+});
 
 interface LogsRoutesOptions {
   prefix: string;
@@ -56,10 +62,16 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
       const { tenantId, vodId } = request.params;
       const { db } = request.tenant;
       const vodIdNum = Number(vodId);
-      const { content_offset_seconds, cursor } = request.query;
+
+      const parsed = LogsQuerySchema.safeParse(request.query);
+      if (!parsed.success) {
+        throw badRequest('Invalid query parameters');
+      }
+
+      const { content_offset_seconds, cursor } = parsed.data;
 
       if (content_offset_seconds === undefined && !cursor) {
-        badRequest('Missing required query parameter: content_offset_seconds or cursor');
+        throw badRequest('Missing required query parameter: content_offset_seconds or cursor');
       }
 
       let result;
@@ -69,7 +81,7 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
       } else if (content_offset_seconds !== undefined && !isNaN(content_offset_seconds)) {
         result = await getLogsByOffset(db, tenantId, vodIdNum, content_offset_seconds);
       } else {
-        badRequest('Invalid content_offset_seconds value');
+        throw badRequest('Invalid content_offset_seconds value');
       }
 
       return { data: result };

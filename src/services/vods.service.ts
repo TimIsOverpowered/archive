@@ -16,6 +16,8 @@ import { RedisService } from '../utils/redis-service.js';
 import { registerVodTags } from './cache-tags.js';
 import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.js';
 import { CacheKeys } from '../utils/cache-keys.js';
+import { extractErrorDetails } from '../utils/error.js';
+import { getLogger } from '../utils/logger.js';
 
 function applyVolatileData(
   vods: VodResponse[],
@@ -184,8 +186,9 @@ export async function getVods(
         const mergedVods = applyVolatileData(cachedResult.vods, volatileMap);
         return { vods: mergedVods, total: cachedResult.total };
       }
-    } catch {
-      // Cache read failed, fall through to DB
+    } catch (err) {
+      const details = extractErrorDetails(err);
+      getLogger().warn({ err: details, key: cacheKey }, 'VOD list cache read failed, falling back to DB');
     }
   }
 
