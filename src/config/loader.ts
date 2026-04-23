@@ -2,13 +2,16 @@ import { LRUCache } from 'lru-cache';
 import { initMetaClient } from '../db/meta-client.js';
 import { getAllTenants, getTenantById } from '../services/meta-tenants.service.js';
 import { decryptScalar } from '../utils/encryption.js';
-import { asJsonObject } from '../utils/object.js';
 import { SettingsSchema, YoutubeSchema, TwitchSchema, KickSchema } from './schemas.js';
 import { TenantConfig } from './types.js';
 import { getBaseConfig } from './env.js';
 import type { TenantResult } from '../db/meta-types.js';
 
 let configCache: LRUCache<string, TenantConfig> | null = null;
+
+function asJsonObject(val: unknown): Record<string, unknown> | null {
+  return val && typeof val === 'object' && !Array.isArray(val) ? (val as Record<string, unknown>) : null;
+}
 
 function createConfigCache(): LRUCache<string, TenantConfig> {
   const ttl = getBaseConfig().CONFIG_CACHE_TTL * 1000;

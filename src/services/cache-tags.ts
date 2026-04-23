@@ -3,7 +3,7 @@ import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
 import { MAX_CACHE_PAGES } from '../constants.js';
-import { isConnectionError } from '../db/streamer-client.js';
+import { isConnectionError } from '../db/utils/errors.js';
 import { CacheKeys } from '../utils/cache-keys.js';
 
 function extractPageFromKey(key: string): number | null {
