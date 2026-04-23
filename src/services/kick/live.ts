@@ -98,7 +98,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
     if (!streamId) {
       getLogger().debug(
         { username, availableKeys: Object.keys(data), idField: data.id },
-        `[Kick] Channel ${username} is offline (no livestream id in data)`
+        `Channel ${username} is offline (no livestream id in data)`
       );
       _cacheKickStream(username, null);
       return null;

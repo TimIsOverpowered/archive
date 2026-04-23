@@ -51,7 +51,7 @@ export async function handlePlatformLiveCheck(
 
   const strategy = getStrategy(platform);
   if (!strategy) {
-    log.warn({ platform }, '[Monitor]: No strategy found for platform');
+    log.warn({ component: 'monitor', platform }, 'No strategy found for platform');
     return;
   }
 
@@ -60,7 +60,7 @@ export async function handlePlatformLiveCheck(
   const platformUserId = platformCfg?.id;
 
   if (!platformUserId || !platformUsername) {
-    log.debug({ platform, username: platformUsername }, '[Monitor]: Platform not fully configured');
+    log.debug({ component: 'monitor', platform, username: platformUsername }, 'Platform not fully configured');
     return;
   }
 
@@ -71,7 +71,7 @@ export async function handlePlatformLiveCheck(
     streamStatus = await strategy.checkStreamStatus(ctx);
   } catch (error: unknown) {
     const details = extractErrorDetails(error);
-    log.warn({ userId: platformUserId, err: details.message }, `[${platform}]: API error - skipping check`);
+    log.warn({ component: 'monitor', userId: platformUserId, platform, err: details.message }, 'API error - skipping check');
     return;
   }
 
@@ -110,10 +110,10 @@ async function handleOfflineStream(
   log: ReturnType<typeof createAutoLogger>,
   activeLiveVod: SelectableVods | null = null
 ): Promise<void> {
-  log.debug({ username }, '[Monitor]: Streamer is OFFLINE');
+  log.debug({ component: 'monitor', username }, 'Streamer is OFFLINE');
 
   if (activeLiveVod) {
-    log.info({ vodId: activeLiveVod.vod_id }, '[Monitor]: Marking VOD as ended');
+    log.info({ component: 'monitor', vodId: activeLiveVod.vod_id }, 'Marking VOD as ended');
 
     await db.updateTable('vods').set({ is_live: false }).where('id', '=', activeLiveVod.id).execute();
 
@@ -154,7 +154,7 @@ async function handleLiveStream(ctx: LiveStreamContext): Promise<void> {
 }
 
 async function handleNewLiveStream(ctx: NewLiveContext): Promise<void> {
-  ctx.log.info({ streamId: ctx.streamStatus.id }, '[Monitor]: New live detected, checking for VOD object');
+  ctx.log.info({ component: 'monitor', streamId: ctx.streamStatus.id }, 'New live detected, checking for VOD object');
 
   const metadataCtx = { tenantId: ctx.tenantId, config: ctx.config, platform: ctx.platform };
   let vodMetadata: PlatformVodMetadata | null = null;
@@ -164,7 +164,7 @@ async function handleNewLiveStream(ctx: NewLiveContext): Promise<void> {
   }
 
   if (!vodMetadata) {
-    ctx.log.debug('[Monitor]: No VOD object found yet');
+    ctx.log.debug({ component: 'monitor' }, 'No VOD object found yet');
     return;
   }
 
@@ -176,13 +176,13 @@ async function handleNewLiveStream(ctx: NewLiveContext): Promise<void> {
     .executeTakeFirst();
 
   if (existingVod) {
-    ctx.log.debug({ vodId: vodMetadata.id }, '[Monitor]: VOD was created by concurrent poll');
+    ctx.log.debug({ component: 'monitor', vodId: vodMetadata.id }, 'VOD was created by concurrent poll');
     return;
   }
 
   ctx.log.info(
-    { vodId: vodMetadata.id, startedAt: ctx.streamStatus.startedAt },
-    '[Monitor]: Creating VOD record for live stream'
+    { component: 'monitor', vodId: vodMetadata.id, startedAt: ctx.streamStatus.startedAt },
+    'Creating VOD record for live stream'
   );
 
   const [createdVod] = await ctx.db
@@ -196,7 +196,7 @@ async function handleNewLiveStream(ctx: NewLiveContext): Promise<void> {
     .execute();
 
   if (!createdVod) {
-    ctx.log.error({ vodId: vodMetadata.id }, '[Monitor]: Failed to create VOD record');
+    ctx.log.error({ component: 'monitor', vodId: vodMetadata.id }, 'Failed to create VOD record');
     return;
   }
 
@@ -210,7 +210,7 @@ async function handleNewLiveStream(ctx: NewLiveContext): Promise<void> {
     ctx.config.displayName
   );
 
-  ctx.log.info({ vodId: vodMetadata.id }, '[Monitor]: Queuing HLS download');
+  ctx.log.info({ component: 'monitor', vodId: vodMetadata.id }, 'Queuing HLS download');
 
   await enqueueLiveHlsDownload({
     dbId: createdVod.id,
@@ -225,7 +225,7 @@ async function handleNewLiveStream(ctx: NewLiveContext): Promise<void> {
 }
 
 async function handleExistingVodBecameLive(ctx: ExistingVodLiveContext): Promise<void> {
-  ctx.log.info({ vodId: ctx.existingVod.vod_id }, '[Monitor]: Existing VOD is now active');
+  ctx.log.info({ component: 'monitor', vodId: ctx.existingVod.vod_id }, 'Existing VOD is now active');
 
   await ctx.db
     .updateTable('vods')
@@ -252,7 +252,7 @@ async function handleExistingVodBecameLive(ctx: ExistingVodLiveContext): Promise
 }
 
 async function handleAlreadyLiveStream(ctx: AlreadyLiveContext): Promise<void> {
-  ctx.log.debug({ vodId: ctx.existingVod.vod_id }, '[Monitor]: VOD is live, ensuring download queued');
+  ctx.log.debug({ component: 'monitor', vodId: ctx.existingVod.vod_id }, 'VOD is live, ensuring download queued');
 
   await enqueueLiveHlsDownload({
     dbId: ctx.existingVod.id,
@@ -276,7 +276,7 @@ export async function validateVodPath(tenantId: string): Promise<{ valid: boolea
     const streamerConfig = configService.get(tenantId);
 
     if (!streamerConfig?.settings.vodPath) {
-      log.error({ tenantId }, `[Monitor] VOD path not configured for tenant - cannot queue downloads`);
+      log.error({ component: 'monitor', tenantId }, 'VOD path not configured for tenant - cannot queue downloads');
       return { valid: false };
     }
 
@@ -288,27 +288,27 @@ export async function validateVodPath(tenantId: string): Promise<{ valid: boolea
       const testSubdir = path.join(vodDirBase, tenantId);
       try {
         await fs.mkdir(testSubdir, { recursive: true });
-        log.trace({ vodPath: vodDirBase }, `[Monitor] VOD path validated successfully`);
+        log.trace({ component: 'monitor', vodPath: vodDirBase }, 'VOD path validated successfully');
         return { valid: true };
       } catch (mkdirError) {
         const details = extractErrorDetails(mkdirError);
         log.error(
-          { tenantId, vodPath: testSubdir, error: details.message },
-          `[Monitor] Cannot write to VOD path - directory creation failed`
+          { component: 'monitor', tenantId, vodPath: testSubdir, error: details.message },
+          'Cannot write to VOD path - directory creation failed'
         );
         return { valid: false };
       }
     } catch (accessError) {
       const details = extractErrorDetails(accessError);
       log.error(
-        { tenantId, vodPath: vodDirBase, error: details.message },
-        `[Monitor] VOD path not accessible - check permissions`
+        { component: 'monitor', tenantId, vodPath: vodDirBase, error: details.message },
+        'VOD path not accessible - check permissions'
       );
       return { valid: false };
     }
   } catch (error) {
     const details = extractErrorDetails(error);
-    log.error({ tenantId, error: details.message }, `[Monitor] Unexpected error validating VOD path`);
+    log.error({ component: 'monitor', tenantId, error: details.message }, 'Unexpected error validating VOD path');
     return { valid: false };
   }
 }
@@ -333,8 +333,8 @@ export async function enqueueLiveHlsDownload(params: {
     const validationResult = await validateVodPath(params.tenantId);
     if (!validationResult.valid) {
       log.error(
-        { vodId: params.vodId, platform: params.platform },
-        `[Monitor] Aborting download queue - VOD path validation failed`
+        { component: 'monitor', vodId: params.vodId, platform: params.platform },
+        'Aborting download queue - VOD path validation failed'
       );
       return;
     }
@@ -344,8 +344,8 @@ export async function enqueueLiveHlsDownload(params: {
 
   try {
     log.debug(
-      { vodId: params.vodId, platform: params.platform, tenantId: params.tenantId },
-      `[Monitor] Attempting to enqueue Live HLS download job`
+      { component: 'monitor', vodId: params.vodId, platform: params.platform, tenantId: params.tenantId },
+      'Attempting to enqueue Live HLS download job'
     );
 
     const { jobId, isNew } = await enqueueJobWithLogging(
@@ -370,15 +370,15 @@ export async function enqueueLiveHlsDownload(params: {
         removeOnFail: true,
       },
       { info: log.info.bind(log), debug: log.debug.bind(log) },
-      `[Monitor] Live HLS download job enqueued successfully`,
+      'Live HLS download job enqueued successfully',
       { dbId: params.dbId, vodId: params.vodId, platform: params.platform, queueName: 'vod_live' }
     );
 
     if (isNew) {
-      log.debug({ vodId: params.vodId, jobId }, `[Monitor] Job was newly added to queue`);
+      log.debug({ component: 'monitor', vodId: params.vodId, jobId }, 'Job was newly added to queue');
     }
   } catch (error) {
     const details = extractErrorDetails(error);
-    log.error({ vodId: params.vodId, ...details }, `[Monitor] CRITICAL - Failed to enqueue Live HLS download job`);
+    log.error({ component: 'monitor', vodId: params.vodId, ...details }, 'CRITICAL - Failed to enqueue Live HLS download job');
   }
 }

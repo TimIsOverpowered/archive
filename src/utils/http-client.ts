@@ -202,7 +202,7 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
   } catch (error) {
     const duration = Date.now() - startTime;
     const { message } = extractErrorDetails(error);
-    getLogger().error({ method, url: scrubbedUrl, duration, error: message, ...logContext }, '[HTTP] FAILED');
+    getLogger().error({ component: 'http-client', method, url: scrubbedUrl, duration, error: message, ...logContext }, 'FAILED');
     throw error;
   }
 }

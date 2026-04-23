@@ -36,8 +36,8 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
   const log = createAutoLogger(tenantId);
 
   log.debug(
-    { jobId: job.id, tenantId, dbId, vodId, platform, duration, startOffset, forceRerun },
-    '[Chat] Job received'
+    { component: 'chat-worker', jobId: job.id, tenantId, dbId, vodId, platform, duration, startOffset, forceRerun },
+    'Job received'
   );
 
   if (!isTwitchPlatform(platform)) {
@@ -53,7 +53,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
     hasExistingData,
     lastMessageId,
   } = await calculateResumeOffset(db, dbId, startOffset);
-  log.debug({ vodId, startOffset, effectiveOffset, hasExistingData }, '[Chat] Resume check completed');
+  log.debug({ component: 'chat-worker', vodId, startOffset, effectiveOffset, hasExistingData }, 'Resume check completed');
 
   const messageId = await initChatAlert(
     chatAlerts,
@@ -66,7 +66,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
   );
 
   if (!messageId) {
-    log.error('[Chat] Failed to initialize alert');
+    log.error({ component: 'chat-worker' }, 'Failed to initialize alert');
     throw new Error('Failed to initialize chat alert');
   }
 
@@ -101,7 +101,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
   const result = await processChatDownload(state, effectiveOffset);
 
   resetFailures(tenantId);
-  log.debug({ vodId, ...result, finalOffset: effectiveOffset }, '[Chat] Download completed successfully');
+  log.debug({ component: 'chat-worker', vodId, ...result, finalOffset: effectiveOffset }, 'Download completed successfully');
   const resumeIndicator = startOffset || hasExistingData;
   updateAlert(
     messageId,

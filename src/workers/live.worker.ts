@@ -25,7 +25,7 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (
   const { dbId, vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl } = job.data;
   const log = createAutoLogger(tenantId);
 
-  log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[Live Worker] Starting job');
+  log.info({ component: 'live-worker', jobId: job.id, dbId, vodId, platform, tenantId }, 'Starting job');
   await job.updateProgress(0);
 
   const ctx = await getJobContext(tenantId);
@@ -144,7 +144,7 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (
     );
 
     await job.updateProgress(100);
-    log.info({ jobId: job.id, vodId }, '[Live Worker] Job completed successfully');
+    log.info({ component: 'live-worker', jobId: job.id, vodId }, 'Job completed successfully');
     return { success: true };
   } catch (error) {
     const errorMsg = handleWorkerError(error, log, { vodId, jobId: job.id, platform, dbId, tenantId });

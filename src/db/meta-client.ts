@@ -42,7 +42,7 @@ export async function initMetaClient(): Promise<Kysely<MetaDB>> {
   _metaDb = db;
   if (getBaseConfig().NODE_ENV !== 'production') globalForMeta.metaDb = db;
 
-  getLogger().info('[meta-client] Initialized (Kysely)');
+  getLogger().info({ component: 'meta-client' }, 'Initialized (Kysely)');
   return _metaDb;
 }
 
@@ -61,5 +61,5 @@ export async function closeMetaClient(): Promise<void> {
   if (getBaseConfig().NODE_ENV !== 'production') {
     globalForMeta.metaDb = undefined;
   }
-  getLogger().info('[meta-client] Closed');
+  getLogger().info({ component: 'meta-client' }, 'Closed');
 }

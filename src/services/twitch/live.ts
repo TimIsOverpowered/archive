@@ -30,7 +30,7 @@ export async function getTwitchStreamStatus(userId: string, tenantId: string): P
     const creds = getTwitchCredentials(tenantId);
 
     if (!creds) {
-      log.warn({ tenantId }, `[Twitch Live Check] No credentials configured for tenant ${tenantId}`);
+      log.warn({ component: 'twitch-live', tenantId }, `No credentials configured for tenant ${tenantId}`);
       return null;
     }
 
@@ -70,7 +70,7 @@ export async function getTwitchStreamStatus(userId: string, tenantId: string): P
     };
   } catch (error: unknown) {
     const { message } = extractErrorDetails(error);
-    log.error({ userId, err: message }, `[Twitch Live Check] Failed to get stream status for user ${userId}`);
+    log.error({ component: 'twitch-live', userId, err: message }, `Failed to get stream status for user ${userId}`);
     throw error;
   }
 }
@@ -85,7 +85,7 @@ export async function getLatestTwitchVodObject(
     const creds = getTwitchCredentials(tenantId);
 
     if (!creds) {
-      log.warn({ tenantId }, `[Twitch] No credentials configured for tenant ${tenantId}`);
+      log.warn({ component: 'twitch-live', tenantId }, `No credentials configured for tenant ${tenantId}`);
       return null;
     }
 
@@ -114,14 +114,14 @@ export async function getLatestTwitchVodObject(
     }
 
     log.info(
-      { userId, stream_id: latestVod.stream_id, id: latestVod.id },
-      `[Twitch] VOD object ready! Match found: stream_id=${latestVod.stream_id}, vod_id=${latestVod.id}`
+      { component: 'twitch-live', userId, stream_id: latestVod.stream_id, id: latestVod.id },
+      `VOD object ready! Match found: stream_id=${latestVod.stream_id}, vod_id=${latestVod.id}`
     );
 
     return latestVod;
   } catch (error: unknown) {
     const { message } = extractErrorDetails(error);
-    log.error({ userId, err: message }, `[Twitch] Failed to get VOD object for user ${userId}`);
+    log.error({ component: 'twitch-live', userId, err: message }, `Failed to get VOD object for user ${userId}`);
     throw error;
   }
 }

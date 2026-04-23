@@ -45,7 +45,7 @@ export async function checkFlareSolverrHealth(): Promise<FlareSolverrHealthResul
     if (body.status !== 'ok') {
       const result: FlareSolverrHealthResult = { status: 'error', stats: { version: 'unknown', sessions: 0 } };
       healthCache.set('health', result);
-      getLogger().error('[FlareSolverr Health] Status report is not ok');
+      getLogger().error({ component: 'flaresolverr-health' }, 'Status report is not ok');
       return result;
     }
 
@@ -61,7 +61,7 @@ export async function checkFlareSolverrHealth(): Promise<FlareSolverrHealthResul
     return result;
   } catch (error) {
     const details = extractErrorDetails(error);
-    getLogger().warn({ ...details }, '[FlareSolverr Health] Failed to check health (transient error)');
+    getLogger().warn({ component: 'flaresolverr-health', ...details }, 'Failed to check health (transient error)');
 
     const result: FlareSolverrHealthResult = {
       status: 'error',

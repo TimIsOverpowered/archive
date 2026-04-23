@@ -38,6 +38,7 @@ export interface ChatDownloadJob {
 }
 
 export interface YoutubeVodUploadJob {
+  kind: 'vod';
   tenantId: string;
   dbId: number;
   vodId: string;
@@ -49,6 +50,7 @@ export interface YoutubeVodUploadJob {
 }
 
 export interface YoutubeGameUploadJob {
+  kind: 'game';
   tenantId: string;
   dbId: number;
   vodId: string;

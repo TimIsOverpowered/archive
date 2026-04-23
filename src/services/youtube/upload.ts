@@ -52,8 +52,8 @@ export async function uploadVideo(
     const fileName = filePath.split('/').pop() || filePath;
 
     logger.info(
-      { tenantId, title, fileSize, fileName, privacyStatus },
-      `[YouTube] Starting upload for ${displayName}: ${title}`
+      { component: 'youtube-upload', tenantId, title, fileSize, fileName, privacyStatus },
+      `Starting upload for ${displayName}: ${title}`
     );
 
     const progressStream = new ProgressStream(fileSize, (progressData) => {
@@ -83,7 +83,7 @@ export async function uploadVideo(
     const videoId = response.data?.id;
     if (!videoId) throw new Error('Upload completed but no video ID returned');
 
-    logger.info({ tenantId, videoId, uploadDuration: Date.now() - uploadStartTime }, '[YouTube] Upload completed');
+    logger.info({ component: 'youtube-upload', tenantId, videoId, uploadDuration: Date.now() - uploadStartTime }, 'Upload completed');
 
     if (onProgress) {
       await onProgress({ milestone: 'processing_metadata', videoId });
@@ -98,8 +98,8 @@ export async function uploadVideo(
     }
 
     logger.info(
-      { tenantId, videoId, totalDuration: Date.now() - uploadStartTime },
-      '[YouTube] Upload completed successfully'
+      { component: 'youtube-upload', tenantId, videoId, totalDuration: Date.now() - uploadStartTime },
+      'Upload completed successfully'
     );
 
     return { videoId, thumbnailUrl };
@@ -107,7 +107,7 @@ export async function uploadVideo(
     const details = extractErrorDetails(err);
     const uploadDuration = Date.now() - uploadStartTime;
 
-    logger.error({ ...details, tenantId, uploadDuration, title }, `[YouTube] Upload failed for ${displayName}`);
+    logger.error({ component: 'youtube-upload', ...details, tenantId, uploadDuration, title }, `Upload failed for ${displayName}`);
 
     if (onProgress) {
       await onProgress({ milestone: 'error', errorDetails: err as Error });

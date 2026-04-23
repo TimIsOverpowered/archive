@@ -77,7 +77,7 @@ export function createTwitchGqlClient(
               errors,
               operationName: (body as Record<string, unknown>)?.operationName,
             },
-            '[Twitch GraphQL] API returned errors'
+            'API returned errors'
           );
         }
       }

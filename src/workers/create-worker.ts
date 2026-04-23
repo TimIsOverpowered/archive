@@ -93,20 +93,20 @@ export function createWorker<TData>(config: WorkerConfig<TData>): Worker<TData, 
         errorMessage: err.message,
         errorStack: err.stack ?? 'No stack trace',
       },
-      `[${name}] job failed`
+      `job failed`
     );
   });
 
   worker.on('stalled', (jobId) => {
     getLogger().warn(
-      { jobId, queueName: name },
-      `[${name}] Job stalled - lock may have expired. This typically happens when a job takes longer than the lock duration (default: 30s). Check if event loop is blocked.`
+      { component: 'worker', jobId, queueName: name },
+      'Job stalled - lock may have expired. This typically happens when a job takes longer than the lock duration (default: 30s). Check if event loop is blocked.'
     );
   });
 
   worker.on('error', (err) => {
     const details = extractErrorDetails(err);
-    getLogger().error({ workerName: name, err: details }, `[${name}] worker error`);
+    getLogger().error({ component: 'worker', workerName: name, err: details }, 'worker error');
   });
 
   workerRegistry.register(name, worker as Worker<Record<string, unknown>, unknown>);

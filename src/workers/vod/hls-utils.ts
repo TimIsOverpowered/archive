@@ -150,12 +150,12 @@ export async function fetchTwitchPlaylist(
     const masterPlaylistContent = await getTwitchM3u8(String(vodId), tokenSig.value, tokenSig.signature);
 
     if (!masterPlaylistContent) {
-      log.error(`[${vodId}] Failed to fetch Twitch master playlist`);
+      log.error({ vodId }, 'Failed to fetch Twitch master playlist');
 
-      if (retryCount > maxRetryBeforeEndDetection) {
-        log.warn(`[${vodId}] Too many consecutive failures. Assuming stream ended or platform issue.`);
-        return null;
-      }
+  if (retryCount > maxRetryBeforeEndDetection) {
+      log.warn({ vodId }, 'Too many consecutive failures. Assuming stream ended or platform issue.');
+      return null;
+    }
 
       await sleep(5000 * Math.min(retryCount, 6));
       return null;
@@ -164,7 +164,7 @@ export async function fetchTwitchPlaylist(
     const parsedMaster: HLS.types.MasterPlaylist | HLS.types.MediaPlaylist = HLS.parse(masterPlaylistContent);
 
     if (!parsedMaster) {
-      log.error(`[${vodId}] Failed to parse Twitch master playlist`);
+      log.error({ vodId }, 'Failed to parse Twitch master playlist');
 
       await sleep(5000);
       return null;
@@ -173,7 +173,7 @@ export async function fetchTwitchPlaylist(
     const bestVariantUrl = (parsedMaster as HLS.types.MasterPlaylist).variants?.[0]?.uri || parsedMaster.uri;
 
     if (!bestVariantUrl) {
-      log.error(`[${vodId}] No variant URL found in master playlist`);
+      log.error({ vodId }, 'No variant URL found in master playlist');
       return null;
     }
     let baseURL: string = '';
@@ -219,12 +219,12 @@ export async function fetchKickPlaylist(
   const fetchUrl = sourceUrl || '';
 
   if (!fetchUrl) {
-    log.error(`[${vodId}] No Kick HLS source URL provided. Cannot continue download.`);
+    log.error({ vodId }, 'No Kick HLS source URL provided. Cannot continue download.');
 
     await sleep(5000);
 
     if (retryCount > maxRetryBeforeEndDetection * 2) {
-      log.error(`[${vodId}] Aborting download - no source URL available after multiple attempts`);
+      log.error({ vodId }, 'Aborting download - no source URL available after multiple attempts');
       return null;
     }
 
