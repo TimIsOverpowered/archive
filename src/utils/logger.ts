@@ -34,7 +34,7 @@ export function getLogger(): pino.Logger {
           })
     ) as unknown as pino.Logger;
   }
-  return _logger!;
+  return _logger;
 }
 
 interface LogContext {

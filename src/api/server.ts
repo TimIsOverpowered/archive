@@ -80,8 +80,7 @@ export async function buildServer() {
     const { statusCode, message, code, isClientError } = formatErrorResponse(error);
 
     if (statusCode >= 500) {
-      const details = extractErrorDetails(error);
-      getLogger().error({ err: details.message, stack: details.stack }, 'Request error');
+      getLogger().error({ err: error }, 'Request error');
     }
 
     return reply.status(statusCode).send({

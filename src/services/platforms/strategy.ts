@@ -1,7 +1,7 @@
 import type { Platform } from '../../types/platforms.js';
 import type { Kysely } from 'kysely';
-import type { TenantConfig } from '../../config/types.js';
 import type { StreamerDB } from '../../db/streamer-types.js';
+import type { TenantPlatformContext } from '../../api/middleware/tenant-platform.js';
 
 /** Data shape for creating a VOD record from platform metadata. */
 export interface VodCreateData {
@@ -43,11 +43,11 @@ export interface PlatformVodMetadata {
   sourceUrl?: string | null | undefined;
 }
 
-/** Context passed to platform strategy methods. */
-export interface PlatformStrategyContext {
-  tenantId: string;
-  config: TenantConfig;
-  platform: Platform;
+/** Context passed to platform strategy methods.
+ * Extends TenantPlatformContext with db optional since some strategy methods (checkStreamStatus, fetchVodMetadata)
+ * don't require a database connection.
+ */
+export interface PlatformStrategyContext extends Omit<TenantPlatformContext, 'db'> {
   db?: Kysely<StreamerDB>;
 }
 
