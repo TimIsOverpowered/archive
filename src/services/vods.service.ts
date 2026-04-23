@@ -18,6 +18,7 @@ import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.js';
 import { CacheKeys } from '../utils/cache-keys.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { getLogger } from '../utils/logger.js';
+import { buildPagination } from '../db/queries/builders.js';
 
 function applyVolatileData(
   vods: VodResponse[],
@@ -177,9 +178,7 @@ export async function getVods(
   tenantId: string,
   query: VodQuery
 ): Promise<{ vods: VodResponse[]; total: number }> {
-  const page = Math.max(1, query.page || 1);
-  const limit = Math.min(100, Math.max(1, query.limit || 20));
-  const offset = (page - 1) * limit;
+  const { page, offset, limit } = buildPagination({ page: query.page, limit: query.limit, maxLimit: 100 });
 
   const cacheKey = buildQueryCacheKey(tenantId, query, page, limit);
   const { where, orderBy } = buildVodQuery(query);
