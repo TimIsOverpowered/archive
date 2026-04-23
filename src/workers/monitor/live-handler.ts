@@ -9,8 +9,9 @@ import { getStrategy, type PlatformStreamStatus, type PlatformVodMetadata } from
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { sendStreamOfflineAlert, sendStreamLiveAlert } from './alert-helpers.js';
-import { getLiveDownloadQueue, enqueueJobWithLogging, LIVE_JOB_ID_PREFIX } from '../jobs/queues.js';
-import type { LiveDownloadJob } from '../jobs/queues.js';
+import { getLiveDownloadQueue, LIVE_JOB_ID_PREFIX } from '../queues/queue.js';
+import { enqueueJobWithLogging } from '../jobs/enqueue.js';
+import type { LiveDownloadJob } from '../jobs/types.js';
 import { configService } from '../../config/tenant-config.js';
 import { publishVodUpdate } from '../../services/cache-invalidator.js';
 
@@ -71,7 +72,10 @@ export async function handlePlatformLiveCheck(
     streamStatus = await strategy.checkStreamStatus(ctx);
   } catch (error: unknown) {
     const details = extractErrorDetails(error);
-    log.warn({ component: 'monitor', userId: platformUserId, platform, err: details.message }, 'API error - skipping check');
+    log.warn(
+      { component: 'monitor', userId: platformUserId, platform, err: details.message },
+      'API error - skipping check'
+    );
     return;
   }
 
@@ -379,6 +383,9 @@ export async function enqueueLiveHlsDownload(params: {
     }
   } catch (error) {
     const details = extractErrorDetails(error);
-    log.error({ component: 'monitor', vodId: params.vodId, ...details }, 'CRITICAL - Failed to enqueue Live HLS download job');
+    log.error(
+      { component: 'monitor', vodId: params.vodId, ...details },
+      'CRITICAL - Failed to enqueue Live HLS download job'
+    );
   }
 }

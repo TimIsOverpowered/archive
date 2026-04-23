@@ -5,7 +5,7 @@ import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { createVodWorkerAlerts } from './utils/alert-factories.js';
-import type { StandardVodJob } from './jobs/queues.js';
+import type { StandardVodJob } from './jobs/types.js';
 import { downloadVodWithFfmpeg } from './vod/vod-download-strategies.js';
 import { DOWNLOAD_METHODS, PLATFORMS } from '../types/platforms.js';
 import { downloadHlsStream } from './vod/hls-orchestrator.js';

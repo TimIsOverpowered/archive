@@ -1,5 +1,5 @@
-import { getFlowProducer, getStandardVodQueue, getYoutubeUploadQueue } from './queues.js';
-import type { YoutubeVodUploadJob, YoutubeGameUploadJob } from './queues.js';
+import { getFlowProducer, getStandardVodQueue, getYoutubeUploadQueue } from '../queues/queue.js';
+import type { YoutubeVodUploadJob, YoutubeGameUploadJob } from './types.js';
 import dayjs from '../../utils/dayjs.js';
 import { childLogger } from '../../utils/logger.js';
 import type { Platform, SourceType, UploadMode } from '../../types/platforms.js';

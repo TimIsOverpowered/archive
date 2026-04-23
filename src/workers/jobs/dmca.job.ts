@@ -1,5 +1,5 @@
-import { defaultJobOptions, getDmcaProcessingQueue, getFlowProducer, getStandardVodQueue } from './queues.js';
-import type { DmcaProcessingJob } from './queues.js';
+import { defaultJobOptions, getDmcaProcessingQueue, getFlowProducer, getStandardVodQueue } from '../queues/queue.js';
+import type { DmcaProcessingJob } from './types.js';
 import { childLogger } from '../../utils/logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import type { Platform, SourceType } from '../../types/platforms.js';

@@ -2,7 +2,7 @@ import { Processor, Job } from 'bullmq';
 import { sleep } from '../utils/delay.js';
 import { fetchComments, fetchNextComments, type TwitchVideoCommentResponse } from '../services/twitch/index.js';
 import { initRichAlert, resetFailures, updateAlert } from '../utils/discord-alerts.js';
-import type { ChatDownloadJob, ChatDownloadResult } from './jobs/queues.js';
+import type { ChatDownloadJob, ChatDownloadResult } from './jobs/types.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
 import { extractErrorDetails } from '../utils/error.js';
@@ -53,7 +53,10 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
     hasExistingData,
     lastMessageId,
   } = await calculateResumeOffset(db, dbId, startOffset);
-  log.debug({ component: 'chat-worker', vodId, startOffset, effectiveOffset, hasExistingData }, 'Resume check completed');
+  log.debug(
+    { component: 'chat-worker', vodId, startOffset, effectiveOffset, hasExistingData },
+    'Resume check completed'
+  );
 
   const messageId = await initChatAlert(
     chatAlerts,
@@ -101,7 +104,10 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
   const result = await processChatDownload(state, effectiveOffset);
 
   resetFailures(tenantId);
-  log.debug({ component: 'chat-worker', vodId, ...result, finalOffset: effectiveOffset }, 'Download completed successfully');
+  log.debug(
+    { component: 'chat-worker', vodId, ...result, finalOffset: effectiveOffset },
+    'Download completed successfully'
+  );
   const resumeIndicator = startOffset || hasExistingData;
   updateAlert(
     messageId,

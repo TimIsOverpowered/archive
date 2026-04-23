@@ -1,5 +1,5 @@
-import type { StandardVodJob } from './queues.js';
-import { getStandardVodQueue } from './queues.js';
+import type { StandardVodJob } from './types.js';
+import { getStandardVodQueue } from '../queues/queue.js';
 import { childLogger } from '../../utils/logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import type { Platform, DownloadMethod } from '../../types/platforms.js';

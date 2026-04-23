@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { pathToFileURL } from 'node:url';
 import { extractErrorDetails } from '../utils/error.js';
 import { configService } from '../config/tenant-config.js';
-import { QUEUE_NAMES, getQueue, closeQueues } from './jobs/queues.js';
+import { QUEUE_NAMES, getQueue, closeQueues } from './queues/queue.js';
 import { initWorkersRedis, getRedisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
 import { startTokenHealthCron } from '../cron/token-health.js';
 import { startMonitorService, stopMonitorService } from './monitor/index.js';
@@ -27,7 +27,10 @@ process.on('uncaughtException', (err) => {
 async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkersConfig>) {
   if (!workerConfig.CLEAR_QUEUES_ON_STARTUP) return;
 
-  getLogger().warn({ component: 'queues' }, 'CLEAR_QUEUES_ON_STARTUP=true — all queued jobs will be permanently deleted');
+  getLogger().warn(
+    { component: 'queues' },
+    'CLEAR_QUEUES_ON_STARTUP=true — all queued jobs will be permanently deleted'
+  );
 
   for (const name of Object.values(QUEUE_NAMES)) {
     const queue = getQueue(name);

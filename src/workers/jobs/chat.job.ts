@@ -1,5 +1,5 @@
-import type { ChatDownloadJob } from './queues.js';
-import { getChatDownloadQueue } from './queues.js';
+import type { ChatDownloadJob } from './types.js';
+import { getChatDownloadQueue } from '../queues/queue.js';
 import { childLogger } from '../../utils/logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { Platform, PLATFORMS } from '../../types/platforms.js';
