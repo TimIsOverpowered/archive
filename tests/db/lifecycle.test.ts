@@ -1,6 +1,7 @@
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert';
-import { poolManager, withDbRetry, resetClientManager, createClient, isConnectionError, ensureClient } from '../../src/db/streamer-client.js';
+import { poolManager, withDbRetry, resetClientManager, createClient, ensureClient } from '../../src/db/streamer-client.js';
+import { isConnectionError } from '../../src/db/utils/errors.js';
 import type { TenantConfig } from '../../src/config/types.js';
 
 const createMockConfig = (id: string): TenantConfig => ({
