@@ -152,10 +152,10 @@ export async function fetchTwitchPlaylist(
     if (!masterPlaylistContent) {
       log.error({ vodId }, 'Failed to fetch Twitch master playlist');
 
-  if (retryCount > maxRetryBeforeEndDetection) {
-      log.warn({ vodId }, 'Too many consecutive failures. Assuming stream ended or platform issue.');
-      return null;
-    }
+      if (retryCount > maxRetryBeforeEndDetection) {
+        log.warn({ vodId }, 'Too many consecutive failures. Assuming stream ended or platform issue.');
+        return null;
+      }
 
       await sleep(5000 * Math.min(retryCount, 6));
       return null;
