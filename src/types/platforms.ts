@@ -106,6 +106,11 @@ export function isValidPlatform(value: string): value is Platform {
   return PLATFORM_VALUES.includes(value as Platform);
 }
 
+/** Type guard narrowing a platform to Twitch. */
+export function isTwitchPlatform(platform: Platform): platform is typeof PLATFORMS.TWITCH {
+  return platform === PLATFORMS.TWITCH;
+}
+
 /** Validates if a string is a valid source type. */
 export function isValidSourceType(value: string): value is SourceType {
   return SOURCE_TYPES_VALUES.includes(value as SourceType);

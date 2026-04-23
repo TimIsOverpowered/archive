@@ -24,15 +24,47 @@ interface PgPoolEntry {
 
 class PoolManager {
   private pools = new Map<string, PgPoolEntry>();
+  private sortedByAccess: string[] = [];
 
   constructor(private readonly PoolCtor: typeof Pool = Pool) {}
   private cleanupIntervalId: NodeJS.Timeout | null = null;
   private creationLocks = new Map<string, Promise<Kysely<StreamerDB>>>();
 
+  private findInsertionIndex(tenantId: string): number {
+    const entry = this.pools.get(tenantId);
+    if (!entry) return 0;
+    const ts = entry.lastAccessedAt;
+    let lo = 0,
+      hi = this.sortedByAccess.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      const midTenant = this.sortedByAccess[mid];
+      const midEntry = midTenant ? this.pools.get(midTenant) : undefined;
+      if (midEntry && midEntry.lastAccessedAt <= ts) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    return lo;
+  }
+
+  private insertSorted(tenantId: string): void {
+    const idx = this.findInsertionIndex(tenantId);
+    this.sortedByAccess.splice(idx, 0, tenantId);
+  }
+
+  private removeFromSorted(tenantId: string): void {
+    const idx = this.sortedByAccess.indexOf(tenantId);
+    if (idx !== -1) this.sortedByAccess.splice(idx, 1);
+  }
+
   getClient(tenantId: string): Kysely<StreamerDB> | undefined {
     const entry = this.pools.get(tenantId);
     if (entry) {
       entry.lastAccessedAt = Date.now();
+      this.removeFromSorted(tenantId);
+      this.insertSorted(tenantId);
       return entry.db;
     }
     return undefined;
@@ -74,6 +106,7 @@ class PoolManager {
       lastAccessedAt: Date.now(),
       createdAt: Date.now(),
     });
+    this.insertSorted(config.id);
 
     return db;
   }
@@ -87,24 +120,18 @@ class PoolManager {
         getLogger().warn({ tenantId, error: extractErrorDetails(error) }, 'Failed to disconnect DB pool');
       }
       this.pools.delete(tenantId);
+      this.removeFromSorted(tenantId);
     }
   }
 
   async evictOldestIdleClient(): Promise<void> {
-    let candidate: string | null = null;
-    let oldestTimestamp = Infinity;
-
-    for (const [tenantId, entry] of this.pools.entries()) {
-      const isFullyIdle = entry.pool.idleCount === entry.pool.totalCount;
-      if (isFullyIdle && entry.lastAccessedAt < oldestTimestamp) {
-        oldestTimestamp = entry.lastAccessedAt;
-        candidate = tenantId;
+    for (const tenantId of this.sortedByAccess) {
+      const entry = this.pools.get(tenantId);
+      if (entry && entry.pool.idleCount === entry.pool.totalCount) {
+        await this.closeClient(tenantId);
+        getLogger().info({ tenantId }, 'Evicted oldest idle client due to MAX_CLIENTS limit');
+        return;
       }
-    }
-
-    if (candidate) {
-      await this.closeClient(candidate);
-      getLogger().info({ tenantId: candidate }, 'Evicted oldest idle client due to MAX_CLIENTS limit');
     }
   }
 
@@ -124,6 +151,7 @@ class PoolManager {
         }
 
         this.pools.delete(tenantId);
+        this.removeFromSorted(tenantId);
 
         getLogger().info(
           { tenantId, idleDurationMs: idleDuration, activePools: this.pools.size },
@@ -155,6 +183,7 @@ class PoolManager {
   reset(): void {
     this.stopCleanup();
     this.pools.clear();
+    this.sortedByAccess = [];
     this.creationLocks.clear();
   }
 
@@ -170,7 +199,11 @@ class PoolManager {
 
   touchPool(tenantId: string): boolean {
     const entry = this.pools.get(tenantId);
-    if (entry) entry.lastAccessedAt = Date.now();
+    if (entry) {
+      entry.lastAccessedAt = Date.now();
+      this.removeFromSorted(tenantId);
+      this.insertSorted(tenantId);
+    }
     return !!entry;
   }
 
@@ -194,6 +227,7 @@ class PoolManager {
     }
 
     this.pools.clear();
+    this.sortedByAccess = [];
     this.creationLocks.clear();
   }
 }

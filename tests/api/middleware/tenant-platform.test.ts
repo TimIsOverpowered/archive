@@ -50,8 +50,8 @@ describe('tenantMiddleware', () => {
 
     assert.strictEqual(reply.getSentStatus(), 404);
     const body = reply.getSentBody();
-    assert.strictEqual(body.error.code, 'NOT_FOUND');
-    assert.strictEqual(body.error.message, 'Tenant ID not provided');
+    assert.strictEqual(body.code, 'NOT_FOUND');
+    assert.strictEqual(body.message, 'Tenant ID not provided');
   });
 
   it('should return 404 when tenant is not found in config', async () => {
@@ -62,8 +62,8 @@ describe('tenantMiddleware', () => {
 
     assert.strictEqual(reply.getSentStatus(), 404);
     const body = reply.getSentBody();
-    assert.strictEqual(body.error.code, 'NOT_FOUND');
-    assert.strictEqual(body.error.message, 'Tenant not found');
+    assert.strictEqual(body.code, 'NOT_FOUND');
+    assert.strictEqual(body.message, 'Tenant not found');
   });
 
   it('should return 503 when database client fails to initialize', async () => {
@@ -85,8 +85,8 @@ describe('platformValidationMiddleware', () => {
 
     assert.strictEqual(reply.getSentStatus(), 400);
     const body = reply.getSentBody();
-    assert.strictEqual(body.error.code, 'BAD_REQUEST');
-    assert.strictEqual(body.error.message, 'Platform is required');
+    assert.strictEqual(body.code, 'BAD_REQUEST');
+    assert.strictEqual(body.message, 'Platform is required');
   });
 
   it('should return 400 when platform is not enabled for tenant', async () => {
@@ -101,8 +101,8 @@ describe('platformValidationMiddleware', () => {
 
     assert.strictEqual(reply.getSentStatus(), 400);
     const body = reply.getSentBody();
-    assert.strictEqual(body.error.code, 'BAD_REQUEST');
-    assert.ok(body.error.message.includes('not enabled'));
+    assert.strictEqual(body.code, 'BAD_REQUEST');
+    assert.ok(body.message.includes('not enabled'));
   });
 
   it('should set platform on tenant context when valid', async () => {
@@ -144,8 +144,8 @@ describe('platformValidationMiddleware', () => {
 
     assert.strictEqual(reply.getSentStatus(), 500);
     const body = reply.getSentBody();
-    assert.strictEqual(body.error.code, 'INTERNAL_SERVER_ERROR');
-    assert.strictEqual(body.error.message, 'Tenant context not found');
+    assert.strictEqual(body.code, 'INTERNAL_SERVER_ERROR');
+    assert.strictEqual(body.message, 'Tenant context not found');
   });
 
   it('should validate kick platform when enabled', async () => {
