@@ -1,27 +1,21 @@
-import { LRUCache } from 'lru-cache';
+import { isCircuitOpen, recordFailure, recordSuccess, clearCircuit } from './circuit-breaker.js';
 
-const _state = new LRUCache<string, true>({
-  max: 5000,
-  ttl: 60_000,
-  allowStale: false,
-});
+const CACHE_STATE_KEY = '__cache_connection__';
 
 export function isConnectionFailed(tenantId: string): boolean {
-  return _state.has(tenantId);
+  return isCircuitOpen(`${CACHE_STATE_KEY}:${tenantId}`);
 }
 
 export function markConnectionFailed(tenantId: string): void {
-  if (!isConnectionFailed(tenantId)) {
-    _state.set(tenantId, true);
-  }
+  recordFailure(`${CACHE_STATE_KEY}:${tenantId}`, { failureThreshold: 1 });
 }
 
 export function markConnectionRestored(tenantId: string): void {
-  _state.delete(tenantId);
+  recordSuccess(`${CACHE_STATE_KEY}:${tenantId}`);
 }
 
 export function clearAllConnectionFailures(): void {
-  _state.clear();
+  clearCircuit(CACHE_STATE_KEY);
 }
 
 export const resetCacheState = clearAllConnectionFailures;

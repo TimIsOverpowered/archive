@@ -1,0 +1,94 @@
+import { LRUCache } from 'lru-cache';
+
+export type CircuitState = 'closed' | 'open' | 'half-open';
+
+export interface CircuitBreakerOptions {
+  /** Number of failures before opening the circuit */
+  failureThreshold: number;
+  /** Time in ms to wait before testing recovery (half-open) */
+  recoveryTimeout: number;
+  /** Maximum number of circuits to track */
+  maxCacheSize?: number;
+  /** TTL for circuit state entries */
+  stateTtl?: number;
+}
+
+export interface CircuitBreakerState {
+  state: CircuitState;
+  failureCount: number;
+  lastFailureTime: number | null;
+  lastSuccessTime: number | null;
+}
+
+const DEFAULT_OPTIONS: CircuitBreakerOptions = {
+  failureThreshold: 5,
+  recoveryTimeout: 30_000,
+  maxCacheSize: 5000,
+  stateTtl: 120_000,
+};
+
+const _breakers = new LRUCache<string, CircuitBreakerState>({
+  max: 5000,
+  ttl: 120_000,
+  allowStale: false,
+});
+
+function getOrCreateBreaker(key: string, _opts?: Partial<CircuitBreakerOptions>): CircuitBreakerState {
+  let state = _breakers.get(key);
+
+  if (!state) {
+    state = {
+      state: 'closed',
+      failureCount: 0,
+      lastFailureTime: null,
+      lastSuccessTime: null,
+    };
+    _breakers.set(key, state);
+  }
+
+  return state;
+}
+
+export function getCircuitState(key: string, opts?: Partial<CircuitBreakerOptions>): CircuitState {
+  const state = getOrCreateBreaker(key, opts);
+
+  if (state.state === 'open' && state.lastFailureTime) {
+    const elapsed = Date.now() - state.lastFailureTime;
+    if (elapsed >= (opts?.recoveryTimeout ?? DEFAULT_OPTIONS.recoveryTimeout)) {
+      state.state = 'half-open';
+    }
+  }
+
+  return state.state;
+}
+
+export function recordSuccess(key: string, opts?: Partial<CircuitBreakerOptions>): void {
+  const state = getOrCreateBreaker(key, opts);
+  state.failureCount = 0;
+  state.lastSuccessTime = Date.now();
+  state.state = 'closed';
+}
+
+export function recordFailure(key: string, opts?: Partial<CircuitBreakerOptions>): void {
+  const state = getOrCreateBreaker(key, opts);
+
+  state.failureCount++;
+  state.lastFailureTime = Date.now();
+  state.state = 'open';
+
+  if (state.failureCount >= (opts?.failureThreshold ?? DEFAULT_OPTIONS.failureThreshold)) {
+    state.state = 'open';
+  }
+}
+
+export function isCircuitOpen(key: string, opts?: Partial<CircuitBreakerOptions>): boolean {
+  return getCircuitState(key, opts) === 'open';
+}
+
+export function clearCircuit(key: string): void {
+  _breakers.delete(key);
+}
+
+export function clearAllCircuits(): void {
+  _breakers.clear();
+}
