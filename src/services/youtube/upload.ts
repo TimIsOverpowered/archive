@@ -83,7 +83,10 @@ export async function uploadVideo(
     const videoId = response.data?.id;
     if (!videoId) throw new Error('Upload completed but no video ID returned');
 
-    logger.info({ component: 'youtube-upload', tenantId, videoId, uploadDuration: Date.now() - uploadStartTime }, 'Upload completed');
+    logger.info(
+      { component: 'youtube-upload', tenantId, videoId, uploadDuration: Date.now() - uploadStartTime },
+      'Upload completed'
+    );
 
     if (onProgress) {
       await onProgress({ milestone: 'processing_metadata', videoId });
@@ -107,7 +110,10 @@ export async function uploadVideo(
     const details = extractErrorDetails(err);
     const uploadDuration = Date.now() - uploadStartTime;
 
-    logger.error({ component: 'youtube-upload', ...details, tenantId, uploadDuration, title }, `Upload failed for ${displayName}`);
+    logger.error(
+      { component: 'youtube-upload', ...details, tenantId, uploadDuration, title },
+      `Upload failed for ${displayName}`
+    );
 
     if (onProgress) {
       await onProgress({ milestone: 'error', errorDetails: err as Error });

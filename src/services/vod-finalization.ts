@@ -35,12 +35,7 @@ export async function finalizeVod(options: FinalizeVodOptions): Promise<void> {
     const strategy = getStrategy(platform);
     const dur = parsed.data.duration ?? null;
     if (dur && strategy?.finalizeChapters) {
-      await strategy.finalizeChapters(
-        { tenantId: ctx.tenantId, config: ctx.config, platform, db },
-        dbId,
-        vodId,
-        dur
-      );
+      await strategy.finalizeChapters({ tenantId: ctx.tenantId, config: ctx.config, platform, db }, dbId, vodId, dur);
     }
     await db
       .updateTable('vods')
