@@ -7,7 +7,7 @@ import { decryptScalar, decryptObject } from '../../src/utils/encryption.js';
 import { loadTenantConfigs } from '../../src/config/loader.js';
 import { createYoutubeClient } from '../../src/services/youtube/client.js';
 import { humanizeDuration } from '../../src/utils/formatting.js';
-import { getAllTenants, findTenantFirst } from '../../src/services/meta-tenants.service.js';
+import { getAllTenants, getTenantById } from '../../src/services/meta-tenants.service.js';
 
 interface YoutubeAuth {
   access_token?: string;
@@ -59,7 +59,7 @@ program
     }
 
     try {
-      const tenantWithYoutube = await findTenantFirst({ id: tenantId });
+      const tenantWithYoutube = await getTenantById(tenantId);
 
       if (!tenantWithYoutube) {
         console.error('Tenant not found');
@@ -119,7 +119,7 @@ program
           }
         }
 
-        const updatedTenant = await findTenantFirst({ id: tenantId });
+        const updatedTenant = await getTenantById(tenantId);
 
         if (!updatedTenant || !(updatedTenant.youtube as any)?.auth) {
           console.error('Error: YouTube credentials missing after refresh');

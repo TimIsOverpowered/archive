@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
 import { encryptObject, encryptScalar } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
-import { findTenantFirst, createTenant } from '../src/services/meta-tenants.service.js';
+import { getTenantById, createTenant } from '../src/services/meta-tenants.service.js';
 import type { InsertableTenants } from '../src/db/meta-types.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -161,7 +161,7 @@ async function importConfig(channelName: string, dbUrl: string): Promise<void> {
   }
 
   // Check for existing tenant
-  const existingTenant = await findTenantFirst({ id: channelName });
+  const existingTenant = await getTenantById(channelName);
   if (existingTenant) {
     console.error(`❌ Tenant already exists: ${channelName}`);
     process.exit(1);

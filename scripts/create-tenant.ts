@@ -10,7 +10,7 @@ import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
 import { encryptScalar, validateEncryptionKey } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
 import { normalizePath as pathNormalize } from '../src/utils/path';
-import { findTenantFirst, createTenant, deleteTenant } from '../src/services/meta-tenants.service.js';
+import { getTenantById, createTenant, deleteTenant } from '../src/services/meta-tenants.service.js';
 import type { InsertableTenants } from '../src/db/meta-types.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -264,7 +264,7 @@ async function main(): Promise<void> {
     }
 
     // Check for duplicates
-    const existingTenant = await findTenantFirst({ id: channelName });
+    const existingTenant = await getTenantById(channelName);
     if (existingTenant) {
       console.error('❌ Tenant with this channel name already exists.');
       process.exit(1);
