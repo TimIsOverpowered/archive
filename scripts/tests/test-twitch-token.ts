@@ -8,7 +8,7 @@ import { getAppAccessToken } from '../../src/services/twitch/index.js';
 import { getTwitchCredentials } from '../../src/utils/credentials.js';
 import { humanizeDuration } from '../../src/utils/formatting.js';
 import { getTwitchAuth } from '../../src/utils/tenant-config.js';
-import { getAllTenants, findTenantFirst } from '../../src/services/meta-tenants.service.js';
+import { getAllTenants, getTenantById } from '../../src/services/meta-tenants.service.js';
 
 interface TwitchAuth {
   client_id: string;
@@ -56,7 +56,7 @@ program
       }
 
       try {
-        const tenant = await findTenantFirst({ id: tenantId });
+        const tenant = await getTenantById(tenantId);
 
         if (!tenant) {
           console.error('Tenant not found');
@@ -88,7 +88,7 @@ program
 
             await new Promise((resolve) => setTimeout(resolve, 500));
 
-            const updatedTenant = await findTenantFirst({ id: tenantId });
+            const updatedTenant = await getTenantById(tenantId);
 
             if (!updatedTenant) {
               console.error('Error: Tenant not found after refresh');

@@ -1,5 +1,5 @@
 import { getMetaClient } from '../db/meta-client.js';
-import type { InsertableTenants, TenantResult, UpdateableTenants, SelectableTenants } from '../db/meta-types.js';
+import type { InsertableTenants, TenantResult, UpdateableTenants } from '../db/meta-types.js';
 
 const tenantSelect = [
   'id',
@@ -21,21 +21,6 @@ export async function getAllTenants(): Promise<TenantResult[]> {
 /** Look up a tenant by ID from the metadata database. */
 export async function getTenantById(id: string): Promise<TenantResult | undefined> {
   return getMetaClient().selectFrom('tenants').select(tenantSelect).where('id', '=', id).executeTakeFirst();
-}
-
-/** Find a tenant matching the first defined where clause key. */
-export async function findTenantFirst(where: Partial<SelectableTenants>): Promise<TenantResult | undefined> {
-  let query = getMetaClient().selectFrom('tenants').select(tenantSelect);
-
-  let key: keyof SelectableTenants;
-  for (key in where) {
-    const value = where[key];
-    if (value !== undefined) {
-      query = query.where(key, '=', value as never);
-    }
-  }
-
-  return await query.executeTakeFirst();
 }
 
 /** Create a new tenant record in the metadata database. */
