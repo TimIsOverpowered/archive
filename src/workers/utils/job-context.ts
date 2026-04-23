@@ -17,6 +17,10 @@ export async function getJobContext(tenantId: string): Promise<JobContext> {
     throw new Error(`Config not found for tenant ${tenantId}`);
   }
 
+  if (!config.settings.vodPath) {
+    throw new Error(`VOD path not configured for ${tenantId}`);
+  }
+
   const db = await ensureClient(tenantId, config);
 
   return { config, db, tenantId };

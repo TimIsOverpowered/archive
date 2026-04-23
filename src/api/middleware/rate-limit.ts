@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { RateLimiterRedis, RateLimiterMemory } from 'rate-limiter-flexible';
 import { validateCloudflareRequest } from '../../utils/cloudflare-ip-validator.js';
+import { getClientIp } from './ip.js';
 
 type RateLimiter = RateLimiterRedis | RateLimiterMemory;
 
@@ -8,17 +9,6 @@ type RateLimiter = RateLimiterRedis | RateLimiterMemory;
 interface RateLimitOptions {
   limiter: RateLimiter;
   writeLimiter?: RateLimiter;
-}
-
-/** Extract client IP from forwarded headers or socket address. */
-function getClientIp(request: FastifyRequest): string {
-  return (
-    (request.headers['cf-connecting-ip'] as string) ??
-    (request.headers['x-real-ip'] as string) ??
-    (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ??
-    request.ip ??
-    'unknown'
-  );
 }
 
 /**

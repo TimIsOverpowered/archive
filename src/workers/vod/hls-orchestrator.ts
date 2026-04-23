@@ -57,8 +57,6 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
   const { config, tenantId } = ctx;
   const log = createAutoLogger(tenantId);
 
-  if (!config?.settings.vodPath) throw new Error(`VOD path not configured for ${tenantId}`);
-
   const concurrency = HLS_SEGMENT_CONCURRENCY;
 
   const vodDir = getVodDirPath({ config, vodId });
