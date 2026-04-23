@@ -21,7 +21,7 @@ const DEFAULT_OPTIONS: CircuitBreakerOptions = {
   recoveryTimeout: 30_000,
 };
 
-const breakerCache = new LRUCache<string, CircuitBreakerState>({
+export const breakerCache = new LRUCache<string, CircuitBreakerState>({
   max: 5000,
   ttl: 120_000,
   allowStale: false,
