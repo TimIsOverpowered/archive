@@ -65,6 +65,10 @@ async function getVodBucketSize(db: Kysely<StreamerDB>, tenantId: string, vodId:
   return bucketSize;
 }
 
+/**
+ * Fetch chat comments for a VOD using offset-based pagination.
+ * Computes dynamic bucket size from comment density, caches results in Redis.
+ */
 export async function getLogsByOffset(
   db: Kysely<StreamerDB>,
   tenantId: string,
@@ -158,6 +162,10 @@ export async function getLogsByOffset(
   return response;
 }
 
+/**
+ * Fetch chat comments for a VOD using cursor-based pagination.
+ * Cursor encodes offset, timestamp, and message ID for deterministic ordering.
+ */
 export async function getLogsByCursor(
   db: Kysely<StreamerDB>,
   tenantId: string,

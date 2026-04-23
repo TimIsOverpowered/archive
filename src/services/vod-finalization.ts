@@ -5,6 +5,7 @@ import { withDbRetry } from '../db/client.js';
 import { VodUpdateSchema } from '../config/schemas.js';
 import { publishVodDurationUpdate } from './cache-invalidator.js';
 
+/** Options for finalizing a VOD after download completes. */
 export interface FinalizeVodOptions {
   ctx: TenantContext;
   dbId: number;
@@ -13,6 +14,10 @@ export interface FinalizeVodOptions {
   durationSeconds: number | null;
 }
 
+/**
+ * Finalize a VOD after download: update duration, set is_live=false,
+ * run platform-specific chapter finalization, and publish cache update.
+ */
 export async function finalizeVod(options: FinalizeVodOptions): Promise<void> {
   const { ctx, dbId, vodId, platform, durationSeconds } = options;
 

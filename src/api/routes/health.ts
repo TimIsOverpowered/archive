@@ -11,10 +11,15 @@ import { getCacheMetrics } from '../../utils/cache.js';
 import { QUEUES_VALUES, type QueueJob } from '../../workers/jobs/queues.js';
 import { getRedisInstance } from '../../workers/redis.js';
 
+/** Options for registering the health routes plugin. */
 interface HealthRouteOptions {
   prefix: string;
 }
 
+/**
+ * Register health check endpoint: reports Redis, DB, streamer, queue, and cache status.
+ * Requires x-health-token header for timing-safe validation.
+ */
 export default async function healthRoutes(fastify: FastifyInstance, _options: HealthRouteOptions) {
   fastify.get(
     '/health',
@@ -117,6 +122,7 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
   );
 }
 
+/** Fetch job counts for all registered worker queues. */
 async function getQueueMetrics(): Promise<
   Record<string, { waiting: number; active: number; failed: number; delayed: number }>
 > {

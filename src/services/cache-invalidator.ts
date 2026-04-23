@@ -16,6 +16,10 @@ interface VodUpdateEvent {
   is_live?: boolean;
 }
 
+/**
+ * Publish a VOD update event to Redis for cache invalidation.
+ * Subscribers will invalidate the static cache for the VOD.
+ */
 export async function publishVodUpdate(tenantId: string, dbId: number): Promise<void> {
   const client = RedisService.getActiveClient();
   if (!client) return;
@@ -30,6 +34,10 @@ export async function publishVodUpdate(tenantId: string, dbId: number): Promise<
   }
 }
 
+/**
+ * Publish a VOD duration update event to Redis.
+ * Subscribers will set the volatile cache entry with the new duration and is_live status.
+ */
 export async function publishVodDurationUpdate(
   tenantId: string,
   dbId: number,
@@ -49,6 +57,11 @@ export async function publishVodDurationUpdate(
   }
 }
 
+/**
+ * Register a Redis Pub/Sub subscriber for VOD cache invalidation events.
+ * Handles VOD_UPDATED (invalidates static cache) and VOD_DURATION_UPDATED (sets volatile cache).
+ * Subscribes to the cache channel and hooks into fastify's onClose for cleanup.
+ */
 export function registerCacheSubscriber(fastify: FastifyInstance): void {
   const mainClient = RedisService.getActiveClient();
   if (!mainClient) return;

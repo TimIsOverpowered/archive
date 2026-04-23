@@ -8,11 +8,13 @@ import { CacheKeys } from '../utils/cache-keys.js';
 
 export { invalidateVodVolatileCache };
 
+/** Volatile cache data for a VOD: dynamic fields that change during playback. */
 export interface VodVolatileData {
   duration: number;
   is_live: boolean;
 }
 
+/** Retrieve a cached VOD list query result from Redis. */
 export async function getVodStaticCache(tenantId: string, dbId: number): Promise<string | null> {
   const client = RedisService.getActiveClient();
   if (!client) return null;
@@ -24,6 +26,7 @@ export async function getVodStaticCache(tenantId: string, dbId: number): Promise
   }
 }
 
+/** Store a VOD list query result in Redis with the given TTL. */
 export async function setVodStaticCache(tenantId: string, dbId: number, data: string, ttl: number): Promise<void> {
   const client = RedisService.getActiveClient();
   if (!client) return;
@@ -36,6 +39,7 @@ export async function setVodStaticCache(tenantId: string, dbId: number, data: st
   }
 }
 
+/** Retrieve volatile cache data (duration, is_live) for a VOD from Redis. */
 export async function getVodVolatileCache(tenantId: string, dbId: number): Promise<VodVolatileData | null> {
   const client = RedisService.getActiveClient();
   if (!client) return null;
@@ -51,6 +55,7 @@ export async function getVodVolatileCache(tenantId: string, dbId: number): Promi
   }
 }
 
+/** Store volatile cache data (duration, is_live) for a VOD in Redis. */
 export async function setVodVolatileCache(
   tenantId: string,
   dbId: number,
@@ -68,6 +73,10 @@ export async function setVodVolatileCache(
   }
 }
 
+/**
+ * Batch retrieve volatile cache data for multiple VODs using Redis MGET.
+ * Returns a Map of dbId -> VodVolatileData, skipping corrupt entries.
+ */
 export async function getVodVolatileCacheBatch(
   tenantId: string,
   dbIds: number[]
@@ -102,6 +111,10 @@ export async function getVodVolatileCacheBatch(
   return result;
 }
 
+/**
+ * Invalidate a VOD's static cache entry and all its tag-associated keys.
+ * Tracks Redis connection state for resumable invalidation.
+ */
 export async function invalidateVodStaticCache(tenantId: string, dbId: number): Promise<void> {
   const client = RedisService.getActiveClient();
   if (!client) return;
@@ -127,6 +140,10 @@ export async function invalidateVodStaticCache(tenantId: string, dbId: number): 
   }
 }
 
+/**
+ * Invalidate the emote cache entry for a VOD.
+ * Tracks Redis connection state for resumable invalidation.
+ */
 export async function invalidateEmoteCache(tenantId: string, vodId: number): Promise<void> {
   const client = RedisService.getActiveClient();
   if (!client) return;

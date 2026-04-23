@@ -4,11 +4,13 @@ import { validateCloudflareRequest } from '../../utils/cloudflare-ip-validator.j
 
 type RateLimiter = RateLimiterRedis | RateLimiterMemory;
 
+/** Configuration for the rate limit middleware factory. */
 interface RateLimitOptions {
   limiter: RateLimiter;
   writeLimiter?: RateLimiter;
 }
 
+/** Extract client IP from forwarded headers or socket address. */
 function getClientIp(request: FastifyRequest): string {
   return (
     (request.headers['cf-connecting-ip'] as string) ??
@@ -19,6 +21,10 @@ function getClientIp(request: FastifyRequest): string {
   );
 }
 
+/**
+ * Create a rate limit middleware function.
+ * Validates Cloudflare requests, extracts client IP, and enforces rate limits with appropriate headers.
+ */
 export default function createRateLimitMiddleware(options: RateLimitOptions) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     const { limiter: readLimiter, writeLimiter } = options;

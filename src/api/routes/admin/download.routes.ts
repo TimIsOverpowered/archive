@@ -22,10 +22,12 @@ import {
 } from '../../../types/platforms.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job';
 
+/** Route params for download job endpoints. */
 interface Params {
   tenantId: string;
 }
 
+/** Body for manually re-triggering a VOD download. */
 interface ReDownloadVodBody {
   vodId: string;
   platform: Platform;
@@ -33,6 +35,7 @@ interface ReDownloadVodBody {
   type: SourceType;
 }
 
+/** Body for the main upload endpoint (create VOD + queue download + YouTube upload). */
 interface UploadBody {
   vodId: string;
   type: SourceType;
@@ -41,6 +44,10 @@ interface UploadBody {
   downloadMethod: DownloadMethod;
 }
 
+/**
+ * Register download job routes: upload (create + download + queue), re-download.
+ * Requires admin API key authentication, tenant middleware, and rate limiting.
+ */
 export default async function downloadJobsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const adminLimiter = RedisService.getLimiter('rate:admin');
   if (!adminLimiter) {

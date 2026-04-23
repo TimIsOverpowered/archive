@@ -11,8 +11,10 @@ import {
 import { HttpError } from './http-error.js';
 import { Agent } from 'undici';
 
+/** Supported HTTP response types for request/safeRequest functions. */
 export type ResponseType = 'json' | 'text' | 'blob' | 'arrayBuffer' | 'response';
 
+/** Configuration options for HTTP requests. */
 export interface RequestOptions<R extends ResponseType = 'json'> {
   method?: ('GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE') | undefined;
   headers?: Record<string, string> | undefined;
@@ -31,6 +33,7 @@ export interface RequestOptions<R extends ResponseType = 'json'> {
   dispatcher?: Agent | undefined;
 }
 
+/** Type-level mapping from ResponseType to the corresponding JavaScript type. */
 export type RequestResult<T, R extends ResponseType> = R extends 'json'
   ? T
   : R extends 'text'
@@ -41,6 +44,7 @@ export type RequestResult<T, R extends ResponseType> = R extends 'json'
         ? ArrayBuffer
         : Response;
 
+/** Undici agent configured for high-concurrency segment downloads. */
 export const segmentDownloadAgent = new Agent({
   connections: SEGMENT_DOWNLOAD_MAX_CONNECTIONS,
   pipelining: SEGMENT_DOWNLOAD_PIPELINING,
@@ -90,6 +94,10 @@ function prepareBodyAndHeaders(
   return { body: body as BodyInit, headers };
 }
 
+/**
+ * Make an HTTP request with configurable response type, retry logic, and abort signals.
+ * Scrubs sensitive query params (nauth, nauthsig, access_token) from URLs before logging.
+ */
 // Overloads for proper type inference
 export function request<T = unknown>(url: string | URL, options?: RequestOptions<'json'>): Promise<T>;
 export function request(url: string | URL, options: RequestOptions<'text'>): Promise<string>;
@@ -194,10 +202,15 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
   }
 }
 
+/** Options for safeRequest, which returns a default value on failure. */
 export interface SafeRequestOptions<R extends ResponseType = 'json'> extends Omit<RequestOptions<R>, 'onError'> {
   onError?: (error: unknown, url: string) => void;
 }
 
+/**
+ * Make an HTTP request that returns a default value instead of throwing on failure.
+ * Useful for fetching non-critical data (emotes, badges, etc.).
+ */
 export function safeRequest<T = unknown>(
   url: string | URL,
   defaultValue: T,

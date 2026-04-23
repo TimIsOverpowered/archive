@@ -22,10 +22,12 @@ import { ensureVodDownload, findVodRecord } from './utils/vod-helpers.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 
+/** Route params for YouTube re-upload endpoint. */
 interface ReUploadYoutubeParams {
   tenantId: string;
 }
 
+/** Body for triggering YouTube re-upload for a VOD. */
 interface ReUploadYoutubeBody {
   vodId: string;
   platform: Platform;
@@ -34,6 +36,10 @@ interface ReUploadYoutubeBody {
   type: SourceType;
 }
 
+/**
+ * Register YouTube upload routes: re-upload a VOD to YouTube.
+ * Requires admin API key authentication, tenant middleware, and rate limiting.
+ */
 export default async function youtubeUploadRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const adminRateLimiter = RedisService.getLimiter('rate:admin');
   if (!adminRateLimiter) {

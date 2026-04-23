@@ -16,6 +16,10 @@ function extractPageFromKey(key: string): number | null {
   return isNaN(page) ? null : page;
 }
 
+/**
+ * Cache a VOD list query result and register tag-based associations for all VODs in the list.
+ * Enables batch invalidation by VOD ID later.
+ */
 export async function registerVodTags(
   tenantId: string,
   vods: { id: number }[],
@@ -61,6 +65,10 @@ export async function registerVodTags(
   }
 }
 
+/**
+ * Invalidate all cache keys tagged with a specific VOD ID.
+ * Uses Redis SSCAN to iterate over tagged keys and unlink them.
+ */
 export async function invalidateVodTags(tenantId: string, dbId: number): Promise<void> {
   const client = RedisService.getActiveClient();
   if (!client) return;
@@ -87,6 +95,10 @@ export async function invalidateVodTags(tenantId: string, dbId: number): Promise
   }
 }
 
+/**
+ * Invalidate the volatile cache entry for a VOD (duration, is_live).
+ * Tracks Redis connection state to suspend/resume invalidation on failures.
+ */
 export async function invalidateVodVolatileCache(tenantId: string, dbId: number): Promise<void> {
   const client = RedisService.getActiveClient();
   if (!client) return;

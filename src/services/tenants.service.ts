@@ -8,6 +8,7 @@ import type { TenantConfig } from '../config/types.js';
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../db/streamer-types';
 
+/** Return the list of enabled platform names for a tenant config. */
 export function getEnabledPlatforms(config: Pick<TenantConfig, 'twitch' | 'kick'>): string[] {
   const platforms: string[] = [];
   if (config.twitch?.enabled) platforms.push(PLATFORMS.TWITCH);
@@ -15,6 +16,7 @@ export function getEnabledPlatforms(config: Pick<TenantConfig, 'twitch' | 'kick'
   return platforms;
 }
 
+/** Aggregated statistics for a tenant including VODs, uploads, chapters, and games. */
 interface TenantStats {
   tenant: {
     id: string;
@@ -47,6 +49,10 @@ interface TenantStats {
   };
 }
 
+/**
+ * Fetch aggregated statistics for a tenant with Redis caching.
+ * Includes VOD counts by platform, upload success rate, chapter/game counts.
+ */
 export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, cacheTtl = 60): Promise<TenantStats> {
   const config = getTenantConfig(tenantId);
 
@@ -171,6 +177,10 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
   });
 }
 
+/**
+ * Return all configured tenants with their enabled platforms.
+ * Read from config files, not from the database.
+ */
 export async function getAllTenants(): Promise<
   Array<{
     id: string;

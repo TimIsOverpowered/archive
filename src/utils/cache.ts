@@ -5,12 +5,19 @@ import { LRUCache } from 'lru-cache';
 import { retryWithBackoff } from './retry.js';
 import { MAX_SWR_FAILURES, SWR_FAILURES_TTL_MS } from '../constants.js';
 
+/** Metrics for Redis cache hit/miss/error tracking. */
 export interface CacheMetrics {
+  /** Number of successful cache reads */
   hits: number;
+  /** Number of cache misses */
   misses: number;
+  /** Number of cache read errors */
   errors: number;
+  /** Number of stale-while-revalidate cache hits */
   swrHits: number;
+  /** Number of stale-while-revalidate serving stale data */
   swrStale: number;
+  /** Number of stale-while-revalidate errors */
   swrErrors: number;
 }
 
@@ -23,10 +30,12 @@ const cacheMetrics: CacheMetrics = {
   swrErrors: 0,
 };
 
+/** Returns a snapshot of current cache metrics. */
 export function getCacheMetrics(): CacheMetrics {
   return { ...cacheMetrics };
 }
 
+/** Resets all cache metrics counters to zero. */
 export function resetCacheMetrics(): void {
   Object.keys(cacheMetrics).forEach((k) => {
     cacheMetrics[k as keyof CacheMetrics] = 0;
@@ -53,6 +62,11 @@ const inflightSimple = new LRUCache<string, Promise<unknown>>({
   allowStale: false,
 });
 
+/**
+ * Reads from Redis cache, falling back to the fetcher on miss or error.
+ * On miss, calls the fetcher and stores the result in Redis with the given TTL.
+ * Handles corrupt cache entries gracefully by falling back to the fetcher.
+ */
 export async function withCache<T>(key: string, ttl: number, fetcher: () => Promise<T>): Promise<T> {
   const client = RedisService.getActiveClient();
   if (!client) return fetcher();
@@ -101,6 +115,14 @@ const inflightPromises = new LRUCache<string, Promise<unknown>>({
 
 const INFIGHT_TIMEOUT_MS = 30_000;
 
+/**
+ * Stale-while-revalidate cache pattern.
+ * Returns cached data immediately (even if stale), then revalidates in the background.
+ * Uses in-flight deduplication to prevent thundering herd on cache misses.
+ * Implements a failure circuit breaker: after N consecutive revalidation failures,
+ * serves stale data for up to 5 minutes before retrying.
+ * Redis write failures during revalidation are silently ignored.
+ */
 export async function withStaleWhileRevalidate<T>(
   key: string,
   ttl: number,
