@@ -1,11 +1,15 @@
+import { MAX_CACHE_PAGES } from '../../constants.js';
+
 export interface PaginationOptions {
   page?: number;
   limit?: number;
   maxLimit?: number;
+  maxPage?: number;
 }
 
 export function buildPagination(opts: PaginationOptions): { page: number; offset: number; limit: number } {
-  const page = Math.max(1, opts.page ?? 1);
+  const maxPage = opts.maxPage ?? MAX_CACHE_PAGES;
+  const page = Math.max(1, Math.min(maxPage, opts.page ?? 1));
   const maxLimit = opts.maxLimit ?? 100;
   const limit = Math.min(maxLimit, Math.max(1, opts.limit ?? 20));
   const offset = (page - 1) * limit;

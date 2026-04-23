@@ -7,6 +7,9 @@ import { extractDatabaseName } from '../utils/formatting.js';
 import { buildPgBouncerUrl } from './utils.js';
 import { DB_STATEMENT_TIMEOUT_MS } from '../constants.js';
 
+// Double-cast pattern: globalThis is `object`-typed, so we cast through `unknown` first
+// to avoid type conflicts. This enables sharing the Kysely instance across hot-reload
+// boundaries in development while the module-level `_metaDb` guard handles production.
 const globalForMeta = globalThis as unknown as { metaDb: Kysely<MetaDB> | undefined };
 
 let _metaDb: Kysely<MetaDB> | null = null;

@@ -37,9 +37,8 @@ export function getCacheMetrics(): CacheMetrics {
 
 /** Resets all cache metrics counters to zero. */
 export function resetCacheMetrics(): void {
-  Object.keys(cacheMetrics).forEach((k) => {
-    cacheMetrics[k as keyof CacheMetrics] = 0;
-  });
+  cacheMetrics.hits = cacheMetrics.misses = cacheMetrics.errors =
+    cacheMetrics.swrHits = cacheMetrics.swrStale = cacheMetrics.swrErrors = 0;
 }
 
 // SWR failure tracking uses Redis (`swr:failures:{key}`) with INCR/EXPIRE (5min TTL)

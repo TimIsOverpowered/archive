@@ -53,6 +53,7 @@ function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
   if (youtubeObj) {
     const youtubeParsed = YoutubeSchema.parse(youtubeObj);
     tenantConfig.youtube = youtubeParsed;
+    // auth is stored encrypted in the database and bypasses Zod parsing (schema expects unencrypted string)
     if ('auth' in youtubeObj && youtubeObj.auth) {
       tenantConfig.youtube.auth = youtubeObj.auth as string;
     }

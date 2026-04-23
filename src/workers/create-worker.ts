@@ -115,6 +115,11 @@ export function createWorker(config: WorkerConfig): Worker<Record<string, unknow
   return worker;
 }
 
+/**
+ * Safely extracts job metadata fields from raw job data.
+ * Uses optional chaining to gracefully handle missing/null fields —
+ * all returned values will be `unknown | undefined`.
+ */
 function extractJobMeta(data: Record<string, unknown>) {
   return {
     vodId: data?.vodId,
