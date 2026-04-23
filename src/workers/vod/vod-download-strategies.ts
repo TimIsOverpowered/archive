@@ -105,9 +105,6 @@ async function downloadTwitchVodWithFfmpeg(
   log: AppLogger
 ): Promise<void> {
   const tenantId = config.id;
-  if (!config?.settings.vodPath) {
-    throw new Error(`No vodPath configured for streamer ${tenantId}`);
-  }
 
   const alerts = createVodWorkerAlerts();
   let messageId: string | null = null;

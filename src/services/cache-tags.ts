@@ -57,11 +57,16 @@ export async function registerVodTags(
       const firstErr = results.find(([err]) => err)?.[1] ?? null;
       throw firstErr ?? new Error('Pipeline command failed');
     }
-  } catch (error) {
-    if (isConnectionError(error)) {
-      markConnectionFailed(tenantId);
+
+    if (isConnectionFailed(tenantId)) {
+      markConnectionRestored(tenantId);
+      getLogger().debug({ tenantId }, 'Redis connection restored, tag registration resumed');
     }
-    getLogger().warn({ tenantId, cacheKey, error: extractErrorDetails(error) }, 'Tag registration failed');
+  } catch (error) {
+    if (!isConnectionFailed(tenantId) && isConnectionError(error)) {
+      markConnectionFailed(tenantId);
+      getLogger().warn({ tenantId, cacheKey, error: extractErrorDetails(error) }, 'Redis connection lost, tag registration suspended');
+    }
   }
 }
 
@@ -88,9 +93,15 @@ export async function invalidateVodTags(tenantId: string, dbId: number): Promise
     } while (cursor !== '0');
 
     await client.del(tagKey);
+
+    if (isConnectionFailed(tenantId)) {
+      markConnectionRestored(tenantId);
+      getLogger().debug({ tenantId }, 'Redis connection restored, tag invalidation resumed');
+    }
   } catch (error) {
-    if (isConnectionError(error)) {
+    if (!isConnectionFailed(tenantId) && isConnectionError(error)) {
       markConnectionFailed(tenantId);
+      getLogger().warn({ tenantId, dbId, error: extractErrorDetails(error) }, 'Redis connection lost, tag invalidation suspended');
     }
   }
 }

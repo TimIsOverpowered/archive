@@ -29,7 +29,6 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (
 
   const ctx = await getJobContext(tenantId);
   const { config } = ctx;
-  if (!config?.settings.vodPath) throw new Error(`VOD path not configured for ${tenantId}`);
 
   const streamerName = config.displayName || tenantId;
   const alerts = createLiveWorkerAlerts();

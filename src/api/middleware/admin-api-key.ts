@@ -3,6 +3,7 @@ import { findAdminByApiKey } from '../../services/admin.service.js';
 import { RateLimiterRedis, RateLimiterMemory } from 'rate-limiter-flexible';
 import { RedisService } from '../../utils/redis-service.js';
 import { getLogger } from '../../utils/logger.js';
+import { getClientIp } from './ip.js';
 
 /** Admin identity attached to the request after successful API key authentication. */
 export interface AdminContext {
@@ -60,12 +61,7 @@ export default async function adminApiKeyMiddleware(request: FastifyRequest, rep
   }
 
   const limiter = getAdminAuthLimiter();
-  const ip =
-    (request.headers['cf-connecting-ip'] as string) ??
-    (request.headers['x-real-ip'] as string) ??
-    (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ??
-    request.ip ??
-    'unknown';
+  const ip = getClientIp(request);
 
   try {
     await limiter.consume(ip);

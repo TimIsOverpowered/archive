@@ -29,7 +29,6 @@ const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job
 
   const ctx = await getJobContext(tenantId);
   const { config } = ctx;
-  if (!config?.settings.vodPath) throw new Error(`VOD path not configured for ${tenantId}`);
 
   const finalPath = getVodFilePath({ config, vodId });
   const streamerName = config.displayName || tenantId;
