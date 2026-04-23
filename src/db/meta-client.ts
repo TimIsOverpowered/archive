@@ -5,6 +5,7 @@ import { getLogger } from '../utils/logger.js';
 import { getBaseConfig } from '../config/env.js';
 import { extractDatabaseName } from '../utils/formatting.js';
 import { buildPgBouncerUrl } from './utils.js';
+import { DB_STATEMENT_TIMEOUT_MS } from '../constants.js';
 
 const globalForMeta = globalThis as unknown as { metaDb: Kysely<MetaDB> | undefined };
 
@@ -31,7 +32,7 @@ export async function initMetaClient(): Promise<Kysely<MetaDB>> {
 
   const url = buildPgBouncerUrl(pgbouncerUrl, metaDbName);
 
-  const pool = new Pool({ connectionString: url });
+  const pool = new Pool({ connectionString: url, statement_timeout: DB_STATEMENT_TIMEOUT_MS });
   const dialect = new PostgresDialect({ pool });
   const db = new Kysely<MetaDB>({ dialect });
 

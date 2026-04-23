@@ -5,6 +5,34 @@ import { LRUCache } from 'lru-cache';
 import { retryWithBackoff } from './retry.js';
 import { MAX_SWR_FAILURES, SWR_FAILURES_TTL_MS } from '../constants.js';
 
+export interface CacheMetrics {
+  hits: number;
+  misses: number;
+  errors: number;
+  swrHits: number;
+  swrStale: number;
+  swrErrors: number;
+}
+
+const cacheMetrics: CacheMetrics = {
+  hits: 0,
+  misses: 0,
+  errors: 0,
+  swrHits: 0,
+  swrStale: 0,
+  swrErrors: 0,
+};
+
+export function getCacheMetrics(): CacheMetrics {
+  return { ...cacheMetrics };
+}
+
+export function resetCacheMetrics(): void {
+  Object.keys(cacheMetrics).forEach((k) => {
+    cacheMetrics[k as keyof CacheMetrics] = 0;
+  });
+}
+
 // SWR failure tracking uses Redis (`swr:failures:{key}`) with INCR/EXPIRE (5min TTL)
 // for cross-instance consistency. All instances share the same failure threshold.
 // Falls back to in-memory LRU if Redis is unavailable during revalidation.
@@ -31,8 +59,13 @@ export async function withCache<T>(key: string, ttl: number, fetcher: () => Prom
 
   try {
     const cached = await client.get(key);
-    if (cached) return JSON.parse(cached) as T;
+    if (cached) {
+      cacheMetrics.hits++;
+      return JSON.parse(cached) as T;
+    }
+    cacheMetrics.misses++;
   } catch (err) {
+    cacheMetrics.errors++;
     const details = extractErrorDetails(err);
     getLogger().warn({ err: details, key }, 'Cache read failed, falling back to DB');
   }
@@ -85,8 +118,12 @@ export async function withStaleWhileRevalidate<T>(
       const entry: CacheEntry<T> = JSON.parse(cached);
       const isStale = now - entry.timestamp > staleAfter * 1000;
 
-      if (!isStale) return entry.data;
+      if (!isStale) {
+        cacheMetrics.swrHits++;
+        return entry.data;
+      }
 
+      cacheMetrics.swrStale++;
       // Stale — serve immediately, revalidate in background
       if (!inflightPromises.get(key)) {
         const revalidatePromise = withTimeout(
@@ -99,7 +136,9 @@ export async function withStaleWhileRevalidate<T>(
 
       return entry.data;
     }
+    cacheMetrics.misses++;
   } catch (err) {
+    cacheMetrics.swrErrors++;
     const details = extractErrorDetails(err);
     getLogger().warn({ err: details, key }, 'SWR cache read failed, falling back to DB');
   }
@@ -152,7 +191,11 @@ async function revalidateWithRetry<T>(
     const data = await retryWithBackoff(fetcher, { attempts: 2, baseDelayMs: 2000 });
     await clearSwrFailureCount(client, failureKey);
     SWR_FAILURES.delete(key);
-    await client.set(key, JSON.stringify({ data, timestamp: Date.now() }), 'EX', ttl);
+    try {
+      await client.set(key, JSON.stringify({ data, timestamp: Date.now() }), 'EX', ttl);
+    } catch (writeErr) {
+      log.warn({ err: extractErrorDetails(writeErr) }, 'SWR cache write failed');
+    }
     inflightPromises.delete(key);
     return data;
   } catch (err) {

@@ -6,6 +6,7 @@ import { checkFlareSolverrHealth } from '../../utils/flaresolverr-health.js';
 import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator.js';
 import healthCheckMiddleware from '../middleware/health-check.js';
 import { RedisService } from '../../utils/redis-service.js';
+import { getCacheMetrics } from '../../utils/cache.js';
 
 interface HealthRouteOptions {
   prefix: string;
@@ -101,6 +102,7 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
               version: flaresolverrHealth.stats.version,
             },
           }),
+          cache: getCacheMetrics(),
         },
       };
 

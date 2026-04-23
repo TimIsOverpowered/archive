@@ -32,11 +32,12 @@ function hasStatusCode(e: unknown): e is { statusCode: number } {
 function formatErrorResponse(error: unknown): {
   statusCode: number;
   message: string;
+  code: string;
   isClientError: boolean;
 } {
   if (error instanceof HttpError) {
-    const { statusCode, message } = error;
-    return { statusCode, message, isClientError: statusCode >= 400 && statusCode < 500 };
+    const { statusCode, message, code } = error;
+    return { statusCode, message, code, isClientError: statusCode >= 400 && statusCode < 500 };
   }
 
   const details = extractErrorDetails(error);
@@ -44,6 +45,7 @@ function formatErrorResponse(error: unknown): {
   return {
     statusCode,
     message: details.message,
+    code: 'INTERNAL_SERVER_ERROR',
     isClientError: statusCode >= 400 && statusCode < 500,
   };
 }
@@ -73,7 +75,7 @@ export async function buildServer() {
   // Set error handler immediately after creating instance (before any plugins/routes)
   // This ensures it's properly inherited by all child instances
   fastify.setErrorHandler((error, _request, reply) => {
-    const { statusCode, message, isClientError } = formatErrorResponse(error);
+    const { statusCode, message, code, isClientError } = formatErrorResponse(error);
 
     if (statusCode >= 500) {
       const details = extractErrorDetails(error);
@@ -83,6 +85,7 @@ export async function buildServer() {
     return reply.status(statusCode).send({
       error: {
         message: isClientError ? message : 'Internal server error',
+        code,
         statusCode,
       },
     });

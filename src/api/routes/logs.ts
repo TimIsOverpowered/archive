@@ -1,4 +1,4 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifySchema } from 'fastify';
 import { getLogsByOffset, getLogsByCursor } from '../../services/logs.service.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { RedisService } from '../../utils/redis-service.js';
@@ -19,7 +19,10 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
     limiter: chatRateLimiter,
   });
 
-  fastify.get(
+  fastify.get<{
+    Params: { tenantId: string; vodId: string };
+    Querystring: { content_offset_seconds?: number; cursor?: string };
+  }>(
     '/:tenantId/vods/:vodId/comments',
     {
       schema: {
@@ -46,14 +49,14 @@ export default async function logsRoutes(fastify: FastifyInstance, _options: Log
             },
           },
         },
-      },
+      } as FastifySchema,
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const { tenantId, vodId } = request.params as { tenantId: string; vodId: string };
+      const { tenantId, vodId } = request.params;
       const { db } = request.tenant;
       const vodIdNum = Number(vodId);
-      const { content_offset_seconds, cursor } = request.query as { content_offset_seconds?: number; cursor?: string };
+      const { content_offset_seconds, cursor } = request.query;
 
       if (content_offset_seconds === undefined && !cursor) {
         badRequest('Missing required query parameter: content_offset_seconds or cursor');
