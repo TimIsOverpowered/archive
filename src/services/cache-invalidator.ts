@@ -64,6 +64,15 @@ export function registerCacheSubscriber(fastify: FastifyInstance): void {
     log.debug({ channel }, 'Cache subscriber connected');
   });
 
+  subClient.on('unsubscribe', (channel) => {
+    log.debug({ channel }, 'Cache subscriber disconnected');
+  });
+
+  subClient.on('reconnect', () => {
+    log.warn('Cache subscriber redis reconnecting, re-subscribing');
+    void subClient.subscribe(CACHE_CHANNEL);
+  });
+
   subClient.on('message', (_channel: string, message: string) => {
     if (_channel !== CACHE_CHANNEL) return;
 

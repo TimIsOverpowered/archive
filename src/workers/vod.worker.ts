@@ -25,6 +25,7 @@ const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job
   const log = createAutoLogger(tenantId);
 
   log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[Standard VOD Worker] Starting job');
+  await job.updateProgress(0);
 
   const ctx = await getJobContext(tenantId);
   const { config } = ctx;
@@ -69,6 +70,7 @@ const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job
       log.info({ vodId, platform }, `Downloaded ${vodId}.mp4`);
     }
 
+    await job.updateProgress(100);
     await updateAlert(messageId, alerts.complete(vodId, platform, finalPath));
 
     log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[Standard VOD Worker] Job completed successfully');

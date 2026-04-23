@@ -25,6 +25,7 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (
   const log = createAutoLogger(tenantId);
 
   log.info({ jobId: job.id, dbId, vodId, platform, tenantId }, '[Live Worker] Starting job');
+  await job.updateProgress(0);
 
   const ctx = await getJobContext(tenantId);
   const { config } = ctx;
@@ -62,6 +63,7 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (
       },
     });
 
+    await job.updateProgress(50);
     await updateAlert(messageId, alerts.converting(vodId, downloadResult.segmentCount));
 
     // 3. Update DB
@@ -141,6 +143,7 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (
       alerts.complete(vodId, actualDuration ? Math.round(actualDuration) : undefined, completionData)
     );
 
+    await job.updateProgress(100);
     log.info({ jobId: job.id, vodId }, '[Live Worker] Job completed successfully');
     return { success: true };
   } catch (error) {
