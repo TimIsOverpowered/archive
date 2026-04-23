@@ -1,6 +1,6 @@
 import { configService } from '../../config/tenant-config.js';
 import type { TenantConfig } from '../../config/types.js';
-import { getMonitorQueue } from '../jobs/queues.js';
+import { getMonitorQueue } from '../queues/queue.js';
 import { getLogger } from '../../utils/logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 
@@ -21,7 +21,10 @@ export async function registerMonitorRepeatJob(config: TenantConfig): Promise<vo
     getLogger().info({ component: 'monitor', jobId, tenantId: config.id }, 'Registered repeat job');
   } catch (error) {
     const details = extractErrorDetails(error);
-    getLogger().error({ component: 'monitor', jobId, tenantId: config.id, ...details }, 'Failed to register repeat job');
+    getLogger().error(
+      { component: 'monitor', jobId, tenantId: config.id, ...details },
+      'Failed to register repeat job'
+    );
   }
 }
 

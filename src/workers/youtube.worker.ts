@@ -5,7 +5,7 @@ import type {
   YoutubeVodUploadJob,
   YoutubeGameUploadJob,
   YoutubeUploadVodResult,
-} from './jobs/queues.js';
+} from './jobs/types.js';
 import { getJobContext } from './utils/job-context.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { processVodUpload, linkVodPartsAfterDelay } from './youtube/vod-upload-processor.js';

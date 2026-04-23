@@ -8,7 +8,8 @@ import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator.js';
 import healthCheckMiddleware from '../middleware/health-check.js';
 import { RedisService } from '../../utils/redis-service.js';
 import { getCacheMetrics } from '../../utils/cache.js';
-import { QUEUES_VALUES, type QueueJob } from '../../workers/jobs/queues.js';
+import { QUEUES_VALUES } from '../../workers/queues/queue.js';
+import type { QueueJob } from '../../workers/queues/types.js';
 import { getRedisInstance } from '../../workers/redis.js';
 
 /** Options for registering the health routes plugin. */

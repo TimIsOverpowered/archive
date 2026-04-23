@@ -5,7 +5,7 @@ import chatProcessor from './chat.worker.js';
 import youtubeProcessor from './youtube.worker.js';
 import dmcaProcessor from './dmca.worker.js';
 import monitorProcessor from './monitor/processor.js';
-import { QUEUE_NAMES } from './jobs/queues.js';
+import { QUEUE_NAMES } from './queues/queue.js';
 import type {
   LiveDownloadJob,
   StandardVodJob,
@@ -16,7 +16,7 @@ import type {
   ChatDownloadResult,
   YoutubeUploadResult,
   DmcaProcessingResult,
-} from './jobs/queues.js';
+} from './jobs/types.js';
 import type { Redis } from 'ioredis';
 import type { TenantConfig } from '../config/types.js';
 import { getWorkersConfig } from '../config/env.js';

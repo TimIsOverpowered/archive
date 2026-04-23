@@ -1,5 +1,5 @@
 import { Processor, Job } from 'bullmq';
-import type { DmcaProcessingJob, DmcaProcessingResult } from './jobs/queues.js';
+import type { DmcaProcessingJob, DmcaProcessingResult } from './jobs/types.js';
 import { queueYoutubeVodUpload } from './jobs/youtube.job.js';
 import type { DMCAClaim } from './dmca/dmca.js';
 import {

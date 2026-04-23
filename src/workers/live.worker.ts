@@ -13,7 +13,7 @@ import { type LiveCompletionData } from './utils/alert-factories.js';
 import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { createLiveWorkerAlerts } from './utils/alert-factories.js';
-import type { LiveDownloadJob } from './jobs/queues.js';
+import type { LiveDownloadJob } from './jobs/types.js';
 import { triggerChatDownload } from './jobs/chat.job.js';
 import { fetchAndSaveEmotes } from '../services/emotes.js';
 import { SOURCE_TYPES } from '../types/platforms.js';
