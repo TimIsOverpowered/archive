@@ -2,6 +2,7 @@ import { getTwitchClient } from './auth.js';
 import { createTwitchGqlClient } from './client.js';
 import { request } from '../../utils/http-client.js';
 import { TWITCH_USHER_BASE_URL } from '../../constants.js';
+import { VodNotFoundError } from '../../utils/domain-errors.js';
 
 export interface VodData {
   id: string;
@@ -33,7 +34,7 @@ export async function getVodData(vodId: string, tenantId: string): Promise<VodDa
   const data = await client.helix.get<{ data: VodData[] }>(`/videos?id=${vodId}`);
 
   if (!data.data || data.data.length === 0) {
-    throw new Error(`VOD ${vodId} not found`);
+    throw new VodNotFoundError(vodId, 'twitch helix');
   }
   return data.data[0] as VodData;
 }

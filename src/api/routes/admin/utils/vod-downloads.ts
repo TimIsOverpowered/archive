@@ -9,6 +9,7 @@ import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
 import { refreshVodRecord } from './vod-records.js';
 import { getPlatformConfig } from '../../../../config/types.js';
+import { PlatformNotConfiguredError, VodNotFoundError } from '../../../../utils/domain-errors.js';
 
 export interface EnsureVodDownloadOptions {
   ctx: TenantPlatformContext;
@@ -35,7 +36,7 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
   const { tenantId, platform, config, db } = ctx;
 
   const platformConfig = validatePlatformConfig(ctx, platform);
-  if (!platformConfig) throw new Error(`Platform ${platform} not configured for tenant ${tenantId}`);
+  if (!platformConfig) throw new PlatformNotConfiguredError(platform, `tenant ${tenantId}`);
   const { platformUserId, platformUsername } = platformConfig;
 
   const filePath =
@@ -47,7 +48,7 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
     vodRecord = await refreshVodRecord(ctx, vodId, dbId, platformUserId, platformUsername, log);
   }
 
-  if (!vodRecord) throw new Error(`Vod Record failed to update`);
+  if (!vodRecord) throw new VodNotFoundError(dbId, 'vod downloads');
 
   const needsDownload = await checkIfDownloadNeeded(filePath, dbId, vodRecord, log);
 

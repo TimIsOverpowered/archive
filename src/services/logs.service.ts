@@ -9,6 +9,7 @@ import { extractErrorDetails } from '../utils/error.js';
 import { badRequest } from '../utils/http-error.js';
 import { LOGS_PAGE_SIZE, LOGS_DEFAULT_BUCKET_SIZE, LOGS_TARGET_COMMENTS_PER_BUCKET } from '../constants.js';
 import { CacheKeys } from '../utils/cache-keys.js';
+import { VodNotFoundError } from '../utils/domain-errors.js';
 
 const BOUNDARIES = [30, 60, 90, 120, 180, 300, 600, 900, 1800, 3600];
 
@@ -99,7 +100,7 @@ export async function getLogsByOffset(
 
   const vod = await db.selectFrom('vods').select(['created_at', 'duration']).where('id', '=', vodId).executeTakeFirst();
 
-  if (!vod) throw new Error('VOD not found');
+  if (!vod) throw new VodNotFoundError(vodId, 'logs service');
 
   // Add a 2-hour buffer to the end time to account for slight timestamp drifts
   const streamStart = vod.created_at;
@@ -211,7 +212,7 @@ export async function getLogsByCursor(
 
   const vod = await db.selectFrom('vods').select(['created_at', 'duration']).where('id', '=', vodId).executeTakeFirst();
 
-  if (!vod) throw new Error('VOD not found');
+  if (!vod) throw new VodNotFoundError(vodId, 'logs service cursor');
 
   const streamStart = vod.created_at;
   const streamEnd = new Date(streamStart.getTime() + (vod.duration + 7200) * 1000);

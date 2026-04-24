@@ -3,6 +3,7 @@ import { ensureClient } from '../../db/streamer-client.js';
 import type { TenantConfig } from '../../config/types.js';
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../../db/streamer-types.js';
+import { TenantNotFoundError, ConfigNotConfiguredError } from '../../utils/domain-errors.js';
 
 export interface JobContext {
   config: TenantConfig;
@@ -14,11 +15,11 @@ export async function getJobContext(tenantId: string): Promise<JobContext> {
   const config = configService.get(tenantId);
 
   if (!config) {
-    throw new Error(`Config not found for tenant ${tenantId}`);
+    throw new TenantNotFoundError(tenantId);
   }
 
   if (!config.settings.vodPath) {
-    throw new Error(`VOD path not configured for ${tenantId}`);
+    throw new ConfigNotConfiguredError(`VOD path for tenant ${tenantId}`);
   }
 
   const db = await ensureClient(tenantId, config);

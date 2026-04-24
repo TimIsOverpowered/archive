@@ -10,6 +10,7 @@ import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { request } from '../../utils/http-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { TWITCH_USHER_BASE_URL } from '../../constants.js';
+import { ConfigNotConfiguredError } from '../../utils/domain-errors.js';
 
 export interface VodDownloadResult {
   finalPath: string;
@@ -45,7 +46,7 @@ async function downloadKickVodWithFfmpeg(
   const username = config?.kick?.username;
 
   if (!username) {
-    throw new Error('Kick username not configured for streamer');
+    throw new ConfigNotConfiguredError(`Kick username for ${config.id}`);
   }
 
   const vodMetadata = await getKickVod(username, vodId);

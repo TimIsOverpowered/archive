@@ -3,6 +3,7 @@ import fsPromises from 'fs/promises';
 import { extractErrorDetails } from './error.js';
 import { childLogger } from './logger.js';
 import { TenantConfig } from '../config/types.js';
+import { ConfigNotConfiguredError } from './domain-errors.js';
 
 const log = childLogger({ module: 'path' });
 
@@ -60,7 +61,7 @@ export function getVodFilePath(options: VodPathOptions): string {
   const { config, vodId } = options;
 
   if (!config.settings.vodPath) {
-    throw new Error(`VOD path not configured for tenant ${config.id}`);
+    throw new ConfigNotConfiguredError(`VOD path for tenant ${config.id}`);
   }
 
   return path.join(config.settings.vodPath, config.id, `${vodId}.mp4`);
@@ -74,7 +75,7 @@ export function getVodDirPath(options: VodPathOptions): string {
   const { config, vodId } = options;
 
   if (!config.settings.vodPath) {
-    throw new Error(`VOD path not configured for tenant ${config.id}`);
+    throw new ConfigNotConfiguredError(`VOD path for tenant ${config.id}`);
   }
 
   return path.join(config.settings.vodPath, config.id, vodId);
@@ -88,7 +89,7 @@ export function getLiveFilePath(options: LivePathOptions): string {
   const { config, streamId } = options;
 
   if (!config.settings.livePath) {
-    throw new Error(`Live path not configured for tenant ${config.id}`);
+    throw new ConfigNotConfiguredError(`Live path for tenant ${config.id}`);
   }
 
   return path.join(config.settings.livePath, config.id, streamId, `${streamId}.mp4`);
@@ -102,7 +103,7 @@ export function getLiveDirPath(options: LivePathOptions): string {
   const { config, streamId } = options;
 
   if (!config.settings.livePath) {
-    throw new Error(`Live path not configured for tenant ${config.id}`);
+    throw new ConfigNotConfiguredError(`Live path for tenant ${config.id}`);
   }
 
   return path.join(config.settings.livePath, config.id, streamId);

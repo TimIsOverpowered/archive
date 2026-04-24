@@ -19,6 +19,7 @@ import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../db/streamer-types.js';
 import { publishVodUpdate } from '../services/cache-invalidator.js';
 import type { VodRecord } from '../types/db.js';
+import { ConfigNotConfiguredError, VodNotFoundError } from '../utils/domain-errors.js';
 
 const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async (job: Job<YoutubeUploadJob>) => {
   const { tenantId, dbId, vodId, type, filePath } = job.data;
@@ -46,7 +47,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
   const { config, db } = await getJobContext(tenantId);
 
   if (!config || !config.youtube) {
-    throw new Error(`YouTube not configured for tenant ${tenantId}`);
+    throw new ConfigNotConfiguredError(`YouTube for tenant ${tenantId}`);
   }
 
   try {
@@ -115,7 +116,7 @@ async function processVodUploadJob(
   const vodRecord = await db.selectFrom('vods').where('id', '=', dbId).selectAll().executeTakeFirst();
 
   if (!vodRecord) {
-    throw new Error(`VOD record not found for dbId ${dbId}`);
+    throw new VodNotFoundError(dbId, 'youtube worker');
   }
 
   const result = await processVodUpload({

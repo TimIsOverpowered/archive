@@ -19,6 +19,7 @@ import { fileExists } from '../utils/path.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { createDmcaWorkerAlerts } from './utils/alert-factories.js';
 import type { Platform } from '../types/platforms.js';
+import { ConfigNotConfiguredError, VodNotFoundError, FileNotFound } from '../utils/domain-errors.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
   const { tenantId, dbId, vodId, receivedClaims, platform, part, filePath: providedFilePath } = job.data;
@@ -33,13 +34,13 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
   const { config, db } = await getJobContext(tenantId);
 
   if (!config.youtube) {
-    throw new Error(`YouTube not configured for tenant ${tenantId}`);
+    throw new ConfigNotConfiguredError(`YouTube for tenant ${tenantId}`);
   }
 
   const vodRecord = await db.selectFrom('vods').where('id', '=', dbId).selectAll().executeTakeFirst();
 
   if (!vodRecord) {
-    throw new Error(`VOD not found in database for streamer ${tenantId}`);
+    throw new VodNotFoundError(dbId, 'dmca worker');
   }
 
   // Determine file path
@@ -67,7 +68,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
 
   // Verify file exists (safety check)
   if (!(await fileExists(filePath))) {
-    throw new Error(`VOD file not found at ${filePath}. Download may have failed or file was deleted.`);
+    throw new FileNotFound(filePath);
   }
 
   // Log processing start with full context

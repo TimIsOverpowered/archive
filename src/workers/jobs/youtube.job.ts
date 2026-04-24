@@ -8,6 +8,7 @@ import { TenantContext } from '../../types/context.js';
 import { withDbRetry } from '../../db/streamer-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getPlatformConfig, getDisplayName } from '../../config/types.js';
+import { ConfigNotConfiguredError, VodNotFoundError } from '../../utils/domain-errors.js';
 
 const log = childLogger({ module: 'youtube-job' });
 
@@ -24,7 +25,7 @@ export async function createVodUploadJob(
 ): Promise<YoutubeVodUploadJob> {
   const { config, tenantId } = ctx;
   if (!config?.youtube?.upload) {
-    throw new Error(`YouTube upload not enabled for tenant ${tenantId}`);
+    throw new ConfigNotConfiguredError(`YouTube upload for tenant ${tenantId}`);
   }
 
   return {
@@ -51,7 +52,7 @@ export async function createGameUploadJob(
 ): Promise<YoutubeGameUploadJob> {
   const { config, tenantId } = ctx;
   if (!config?.youtube?.upload) {
-    throw new Error(`YouTube upload not enabled for tenant ${tenantId}`);
+    throw new ConfigNotConfiguredError(`YouTube upload for tenant ${tenantId}`);
   }
 
   const platformCfg = getPlatformConfig(config, platform);
@@ -64,7 +65,7 @@ export async function createGameUploadJob(
   });
 
   if (!vodRecord) {
-    throw new Error(`VOD record not found for dbId ${dbId}`);
+    throw new VodNotFoundError(dbId, 'youtube job');
   }
 
   // Check restricted games
@@ -132,7 +133,7 @@ export async function createGameUploadJobsForVod(
   }
 
   if (!config?.youtube?.upload) {
-    throw new Error(`YouTube upload not enabled for tenant ${tenantId}`);
+    throw new ConfigNotConfiguredError(`YouTube upload for tenant ${tenantId}`);
   }
 
   const platformCfg = getPlatformConfig(config, platform);

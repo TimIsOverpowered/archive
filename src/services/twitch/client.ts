@@ -2,6 +2,7 @@ import { request } from '../../utils/http-client.js';
 import { getTwitchCredentials } from '../../utils/credentials.js';
 import { getLogger } from '../../utils/logger.js';
 import { TWITCH_HELIX_BASE_URL, TWITCH_GQL_URL, TWITCH_GQL_CLIENT_ID } from '../../constants.js';
+import { ConfigNotConfiguredError } from '../../utils/domain-errors.js';
 
 export interface TwitchClient {
   helix: {
@@ -14,7 +15,7 @@ export function createTwitchClient(tenantId: string, getAccessToken: () => Promi
   const creds = getTwitchCredentials(tenantId);
 
   if (!creds) {
-    throw new Error(`Twitch credentials not configured for tenant ${tenantId}`);
+    throw new ConfigNotConfiguredError(`Twitch credentials for tenant ${tenantId}`);
   }
 
   return {

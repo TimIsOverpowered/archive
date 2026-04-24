@@ -4,6 +4,7 @@ import { fetchUrl } from '../../utils/flaresolverr-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
 import { KICK_API_BASE } from '../../constants.js';
+import { VodNotFoundError } from '../../utils/domain-errors.js';
 
 const log = childLogger({ module: 'kick-vod' });
 
@@ -96,7 +97,7 @@ export async function getVod(channelName: string, vodId: string): Promise<KickVo
   const dataArray = result.data;
 
   if (!Array.isArray(dataArray)) {
-    throw new Error(`VOD ${vodId} not found`);
+    throw new VodNotFoundError(vodId, 'kick api response');
   }
 
   const video = dataArray.find((v): v is KickVod => {
@@ -105,7 +106,7 @@ export async function getVod(channelName: string, vodId: string): Promise<KickVo
   });
 
   if (!video) {
-    throw new Error(`VOD ${vodId} not found`);
+    throw new VodNotFoundError(vodId, 'kick api');
   }
 
   return video;

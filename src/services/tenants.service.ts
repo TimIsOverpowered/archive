@@ -7,6 +7,7 @@ import { PERCENTAGE_PRECISION_MULTIPLIER, PERCENTAGE_PRECISION_DIVISOR } from '.
 import type { TenantConfig } from '../config/types.js';
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../db/streamer-types.js';
+import { TenantNotFoundError } from '../utils/domain-errors.js';
 
 /** Return the list of enabled platform names for a tenant config. */
 export function getEnabledPlatforms(config: Pick<TenantConfig, 'twitch' | 'kick'>): string[] {
@@ -57,7 +58,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
   const config = configService.get(tenantId);
 
   if (!config) {
-    throw new Error('Tenant not found');
+    throw new TenantNotFoundError(tenantId);
   }
 
   const platforms = getEnabledPlatforms(config);

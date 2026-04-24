@@ -8,6 +8,7 @@ import { request } from '../../utils/http-client.js';
 import { createTwitchClient, type TwitchClient } from './client.js';
 import { LRUCache } from 'lru-cache';
 import { TWITCH_TOKEN_URL } from '../../constants.js';
+import { ConfigNotConfiguredError } from '../../utils/domain-errors.js';
 
 const log = createAutoLogger('twitch-auth');
 
@@ -33,7 +34,7 @@ export async function getAppAccessToken(tenantId: string): Promise<string> {
 
   const creds = getTwitchCredentials(tenantId);
   if (!creds) {
-    throw new Error('Twitch credentials not configured');
+    throw new ConfigNotConfiguredError(`Twitch credentials for tenant ${tenantId}`);
   }
 
   if (creds.accessToken && creds.expiryDate) {

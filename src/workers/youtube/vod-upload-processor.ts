@@ -15,6 +15,7 @@ import { UPLOAD_TYPES } from '../../types/platforms.js';
 import type { VodRecord } from '../../types/db.js';
 import { deleteFileIfExists } from '../../utils/path.js';
 import { extractErrorDetails } from '../../utils/error.js';
+import { VodNotFoundError } from '../../utils/domain-errors.js';
 
 export interface VodUploadContext {
   tenantId: string;
@@ -44,7 +45,7 @@ export async function processVodUpload(ctx: VodUploadContext): Promise<VodUpload
   const vodRecord = await db.selectFrom('vods').where('id', '=', dbId).selectAll().executeTakeFirst();
 
   if (!vodRecord) {
-    throw new Error(`VOD record not found for dbId ${dbId}`);
+    throw new VodNotFoundError(dbId, 'vod upload processor');
   }
 
   const channelName = getDisplayName(config);

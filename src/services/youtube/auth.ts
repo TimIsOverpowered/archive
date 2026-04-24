@@ -5,6 +5,7 @@ import { getMetaClient } from '../../db/meta-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { getWorkersConfig } from '../../config/env.js';
+import { ConfigNotConfiguredError } from '../../utils/domain-errors.js';
 
 interface AuthObject {
   access_token?: string;
@@ -124,13 +125,13 @@ export async function getYoutubeAuth(tenantId: string): Promise<{
   const config = configService.get(tenantId);
 
   if (!config?.youtube?.auth) {
-    throw new Error(`YouTube auth not configured for ${tenantId}`);
+    throw new ConfigNotConfiguredError(`YouTube auth for ${tenantId}`);
   }
 
   const authObj = JSON.parse(config.youtube.auth) as AuthObject;
 
   if (!authObj.refresh_token || typeof authObj.refresh_token !== 'string' || !authObj.refresh_token.trim()) {
-    throw new Error(`YouTube refresh token not configured for ${tenantId}`);
+    throw new ConfigNotConfiguredError(`YouTube refresh token for ${tenantId}`);
   }
 
   if (authObj.access_token && authObj.expiry_date && authObj.expiry_date > Date.now() + 60_000) {

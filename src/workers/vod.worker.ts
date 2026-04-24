@@ -11,6 +11,7 @@ import { DOWNLOAD_METHODS, PLATFORMS } from '../types/platforms.js';
 import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
 import { getDisplayName } from '../config/types.js';
+import { PlatformNotConfiguredError } from '../utils/domain-errors.js';
 
 const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job<StandardVodJob, unknown, string>) => {
   const {
@@ -47,7 +48,7 @@ const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job
       }
 
       if (!platformUserId) {
-        throw new Error(`Platform user ID not configured for ${platform}`);
+        throw new PlatformNotConfiguredError(platform, `user ID missing for ${job.id}`);
       }
 
       if (platform === PLATFORMS.KICK && !sourceUrl) {
