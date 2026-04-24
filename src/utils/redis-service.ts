@@ -46,7 +46,10 @@ export class RedisService {
   }
 
   static init(options: RedisServiceOptions): RedisService {
-    if (this._instance) return this._instance;
+    if (this._instance) {
+      getLogger().warn('RedisService.init() called on already-initialized instance — ignoring');
+      return this._instance;
+    }
     this._instance = new RedisService();
     this._instance._options = options;
     return this._instance;

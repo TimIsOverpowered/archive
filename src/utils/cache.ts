@@ -56,11 +56,7 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
-const inflightSimple = new LRUCache<string, Promise<unknown>>({
-  max: 5000,
-  ttl: 30_000,
-  allowStale: false,
-});
+const inflightSimple = new Map<string, Promise<unknown>>();
 
 /**
  * Reads from Redis cache, falling back to the fetcher on miss or error.
@@ -103,11 +99,7 @@ export async function withCache<T>(key: string, ttl: number, fetcher: () => Prom
   return promise;
 }
 
-const inflightPromises = new LRUCache<string, Promise<unknown>>({
-  max: 5000,
-  ttl: 60 * 1000,
-  allowStale: false,
-});
+const inflightPromises = new Map<string, Promise<unknown>>();
 
 const INFLIGHT_TIMEOUT_MS = 30_000;
 
@@ -145,7 +137,7 @@ export async function withStaleWhileRevalidate<T>(
       // Stale — serve immediately, revalidate in background
       if (!inflightPromises.get(key)) {
         const revalidatePromise = withTimeout(
-          revalidateWithRetry(client, key, ttl, fetcher).catch(() => inflightPromises.delete(key)),
+          revalidateWithRetry(client, key, ttl, fetcher).finally(() => inflightPromises.delete(key)),
           INFLIGHT_TIMEOUT_MS
         );
 
@@ -166,10 +158,7 @@ export async function withStaleWhileRevalidate<T>(
   }
 
   const fetchPromise = withTimeout(
-    revalidateWithRetry(client, key, ttl, fetcher).catch((err) => {
-      inflightPromises.delete(key);
-      throw err;
-    }),
+    revalidateWithRetry(client, key, ttl, fetcher).finally(() => inflightPromises.delete(key)),
     INFLIGHT_TIMEOUT_MS
   );
 
@@ -200,7 +189,6 @@ async function revalidateWithRetry<T>(
 
   if (failures >= MAX_SWR_FAILURES) {
     SWR_FAILURES.delete(key);
-    inflightPromises.delete(key);
     log.warn('SWR revalidation failing repeatedly, skipping retry');
     throw new Error('SWR revalidation limit exceeded');
   }
@@ -214,12 +202,10 @@ async function revalidateWithRetry<T>(
     } catch (writeErr) {
       log.warn({ err: extractErrorDetails(writeErr) }, 'SWR cache write failed');
     }
-    inflightPromises.delete(key);
     return data;
   } catch (err) {
     await incrementSwrFailureCount(client, failureKey);
     SWR_FAILURES.set(key, failures + 1);
-    inflightPromises.delete(key);
     log.error({ err: extractErrorDetails(err) }, 'SWR revalidation exhausted retries');
     throw err;
   }

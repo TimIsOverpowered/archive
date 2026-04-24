@@ -20,12 +20,14 @@ export function encrypt(plaintext: string): Buffer {
 
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
 
-  let encrypted = cipher.update(plaintext, 'utf8', 'base64');
-  encrypted += cipher.final('base64');
+  const encrypted = Buffer.concat([
+    cipher.update(Buffer.from(plaintext, 'utf8')),
+    cipher.final(),
+  ]);
 
   const authTag = cipher.getAuthTag();
 
-  const combined = Buffer.concat([iv, authTag, Buffer.from(encrypted, 'base64')]);
+  const combined = Buffer.concat([iv, authTag, encrypted]);
 
   return combined;
 }
@@ -42,14 +44,12 @@ export function decrypt(ciphertext: Uint8Array): string {
   const authTag = Buffer.from(
     ciphertext.subarray(ENCRYPTION_IV_LENGTH, ENCRYPTION_IV_LENGTH + ENCRYPTION_AUTH_TAG_LENGTH)
   );
-  const encryptedData = Buffer.from(ciphertext.subarray(ENCRYPTION_IV_LENGTH + ENCRYPTION_AUTH_TAG_LENGTH)).toString(
-    'base64'
-  );
+  const encryptedData = ciphertext.subarray(ENCRYPTION_IV_LENGTH + ENCRYPTION_AUTH_TAG_LENGTH);
 
   const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
   decipher.setAuthTag(authTag);
 
-  let decrypted = decipher.update(Buffer.from(encryptedData, 'base64'));
+  let decrypted = decipher.update(encryptedData);
   decrypted = Buffer.concat([decrypted, decipher.final()]);
 
   return decrypted.toString('utf8');

@@ -3,11 +3,10 @@ import 'dotenv/config';
 import { program } from 'commander';
 import { initMetaClient, closeMetaClient } from '../../src/db/meta-client.js';
 import { extractErrorDetails } from '../../src/utils/error.js';
-import { configService } from '../../src/config/tenant-config.js';
+import { configService, buildTenantConfig } from '../../src/config/tenant-config.js';
 import { getAppAccessToken } from '../../src/services/twitch/index.js';
 import { getTwitchCredentials } from '../../src/utils/credentials.js';
 import { humanizeDuration } from '../../src/utils/formatting.js';
-import { getTwitchAuth } from '../../src/utils/tenant-config.js';
 import { getAllTenants, getTenantById } from '../../src/services/meta-tenants.service.js';
 
 interface TwitchAuth {
@@ -63,12 +62,14 @@ program
           process.exit(1);
         }
 
-        let decrypted = getTwitchAuth(tenant);
+        const config = buildTenantConfig(tenant);
 
-        if (!decrypted) {
+        if (!config?.twitch?.auth) {
           console.error('Twitch credentials not found. Run scripts/auth-twitch.ts first.');
           process.exit(1);
         }
+
+        let decrypted = JSON.parse(config.twitch.auth!) as TwitchAuth;
 
         console.log('\nCurrent Token State:');
         console.log('-'.repeat(50));
@@ -95,12 +96,14 @@ program
               process.exit(1);
             }
 
-            let decryptedAfter = getTwitchAuth(updatedTenant);
+            const configAfter = buildTenantConfig(updatedTenant);
 
-            if (!decryptedAfter) {
+            if (!configAfter?.twitch?.auth) {
               console.error('Failed to decrypt Twitch auth data after refresh');
               process.exit(1);
             }
+
+            let decryptedAfter = JSON.parse(configAfter.twitch.auth!) as TwitchAuth;
 
             console.log('\n\nToken State After Refresh:');
             console.log('-'.repeat(50));
