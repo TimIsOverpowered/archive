@@ -27,6 +27,7 @@ import {
 } from '../../constants.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { TenantContext } from '../../types/context.js';
+import type { TenantConfig } from '../../config/types.js';
 import { updateVodDurationDuringDownload } from './duration-updater.js';
 
 export interface HlsDownloadOptions {
@@ -52,6 +53,21 @@ export interface HlsDownloadResult {
   finalMp4Path: string;
 }
 
+interface HlsConvertOptions {
+  vodId: string;
+  tenantId: string;
+  config: TenantConfig;
+  onConversionProgress?: (percent: number) => void;
+  discordMessageId?: string | null;
+}
+
+interface HlsSegmentFilterResult {
+  newSegments: HLS.types.Segment[];
+  isStreamEnd: boolean;
+  newLastSegmentUri: string;
+  newNoChangeCount: number;
+}
+
 export async function downloadHlsStream(options: HlsDownloadOptions): Promise<HlsDownloadResult> {
   const { ctx, dbId, vodId, platform, startedAt, sourceUrl, isLive = false, onProgress } = options;
   const { config, tenantId } = ctx;
@@ -68,20 +84,22 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
 
   try {
     if (isLive) {
-      await runLivePollingLoop({
-        ctx,
-        vodId,
-        platform,
-        dbId,
-        sourceUrl,
-        startedAt,
-        vodDir,
-        m3u8Path,
-        cycleTLS,
-        log,
-        concurrency: HLS_SEGMENT_CONCURRENCY,
-        onProgress,
-      });
+      await runLivePollingLoop(
+        {
+          ctx,
+          vodId,
+          platform,
+          dbId,
+          sourceUrl,
+          startedAt,
+          vodDir,
+          m3u8Path,
+          cycleTLS,
+          log,
+          concurrency: HLS_SEGMENT_CONCURRENCY,
+        },
+        onProgress
+      );
     } else {
       await downloadArchivedVod({
         ctx,
@@ -95,41 +113,97 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
       });
     }
 
-    const m3u8Content = await fsPromises.readFile(m3u8Path, 'utf8');
-    const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
-
-    log.info({ vodId, isFmp4 }, 'Converting HLS to MP4');
-    const alerts = createVodWorkerAlerts();
-    await convertHlsToMp4(m3u8Path, finalMp4Path, {
-      vodId,
-      isFmp4,
-      onProgress: (percent) => {
-        if (options.discordMessageId) {
-          void updateAlert(options.discordMessageId, alerts.progress(vodId, `Converting ${vodId} (${percent}%)`));
-        }
+    const result = await convertAndCleanup(
+      m3u8Path,
+      finalMp4Path,
+      vodDir,
+      {
+        vodId,
+        tenantId,
+        config,
+        onConversionProgress: (percent) => {
+          if (options.discordMessageId) {
+            void updateAlert(
+              options.discordMessageId,
+              createVodWorkerAlerts().progress(vodId, `Converting ${vodId} (${percent}%)`)
+            );
+          }
+        },
+        discordMessageId: options.discordMessageId ?? null,
       },
-    });
+      log
+    );
 
-    const files = await fsPromises.readdir(vodDir);
-    const segmentCount = files.filter((f) => f.endsWith('.mp4') || f.endsWith('.ts')).length;
+    log.info({ vodId, platform, segmentCount: result.segmentCount }, 'HLS download and conversion complete');
 
-    log.info({ vodId, platform, segmentCount }, 'HLS download and conversion complete');
-
-    const shouldKeepHls = config.settings.saveHLS ?? false;
-    if (shouldKeepHls) {
-      log.info({ vodId }, 'Preserving HLS files (saveHLS=true)');
-    } else {
-      log.info({ vodId }, 'Cleaning up HLS files');
-    }
-    await cleanupHlsFiles(vodDir, shouldKeepHls, log);
-
-    return { success: true, m3u8Path, outputDir: vodDir, segmentCount, finalMp4Path };
+    return {
+      success: true,
+      m3u8Path,
+      outputDir: vodDir,
+      segmentCount: result.segmentCount,
+      finalMp4Path: result.finalMp4Path,
+    };
   } finally {
     if (cycleTLS) {
       await cycleTLS.close();
       log.info({ vodId }, 'CycleTLS session closed');
     }
   }
+}
+
+async function convertAndCleanup(
+  m3u8Path: string,
+  finalMp4Path: string,
+  vodDir: string,
+  options: HlsConvertOptions,
+  log: AppLogger
+): Promise<{ segmentCount: number; finalMp4Path: string }> {
+  const { vodId, config } = options;
+
+  const m3u8Content = await fsPromises.readFile(m3u8Path, 'utf8');
+  const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
+
+  log.info({ vodId, isFmp4 }, 'Converting HLS to MP4');
+  await convertHlsToMp4(m3u8Path, finalMp4Path, {
+    vodId,
+    isFmp4,
+    ...(options.onConversionProgress && { onProgress: options.onConversionProgress }),
+  });
+
+  const files = await fsPromises.readdir(vodDir);
+  const segmentCount = files.filter((f) => f.endsWith('.mp4') || f.endsWith('.ts')).length;
+
+  const shouldKeepHls = config.settings.saveHLS ?? false;
+  if (shouldKeepHls) {
+    log.info({ vodId }, 'Preserving HLS files (saveHLS=true)');
+  } else {
+    log.info({ vodId }, 'Cleaning up HLS files');
+  }
+  await cleanupHlsFiles(vodDir, shouldKeepHls, log);
+
+  return { segmentCount, finalMp4Path };
+}
+
+function filterNewSegments(
+  segments: HLS.types.Segment[],
+  downloadedSegments: Set<string>,
+  lastSegmentUri: string | null,
+  noChangeCount: number
+): HlsSegmentFilterResult {
+  const currentLastUri = segments.at(-1)?.uri ?? '';
+
+  if (currentLastUri && currentLastUri === lastSegmentUri) {
+    noChangeCount++;
+  } else {
+    lastSegmentUri = currentLastUri;
+    noChangeCount = 0;
+  }
+
+  const isStreamEnd = noChangeCount >= HLS_NO_CHANGE_THRESHOLD;
+
+  const newSegments = segments.filter((seg) => !downloadedSegments.has(seg.uri));
+
+  return { newSegments, isStreamEnd, newLastSegmentUri: currentLastUri, newNoChangeCount: noChangeCount };
 }
 
 interface LivePollingContext {
@@ -143,18 +217,20 @@ interface LivePollingContext {
   m3u8Path: string;
   cycleTLS: CycleTLSSession | null;
   log: AppLogger;
-  onProgress?: ((segmentsDownloaded: number) => void) | undefined;
   concurrency: number;
 }
 
-async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
+async function runLivePollingLoop(
+  ctx: LivePollingContext,
+  onProgress?: (segmentsDownloaded: number) => void
+): Promise<void> {
   const { vodId, platform, log, concurrency } = ctx;
 
   let consecutiveErrors = 0;
   let noChangePollCount = 0;
   let lastSegmentUri: string | null = null;
 
-  const downloadedSegments = new Set(await fsPromises.readdir(ctx.vodDir));
+  const downloadedSegments = new Set<string>(await fsPromises.readdir(ctx.vodDir));
 
   while (true) {
     try {
@@ -169,50 +245,46 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
       const { variantM3u8String, baseURL } = playlist;
       const parsed = HLS.parse(variantM3u8String) as HLS.types.MediaPlaylist;
       const segments = parsed.segments ?? [];
-      const currentLastUri = segments.at(-1)?.uri ?? '';
-
-      if (currentLastUri && currentLastUri === lastSegmentUri) {
-        noChangePollCount++;
-        log.info({ vodId, pollCount: noChangePollCount, threshold: HLS_NO_CHANGE_THRESHOLD }, 'No new segments');
-        if (noChangePollCount >= HLS_NO_CHANGE_THRESHOLD) {
-          log.info({ vodId }, 'Stream end detected');
-          break;
-        }
-      } else {
-        if (noChangePollCount > 0) log.info({ vodId, resumedAfter: noChangePollCount }, 'New segments resumed');
-        lastSegmentUri = currentLastUri;
-        noChangePollCount = 0;
-      }
 
       await fsPromises.writeFile(ctx.m3u8Path, variantM3u8String);
 
-      const newSegments = segments.filter((seg) => !downloadedSegments.has(seg.uri));
+      const result = filterNewSegments(segments, downloadedSegments, lastSegmentUri, noChangePollCount);
 
-      if (newSegments.length > 0) {
+      if (result.isStreamEnd) {
+        log.info({ vodId }, 'Stream end detected');
+        break;
+      }
+
+      if (noChangePollCount > 0 && result.newNoChangeCount === 0) {
+        log.info({ vodId, resumedAfter: noChangePollCount }, 'New segments resumed');
+      }
+
+      lastSegmentUri = result.newLastSegmentUri;
+      noChangePollCount = result.newNoChangeCount;
+
+      if (result.newSegments.length > 0) {
         const strategy: DownloadStrategy =
           platform === PLATFORMS.KICK && ctx.cycleTLS ? { type: 'cycletls', session: ctx.cycleTLS } : { type: 'fetch' };
 
         await downloadSegmentsParallel(
-          newSegments,
+          result.newSegments,
           ctx.vodDir,
           baseURL,
           strategy,
           concurrency,
           HLS_SEGMENT_RETRY_ATTEMPTS,
           log,
-          () => ctx.onProgress?.(downloadedSegments.size)
+          () => onProgress?.(downloadedSegments.size)
         );
 
-        for (const seg of newSegments) downloadedSegments.add(seg.uri);
+        for (const seg of result.newSegments) downloadedSegments.add(seg.uri);
       }
 
       consecutiveErrors = 0;
 
       if (platform === PLATFORMS.KICK) {
-        await updateChapterDuringDownload(ctx.ctx, ctx.dbId, vodId);
+        void updateChapterDuringDownload(ctx.ctx, ctx.dbId, vodId);
       }
-
-      // Fire-and-forget duration update
       void updateVodDurationDuringDownload(ctx.ctx, ctx.dbId, vodId, platform, ctx.m3u8Path, variantM3u8String);
 
       await sleep(HLS_POLL_INTERVAL_MS);
