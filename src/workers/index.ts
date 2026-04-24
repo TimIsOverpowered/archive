@@ -77,23 +77,39 @@ export async function bootstrap() {
 }
 
 function registerShutdownHandlers() {
-  const shutdown = async () => {
+ const shutdown = async () => {
     getLogger().info('Shutting down workers...');
-    await stopMonitorService();
 
-    for (const { name, worker } of workerRegistry.getAll()) {
-      await worker.close(true);
-      getLogger().info({ name }, 'Worker closed');
+    const forceExitTimer = setTimeout(() => {
+      getLogger().error('Forced shutdown after timeout');
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT_MS);
+
+    try {
+      await stopMonitorService();
+
+      for (const { name, worker } of workerRegistry.getAll()) {
+        await worker.close(true);
+        getLogger().info({ name }, 'Worker closed');
+      }
+
+      await closeQueues();
+
+      stopClientCleanup();
+      await closeAllClients();
+      await closeMetaClient();
+      await closeWorkersRedis();
+      configService.reset();
+
+      clearTimeout(forceExitTimer);
+      getLogger().info('Graceful shutdown complete');
+      process.exit(0);
+    } catch (error) {
+      clearTimeout(forceExitTimer);
+      const details = extractErrorDetails(error);
+      getLogger().error({ ...details }, 'Error during shutdown');
+      process.exit(1);
     }
-
-    await closeQueues();
-
-    stopClientCleanup();
-    await closeAllClients();
-    await closeMetaClient();
-    await closeWorkersRedis();
-    configService.reset();
-    setTimeout(() => process.exit(0), SHUTDOWN_TIMEOUT_MS);
   };
 
   process.on('SIGTERM', () => {

@@ -105,4 +105,4 @@ export const PERCENTAGE_PRECISION_DIVISOR = 10;
 // ── HTTP / Server ────────────────────────────────────────────────────────────
 export const BODY_LIMIT = 25 * 1024 * 1024; // 25MB request body limit
 export const COMPRESSION_THRESHOLD = 10240; // 10KB response compression threshold
-export const SHUTDOWN_TIMEOUT_MS = 100; // Grace period before force-exit on SIGTERM/SIGINT
+export const SHUTDOWN_TIMEOUT_MS = 5_000; // Grace period before force-exit on SIGTERM/SIGINT
