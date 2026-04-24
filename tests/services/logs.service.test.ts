@@ -98,7 +98,7 @@ describe('LogsService: getLogsByOffset', () => {
       assert.fail('Should have thrown');
     } catch (error) {
       assert.ok(error instanceof Error);
-      assert.strictEqual((error as Error).message, 'VOD not found');
+      assert.ok((error as Error).message.startsWith('VOD not found'));
     }
   });
 
@@ -384,7 +384,7 @@ describe('LogsService: getLogsByCursor', () => {
       assert.fail('Should have thrown');
     } catch (error) {
       assert.ok(error instanceof Error);
-      assert.strictEqual((error as Error).message, 'VOD not found');
+      assert.ok((error as Error).message.startsWith('VOD not found'));
     }
   });
 

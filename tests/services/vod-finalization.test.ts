@@ -40,6 +40,23 @@ describe('finalizeVod', () => {
           };
         },
       }),
+      transaction: () => ({
+        execute: async (fn: any) => {
+          const trx = {
+            updateTable: () => ({
+              set: (s: any) => {
+                updateSet = s;
+                return {
+                  where: () => ({
+                    execute: async () => undefined,
+                  }),
+                };
+              },
+            }),
+          };
+          await fn(trx);
+        },
+      }),
     };
   }
 
