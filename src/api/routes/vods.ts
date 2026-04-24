@@ -65,7 +65,7 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
             game: { type: 'string', description: 'Fuzzy search in chapters.name' },
             page: { type: 'integer', minimum: 1, default: 1, description: 'Page number' },
             limit: { type: 'integer', minimum: 1, maximum: 100, default: 20, description: 'Items per page' },
-            sort: { type: 'string', enum: ['created_at', 'duration', 'uploaded_at'], default: 'created_at' },
+            sort: { type: 'string', enum: ['created_at', 'duration'], default: 'created_at' },
             order: { type: 'string', enum: ['asc', 'desc'], default: 'desc' },
           },
         },

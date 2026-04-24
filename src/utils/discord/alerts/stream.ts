@@ -26,7 +26,7 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
     return null;
   }
 
-  const emojiMap: Record<'in_progress' | 'failure' | 'success', string> = {
+  const statusLabels: Record<'in_progress' | 'failure' | 'success', string> = {
     in_progress: '[IN_PROGRESS]',
     failure: '[FAILED]',
     success: '[SUCCESS]',
@@ -51,7 +51,7 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
   }
 
   const embedData = {
-    title: `${emojiMap[data.alertType]} ${titleMap[data.alertType]}`,
+    title: `${statusLabels[data.alertType]} ${titleMap[data.alertType]}`,
     description: data.errorMessage ? `**Error:**\n\`\`\`${data.errorMessage}\`\`\`` : undefined,
     status: embedStatus,
     fields,

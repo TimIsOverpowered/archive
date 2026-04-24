@@ -116,16 +116,15 @@ export function createWorker<TData>(config: WorkerConfig<TData>): Worker<TData, 
 }
 
 /**
- * Safely extracts job metadata fields from raw job data.
- * Uses optional chaining to gracefully handle missing/null fields —
- * all returned values will be `unknown | undefined`.
+ * Extracts job metadata from raw job data.
+ * All returned values will be `unknown | undefined` when the key is absent.
  */
 function extractJobMeta(data: Record<string, unknown>) {
   return {
-    vodId: data?.vodId,
-    platform: data?.platform,
-    tenantId: data?.tenantId,
-    type: data?.type,
-    reqId: data?.reqId,
+    vodId: data.vodId,
+    platform: data.platform,
+    tenantId: data.tenantId,
+    type: data.type,
+    reqId: data.reqId,
   };
 }

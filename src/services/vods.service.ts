@@ -4,7 +4,6 @@ import { sql } from 'kysely';
 import type { Expression, ExpressionBuilder, Kysely, Selectable, SqlBool } from 'kysely';
 import type { StreamerDB, DBClient } from '../db/streamer-types.js';
 import { withStaleWhileRevalidate } from '../utils/cache.js';
-import { deduplicate } from '../utils/deduplicate.js';
 import {
   VOD_DETAILS_CACHE_TTL,
   VOD_LIST_CACHE_TTL,
@@ -12,12 +11,9 @@ import {
   VOD_DETAILS_STALE_RATIO,
 } from '../constants.js';
 import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
-import { RedisService } from '../utils/redis-service.js';
-import { registerVodTags } from './cache-tags.js';
+import { registerVodTags, setVodListCache } from './cache-tags.js';
 import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.js';
 import { CacheKeys } from '../utils/cache-keys.js';
-import { extractErrorDetails } from '../utils/error.js';
-import { getLogger } from '../utils/logger.js';
 import { buildPagination } from '../db/queries/builders.js';
 
 function applyVolatileData(
@@ -114,7 +110,7 @@ export const VodQuerySchema = z.object({
   game: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
-  sort: z.enum(['created_at', 'duration', 'uploaded_at']).default('created_at'),
+  sort: z.enum(['created_at', 'duration']).default('created_at'),
   order: z.enum(['asc', 'desc']).default('desc'),
 });
 
@@ -159,7 +155,7 @@ export function buildVodQuery(query: VodQuery): {
   };
 
   const orderBy = {
-    col: ((query.sort === 'uploaded_at' ? 'created_at' : query.sort) ?? 'created_at') as VodsOrderByCol,
+    col: (query.sort ?? 'created_at') as VodsOrderByCol,
     dir: query.order ?? 'desc',
   };
 
@@ -180,26 +176,7 @@ export async function getVods(
   const cacheKey = buildQueryCacheKey(tenantId, query, page, limit);
   const { where, orderBy } = buildVodQuery(query);
 
-  const redisClient = RedisService.getActiveClient();
-  const disabled = !redisClient;
-
-  if (!disabled) {
-    try {
-      const cached = await redisClient.get(cacheKey);
-      if (cached) {
-        const cachedResult = JSON.parse(cached) as { vods: VodResponse[]; total: number };
-        const dbIds = cachedResult.vods.map((v) => v.id);
-        const volatileMap = await getVodVolatileCacheBatch(tenantId, dbIds);
-        const mergedVods = applyVolatileData(cachedResult.vods, volatileMap);
-        return { vods: mergedVods, total: cachedResult.total };
-      }
-    } catch (err) {
-      const details = extractErrorDetails(err);
-      getLogger().warn({ err: details, key: cacheKey }, 'VOD list cache read failed, falling back to DB');
-    }
-  }
-
-  return deduplicate(cacheKey, async () => {
+  const fetcher = async () => {
     const [result, totalRow] = await Promise.all([
       db
         .selectFrom('vods')
@@ -224,14 +201,15 @@ export async function getVods(
     const volatileMap = await getVodVolatileCacheBatch(tenantId, dbIds);
     const mergedVods = applyVolatileData(resultVods, volatileMap);
 
-    if (!disabled) {
-      const hasLiveVod = mergedVods.some((vod) => vod.is_live);
-      const ttl = hasLiveVod ? VOD_VOLATILE_CACHE_TTL : VOD_LIST_CACHE_TTL;
-      await registerVodTags(tenantId, mergedVods, cacheKey, JSON.stringify({ vods: mergedVods, total }), ttl);
-    }
+    const hasLiveVod = mergedVods.some((vod) => vod.is_live);
+    const ttl = hasLiveVod ? VOD_VOLATILE_CACHE_TTL : VOD_LIST_CACHE_TTL;
+    await setVodListCache(cacheKey, JSON.stringify({ vods: mergedVods, total }), ttl);
+    await registerVodTags(tenantId, mergedVods, cacheKey, JSON.stringify({ vods: mergedVods, total }), ttl);
 
     return { vods: mergedVods, total };
-  });
+  };
+
+  return withStaleWhileRevalidate(cacheKey, VOD_LIST_CACHE_TTL, VOD_LIST_CACHE_TTL * VOD_DETAILS_STALE_RATIO, fetcher);
 }
 
 /**

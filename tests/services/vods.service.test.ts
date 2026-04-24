@@ -10,13 +10,6 @@ describe('VodService: buildVodQuery', () => {
     assert.strictEqual(orderBy.dir, 'desc');
   });
 
-  it('should map uploaded_at sort to created_at', () => {
-    const query = VodQuerySchema.parse({ sort: 'uploaded_at' });
-    const { orderBy } = buildVodQuery(query);
-    assert.strictEqual(orderBy.col, 'created_at');
-    assert.strictEqual(orderBy.dir, 'desc');
-  });
-
   it('should respect custom sort and order', () => {
     const query = VodQuerySchema.parse({ sort: 'duration', order: 'asc' });
     const { orderBy } = buildVodQuery(query);

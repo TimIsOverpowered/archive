@@ -7,6 +7,14 @@ function envBoolWithDefault(defaultsTo: boolean) {
   );
 }
 
+function throwConfigError(label: string, error: unknown): never {
+  if (error instanceof z.ZodError) {
+    const msgs = error.issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n');
+    throw new Error(`${label} config validation failed:\n${msgs}`);
+  }
+  throw error;
+}
+
 // Shared base schema (used by both API and workers)
 export const BaseConfigSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -76,11 +84,7 @@ export function loadApiConfig(): ApiConfig {
     apiConfigCache = ApiConfigSchema.parse(process.env);
     return apiConfigCache;
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      const errorMessages = error.issues.map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`).join('\n');
-      throw new Error(`API config validation failed:\n${errorMessages}`);
-    }
-    throw error;
+    throwConfigError('API', error);
   }
 }
 
@@ -96,11 +100,7 @@ export function loadWorkersConfig(): WorkersConfig {
     workersConfigCache = WorkersConfigSchema.parse(process.env);
     return workersConfigCache;
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      const errorMessages = error.issues.map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`).join('\n');
-      throw new Error(`Workers config validation failed:\n${errorMessages}`);
-    }
-    throw error;
+    throwConfigError('Workers', error);
   }
 }
 

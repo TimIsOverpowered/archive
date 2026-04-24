@@ -109,7 +109,7 @@ const inflightPromises = new LRUCache<string, Promise<unknown>>({
   allowStale: false,
 });
 
-const INFIGHT_TIMEOUT_MS = 30_000;
+const INFLIGHT_TIMEOUT_MS = 30_000;
 
 /**
  * Stale-while-revalidate cache pattern.
@@ -146,7 +146,7 @@ export async function withStaleWhileRevalidate<T>(
       if (!inflightPromises.get(key)) {
         const revalidatePromise = withTimeout(
           revalidateWithRetry(client, key, ttl, fetcher).catch(() => inflightPromises.delete(key)),
-          INFIGHT_TIMEOUT_MS
+          INFLIGHT_TIMEOUT_MS
         );
 
         inflightPromises.set(key, revalidatePromise);
@@ -170,7 +170,7 @@ export async function withStaleWhileRevalidate<T>(
       inflightPromises.delete(key);
       throw err;
     }),
-    INFIGHT_TIMEOUT_MS
+    INFLIGHT_TIMEOUT_MS
   );
 
   inflightPromises.set(key, fetchPromise);
