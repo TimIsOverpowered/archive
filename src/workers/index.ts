@@ -2,8 +2,9 @@ import 'dotenv/config';
 import { pathToFileURL } from 'node:url';
 import { extractErrorDetails } from '../utils/error.js';
 import { configService } from '../config/tenant-config.js';
-import { QUEUE_NAMES, getQueue, closeQueues } from './queues/queue.js';
-import { initWorkersRedis, getRedisInstance, closeWorkersRedis, waitForRedisReady } from './redis.js';
+import { QUEUE_NAMES, closeQueues } from './queues/queue.js';
+import { Queue } from 'bullmq';
+import { getRedisInstance, initWorkersRedis, closeWorkersRedis, waitForRedisReady } from './redis.js';
 import { startTokenHealthCron } from '../cron/token-health.js';
 import { startMonitorService, stopMonitorService } from './monitor/index.js';
 import { getLogger, setLoggerConfig } from '../utils/logger.js';
@@ -33,7 +34,7 @@ async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkers
   );
 
   for (const name of Object.values(QUEUE_NAMES)) {
-    const queue = getQueue(name);
+    const queue = new Queue(name, { connection: getRedisInstance() });
     await queue.pause();
     await queue.obliterate({ force: true });
     await queue.resume();
@@ -77,7 +78,7 @@ export async function bootstrap() {
 }
 
 function registerShutdownHandlers() {
- const shutdown = async () => {
+  const shutdown = async () => {
     getLogger().info('Shutting down workers...');
 
     const forceExitTimer = setTimeout(() => {

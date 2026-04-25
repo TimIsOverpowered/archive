@@ -8,7 +8,7 @@ import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator.js';
 import healthCheckMiddleware from '../middleware/health-check.js';
 import { RedisService } from '../../utils/redis-service.js';
 import { getCacheMetrics } from '../../utils/cache.js';
-import { QUEUES_VALUES } from '../../workers/queues/queue.js';
+import { QUEUE_NAMES } from '../../workers/queues/queue.js';
 import type { QueueJob } from '../../workers/queues/types.js';
 import { getRedisInstance } from '../../workers/redis.js';
 
@@ -130,7 +130,7 @@ async function getQueueMetrics(): Promise<
   const result: Record<string, { waiting: number; active: number; failed: number; delayed: number }> = {};
   try {
     const redis = getRedisInstance();
-    for (const queueName of QUEUES_VALUES) {
+    for (const queueName of Object.values(QUEUE_NAMES)) {
       const queue = new Queue<QueueJob, QueueJob, string>(queueName, { connection: redis });
       try {
         const counts = await queue.getJobCounts();

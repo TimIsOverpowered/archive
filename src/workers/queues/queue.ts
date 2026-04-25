@@ -1,5 +1,4 @@
 import { Queue, QueueOptions, FlowProducer } from 'bullmq';
-import type { QueueJob } from './types.js';
 import type {
   LiveDownloadJob,
   StandardVodJob,
@@ -21,8 +20,6 @@ export const QUEUE_NAMES = {
 
 export const LIVE_JOB_ID_PREFIX = 'live_hls_';
 
-export const QUEUES_VALUES = Object.values(QUEUE_NAMES);
-
 export const defaultJobOptions = {
   attempts: 3,
   backoff: { type: 'exponential' as const, delay: 5000 },
@@ -36,15 +33,21 @@ export const queueRetryOptions: Record<string, QueueOptions['defaultJobOptions']
   [QUEUE_NAMES.DMCA_PROCESSING]: { attempts: 3, backoff: { type: 'exponential' as const, delay: 10000 } },
 };
 
-const queueCache = new Map<string, Queue<QueueJob, QueueJob, string>>();
+const queueCache = new Map<string, Queue<unknown, unknown, string>>();
 
 function normalizeOptions(options: unknown): string {
   if (!options) return '';
-  try {
-    return JSON.stringify(options, Object.keys(options as Record<string, unknown>).sort());
-  } catch {
-    return JSON.stringify(options);
-  }
+  return JSON.stringify(sortObject(options as Record<string, unknown>));
+}
+
+function sortObject(obj: Record<string, unknown>): unknown {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sortObject);
+  return Object.fromEntries(
+    Object.entries(obj)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => [k, sortObject(v as Record<string, unknown>)])
+  );
 }
 
 let _flowProducer: FlowProducer | null = null;
@@ -58,7 +61,7 @@ export function getFlowProducer(): FlowProducer {
   return _flowProducer;
 }
 
-export function getQueue<TData = unknown, TFinishedData = unknown>(
+function getQueue<TData = unknown, TFinishedData = unknown>(
   name: string,
   jobOptions?: QueueOptions['defaultJobOptions']
 ): Queue<TData, TFinishedData, string> {
@@ -73,7 +76,7 @@ export function getQueue<TData = unknown, TFinishedData = unknown>(
     defaultJobOptions: jobOptions || defaultJobOptions,
   });
 
-  queueCache.set(cacheKey, queue as Queue<QueueJob, QueueJob, string>);
+  queueCache.set(cacheKey, queue);
   return queue;
 }
 

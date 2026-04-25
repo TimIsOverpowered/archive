@@ -20,10 +20,7 @@ export function encrypt(plaintext: string): Buffer {
 
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
 
-  const encrypted = Buffer.concat([
-    cipher.update(Buffer.from(plaintext, 'utf8')),
-    cipher.final(),
-  ]);
+  const encrypted = Buffer.concat([cipher.update(Buffer.from(plaintext, 'utf8')), cipher.final()]);
 
   const authTag = cipher.getAuthTag();
 

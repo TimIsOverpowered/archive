@@ -20,6 +20,13 @@ import { registerCacheSubscriber } from '../services/cache-invalidator.js';
 import { BODY_LIMIT, COMPRESSION_THRESHOLD } from '../constants.js';
 import { randomUUID } from 'node:crypto';
 
+interface FormattedError {
+  statusCode: number;
+  message: string;
+  code: string;
+  isClientError: boolean;
+}
+
 function hasStatusCode(e: unknown): e is { statusCode: number } {
   return (
     typeof e === 'object' &&
@@ -29,12 +36,7 @@ function hasStatusCode(e: unknown): e is { statusCode: number } {
   );
 }
 
-function formatErrorResponse(error: unknown): {
-  statusCode: number;
-  message: string;
-  code: string;
-  isClientError: boolean;
-} {
+function formatErrorResponse(error: unknown): FormattedError {
   if (error instanceof HttpError) {
     const { statusCode, message, code } = error;
     return { statusCode, message, code, isClientError: statusCode >= 400 && statusCode < 500 };

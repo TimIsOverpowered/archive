@@ -3,7 +3,7 @@ import { extractErrorDetails } from './error.js';
 import { getLogger } from '../utils/logger.js';
 import { LRUCache } from 'lru-cache';
 import { retryWithBackoff } from './retry.js';
-import { MAX_SWR_FAILURES, SWR_FAILURES_TTL_MS } from '../constants.js';
+import { MAX_SWR_FAILURES, SWR_FAILURES_TTL_MS, SWR_FAILURES_TTL_SECONDS } from '../constants.js';
 
 /** Metrics for Redis cache hit/miss/error tracking. */
 export interface CacheMetrics {
@@ -51,11 +51,6 @@ const SWR_FAILURES = new LRUCache<string, number>({
   allowStale: false,
 });
 
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-}
-
 const inflightSimple = new Map<string, Promise<unknown>>();
 
 /**
@@ -102,6 +97,11 @@ export async function withCache<T>(key: string, ttl: number, fetcher: () => Prom
 const inflightPromises = new Map<string, Promise<unknown>>();
 
 const INFLIGHT_TIMEOUT_MS = 30_000;
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
 
 /**
  * Stale-while-revalidate cache pattern.
@@ -153,9 +153,8 @@ export async function withStaleWhileRevalidate<T>(
     getLogger().warn({ err: details, key }, 'SWR cache read failed, falling back to DB');
   }
 
-  if (inflightPromises.get(key)) {
-    return (await inflightPromises.get(key)) as T;
-  }
+  const existing = inflightPromises.get(key);
+  if (existing) return (await existing) as T;
 
   const fetchPromise = withTimeout(
     revalidateWithRetry(client, key, ttl, fetcher).finally(() => inflightPromises.delete(key)),
@@ -231,7 +230,7 @@ async function incrementSwrFailureCount(
   try {
     const pipeline = client.pipeline();
     pipeline.incr(failureKey);
-    pipeline.expire(failureKey, Math.ceil(SWR_FAILURES_TTL_MS / 1000));
+    pipeline.expire(failureKey, SWR_FAILURES_TTL_SECONDS);
     await pipeline.exec();
   } catch {
     const current = SWR_FAILURES.get(failureKey) ?? 0;

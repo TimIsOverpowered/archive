@@ -3,6 +3,7 @@ import { findAdminByApiKey } from '../../services/admin.service.js';
 import { RedisService } from '../../utils/redis-service.js';
 import { getLogger } from '../../utils/logger.js';
 import { getClientIp } from './ip.js';
+import { createHash } from 'node:crypto';
 
 /** Admin identity attached to the request after successful API key authentication. */
 export interface AdminContext {
@@ -58,7 +59,8 @@ export default async function adminApiKeyMiddleware(request: FastifyRequest, rep
   const admin = await findAdminByApiKey(apiKey);
 
   if (!admin) {
-    getLogger().warn({ ip, apiKeyPrefix: apiKey.substring(0, 8) }, 'Invalid admin API key used');
+    const keyFingerprint = createHash('sha256').update(apiKey).digest('hex').substring(0, 12);
+    getLogger().warn({ ip, keyFingerprint }, 'Invalid admin API key used');
     return reply.status(401).send({
       statusCode: 401,
       message: 'Invalid API key',

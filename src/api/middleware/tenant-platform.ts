@@ -9,15 +9,19 @@ export interface TenantPlatformContext extends TenantContext {
   platform: Platform;
 }
 
+function hasPlatform(ctx: TenantContext): ctx is TenantPlatformContext {
+  return typeof ctx.platform === 'string' && ctx.platform.length > 0;
+}
+
 /**
- * Cast TenantContext to TenantPlatformContext after platformValidationMiddleware runs.
+ * Assert TenantContext has been narrowed by platformValidationMiddleware.
  * Throws if platform is not set — platformValidationMiddleware must have run first.
  */
 export function asTenantPlatformContext(ctx: TenantContext): TenantPlatformContext {
-  if (!ctx.platform) {
+  if (!hasPlatform(ctx)) {
     throw new Error('platformValidationMiddleware must run before asTenantPlatformContext');
   }
-  return ctx as TenantPlatformContext;
+  return ctx;
 }
 
 /**

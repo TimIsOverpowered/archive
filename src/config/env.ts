@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CHAT_CURSOR_TTL, CHAT_OFFSET_TTL, CHAT_BUCKET_SIZE_TTL } from '../constants.js';
 
 function envBoolWithDefault(defaultsTo: boolean) {
   return z.preprocess(
@@ -49,9 +50,9 @@ export const ApiConfigSchema = BaseConfigSchema.extend({
   RATE_LIMIT_ADMIN_GET: z.coerce.number().int().positive().default(60),
   RATE_LIMIT_ADMIN_AUTH: z.coerce.number().int().positive().default(20),
   RATE_LIMIT_BLOCK_DURATION: z.coerce.number().int().positive().default(60),
-  CHAT_CURSOR_TTL: z.coerce.number().int().positive().default(259200),
-  CHAT_OFFSET_TTL: z.coerce.number().int().positive().default(259200),
-  CHAT_BUCKET_SIZE_TTL: z.coerce.number().int().positive().default(2592000),
+  CHAT_CURSOR_TTL: z.coerce.number().int().positive().default(CHAT_CURSOR_TTL),
+  CHAT_OFFSET_TTL: z.coerce.number().int().positive().default(CHAT_OFFSET_TTL),
+  CHAT_BUCKET_SIZE_TTL: z.coerce.number().int().positive().default(CHAT_BUCKET_SIZE_TTL),
   HEALTH_TOKEN: z.string().optional(),
 });
 
@@ -108,12 +109,18 @@ export function getWorkersConfig(): WorkersConfig {
   return workersConfigCache || loadWorkersConfig();
 }
 
-export function getBaseConfig(): BaseConfig {
-  if (apiConfigCache) return apiConfigCache;
-  if (workersConfigCache) return workersConfigCache;
+export function loadBaseConfig(): BaseConfig {
   if (baseConfigCache) return baseConfigCache;
-  baseConfigCache = BaseConfigSchema.parse(process.env);
-  return baseConfigCache;
+  try {
+    baseConfigCache = BaseConfigSchema.parse(process.env);
+    return baseConfigCache;
+  } catch (error) {
+    throwConfigError('Base', error);
+  }
+}
+
+export function getBaseConfig(): BaseConfig {
+  return baseConfigCache ?? apiConfigCache ?? workersConfigCache ?? loadBaseConfig();
 }
 
 // --- Lazy accessor helpers (consolidated from env-accessors.ts) ---

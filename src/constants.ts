@@ -28,6 +28,9 @@ export const VOD_DETAILS_CACHE_TTL = 3_600; // 1 hour for individual VODs
 export const VOD_LIST_CACHE_TTL = 900; // 15 minutes for list queries
 export const VOD_VOLATILE_CACHE_TTL = 15; // 15 seconds for live status/duration
 export const EMOTE_CACHE_TTL = 86_400; // 1 day for emotes
+export const CHAT_CURSOR_TTL = 3 * 24 * 3600; // 3 days for chat cursor positions
+export const CHAT_OFFSET_TTL = 3 * 24 * 3600; // 3 days for chat offset positions
+export const CHAT_BUCKET_SIZE_TTL = 30 * 24 * 3600; // 30 days for chat bucket size cache
 export const MAX_CACHE_PAGES = 10; // cap paginated list cache to prevent tag explosion
 
 // ── Cache Stale-While-Revalidate ────────────────────────────────────────────
@@ -35,6 +38,7 @@ export const VOD_DETAILS_STALE_RATIO = 0.8; // Revalidate when 80% of TTL has el
 
 // ── Cache SWR Failure Tracking ──────────────────────────────────────────────
 export const SWR_FAILURES_TTL_MS = 5 * 60 * 1000; // 5 minutes
+export const SWR_FAILURES_TTL_SECONDS = 300; // 5 minutes in seconds
 export const MAX_SWR_FAILURES = 3; // Max revalidation failures before skipping retries
 
 // ── Database ─────────────────────────────────────────────────────────────────

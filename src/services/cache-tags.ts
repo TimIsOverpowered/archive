@@ -20,11 +20,7 @@ function extractPageFromKey(key: string): number | null {
  * Cache a VOD list query result and register tag-based associations for all VODs in the list.
  * Enables batch invalidation by VOD ID later.
  */
-export async function setVodListCache(
-  cacheKey: string,
-  data: string,
-  ttl: number
-): Promise<void> {
+export async function setVodListCache(cacheKey: string, data: string, ttl: number): Promise<void> {
   const client = RedisService.getActiveClient();
   if (!client) return;
 

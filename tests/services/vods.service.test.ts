@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { buildVodQuery, VodQuerySchema, VodResponse } from '../../src/services/vods.service.js';
+import { buildVodQuery, VodQuerySchema } from '../../src/services/vods.service.js';
+import type { VodResponse } from '../../src/types/vods.js';
 
 describe('VodService: buildVodQuery', () => {
   it('should return default order by created_at desc when no sort/order specified', () => {
