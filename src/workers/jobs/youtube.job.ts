@@ -152,10 +152,10 @@ export async function createGameUploadJobsForVod(
     try {
       const job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, {
         id: chapter.id,
-        name: chapter.name || '',
+        name: chapter.name ?? '',
         start: chapter.start ?? 0,
         end: chapter.end ?? 0,
-        gameId: chapter.game_id || undefined,
+        gameId: chapter.game_id ?? undefined,
       });
       jobs.push(job);
     } catch (error) {
@@ -323,10 +323,10 @@ export async function queueYoutubeGameUpload(
 
   const job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, {
     id: chapter.id,
-    name: chapter.name || '',
+    name: chapter.name ?? '',
     start: chapter.start ?? 0,
     end: chapter.end ?? 0,
-    gameId: chapter.game_id || undefined,
+    gameId: chapter.game_id ?? undefined,
   });
 
   return enqueueGameUpload(job, downloadJobId);

@@ -67,7 +67,7 @@ async function fetchFromFlareSolverr(
   const body: FlareSolverrResponse = await response.json();
 
   if (body.error || body.message) {
-    throw new Error(body.error || body.message);
+    throw new Error(body.error ?? body.message);
   }
 
   const solution = body.solution;

@@ -46,7 +46,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
   const { config, db } = await getJobContext(tenantId);
 
-  if (!config || !config.youtube) {
+  if (!config || config.youtube == null) {
     throw new ConfigNotConfiguredError(`YouTube for tenant ${tenantId}`);
   }
 
@@ -154,7 +154,7 @@ async function processVodUploadJob(
 
   await publishVodUpdate(tenantId, dbId);
 
-  const splitDuration = getEffectiveSplitDuration(config.youtube!.splitDuration);
+  const splitDuration = getEffectiveSplitDuration(config.youtube?.splitDuration);
   await linkVodPartsAfterDelay(tenantId, dbId, result.uploadedVideos, splitDuration, db, log);
 
   return { success: true, videos: result.uploadedVideos };

@@ -67,13 +67,14 @@ function getQueue<TData = unknown, TFinishedData = unknown>(
 ): Queue<TData, TFinishedData, string> {
   const cacheKey = `${name}:${normalizeOptions(jobOptions)}`;
 
-  if (queueCache.has(cacheKey)) {
-    return queueCache.get(cacheKey)! as Queue<TData, TFinishedData, string>;
+  const cached = queueCache.get(cacheKey);
+  if (cached) {
+    return cached as Queue<TData, TFinishedData, string>;
   }
 
   const queue = new Queue<TData, TFinishedData, string>(name, {
     connection: getRedisInstance(),
-    defaultJobOptions: jobOptions || defaultJobOptions,
+    defaultJobOptions: jobOptions ?? defaultJobOptions,
   });
 
   queueCache.set(cacheKey, queue);

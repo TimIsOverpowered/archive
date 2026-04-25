@@ -39,7 +39,7 @@ export async function getChannelBadges(tenantId: string): Promise<Record<string,
       `/chat/badges?broadcaster_id=${config.twitch.id}`
     );
 
-    const badgesData = data?.data || null;
+    const badgesData = data?.data ?? null;
     if (!badgesData) {
       log.debug({ tenantId }, 'No channel badges found for Twitch user');
       return null;
@@ -76,8 +76,8 @@ export async function getGlobalBadges(tenantId: string): Promise<Record<string, 
 
   try {
     const client = getTwitchClient(tenantId);
-    const data = await client.helix.get<{ data?: Record<string, unknown> }>('/chat/badges/global');
-    const badgesData = data?.data || null;
+    const data = await client.helix.get<{ data?: Record<string, unknown }>('/chat/badges/global');
+    const badgesData = data?.data ?? null;
 
     if (badgesData) {
       globalBadgesCache.set(tenantId, badgesData as Record<string, unknown>);

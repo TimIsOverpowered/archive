@@ -47,7 +47,7 @@ export async function processGameUpload(ctx: GameUploadContext): Promise<GameUpl
 
   const gameExceedsYoutubeMax = trimmedDuration > YOUTUBE_MAX_DURATION;
 
-  if (gameExceedsYoutubeMax) {
+  if (gameExceedsYoutubeMax === true) {
     return await processSplitGameUpload(ctx, trimmedPath, trimmedDuration);
   } else {
     return await processSingleGameUpload(ctx, trimmedPath);
@@ -138,7 +138,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
 
   await deleteFileIfExists(trimmedPath);
 
-  return { success: true, videoId: result.videoId, gameId: String(gameRecord!.id) };
+  return { success: true, videoId: result.videoId, gameId: String(gameRecord.id) };
 }
 
 async function processSplitGameUpload(
@@ -270,7 +270,7 @@ async function processSplitGameUpload(
       part: currentPartNum,
       startTime,
       endTime,
-      gameId: String(gameRecord!.id),
+      gameId: String(gameRecord.id),
     });
 
     if (!config.settings.saveMP4) {

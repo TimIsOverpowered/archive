@@ -145,7 +145,7 @@ export function createYoutubeUploadProgressHandler({
         const title = `${titlePrefix}${partSuffix}`;
 
         const fields: Array<{ name: string; value: string; inline: boolean }> = [
-          { name: 'Video ID', value: progress.videoId || '', inline: false },
+          { name: 'Video ID', value: progress.videoId ?? '', inline: false },
         ];
         if (partField) fields.push(partField);
 

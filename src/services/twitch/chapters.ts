@@ -53,7 +53,7 @@ export async function getChapter(vodId: string, tenantId?: string): Promise<Reco
       },
     },
   });
-  return data?.data?.video || null;
+  return data?.data?.video ?? null;
 }
 
 export async function getGameData(gameId: string, tenantId: string): Promise<Record<string, unknown> | null> {

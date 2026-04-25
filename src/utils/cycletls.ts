@@ -21,7 +21,7 @@ let initPromise: Promise<CycleTLSClient> | null = null;
 async function getCycleTLS(): Promise<CycleTLSClient> {
   if (cycleTLSInstance?.exit) return cycleTLSInstance;
 
-  if (!initPromise) {
+  if (initPromise == null) {
     initPromise = (async () => {
       try {
         getLogger().debug('Initializing CycleTLS with Firefox fingerprint');

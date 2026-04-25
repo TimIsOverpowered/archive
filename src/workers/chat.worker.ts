@@ -108,7 +108,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
     { component: 'chat-worker', vodId, ...result, finalOffset: effectiveOffset },
     'Download completed successfully'
   );
-  const resumeIndicator = startOffset || hasExistingData;
+  const resumeIndicator = startOffset ?? hasExistingData;
   updateAlert(
     messageId,
     chatAlerts.complete(
@@ -304,12 +304,12 @@ async function processChatDownload(
       batchBuffer.push({
         id: node.id,
         vod_id: dbId,
-        display_name: ('commenter' in node && node.commenter?.displayName) || null,
+        display_name: ('commenter' in node && node.commenter?.displayName) ?? null,
         content_offset_seconds: Math.round(offsetSeconds),
         createdAt: 'createdAt' in node && node.createdAt ? new Date(node.createdAt as string) : new Date(),
         message,
         user_badges: userBadges,
-        user_color: ('message' in node && node.message?.userColor) || '#FFFFFF',
+        user_color: ('message' in node && node.message?.userColor) ?? '#FFFFFF',
       });
     }
 

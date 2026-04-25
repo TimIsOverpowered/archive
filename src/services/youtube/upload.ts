@@ -49,7 +49,7 @@ export async function uploadVideo(
     const youtube = await createYoutubeClient(tenantId);
 
     const fileSize = (await fsPromises.stat(filePath)).size;
-    const fileName = filePath.split('/').pop() || filePath;
+    const fileName = filePath.split('/').pop() ?? filePath;
 
     logger.info(
       { component: 'youtube-upload', tenantId, title, fileSize, fileName, privacyStatus },
@@ -94,7 +94,7 @@ export async function uploadVideo(
 
     let thumbnailUrl = '';
     const thumbs = response?.data?.snippet?.thumbnails;
-    thumbnailUrl = thumbs?.high?.url || thumbs?.medium?.url || '';
+    thumbnailUrl = thumbs?.high?.url ?? thumbs?.medium?.url ?? '';
 
     if (onProgress) {
       await onProgress({ milestone: 'success', videoId, thumbnailUrl, videoDuration, privacyStatus });

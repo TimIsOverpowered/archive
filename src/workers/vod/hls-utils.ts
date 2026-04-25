@@ -163,14 +163,14 @@ export async function fetchTwitchPlaylist(
 
     const parsedMaster: HLS.types.MasterPlaylist | HLS.types.MediaPlaylist = HLS.parse(masterPlaylistContent);
 
-    if (!parsedMaster) {
+    if (parsedMaster == null) {
       log.error({ vodId }, 'Failed to parse Twitch master playlist');
 
       await sleep(5000);
       return null;
     }
 
-    const bestVariantUrl = (parsedMaster as HLS.types.MasterPlaylist).variants?.[0]?.uri || parsedMaster.uri;
+    const bestVariantUrl = (parsedMaster as HLS.types.MasterPlaylist).variants?.[0]?.uri ?? parsedMaster.uri;
 
     if (!bestVariantUrl) {
       log.error({ vodId }, 'No variant URL found in master playlist');
@@ -216,7 +216,7 @@ export async function fetchKickPlaylist(
   maxRetryBeforeEndDetection: number,
   session?: CycleTLSSession
 ): Promise<FetchPlaylistResult | null> {
-  const fetchUrl = sourceUrl || '';
+  const fetchUrl = sourceUrl ?? '';
 
   if (!fetchUrl) {
     log.error({ vodId }, 'No Kick HLS source URL provided. Cannot continue download.');
@@ -234,7 +234,7 @@ export async function fetchKickPlaylist(
   let baseURL: string = '';
 
   try {
-    const tempSession = session || createSession(); // Create if not provided
+    const tempSession = session ?? createSession(); // Create if not provided
 
     if (fetchUrl.includes('master.m3u8')) {
       const baseEndpoint = fetchUrl.substring(0, fetchUrl.lastIndexOf('/'));

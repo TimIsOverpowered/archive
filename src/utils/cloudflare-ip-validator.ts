@@ -90,7 +90,7 @@ export function isFromCloudflare(ip: string, ranges?: CloudflareIpRanges): boole
           return false;
         }
         const subnet = ipaddr.parseCIDR(cidr);
-        return parsed.match(subnet, Number(rangeMask || 0));
+        return parsed.match(subnet, Number(rangeMask ?? 0));
       } catch {
         return false;
       }

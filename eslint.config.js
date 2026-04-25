@@ -38,6 +38,21 @@ export default tseslint.config(
       'import-x/no-duplicates': 'error',
       'no-empty-function': 'off',
       'import-x/extensions': ['error', 'ignorePackages', { ts: 'always', js: 'always', checkTypeImports: true }],
+      '@typescript-eslint/no-non-null-assertion': 'warn',
+      '@typescript-eslint/prefer-nullish-coalescing': 'warn',
+      '@typescript-eslint/strict-boolean-expressions': [
+        'error',
+        {
+          allowString: false,
+          allowNumber: false,
+          allowNullableObject: true,
+          allowNullableBoolean: false,
+          allowNullableString: false,
+          allowNullableNumber: false,
+          allowNullableEnum: false,
+          allowAny: false,
+        },
+      ],
     },
   },
   prettier

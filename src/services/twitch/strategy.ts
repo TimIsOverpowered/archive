@@ -105,7 +105,7 @@ export const strategy: PlatformStrategy = {
   async finalizeChapters(ctx, dbId, vodId, finalDurationSeconds): Promise<void> {
     try {
       await saveVodChapters(
-        { tenantId: ctx.tenantId, config: ctx.config, db: ctx.db! },
+        { tenantId: ctx.tenantId, config: ctx.config, db: ctx.db ?? null },
         dbId,
         vodId,
         finalDurationSeconds

@@ -71,7 +71,7 @@ async function refreshToken(
   const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, REDIRECT_URI);
   oauth2Client.setCredentials({
     refresh_token: refreshToken,
-    access_token: accessToken || null,
+    access_token: accessToken ?? null,
   });
 
   try {
@@ -100,7 +100,7 @@ async function refreshToken(
     return {
       accessToken: credentials.access_token,
       expiryDate: credentials.expiry_date,
-      refreshToken: credentials.refresh_token || refreshToken,
+      refreshToken: credentials.refresh_token ?? refreshToken,
     };
   } catch (error: unknown) {
     const details = extractErrorDetails(error);

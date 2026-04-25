@@ -30,7 +30,7 @@ export function detectFmp4FromPlaylist(m3u8Content: string): boolean {
     const parsed = HLS.parse(m3u8Content);
 
     // Check if this is a media playlist (not master) with segments
-    if (!parsed || !('segments' in parsed)) {
+    if (!('segments' in parsed)) {
       return false;
     }
 
@@ -39,7 +39,7 @@ export function detectFmp4FromPlaylist(m3u8Content: string): boolean {
     };
 
     // Check for init segment (EXT-X-MAP tag) - strongest fMP4 indicator
-    if (mediaPlaylist.segments.some((seg) => seg.map && seg.map.uri)) {
+    if (mediaPlaylist.segments.some((seg) => seg.map?.uri)) {
       return true;
     }
 
@@ -150,7 +150,7 @@ export async function convertHlsToMp4(source: string, outputPath: string, option
   // Use fMP4 status provided by caller (defaults to false for standard .ts segments)
   const isFmp4 = options?.isFmp4 ?? false;
 
-  logger.debug({ vodId: options?.vodId || source.substring(0, 30), isFmp4 }, `HLS format determined`);
+  logger.debug({ vodId: options?.vodId ?? source.substring(0, 30), isFmp4 }, `HLS format determined`);
 
   // Build ffmpeg output options based on caller-provided fMP4 status
   const baseOptions: string[] = ['-bsf:a', 'aac_adtstoasc', '-movflags', '+faststart'];
@@ -187,7 +187,7 @@ export async function convertHlsToMp4(source: string, outputPath: string, option
     });
     ffmpegProcess.on('error', (err: Error, _stdout: string | null, stderr: string | null) => {
       ffmpegProcess.kill('SIGKILL');
-      reject(err || new Error(stderr?.toString() || 'Unknown error'));
+      reject(err ?? new Error(stderr?.toString() ?? 'Unknown error'));
     });
     ffmpegProcess.on('end', () => {
       resolve();

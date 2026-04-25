@@ -67,7 +67,7 @@ export function createWorker<TData>(config: WorkerConfig<TData>): Worker<TData, 
   });
 
   worker.on('active', (job) => {
-    if (!job) return;
+    if (job == null) return;
     getLogger().debug(
       { jobId: String(job.id), ...extractJobMeta(job.data as Record<string, unknown>), attemptsMade: job.attemptsMade },
       `[${name}] job started`
@@ -75,7 +75,7 @@ export function createWorker<TData>(config: WorkerConfig<TData>): Worker<TData, 
   });
 
   worker.on('completed', (job) => {
-    if (!job) return;
+    if (job == null) return;
     getLogger().debug(
       { jobId: String(job.id), ...extractJobMeta(job.data as Record<string, unknown>) },
       `[${name}] job completed`
@@ -83,7 +83,7 @@ export function createWorker<TData>(config: WorkerConfig<TData>): Worker<TData, 
   });
 
   worker.on('failed', (job, err) => {
-    if (!job || !err) return;
+    if (job == null || err == null) return;
     getLogger().error(
       {
         jobId: String(job.id),

@@ -78,7 +78,7 @@ export async function fetchComments(
       },
     },
   });
-  return data.data?.video || null;
+  return data.data?.video ?? null;
 }
 
 export async function fetchNextComments(
@@ -100,5 +100,5 @@ export async function fetchNextComments(
       },
     },
   });
-  return data.data?.video || null;
+  return data.data?.video ?? null;
 }

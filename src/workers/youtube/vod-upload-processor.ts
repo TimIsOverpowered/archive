@@ -50,8 +50,8 @@ export async function processVodUpload(ctx: VodUploadContext): Promise<VodUpload
 
   const channelName = getDisplayName(config);
   const domainName = config.settings?.domainName || 'localhost';
-  const privacyStatus = config.youtube!.public ? 'public' : 'unlisted';
-  const splitDuration = getEffectiveSplitDuration(config.youtube!.splitDuration);
+  const privacyStatus = config.youtube?.public ? 'public' : 'unlisted';
+  const splitDuration = getEffectiveSplitDuration(config.youtube?.splitDuration);
   const duration = (await getDuration(filePath)) ?? vodRecord.duration;
 
   const platformName = vodRecord.platform as Platform;
@@ -160,7 +160,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
       vodRecord: vodRecord,
       domainName,
       timezone: config.settings?.timezone || 'UTC',
-      youtubeDescription: config.youtube!.description,
+      youtubeDescription: config.youtube?.description,
       part: totalParts > 1 ? currentPartNum : undefined,
       type,
     });
@@ -251,14 +251,14 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
     throw new Error('File path is required for VOD upload');
   }
 
-  const title = vodRecord.title?.replace(/>|</gi, '') || '';
+  const title = vodRecord.title?.replace(/>|</gi, '') ?? '';
   const { description: youtubeDescription } = buildYoutubeMetadata({
     channelName,
     platform: platformName,
     vodRecord,
     domainName,
     timezone: config.settings?.timezone || 'UTC',
-    youtubeDescription: config.youtube!.description,
+    youtubeDescription: config.youtube?.description,
     type,
   });
 

@@ -21,7 +21,7 @@ export async function saveChaptersAndLinkParts(
     .orderBy('start', 'asc')
     .execute();
 
-  const hasChapters = chapters && chapters.length > 0;
+  const hasChapters = chapters.length > 0;
   const needsLinking = uploadedVideos.length > 1;
 
   if (!hasChapters && !needsLinking) {
@@ -43,8 +43,8 @@ export async function saveChaptersAndLinkParts(
       part: ['snippet'],
     });
 
-    const currentSnippet = currentVideo.data?.items?.[0]?.snippet || {};
-    const currentDescription = currentSnippet.description || '';
+    const currentSnippet = currentVideo.data?.items?.[0]?.snippet ?? {};
+    const currentDescription = currentSnippet.description ?? '';
 
     let newDescription = currentDescription;
 
@@ -107,7 +107,7 @@ function buildChapterTimestampsForPart(chapters: SelectableChapters[], partNum: 
   for (const chapter of chaptersInPart) {
     const relativeTime = Math.max(0, chapter.start - partStart);
     const timestamp = dayjs.duration(relativeTime, 'seconds').format('HH:mm:ss');
-    const chapterName = chapter.name || `Chapter ${chapter.id}`;
+    const chapterName = chapter.name ?? `Chapter ${chapter.id}`;
     result += `${timestamp} ${chapterName}\n`;
   }
 

@@ -30,7 +30,7 @@ export function buildYoutubeMetadata(options: YoutubeMetadataOptions): YoutubeMe
   const baseTitle = `${channelName} ${platformName}${type === SOURCE_TYPES.LIVE ? ' LIVE' : ''} VOD - ${dateFormatted}`;
   const title = part ? `${baseTitle} PART ${part}` : baseTitle;
   const replayPath = `/vods/${vodRecord.id}`;
-  const description = `Chat Replay: https://${domainName}${replayPath}\nStream Title: ${vodRecord.title?.replace(/<[^>]*>/g, '') || ''}\n${youtubeDescription || ''}`;
+  const description = `Chat Replay: https://${domainName}${replayPath}\nStream Title: ${vodRecord.title?.replace(/<[^>]*>/g, '') ?? ''}\n${youtubeDescription ?? ''}`;
 
   return { title, description };
 }

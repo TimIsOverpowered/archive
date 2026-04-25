@@ -26,9 +26,9 @@ export function parseTwitchDuration(durationStr: string): number {
     throw new Error(`Invalid Twitch duration format: ${durationStr}`);
   }
 
-  const hours = hoursMatch ? parseInt(hoursMatch[1]!, 10) : 0;
-  const minutes = minsMatch ? parseInt(minsMatch[1]!, 10) : 0;
-  const seconds = secsMatch ? parseFloat(secsMatch[1]!) : 0;
+  const hours = hoursMatch ? parseInt(hoursMatch[1], 10) : 0;
+  const minutes = minsMatch ? parseInt(minsMatch[1], 10) : 0;
+  const seconds = secsMatch ? parseFloat(secsMatch[1]) : 0;
 
   return hours * 3600 + minutes * 60 + Math.floor(seconds);
 }

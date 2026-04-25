@@ -114,7 +114,7 @@ async function downloadTwitchVodWithFfmpeg(
   try {
     const tokenSig = await getVodTokenSig(vodId, tenantId);
 
-    if (!tokenSig) {
+    if (tokenSig == null) {
       throw new Error(`Failed to get token/sig for ${vodId}`);
     }
 

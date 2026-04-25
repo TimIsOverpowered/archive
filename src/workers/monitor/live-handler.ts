@@ -127,7 +127,7 @@ async function handleOfflineStream(
       platform,
       activeLiveVod.vod_id,
       activeLiveVod.started_at ?? undefined,
-      username || undefined,
+      username ?? undefined,
       displayName
     );
   }

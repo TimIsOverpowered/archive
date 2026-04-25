@@ -96,7 +96,7 @@ export function registerWorkers(
     const concurrency =
       name === QUEUE_NAMES.VOD_LIVE
         ? Math.max(
-            tenantConfigs.filter((c) => c.settings.vodDownload && (c.twitch?.enabled || c.kick?.enabled)).length *
+            tenantConfigs.filter((c) => c.settings.vodDownload && (c.twitch?.enabled ?? c.kick?.enabled)).length *
               2 *
               vodLiveHeadroom,
             vodMinConcurrency

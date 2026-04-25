@@ -65,7 +65,7 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
       method: 'POST',
       body: { embeds: [embed] },
     });
-    return responseData.id || null;
+    return responseData.id ?? null;
   } catch (err) {
     getLogger().error(extractErrorDetails(err), 'Failed to send stream alert');
     return null;

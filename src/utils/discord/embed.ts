@@ -45,7 +45,7 @@ export function constructEmbed(data: RichEmbedData): DiscordEmbed {
         name: f.name,
         value: f.value,
         inline: !!f.inline,
-      })) || [],
+      })) ?? [],
   };
 
   if (data.description) {

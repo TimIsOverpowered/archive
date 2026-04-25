@@ -38,7 +38,7 @@ export async function sendStreamOfflineAlert(
   username?: string,
   displayName?: string
 ): Promise<void> {
-  const streamerName = displayName || username;
+  const streamerName = displayName ?? username;
 
   try {
     const fields: Array<{ name: string; value: string; inline?: boolean }> = [

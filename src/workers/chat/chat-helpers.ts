@@ -77,7 +77,7 @@ export function extractMessageData(node: TwitchChatMessageNode | null | undefine
     return { message: { content: '', fragments: [] }, userBadges: undefined };
   }
 
-  const rawFragments = node.message.fragments || [];
+  const rawFragments = node.message.fragments ?? [];
   const cleanFragments = stripTypename(rawFragments);
   const badgesRaw = node.message.userBadges ?? null;
 
