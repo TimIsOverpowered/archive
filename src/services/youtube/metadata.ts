@@ -50,7 +50,7 @@ export async function saveChaptersAndLinkParts(
 
     if (hasChapters) {
       const chapterTimestamps = buildChapterTimestampsForPart(chapters, partNum, splitDuration);
-      if (chapterTimestamps) {
+      if (chapterTimestamps != null && chapterTimestamps !== '') {
         newDescription += '\n\n' + chapterTimestamps;
         videosWithChapters++;
       }
@@ -58,7 +58,7 @@ export async function saveChaptersAndLinkParts(
 
     if (needsLinking) {
       const navLinks = buildPartNavigationLinks(sortedParts, videoId);
-      if (navLinks) {
+      if (navLinks != null && navLinks !== '') {
         newDescription = navLinks + '\n' + newDescription;
         videosWithLinks++;
       }
@@ -84,7 +84,7 @@ export async function saveChaptersAndLinkParts(
       videoCount: sortedParts.length,
       videosWithChapters,
       videosWithLinks,
-      chapterCount: chapters?.length || 0,
+      chapterCount: chapters?.length ?? 0,
     },
     'Saved chapters and linked YouTube video parts'
   );

@@ -30,7 +30,7 @@ export async function downloadVodWithFfmpeg(
   } else if (platform === PLATFORMS.TWITCH) {
     await downloadTwitchVodWithFfmpeg(vodId, finalPath, config, log);
   } else {
-    throw new Error(`Unsupported platform: ${platform}`);
+    throw new Error(`Unsupported platform: ${String(platform)}`);
   }
 
   log.info({ vodId, platform }, `ffmpeg download completed for ${vodId}`);
@@ -45,19 +45,19 @@ async function downloadKickVodWithFfmpeg(
 ): Promise<void> {
   const username = config?.kick?.username;
 
-  if (!username) {
+  if (username == null || username === '') {
     throw new ConfigNotConfiguredError(`Kick username for ${config.id}`);
   }
 
   const vodMetadata = await getKickVod(username, vodId);
 
-  if (!vodMetadata?.source) {
+  if (vodMetadata?.source == null || vodMetadata?.source === '') {
     throw new Error('VOD source URL not available');
   }
 
   const m3u8Url = await getKickParsedM3u8ForFfmpeg(vodMetadata.source);
 
-  if (!m3u8Url) {
+  if (m3u8Url == null || m3u8Url === '') {
     throw new Error('Failed to parse Kick HLS playlist');
   }
 
@@ -73,7 +73,7 @@ async function downloadKickVodWithFfmpeg(
       vodId: vodId,
       isFmp4: false,
       onProgress: (percent) => {
-        if (messageId) {
+        if (messageId != null) {
           void updateAlert(messageId, alerts.progress(vodId, `Converting ${vodId} (${percent}%)`));
         }
       },
@@ -82,7 +82,7 @@ async function downloadKickVodWithFfmpeg(
     log.info(`Downloaded ${vodId}.mp4`);
 
     // Success alert
-    if (messageId) {
+    if (messageId != null) {
       await updateAlert(messageId, alerts.complete(vodId, PLATFORMS.KICK, finalPath));
     }
   } catch (error) {
@@ -92,7 +92,7 @@ async function downloadKickVodWithFfmpeg(
     log.error(`ffmpeg error occurred: ${errorMsg}`);
 
     // Failure alert
-    if (messageId) {
+    if (messageId != null) {
       await updateAlert(messageId, alerts.error(vodId, PLATFORMS.KICK, errorMsg));
     }
 
@@ -133,7 +133,7 @@ async function downloadTwitchVodWithFfmpeg(
       vodId,
       isFmp4,
       onProgress: (percent) => {
-        if (messageId) {
+        if (messageId != null) {
           void updateAlert(messageId, alerts.progress(vodId, `Converting ${vodId} (${percent}%)`));
         }
       },
@@ -141,7 +141,7 @@ async function downloadTwitchVodWithFfmpeg(
 
     log.info(`Downloaded ${vodId}.mp4`);
 
-    if (messageId) {
+    if (messageId != null) {
       await updateAlert(messageId, alerts.complete(vodId, PLATFORMS.TWITCH, finalPath));
     }
   } catch (error) {
@@ -150,7 +150,7 @@ async function downloadTwitchVodWithFfmpeg(
 
     log.error(`ffmpeg error occurred: ${errorMsg}`);
 
-    if (messageId) {
+    if (messageId != null) {
       await updateAlert(messageId, alerts.error(vodId, PLATFORMS.TWITCH, errorMsg));
     }
 

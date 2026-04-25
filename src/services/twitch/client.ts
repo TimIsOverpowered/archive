@@ -66,10 +66,10 @@ export function createTwitchGqlClient(
         },
         body,
         timeoutMs: 10000,
-        logContext: tenantId ? { tenantId } : undefined,
+        logContext: tenantId != null ? { tenantId } : undefined,
       });
 
-      if (result && typeof result === 'object' && 'errors' in result) {
+      if (result != null && typeof result === 'object' && 'errors' in result) {
         const errors = (result as Record<string, unknown>).errors;
         if (Array.isArray(errors) && errors.length > 0) {
           getLogger().error(

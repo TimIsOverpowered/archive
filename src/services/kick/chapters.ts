@@ -14,7 +14,7 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
   try {
     const { config } = ctx;
     const username = config?.kick?.username;
-    if (!username) {
+    if (username == null || username === '') {
       log.warn({ dbId, vodId }, 'Kick username not configured');
       return;
     }
@@ -56,7 +56,7 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
       }
 
       let bannerImage: string | null = null;
-      if (category.slug) {
+      if (category.slug != null && category.slug !== '') {
         try {
           const categoryInfo = await getKickCategoryInfo(category.slug);
           if (categoryInfo && typeof categoryInfo.banner === 'object' && categoryInfo.banner !== null) {
@@ -121,7 +121,7 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
 }
 
 export async function finalizeKickChapters(
-  ctx: TenantContext,
+  ctx: Omit<TenantContext, 'db'>,
   dbId: number,
   vodId: string,
   finalDurationSeconds: number

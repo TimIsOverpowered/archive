@@ -22,13 +22,13 @@ export default async function adminApiKeyMiddleware(request: FastifyRequest, rep
 
   let apiKey: string | undefined;
 
-  if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+  if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
     apiKey = authHeader.substring(7);
-  } else if (apiKeyHeader) {
-    apiKey = typeof apiKeyHeader === 'string' ? apiKeyHeader : undefined;
+  } else if (typeof apiKeyHeader === 'string') {
+    apiKey = apiKeyHeader;
   }
 
-  if (!apiKey || !apiKey.startsWith('archive_')) {
+  if (apiKey == null || !apiKey.startsWith('archive_')) {
     return reply.status(401).send({
       statusCode: 401,
       message: 'Missing or invalid API key',

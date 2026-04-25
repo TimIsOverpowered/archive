@@ -13,7 +13,7 @@ import {
  * and allows route handlers to use createAutoLogger() without explicit tenantId parameter.
  */
 export default function createTenantLoggerMiddleware() {
-  return async function tenantLoggerMiddleware(request: FastifyRequest, reply: FastifyReply) {
+  return function tenantLoggerMiddleware(request: FastifyRequest, reply: FastifyReply) {
     // Extract tenantId from params (routes like /api/v1/:tenantId/vods/* or /api/v1/:tenantId/admin/...)
     const params = request.params as Record<string, string>;
 
@@ -24,7 +24,7 @@ export default function createTenantLoggerMiddleware() {
       tenantId = String(params.tenantId);
     }
 
-    if (!tenantId) return; // No tenant context available for this route (e.g., health check, root paths)
+    if (tenantId == null) return; // No tenant context available for this route (e.g., health check, root paths)
 
     const config = configService.get(tenantId);
     const displayName = config?.displayName ?? tenantId;

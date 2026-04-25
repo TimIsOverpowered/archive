@@ -15,7 +15,9 @@ export interface ErrorDetails {
  */
 export function extractErrorDetails(error: unknown): ErrorDetails {
   if (error instanceof ZodError) {
-    const message = error.issues.map((i) => `${i.path.join('.') || 'root'}: ${i.message}`).join(', ');
+    const message = error.issues
+      .map((i) => `${i.path.join('.') !== '' ? i.path.join('.') : 'root'}: ${i.message}`)
+      .join(', ');
     return { message: `Validation Error: ${message}`, stack: error.stack };
   }
 
@@ -27,7 +29,7 @@ export function extractErrorDetails(error: unknown): ErrorDetails {
     return { message: error };
   }
 
-  if (error && typeof error === 'object' && !Array.isArray(error)) {
+  if (error != null && typeof error === 'object' && !Array.isArray(error)) {
     const props = Object.getOwnPropertyNames(error);
     const errorMessage = props.includes('message')
       ? String((error as Record<string, unknown>).message)
@@ -52,7 +54,7 @@ export function createErrorContext(
 ): { error: string } & Record<string, unknown> {
   const details = extractErrorDetails(error);
   const context = { ...additionalContext, error: details.message };
-  return context as { error: string } & Record<string, unknown>;
+  return context;
 }
 
 /**

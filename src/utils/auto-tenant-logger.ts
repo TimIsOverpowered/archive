@@ -3,11 +3,8 @@ import { configService } from '../config/tenant-config.js';
 import { type AppLogger, getLogger } from './logger.js';
 import { asJsonObject } from './object.js';
 
-// Define a specific call signature for the wrapper to satisfy ESLint
-type InternalLogCall = (arg1: unknown, ...args: unknown[]) => void;
-
 export function createAutoLogger(tenantId?: string | null): AppLogger {
-  if (!tenantId) {
+  if (tenantId == null || tenantId === '') {
     return getLogger();
   }
 
@@ -24,9 +21,8 @@ export function createAutoLogger(tenantId?: string | null): AppLogger {
 
   function wrapMethod(method: LogFn): LogFn {
     return (firstArg: unknown, ...rest: unknown[]): void => {
-      // Cast the method to our explicit InternalLogCall signature.
-      // This satisfies the 'no-unsafe-function-type' rule because it defines params/return.
-      const log = method as InternalLogCall;
+      // Cast the method to satisfy type requirements for call signature.
+      const log = method as unknown as { call: (thisArg: unknown, ...args: unknown[]) => void };
 
       if (typeof firstArg === 'string') {
         const msg = prefix(firstArg);

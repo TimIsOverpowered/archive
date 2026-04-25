@@ -112,11 +112,11 @@ async function shutdown(signal: string) {
 
 // Handle graceful shutdown signals
 process.on('SIGTERM', () => {
-  shutdown('SIGTERM');
+  void shutdown('SIGTERM');
 });
 process.on('SIGINT', () => {
-  shutdown('SIGINT');
+  void shutdown('SIGINT');
 });
 
 // Start the server
-start();
+void start();

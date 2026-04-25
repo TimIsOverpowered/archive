@@ -58,5 +58,5 @@ export async function removeMonitorRepeatJob(tenantId: string): Promise<void> {
 }
 
 function getTenantConfigsForMonitoring(): TenantConfig[] {
-  return configService.getAll().filter((config) => config.settings.vodDownload);
+  return configService.getAll().filter((config) => config.settings.vodDownload === true);
 }

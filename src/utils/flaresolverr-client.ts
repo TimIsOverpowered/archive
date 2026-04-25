@@ -64,9 +64,9 @@ async function fetchFromFlareSolverr(
     }),
   });
 
-  const body: FlareSolverrResponse = await response.json();
+  const body = (await response.json()) as unknown as FlareSolverrResponse;
 
-  if (body.error || body.message) {
+  if (body.error != null || body.message != null) {
     throw new Error(body.error ?? body.message);
   }
 

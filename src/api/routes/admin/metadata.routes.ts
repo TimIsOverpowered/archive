@@ -8,7 +8,7 @@ import {
 } from '../../middleware/tenant-platform.js';
 import { saveVodChapters } from '../../../services/twitch/index.js';
 import { RedisService } from '../../../utils/redis-service.js';
-import { badRequest, notFound } from '../../../utils/http-error.js';
+import { HttpError } from '../../../utils/http-error.js';
 import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
 import { findVodRecord } from './utils/vod-helpers.js';
@@ -36,7 +36,7 @@ interface SaveBody {
  * Register metadata fetching routes: chapters, emotes, chat.
  * Requires admin API key authentication, tenant middleware, and rate limiting.
  */
-export default async function metadataFetchingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
+export default function metadataFetchingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const adminRateLimiter = RedisService.getLimiter('rate:admin');
   if (!adminRateLimiter) {
     throw new Error('Rate limiter not initialized');
@@ -70,24 +70,21 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { db, platform } = asTenantPlatformContext(request.tenant);
+      const tenantCtx = asTenantPlatformContext(request.tenant);
+      const { db, platform } = tenantCtx;
       const { vodId } = request.body;
 
       const vodRecord = await findVodRecord(db, vodId, platform);
 
-      if (!vodRecord) throw notFound(`VOD ${vodId} not found`);
+      if (!vodRecord) throw new HttpError(404, `VOD ${vodId} not found`, 'NOT_FOUND');
 
       if (platform !== PLATFORMS.TWITCH) {
         return { data: { message: `Chapter fetching only supported for Twitch VODs`, vodId, platform } };
       }
 
-      const durationSeconds = vodRecord.duration ? parseInt(vodRecord.duration.toString()) : 0;
-      const savedCount = await saveVodChapters(
-        asTenantPlatformContext(request.tenant),
-        vodRecord.id,
-        vodId,
-        durationSeconds
-      );
+      const durationSeconds =
+        vodRecord.duration != null && vodRecord.duration > 0 ? parseInt(vodRecord.duration.toString()) : 0;
+      const savedCount = await saveVodChapters(tenantCtx, vodRecord.id, vodId, durationSeconds);
 
       if (savedCount === 0) {
         return { data: { message: `No chapters found for ${vodId}`, vodId, count: 0 } };
@@ -123,19 +120,21 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { db, platform, config } = asTenantPlatformContext(request.tenant);
+      const tenantCtx = asTenantPlatformContext(request.tenant);
+      const { db, platform, config } = tenantCtx;
       const { vodId } = request.body;
 
       const vodRecord = await findVodRecord(db, vodId, platform);
 
-      if (!vodRecord) throw notFound(`VOD ${vodId} not found`);
+      if (!vodRecord) throw new HttpError(404, `VOD ${vodId} not found`, 'NOT_FOUND');
 
       // Queue emote save job (fire-and-forget within request context)
       const platformId = getPlatformConfig(config, platform)?.id;
 
-      if (!platformId) throw badRequest(`No platform ID available for ${platform} ${vodId}`);
+      if (platformId == null)
+        throw new HttpError(400, `No platform ID available for ${platform} ${vodId}`, 'BAD_REQUEST');
 
-      await fetchAndSaveEmotes(asTenantPlatformContext(request.tenant), vodRecord.id, platform, platformId);
+      await fetchAndSaveEmotes(tenantCtx, vodRecord.id, platform, platformId);
 
       return { data: { message: `Emote saving completed for ${vodId}`, vodId, platform } };
     }
@@ -168,18 +167,20 @@ export default async function metadataFetchingRoutes(fastify: FastifyInstance, _
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { db, platform, config, tenantId } = asTenantPlatformContext(request.tenant);
+      const tenantCtx = asTenantPlatformContext(request.tenant);
+      const { db, platform, config, tenantId } = tenantCtx;
       const { vodId, forceRerun = false } = request.body;
 
       const vodRecord = await findVodRecord(db, vodId, platform);
 
-      if (!vodRecord) throw notFound(`VOD ${vodId} not found`);
+      if (!vodRecord) throw new HttpError(404, `VOD ${vodId} not found`, 'NOT_FOUND');
 
       // Queue emote save job (fire-and-forget within request context)
       const platformCfg = getPlatformConfig(config, platform);
       const platformId = platformCfg?.id;
 
-      if (!platformId) throw badRequest(`No platform ID available for ${platform} ${vodId}`);
+      if (platformId == null)
+        throw new HttpError(400, `No platform ID available for ${platform} ${vodId}`, 'BAD_REQUEST');
 
       const jobId = await triggerChatDownload(
         tenantId,

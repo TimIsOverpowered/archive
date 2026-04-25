@@ -75,7 +75,7 @@ export async function fetchAndSaveEmotes(
   let bttvEmotes: EmoteData[] = [];
   let sevenTvEmotes: EmoteData[] = [];
 
-  if (platform === PLATFORMS.TWITCH && platformId) {
+  if (platform === PLATFORMS.TWITCH && platformId != null && platformId !== '') {
     const [ffzRes, bttvGlobalRes, bttvChannelRes, sevenTvRes, sevenTvGlobalRes] = await Promise.all([
       safeRequest<FFZResponse>(`${FFZ_API_BASE}/${platformId}`, {}, { timeoutMs: 5000 }),
       safeRequest<BTTVGlobalResponse>(`${BTTV_API_BASE}/emotes/global`, { emotes: [] }, { timeoutMs: 5000 }),
@@ -92,20 +92,18 @@ export async function fetchAndSaveEmotes(
       safeRequest<SevenTVResponse>(`${SEVENTV_API_BASE}/emote-sets/global`, { emotes: [] }, { timeoutMs: 5000 }),
     ]);
 
-    ffzEmotes =
-      ((ffzRes as FFZResponse).channels?.[platformId]?.emotes || []).map((e) => ({ id: String(e.id), code: e.code })) ||
-      [];
+    ffzEmotes = (ffzRes.channels?.[platformId]?.emotes ?? []).map((e) => ({ id: String(e.id), code: e.code })) ?? [];
 
     bttvEmotes = [
-      ...(bttvGlobalRes.emotes || []).map(({ id, code }) => ({ id, code })),
-      ...(((bttvChannelRes as BTTVChannelResponse).channelEmotes || [])?.map(({ id, code }) => ({ id, code })) || []),
+      ...(bttvGlobalRes.emotes ?? []).map(({ id, code }) => ({ id, code })),
+      ...((bttvChannelRes.channelEmotes ?? [])?.map(({ id, code }) => ({ id, code })) ?? []),
     ];
 
     sevenTvEmotes = [
-      ...((sevenTvGlobalRes as SevenTVResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags })),
-      ...((sevenTvRes as SevenTVResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags })),
+      ...(sevenTvGlobalRes?.emotes ?? []).map((e) => ({ id: e.id, code: e.name, flags: e.flags })),
+      ...(sevenTvRes?.emotes ?? []).map((e) => ({ id: e.id, code: e.name, flags: e.flags })),
     ];
-  } else if (platform === PLATFORMS.KICK && platformId) {
+  } else if (platform === PLATFORMS.KICK && platformId != null && platformId !== '') {
     const [sevenTvRes, sevenTvGlobalRes] = await Promise.all([
       safeRequest<SevenTVResponse>(
         `${SEVENTV_API_BASE}/users/twitch/${platformId}`,
@@ -118,8 +116,8 @@ export async function fetchAndSaveEmotes(
     ffzEmotes = [];
     bttvEmotes = [];
     sevenTvEmotes = [
-      ...((sevenTvGlobalRes as SevenTVResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags })),
-      ...((sevenTvRes as SevenTVResponse)?.emotes || []).map((e) => ({ id: e.id, code: e.name, flags: e.flags })),
+      ...(sevenTvGlobalRes?.emotes ?? []).map((e) => ({ id: e.id, code: e.name, flags: e.flags })),
+      ...(sevenTvRes?.emotes ?? []).map((e) => ({ id: e.id, code: e.name, flags: e.flags })),
     ];
   }
 
@@ -178,7 +176,7 @@ export async function getEmotesByVodId(db: DBClient, tenantId: string, vodId: nu
   if (redis) {
     try {
       const cached = await redis.get(cacheKey);
-      if (cached) {
+      if (cached != null && cached !== '') {
         return (await decompressChatData(cached as unknown as Buffer)) as VodEmotes;
       }
     } catch (err) {
@@ -213,7 +211,7 @@ export async function getEmotesByVodId(db: DBClient, tenantId: string, vodId: nu
   if (redis) {
     try {
       const compressed = await compressChatData(result);
-      await redis.set(cacheKey, compressed as Buffer, 'EX', EMOTE_CACHE_TTL);
+      await redis.set(cacheKey, compressed, 'EX', EMOTE_CACHE_TTL);
     } catch (err) {
       getLogger().warn({ err, cacheKey }, 'Emote cache write failed');
     }

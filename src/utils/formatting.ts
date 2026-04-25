@@ -26,9 +26,9 @@ export function parseTwitchDuration(durationStr: string): number {
     throw new Error(`Invalid Twitch duration format: ${durationStr}`);
   }
 
-  const hours = hoursMatch ? parseInt(hoursMatch[1], 10) : 0;
-  const minutes = minsMatch ? parseInt(minsMatch[1], 10) : 0;
-  const seconds = secsMatch ? parseFloat(secsMatch[1]) : 0;
+  const hours = hoursMatch?.[1] != null ? parseInt(hoursMatch[1], 10) : 0;
+  const minutes = minsMatch?.[1] != null ? parseInt(minsMatch[1], 10) : 0;
+  const seconds = secsMatch?.[1] != null ? parseFloat(secsMatch[1]) : 0;
 
   return hours * 3600 + minutes * 60 + Math.floor(seconds);
 }
@@ -43,7 +43,7 @@ export function extractDatabaseName(connectionString: string): string {
   try {
     const parsed = new URL(connectionString);
     const dbName = parsed.pathname.slice(1);
-    return dbName || 'postgres';
+    return dbName !== '' ? dbName : 'postgres';
   } catch {
     return 'postgres';
   }

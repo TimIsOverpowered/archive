@@ -5,7 +5,7 @@ import { ENCRYPTION_KEY_LENGTH, ENCRYPTION_IV_LENGTH, ENCRYPTION_AUTH_TAG_LENGTH
 const ALGORITHM = 'aes-256-gcm';
 
 export function validateEncryptionKey(key: string): boolean {
-  if (!key) return false;
+  if (key == null || key === '') return false;
   if (key.length !== ENCRYPTION_KEY_LENGTH * 2) return false;
   return /^[0-9a-fA-F]+$/.test(key);
 }

@@ -22,7 +22,7 @@ export const BaseConfigSchema = z.object({
   REDIS_URL: z.string().min(1, 'REDIS_URL is required'),
   META_DATABASE_URL: z.string().min(1, 'META_DATABASE_URL is required'),
   ENCRYPTION_MASTER_KEY: z.string().refine((val) => {
-    if (!val) return false;
+    if (val === '') return false;
     if (val.length !== 64) return false;
     return /^[0-9a-fA-F]+$/.test(val);
   }, 'ENCRYPTION_MASTER_KEY must be a valid 32-byte hex string'),
@@ -90,7 +90,7 @@ export function loadApiConfig(): ApiConfig {
 }
 
 export function getApiConfig(): ApiConfig {
-  return apiConfigCache || loadApiConfig();
+  return apiConfigCache ?? loadApiConfig();
 }
 
 // Workers config loader
@@ -106,7 +106,7 @@ export function loadWorkersConfig(): WorkersConfig {
 }
 
 export function getWorkersConfig(): WorkersConfig {
-  return workersConfigCache || loadWorkersConfig();
+  return workersConfigCache ?? loadWorkersConfig();
 }
 
 export function loadBaseConfig(): BaseConfig {
@@ -131,7 +131,7 @@ let _keyBuffer: Buffer | null = null;
 export function getEncryptionKeyBuffer(): Buffer {
   if (_keyBuffer) return _keyBuffer;
   const raw = process.env.ENCRYPTION_MASTER_KEY;
-  if (!raw) throw new Error('ENCRYPTION_MASTER_KEY is not set');
+  if (raw == null || raw === '') throw new Error('ENCRYPTION_MASTER_KEY is not set');
   _keyBuffer = Buffer.from(raw, 'hex');
   return _keyBuffer;
 }

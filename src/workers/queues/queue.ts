@@ -36,7 +36,7 @@ export const queueRetryOptions: Record<string, QueueOptions['defaultJobOptions']
 const queueCache = new Map<string, Queue<unknown, unknown, string>>();
 
 function normalizeOptions(options: unknown): string {
-  if (!options) return '';
+  if (options == null) return '';
   return JSON.stringify(sortObject(options as Record<string, unknown>));
 }
 
@@ -53,11 +53,9 @@ function sortObject(obj: Record<string, unknown>): unknown {
 let _flowProducer: FlowProducer | null = null;
 
 export function getFlowProducer(): FlowProducer {
-  if (!_flowProducer) {
-    _flowProducer = new FlowProducer({
-      connection: getRedisInstance(),
-    });
-  }
+  _flowProducer ??= new FlowProducer({
+    connection: getRedisInstance(),
+  });
   return _flowProducer;
 }
 

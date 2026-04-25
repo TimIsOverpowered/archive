@@ -23,7 +23,7 @@ function validatePlatformConfig(
   const platformUserId = platformCfg?.id;
   const platformUsername = platformCfg?.username;
 
-  if (!platformUserId || !platformUsername) {
+  if (platformUserId == null || platformUsername == null) {
     return null;
   }
 
@@ -113,7 +113,7 @@ export async function ensureVodRecord(
   if (platform === 'twitch') {
     await saveVodChapters(ctx, vodRecord.id, vodRecord.vod_id, vodRecord.duration);
     await fetchAndSaveEmotes(ctx, vodRecord.id, platform, platformUserId);
-    triggerChatDownload(
+    void triggerChatDownload(
       tenantId,
       platformUserId,
       vodRecord.id,
@@ -169,7 +169,7 @@ export async function refreshVodRecord(
   if (platform === 'twitch') {
     await saveVodChapters(ctx, updatedRecord.id, updatedRecord.vod_id, updatedRecord.duration);
     await fetchAndSaveEmotes(ctx, updatedRecord.id, platform, platformUserId);
-    triggerChatDownload(
+    void triggerChatDownload(
       tenantId,
       platformUserId,
       updatedRecord.id,

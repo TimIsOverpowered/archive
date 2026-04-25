@@ -18,7 +18,6 @@ import { TenantConfig } from '../config/types.js';
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../db/streamer-types.js';
 import { publishVodUpdate } from '../services/cache-invalidator.js';
-import type { VodRecord } from '../types/db.js';
 import { ConfigNotConfiguredError, VodNotFoundError } from '../utils/domain-errors.js';
 
 const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async (job: Job<YoutubeUploadJob>) => {
@@ -30,11 +29,11 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
   let actualFilePath = filePath;
 
-  if (!actualFilePath) {
+  if (actualFilePath == null || actualFilePath === '') {
     const childResults = await job.getChildrenValues();
     const downloadResult = Object.values(childResults)[0] as { finalPath?: string };
 
-    if (!downloadResult?.finalPath) {
+    if (downloadResult?.finalPath == null || downloadResult?.finalPath === '') {
       throw new Error(
         `File path not available for vodId=${vodId}, jobId=${jobId}: download job may have failed or not completed`
       );
@@ -46,18 +45,13 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
 
   const { config, db } = await getJobContext(tenantId);
 
-  if (!config || config.youtube == null) {
+  if (config == null || config.youtube == null) {
     throw new ConfigNotConfiguredError(`YouTube for tenant ${tenantId}`);
   }
 
   try {
     if (job.data.kind === 'vod') {
-      const vodResult = await processVodUploadJob(
-        { ...job.data, filePath: actualFilePath } as YoutubeVodUploadJob & { filePath: string },
-        config,
-        db,
-        log
-      );
+      const vodResult = await processVodUploadJob({ ...job.data, filePath: actualFilePath }, config, db, log);
       const duration = Date.now() - startTime;
       log.info(
         { vodId, jobId, duration, uploadedVideosCount: (vodResult as YoutubeUploadVodResult).videos?.length },
@@ -65,12 +59,7 @@ const youtubeProcessor: Processor<YoutubeUploadJob, YoutubeUploadResult> = async
       );
       return vodResult;
     } else {
-      const result = await processGameUploadJob(
-        { ...job.data, filePath: actualFilePath } as YoutubeGameUploadJob & { filePath: string },
-        config,
-        db,
-        log
-      );
+      const result = await processGameUploadJob({ ...job.data, filePath: actualFilePath }, config, db, log);
       const duration = Date.now() - startTime;
       log.info({ component: 'youtube-upload', vodId, jobId, duration }, 'Game upload completed successfully');
       return result;
@@ -130,7 +119,7 @@ async function processVodUploadJob(
     log,
     type,
     part,
-    vodRecord: vodRecord as VodRecord,
+    vodRecord: vodRecord,
   } as Parameters<typeof processVodUpload>[0]);
 
   for (const video of result.uploadedVideos) {
@@ -155,7 +144,7 @@ async function processVodUploadJob(
   await publishVodUpdate(tenantId, dbId);
 
   const splitDuration = getEffectiveSplitDuration(config.youtube?.splitDuration);
-  await linkVodPartsAfterDelay(tenantId, dbId, result.uploadedVideos, splitDuration, db, log);
+  linkVodPartsAfterDelay(tenantId, dbId, result.uploadedVideos, splitDuration, db, log);
 
   return { success: true, videos: result.uploadedVideos };
 }
@@ -186,7 +175,7 @@ async function processGameUploadJob(
   });
 
   resetFailures(tenantId);
-  return result as YoutubeUploadResult;
+  return result;
 }
 
 export default youtubeProcessor;

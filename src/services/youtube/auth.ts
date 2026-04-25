@@ -27,7 +27,7 @@ async function updateYoutubeTokenInDb(
 ): Promise<void> {
   const logger = createAutoLogger('youtube-auth');
   const config = configService.get(tenantId);
-  if (!config?.youtube?.auth) {
+  if (config?.youtube?.auth == null) {
     return;
   }
 
@@ -77,11 +77,11 @@ async function refreshToken(
   try {
     const { credentials } = await oauth2Client.refreshAccessToken();
 
-    if (!credentials.access_token || !credentials.expiry_date) {
+    if (credentials.access_token == null || credentials.expiry_date == null) {
       throw new Error('Token refresh failed - no access token or expiry returned');
     }
 
-    if (credentials.refresh_token) {
+    if (credentials.refresh_token != null && credentials.refresh_token !== '') {
       try {
         await updateYoutubeTokenInDb(
           tenantId,
@@ -124,17 +124,21 @@ export async function getYoutubeAuth(tenantId: string): Promise<{
   const logger = createAutoLogger('youtube-auth');
   const config = configService.get(tenantId);
 
-  if (!config?.youtube?.auth) {
+  if (config?.youtube?.auth == null) {
     throw new ConfigNotConfiguredError(`YouTube auth for ${tenantId}`);
   }
 
   const authObj = JSON.parse(config.youtube.auth) as AuthObject;
 
-  if (!authObj.refresh_token || typeof authObj.refresh_token !== 'string' || !authObj.refresh_token.trim()) {
+  if (
+    authObj.refresh_token == null ||
+    typeof authObj.refresh_token !== 'string' ||
+    authObj.refresh_token.trim() === ''
+  ) {
     throw new ConfigNotConfiguredError(`YouTube refresh token for ${tenantId}`);
   }
 
-  if (authObj.access_token && authObj.expiry_date && authObj.expiry_date > Date.now() + 60_000) {
+  if (authObj.access_token != null && authObj.expiry_date != null && authObj.expiry_date > Date.now() + 60_000) {
     logger.info({ tenantId }, 'Using cached YouTube access token');
     return {
       clientId,

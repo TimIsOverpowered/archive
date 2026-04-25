@@ -3,7 +3,7 @@ import { getVods, getVodById, getVodByPlatformId, VodQuerySchema } from '../../s
 import { getEmotesByVodId } from '../../services/emotes.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { RedisService } from '../../utils/redis-service.js';
-import { notFound } from '../../utils/http-error.js';
+import { HttpError } from '../../utils/http-error.js';
 import { tenantMiddleware } from '../middleware/tenant-platform.js';
 import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
 import { INT32_MAX } from '../../constants.js';
@@ -21,10 +21,10 @@ interface VodRoutesOptions {
 async function fetchVodByIdSafe(vodId: string, db: Kysely<StreamerDB>, tenantId: string) {
   const vodIdNum = Number(vodId);
   if (isNaN(vodIdNum) || vodIdNum < 0 || vodIdNum > INT32_MAX) {
-    throw notFound('VOD not found');
+    throw new HttpError(404, 'VOD not found', 'NOT_FOUND');
   }
   const vod = await getVodById(db, tenantId, vodIdNum);
-  if (!vod) throw notFound('VOD not found');
+  if (!vod) throw new HttpError(404, 'VOD not found', 'NOT_FOUND');
   return vod;
 }
 
@@ -32,7 +32,7 @@ async function fetchVodByIdSafe(vodId: string, db: Kysely<StreamerDB>, tenantId:
  * Register VODs routes: list VODs, get by ID, get by platform ID, get emotes.
  * All routes require tenant middleware and rate limiting.
  */
-export default async function vodsRoutes(fastify: FastifyInstance, _options: VodRoutesOptions) {
+export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutesOptions) {
   const publicRateLimiter = RedisService.getLimiter('rate:vods');
   if (!publicRateLimiter) {
     throw new Error('Rate limiter not initialized');
@@ -73,7 +73,8 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const { tenantId, db } = request.tenant;
+      const tenantCtx = request.tenant;
+      const { tenantId, db } = tenantCtx;
 
       const query = VodQuerySchema.parse(request.query);
       const { vods, total } = await getVods(db, tenantId, query);
@@ -108,7 +109,8 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
     },
     async (request) => {
       const { tenantId, vodId } = request.params;
-      const { db } = request.tenant;
+      const tenantCtx = request.tenant;
+      const { db } = tenantCtx;
       const vod = await fetchVodByIdSafe(vodId, db, tenantId);
       return { data: vod };
     }
@@ -134,12 +136,13 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
     },
     async (request) => {
       const { tenantId, platform, platformVodId } = request.params;
-      const { db } = request.tenant;
+      const tenantCtx = request.tenant;
+      const { db } = tenantCtx;
 
       const vod = await getVodByPlatformId(db, tenantId, platform, platformVodId);
 
       if (!vod) {
-        throw notFound('VOD not found');
+        throw new HttpError(404, 'VOD not found', 'NOT_FOUND');
       }
 
       return { data: vod };
@@ -165,12 +168,13 @@ export default async function vodsRoutes(fastify: FastifyInstance, _options: Vod
     },
     async (request) => {
       const { tenantId, vodId } = request.params;
-      const { db } = request.tenant;
+      const tenantCtx = request.tenant;
+      const { db } = tenantCtx;
       await fetchVodByIdSafe(vodId, db, tenantId);
       const emotes = await getEmotesByVodId(db, tenantId, Number(vodId));
 
       if (!emotes) {
-        throw notFound('Emotes not found for this VOD');
+        throw new HttpError(404, 'Emotes not found for this VOD', 'NOT_FOUND');
       }
 
       return { data: emotes };

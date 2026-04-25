@@ -9,7 +9,7 @@ import {
 import { ensureVodDownload, ensureVodRecord, findVodRecord } from './utils/vod-helpers.js';
 import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { badRequest, notFound } from '../../../utils/http-error.js';
+import { HttpError } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
 import {
   SOURCE_TYPES,
@@ -48,7 +48,7 @@ interface UploadBody {
  * Register download job routes: upload (create + download + queue), re-download.
  * Requires admin API key authentication, tenant middleware, and rate limiting.
  */
-export default async function downloadJobsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
+export default function downloadJobsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const adminLimiter = RedisService.getLimiter('rate:admin');
   if (!adminLimiter) {
     throw new Error('Rate limiter not initialized');
@@ -85,22 +85,23 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, platform } = asTenantPlatformContext(request.tenant);
+      const tenantCtx = asTenantPlatformContext(request.tenant);
+      const { tenantId, platform } = tenantCtx;
       const { vodId, type, downloadMethod, uploadMode } = request.body;
       const log = createAutoLogger(tenantId);
 
       // Ensure VOD record exists or create it from platform API metadata
-      const vodRecord = await ensureVodRecord(asTenantPlatformContext(request.tenant), vodId, log);
+      const vodRecord = await ensureVodRecord(tenantCtx, vodId, log);
 
       if (!vodRecord) {
-        throw notFound(`VOD ${vodId} not found on ${platform}`);
+        throw new HttpError(404, `VOD ${vodId} not found on ${platform}`, 'NOT_FOUND');
       }
 
       const dbId = vodRecord.id;
 
       // Ensure vod download
       const { jobId, filePath } = await ensureVodDownload({
-        ctx: asTenantPlatformContext(request.tenant),
+        ctx: tenantCtx,
         dbId,
         vodId,
         type,
@@ -110,7 +111,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
 
       // Queue Youtube upload
       await queueYoutubeUploads({
-        ctx: asTenantPlatformContext(request.tenant),
+        ctx: tenantCtx,
         dbId,
         vodId,
         filePath,
@@ -120,7 +121,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         type,
       });
 
-      if (jobId) {
+      if (jobId != null) {
         return {
           data: {
             message: 'VOD download queued, YouTube upload will be triggered after completion',
@@ -178,7 +179,8 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, platform, db } = asTenantPlatformContext(request.tenant);
+      const tenantCtx = asTenantPlatformContext(request.tenant);
+      const { tenantId, platform, db } = tenantCtx;
       const { vodId, type, downloadMethod } = request.body;
       const log = createAutoLogger(tenantId);
 
@@ -186,14 +188,14 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
       const vodRecord = await findVodRecord(db, vodId, platform);
 
       if (!vodRecord) {
-        throw notFound(`VOD ${vodId} not found on ${platform}`);
+        throw new HttpError(404, `VOD ${vodId} not found on ${platform}`, 'NOT_FOUND');
       }
 
       const dbId = vodRecord.id;
 
       // Ensure vod download
       const { jobId, filePath } = await ensureVodDownload({
-        ctx: asTenantPlatformContext(request.tenant),
+        ctx: tenantCtx,
         dbId,
         vodId,
         type,
@@ -201,7 +203,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
         log,
       });
 
-      if (jobId) {
+      if (jobId != null) {
         return {
           data: {
             message: 'VOD download queued!',
@@ -211,7 +213,7 @@ export default async function downloadJobsRoutes(fastify: FastifyInstance, _opti
           },
         };
       } else {
-        throw badRequest(`File already exists at ${filePath}`);
+        throw new HttpError(400, `File already exists at ${filePath}`, 'BAD_REQUEST');
       }
     }
   );

@@ -33,7 +33,7 @@ export function asTenantPlatformContext(ctx: TenantContext): TenantPlatformConte
 export async function tenantMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const tenantId = (request.params as { tenantId?: string }).tenantId;
 
-  if (!tenantId) {
+  if (tenantId == null) {
     return reply.status(404).send({
       statusCode: 404,
       message: 'Tenant ID not provided',
@@ -79,9 +79,8 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
  * Register in preValidation hook
  */
 export async function platformValidationMiddleware(request: FastifyRequest, reply: FastifyReply) {
-  const requestPlatform = (request.body as { platform?: string }).platform?.toLowerCase() as Platform;
-
-  if (!requestPlatform) {
+  const rawPlatform = (request.body as { platform?: string }).platform;
+  if (rawPlatform == null || rawPlatform === '') {
     return reply.status(400).send({
       statusCode: 400,
       message: 'Platform is required',
@@ -89,9 +88,10 @@ export async function platformValidationMiddleware(request: FastifyRequest, repl
     });
   }
 
-  const config = request.tenant?.config;
+  const requestPlatform = rawPlatform.toLowerCase() as Platform;
 
-  if (!config) {
+  const tenant = request.tenant;
+  if (tenant == null) {
     return reply.status(500).send({
       statusCode: 500,
       message: 'Tenant context not found',
@@ -99,7 +99,9 @@ export async function platformValidationMiddleware(request: FastifyRequest, repl
     });
   }
 
-  if (!config[requestPlatform]?.enabled) {
+  const config = tenant.config;
+
+  if (config[requestPlatform]?.enabled !== true) {
     return reply.status(400).send({
       statusCode: 400,
       message: `${requestPlatform} is not enabled for this tenant`,

@@ -14,9 +14,15 @@ export async function createYoutubeClient(tenantId: string): Promise<youtube_v3.
   });
 
   oauth2Client.on('tokens', (_credentials) => {
-    (async () => {
+    void (async () => {
       const credentials = _credentials;
-      if (credentials.refresh_token && credentials.access_token && credentials.expiry_date) {
+      if (
+        credentials.refresh_token != null &&
+        credentials.refresh_token !== '' &&
+        credentials.access_token != null &&
+        credentials.access_token !== '' &&
+        credentials.expiry_date != null
+      ) {
         const expiryDate = new Date(credentials.expiry_date);
         logger.info(
           {

@@ -94,7 +94,7 @@ export function createLiveWorkerAlerts(): LiveWorkerAlerts {
       fields: [
         { name: 'Platform', value: capitalizePlatform(platform), inline: true },
         { name: 'Streamer', value: streamerName, inline: true },
-        ...(startedAt ? [{ name: 'Started At', value: startedAt, inline: false }] : []),
+        ...(startedAt != null ? [{ name: 'Started At', value: startedAt, inline: false }] : []),
       ],
       timestamp: new Date().toISOString(),
     }),
@@ -142,18 +142,18 @@ export function createLiveWorkerAlerts(): LiveWorkerAlerts {
     complete: (vodId, duration, completionData) => {
       const fields: Array<{ name: string; value: string; inline: boolean }> = [];
 
-      fields.push({ name: 'Duration', value: duration ? toHHMMSS(duration) : 'Unknown', inline: true });
+      fields.push({ name: 'Duration', value: duration != null ? toHHMMSS(duration) : 'Unknown', inline: true });
 
       if (completionData) {
-        if (completionData.emotesSaved) {
+        if (completionData.emotesSaved === true) {
           fields.push({ name: 'Emotes', value: '✅ Saved', inline: true });
         }
 
-        if (completionData.chatJobId) {
+        if (completionData.chatJobId != null) {
           fields.push({ name: 'Chat Job', value: completionData.chatJobId, inline: false });
         }
 
-        if (completionData.youtubeVodJobId) {
+        if (completionData.youtubeVodJobId != null) {
           fields.push({ name: 'VOD Upload Job', value: completionData.youtubeVodJobId, inline: false });
         }
 
@@ -239,7 +239,7 @@ export function createChatWorkerAlerts(): ChatWorkerAlerts {
       fields: [
         { name: 'Platform', value: capitalizePlatform(platform), inline: true },
         { name: 'VOD ID', value: String(vodId), inline: false },
-        ...(offset
+        ...(offset != null
           ? [{ name: isResume ? 'Resume Offset' : 'Start Offset', value: `${offset.toFixed(2)}s`, inline: true }]
           : []),
       ],
@@ -284,10 +284,10 @@ export function createChatWorkerAlerts(): ChatWorkerAlerts {
         { name: 'Platform', value: capitalizePlatform(platform), inline: true },
         { name: 'Total Messages', value: String(totalMessages), inline: true },
         { name: 'Total Batches', value: String(batchCount), inline: true },
-        ...(startOffset
+        ...(startOffset != null
           ? [
               {
-                name: startOffset ? 'Resume Point' : 'Auto-Resumed From',
+                name: startOffset !== 0 ? 'Resume Point' : 'Auto-Resumed From',
                 value: `${startOffset.toFixed(2)}s → Final offset reached`,
                 inline: false,
               },
@@ -362,7 +362,7 @@ export function createYoutubeWorkerAlerts(): YoutubeWorkerAlerts {
 
     uploadProgress: (vodId, part, percent) => ({
       title: `📺 Uploading to YouTube`,
-      description: part ? `Part ${part}: ${percent}% complete` : `${vodId}: ${percent}% complete`,
+      description: part != null ? `Part ${part}: ${percent}% complete` : `${vodId}: ${percent}% complete`,
       status: 'warning',
       fields: [],
       timestamp: new Date().toISOString(),
@@ -370,11 +370,12 @@ export function createYoutubeWorkerAlerts(): YoutubeWorkerAlerts {
 
     complete: (vodId, videoIds, parts) => ({
       title: `✅ YouTube Upload Complete`,
-      description: parts ? `Successfully uploaded ${parts} parts for ${vodId}` : `Successfully uploaded ${vodId}`,
+      description:
+        parts != null ? `Successfully uploaded ${parts} parts for ${vodId}` : `Successfully uploaded ${vodId}`,
       status: 'success',
       fields: [
         { name: 'Video ID(s)', value: videoIds.slice(0, 3).join(', '), inline: false },
-        ...(parts ? [{ name: 'Total Parts', value: String(parts), inline: true }] : []),
+        ...(parts != null ? [{ name: 'Total Parts', value: String(parts), inline: true }] : []),
       ],
       timestamp: new Date().toISOString(),
     }),
@@ -403,7 +404,8 @@ export function createDmcaWorkerAlerts(): DmcaWorkerAlerts {
   return {
     processing: (vodId, claimCount, part) => ({
       title: `⚖️ DMCA Processing ${vodId}`,
-      description: part ? `Processing part ${part} with ${claimCount} claims` : `Processing ${claimCount} claims`,
+      description:
+        part != null ? `Processing part ${part} with ${claimCount} claims` : `Processing ${claimCount} claims`,
       status: 'warning',
       fields: [{ name: 'VOD ID', value: vodId, inline: false }],
       timestamp: new Date().toISOString(),

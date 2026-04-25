@@ -27,8 +27,8 @@ export async function getKickCategoryInfo(slug: string): Promise<Record<string, 
 
     const response = result.data;
     const cachedResult = response ?? null;
-    if (cachedResult) {
-      kickCategoryCache.set(slug, cachedResult as Record<string, unknown>);
+    if (cachedResult != null) {
+      kickCategoryCache.set(slug, cachedResult);
     }
     return cachedResult;
   } catch (error) {

@@ -29,7 +29,7 @@ export async function getChapters(vodId: string, tenantId?: string): Promise<unk
       },
     },
   });
-  const video = (data?.data as Record<string, unknown> | undefined)?.video as Record<string, unknown> | undefined;
+  const video = data?.data?.video as Record<string, unknown> | undefined;
   const moments = video?.moments as Record<string, unknown> | undefined;
   return moments?.edges as unknown[] | null;
 }
@@ -65,18 +65,18 @@ export async function getGameData(gameId: string, tenantId: string): Promise<Rec
   const client = getTwitchClient(tenantId);
   const data = await client.helix.get<{ data: Record<string, unknown>[] }>(`/games?id=${gameId}`);
 
-  if (!data.data || data.data.length === 0) {
+  if (data.data == null || data.data.length === 0) {
     return null;
   }
 
   const result = data.data[0];
-  if (!result) return null;
+  if (result == null) return null;
   gameDataCache.set(gameId, result);
   return result;
 }
 
 export async function saveVodChapters(
-  ctx: TenantContext,
+  ctx: Omit<TenantContext, 'db'>,
   dbId: number,
   vodId: string,
   finalDurationSeconds: number
@@ -97,14 +97,14 @@ export async function saveVodChapters(
 
       if (chapters.length === 0) {
         const chapter = await getChapter(vodId, tenantId);
-        if (!chapter || !chapter.game) {
+        if (chapter == null || chapter.game == null) {
           logger.warn({ vodId }, 'No game info available');
           return;
         }
 
         const game = chapter.game as Record<string, unknown>;
         const gameId = typeof game.id === 'string' ? game.id : null;
-        const gameData = gameId ? await getGameData(gameId, tenantId) : null;
+        const gameData = gameId != null ? await getGameData(gameId, tenantId) : null;
 
         const validatedChapter = ChapterCreateSchema.parse({
           vod_id: dbId,
@@ -152,9 +152,9 @@ export async function saveVodChapters(
             const gameName = typeof game?.displayName === 'string' ? game.displayName : null;
 
             let gameImage: string | null = null;
-            if (gameId) {
+            if (gameId != null && gameId !== '') {
               const gameData = await getGameData(gameId, tenantId);
-              if (gameData && typeof gameData.box_art_url === 'string') {
+              if (gameData != null && typeof gameData.box_art_url === 'string') {
                 gameImage = gameData.box_art_url.replace('{width}x{height}', '40x53');
               }
             }

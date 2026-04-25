@@ -89,7 +89,7 @@ async function checkIfDownloadNeeded(
   }
 
   const actualDuration = await getDuration(filePath);
-  if (!actualDuration) {
+  if (actualDuration == null || Number.isNaN(actualDuration)) {
     log.warn({ filePath }, 'Could not determine file duration');
     return true;
   }
@@ -113,7 +113,7 @@ function validatePlatformConfig(
   const platformUserId = platformCfg?.id;
   const platformUsername = platformCfg?.username;
 
-  if (!platformUserId || !platformUsername) {
+  if (platformUserId == null || platformUsername == null) {
     return null;
   }
 

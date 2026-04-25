@@ -18,7 +18,7 @@ export async function getJobContext(tenantId: string): Promise<JobContext> {
     throw new TenantNotFoundError(tenantId);
   }
 
-  if (!config.settings.vodPath) {
+  if (config.settings.vodPath == null) {
     throw new ConfigNotConfiguredError(`VOD path for tenant ${tenantId}`);
   }
 

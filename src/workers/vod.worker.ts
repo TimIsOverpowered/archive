@@ -47,11 +47,11 @@ const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job
         await cleanupOrphanedTmpFiles(vodDirPath, log);
       }
 
-      if (!platformUserId) {
+      if (platformUserId == null) {
         throw new PlatformNotConfiguredError(platform, `user ID missing for ${job.id}`);
       }
 
-      if (platform === PLATFORMS.KICK && !sourceUrl) {
+      if (platform === PLATFORMS.KICK && sourceUrl == null) {
         throw new Error('Kick source URL not available for VOD');
       }
 
@@ -64,7 +64,7 @@ const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job
         platformUsername,
         sourceUrl,
         isLive: false,
-        discordMessageId: messageId || undefined,
+        discordMessageId: messageId ?? undefined,
         streamerName,
       });
 

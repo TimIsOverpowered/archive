@@ -22,7 +22,7 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
   }
 
   const webhookUrl = getDiscordAlertWebhookUrl();
-  if (!webhookUrl) {
+  if (webhookUrl == null || webhookUrl === '') {
     return null;
   }
 
@@ -46,13 +46,16 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
     { name: 'VOD ID', value: `\`${data.vodId}\``, inline: true },
   ];
 
-  if (data.durationSeconds) {
+  if (data.durationSeconds != null && data.durationSeconds > 0) {
     fields.push({ name: 'Duration', value: toHHMMSS(data.durationSeconds), inline: true });
   }
 
   const embedData = {
     title: `${statusLabels[data.alertType]} ${titleMap[data.alertType]}`,
-    description: data.errorMessage ? `**Error:**\n\`\`\`${data.errorMessage}\`\`\`` : undefined,
+    description:
+      data.errorMessage != null && data.errorMessage !== ''
+        ? `**Error:**\n\`\`\`${data.errorMessage}\`\`\``
+        : undefined,
     status: embedStatus,
     fields,
     timestamp: new Date().toISOString(),

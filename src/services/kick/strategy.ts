@@ -14,24 +14,24 @@ export const strategy: PlatformStrategy = {
 
     const platformCfg = getPlatformConfig(config, platform);
 
-    if (!platformCfg?.enabled) {
+    if (platformCfg?.enabled !== true) {
       return null;
     }
 
     const username = platformCfg?.username;
-    if (!username) {
+    if (username == null || username === '') {
       return null;
     }
 
     const streamStatus = await getKickStreamStatus(username);
 
-    if (!streamStatus) {
+    if (streamStatus == null) {
       return null;
     }
 
     return {
       id: streamStatus.id,
-      title: streamStatus.session_title || '',
+      title: streamStatus.session_title ?? '',
       startedAt: streamStatus.created_at,
       streamId: streamStatus.id,
       platformUserId: platformCfg?.id ?? undefined,
@@ -44,7 +44,7 @@ export const strategy: PlatformStrategy = {
 
     const platformCfg = getPlatformConfig(config, platform);
     const username = platformCfg?.username;
-    if (!username) {
+    if (username == null || username === '') {
       return null;
     }
 
@@ -52,7 +52,7 @@ export const strategy: PlatformStrategy = {
 
     return {
       id: `${vodData.id}`,
-      title: vodData.session_title || '',
+      title: vodData.session_title ?? '',
       createdAt: vodData.created_at,
       duration: Math.floor(Number(vodData.duration) / 1000),
       streamId: `${vodData.id}`,
@@ -65,7 +65,7 @@ export const strategy: PlatformStrategy = {
 
     const platformCfg = getPlatformConfig(config, platform);
     const username = platformCfg?.username;
-    if (!username) {
+    if (username == null || username === '') {
       return null;
     }
 
@@ -77,7 +77,7 @@ export const strategy: PlatformStrategy = {
 
     return {
       id: vodObject.id,
-      title: vodObject.title || '',
+      title: vodObject.title ?? '',
       createdAt: new Date().toISOString(),
       duration: 0,
       streamId,
@@ -88,7 +88,7 @@ export const strategy: PlatformStrategy = {
   createVodData(meta: PlatformVodMetadata): VodCreateData {
     return {
       vod_id: meta.id,
-      title: meta.title || null,
+      title: meta.title ?? null,
       created_at: new Date(meta.createdAt),
       duration: meta.duration,
       stream_id: meta.streamId ?? null,
@@ -100,7 +100,7 @@ export const strategy: PlatformStrategy = {
   updateVodData(meta: PlatformVodMetadata): VodUpdateData {
     return {
       vod_id: meta.id,
-      title: meta.title || null,
+      title: meta.title ?? null,
       created_at: new Date(meta.createdAt),
       duration: meta.duration,
       stream_id: meta.streamId,
@@ -109,12 +109,7 @@ export const strategy: PlatformStrategy = {
 
   async finalizeChapters(ctx, dbId, vodId, finalDurationSeconds): Promise<void> {
     try {
-      await finalizeKickChapters(
-        { tenantId: ctx.tenantId, config: ctx.config, db: ctx.db! },
-        dbId,
-        vodId,
-        finalDurationSeconds
-      );
+      await finalizeKickChapters({ tenantId: ctx.tenantId, config: ctx.config }, dbId, vodId, finalDurationSeconds);
     } catch (error) {
       getLogger().error({ vodId, error }, 'Failed to finalize Kick chapters');
     }

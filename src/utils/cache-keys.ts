@@ -4,7 +4,7 @@ function buildVodQueryKey(
   page: number,
   limit: number
 ): string {
-  const sorted = Object.keys(query).sort() as (keyof typeof query)[];
+  const sorted = Object.keys(query).sort();
   const queryParts = sorted
     .filter((k) => query[k] !== undefined && query[k] !== null && query[k] !== '')
     .map((k) => `${k}:${encodeURIComponent(String(query[k]))}`);

@@ -3,7 +3,7 @@ import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { RedisService } from '../../utils/redis-service.js';
 import { configService } from '../../config/tenant-config.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { notFound } from '../../utils/http-error.js';
+import { HttpError } from '../../utils/http-error.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getChannelBadges, getGlobalBadges } from '../../services/twitch/index.js';
 
@@ -16,7 +16,7 @@ interface BadgesRoutesOptions {
  * Register badges routes: fetch Twitch channel + global badges with Redis caching.
  * Requires rate limiting.
  */
-export default async function badgesRoutes(fastify: FastifyInstance, _options: BadgesRoutesOptions) {
+export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesRoutesOptions) {
   const badgesRateLimiter = RedisService.getLimiter('rate:vods');
   if (!badgesRateLimiter) {
     throw new Error('Rate limiter not initialized');
@@ -47,7 +47,7 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
 
       const config = configService.get(tenantId);
 
-      if (!config?.twitch?.id) throw notFound('Twitch not configured for this tenant');
+      if (config?.twitch?.id == null) throw new HttpError(404, 'Twitch not configured for this tenant', 'NOT_FOUND');
 
       const redis = RedisService.getActiveClient();
       // Check Redis cache first (60-minute TTL)
@@ -55,10 +55,10 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
         try {
           const cachedBadges = await redis.get(`twitch_badges:${tenantId}`);
 
-          if (cachedBadges) {
+          if (cachedBadges != null) {
             log.info('Returning cached Twitch badges');
 
-            return { data: JSON.parse(cachedBadges) };
+            return { data: JSON.parse(cachedBadges) as Record<string, unknown> };
           }
         } catch (err) {
           const details = extractErrorDetails(err);
@@ -73,7 +73,7 @@ export default async function badgesRoutes(fastify: FastifyInstance, _options: B
           getGlobalBadges(tenantId).catch(() => null),
         ]);
 
-        const badgesData = { channel: channelBadges || null, global: globalBadges || null };
+        const badgesData = { channel: channelBadges ?? null, global: globalBadges ?? null };
 
         // Cache in Redis with 60-minute TTL (3600 seconds) if fetch succeeded
         if (redis) {

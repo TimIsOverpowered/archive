@@ -3,7 +3,7 @@ import path from 'path';
 import { YOUTUBE_MAX_DURATION } from '../constants.js';
 
 function normalizePathForSchema(basePath?: string): string | undefined {
-  if (!basePath) return basePath;
+  if (basePath == null || basePath === '') return undefined;
   const normalized = path.normalize(basePath);
   return normalized.startsWith('/') || /^[A-Za-z]:/.test(normalized) ? normalized : path.resolve(normalized);
 }
@@ -28,12 +28,12 @@ export const SettingsSchema = z.object({
   vodPath: z
     .string()
     .optional()
-    .transform((p) => (p ? normalizePathForSchema(p) : undefined)),
+    .transform((p): string | undefined => (p != null && p !== '' ? normalizePathForSchema(p) : undefined)),
   /** Base path for storing live stream files, normalized to absolute */
   livePath: z
     .string()
     .optional()
-    .transform((p) => (p ? normalizePathForSchema(p) : undefined)),
+    .transform((p): string | undefined => (p != null && p !== '' ? normalizePathForSchema(p) : undefined)),
 });
 
 /** YouTube OAuth token credentials. */

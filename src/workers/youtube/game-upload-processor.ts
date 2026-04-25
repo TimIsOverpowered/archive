@@ -38,7 +38,7 @@ export type GameUploadResult =
 export async function processGameUpload(ctx: GameUploadContext): Promise<GameUploadResult> {
   const { filePath, chapterStart, chapterEnd } = ctx;
 
-  if (!filePath) {
+  if (filePath === '') {
     throw new Error('File path is required for game upload');
   }
 
@@ -82,16 +82,17 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     timestamp: new Date().toISOString(),
   });
 
-  const onUploadProgress = uploadAlertMessageId
-    ? createGameUploadProgressHandler({
-        messageId: uploadAlertMessageId,
-        type: 'game',
-        channelName,
-        gameName: chapterName,
-        videoTitle: title,
-        privacyStatus: 'public',
-      })
-    : () => {};
+  const onUploadProgress =
+    uploadAlertMessageId != null
+      ? createGameUploadProgressHandler({
+          messageId: uploadAlertMessageId,
+          type: 'game',
+          channelName,
+          gameName: chapterName,
+          videoTitle: title,
+          privacyStatus: 'public',
+        })
+      : () => {};
 
   const result = await uploadVideo(
     tenantId,
@@ -116,7 +117,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
       end_time: chapterEnd,
       video_provider: 'youtube',
       video_id: result.videoId,
-      thumbnail_url: result.thumbnailUrl || null,
+      thumbnail_url: result.thumbnailUrl ?? null,
       game_id: chapterGameId,
       game_name: chapterName,
       title: chapterName,
@@ -125,7 +126,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
       oc.columns(['vod_id', 'start_time', 'end_time']).doUpdateSet({
         video_provider: 'youtube',
         video_id: result.videoId,
-        thumbnail_url: result.thumbnailUrl || null,
+        thumbnail_url: result.thumbnailUrl ?? null,
         game_id: chapterGameId,
         game_name: chapterName,
         title: chapterName,
@@ -138,6 +139,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
 
   await deleteFileIfExists(trimmedPath);
 
+  if (gameRecord == null) throw new Error('Failed to insert game record');
   return { success: true, videoId: result.videoId, gameId: String(gameRecord.id) };
 }
 
@@ -192,7 +194,7 @@ async function processSplitGameUpload(
     const partTitle = i > 0 ? `${title} PART ${i + 1}` : title;
 
     const splitPath = splitPaths[i];
-    if (!splitPath) {
+    if (splitPath == null) {
       log.warn({ part: currentPartNum, totalParts }, `Missing split path for part ${currentPartNum}`);
       continue;
     }
@@ -209,18 +211,19 @@ async function processSplitGameUpload(
       timestamp: new Date().toISOString(),
     });
 
-    const onUploadProgress = uploadAlertMessageId
-      ? createGameUploadProgressHandler({
-          messageId: uploadAlertMessageId,
-          type: 'game',
-          channelName: getDisplayName(config),
-          gameName: chapterName,
-          videoTitle: partTitle,
-          part: currentPartNum,
-          totalParts,
-          privacyStatus: 'public',
-        })
-      : () => {};
+    const onUploadProgress =
+      uploadAlertMessageId != null
+        ? createGameUploadProgressHandler({
+            messageId: uploadAlertMessageId,
+            type: 'game',
+            channelName: getDisplayName(config),
+            gameName: chapterName,
+            videoTitle: partTitle,
+            part: currentPartNum,
+            totalParts,
+            privacyStatus: 'public',
+          })
+        : () => {};
 
     const result = await uploadVideo(
       tenantId,
@@ -245,7 +248,7 @@ async function processSplitGameUpload(
         end_time: endTime + chapterStart,
         video_provider: 'youtube',
         video_id: result.videoId,
-        thumbnail_url: result.thumbnailUrl || null,
+        thumbnail_url: result.thumbnailUrl ?? null,
         game_id: chapterGameId,
         game_name: chapterName,
         title: chapterName,
@@ -254,7 +257,7 @@ async function processSplitGameUpload(
         oc.columns(['vod_id', 'start_time', 'end_time']).doUpdateSet({
           video_provider: 'youtube',
           video_id: result.videoId,
-          thumbnail_url: result.thumbnailUrl || null,
+          thumbnail_url: result.thumbnailUrl ?? null,
           game_id: chapterGameId,
           game_name: chapterName,
           title: chapterName,
@@ -265,6 +268,7 @@ async function processSplitGameUpload(
 
     await publishVodUpdate(tenantId, dbId);
 
+    if (gameRecord == null) throw new Error('Failed to insert game record');
     uploadedGameVideos.push({
       id: result.videoId,
       part: currentPartNum,

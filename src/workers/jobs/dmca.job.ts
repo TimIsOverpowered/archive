@@ -35,7 +35,7 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
   };
 
   try {
-    if (downloadJobId) {
+    if (downloadJobId != null) {
       const flow = await getFlowProducer().add({
         name: 'dmca_processing',
         queueName: getDmcaProcessingQueue().name,

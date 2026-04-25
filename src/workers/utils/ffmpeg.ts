@@ -1,4 +1,5 @@
 import ffmpeg from 'fluent-ffmpeg';
+import { extractErrorDetails } from '../../utils/error.js';
 import path from 'path';
 import events from 'events';
 import { childLogger } from '../../utils/logger.js';
@@ -39,7 +40,7 @@ export function detectFmp4FromPlaylist(m3u8Content: string): boolean {
     };
 
     // Check for init segment (EXT-X-MAP tag) - strongest fMP4 indicator
-    if (mediaPlaylist.segments.some((seg) => seg.map?.uri)) {
+    if (mediaPlaylist.segments.some((seg) => seg.map?.uri != null && seg.map.uri !== '')) {
       return true;
     }
 
@@ -127,8 +128,9 @@ export async function trimVideo(
 export async function getDuration(filePath: string): Promise<number | null> {
   return new Promise((resolve) => {
     ffmpeg.ffprobe(filePath, (err, metadata) => {
-      if (err || !metadata.format?.duration) {
-        logger.error({ filePath }, `Failed to probe video file: ${err?.message}`);
+      if (err != null || metadata.format?.duration == null) {
+        const errDetails = extractErrorDetails(err);
+        logger.error({ filePath, error: errDetails.message }, `Failed to probe video file`);
         resolve(null);
       } else {
         const duration = Math.round(metadata.format.duration);
@@ -181,7 +183,7 @@ export async function convertHlsToMp4(source: string, outputPath: string, option
       }
     });
     ffmpegProcess.on('start', () => {
-      const ctx = options?.vodId ? `VOD ${options.vodId}` : source.substring(0, 40);
+      const ctx = options?.vodId != null ? `VOD ${options.vodId}` : source.substring(0, 40);
 
       logger.info({ isFmp4 }, `${ctx} - Converting HLS to MP4${isFmp4 ? ' (fMP4)' : ''}`);
     });

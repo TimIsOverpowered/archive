@@ -28,25 +28,23 @@ export async function getChannelBadges(tenantId: string): Promise<Record<string,
 
   const creds = getTwitchCredentials(tenantId);
   const config = configService.get(tenantId);
-  if (!creds?.clientId || !config?.twitch?.id) {
+  if (creds?.clientId == null || creds?.clientId === '' || config?.twitch?.id == null || config?.twitch?.id === '') {
     log.warn({ tenantId }, 'Twitch credentials not configured for streamer');
     return null;
   }
 
   try {
     const client = getTwitchClient(tenantId);
-    const data = await client.helix.get<{ data?: Record<string, unknown> }>(
-      `/chat/badges?broadcaster_id=${config.twitch.id}`
-    );
+    const data = await client.helix.get(`/chat/badges?broadcaster_id=${config.twitch.id}`);
 
-    const badgesData = data?.data ?? null;
-    if (!badgesData) {
+    const badgesData = ((data as { data?: unknown })?.data ?? null) as Record<string, unknown>[] | null;
+    if (badgesData == null) {
       log.debug({ tenantId }, 'No channel badges found for Twitch user');
       return null;
     }
 
-    channelBadgesCache.set(tenantId, badgesData as Record<string, unknown>);
-    return badgesData as Record<string, unknown>;
+    channelBadgesCache.set(tenantId, badgesData as unknown as Record<string, unknown>);
+    return badgesData as unknown as Record<string, unknown>;
   } catch (error: unknown) {
     if (error instanceof HttpError) {
       if (error.statusCode === 404) {
@@ -72,18 +70,18 @@ export async function getGlobalBadges(tenantId: string): Promise<Record<string, 
   }
 
   const creds = getTwitchCredentials(tenantId);
-  if (!creds?.clientId) return null;
+  if (creds?.clientId == null || creds?.clientId === '') return null;
 
   try {
     const client = getTwitchClient(tenantId);
-    const data = await client.helix.get<{ data?: Record<string, unknown }>('/chat/badges/global');
-    const badgesData = data?.data ?? null;
+    const data = await client.helix.get('/chat/badges/global');
+    const badgesData = ((data as { data?: unknown })?.data ?? null) as Record<string, unknown>[] | null;
 
-    if (badgesData) {
-      globalBadgesCache.set(tenantId, badgesData as Record<string, unknown>);
+    if (badgesData != null) {
+      globalBadgesCache.set(tenantId, badgesData as unknown as Record<string, unknown>);
     }
 
-    return badgesData as Record<string, unknown>;
+    return badgesData as unknown as Record<string, unknown>;
   } catch (error: unknown) {
     if (error instanceof HttpError) {
       if (error.statusCode === 404) {

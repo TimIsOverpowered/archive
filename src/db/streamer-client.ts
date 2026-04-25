@@ -55,7 +55,7 @@ class PoolManager {
     return creationPromise;
   }
 
-  private async createConnection(config: TenantConfig): Promise<Kysely<StreamerDB>> {
+  private createConnection(config: TenantConfig): Promise<Kysely<StreamerDB>> {
     const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
     const connectionLimit = config.database.connectionLimit ?? 2;
     const tenantDbName = extractDatabaseName(config.database.url);
@@ -76,7 +76,7 @@ class PoolManager {
       createdAt: Date.now(),
     });
 
-    return db;
+    return Promise.resolve(db);
   }
 
   async closeClient(tenantId: string): Promise<void> {

@@ -6,14 +6,14 @@ export default tseslint.config(
   {
     ignores: ['dist/', 'node_modules/', 'generated/'],
   },
-  ...tseslint.configs.recommended,
+  ...tseslint.configs.recommendedTypeChecked,
   {
     files: ['**/*.ts'],
     plugins: {
       'import-x': importX,
     },
     languageOptions: {
-      ecmaVersion: 2022,
+      ecmaVersion: 'latest',
       sourceType: 'module',
       parserOptions: {
         project: './tsconfig.json',
@@ -33,10 +33,9 @@ export default tseslint.config(
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
       ],
-      'no-unused-vars': 'off',
-      'no-unused-expressions': 'off',
+      '@typescript-eslint/no-unused-expressions': 'error',
+      '@typescript-eslint/no-empty-function': 'off',
       'import-x/no-duplicates': 'error',
-      'no-empty-function': 'off',
       'import-x/extensions': ['error', 'ignorePackages', { ts: 'always', js: 'always', checkTypeImports: true }],
       '@typescript-eslint/no-non-null-assertion': 'warn',
       '@typescript-eslint/prefer-nullish-coalescing': 'warn',

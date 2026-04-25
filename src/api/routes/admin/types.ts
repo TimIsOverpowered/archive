@@ -34,7 +34,7 @@ export interface VodRecordBase {
   created_at: Date;
   duration: number;
   stream_id: string | null;
-  platform: Platform | string; // Allow string for legacy data compatibility
+  platform: Platform;
 }
 
 /** Body for queuing a VOD download job. */

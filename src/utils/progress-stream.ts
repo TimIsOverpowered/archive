@@ -14,7 +14,7 @@ export class ProgressStream extends stream.Transform {
   private startTime: number;
   private onProgress?: ((progressData: UploadProgressData) => void) | undefined;
 
-  constructor(fileSize: number, onProgress?: ((progressData: UploadProgressData) => void) | undefined) {
+  constructor(fileSize: number, onProgress?: (progressData: UploadProgressData) => void) {
     super();
     this.fileSize = fileSize;
     this.bytesUploaded = 0;

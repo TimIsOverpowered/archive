@@ -13,12 +13,14 @@ import { asJsonObject } from '../utils/object.js';
  * Pure function — does not depend on any module-level state.
  */
 export function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
-  if (!tenant.databaseUrl) return null;
+  if (tenant.databaseUrl == null) return null;
 
   const dbUrl = decryptScalar(tenant.databaseUrl);
 
   const settingsObj: Record<string, unknown> =
-    tenant.settings && typeof tenant.settings === 'object' && !Array.isArray(tenant.settings) ? tenant.settings : {};
+    typeof tenant.settings === 'object' && tenant.settings !== null && !Array.isArray(tenant.settings)
+      ? tenant.settings
+      : {};
   const settings = SettingsSchema.parse(settingsObj);
 
   const tenantConfig: TenantConfig = {
@@ -36,11 +38,11 @@ export function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
 
   const youtubeObj = asJsonObject(tenant.youtube);
   if (youtubeObj) {
-    if ('auth' in youtubeObj && youtubeObj.auth) {
-      youtubeObj.auth = decryptScalar(youtubeObj.auth as string);
+    if ('auth' in youtubeObj && typeof youtubeObj.auth === 'string' && youtubeObj.auth !== '') {
+      youtubeObj.auth = decryptScalar(youtubeObj.auth);
     }
-    if ('apiKey' in youtubeObj && youtubeObj.apiKey) {
-      youtubeObj.apiKey = decryptScalar(youtubeObj.apiKey as string);
+    if ('apiKey' in youtubeObj && typeof youtubeObj.apiKey === 'string' && youtubeObj.apiKey !== '') {
+      youtubeObj.apiKey = decryptScalar(youtubeObj.apiKey);
     }
     tenantConfig.youtube = YoutubeSchema.parse(youtubeObj);
   }
@@ -128,7 +130,7 @@ export class ConfigService {
    */
   updateTwitchAuth(tenantId: string, encryptedAuth: string): void {
     const config = this.getCache().get(tenantId);
-    if (!config?.twitch?.auth) return;
+    if (config?.twitch?.auth == null) return;
     config.twitch.auth = encryptedAuth;
   }
 
@@ -142,7 +144,7 @@ export class ConfigService {
    */
   updateYoutubeAuth(tenantId: string, encryptedAuth: string): void {
     const config = this.getCache().get(tenantId);
-    if (!config?.youtube?.auth) return;
+    if (config?.youtube?.auth == null) return;
     const decryptedAuth = decryptScalar(encryptedAuth);
     config.youtube.auth = decryptedAuth;
   }

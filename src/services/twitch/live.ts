@@ -57,15 +57,15 @@ export async function getTwitchStreamStatus(userId: string, tenantId: string): P
       id: streamData.id,
       user_id: streamData.user_id,
       user_login: streamData.user_login,
-      user_name: streamData.user_name || '',
+      user_name: streamData.user_name ?? '',
       game_id: streamData.game_id ?? undefined,
       game_name: streamData.game_name ?? undefined,
-      type: streamData.type || '',
-      title: streamData.title || '',
+      type: streamData.type ?? '',
+      title: streamData.title ?? '',
       tags: streamData.tags ?? undefined,
       viewer_count: streamData.viewer_count,
       started_at: streamData.started_at,
-      language: streamData.language || 'other',
+      language: streamData.language ?? 'other',
       thumbnail_url: streamData.thumbnail_url ?? undefined,
     };
   } catch (error: unknown) {
@@ -109,7 +109,7 @@ export async function getLatestTwitchVodObject(
     const latestVod = data.data[0];
     if (!latestVod) return null;
 
-    if (latestVod.stream_id !== expectedStreamId || !latestVod.id) {
+    if (latestVod.stream_id !== expectedStreamId || latestVod.id == null) {
       return null;
     }
 

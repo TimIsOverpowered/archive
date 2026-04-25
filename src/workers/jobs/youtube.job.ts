@@ -14,7 +14,7 @@ const log = childLogger({ module: 'youtube-job' });
 
 // ============== VOD Job Creation ==============
 
-export async function createVodUploadJob(
+export function createVodUploadJob(
   ctx: TenantContext,
   dbId: number,
   vodId: string,
@@ -22,9 +22,9 @@ export async function createVodUploadJob(
   platform: Platform,
   type: SourceType,
   part?: number
-): Promise<YoutubeVodUploadJob> {
+): YoutubeVodUploadJob {
   const { config, tenantId } = ctx;
-  if (!config?.youtube?.upload) {
+  if (config?.youtube?.upload == null) {
     throw new ConfigNotConfiguredError(`YouTube upload for tenant ${tenantId}`);
   }
 
@@ -51,12 +51,12 @@ export async function createGameUploadJob(
   chapter: { id: number; name: string; start: number; end: number; gameId?: string | undefined }
 ): Promise<YoutubeGameUploadJob> {
   const { config, tenantId } = ctx;
-  if (!config?.youtube?.upload) {
+  if (config?.youtube?.upload == null) {
     throw new ConfigNotConfiguredError(`YouTube upload for tenant ${tenantId}`);
   }
 
   const platformCfg = getPlatformConfig(config, platform);
-  if (!platformCfg?.mainPlatform) {
+  if (platformCfg?.mainPlatform !== true) {
     throw new Error(`Skipping upload because ${platform} mainPlatform is false`);
   }
 
@@ -87,11 +87,11 @@ export async function createGameUploadJob(
 
   const channelName = getDisplayName(config);
   const dateFormatted = dayjs(vodRecord.created_at)
-    .tz(config.settings?.timezone || 'UTC')
+    .tz(config.settings?.timezone ?? 'UTC')
     .format('MMMM DD YYYY')
     .toUpperCase();
 
-  const vodStreamTitle = vodRecord.title ? vodRecord.title.replace(/>|</gi, '') : '';
+  const vodStreamTitle = vodRecord.title != null && vodRecord.title !== '' ? vodRecord.title.replace(/>|</gi, '') : '';
   const domainName = config.settings?.domainName;
 
   // Generate title with EP number
@@ -128,16 +128,16 @@ export async function createGameUploadJobsForVod(
   platform: Platform
 ): Promise<YoutubeGameUploadJob[]> {
   const { config, tenantId } = ctx;
-  if (!config?.youtube?.perGameUpload) {
+  if (config?.youtube?.perGameUpload !== true) {
     return [];
   }
 
-  if (!config?.youtube?.upload) {
+  if (config?.youtube?.upload == null) {
     throw new ConfigNotConfiguredError(`YouTube upload for tenant ${tenantId}`);
   }
 
   const platformCfg = getPlatformConfig(config, platform);
-  if (!platformCfg?.mainPlatform) {
+  if (platformCfg?.mainPlatform !== true) {
     throw new Error(`Skipping upload because ${platform} mainPlatform is false`);
   }
 
@@ -181,7 +181,7 @@ export async function enqueueVodUpload(job: YoutubeVodUploadJob, downloadJobId?:
   const jobId = `youtube_${job.vodId}_vod_${job.part ?? 1}`;
 
   try {
-    if (downloadJobId) {
+    if (downloadJobId != null) {
       const flow = await getFlowProducer().add({
         name: 'youtube_upload',
         queueName: queue.name,
@@ -230,7 +230,7 @@ export async function enqueueGameUpload(job: YoutubeGameUploadJob, downloadJobId
   const jobId = `youtube_${job.vodId}_game_${job.chapterId}_${job.chapterStart}`;
 
   try {
-    if (downloadJobId) {
+    if (downloadJobId != null) {
       const flow = await getFlowProducer().add({
         name: 'youtube_upload',
         queueName: queue.name,
@@ -291,7 +291,7 @@ export async function queueYoutubeVodUpload(
   downloadJobId?: string,
   part?: number
 ): Promise<string | null> {
-  const job = await createVodUploadJob(ctx, dbId, vodId, filePath, platform, type, part);
+  const job = createVodUploadJob(ctx, dbId, vodId, filePath, platform, type, part);
   return enqueueVodUpload(job, downloadJobId);
 }
 
@@ -398,11 +398,11 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
   };
 
   // VOD Upload
-  if ((uploadMode === UPLOAD_MODES.VOD || uploadMode === UPLOAD_MODES.ALL) && config?.youtube?.vodUpload) {
+  if ((uploadMode === UPLOAD_MODES.VOD || uploadMode === UPLOAD_MODES.ALL) && config?.youtube?.vodUpload === true) {
     try {
       const vodJobId = await queueYoutubeVodUpload(ctx, dbId, vodId, filePath, platform, type, downloadJobId);
       result.vodJobId = vodJobId;
-      log.info({ vodId, chained: !!downloadJobId, vodJobId }, 'Queued YouTube VOD upload');
+      log.info({ vodId, chained: downloadJobId != null, vodJobId }, 'Queued YouTube VOD upload');
     } catch (error) {
       const details = extractErrorDetails(error);
       log.warn({ ...details, vodId }, 'Failed to queue YouTube VOD upload');
@@ -410,19 +410,19 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
   }
 
   // Game Uploads
-  if (uploadMode === UPLOAD_MODES.ALL && config?.youtube?.perGameUpload) {
+  if (uploadMode === UPLOAD_MODES.ALL && config?.youtube?.perGameUpload === true) {
     try {
       const jobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform);
 
       for (const job of jobs) {
         const gameJobId = await enqueueGameUpload(job, downloadJobId);
-        if (gameJobId) {
+        if (gameJobId != null) {
           result.gameJobIds.push(gameJobId);
         }
       }
 
       log.info(
-        { vodId, chained: !!downloadJobId, gameJobsCount: result.gameJobIds.length },
+        { vodId, chained: downloadJobId != null, gameJobsCount: result.gameJobIds.length },
         'Queued YouTube game uploads'
       );
     } catch (error) {

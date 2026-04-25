@@ -16,7 +16,7 @@ export async function checkTokenHealth(): Promise<void> {
     // Create logger with tenant context per iteration so each error is attributed to correct tenant
     const log = createAutoLogger(tenantId);
 
-    if (config.twitch?.auth) {
+    if (config.twitch?.auth !== null && config.twitch?.auth !== undefined) {
       try {
         await getAppAccessToken(tenantId);
         resetFailures(`${tenantId}:twitch`);
@@ -35,7 +35,7 @@ export async function checkTokenHealth(): Promise<void> {
 }
 
 export function startTokenHealthCron(): NodeJS.Timeout {
-  checkTokenHealth();
+  void checkTokenHealth();
 
   return setInterval(
     () => {

@@ -14,7 +14,7 @@ export function setLoggerConfig(opts: { level: string; isProduction: boolean }):
 
 export function getLogger(): pino.Logger {
   if (!_logger) {
-    if (!_loggerConfig) _loggerConfig = { level: 'info', isProduction: false };
+    _loggerConfig ??= { level: 'info', isProduction: false };
     _logger = pino(
       {
         level: _loggerConfig.level,

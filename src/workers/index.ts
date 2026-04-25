@@ -87,7 +87,7 @@ function registerShutdownHandlers() {
     }, SHUTDOWN_TIMEOUT_MS);
 
     try {
-      await stopMonitorService();
+      stopMonitorService();
 
       for (const { name, worker } of workerRegistry.getAll()) {
         await worker.close(true);
@@ -114,14 +114,14 @@ function registerShutdownHandlers() {
   };
 
   process.on('SIGTERM', () => {
-    shutdown();
+    void shutdown();
   });
   process.on('SIGINT', () => {
-    shutdown();
+    void shutdown();
   });
 }
 
 const scriptPath = process.argv[1];
-if (scriptPath && import.meta.url === pathToFileURL(scriptPath).href) {
-  bootstrap();
+if (scriptPath != null && import.meta.url === pathToFileURL(scriptPath).href) {
+  void bootstrap();
 }

@@ -3,7 +3,7 @@
  */
 import type Redis from 'ioredis';
 import type { AdminContext } from '../api/middleware/admin-api-key.js';
-import type { TenantContext } from '../api/middleware/tenant-platform.js';
+import type { TenantContext } from './context.js';
 
 declare module 'fastify' {
   interface FastifyInstance {

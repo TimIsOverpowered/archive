@@ -74,7 +74,7 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (
       dbId,
       vodId,
       platform,
-      durationSeconds: actualDuration ? Math.round(actualDuration) : null,
+      durationSeconds: actualDuration != null ? Math.round(actualDuration) : null,
     });
 
     // Track completion data
@@ -100,10 +100,10 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (
         dbId,
         vodId,
         platform,
-        actualDuration ? Math.round(actualDuration) : 0,
+        actualDuration != null ? Math.round(actualDuration) : 0,
         platformUsername
       );
-      if (chatJobId) {
+      if (chatJobId != null) {
         await updateAlert(messageId, alerts.chatQueued(vodId));
       }
       log.info({ vodId, chatJobId }, 'Queued chat download job');
@@ -121,7 +121,7 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (
         platform,
         type: SOURCE_TYPES.VOD,
       });
-      if (youtubeResult.vodJobId || youtubeResult.gameJobIds.length > 0) {
+      if (youtubeResult.vodJobId != null || youtubeResult.gameJobIds.length > 0) {
         await updateAlert(messageId, alerts.uploadQueued(vodId));
       }
     } catch (error) {
@@ -140,7 +140,7 @@ const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (
 
     await updateAlert(
       messageId,
-      alerts.complete(vodId, actualDuration ? Math.round(actualDuration) : undefined, completionData)
+      alerts.complete(vodId, actualDuration != null ? Math.round(actualDuration) : undefined, completionData)
     );
 
     await job.updateProgress(100);

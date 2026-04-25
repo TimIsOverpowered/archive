@@ -18,18 +18,18 @@ export const strategy: PlatformStrategy = {
     const { tenantId, config, platform } = ctx;
     const platformCfg = getPlatformConfig(config, platform);
 
-    if (!platformCfg?.enabled) {
+    if (platformCfg?.enabled !== true) {
       return null;
     }
 
     const userId = platformCfg?.id;
-    if (!userId) {
+    if (userId == null) {
       return null;
     }
 
     const streamStatus = await getTwitchStreamStatus(userId, tenantId);
 
-    if (!streamStatus || streamStatus.type !== 'live') {
+    if (streamStatus == null || streamStatus.type !== 'live') {
       return null;
     }
 
@@ -61,13 +61,13 @@ export const strategy: PlatformStrategy = {
     const { tenantId, config, platform } = ctx;
     const platformCfg = getPlatformConfig(config, platform);
     const userId = platformCfg?.id;
-    if (!userId) {
+    if (userId == null) {
       return null;
     }
 
     const vodObject = await getLatestTwitchVodObject(userId, streamId, tenantId);
 
-    if (!vodObject || vodObject.stream_id !== streamId) {
+    if (vodObject == null || vodObject.stream_id !== streamId) {
       return null;
     }
 
@@ -83,7 +83,7 @@ export const strategy: PlatformStrategy = {
   createVodData(meta: PlatformVodMetadata): VodCreateData {
     return {
       vod_id: meta.id,
-      title: meta.title || null,
+      title: meta.title ?? null,
       created_at: new Date(meta.createdAt),
       duration: meta.duration,
       stream_id: meta.streamId ?? null,
@@ -95,7 +95,7 @@ export const strategy: PlatformStrategy = {
   updateVodData(meta: PlatformVodMetadata): VodUpdateData {
     return {
       vod_id: meta.id,
-      title: meta.title || null,
+      title: meta.title ?? null,
       created_at: new Date(meta.createdAt),
       duration: meta.duration,
       stream_id: meta.streamId,
@@ -104,12 +104,7 @@ export const strategy: PlatformStrategy = {
 
   async finalizeChapters(ctx, dbId, vodId, finalDurationSeconds): Promise<void> {
     try {
-      await saveVodChapters(
-        { tenantId: ctx.tenantId, config: ctx.config, db: ctx.db ?? null },
-        dbId,
-        vodId,
-        finalDurationSeconds
-      );
+      await saveVodChapters({ tenantId: ctx.tenantId, config: ctx.config }, dbId, vodId, finalDurationSeconds);
     } catch (error) {
       getLogger().error(createErrorContext(error, { vodId }), 'Failed to finalize Twitch chapters');
     }

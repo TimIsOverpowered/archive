@@ -50,7 +50,7 @@ export async function calculateResumeOffset(
   vodId: number,
   manualStartOffset?: number
 ): Promise<{ offset: number; hasExistingData: boolean; lastMessageId?: string }> {
-  if (manualStartOffset) {
+  if (manualStartOffset != null) {
     return { offset: manualStartOffset, hasExistingData: false };
   }
 
@@ -61,7 +61,11 @@ export async function calculateResumeOffset(
     .orderBy('content_offset_seconds', 'desc')
     .executeTakeFirst();
 
-  if (!lastSavedRecord?.content_offset_seconds) {
+  if (
+    lastSavedRecord == null ||
+    lastSavedRecord.content_offset_seconds == null ||
+    lastSavedRecord.content_offset_seconds <= 0
+  ) {
     return { offset: 0, hasExistingData: false };
   }
 
@@ -87,10 +91,14 @@ export function extractMessageData(node: TwitchChatMessageNode | null | undefine
         .map((f: unknown) => {
           if (typeof f !== 'object' || f === null) return '';
           const text = (f as Record<string, unknown>).text;
-          return String(text ?? '');
+          return typeof text === 'string' ? text : '';
         })
         .join(''),
-      fragments: Array.isArray(cleanFragments) ? cleanFragments.map((frag) => ({ ...frag })) : [],
+      fragments: Array.isArray(cleanFragments)
+        ? cleanFragments.map((frag) =>
+            typeof frag === 'object' && frag !== null ? { ...(frag as Record<string, unknown>) } : {}
+          )
+        : [],
     },
     userBadges:
       badgesRaw && typeof stripTypename(badgesRaw) === 'object'

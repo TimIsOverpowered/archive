@@ -64,7 +64,7 @@ export async function withCache<T>(key: string, ttl: number, fetcher: () => Prom
 
   try {
     const cached = await client.get(key);
-    if (cached) {
+    if (cached != null && cached !== '') {
       cacheMetrics.hits++;
       return JSON.parse(cached) as T;
     }
@@ -90,7 +90,7 @@ export async function withCache<T>(key: string, ttl: number, fetcher: () => Prom
     })
     .finally(() => inflightSimple.delete(key));
 
-  inflightSimple.set(key, promise as Promise<unknown>);
+  inflightSimple.set(key, promise);
   return promise;
 }
 
@@ -124,8 +124,8 @@ export async function withStaleWhileRevalidate<T>(
 
   try {
     const cached = await client.get(key);
-    if (cached) {
-      const entry: CacheEntry<T> = JSON.parse(cached);
+    if (cached != null && cached !== '') {
+      const entry = JSON.parse(cached) as unknown as CacheEntry<T>;
       const isStale = now - entry.timestamp > staleAfter * 1000;
 
       if (!isStale) {
@@ -216,7 +216,7 @@ async function getSwrFailureCount(
 ): Promise<number> {
   try {
     const val = await client.get(failureKey);
-    if (val) return parseInt(val, 10);
+    if (val != null && val !== '') return parseInt(val, 10);
     return 0;
   } catch {
     return SWR_FAILURES.get(failureKey) ?? 0;

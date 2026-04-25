@@ -28,12 +28,7 @@ interface FormattedError {
 }
 
 function hasStatusCode(e: unknown): e is { statusCode: number } {
-  return (
-    typeof e === 'object' &&
-    e !== null &&
-    'statusCode' in e &&
-    typeof (e as { statusCode: unknown }).statusCode === 'number'
-  );
+  return typeof e === 'object' && e !== null && 'statusCode' in e && typeof e.statusCode === 'number';
 }
 
 function formatErrorResponse(error: unknown): FormattedError {
@@ -104,7 +99,7 @@ export async function buildServer() {
   // Add tenant display name to logger for routes with streamer ID
   const tenantLoggerMiddleware = createTenantLoggerMiddleware();
   fastify.addHook('preHandler', tenantLoggerMiddleware);
-  fastify.addHook('onResponse', async () => {
+  fastify.addHook('onResponse', () => {
     exitTenantContext();
   });
 

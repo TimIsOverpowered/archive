@@ -60,7 +60,7 @@ export async function handlePlatformLiveCheck(
   const platformUsername = platformCfg?.username;
   const platformUserId = platformCfg?.id;
 
-  if (!platformUserId || !platformUsername) {
+  if (platformUserId == null || platformUsername == null) {
     log.debug({ component: 'monitor', platform, username: platformUsername }, 'Platform not fully configured');
     return;
   }
@@ -84,7 +84,7 @@ export async function handlePlatformLiveCheck(
       db,
       tenantId,
       platform,
-      platformUsername || undefined,
+      platformUsername ?? undefined,
       config.displayName,
       log,
       activeLiveVod
@@ -99,7 +99,7 @@ export async function handlePlatformLiveCheck(
     platformUserId,
     platformUsername,
     config,
-    strategy: strategy as NonNullable<ReturnType<typeof getStrategy>>,
+    strategy: strategy,
     tenantId,
     log,
   });
@@ -279,7 +279,7 @@ export async function validateVodPath(tenantId: string): Promise<{ valid: boolea
   try {
     const streamerConfig = configService.get(tenantId);
 
-    if (!streamerConfig?.settings.vodPath) {
+    if (streamerConfig?.settings.vodPath == null) {
       log.error({ component: 'monitor', tenantId }, 'VOD path not configured for tenant - cannot queue downloads');
       return { valid: false };
     }
@@ -333,7 +333,7 @@ export async function enqueueLiveHlsDownload(params: {
 }): Promise<void> {
   const log = createAutoLogger(params.tenantId);
 
-  if (!params.skipValidation) {
+  if (params.skipValidation !== false) {
     const validationResult = await validateVodPath(params.tenantId);
     if (!validationResult.valid) {
       log.error(

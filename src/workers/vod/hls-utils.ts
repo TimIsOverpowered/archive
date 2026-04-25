@@ -48,7 +48,7 @@ export async function downloadSegmentsParallel(
 
   await Promise.all(
     segments.map(async (segment) => {
-      if (isAborted()) {
+      if (isAborted() === true) {
         return;
       }
 
@@ -64,7 +64,7 @@ export async function downloadSegmentsParallel(
 
       try {
         await limit(async () => {
-          if (isAborted()) {
+          if (isAborted() === true) {
             throw new Error('Aborted');
           }
 
@@ -92,7 +92,7 @@ export async function downloadSegmentsParallel(
 
         log.debug({ uri: segment.uri, current: completedCount, total: totalSegments }, `Segment downloaded`);
       } catch (error: unknown) {
-        if (isAborted()) {
+        if (isAborted() === true) {
           return;
         }
 
@@ -108,7 +108,7 @@ export async function downloadSegmentsParallel(
     })
   );
 
-  if (!isAborted()) {
+  if (isAborted() !== true) {
     log.debug({ total: totalSegments }, `All segments downloaded successfully`);
     if (onBatchComplete) {
       onBatchComplete(completedCount);
@@ -149,7 +149,7 @@ export async function fetchTwitchPlaylist(
   try {
     const masterPlaylistContent = await getTwitchM3u8(String(vodId), tokenSig.value, tokenSig.signature);
 
-    if (!masterPlaylistContent) {
+    if (masterPlaylistContent == null || masterPlaylistContent === '') {
       log.error({ vodId }, 'Failed to fetch Twitch master playlist');
 
       if (retryCount > maxRetryBeforeEndDetection) {
@@ -172,7 +172,7 @@ export async function fetchTwitchPlaylist(
 
     const bestVariantUrl = (parsedMaster as HLS.types.MasterPlaylist).variants?.[0]?.uri ?? parsedMaster.uri;
 
-    if (!bestVariantUrl) {
+    if (bestVariantUrl == null || bestVariantUrl === '') {
       log.error({ vodId }, 'No variant URL found in master playlist');
       return null;
     }
@@ -218,7 +218,7 @@ export async function fetchKickPlaylist(
 ): Promise<FetchPlaylistResult | null> {
   const fetchUrl = sourceUrl ?? '';
 
-  if (!fetchUrl) {
+  if (fetchUrl == null || fetchUrl === '') {
     log.error({ vodId }, 'No Kick HLS source URL provided. Cannot continue download.');
 
     await sleep(5000);
@@ -243,7 +243,7 @@ export async function fetchKickPlaylist(
       const variantM3u8String = await tempSession.fetchText(`${baseURL}/playlist.m3u8`);
 
       if (!session) {
-        await tempSession.close(); // Only close temporary sessions
+        tempSession.close(); // Only close temporary sessions
       }
 
       return { variantM3u8String, baseURL };
@@ -253,7 +253,7 @@ export async function fetchKickPlaylist(
       baseURL = fetchUrl.substring(0, fetchUrl.lastIndexOf('/'));
 
       if (!session) {
-        await tempSession.close();
+        tempSession.close();
       }
 
       return { variantM3u8String: response, baseURL };

@@ -7,7 +7,7 @@ export interface RichEmbedData {
   fields?: Array<{ name: string; value: string; inline?: boolean }>;
   timestamp?: string | undefined;
   updatedTimestamp?: string | undefined;
-  mention?: ('everyone' | 'here' | string) | undefined;
+  mention?: ('everyone' | 'here') | undefined;
   thumbnailUrl?: string | undefined;
   url?: string | undefined;
 }
@@ -35,7 +35,7 @@ function getEmbedColor(status: AlertStatus): number {
 }
 
 export function constructEmbed(data: RichEmbedData): DiscordEmbed {
-  const timestamp = data.timestamp ? new Date(data.timestamp) : new Date();
+  const timestamp = data.timestamp != null ? new Date(data.timestamp) : new Date();
 
   const embed: DiscordEmbed = {
     title: data.title,
@@ -44,23 +44,23 @@ export function constructEmbed(data: RichEmbedData): DiscordEmbed {
       data.fields?.map((f) => ({
         name: f.name,
         value: f.value,
-        inline: !!f.inline,
+        inline: f.inline === true,
       })) ?? [],
   };
 
-  if (data.description) {
+  if (data.description != null && data.description !== '') {
     embed.description = data.description;
   }
 
-  if (data.thumbnailUrl) {
+  if (data.thumbnailUrl != null && data.thumbnailUrl !== '') {
     embed.thumbnail = { url: data.thumbnailUrl };
   }
 
-  if (data.url) {
+  if (data.url != null && data.url !== '') {
     embed.url = data.url;
   }
 
-  if (data.updatedTimestamp) {
+  if (data.updatedTimestamp != null && data.updatedTimestamp !== '') {
     embed.footer = {
       text: `Started: ${timestamp.toLocaleString()} | Updated: ${new Date(data.updatedTimestamp).toLocaleString()}`,
     };

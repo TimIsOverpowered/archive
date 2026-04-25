@@ -5,13 +5,14 @@ import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from
 import { MAX_CACHE_PAGES } from '../constants.js';
 import { isConnectionError } from '../db/utils/errors.js';
 import { CacheKeys } from '../utils/cache-keys.js';
+import { HttpError } from '../utils/http-error.js';
 
 function extractPageFromKey(key: string): number | null {
   const parts = key.split(':');
   const pageIdx = parts.indexOf('page');
   if (pageIdx === -1 || pageIdx + 1 >= parts.length) return null;
   const pageStr = parts[pageIdx + 1];
-  if (!pageStr) return null;
+  if (pageStr == null || pageStr === '') return null;
   const page = parseInt(pageStr, 10);
   return isNaN(page) ? null : page;
 }
@@ -69,9 +70,8 @@ export async function registerVodTags(
       }
 
       const results = await chunk.exec();
-      if (results?.some(([err]) => err)) {
-        const firstErr = results.find(([err]) => err)?.[1] ?? null;
-        throw firstErr ?? new Error('Pipeline command failed');
+      if (results != null && results.some(([err]) => err !== null && err !== undefined)) {
+        throw new HttpError(500, 'Pipeline command failed', 'INTERNAL_SERVER_ERROR');
       }
     }
 

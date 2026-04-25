@@ -21,7 +21,7 @@ interface HealthRouteOptions {
  * Register health check endpoint: reports Redis, DB, streamer, queue, and cache status.
  * Requires x-health-token header for timing-safe validation.
  */
-export default async function healthRoutes(fastify: FastifyInstance, _options: HealthRouteOptions) {
+export default function healthRoutes(fastify: FastifyInstance, _options: HealthRouteOptions) {
   fastify.get(
     '/health',
     {
@@ -75,13 +75,13 @@ export default async function healthRoutes(fastify: FastifyInstance, _options: H
         });
       }
 
-      const kickConfig = streamerConfigs.find((c) => c.kick?.enabled);
+      const kickConfig = streamerConfigs.find((c) => c.kick?.enabled === true);
       const flaresolverrHealth = await checkFlareSolverrHealth();
 
       let cloudflareCache = { status: 'unknown' };
       try {
         const cfInfo = await getCachedRangeInfo();
-        cloudflareCache = cfInfo || { status: 'missing' };
+        cloudflareCache = cfInfo ?? { status: 'missing' };
       } catch {
         cloudflareCache = { status: 'error' };
       }

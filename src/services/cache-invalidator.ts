@@ -97,7 +97,7 @@ export function registerCacheSubscriber(fastify: FastifyInstance): void {
       return;
     }
 
-    (async () => {
+    void (async () => {
       try {
         if (event.type === 'VOD_DURATION_UPDATED' && event.duration !== undefined) {
           await setVodVolatileCache(

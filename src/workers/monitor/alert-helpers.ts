@@ -11,7 +11,7 @@ export async function sendStreamLiveAlert(
   username: string,
   displayName?: string
 ): Promise<void> {
-  const streamerName = displayName || username;
+  const streamerName = displayName ?? username;
 
   try {
     await sendRichAlert({

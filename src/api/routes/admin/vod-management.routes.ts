@@ -9,7 +9,7 @@ import {
 } from '../../middleware/tenant-platform.js';
 import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { badRequest, notFound } from '../../../utils/http-error.js';
+import { HttpError } from '../../../utils/http-error.js';
 import { findVodRecord } from './utils/vod-helpers.js';
 import { getStrategy } from '../../../services/platforms/index.js';
 import { getApiConfig } from '../../../config/env.js';
@@ -24,7 +24,7 @@ import type { InsertableVods, SelectableVods } from '../../../db/streamer-types.
  * Register VOD management routes: stats, create VOD, delete VOD.
  * Requires admin API key authentication, tenant middleware, and rate limiting.
  */
-export default async function vodManagementRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
+export default function vodManagementRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const adminRateLimiter = RedisService.getLimiter('rate:admin');
   if (!adminRateLimiter) {
     throw new Error('Rate limiter not initialized');
@@ -50,7 +50,8 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
     },
     async (request) => {
       // Non-null assertion safe: tenantMiddleware runs in onRequest and always sets request.tenant
-      const { tenantId, db } = request.tenant!;
+      const tenantCtx = request.tenant;
+      const { tenantId, db } = tenantCtx;
 
       const stats = await getTenantStats(db, tenantId, getApiConfig().STATS_CACHE_TTL);
       return { data: stats };
@@ -85,13 +86,14 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, db, platform } = asTenantPlatformContext(request.tenant);
+      const tenantCtx = asTenantPlatformContext(request.tenant);
+      const { tenantId, db, platform } = tenantCtx;
       const { vodId, title, createdAt, duration } = request.body;
       const log = createAutoLogger(tenantId);
 
       // Validate vodId is provided
-      if (!vodId) {
-        throw badRequest('vodId is required');
+      if (vodId === '') {
+        throw new HttpError(400, 'vodId is required', 'BAD_REQUEST');
       }
 
       const vodRecord = await findVodRecord(db, vodId, platform);
@@ -103,9 +105,9 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       const strategy = getStrategy(platform);
       const validatedData = VodCreateSchema.parse({
         vod_id: vodId,
-        title: title || null,
-        created_at: createdAt ? new Date(createdAt) : new Date(),
-        duration: Number(duration) || 0,
+        title: title ?? null,
+        created_at: createdAt != null && createdAt !== '' ? new Date(createdAt) : new Date(),
+        duration: Number(duration) ?? 0,
         platform,
       });
       const newVod = (await db
@@ -114,11 +116,11 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
           strategy
             ? (strategy.createVodData({
                 id: validatedData.vod_id,
-                title: validatedData.title || '',
+                title: validatedData.title ?? '',
                 createdAt: validatedData.created_at.toISOString(),
                 duration: validatedData.duration,
               }) as InsertableVods)
-            : ({
+            : {
                 vod_id: validatedData.vod_id,
                 title: validatedData.title,
                 created_at: validatedData.created_at.toISOString(),
@@ -126,7 +128,7 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
                 platform: validatedData.platform,
                 stream_id: null,
                 is_live: false,
-              } as InsertableVods)
+              }
         )
         .returning(['id', 'vod_id', 'platform', 'title', 'duration', 'stream_id', 'created_at'])
         .executeTakeFirst()) as SelectableVods;
@@ -166,13 +168,14 @@ export default async function vodManagementRoutes(fastify: FastifyInstance, _opt
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, db, platform } = asTenantPlatformContext(request.tenant);
+      const tenantCtx = asTenantPlatformContext(request.tenant);
+      const { tenantId, db, platform } = tenantCtx;
       const { vodId } = request.body;
       const log = createAutoLogger(tenantId);
 
       const vodRecord = await findVodRecord(db, vodId, platform);
 
-      if (!vodRecord) throw notFound(`VOD ${vodId} not found`);
+      if (!vodRecord) throw new HttpError(404, `VOD ${vodId} not found`, 'NOT_FOUND');
 
       await db.deleteFrom('vods').where('platform', '=', platform).where('vod_id', '=', vodId).execute();
 

@@ -56,7 +56,7 @@ export function createYoutubeUploadProgressHandler({
   privacyStatus,
 }: UploadProgressOptions): (progress: UploadProgressCallbackData) => Promise<void> {
   return async (progress: UploadProgressCallbackData) => {
-    if (!messageId || !isAlertsEnabled()) return;
+    if (messageId == null || !isAlertsEnabled()) return;
 
     const partSuffix = part !== undefined && totalParts !== undefined ? ` Part ${part}/${totalParts}` : '';
     const partField =
@@ -68,16 +68,16 @@ export function createYoutubeUploadProgressHandler({
       case 'starting': {
         const titlePrefix = type === UPLOAD_TYPES.VOD ? '📺 Uploading VOD' : '🎮 Uploading Game';
         const title = `${titlePrefix}${partSuffix}`;
-        const videoField = videoTitle
-          ? { name: 'Video', value: videoTitle.substring(0, 150), inline: false }
-          : undefined;
-        const gameField = gameName ? { name: 'Game', value: gameName.substring(0, 150), inline: true } : undefined;
+        const videoField =
+          videoTitle != null ? { name: 'Video', value: videoTitle.substring(0, 150), inline: false } : undefined;
+        const gameField =
+          gameName != null ? { name: 'Game', value: gameName.substring(0, 150), inline: true } : undefined;
 
         const fields: Array<{ name: string; value: string; inline: boolean }> = [];
         if (gameField) fields.push(gameField);
         if (videoField) fields.push(videoField);
         if (partField) fields.push(partField);
-        if (privacyStatus) {
+        if (privacyStatus != null) {
           const privacyLabel = privacyStatus.charAt(0).toUpperCase() + privacyStatus.slice(1);
           fields.push({ name: 'Privacy', value: privacyLabel, inline: true });
         }
@@ -163,7 +163,7 @@ export function createYoutubeUploadProgressHandler({
         const titlePrefix = type === UPLOAD_TYPES.VOD ? '✅ VOD Upload Complete' : '✅ Game Upload Complete';
         const title = `${titlePrefix}${partSuffix}`;
 
-        const youtubeVideoUrl = progress.videoId ? `https://www.youtube.com/watch?v=${progress.videoId}` : '';
+        const youtubeVideoUrl = progress.videoId != null ? `https://www.youtube.com/watch?v=${progress.videoId}` : '';
 
         const fields: Array<{ name: string; value: string; inline: boolean }> = [];
 
@@ -171,11 +171,11 @@ export function createYoutubeUploadProgressHandler({
           fields.push({ name: 'Duration', value: toHHMMSS(progress.videoDuration), inline: true });
         }
 
-        if (videoTitle) {
+        if (videoTitle != null) {
           fields.push({ name: 'Title', value: videoTitle.substring(0, 256), inline: false });
         }
 
-        if (progress.privacyStatus) {
+        if (progress.privacyStatus != null) {
           const privacyLabel = progress.privacyStatus.charAt(0).toUpperCase() + progress.privacyStatus.slice(1);
           fields.push({ name: 'Privacy', value: privacyLabel, inline: true });
         }

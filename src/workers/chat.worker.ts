@@ -68,12 +68,12 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
     startOffset
   );
 
-  if (!messageId) {
+  if (messageId == null) {
     log.error({ component: 'chat-worker' }, 'Failed to initialize alert');
     throw new Error('Failed to initialize chat alert');
   }
 
-  if (hasExistingData && !startOffset) {
+  if (hasExistingData && startOffset == null) {
     const skipResult = await checkAlreadyComplete(
       db,
       dbId,
@@ -117,7 +117,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
       platform,
       result.totalMessages,
       result.batchCount,
-      resumeIndicator ? (startOffset ?? 0) : undefined
+      resumeIndicator != null ? (startOffset ?? 0) : undefined
     )
   ).catch((err) => {
     log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
@@ -134,7 +134,7 @@ async function initChatAlert(
   hasExistingData: boolean,
   startOffset: number | undefined
 ): Promise<string | null> {
-  const isResume = hasExistingData && !startOffset;
+  const isResume = hasExistingData && startOffset == null;
   const alertData = chatAlerts.init(
     tenantId,
     vodId,
@@ -174,7 +174,7 @@ async function isCompleteByLastMessage(
   lastMessageId: string | undefined,
   tenantId: string
 ): Promise<number | null> {
-  if (!lastMessageId) return null;
+  if (lastMessageId == null) return null;
   const rawPage = await fetchComments(vodId, effectiveOffset, tenantId);
   if (!rawPage?.comments) return null;
   const edges = extractEdges(rawPage.comments);
@@ -253,7 +253,7 @@ async function* paginateChatComments(
     if (!comments) break;
     const edges = extractEdges(comments);
     const cursor = edges.at(-1)?.cursor ?? null;
-    if (!cursor || cursor === lastCursor) break;
+    if (cursor == null || cursor === lastCursor) break;
     lastCursor = cursor;
     await sleep(CHAT_RATE_LIMIT_MS);
     page = await fetchNextComments(vodId, cursor, tenantId);
@@ -304,12 +304,12 @@ async function processChatDownload(
       batchBuffer.push({
         id: node.id,
         vod_id: dbId,
-        display_name: ('commenter' in node && node.commenter?.displayName) ?? null,
+        display_name: 'commenter' in node ? (node.commenter?.displayName ?? null) : null,
         content_offset_seconds: Math.round(offsetSeconds),
-        createdAt: 'createdAt' in node && node.createdAt ? new Date(node.createdAt as string) : new Date(),
+        createdAt: 'createdAt' in node && node.createdAt != null ? new Date(node.createdAt) : new Date(),
         message,
         user_badges: userBadges,
-        user_color: ('message' in node && node.message?.userColor) ?? '#FFFFFF',
+        user_color: 'message' in node ? (node.message?.userColor ?? '#FFFFFF') : '#FFFFFF',
       });
     }
 

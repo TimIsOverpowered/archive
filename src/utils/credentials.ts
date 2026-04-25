@@ -19,7 +19,7 @@ export function getTwitchCredentials(tenantId: string): TwitchCredentials | null
   const log = createAutoLogger(tenantId);
   const config = configService.get(tenantId);
 
-  if (!config?.twitch?.auth) {
+  if (config?.twitch?.auth == null) {
     log.warn({ component: 'credentials', tenantId }, 'No auth configured for tenant');
     return null;
   }
@@ -27,7 +27,7 @@ export function getTwitchCredentials(tenantId: string): TwitchCredentials | null
   try {
     const auth = decryptObject<TwitchAuthObject>(config.twitch.auth);
 
-    if (!auth.client_id || !auth.client_secret) {
+    if (auth.client_id == null || auth.client_id === '' || auth.client_secret == null || auth.client_secret === '') {
       log.error({ component: 'credentials' }, 'Missing client_id or client_secret in decrypted credentials');
       return null;
     }

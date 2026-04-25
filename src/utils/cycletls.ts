@@ -21,32 +21,30 @@ let initPromise: Promise<CycleTLSClient> | null = null;
 async function getCycleTLS(): Promise<CycleTLSClient> {
   if (cycleTLSInstance?.exit) return cycleTLSInstance;
 
-  if (initPromise == null) {
-    initPromise = (async () => {
-      try {
-        getLogger().debug('Initializing CycleTLS with Firefox fingerprint');
+  initPromise ??= (async () => {
+    try {
+      getLogger().debug('Initializing CycleTLS with Firefox fingerprint');
 
-        const instance = await initCycleTLS({
-          debug: getBaseConfig().NODE_ENV === 'development',
-          timeout: 30000,
-        });
+      const instance = await initCycleTLS({
+        debug: getBaseConfig().NODE_ENV === 'development',
+        timeout: 30000,
+      });
 
-        cycleTLSInstance = instance;
-        return instance;
-      } catch (err: unknown) {
-        const error = err as Error & { code?: string };
+      cycleTLSInstance = instance;
+      return instance;
+    } catch (err: unknown) {
+      const error = err as Error & { code?: string };
 
-        if (error.code === 'ENOENT') {
-          throw new Error('CycleTLS executable not found. Please ensure cycletls package was installed correctly.');
-        } else {
-          getLogger().error({ message: error.message }, 'Failed to initialize CycleTLS');
-          throw new Error(`Failed to initialize CycleTLS: ${error.message}`);
-        }
-      } finally {
-        initPromise = null;
+      if (error.code === 'ENOENT') {
+        throw new Error('CycleTLS executable not found. Please ensure cycletls package was installed correctly.');
+      } else {
+        getLogger().error({ message: error.message }, 'Failed to initialize CycleTLS');
+        throw new Error(`Failed to initialize CycleTLS: ${error.message}`);
       }
-    })();
-  }
+    } finally {
+      initPromise = null;
+    }
+  })();
 
   return initPromise;
 }
@@ -79,7 +77,7 @@ export class CycleTLSSession {
     }
 
     // For text responses, data is already parsed as string in cycletls v2.x
-    return response.data;
+    return response.data as string;
   }
 
   async streamToFile(url: string, outputPath: string): Promise<void> {
@@ -114,7 +112,7 @@ export class CycleTLSSession {
     }
   }
 
-  async close(): Promise<void> {
+  close(): void {
     if (this._closed) return;
 
     this._closed = true;

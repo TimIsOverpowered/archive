@@ -68,14 +68,14 @@ function getKickParsedM3u8(m3u8: string, baseURL: string): string | null {
   try {
     const parsed = HLS.parse(m3u8);
 
-    if (!parsed || !('variants' in parsed) || parsed.variants.length === 0) {
+    if (!('variants' in parsed) || parsed.variants.length === 0) {
       return null;
     }
 
     const bestVariant = parsed.variants[0];
-    if (!bestVariant) return null;
+    if (bestVariant == null) return null;
 
-    if (!bestVariant.uri) {
+    if (bestVariant.uri == null || bestVariant.uri === '') {
       return null;
     }
 
@@ -101,11 +101,11 @@ export async function getVod(channelName: string, vodId: string): Promise<KickVo
   }
 
   const video = dataArray.find((v): v is KickVod => {
-    if (!v || typeof v !== 'object') return false;
+    if (typeof v !== 'object') return false;
     return v.id === Number(vodId);
   });
 
-  if (!video) {
+  if (video == null) {
     throw new VodNotFoundError(vodId, 'kick api');
   }
 
@@ -118,7 +118,7 @@ export async function getKickParsedM3u8ForFfmpeg(sourceUrl: string): Promise<str
   try {
     const m3u8Content = await session.fetchText(sourceUrl);
 
-    if (!m3u8Content) {
+    if (m3u8Content == null || m3u8Content === '') {
       throw new Error('Empty HLS playlist response from Kick');
     }
 
@@ -128,7 +128,7 @@ export async function getKickParsedM3u8ForFfmpeg(sourceUrl: string): Promise<str
       const baseURL = sourceUrl.replace('/master.m3u8', '');
       m3u8Url = getKickParsedM3u8(m3u8Content, baseURL);
 
-      if (!m3u8Url) {
+      if (m3u8Url == null || m3u8Url === '') {
         throw new Error('No video variants found in HLS playlist');
       }
     } else {
@@ -137,6 +137,6 @@ export async function getKickParsedM3u8ForFfmpeg(sourceUrl: string): Promise<str
 
     return m3u8Url;
   } finally {
-    await session.close();
+    session.close();
   }
 }

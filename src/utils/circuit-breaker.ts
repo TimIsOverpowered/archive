@@ -46,7 +46,7 @@ function getOrCreateBreaker(key: string, _opts?: Partial<CircuitBreakerOptions>)
 export function getCircuitState(key: string, opts?: Partial<CircuitBreakerOptions>): CircuitState {
   const state = getOrCreateBreaker(key, opts);
 
-  if (state.state === 'open' && state.lastFailureTime) {
+  if (state.state === 'open' && state.lastFailureTime != null) {
     const elapsed = Date.now() - state.lastFailureTime;
     if (elapsed >= (opts?.recoveryTimeout ?? DEFAULT_OPTIONS.recoveryTimeout)) {
       const nextState: CircuitBreakerState = { ...state, state: 'half-open' };

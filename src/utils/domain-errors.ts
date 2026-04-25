@@ -28,7 +28,7 @@ export class VodNotFoundError extends DomainError {
   readonly code = 'VOD_NOT_FOUND';
 
   constructor(vodId: string | number, context?: string) {
-    super(context ? `VOD not found: ${vodId} (${context})` : `VOD not found: ${vodId}`);
+    super(context != null && context !== '' ? `VOD not found: ${vodId} (${context})` : `VOD not found: ${vodId}`);
   }
 }
 
@@ -36,7 +36,7 @@ export class PlatformNotConfiguredError extends DomainError {
   readonly code = 'PLATFORM_NOT_CONFIGURED';
 
   constructor(platform: string, context?: string) {
-    super(context ? `${platform} not configured: ${context}` : `${platform} not configured`);
+    super(context != null && context !== '' ? `${platform} not configured: ${context}` : `${platform} not configured`);
   }
 }
 

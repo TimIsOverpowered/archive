@@ -25,22 +25,22 @@ export async function updateVodDurationDuringDownload(
     let duration: number | null = null;
 
     // Twitch: try parsing #EXT-X-TWITCH-TOTAL-SECS from m3u8 content first
-    if (platform === PLATFORMS.TWITCH && m3u8Content) {
+    if (platform === PLATFORMS.TWITCH && m3u8Content != null) {
       duration = parseTwitchTotalDuration(m3u8Content);
 
       // Fallback to ffprobe on m3u8 file if tag not found
-      if (!duration && m3u8Path) {
+      if (duration == null && m3u8Path != null) {
         log.debug({ vodId }, 'Twitch tag not found, falling back to ffprobe');
         duration = await getDuration(m3u8Path);
       }
     }
     // Other platforms: ffprobe on m3u8 file
-    else if (m3u8Path) {
+    else if (m3u8Path != null) {
       duration = await getDuration(m3u8Path);
     }
 
     // No duration found
-    if (!duration || duration <= 0) {
+    if (duration == null || duration <= 0) {
       return;
     }
 
@@ -53,7 +53,7 @@ export async function updateVodDurationDuringDownload(
         .executeTakeFirst();
 
       // Skip update if current duration is already >= new duration
-      if (current?.duration && current.duration >= duration) {
+      if (current?.duration != null && current.duration >= duration) {
         return;
       }
 
@@ -77,7 +77,7 @@ export async function updateVodDurationDuringDownload(
 function parseTwitchTotalDuration(m3u8Content: string): number | null {
   try {
     const match = m3u8Content.match(/#EXT-X-TWITCH-TOTAL-SECS:(\d+)/);
-    return match ? parseInt(match[1], 10) : null;
+    return match?.[1] != null ? parseInt(match[1], 10) : null;
   } catch {
     return null;
   }

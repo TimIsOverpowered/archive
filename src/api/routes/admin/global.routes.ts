@@ -8,7 +8,7 @@ import { RedisService } from '../../../utils/redis-service.js';
  * Register global admin routes: list all tenants.
  * Requires admin API key authentication and rate limiting.
  */
-export default async function globalAdminRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
+export default function globalAdminRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const adminRateLimiter = RedisService.getLimiter('rate:admin');
   if (!adminRateLimiter) {
     throw new Error('Rate limiter not initialized');
@@ -26,8 +26,8 @@ export default async function globalAdminRoutes(fastify: FastifyInstance, _optio
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
-    async (_request) => {
-      const tenants = await getAllTenants();
+    (_request) => {
+      const tenants = getAllTenants();
       return { data: tenants };
     }
   );

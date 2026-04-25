@@ -38,7 +38,7 @@ export interface VodUploadResult {
 export async function processVodUpload(ctx: VodUploadContext): Promise<VodUploadResult> {
   const { filePath, config, db, dbId } = ctx;
 
-  if (!filePath) {
+  if (filePath == null) {
     throw new Error('File path is required for VOD upload');
   }
 
@@ -49,8 +49,8 @@ export async function processVodUpload(ctx: VodUploadContext): Promise<VodUpload
   }
 
   const channelName = getDisplayName(config);
-  const domainName = config.settings?.domainName || 'localhost';
-  const privacyStatus = config.youtube?.public ? 'public' : 'unlisted';
+  const domainName = config.settings?.domainName ?? 'localhost';
+  const privacyStatus = config.youtube?.public === true ? 'public' : 'unlisted';
   const splitDuration = getEffectiveSplitDuration(config.youtube?.splitDuration);
   const duration = (await getDuration(filePath)) ?? vodRecord.duration;
 
@@ -108,7 +108,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
     type,
   } = ctx;
 
-  if (!filePath) {
+  if (filePath == null) {
     throw new Error('File path is required for VOD upload');
   }
 
@@ -150,7 +150,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
   for (let i = 0; i < parts.length; i++) {
     const currentPartNum = i + 1;
     const partPath = parts[i];
-    if (!partPath) continue;
+    if (partPath == null) continue;
 
     const partDuration = i === parts.length - 1 ? duration - i * splitDuration : splitDuration;
 
@@ -159,7 +159,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
       platform: platformName,
       vodRecord: vodRecord,
       domainName,
-      timezone: config.settings?.timezone || 'UTC',
+      timezone: config.settings?.timezone ?? 'UTC',
       youtubeDescription: config.youtube?.description,
       part: totalParts > 1 ? currentPartNum : undefined,
       type,
@@ -177,17 +177,18 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
       timestamp: new Date().toISOString(),
     });
 
-    const onUploadProgress = uploadAlertMessageId
-      ? createVodUploadProgressHandler({
-          messageId: uploadAlertMessageId,
-          type: UPLOAD_TYPES.VOD,
-          channelName,
-          videoTitle: partTitle,
-          part: currentPartNum,
-          totalParts,
-          privacyStatus: privacyStatus as 'public' | 'unlisted' | 'private',
-        })
-      : () => {};
+    const onUploadProgress =
+      uploadAlertMessageId != null
+        ? createVodUploadProgressHandler({
+            messageId: uploadAlertMessageId,
+            type: UPLOAD_TYPES.VOD,
+            channelName,
+            videoTitle: partTitle,
+            part: currentPartNum,
+            totalParts,
+            privacyStatus: privacyStatus as 'public' | 'unlisted' | 'private',
+          })
+        : () => {};
 
     const result = await uploadVideo(
       tenantId,
@@ -247,7 +248,7 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
     part,
   } = ctx;
 
-  if (!filePath) {
+  if (filePath == null) {
     throw new Error('File path is required for VOD upload');
   }
 
@@ -257,7 +258,7 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
     platform: platformName,
     vodRecord,
     domainName,
-    timezone: config.settings?.timezone || 'UTC',
+    timezone: config.settings?.timezone ?? 'UTC',
     youtubeDescription: config.youtube?.description,
     type,
   });
@@ -275,15 +276,16 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
 
   const duration = (await getDuration(filePath)) ?? vodRecord.duration;
 
-  const onUploadProgress = uploadAlertMessageId
-    ? createVodUploadProgressHandler({
-        messageId: uploadAlertMessageId,
-        type: UPLOAD_TYPES.VOD,
-        channelName,
-        videoTitle: title,
-        privacyStatus: privacyStatus as 'public' | 'unlisted' | 'private',
-      })
-    : () => {};
+  const onUploadProgress =
+    uploadAlertMessageId != null
+      ? createVodUploadProgressHandler({
+          messageId: uploadAlertMessageId,
+          type: UPLOAD_TYPES.VOD,
+          channelName,
+          videoTitle: title,
+          privacyStatus: privacyStatus as 'public' | 'unlisted' | 'private',
+        })
+      : () => {};
 
   const result = await uploadVideo(
     tenantId,
@@ -306,17 +308,17 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
   return { uploadedVideos, needsPartLinking: false };
 }
 
-export async function linkVodPartsAfterDelay(
+export function linkVodPartsAfterDelay(
   tenantId: string,
   dbId: number,
   uploadedVideos: Array<{ id: string; part: number; duration: number }>,
   splitDuration: number,
   db: Kysely<StreamerDB>,
   log: AppLogger
-): Promise<void> {
+): void {
   if (uploadedVideos.length > 0) {
     setTimeout(() => {
-      (async () => {
+      void (async () => {
         try {
           await saveChaptersAndLinkParts(tenantId, dbId, uploadedVideos, splitDuration, db);
         } catch (error) {

@@ -17,7 +17,7 @@ export async function sendDiscordAlert(message: string): Promise<string | null> 
   }
 
   const webhookUrl = getDiscordAlertWebhookUrl();
-  if (!webhookUrl) {
+  if (webhookUrl == null || webhookUrl === '') {
     return null;
   }
 
@@ -27,7 +27,7 @@ export async function sendDiscordAlert(message: string): Promise<string | null> 
       body: { content: message },
     });
 
-    if (data.id) {
+    if (data.id != null && data.id !== '') {
       return data.id;
     }
     return null;
@@ -43,7 +43,7 @@ export async function sendRichAlert(data: import('./embed.js').RichEmbedData): P
   }
 
   const webhookUrl = getDiscordAlertWebhookUrl();
-  if (!webhookUrl) {
+  if (webhookUrl == null || webhookUrl === '') {
     return null;
   }
 
@@ -56,8 +56,8 @@ export async function sendRichAlert(data: import('./embed.js').RichEmbedData): P
       payload.content = '@everyone';
     } else if (data.mention === 'here') {
       payload.content = '@here';
-    } else if (data.mention) {
-      payload.content = `<@&${data.mention}>`;
+    } else if (data.mention != null) {
+      payload.content = `<@&${data.mention as string}>`;
     }
 
     const responseData = await request<{ id?: string }>(`${webhookUrl}?wait=true`, {
@@ -65,7 +65,7 @@ export async function sendRichAlert(data: import('./embed.js').RichEmbedData): P
       body: payload,
     });
 
-    if (responseData.id) {
+    if (responseData.id != null && responseData.id !== '') {
       return responseData.id;
     }
     return null;
@@ -81,7 +81,7 @@ export async function updateDiscordEmbed(messageId: string, data: import('./embe
   }
 
   const webhookUrl = getDiscordAlertWebhookUrl();
-  if (!webhookUrl) {
+  if (webhookUrl == null || webhookUrl === '') {
     return;
   }
 
@@ -109,7 +109,7 @@ export async function initRichAlert(data: import('./embed.js').RichEmbedData): P
 }
 
 export async function updateAlert(messageId: string | null, data: import('./embed.js').RichEmbedData): Promise<void> {
-  if (!messageId || !isAlertsEnabled()) return;
+  if (messageId == null || messageId === '' || !isAlertsEnabled()) return;
   await updateDiscordEmbed(messageId, data).catch((err) => {
     const details = extractErrorDetails(err);
     getLogger().warn({ ...details }, 'Failed to update Discord embed');

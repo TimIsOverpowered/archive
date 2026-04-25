@@ -1,7 +1,6 @@
 import { Processor, Job } from 'bullmq';
 import type { DmcaProcessingJob, DmcaProcessingResult } from './jobs/types.js';
 import { queueYoutubeVodUpload } from './jobs/youtube.job.js';
-import type { DMCAClaim } from './dmca/dmca.js';
 import {
   isBlockingPolicy,
   buildMuteFilters,
@@ -18,14 +17,13 @@ import { handleWorkerError } from './utils/error-handler.js';
 import { fileExists } from '../utils/path.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { createDmcaWorkerAlerts } from './utils/alert-factories.js';
-import type { Platform } from '../types/platforms.js';
 import { ConfigNotConfiguredError, VodNotFoundError, FileNotFound } from '../utils/domain-errors.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
   const { tenantId, dbId, vodId, receivedClaims, platform, part, filePath: providedFilePath } = job.data;
   const log = createAutoLogger(String(tenantId));
 
-  if (!receivedClaims || receivedClaims.length === 0) {
+  if (receivedClaims == null || receivedClaims.length === 0) {
     log.warn({ vodId }, 'No claims to process for VOD');
 
     return { success: true, message: 'No blocking claims found' };
@@ -46,7 +44,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
   // Determine file path
   let filePath: string;
 
-  if (providedFilePath) {
+  if (providedFilePath != null) {
     // File path provided by route (file already exists)
     filePath = providedFilePath;
     log.info({ vodId, filePath, part }, 'DMCA processing started (file exists)');
@@ -55,7 +53,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     const childResults = await job.getChildrenValues();
     const downloadResult = Object.values(childResults)[0] as { finalPath?: string };
 
-    if (!downloadResult?.finalPath) {
+    if (downloadResult == null || downloadResult.finalPath == null) {
       throw new Error(
         `File path not available for vodId=${vodId}, jobId=${job.id}: ` +
           `download job may have failed or not completed. Child results: ${JSON.stringify(childResults)}`
@@ -101,8 +99,8 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
   const tempFiles: string[] = [];
 
   try {
-    if (part) {
-      const splitDuration = config.youtube.splitDuration || 10800;
+    if (part != null) {
+      const splitDuration = config.youtube.splitDuration ?? 10800;
       const startOffset = splitDuration * (parseInt(String(part)) - 1);
 
       log.info({ vodId, part }, 'Extracting part from VOD');
@@ -126,14 +124,14 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     if (audioClaims.length > 0) {
       log.info({ vodId, count: audioClaims.length }, 'Processing audio claims');
 
-      const muteFilters = buildMuteFilters(audioClaims as DMCAClaim[]);
+      const muteFilters = buildMuteFilters(audioClaims);
       const mutedPath = `${processedPath.replace('.mp4', '-muted.mp4')}`;
 
       intermediateMutedPath = mutedPath;
 
       const mutedResult = await muteAudioSections(processedPath, muteFilters, mutedPath);
 
-      if (!mutedResult) {
+      if (mutedResult == null) {
         throw new Error('Failed to process audio claims');
       }
 
@@ -145,9 +143,9 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
 
       const blackoutSections: BlackoutSection[] = [];
 
-      for (const claim of visualClaims as DMCAClaim[]) {
+      for (const claim of visualClaims) {
         const startSeconds = claim.matchDetails.longestMatchStartTimeSeconds;
-        const durationSeconds = parseInt(claim.matchDetails.longestMatchDurationSeconds) || 0;
+        const durationSeconds = parseInt(claim.matchDetails.longestMatchDurationSeconds) ?? 0;
         const endSeconds = startSeconds + durationSeconds;
 
         log.info({ vodId, startSeconds, endSeconds }, 'Blackouting section');
@@ -155,13 +153,13 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
         blackoutSections.push({ startSeconds, durationSeconds, endSeconds });
       }
 
-      if (intermediateMutedPath && processedPath.endsWith('-muted.mp4')) {
+      if (intermediateMutedPath != null && processedPath.endsWith('-muted.mp4')) {
         tempFiles.push(intermediateMutedPath);
       }
 
       const blackoutedPath = await blackoutVideoSections(processedPath, vodId, blackoutSections);
 
-      if (!blackoutedPath) {
+      if (blackoutedPath == null) {
         throw new Error('Failed to process visual claims');
       }
 
@@ -175,13 +173,13 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       dbId,
       vodId,
       processedPath,
-      platform as Platform,
+      platform,
       'vod',
       undefined,
       part
     );
 
-    if (!jobId) {
+    if (jobId == null) {
       throw new Error('Failed to queue YouTube upload job');
     }
 

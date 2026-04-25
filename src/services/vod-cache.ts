@@ -46,7 +46,7 @@ export async function getVodVolatileCache(tenantId: string, dbId: number): Promi
 
   try {
     const cached = await client.get(CacheKeys.vodVolatile(tenantId, dbId));
-    if (!cached) return null;
+    if (cached == null || cached === '') return null;
     return JSON.parse(cached) as VodVolatileData;
   } catch (err) {
     const details = extractErrorDetails(err);
@@ -92,9 +92,9 @@ export async function getVodVolatileCacheBatch(
 
   try {
     const values = await client.mget(...keys);
-    if (values) {
+    if (values != null) {
       dbIds.forEach((id, i) => {
-        if (values[i]) {
+        if (values[i] != null && values[i] !== '') {
           try {
             result.set(id, JSON.parse(values[i]) as VodVolatileData);
           } catch {

@@ -51,7 +51,7 @@ export async function decompressChatData(compressed: Buffer): Promise<unknown> {
   } else if (algo === 'gzip') {
     decompressed = await gzipDecompress(compressed);
   } else {
-    throw new Error(`Unknown compression algorithm: ${algo}`);
+    throw new Error(`Unknown compression algorithm: ${algo as string}`);
   }
 
   return JSON.parse(decompressed.toString('utf8'));

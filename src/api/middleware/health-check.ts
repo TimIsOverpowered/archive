@@ -20,7 +20,7 @@ export default async function healthCheckMiddleware(request: FastifyRequest, rep
   const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
   const expectedToken = getHealthToken();
 
-  if (!token || !expectedToken || !timingSafeEqual(token, expectedToken)) {
+  if (token == null || expectedToken == null || !timingSafeEqual(token, expectedToken)) {
     return reply.status(401).send({
       statusCode: 401,
       message: 'Invalid health check token',

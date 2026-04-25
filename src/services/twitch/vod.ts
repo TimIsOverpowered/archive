@@ -33,7 +33,7 @@ export async function getVodData(vodId: string, tenantId: string): Promise<VodDa
   const client = getTwitchClient(tenantId);
   const data = await client.helix.get<{ data: VodData[] }>(`/videos?id=${vodId}`);
 
-  if (!data.data || data.data.length === 0) {
+  if (data.data == null || data.data.length === 0) {
     throw new VodNotFoundError(vodId, 'twitch helix');
   }
   return data.data[0] as VodData;
@@ -62,7 +62,7 @@ export async function getVodTokenSig(vodId: string, tenantId?: string): Promise<
   });
 
   const token = data.data.videoPlaybackAccessToken;
-  if (!token) {
+  if (token == null) {
     throw new Error('Failed to get VOD token');
   }
   return {

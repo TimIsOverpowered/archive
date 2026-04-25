@@ -16,7 +16,7 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
 
   const { config, db } = await getJobContext(tenantId);
 
-  if (!config?.settings.vodDownload) {
+  if (config == null || config.settings.vodDownload == null) {
     log.debug({ component: 'monitor', tenantId }, 'VOD download disabled, skipping');
     return { success: true };
   }
@@ -25,7 +25,7 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
 
   for (const platform of PLATFORM_VALUES) {
     const platformConfig = getPlatformConfig(config, platform);
-    if (!platformConfig?.enabled || !platformConfig.username) {
+    if (platformConfig == null || platformConfig.enabled !== true || platformConfig.username == null) {
       continue;
     }
 

@@ -122,7 +122,7 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
         tenantId,
         config,
         onConversionProgress: (percent) => {
-          if (options.discordMessageId) {
+          if (options.discordMessageId != null) {
             void updateAlert(
               options.discordMessageId,
               createVodWorkerAlerts().progress(vodId, `Converting ${vodId} (${percent}%)`)
@@ -145,7 +145,7 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
     };
   } finally {
     if (cycleTLS) {
-      await cycleTLS.close();
+      cycleTLS.close();
       log.info({ vodId }, 'CycleTLS session closed');
     }
   }
@@ -192,7 +192,7 @@ function filterNewSegments(
 ): HlsSegmentFilterResult {
   const currentLastUri = segments.at(-1)?.uri ?? '';
 
-  if (currentLastUri && currentLastUri === lastSegmentUri) {
+  if (currentLastUri != null && currentLastUri !== '' && currentLastUri === lastSegmentUri) {
     noChangeCount++;
   } else {
     lastSegmentUri = currentLastUri;
@@ -318,7 +318,7 @@ interface ArchivedVodContext {
 async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
   const { vodId, platform, vodDir, m3u8Path, cycleTLS, log } = ctx;
 
-  const playlist = await fetchPlaylistForArchived(ctx as ArchivedVodContext & { ctx?: TenantContext });
+  const playlist = await fetchPlaylistForArchived(ctx);
 
   if (!playlist) {
     throw new Error(`Failed to fetch HLS playlist for ${vodId}`);
@@ -368,7 +368,7 @@ async function fetchPlaylist(ctx: LivePollingContext, retryCount: number) {
 
 async function fetchPlaylistForArchived(ctx: ArchivedVodContext & { ctx?: TenantContext }) {
   const tenantId = ctx.ctx?.tenantId;
-  if (!tenantId) throw new Error('tenantId required for archived vod download');
+  if (tenantId == null) throw new Error('tenantId required for archived vod download');
   if (ctx.platform === PLATFORMS.TWITCH) {
     return fetchTwitchPlaylist(ctx.vodId, ctx.log, 0, HLS_MAX_CONSECUTIVE_ERRORS, tenantId);
   }

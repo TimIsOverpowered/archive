@@ -12,8 +12,8 @@ import { TenantNotFoundError } from '../utils/domain-errors.js';
 /** Return the list of enabled platform names for a tenant config. */
 export function getEnabledPlatforms(config: Pick<TenantConfig, 'twitch' | 'kick'>): string[] {
   const platforms: string[] = [];
-  if (config.twitch?.enabled) platforms.push(PLATFORMS.TWITCH);
-  if (config.kick?.enabled) platforms.push(PLATFORMS.KICK);
+  if (config.twitch?.enabled === true) platforms.push(PLATFORMS.TWITCH);
+  if (config.kick?.enabled === true) platforms.push(PLATFORMS.KICK);
   return platforms;
 }
 
@@ -124,7 +124,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
     for (const stat of vodStats) {
       byPlatform[stat.platform] = Number(stat.cnt);
       totalDurationSeconds += Number(stat.dur ?? 0);
-      if (stat.last && (!lastVodDate || stat.last > lastVodDate)) {
+      if (stat.last != null && (!lastVodDate || stat.last > lastVodDate)) {
         lastVodDate = stat.last;
       }
     }
@@ -182,14 +182,12 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
  * Return all configured tenants with their enabled platforms.
  * Read from config files, not from the database.
  */
-export async function getAllTenants(): Promise<
-  Array<{
-    id: string;
-    display_name: string | null;
-    platforms: string[];
-    created_at: Date;
-  }>
-> {
+export function getAllTenants(): Array<{
+  id: string;
+  display_name: string | null;
+  platforms: string[];
+  created_at: Date;
+}> {
   const configs = configService.getAll();
 
   return configs.map((config) => ({

@@ -12,7 +12,7 @@ type PublicAdmin = Pick<SelectableAdmins, 'id' | 'username' | 'created_at'>;
  * Returns undefined if the key is invalid or doesn't match any admin.
  */
 export async function findAdminByApiKey(apiKey: string): Promise<SelectableAdmins | undefined> {
-  if (!apiKey || !apiKey.startsWith('archive_')) return;
+  if (apiKey == null || apiKey === '' || !apiKey.startsWith('archive_')) return;
 
   const admins = await getMetaClient().selectFrom('admins').select(adminAuthSelect).execute();
 

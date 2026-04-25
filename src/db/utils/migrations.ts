@@ -48,7 +48,7 @@ export async function runMigrations(db: Kysely<MetaDB>): Promise<void> {
 
     log.info({ migration: migration.name }, 'Applying migration');
     await db.transaction().execute(async (trx) => {
-      const statements = migration.sql.split(';').filter((s) => s.trim());
+      const statements = migration.sql.split(';').filter((s) => s.trim() !== '');
       for (const statement of statements) {
         await sql`${sql.raw(statement)}`.execute(trx);
       }

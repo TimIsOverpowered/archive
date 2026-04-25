@@ -7,7 +7,7 @@ import {
   asTenantPlatformContext,
 } from '../../middleware/tenant-platform.js';
 import { RedisService } from '../../../utils/redis-service.js';
-import { notFound } from '../../../utils/http-error.js';
+import { HttpError } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
 import {
   SOURCE_TYPES,
@@ -21,7 +21,6 @@ import {
 import { ensureVodDownload, findVodRecord } from './utils/vod-helpers.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-
 /** Route params for YouTube re-upload endpoint. */
 interface ReUploadYoutubeParams {
   tenantId: string;
@@ -40,7 +39,7 @@ interface ReUploadYoutubeBody {
  * Register YouTube upload routes: re-upload a VOD to YouTube.
  * Requires admin API key authentication, tenant middleware, and rate limiting.
  */
-export default async function youtubeUploadRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
+export default function youtubeUploadRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const adminRateLimiter = RedisService.getLimiter('rate:admin');
   if (!adminRateLimiter) {
     throw new Error('Rate limiter not initialized');
@@ -87,7 +86,8 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, platform, db } = asTenantPlatformContext(request.tenant);
+      const tenantCtx = asTenantPlatformContext(request.tenant);
+      const { tenantId, platform, db } = tenantCtx;
       const { vodId, type, downloadMethod, uploadMode } = request.body;
       const log = createAutoLogger(tenantId);
 
@@ -95,14 +95,14 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
       const vodRecord = await findVodRecord(db, vodId, platform);
 
       if (!vodRecord) {
-        throw notFound(`VOD ${vodId} not found on ${platform}`);
+        throw new HttpError(404, `VOD ${vodId} not found on ${platform}`, 'NOT_FOUND');
       }
 
       const dbId = vodRecord.id;
 
       // Ensure vod download
       const { jobId, filePath } = await ensureVodDownload({
-        ctx: asTenantPlatformContext(request.tenant),
+        ctx: tenantCtx,
         dbId,
         vodId,
         type,
@@ -112,7 +112,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
 
       // Queue Youtube upload
       await queueYoutubeUploads({
-        ctx: asTenantPlatformContext(request.tenant),
+        ctx: tenantCtx,
         dbId,
         vodId,
         filePath,
@@ -122,7 +122,7 @@ export default async function youtubeUploadRoutes(fastify: FastifyInstance, _opt
         type,
       });
 
-      if (jobId) {
+      if (jobId != null) {
         return {
           data: {
             message: 'VOD download queued, YouTube upload will be triggered after completion',

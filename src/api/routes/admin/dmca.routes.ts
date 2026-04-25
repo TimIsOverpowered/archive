@@ -8,7 +8,7 @@ import {
 } from '../../middleware/tenant-platform.js';
 import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { notFound } from '../../../utils/http-error.js';
+import { HttpError } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod } from '../../../types/platforms.js';
 import {
   PLATFORM_VALUES,
@@ -42,7 +42,7 @@ interface DmcaRequestBody {
  * Register DMCA processing routes: ensure VOD download, queue DMCA processing job.
  * Requires admin API key authentication, tenant middleware, and rate limiting.
  */
-export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
+export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const adminRateLimiter = RedisService.getLimiter('rate:admin');
   if (!adminRateLimiter) {
     throw new Error('Rate limiter not initialized');
@@ -96,7 +96,7 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
 
       // Step 1: Ensure VOD record exists
       const vodRecord = await findVodRecord(db, vodId, platform);
-      if (!vodRecord) throw notFound('VOD not found');
+      if (!vodRecord) throw new HttpError(404, 'VOD not found', 'NOT_FOUND');
 
       // Step 2: Ensure VOD download (like /upload does)
       const { jobId: downloadJobId, filePath } = await ensureVodDownload({
@@ -109,9 +109,9 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
       });
 
       // Step 3: Parse claims (lenient - no validation)
-      const claimsArray = Array.isArray(claims)
+      const claimsArray: unknown[] = Array.isArray(claims)
         ? claims
-        : JSON.parse(typeof claims === 'string' ? claims : JSON.stringify(claims));
+        : (JSON.parse(typeof claims === 'string' ? claims : JSON.stringify(claims)) as unknown[]);
 
       // Step 4: Queue DMCA processing (chained to download if needed)
       const dmcaJobId = await queueDmcaProcessing({
@@ -125,12 +125,12 @@ export default async function dmcaProcessingRoutes(fastify: FastifyInstance, _op
         downloadJobId: downloadJobId ?? undefined,
       });
 
-      if (!dmcaJobId) {
+      if (dmcaJobId == null) {
         throw new Error('Failed to queue DMCA processing job');
       }
 
       // Step 5: Return appropriate response
-      if (downloadJobId) {
+      if (downloadJobId != null) {
         const context = { vodId, downloadJobId, dmcaJobId, part, claimsCount: claimsArray.length };
         log.info(context, 'VOD download queued, DMCA processing will be triggered after completion');
         return {

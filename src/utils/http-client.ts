@@ -18,7 +18,7 @@ export type ResponseType = 'json' | 'text' | 'blob' | 'arrayBuffer' | 'response'
 export interface RequestOptions<R extends ResponseType = 'json'> {
   method?: ('GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE') | undefined;
   headers?: Record<string, string> | undefined;
-  body?: unknown | undefined;
+  body?: unknown;
   timeoutMs?: number | undefined;
   responseType?: R | undefined;
   retryOptions?:

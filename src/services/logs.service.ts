@@ -31,7 +31,7 @@ async function getVodBucketSize(db: Kysely<StreamerDB>, tenantId: string, vodId:
   if (redis) {
     try {
       const cached = await redis.get(key);
-      if (cached) {
+      if (cached != null && cached !== '') {
         getLogger().debug({ vodId }, '[CACHE HIT] bucketSize');
         return parseInt(cached, 10);
       }
@@ -84,7 +84,7 @@ export async function getLogsByOffset(
   if (redis) {
     try {
       const cached = await redis.getBuffer(cacheKey);
-      if (cached) {
+      if (cached != null && cached.length > 0) {
         getLogger().debug({ vodId, bucket }, '[CACHE HIT] bucket');
         const data = (await decompressChatData(cached)) as {
           comments: SelectableChatMessages[];
@@ -127,7 +127,7 @@ export async function getLogsByOffset(
     .limit(LOGS_PAGE_SIZE + 1)
     .execute();
 
-  if (!data || data.length === 0) {
+  if (data.length === 0) {
     return { comments: [], cursor: undefined };
   }
 
@@ -136,8 +136,8 @@ export async function getLogsByOffset(
   let cursor: string | undefined;
   if (data.length === LOGS_PAGE_SIZE + 1) {
     const lastMsg = data[LOGS_PAGE_SIZE];
-    if (!lastMsg) throw new Error('Missing last message in data array');
-    if (!lastMsg.created_at) {
+    if (lastMsg == null) throw new Error('Missing last message in data array');
+    if (lastMsg.created_at == null) {
       throw new Error(`Missing created_at on message ${lastMsg.id}`);
     }
     const cursorData: CursorData = {
@@ -153,7 +153,7 @@ export async function getLogsByOffset(
   if (redis) {
     try {
       const compressed = await compressChatData(response);
-      await redis.set(cacheKey, compressed as Buffer, 'EX', getApiConfig().CHAT_OFFSET_TTL);
+      await redis.set(cacheKey, compressed, 'EX', getApiConfig().CHAT_OFFSET_TTL);
       getLogger().debug({ vodId, bucket }, '[CACHE SET] bucket');
     } catch {
       // Ignore cache errors
@@ -196,7 +196,7 @@ export async function getLogsByCursor(
 
   let cursorJson: CursorData | null = null;
   try {
-    cursorJson = JSON.parse(Buffer.from(cursor, 'base64').toString());
+    cursorJson = JSON.parse(Buffer.from(cursor, 'base64').toString()) as CursorData;
   } catch {
     badRequest('Invalid cursor format');
   }
@@ -234,12 +234,12 @@ export async function getLogsByCursor(
     .where('created_at', '<=', streamEnd)
     .where((eb) =>
       eb.or([
-        eb('content_offset_seconds', '>', cursorJson.offset!),
+        eb('content_offset_seconds', '>', cursorJson.offset),
         eb.and([
-          eb('content_offset_seconds', '=', cursorJson.offset!),
+          eb('content_offset_seconds', '=', cursorJson.offset),
           eb.or([
             eb('created_at', '>', cursorDate),
-            eb.and([eb('created_at', '=', cursorDate), eb('id', '>', cursorJson.id!)]),
+            eb.and([eb('created_at', '=', cursorDate), eb('id', '>', cursorJson.id)]),
           ]),
         ]),
       ])
@@ -249,7 +249,7 @@ export async function getLogsByCursor(
     .limit(LOGS_PAGE_SIZE + 1)
     .execute();
 
-  if (!data || data.length === 0) {
+  if (data.length === 0) {
     return { comments: [], cursor: undefined };
   }
 
@@ -258,8 +258,8 @@ export async function getLogsByCursor(
   let nextCursor: string | undefined;
   if (data.length === LOGS_PAGE_SIZE + 1) {
     const lastMsg = data[LOGS_PAGE_SIZE];
-    if (!lastMsg) throw new Error('Missing last message in data array');
-    if (!lastMsg.created_at) {
+    if (lastMsg == null) throw new Error('Missing last message in data array');
+    if (lastMsg.created_at == null) {
       throw new Error(`Missing created_at on message ${lastMsg.id}`);
     }
     const cursorData: CursorData = {
@@ -275,7 +275,7 @@ export async function getLogsByCursor(
   if (redis) {
     try {
       const compressed = await compressChatData(response);
-      await redis.set(cacheKey, compressed as Buffer, 'EX', getApiConfig().CHAT_CURSOR_TTL);
+      await redis.set(cacheKey, compressed, 'EX', getApiConfig().CHAT_CURSOR_TTL);
       getLogger().debug({ vodId }, '[CACHE SET] cursor');
     } catch {
       // Ignore cache errors

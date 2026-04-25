@@ -34,10 +34,10 @@ export async function finalizeVod(options: FinalizeVodOptions): Promise<void> {
   await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
     const strategy = getStrategy(platform);
     const dur = parsed.data.duration ?? null;
-    const finalizeFn = strategy?.finalizeChapters;
-    if (dur && finalizeFn) {
+    if (dur != null && strategy?.finalizeChapters != null) {
+      const finalize = strategy.finalizeChapters.bind(strategy);
       await db.transaction().execute(async (trx) => {
-        await finalizeFn({ tenantId: ctx.tenantId, config: ctx.config, platform, db: trx }, dbId, vodId, dur);
+        await finalize({ tenantId: ctx.tenantId, config: ctx.config, platform, db: trx }, dbId, vodId, dur);
         await trx
           .updateTable('vods')
           .set({

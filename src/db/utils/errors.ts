@@ -6,7 +6,11 @@ const NODE_CONNECTION_ERROR_CODES = new Set(['ECONNRESET', 'ETIMEDOUT', 'EPIPE',
  */
 export function isConnectionError(error: unknown): boolean {
   const code = (error as { code?: string }).code;
-  if (code && (PG_CONNECTION_ERROR_CODES.has(code) || NODE_CONNECTION_ERROR_CODES.has(code))) {
+  if (
+    code !== null &&
+    code !== undefined &&
+    (PG_CONNECTION_ERROR_CODES.has(code) || NODE_CONNECTION_ERROR_CODES.has(code))
+  ) {
     return true;
   }
 

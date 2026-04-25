@@ -12,7 +12,7 @@ const log = childLogger({ module: 'path' });
  * Converts platform-specific separators and resolves relative paths.
  */
 export function normalizePath(basePath?: string): string | undefined {
-  if (!basePath) return basePath;
+  if (basePath == null || basePath === '') return basePath;
 
   const normalized = path.normalize(basePath);
 
@@ -60,7 +60,7 @@ export interface LivePathOptions {
 export function getVodFilePath(options: VodPathOptions): string {
   const { config, vodId } = options;
 
-  if (!config.settings.vodPath) {
+  if (config.settings.vodPath == null || config.settings.vodPath === '') {
     throw new ConfigNotConfiguredError(`VOD path for tenant ${config.id}`);
   }
 
@@ -74,7 +74,7 @@ export function getVodFilePath(options: VodPathOptions): string {
 export function getVodDirPath(options: VodPathOptions): string {
   const { config, vodId } = options;
 
-  if (!config.settings.vodPath) {
+  if (config.settings.vodPath == null || config.settings.vodPath === '') {
     throw new ConfigNotConfiguredError(`VOD path for tenant ${config.id}`);
   }
 
@@ -88,7 +88,7 @@ export function getVodDirPath(options: VodPathOptions): string {
 export function getLiveFilePath(options: LivePathOptions): string {
   const { config, streamId } = options;
 
-  if (!config.settings.livePath) {
+  if (config.settings.livePath == null || config.settings.livePath === '') {
     throw new ConfigNotConfiguredError(`Live path for tenant ${config.id}`);
   }
 
@@ -102,7 +102,7 @@ export function getLiveFilePath(options: LivePathOptions): string {
 export function getLiveDirPath(options: LivePathOptions): string {
   const { config, streamId } = options;
 
-  if (!config.settings.livePath) {
+  if (config.settings.livePath == null || config.settings.livePath === '') {
     throw new ConfigNotConfiguredError(`Live path for tenant ${config.id}`);
   }
 

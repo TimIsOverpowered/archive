@@ -28,7 +28,7 @@ interface TwitchAuth {
 
 export async function getAppAccessToken(tenantId: string): Promise<string> {
   const cached = accessTokenCache.get(tenantId);
-  if (cached && cached.expiresAt > Date.now()) {
+  if (cached != null && cached.expiresAt > Date.now()) {
     return cached.token;
   }
 
@@ -37,7 +37,7 @@ export async function getAppAccessToken(tenantId: string): Promise<string> {
     throw new ConfigNotConfiguredError(`Twitch credentials for tenant ${tenantId}`);
   }
 
-  if (creds.accessToken && creds.expiryDate) {
+  if (creds.accessToken != null && creds.expiryDate != null && creds.expiryDate > 0) {
     const oneHourFromNow = Date.now() + 60 * 60 * 1000;
 
     if (creds.expiryDate > oneHourFromNow) {
@@ -74,7 +74,7 @@ export async function getAppAccessToken(tenantId: string): Promise<string> {
 
 export async function updateTwitchTokenInDb(tenantId: string, newToken: string, expiryDate: number): Promise<void> {
   const config = configService.get(tenantId);
-  if (!config?.twitch?.auth) {
+  if (config?.twitch?.auth == null) {
     return;
   }
 

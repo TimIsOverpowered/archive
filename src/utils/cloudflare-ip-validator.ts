@@ -49,7 +49,7 @@ export async function getCloudflareIpRanges(): Promise<CloudflareIpRanges | null
   if (client) {
     try {
       const cached = await client.get(CF_IP_RANGES_KEY);
-      if (cached) {
+      if (cached != null && cached !== '') {
         return JSON.parse(cached) as CloudflareIpRanges;
       }
     } catch {
@@ -75,16 +75,16 @@ export function isFromCloudflare(ip: string, ranges?: CloudflareIpRanges): boole
   try {
     const parsed = ipaddr.parse(ip);
     const ipKind = parsed.kind();
-    const cidrList = ranges ? (ipKind === 'ipv6' ? ranges.v6 : ranges.v4) : null;
+    const cidrList = ranges != null ? (ipKind === 'ipv6' ? ranges.v6 : ranges.v4) : null;
 
-    if (!cidrList || cidrList.length === 0) {
+    if (cidrList == null || cidrList.length === 0) {
       return false;
     }
 
     return cidrList.some((cidr) => {
       try {
         const [rangeIp, rangeMask] = cidr.split('/');
-        if (!rangeIp) return false;
+        if (rangeIp == null || rangeIp === '') return false;
         const rangeParsed = ipaddr.parse(rangeIp);
         if (rangeParsed.kind() !== ipKind) {
           return false;
@@ -110,13 +110,13 @@ export async function validateCloudflareRequest(request: {
     return true;
   }
 
-  const cfIp = request.headers['cf-connecting-ip'] as string;
-  if (!cfIp) {
+  const cfIp = request.headers['cf-connecting-ip'] as string | undefined;
+  if (cfIp == null || cfIp === '') {
     return true;
   }
 
   const remoteAddress = request.raw.socket?.remoteAddress;
-  if (!remoteAddress) {
+  if (remoteAddress == null || remoteAddress === '') {
     return true;
   }
 
@@ -143,7 +143,7 @@ export async function getCachedRangeInfo(): Promise<CloudflareCacheInfo | null> 
 
   try {
     const cached = await client.get(CF_IP_RANGES_KEY);
-    if (!cached) {
+    if (cached == null || cached === '') {
       return { status: 'missing' };
     }
 

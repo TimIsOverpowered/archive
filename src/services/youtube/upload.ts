@@ -81,7 +81,7 @@ export async function uploadVideo(
     });
 
     const videoId = response.data?.id;
-    if (!videoId) throw new Error('Upload completed but no video ID returned');
+    if (videoId == null) throw new Error('Upload completed but no video ID returned');
 
     logger.info(
       { component: 'youtube-upload', tenantId, videoId, uploadDuration: Date.now() - uploadStartTime },
