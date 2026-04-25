@@ -12,7 +12,7 @@ import { updateAlert } from '../utils/discord-alerts.js';
 import type { LiveDownloadJob } from './jobs/types.js';
 
 const liveProcessor: Processor<LiveDownloadJob, unknown, string> = async (
-  job: Job<LiveDownloadJob, unknown, string>,
+  job: Job<LiveDownloadJob, unknown, string>
 ) => {
   const ctx = await buildLiveProcessorContext(job);
 

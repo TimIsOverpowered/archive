@@ -37,7 +37,7 @@ export interface VodProcessorContext {
 }
 
 export async function buildVodProcessorContext(
-  job: Job<StandardVodJob, unknown, string>,
+  job: Job<StandardVodJob, unknown, string>
 ): Promise<VodProcessorContext> {
   const {
     dbId,
@@ -130,6 +130,6 @@ export async function sendVodCompletion(ctx: VodProcessorContext): Promise<void>
       platform: ctx.platform,
       tenantId: ctx.tenantId,
     },
-    'Job completed successfully',
+    'Job completed successfully'
   );
 }

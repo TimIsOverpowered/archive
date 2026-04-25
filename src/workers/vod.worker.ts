@@ -4,9 +4,7 @@ import { handleWorkerError } from './utils/error-handler.js';
 import { updateAlert } from '../utils/discord-alerts.js';
 import type { StandardVodJob } from './jobs/types.js';
 
-const vodProcessor: Processor<StandardVodJob, unknown, string> = async (
-  job: Job<StandardVodJob, unknown, string>,
-) => {
+const vodProcessor: Processor<StandardVodJob, unknown, string> = async (job: Job<StandardVodJob, unknown, string>) => {
   const ctx = await buildVodProcessorContext(job);
 
   try {

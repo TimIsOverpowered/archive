@@ -55,7 +55,7 @@ export interface LiveProcessorContext {
 }
 
 export async function buildLiveProcessorContext(
-  job: Job<LiveDownloadJob, unknown, string>,
+  job: Job<LiveDownloadJob, unknown, string>
 ): Promise<LiveProcessorContext> {
   const { dbId, vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl } = job.data;
   const log = createAutoLogger(tenantId);
@@ -128,7 +128,7 @@ export async function runDownload(ctx: LiveProcessorContext): Promise<LiveDownlo
 
 export async function runFinalization(
   ctx: LiveProcessorContext,
-  downloadResult: LiveDownloadResult,
+  downloadResult: LiveDownloadResult
 ): Promise<number | null> {
   const actualDuration = await getDuration(downloadResult.finalMp4Path);
   await finalizeVod({
@@ -144,7 +144,7 @@ export async function runFinalization(
 export async function runPostProcessing(
   ctx: LiveProcessorContext,
   downloadResult: LiveDownloadResult,
-  actualDuration: number | null,
+  actualDuration: number | null
 ): Promise<LiveCompletionData> {
   let emotesSaved = false;
   let chatJobId: string | null = null;
@@ -169,7 +169,7 @@ export async function runPostProcessing(
       ctx.vodId,
       ctx.platform,
       actualDuration != null ? Math.round(actualDuration) : 0,
-      ctx.platformUsername,
+      ctx.platformUsername
     );
     if (chatJobId != null) {
       await updateAlert(ctx.messageId, ctx.alerts.chatQueued(ctx.vodId));
@@ -209,11 +209,11 @@ export async function runPostProcessing(
 export async function sendCompletionAlert(
   ctx: LiveProcessorContext,
   completionData: LiveCompletionData,
-  actualDuration: number | null,
+  actualDuration: number | null
 ): Promise<void> {
   await updateAlert(
     ctx.messageId,
-    ctx.alerts.complete(ctx.vodId, actualDuration != null ? Math.round(actualDuration) : undefined, completionData),
+    ctx.alerts.complete(ctx.vodId, actualDuration != null ? Math.round(actualDuration) : undefined, completionData)
   );
 
   await ctx.job.updateProgress(100);
