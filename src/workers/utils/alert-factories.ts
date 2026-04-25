@@ -7,15 +7,7 @@ import { toHHMMSS } from '../../utils/formatting.js';
 import type { RichEmbedData } from '../../utils/discord-alerts.js';
 import { createProgressBar } from '../../utils/discord-alerts.js';
 import { capitalizePlatform, Platform } from '../../types/platforms.js';
-
-export interface LiveCompletionData {
-  emotesSaved: boolean;
-  chatJobId: string | null;
-  youtubeVodJobId: string | null;
-  youtubeGameJobIds: string[];
-  segmentCount: number;
-  finalPath: string;
-}
+import type { LiveCompletionData } from '../live.worker.phases.js';
 
 // ============================================================================
 // VOD Worker Alerts
