@@ -22,6 +22,13 @@ export function createLogger(opts: { level: string; isProduction: boolean }): pi
       level: opts.level,
       customLevels: { metric: 35 },
       redact: ['headers.authorization', 'headers.cookie'],
+      serializers: {
+        req: (request: pino.SerializedRequest) => ({
+          method: request.method,
+          url: request.url,
+        }),
+        res: (reply: { statusCode: number }) => ({ statusCode: reply.statusCode }),
+      },
       mixin: () => {
         const ctx = { reqId: getRequestId(), tenantId: getTenantId(), displayName: getDisplayName() };
         return Object.fromEntries(Object.entries(ctx).filter(([, v]) => v != null));

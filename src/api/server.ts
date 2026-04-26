@@ -11,7 +11,7 @@ import { getApiConfig } from '../config/env.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { HttpError } from '../utils/http-error.js';
 import { getLogger, createLogger, setGlobalLogger } from '../utils/logger.js';
-import type { FastifyBaseLogger as _FastifyBaseLogger, FastifyBaseLogger } from 'fastify';
+import type { FastifyBaseLogger } from 'fastify';
 import healthRoutes from './routes/health.js';
 import vodsRoutes from './routes/vods.js';
 import logsRoutes from './routes/logs.js';
@@ -57,7 +57,7 @@ export async function buildServer() {
   const fastify = Fastify({
     bodyLimit: BODY_LIMIT,
     exposeHeadRoutes: true,
-    loggerInstance: logger as FastifyBaseLogger,
+    loggerInstance: logger as unknown as FastifyBaseLogger,
     trustProxy: true,
   });
 

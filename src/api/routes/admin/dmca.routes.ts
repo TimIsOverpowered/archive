@@ -75,7 +75,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
               description: 'Optional part number (1-indexed) to process only a specific part of the VOD',
             },
             platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Source platform' },
-            type: { type: 'string', enum: SOURCE_TYPES_VALUES },
+            type: { type: 'string', enum: SOURCE_TYPES_VALUES, default: SOURCE_TYPES.VOD },
             downloadMethod: {
               type: 'string',
               enum: DOWNLOAD_METHODS_VALUES,
