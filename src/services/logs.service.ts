@@ -9,6 +9,7 @@ import { extractErrorDetails } from '../utils/error.js';
 import { badRequest } from '../utils/http-error.js';
 import { LOGS_PAGE_SIZE, LOGS_DEFAULT_BUCKET_SIZE, LOGS_TARGET_COMMENTS_PER_BUCKET } from '../constants.js';
 import { simpleKeys } from '../utils/cache-keys.js';
+import { withSimpleCache } from '../utils/cache.js';
 import { VodNotFoundError } from '../utils/domain-errors.js';
 
 const BOUNDARIES = [30, 60, 90, 120, 180, 300, 600, 900, 1800, 3600];
@@ -27,43 +28,28 @@ function computeBucketSize(commentsPer100s: number): number {
 async function getVodBucketSize(db: Kysely<StreamerDB>, tenantId: string, vodId: number): Promise<number> {
   const key = simpleKeys.bucketSize(tenantId, vodId);
 
-  const redis = RedisService.getActiveClient();
-  if (redis) {
-    try {
-      const cached = await redis.get(key);
-      if (cached != null && cached !== '') {
-        getLogger().debug({ vodId }, '[CACHE HIT] bucketSize');
-        return parseInt(cached, 10);
-      }
-    } catch {
-      // fall through to DB query
+  return withSimpleCache(
+    key,
+    getApiConfig().CHAT_BUCKET_SIZE_TTL,
+    (v) => v.toString(),
+    (s) => parseInt(s, 10),
+    async () => {
+      const result = await db
+        .selectFrom('chat_messages')
+        .select(
+          sql<number>`
+          COUNT(*) / NULLIF(MAX(content_offset_seconds) - MIN(content_offset_seconds), 0) * 100
+        `.as('comments_per_100s')
+        )
+        .where('vod_id', '=', vodId)
+        .executeTakeFirst();
+
+      const commentsPer100sValue = parseFloat(String(result?.comments_per_100s ?? ''));
+      return isFinite(commentsPer100sValue)
+        ? computeBucketSize(commentsPer100sValue)
+        : LOGS_DEFAULT_BUCKET_SIZE;
     }
-  }
-
-  const result = await db
-    .selectFrom('chat_messages')
-    .select(
-      sql<number>`
-      COUNT(*) / NULLIF(MAX(content_offset_seconds) - MIN(content_offset_seconds), 0) * 100
-    `.as('comments_per_100s')
-    )
-    .where('vod_id', '=', vodId)
-    .executeTakeFirst();
-
-  const commentsPer100sValue = parseFloat(String(result?.comments_per_100s ?? ''));
-  const bucketSize = isFinite(commentsPer100sValue)
-    ? computeBucketSize(commentsPer100sValue)
-    : LOGS_DEFAULT_BUCKET_SIZE;
-
-  if (redis) {
-    try {
-      await redis.set(key, bucketSize.toString(), 'EX', getApiConfig().CHAT_BUCKET_SIZE_TTL);
-    } catch {
-      // Ignore cache errors
-    }
-  }
-
-  return bucketSize;
+  );
 }
 
 /**

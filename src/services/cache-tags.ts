@@ -2,7 +2,7 @@ import { RedisService } from '../utils/redis-service.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
-import { MAX_CACHE_PAGES } from '../constants.js';
+import { MAX_CACHE_PAGES, CACHE_TAG_TTL_BUFFER_MS } from '../constants.js';
 import { isConnectionError } from '../db/utils/errors.js';
 import { CacheKeys } from '../utils/cache-keys.js';
 import { HttpError } from '../utils/http-error.js';
@@ -52,7 +52,7 @@ export async function registerVodTags(
     return;
   }
 
-  const tagTtlMs = ttl * 1000 + 60_000;
+  const tagTtlMs = ttl * 1000 + CACHE_TAG_TTL_BUFFER_MS;
 
   try {
     const CHUNK_SIZE = 50;

@@ -35,10 +35,12 @@ interface ExistingVodInfo {
   started_at?: Date | null;
 }
 
-type NewLiveContext = LiveStreamContext;
-
+// ExistingVodLiveContext: stream came back online on an existing VOD that was marked is_live=false.
+// Only needs id and vod_id — the VOD hasn't started a new session yet.
 type ExistingVodLiveContext = LiveStreamContext & { existingVod: { id: number; vod_id: string } };
 
+// AlreadyLiveContext: stream is currently live on an existing VOD.
+// Has full ExistingVodInfo including started_at for queueing the download with the correct timestamp.
 type AlreadyLiveContext = LiveStreamContext & { existingVod: ExistingVodInfo };
 
 export async function handlePlatformLiveCheck(
@@ -157,7 +159,7 @@ async function handleLiveStream(ctx: LiveStreamContext): Promise<void> {
   });
 }
 
-async function handleNewLiveStream(ctx: NewLiveContext): Promise<void> {
+async function handleNewLiveStream(ctx: LiveStreamContext): Promise<void> {
   ctx.log.info({ component: 'monitor', streamId: ctx.streamStatus.id }, 'New live detected, checking for VOD object');
 
   const metadataCtx = { tenantId: ctx.tenantId, config: ctx.config, platform: ctx.platform };

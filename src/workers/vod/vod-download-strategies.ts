@@ -4,6 +4,7 @@ import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
 import { createVodWorkerAlerts } from '../utils/alert-factories.js';
 import { initRichAlert, updateAlert } from '../../utils/discord-alerts.js';
 import type { AppLogger } from '../../utils/logger.js';
+import { getLogger } from '../../utils/logger.js';
 import type { TenantConfig } from '../../config/types.js';
 import { getDisplayName } from '../../config/types.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
@@ -27,7 +28,11 @@ async function withVodAlerts<T>(
   const messageId = await initRichAlert(alerts.init(vodId, platform, displayName));
   try {
     const result = await fn(messageId, (pct) => {
-      if (messageId !== null) void updateAlert(messageId, alerts.progress(vodId, `Converting ${vodId} (${pct}%)`));
+      if (messageId !== null) {
+        updateAlert(messageId, alerts.progress(vodId, `Converting ${vodId} (${pct}%)`)).catch((err) => {
+          getLogger().debug({ err: extractErrorDetails(err) }, 'Progress alert update failed');
+        });
+      }
     });
     if (messageId !== null) await updateAlert(messageId, alerts.complete(vodId, platform, ''));
     return result;

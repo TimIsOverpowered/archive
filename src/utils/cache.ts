@@ -274,3 +274,41 @@ async function clearSwrFailureCount(
     SWR_FAILURES.delete(failureKey);
   }
 }
+
+/**
+ * Simple cache with automatic read-fallback-write for scalar values.
+ * Gets Redis client, tries to read and deserialize from cache, falls back to fetcher on miss/error,
+ * then writes the result back to cache with the given TTL.
+ */
+export async function withSimpleCache<T>(
+  key: string,
+  ttl: number,
+  serialize: (v: T) => string,
+  deserialize: (s: string) => T,
+  fetcher: () => Promise<T>
+): Promise<T> {
+  const client = RedisService.getActiveClient();
+  if (!client) return fetcher();
+
+  try {
+    const cached = await client.get(key);
+    if (cached != null && cached !== '') {
+      getLogger().debug({ key }, 'Simple cache hit');
+      return deserialize(cached);
+    }
+  } catch (err) {
+    const details = extractErrorDetails(err);
+    getLogger().warn({ err: details, key }, 'Simple cache read failed, falling back to fetcher');
+  }
+
+  const result = await fetcher();
+
+  try {
+    await client.set(key, serialize(result), 'EX', ttl);
+  } catch (err) {
+    const details = extractErrorDetails(err);
+    getLogger().warn({ err: details, key }, 'Simple cache write failed');
+  }
+
+  return result;
+}

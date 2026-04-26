@@ -12,27 +12,36 @@ export function setLoggerConfig(opts: { level: string; isProduction: boolean }):
   _logger = null;
 }
 
+export function setGlobalLogger(logger: pino.Logger): void {
+  _logger = logger;
+}
+
+export function createLogger(opts: { level: string; isProduction: boolean }): pino.Logger {
+  return pino(
+    {
+      level: opts.level,
+      customLevels: { metric: 35 },
+      redact: ['headers.authorization', 'headers.cookie'],
+      mixin: () => {
+        const ctx = { reqId: getRequestId(), tenantId: getTenantId(), displayName: getDisplayName() };
+        return Object.fromEntries(Object.entries(ctx).filter(([, v]) => v != null));
+      },
+    },
+    opts.isProduction
+      ? undefined
+      : pretty({
+          colorize: true,
+          translateTime: 'mmmm dd yyyy HH:mm:ss',
+          ignore: 'pid,hostname,tenant,reqId',
+          singleLine: false,
+        })
+  ) as unknown as pino.Logger;
+}
+
 export function getLogger(): pino.Logger {
   if (!_logger) {
     _loggerConfig ??= { level: 'info', isProduction: false };
-    _logger = pino(
-      {
-        level: _loggerConfig.level,
-        customLevels: { metric: 35 },
-        mixin: () => {
-          const ctx = { reqId: getRequestId(), tenantId: getTenantId(), displayName: getDisplayName() };
-          return Object.fromEntries(Object.entries(ctx).filter(([, v]) => v != null));
-        },
-      },
-      _loggerConfig.isProduction
-        ? undefined
-        : pretty({
-            colorize: true,
-            translateTime: 'mmmm dd yyyy HH:mm:ss',
-            ignore: 'pid,hostname,tenant,reqId',
-            singleLine: false,
-          })
-    ) as unknown as pino.Logger;
+    _logger = createLogger(_loggerConfig);
   }
   return _logger;
 }

@@ -98,3 +98,7 @@ export function clearCircuit(key: string): void {
 export function clearAllCircuits(): void {
   breakerCache.clear();
 }
+
+export function resetAllBreakers(): void {
+  breakerCache.clear();
+}

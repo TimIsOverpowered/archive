@@ -73,32 +73,26 @@ export class ConfigService {
     });
   }
 
-  private getCache(): LRUCache<string, TenantConfig> {
-    return this.cache;
-  }
-
   async loadAll(): Promise<TenantConfig[]> {
     await initMetaClient();
     const tenants = await getAllTenants();
     if (tenants.length === 0) return [];
 
-    const cache = this.getCache();
     for (const tenant of tenants) {
       const config = buildTenantConfig(tenant);
       if (!config) continue;
-      cache.set(config.id, config);
+      this.cache.set(config.id, config);
     }
 
-    return Array.from(cache.values());
+    return Array.from(this.cache.values());
   }
 
   get(tenantId: string): TenantConfig | undefined {
-    return this.getCache().get(tenantId);
+    return this.cache.get(tenantId);
   }
 
   getAll(): TenantConfig[] {
-    const cache = this.getCache();
-    return Array.from(cache.values());
+    return Array.from(this.cache.values());
   }
 
   /**
@@ -114,9 +108,8 @@ export class ConfigService {
    * without hitting the database.
    */
   seed(configs: TenantConfig[]): void {
-    const cache = this.getCache();
     for (const config of configs) {
-      cache.set(config.id, config);
+      this.cache.set(config.id, config);
     }
   }
 
@@ -129,7 +122,7 @@ export class ConfigService {
    * code holds a reference to the cached TenantConfig.
    */
   updateTwitchAuth(tenantId: string, encryptedAuth: string): void {
-    const config = this.getCache().get(tenantId);
+    const config = this.cache.get(tenantId);
     if (config?.twitch?.auth == null) return;
     config.twitch.auth = encryptedAuth;
   }
@@ -143,7 +136,7 @@ export class ConfigService {
    * code holds a reference to the cached TenantConfig.
    */
   updateYoutubeAuth(tenantId: string, encryptedAuth: string): void {
-    const config = this.getCache().get(tenantId);
+    const config = this.cache.get(tenantId);
     if (config?.youtube?.auth == null) return;
     const decryptedAuth = decryptScalar(encryptedAuth);
     config.youtube.auth = decryptedAuth;

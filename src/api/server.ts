@@ -10,7 +10,8 @@ import createTenantLoggerMiddleware, { exitTenantContext } from './middleware/te
 import { getApiConfig } from '../config/env.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { HttpError } from '../utils/http-error.js';
-import { getLogger } from '../utils/logger.js';
+import { getLogger, createLogger, setGlobalLogger } from '../utils/logger.js';
+import type { FastifyBaseLogger } from 'fastify';
 import healthRoutes from './routes/health.js';
 import vodsRoutes from './routes/vods.js';
 import logsRoutes from './routes/logs.js';
@@ -50,21 +51,13 @@ function formatErrorResponse(error: unknown): FormattedError {
 export async function buildServer() {
   const config = getApiConfig();
 
+  const logger = createLogger({ level: config.LOG_LEVEL, isProduction: config.NODE_ENV === 'production' });
+  setGlobalLogger(logger);
+
   const fastify = Fastify({
     bodyLimit: BODY_LIMIT,
     exposeHeadRoutes: true,
-    logger: {
-      level: config.LOG_LEVEL,
-      redact: ['headers.authorization', 'headers.cookie'],
-      ...(config.NODE_ENV !== 'production'
-        ? {
-            transport: {
-              target: 'pino-pretty',
-              options: { translateTime: 'HH:MM:ss Z', ignore: 'pid,hostname' },
-            },
-          }
-        : {}),
-    },
+    logger: logger as FastifyBaseLogger,
     trustProxy: true,
     routerOptions: {
       ignoreTrailingSlash: true,

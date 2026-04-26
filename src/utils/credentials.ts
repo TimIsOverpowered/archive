@@ -4,6 +4,8 @@ import { createAutoLogger } from './auto-tenant-logger.js';
 import { extractErrorDetails } from './error.js';
 import type { TwitchAuthObject } from '../config/schemas.js';
 
+const loggerCache = new Map<string, ReturnType<typeof createAutoLogger>>();
+
 export interface TwitchCredentials {
   clientId: string;
   clientSecret: string;
@@ -16,7 +18,12 @@ export interface TwitchCredentials {
  * Returns null if not configured or decryption fails.
  */
 export function getTwitchCredentials(tenantId: string): TwitchCredentials | null {
-  const log = createAutoLogger(tenantId);
+  let log = loggerCache.get(tenantId);
+  if (log == null) {
+    log = createAutoLogger(tenantId);
+    loggerCache.set(tenantId, log);
+  }
+
   const config = configService.get(tenantId);
 
   if (config?.twitch?.auth == null) {

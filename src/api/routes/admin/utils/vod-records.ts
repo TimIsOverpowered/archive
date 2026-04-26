@@ -12,10 +12,10 @@ import { getStrategy } from '../../../../services/platforms/index.js';
 import { getPlatformConfig, type PlatformConfig } from '../../../../config/types.js';
 
 /**
- * Validates and extracts platform configuration from context
- * Returns null if platform is not configured for tenant
+ * Extracts platform identifiers from tenant config.
+ * Returns null if platform is not configured for tenant.
  */
-function validatePlatformConfig(
+function extractPlatformConfig(
   ctx: TenantPlatformContext,
   platform: Platform
 ): { platformUserId: string; platformUsername: string; platformCfg: PlatformConfig } | null {
@@ -77,7 +77,7 @@ export async function ensureVodRecord(
 ): Promise<VodRecord | null> {
   const { db, tenantId, platform } = ctx;
 
-  const platformConfig = validatePlatformConfig(ctx, platform);
+  const platformConfig = extractPlatformConfig(ctx, platform);
   if (!platformConfig) {
     return null;
   }

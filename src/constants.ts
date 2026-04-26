@@ -36,6 +36,9 @@ export const MAX_CACHE_PAGES = 10; // cap paginated list cache to prevent tag ex
 // ── Cache Stale-While-Revalidate ────────────────────────────────────────────
 export const VOD_DETAILS_STALE_RATIO = 0.8; // Revalidate when 80% of TTL has elapsed
 
+// ── Cache Tag TTL Buffer ────────────────────────────────────────────────────
+export const CACHE_TAG_TTL_BUFFER_MS = 60_000; // 1 minute grace period past cache TTL
+
 // ── Cache SWR Failure Tracking ──────────────────────────────────────────────
 export const SWR_FAILURES_TTL_MS = 5 * 60 * 1000; // 5 minutes
 export const SWR_FAILURES_TTL_SECONDS = 300; // 5 minutes in seconds

@@ -41,6 +41,8 @@ export default function createRateLimitMiddleware(options: RateLimitOptions) {
       if (rateLimitError instanceof RateLimiterRes) {
         const retryAfter = Math.ceil(rateLimitError.msBeforeNext / 1000);
 
+        reply.header('Retry-After', String(retryAfter));
+
         return reply.status(429).send({
           statusCode: 429,
           message: 'Too Many Requests',
