@@ -8,3 +8,8 @@ process.env.LOG_LEVEL = 'info';
 process.env.YOUTUBE_CLIENT_ID = 'test-youtube-client-id';
 process.env.YOUTUBE_CLIENT_SECRET = 'test-youtube-client-secret';
 process.env.VOD_PATH = '/tmp/test-vods';
+
+// Mock global fetch to prevent real HTTP requests in tests.
+// This affects all modules using fetch (http-client, etc.).
+globalThis.fetch = async () =>
+  new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } });
