@@ -2,6 +2,68 @@ import { mock } from 'node:test';
 import { RedisService } from '../../src/utils/redis-service.js';
 import { poolManager, resetClientManager } from '../../src/db/streamer-client.js';
 import { resetEnvConfig } from '../../src/config/env.js';
+import type { TenantConfig, TwitchConfig, YouTubeConfig, KickConfig, TenantSettings, DatabaseConfig } from '../../src/config/types.js';
+
+export interface MockTenantConfigOverrides {
+  id?: string;
+  displayName?: string;
+  createdAt?: Date;
+  twitch?: Partial<TwitchConfig>;
+  youtube?: Partial<YouTubeConfig>;
+  kick?: Partial<KickConfig>;
+  database?: Partial<DatabaseConfig>;
+  settings?: Partial<TenantSettings>;
+}
+
+export function createMockTenantConfig(overrides: MockTenantConfigOverrides = {}): TenantConfig {
+  return {
+    id: overrides.id ?? 'test-tenant',
+    displayName: overrides.displayName ?? 'Test Tenant',
+    createdAt: overrides.createdAt ?? new Date(),
+    twitch: {
+      enabled: false,
+      mainPlatform: false,
+      auth: undefined,
+      username: undefined,
+      id: undefined,
+      ...(overrides.twitch ?? {}),
+    },
+    youtube: {
+      public: false,
+      upload: false,
+      vodUpload: false,
+      liveUpload: false,
+      multiTrack: false,
+      splitDuration: 60,
+      perGameUpload: false,
+      restrictedGames: [],
+      description: '',
+      auth: '',
+      ...(overrides.youtube ?? {}),
+    },
+    kick: {
+      enabled: false,
+      mainPlatform: false,
+      id: undefined,
+      username: undefined,
+      ...(overrides.kick ?? {}),
+    },
+    database: {
+      url: 'postgresql://test:test@localhost:5432/test',
+      ...(overrides.database ?? {}),
+    },
+    settings: {
+      domainName: overrides.settings?.domainName ?? 'test.example.com',
+      timezone: overrides.settings?.timezone ?? 'UTC',
+      saveMP4: overrides.settings?.saveMP4 ?? false,
+      saveHLS: overrides.settings?.saveHLS ?? false,
+      vodDownload: overrides.settings?.vodDownload ?? true,
+      chatDownload: overrides.settings?.chatDownload ?? true,
+      vodPath: overrides.settings?.vodPath ?? undefined,
+      livePath: overrides.settings?.livePath ?? undefined,
+    },
+  };
+}
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 

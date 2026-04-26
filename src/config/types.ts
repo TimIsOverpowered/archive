@@ -1,4 +1,15 @@
+import type {
+  TwitchConfig as _TwitchConfig,
+  YouTubeConfig as _YouTubeConfig,
+  KickConfig as _KickConfig,
+  TenantSettings as _TenantSettings,
+} from './schemas.js';
 import { Platform } from '../types/platforms.js';
+
+export type TwitchConfig = _TwitchConfig;
+export type YouTubeConfig = _YouTubeConfig;
+export type KickConfig = _KickConfig;
+export type TenantSettings = _TenantSettings;
 
 export interface TenantBase {
   id: string;
@@ -6,49 +17,9 @@ export interface TenantBase {
   createdAt: Date;
 }
 
-export interface TwitchConfig {
-  enabled: boolean;
-  auth?: string | undefined;
-  username?: string | undefined;
-  mainPlatform?: boolean | undefined;
-  id?: string | undefined;
-}
-
-export interface YouTubeConfig {
-  auth?: string | undefined;
-  public: boolean;
-  upload: boolean;
-  vodUpload: boolean;
-  liveUpload: boolean;
-  multiTrack: boolean;
-  apiKey?: string | undefined;
-  splitDuration: number;
-  perGameUpload: boolean;
-  restrictedGames: (string | null)[];
-  description: string;
-}
-
-export interface KickConfig {
-  id?: string | undefined;
-  enabled: boolean;
-  username?: string | undefined;
-  mainPlatform?: boolean | undefined;
-}
-
 export interface DatabaseConfig {
   url: string;
   connectionLimit?: number;
-}
-
-export interface TenantSettings {
-  vodPath?: string | undefined;
-  livePath?: string | undefined;
-  vodDownload?: boolean | undefined;
-  chatDownload?: boolean | undefined;
-  domainName: string;
-  timezone: string;
-  saveMP4: boolean;
-  saveHLS: boolean;
 }
 
 export interface TenantConfig extends TenantBase {

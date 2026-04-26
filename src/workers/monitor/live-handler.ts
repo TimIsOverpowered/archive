@@ -352,10 +352,10 @@ export async function enqueueLiveHlsDownload(params: {
       'Attempting to enqueue Live HLS download job'
     );
 
-    const { jobId, isNew } = await enqueueJobWithLogging(
+    const { jobId, isNew } = await enqueueJobWithLogging({
       queue,
-      `${LIVE_JOB_ID_PREFIX}download`,
-      {
+      jobName: `${LIVE_JOB_ID_PREFIX}download`,
+      data: {
         dbId: params.dbId,
         vodId: params.vodId,
         platform: params.platform,
@@ -365,7 +365,7 @@ export async function enqueueLiveHlsDownload(params: {
         startedAt: params.startedAt.toISOString(),
         sourceUrl: params.sourceUrl,
       } satisfies LiveDownloadJob,
-      {
+      options: {
         jobId: `${LIVE_JOB_ID_PREFIX}${params.vodId}`,
         attempts: 10,
         backoff: { type: 'exponential' as const, delay: 5000 },
@@ -373,10 +373,10 @@ export async function enqueueLiveHlsDownload(params: {
         removeOnComplete: true,
         removeOnFail: true,
       },
-      { info: log.info.bind(log), debug: log.debug.bind(log) },
-      'Live HLS download job enqueued successfully',
-      { dbId: params.dbId, vodId: params.vodId, platform: params.platform, queueName: 'vod_live' }
-    );
+      logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
+      successMessage: 'Live HLS download job enqueued successfully',
+      extraContext: { dbId: params.dbId, vodId: params.vodId, platform: params.platform, queueName: 'vod_live' },
+    });
 
     if (isNew) {
       log.debug({ component: 'monitor', vodId: params.vodId, jobId }, 'Job was newly added to queue');

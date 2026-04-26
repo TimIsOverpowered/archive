@@ -116,6 +116,11 @@ export const TwitchSchema = z.object({
     .transform((val) => val ?? undefined),
 });
 
+export type TwitchConfig = z.infer<typeof TwitchSchema>;
+export type YouTubeConfig = z.infer<typeof YoutubeSchema>;
+export type KickConfig = z.infer<typeof KickSchema>;
+export type TenantSettings = z.infer<typeof SettingsSchema>;
+
 /** Kick platform configuration for a tenant. */
 export const KickSchema = z.object({
   /** Enable Kick streaming (default: false) */

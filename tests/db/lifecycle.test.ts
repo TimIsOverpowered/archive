@@ -3,36 +3,16 @@ import assert from 'node:assert';
 import { poolManager, withDbRetry, resetClientManager, createClient, ensureClient } from '../../src/db/streamer-client.js';
 import { isConnectionError } from '../../src/db/utils/errors.js';
 import type { TenantConfig } from '../../src/config/types.js';
+import { createMockTenantConfig } from '../helpers/worker-test-setup.js';
 
-const createMockConfig = (id: string): TenantConfig => ({
+const createMockConfig = (id: string): TenantConfig => createMockTenantConfig({
   id,
   displayName: id,
-  createdAt: new Date(),
   database: {
     url: `postgresql://test:test@localhost:5432/${id}`,
   },
   settings: {
     domainName: `${id}.example.com`,
-    timezone: 'UTC',
-    saveMP4: false,
-    saveHLS: false,
-  },
-  youtube: {
-    public: false,
-    upload: false,
-    vodUpload: false,
-    liveUpload: false,
-    multiTrack: false,
-    splitDuration: 60,
-    perGameUpload: false,
-    restrictedGames: [],
-    description: '',
-  },
-  twitch: {
-    enabled: false,
-  },
-  kick: {
-    enabled: false,
   },
 });
 
