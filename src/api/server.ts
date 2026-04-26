@@ -57,7 +57,7 @@ export async function buildServer() {
   const fastify = Fastify({
     bodyLimit: BODY_LIMIT,
     exposeHeadRoutes: true,
-    logger: logger as FastifyBaseLogger,
+    loggerInstance: logger as FastifyBaseLogger,
     trustProxy: true,
     routerOptions: {
       ignoreTrailingSlash: true,
