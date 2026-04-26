@@ -11,7 +11,7 @@ import { getApiConfig } from '../config/env.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { HttpError } from '../utils/http-error.js';
 import { getLogger, createLogger, setGlobalLogger } from '../utils/logger.js';
-import type { FastifyBaseLogger } from 'fastify';
+import type { FastifyBaseLogger as _FastifyBaseLogger, FastifyBaseLogger } from 'fastify';
 import healthRoutes from './routes/health.js';
 import vodsRoutes from './routes/vods.js';
 import logsRoutes from './routes/logs.js';
@@ -59,9 +59,6 @@ export async function buildServer() {
     exposeHeadRoutes: true,
     loggerInstance: logger as FastifyBaseLogger,
     trustProxy: true,
-    routerOptions: {
-      ignoreTrailingSlash: true,
-    },
   });
 
   // Set error handler immediately after creating instance (before any plugins/routes)
@@ -92,8 +89,9 @@ export async function buildServer() {
   // Add tenant display name to logger for routes with streamer ID
   const tenantLoggerMiddleware = createTenantLoggerMiddleware();
   fastify.addHook('preHandler', tenantLoggerMiddleware);
-  fastify.addHook('onResponse', () => {
+  fastify.addHook('onResponse', (_request, _reply, done) => {
     exitTenantContext();
+    done();
   });
 
   // Request ID propagation
