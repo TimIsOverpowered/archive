@@ -42,6 +42,13 @@
  *
  * Deployment on Linux:
  *   npm install && npm run start:pm2
+ *
+ * Log rotation (pm2-logrotate):
+ *   pm2 install pm2-logrotate
+ *   pm2 set pm2-logrotate:rotate_interval daily
+ *   pm2 set pm2-logrotate:retain 7
+ *   pm2 set pm2-logrotate:compress true
+ *   pm2 set pm2-logrotate:max_size 100M
  */
 
 module.exports = {
