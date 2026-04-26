@@ -3,20 +3,20 @@ import { describe, it } from 'node:test';
 import { tenantMiddleware, platformValidationMiddleware, asTenantPlatformContext } from '../../../src/api/middleware/tenant-platform.js';
 import { PLATFORMS } from '../../../src/types/platforms.js';
 
-function createMockReply(statusCode = 200, body: any = null): any {
+function createMockReply(statusCode = 200, _body: any = null): any {
   const headers: Record<string, string> = {};
   let sentBody: any = null;
   let sentStatus = statusCode;
 
   return {
-    header: (key: string, value: string) => {
+    header: function (key: string, value: string) {
       headers[key] = value;
       return this;
     },
-    status: (code: number) => {
+    status: function (code: number) {
       sentStatus = code;
       return {
-        send: (b: any) => {
+        send: function (b: any) {
           sentBody = b;
           return this;
         },
@@ -68,7 +68,7 @@ describe('tenantMiddleware', () => {
 
   it('should return 503 when database client fails to initialize', async () => {
     // Register a tenant config first
-    const { configService } = await import('../../../src/config/tenant-config.js');
+    const { configService: _configService } = await import('../../../src/config/tenant-config.js');
 
     // This test will skip since we can't easily mock the DB without a real config
     // The 404 case above covers the main path for unregistered tenants

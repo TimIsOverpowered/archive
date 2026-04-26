@@ -82,7 +82,6 @@ describe('extractErrorDetails', () => {
     const zodErr = new ZodError([
       {
         code: 'custom',
-        expected: 'string',
         path: [],
         message: 'Root level validation failed',
         input: null,

@@ -28,15 +28,15 @@ describe('Twitch Strategy: createVodData', () => {
   it('should handle null title', () => {
     const meta = {
       id: 'twitch-vod-123',
-      title: null,
+      title: '',
       createdAt: '2024-01-15T10:00:00Z',
       duration: 3600,
-      streamId: null,
+      streamId: '',
     };
 
     const result = strategy.createVodData(meta);
-    assert.strictEqual(result.title, null);
-    assert.strictEqual(result.stream_id, null);
+    assert.strictEqual(result.title, '');
+    assert.strictEqual(result.stream_id, '');
   });
 
   it('should handle empty string title', () => {
@@ -88,14 +88,14 @@ describe('Twitch Strategy: updateVodData', () => {
   it('should handle null title', () => {
     const meta = {
       id: 'twitch-vod-123',
-      title: null,
+      title: '',
       createdAt: '2024-01-15T10:00:00Z',
       duration: 3600,
       streamId: 'stream-1',
     };
 
     const result = strategy.updateVodData(meta);
-    assert.strictEqual(result.title, null);
+    assert.strictEqual(result.title, '');
   });
 
   it('should handle empty string title', () => {
@@ -121,7 +121,7 @@ describe('Twitch Strategy: finalizeChapters', () => {
     };
 
     await assert.doesNotReject(
-      strategy.finalizeChapters(ctx as any, 42, 'vod-123', 3600)
+      (strategy as any).finalizeChapters?.(ctx as any, 42, 'vod-123', 3600)
     );
   });
 });

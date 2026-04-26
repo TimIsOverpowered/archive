@@ -48,8 +48,8 @@ describe('CacheInvalidator: publishVodUpdate', () => {
   it('should publish VOD_UPDATED event', async () => {
     await publishVodUpdate('tenant-1', 42);
     assert.strictEqual(publishCalls.length, 1);
-    assert.strictEqual(publishCalls[0].channel, 'cache:vod');
-    const event = JSON.parse(publishCalls[0].message);
+    assert.strictEqual(publishCalls[0]?.channel, 'cache:vod');
+    const event = JSON.parse(publishCalls[0]?.message);
     assert.strictEqual(event.type, 'VOD_UPDATED');
     assert.strictEqual(event.tenantId, 'tenant-1');
     assert.strictEqual(event.dbId, 42);
@@ -64,12 +64,12 @@ describe('CacheInvalidator: publishVodUpdate', () => {
 
   it('should use correct Redis channel', async () => {
     await publishVodUpdate('tenant-1', 42);
-    assert.strictEqual(publishCalls[0].channel, 'cache:vod');
+    assert.strictEqual(publishCalls[0]?.channel, 'cache:vod');
   });
 
   it('should publish correct event structure', async () => {
     await publishVodUpdate('tenant-2', 999);
-    const event = JSON.parse(publishCalls[0].message);
+    const event = JSON.parse(publishCalls[0]?.message ?? '');
     assert.ok('type' in event);
     assert.ok('tenantId' in event);
     assert.ok('dbId' in event);
@@ -110,8 +110,8 @@ describe('CacheInvalidator: publishVodDurationUpdate', () => {
   it('should publish VOD_DURATION_UPDATED event with duration', async () => {
     await publishVodDurationUpdate('tenant-1', 42, 3600, false);
     assert.strictEqual(publishCalls.length, 1);
-    assert.strictEqual(publishCalls[0].channel, 'cache:vod');
-    const event = JSON.parse(publishCalls[0].message);
+    assert.strictEqual(publishCalls[0]?.channel, 'cache:vod');
+    const event = JSON.parse(publishCalls[0]?.message ?? '');
     assert.strictEqual(event.type, 'VOD_DURATION_UPDATED');
     assert.strictEqual(event.tenantId, 'tenant-1');
     assert.strictEqual(event.dbId, 42);
@@ -121,7 +121,7 @@ describe('CacheInvalidator: publishVodDurationUpdate', () => {
 
   it('should publish with is_live: true', async () => {
     await publishVodDurationUpdate('tenant-1', 42, 7200, true);
-    const event = JSON.parse(publishCalls[0].message);
+    const event = JSON.parse(publishCalls[0]?.message ?? '');
     assert.strictEqual(event.type, 'VOD_DURATION_UPDATED');
     assert.strictEqual(event.duration, 7200);
     assert.strictEqual(event.is_live, true);
@@ -129,7 +129,7 @@ describe('CacheInvalidator: publishVodDurationUpdate', () => {
 
   it('should handle zero duration', async () => {
     await publishVodDurationUpdate('tenant-1', 42, 0, false);
-    const event = JSON.parse(publishCalls[0].message);
+    const event = JSON.parse(publishCalls[0]?.message ?? '');
     assert.strictEqual(event.duration, 0);
   });
 
@@ -142,12 +142,12 @@ describe('CacheInvalidator: publishVodDurationUpdate', () => {
 
   it('should use correct Redis channel', async () => {
     await publishVodDurationUpdate('tenant-1', 42, 3600, false);
-    assert.strictEqual(publishCalls[0].channel, 'cache:vod');
+    assert.strictEqual(publishCalls[0]?.channel, 'cache:vod');
   });
 
   it('should publish correct event structure', async () => {
     await publishVodDurationUpdate('tenant-3', 100, 1800, true);
-    const event = JSON.parse(publishCalls[0].message);
+    const event = JSON.parse(publishCalls[0]?.message ?? '');
     assert.ok('type' in event);
     assert.ok('tenantId' in event);
     assert.ok('dbId' in event);

@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import { getLogsByOffset, getLogsByCursor } from '../../src/services/logs.service.js';
 import { RedisService } from '../../src/utils/redis-service.js';
-import { poolManager, resetClientManager } from '../../src/db/streamer-client.js';
+import { resetClientManager } from '../../src/db/streamer-client.js';
 import { resetEnvConfig } from '../../src/config/env.js';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
@@ -94,7 +94,7 @@ describe('LogsService: getLogsByOffset', () => {
     };
 
     try {
-      await getLogsByOffset(neverResolveDb, 'tenant-1', 999, 0);
+      await getLogsByOffset(neverResolveDb as any, 'tenant-1', 999, 0);
       assert.fail('Should have thrown');
     } catch (error) {
       assert.ok(error instanceof Error);
@@ -144,8 +144,8 @@ describe('LogsService: getLogsByOffset', () => {
     const result = await getLogsByOffset(mockDb, 'tenant-1', 1, 0);
     assert.strictEqual(result.comments.length, 2);
     assert.strictEqual(result.cursor, undefined);
-    assert.strictEqual(result.comments[0].id, 'msg-1');
-    assert.strictEqual(result.comments[1].id, 'msg-2');
+    assert.strictEqual(result.comments[0]?.id, 'msg-1');
+    assert.strictEqual(result.comments[1]?.id, 'msg-2');
   });
 
   it('should return cursor when there are more messages (page size + 1)', async () => {
@@ -196,7 +196,7 @@ describe('LogsService: getLogsByOffset', () => {
 
     const result = await getLogsByOffset(mockDb, 'tenant-1', 1, 0);
     assert.strictEqual(result.comments.length, 1);
-    assert.strictEqual(result.comments[0].id, 'cached-msg');
+    assert.strictEqual(result.comments[0]?.id, 'cached-msg');
     assert.strictEqual(result.cursor, 'cached-cursor');
   });
 
@@ -380,7 +380,7 @@ describe('LogsService: getLogsByCursor', () => {
     };
 
     try {
-      await getLogsByCursor(neverResolveDb, 'tenant-1', 999, cursor);
+      await getLogsByCursor(neverResolveDb as any, 'tenant-1', 999, cursor);
       assert.fail('Should have thrown');
     } catch (error) {
       assert.ok(error instanceof Error);
@@ -463,7 +463,7 @@ describe('LogsService: getLogsByCursor', () => {
 
     const result = await getLogsByCursor(mockDb, 'tenant-1', 1, cursor);
     assert.strictEqual(result.comments.length, 1);
-    assert.strictEqual(result.comments[0].id, 'cached-msg');
+    assert.strictEqual(result.comments[0]?.id, 'cached-msg');
     assert.strictEqual(result.cursor, 'next-cursor');
   });
 

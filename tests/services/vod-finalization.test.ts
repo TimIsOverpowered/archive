@@ -103,7 +103,8 @@ describe('finalizeVod', () => {
   it('should update VOD with is_live: false', async () => {
     const ctx = {
       tenantId: 'tenant-1',
-      config: { id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: {} },
+      config: { id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false }, createdAt: new Date() },
+      db: mockDb,
     };
 
     await finalizeVod({ ctx, dbId: 42, vodId: 'vod-123', platform: 'twitch', durationSeconds: 3600 });
@@ -116,7 +117,8 @@ describe('finalizeVod', () => {
   it('should call strategy.finalizeChapters when duration is provided and strategy has finalizeChapters', async () => {
     const ctx = {
       tenantId: 'tenant-1',
-      config: { id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: {} },
+      config: { id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false }, createdAt: new Date() },
+      db: mockDb,
     };
 
     await finalizeVod({ ctx, dbId: 42, vodId: 'vod-123', platform: 'twitch', durationSeconds: 3600 });
@@ -130,7 +132,8 @@ describe('finalizeVod', () => {
   it('should not call finalizeChapters when durationSeconds is null', async () => {
     const ctx = {
       tenantId: 'tenant-1',
-      config: { id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: {} },
+      config: { id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false }, createdAt: new Date() },
+      db: mockDb,
     };
 
     await finalizeVod({ ctx, dbId: 42, vodId: 'vod-123', platform: 'twitch', durationSeconds: null });
@@ -138,13 +141,14 @@ describe('finalizeVod', () => {
     assert.strictEqual(operationCalls.length, 0);
   });
 
-  it('should not call finalizeChapters when strategy does not have finalizeChapters', async () => {
-    mockStrategy = {};
-    registerStrategy('twitch' as any, mockStrategy);
+it('should not call finalizeChapters when strategy does not have finalizeChapters', async () => {
+    const mockStrategyNoChapters = {} as any;
+    registerStrategy('twitch' as any, mockStrategyNoChapters);
 
     const ctx = {
       tenantId: 'tenant-1',
-      config: { id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: {} },
+      config: { id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false }, createdAt: new Date() },
+      db: mockDb,
     };
 
     await finalizeVod({ ctx, dbId: 42, vodId: 'vod-123', platform: 'twitch', durationSeconds: 3600 });
@@ -155,7 +159,8 @@ describe('finalizeVod', () => {
   it('should not include duration in update when durationSeconds is null', async () => {
     const ctx = {
       tenantId: 'tenant-1',
-      config: { id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: {} },
+      config: { id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false }, createdAt: new Date() },
+      db: mockDb,
     };
 
     await finalizeVod({ ctx, dbId: 42, vodId: 'vod-123', platform: 'twitch', durationSeconds: null });
@@ -168,7 +173,8 @@ describe('finalizeVod', () => {
   it('should publish VOD duration update event', async () => {
     const ctx = {
       tenantId: 'tenant-1',
-      config: { id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: {} },
+      config: { id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false }, createdAt: new Date() },
+      db: mockDb,
     };
 
     await finalizeVod({ ctx, dbId: 42, vodId: 'vod-123', platform: 'twitch', durationSeconds: 3600 });
@@ -189,7 +195,8 @@ describe('finalizeVod', () => {
 
     const ctx = {
       tenantId: 'tenant-1',
-      config: { id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: {} },
+      config: { id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false }, createdAt: new Date() },
+      db: mockDb,
     };
 
     await finalizeVod({ ctx, dbId: 42, vodId: 'vod-123', platform: 'twitch', durationSeconds: null });

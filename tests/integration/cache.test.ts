@@ -45,7 +45,7 @@ describe('Integration: Mock Redis', () => {
 
   it('should support publish/subscribe', async () => {
     let received: string | null = null;
-    mock.on('message', (ch: string, msg: string) => {
+    mock.on('message', (_ch: string, msg: string) => {
       received = msg;
     });
     await mock.subscribe('test-channel');

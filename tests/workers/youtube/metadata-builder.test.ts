@@ -118,8 +118,8 @@ describe('buildYoutubeMetadata', () => {
     const result = buildYoutubeMetadata(baseOptions);
     const lines = result.description.split('\n');
     assert.strictEqual(lines.length, 3);
-    assert.ok(lines[0].startsWith('Chat Replay:'));
-    assert.ok(lines[1].startsWith('Stream Title:'));
+    assert.ok(lines[0]?.startsWith('Chat Replay:'));
+    assert.ok(lines[1]?.startsWith('Stream Title:'));
     assert.strictEqual(lines[2], '');
   });
 

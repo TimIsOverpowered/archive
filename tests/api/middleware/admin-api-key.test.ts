@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it } from 'node:test';
 import adminApiKeyMiddleware from '../../../src/api/middleware/admin-api-key.js';
 
 function createMockReply(): any {

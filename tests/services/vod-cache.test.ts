@@ -113,10 +113,10 @@ describe('VodCache: setVodStaticCache', () => {
   it('should set cache with correct key and TTL', async () => {
     await setVodStaticCache('tenant-1', 42, JSON.stringify({ id: 42 }), 3600);
     assert.strictEqual(setCalls.length, 1);
-    assert.strictEqual(setCalls[0][0], 'vod:{tenant-1}:42');
-    assert.strictEqual(setCalls[0][1], JSON.stringify({ id: 42 }));
-    assert.strictEqual(setCalls[0][2], 'EX');
-    assert.strictEqual(setCalls[0][3], 3600);
+    assert.strictEqual(setCalls[0]?.[0], 'vod:{tenant-1}:42');
+    assert.strictEqual(setCalls[0]?.[1], JSON.stringify({ id: 42 }));
+    assert.strictEqual(setCalls[0]?.[2], 'EX');
+    assert.strictEqual(setCalls[0]?.[3], 3600);
   });
 
   it('should handle Redis error gracefully', async () => {
@@ -219,12 +219,12 @@ describe('VodCache: setVodVolatileCache', () => {
   it('should set volatile data with correct key and TTL', async () => {
     await setVodVolatileCache('tenant-1', 42, { duration: 3600, is_live: true }, 300);
     assert.strictEqual(setCalls.length, 1);
-    assert.strictEqual(setCalls[0][0], 'vod:volatile:{tenant-1}:42');
-    const parsed = JSON.parse(setCalls[0][1]);
+    assert.strictEqual(setCalls[0]?.[0], 'vod:volatile:{tenant-1}:42');
+    const parsed = JSON.parse(setCalls[0]?.[1] as string);
     assert.strictEqual(parsed.duration, 3600);
     assert.strictEqual(parsed.is_live, true);
-    assert.strictEqual(setCalls[0][2], 'EX');
-    assert.strictEqual(setCalls[0][3], 300);
+    assert.strictEqual(setCalls[0]?.[2], 'EX');
+    assert.strictEqual(setCalls[0]?.[3], 300);
   });
 
   it('should handle Redis error gracefully', async () => {
@@ -271,7 +271,7 @@ describe('VodCache: getVodVolatileCacheBatch', () => {
   });
 
   it('should parse and return valid volatile data', async () => {
-    mockClient.mget = async (...keys: string[]) => [
+    mockClient.mget = async (..._keys: string[]) => [
       JSON.stringify({ duration: 3600, is_live: true }),
       null,
       JSON.stringify({ duration: 1800, is_live: false }),
@@ -286,7 +286,7 @@ describe('VodCache: getVodVolatileCacheBatch', () => {
   });
 
   it('should skip corrupt entries', async () => {
-    mockClient.mget = async (...keys: string[]) => [
+    mockClient.mget = async (..._keys: string[]) => [
       JSON.stringify({ duration: 3600, is_live: true }),
       'corrupt-json',
       JSON.stringify({ duration: 1800, is_live: false }),
@@ -318,7 +318,7 @@ describe('VodCache: invalidateVodStaticCache', () => {
       unlink: async (...keys: string[]) => {
         unlinkCalls.push(keys);
       },
-      sscan: async (key: string, cursor: string, ...args: any[]) => {
+      sscan: async (key: string, cursor: string, ..._args: any[]) => {
         sscanCalls.push([key, cursor]);
         return ['0', []];
       },
@@ -347,7 +347,7 @@ describe('VodCache: invalidateVodStaticCache', () => {
 
   it('should invalidate tags', async () => {
     await invalidateVodStaticCache('tenant-1', 42);
-    assert.ok(sscanCalls.some((calls) => calls[0].includes('vods:tags:{tenant-1}:42')));
+    assert.ok(sscanCalls.some((calls) => calls[0]?.includes('vods:tags:{tenant-1}:42')));
   });
 
   it('should handle Redis error gracefully', async () => {

@@ -211,11 +211,10 @@ export async function sendCompletionAlert(
   completionData: LiveCompletionData,
   actualDuration: number | null
 ): Promise<void> {
+  await ctx.job.updateProgress(100);
   await updateAlert(
     ctx.messageId,
     ctx.alerts.complete(ctx.vodId, actualDuration != null ? Math.round(actualDuration) : undefined, completionData)
   );
-
-  await ctx.job.updateProgress(100);
   ctx.log.info({ component: 'live-worker', jobId: ctx.job.id, vodId: ctx.vodId }, 'Job completed successfully');
 }

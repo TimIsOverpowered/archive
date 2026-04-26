@@ -17,14 +17,14 @@ function createMockReply(): any {
   let sentBody: any = null;
 
   return {
-    header: (key: string, value: string) => {
+    header: function (key: string, value: string) {
       headers[key] = value;
       return this;
     },
-    status: (code: number) => {
+    status: function (code: number) {
       statusCode.value = code;
       return {
-        send: (body: any) => {
+        send: function (body: any) {
           sentBody = body;
           return this;
         },

@@ -201,7 +201,7 @@ describe('extractMessageData', () => {
     };
     const result = extractMessageData(node as any);
     assert.strictEqual(result.message.content, 'hello world');
-    assert.deepStrictEqual(result.message.fragments[0], { text: 'hello' });
+    assert.deepStrictEqual((result.message.fragments as any)[0], { text: 'hello' });
   });
 
   it('should extract userBadges when present', () => {
@@ -285,8 +285,8 @@ describe('extractMessageData', () => {
       },
     };
     const result = extractMessageData(node as any);
-    result.message.fragments[0].text = 'modified';
+    (result.message.fragments as any)[0].text = 'modified';
     // The original should not be affected since we create a new object
-    assert.deepStrictEqual(result.message.fragments[0], { text: 'modified' });
+    assert.deepStrictEqual((result.message.fragments as any)[0], { text: 'modified' });
   });
 });

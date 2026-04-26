@@ -1,8 +1,4 @@
 import { EventEmitter } from 'node:events';
-import type Redis from 'ioredis';
-
-type RedisCommand = string;
-type RedisCallback = (err: Error | null, result: unknown) => void;
 
 export interface MockRedisOptions {
   data?: Map<string, string>;
@@ -110,7 +106,7 @@ export class MockRedisClient extends EventEmitter {
     return new MockRedisPipeline(this);
   }
 
-  async scan(cursor: number, _option: string, pattern: string): Promise<[string, string[]]> {
+  async scan(_cursor: number, _option: string, pattern: string): Promise<[string, string[]]> {
     const matches = [...this.data.keys()].filter((k) => k.includes(pattern.replace('{', '').replace('}', '')));
     return ['0', matches];
   }

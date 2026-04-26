@@ -1,8 +1,8 @@
 import { EventEmitter } from 'node:events';
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach, mock } from 'node:test';
+import { describe, it, mock } from 'node:test';
 import { isConnectionError } from '../../src/db/utils/errors.js';
-import { resetClientManager, createPoolManager } from '../../src/db/streamer-client.js';
+import { createPoolManager } from '../../src/db/streamer-client.js';
 import { resetEnvConfig } from '../../src/config/env.js';
 import type { Pool } from 'pg';
 import { TenantConfig } from '../../src/config/types.js';

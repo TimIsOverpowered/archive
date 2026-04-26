@@ -1,12 +1,12 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { describe, it } from 'node:test';
 import {
   isBlockingPolicy,
   buildMuteFilters,
   CLAIM_TYPES,
   cleanupTempFiles,
 } from '../../../src/workers/dmca/dmca.js';
-import { createAutoLogger } from '../../../src/utils/auto-tenant-logger.js';
+import { createAutoLogger as _createAutoLogger } from '../../../src/utils/auto-tenant-logger.js';
 
 describe('isBlockingPolicy', () => {
   it('should return true for POLICY_TYPE_GLOBAL_BLOCK', () => {

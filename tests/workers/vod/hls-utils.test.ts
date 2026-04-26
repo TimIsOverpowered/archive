@@ -139,7 +139,7 @@ describe('cleanupOrphanedTmpFiles', () => {
     await cleanupOrphanedTmpFiles('/tmp/test-vod', mockLog as any);
 
     assert.strictEqual(removedFiles.length, 1);
-    assert.ok(removedFiles[0].endsWith('.tmp'));
+    assert.ok(removedFiles[0]?.endsWith('.tmp'));
 
     (fsPromises as any).readdir = mockReaddir;
     (fsPromises as any).unlink = mockUnlink;

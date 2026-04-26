@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { describe, it } from 'node:test';
 import { retryWithBackoff } from '../../src/utils/retry.js';
 
 describe('Retry with Backoff', () => {

@@ -68,7 +68,7 @@ describe('CacheKeys', () => {
     });
 
     it('should exclude null values from key', () => {
-      const key = CacheKeys.vodQuery('tenant-1', { title: 'test', status: null }, 1, 20);
+      const key = CacheKeys.vodQuery('tenant-1', { title: 'test', status: undefined as string | undefined }, 1, 20);
       assert.strictEqual(key.includes('null'), false);
       assert.strictEqual(key.includes('status'), false);
       assert.ok(key.includes('title:test'));
@@ -128,7 +128,7 @@ describe('CacheKeys', () => {
         title: 'test',
         status: undefined,
         platform: 'twitch',
-        tag: null,
+        tag: undefined as string | undefined,
         genre: '',
         year: 2024,
       }, 1, 20);

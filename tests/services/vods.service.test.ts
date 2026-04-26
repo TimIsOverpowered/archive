@@ -221,8 +221,8 @@ describe('VodService: VodResponse type', () => {
     assert.strictEqual(vod.vod_uploads.length, 1);
     assert.strictEqual(vod.chapters.length, 1);
     assert.strictEqual(vod.games.length, 1);
-    assert.strictEqual(vod.vod_uploads[0].upload_id, 'yt-1');
-    assert.strictEqual(vod.chapters[0].name, 'Intro');
-    assert.strictEqual(vod.games[0].game_name, 'FPS Game');
+    assert.strictEqual(vod.vod_uploads[0]?.upload_id, 'yt-1');
+    assert.strictEqual(vod.chapters[0]?.name, 'Intro');
+    assert.strictEqual(vod.games[0]?.game_name, 'FPS Game');
   });
 });

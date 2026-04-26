@@ -99,15 +99,13 @@ describe('flushChatBatch', () => {
   it('should insert messages into the database', async () => {
     const db = createMockDb();
     const log = createMockLog();
-    let onProgressCalled = false;
-
     const messages = [createMockMessage({ id: 'msg-1' }), createMockMessage({ id: 'msg-2' })];
     const options: FlushBatchOptions = {
       db,
       buffer: messages,
       log,
       vodId: 'vod-123',
-      onProgress: () => { onProgressCalled = true; },
+      onProgress: () => {},
       lastOffset: 100,
       totalMessages: 50,
       batchCount: 5,
@@ -164,9 +162,10 @@ describe('flushChatBatch', () => {
     await flushChatBatch(options);
 
     assert.ok(progressArgs);
-    assert.strictEqual(progressArgs!.offset, 100);
-    assert.strictEqual(progressArgs!.batchNumber, 6);
-    assert.strictEqual(progressArgs!.messagesInBatch, 1);
+    const p = progressArgs as { offset: number; batchNumber: number; messagesInBatch: number };
+    assert.strictEqual(p.offset, 100);
+    assert.strictEqual(p.batchNumber, 6);
+    assert.strictEqual(p.messagesInBatch, 1);
   });
 
   it('should clear the buffer after flushing', async () => {
@@ -209,7 +208,7 @@ describe('flushChatBatch', () => {
     await flushChatBatch(options);
 
     const calls = log.getCalls();
-    const debugCall = calls.find((c) => c.level === 'debug' && c.msg === 'Batch flushed to database');
+    const debugCall = calls.find((c: any) => c.level === 'debug' && c.msg === 'Batch flushed to database');
     assert.ok(debugCall);
     assert.strictEqual(debugCall!.ctx.vodId, 'vod-123');
     assert.strictEqual(debugCall!.ctx.batchNumber, 6);

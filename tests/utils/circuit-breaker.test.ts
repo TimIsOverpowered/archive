@@ -55,10 +55,7 @@ describe('Circuit Breaker', () => {
     });
 
     it('should update lastFailureTime', () => {
-      const before = Date.now();
       recordFailure('test-key');
-      const state = getCircuitState('test-key');
-      // lastFailureTime should be recent
     });
   });
 
@@ -88,7 +85,6 @@ describe('Circuit Breaker', () => {
         recordFailure('test-key');
       }
       // Wait for recovery timeout
-      const state = getCircuitState('test-key');
       recordSuccess('test-key');
       assert.strictEqual(getCircuitState('test-key'), 'closed');
     });

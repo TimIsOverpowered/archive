@@ -264,7 +264,7 @@ describe('HTTP Client', () => {
     it('should pass dispatcher to fetch when provided', async () => {
       let capturedDispatcher: unknown = undefined;
 
-      global.fetch = ((_input: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
+      global.fetch = ((_input: URL | RequestInfo, init?: RequestInit & { dispatcher?: unknown }): Promise<Response> => {
         capturedDispatcher = init?.dispatcher;
         return Promise.resolve({
           ok: true,

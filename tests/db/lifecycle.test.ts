@@ -146,7 +146,7 @@ describe('DB Client Lifecycle Management', () => {
     it('executes operation successfully on first attempt', async () => {
       const config = createMockConfig('test-tenant');
       let callCount = 0;
-      const result = await withDbRetry('test-tenant', config, async (db) => {
+      const result = await withDbRetry('test-tenant', config, async (_db) => {
         callCount++;
         return { success: true, callCount };
       });

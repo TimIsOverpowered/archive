@@ -88,7 +88,7 @@ export const strategy: PlatformStrategy = {
   createVodData(meta: PlatformVodMetadata): VodCreateData {
     return {
       vod_id: meta.id,
-      title: meta.title || null,
+      title: meta.title === '' ? null : meta.title,
       created_at: new Date(meta.createdAt),
       duration: meta.duration,
       stream_id: meta.streamId ?? null,
@@ -100,7 +100,7 @@ export const strategy: PlatformStrategy = {
   updateVodData(meta: PlatformVodMetadata): VodUpdateData {
     return {
       vod_id: meta.id,
-      title: meta.title || null,
+      title: meta.title === '' ? null : meta.title,
       created_at: new Date(meta.createdAt),
       duration: meta.duration,
       stream_id: meta.streamId,

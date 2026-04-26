@@ -27,16 +27,16 @@ const _fileExistsState = { returns: true };
 mock.module('../../src/utils/path.js', {
   getVodDirPath: () => '/tmp/test-vods/test-tenant/live-vod-123',
   fileExists: async () => _fileExistsState.returns,
-});
+} as any);
 
 mock.module('../../src/workers/vod/hls-utils.js', {
   cleanupOrphanedTmpFiles: async () => {},
-});
+} as any);
 
 function createMockCtx(overrides: Partial<LiveProcessorContext> = {}): LiveProcessorContext & {
-  calls: Record<string, unknown[]>;
+  calls: Record<string, unknown>;
 } {
-  const calls: Record<string, unknown[]> = {};
+  const calls: Record<string, unknown> = {};
 
   const base: LiveProcessorContext = {
     job: {
@@ -76,13 +76,13 @@ function createMockCtx(overrides: Partial<LiveProcessorContext> = {}): LiveProce
     ...overrides,
     log: {
       info: (...args: unknown[]) => {
-        calls.info = [...(calls.info ?? []), args];
+        (calls.info as any[]) = [...(calls.info as any[] ?? []), args];
       },
       warn: (...args: unknown[]) => {
-        calls.warn = [...(calls.warn ?? []), args];
+        (calls.warn as any[]) = [...(calls.warn as any[] ?? []), args];
       },
       error: (...args: unknown[]) => {
-        calls.error = [...(calls.error ?? []), args];
+        (calls.error as any[]) = [...(calls.error as any[] ?? []), args];
       },
     },
     alerts: {
@@ -119,7 +119,7 @@ function createMockCtx(overrides: Partial<LiveProcessorContext> = {}): LiveProce
       },
     },
     calls,
-  } as LiveProcessorContext & { calls: Record<string, unknown[]> };
+  } as LiveProcessorContext & { calls: Record<string, unknown> };
 
   return ctx;
 }
@@ -230,7 +230,7 @@ describe('Live Worker Phases', () => {
       await sendCompletionAlert(ctx, completionData, 180);
 
       assert.strictEqual(ctx.calls.progress, 100);
-      assert.ok(ctx.calls.info?.length! > 0);
+      assert.ok((ctx.calls.info as unknown[])?.length! > 0);
     });
   });
 

@@ -1,7 +1,4 @@
 import Fastify, { FastifyInstance } from 'fastify';
-import { RedisService } from '../../src/utils/redis-service.js';
-import { MockRedisClient } from './mock-redis.js';
-import { resetEnvConfig } from '../../src/config/env.js';
 
 export interface TestServerOptions {
   disableRedis?: boolean;
@@ -23,8 +20,8 @@ export async function buildTestServer(_options: TestServerOptions = {}): Promise
     },
   });
 
-  server.setErrorHandler((error, _request, reply) => {
-    const statusCode = error.statusCode ?? 500;
+  server.setErrorHandler((error: unknown, _request, reply) => {
+    const statusCode = (error instanceof Error && (error as any).statusCode) ?? 500;
     return reply.status(statusCode).send({
       statusCode,
       message: 'Internal server error',
