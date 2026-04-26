@@ -707,7 +707,7 @@ describe('HTTP Client', () => {
         await request('https://api.example.com/test', { timeoutMs: 50, retryOptions: { attempts: 1 } });
         assert.fail('Should have thrown');
       } catch (error) {
-        assert.strictEqual((error as Error).name, 'AbortError');
+        assert.strictEqual((error as Error).name, 'DownloadAbortedError');
       }
     });
   });
