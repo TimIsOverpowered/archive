@@ -1,7 +1,9 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach } from 'node:test';
+import { Job } from 'bullmq';
 import liveProcessor from '../../src/workers/live.worker.js';
 import { setupBaseEnv, setupWorkerMocks, teardownWorkerMocks } from '../helpers/worker-test-setup.js';
+import type { LiveDownloadJob } from '../../src/workers/jobs/types.js';
 
 setupBaseEnv('/tmp/test-vods');
 
@@ -28,10 +30,10 @@ describe('Live Worker', () => {
         platformUsername: 'teststreamer',
         startedAt: new Date().toISOString(),
       },
-    } as any;
+    } as unknown as Job<LiveDownloadJob>;
 
     try {
-      await (liveProcessor as any)(job);
+      await liveProcessor(job);
       assert.fail('Should have thrown');
     } catch (error) {
       assert.ok(error instanceof Error);
@@ -50,11 +52,11 @@ describe('Live Worker', () => {
         platformUsername: 'teststreamer',
         startedAt: new Date().toISOString(),
       },
-    } as any;
+    } as unknown as Job<LiveDownloadJob>;
 
     let errorThrown: Error | null = null;
     try {
-      await (liveProcessor as any)(job);
+      await liveProcessor(job);
     } catch (error) {
       errorThrown = error as Error;
     }
@@ -74,10 +76,10 @@ describe('Live Worker', () => {
         startedAt: new Date().toISOString(),
         sourceUrl: 'https://example.com/live.m3u8',
       },
-    } as any;
+    } as unknown as Job<LiveDownloadJob>;
 
     try {
-      await (liveProcessor as any)(job);
+      await liveProcessor(job);
     } catch (error) {
       assert.ok(error instanceof Error);
     }
@@ -95,11 +97,11 @@ describe('Live Worker', () => {
         platformUsername: 'kickstreamer',
         startedAt: new Date().toISOString(),
       },
-    } as any;
+    } as unknown as Job<LiveDownloadJob>;
 
     let errorThrown: Error | null = null;
     try {
-      await (liveProcessor as any)(job);
+      await liveProcessor(job);
     } catch (error) {
       errorThrown = error as Error;
     }
@@ -118,10 +120,10 @@ describe('Live Worker', () => {
         platformUsername: undefined,
         startedAt: new Date().toISOString(),
       },
-    } as any;
+    } as unknown as Job<LiveDownloadJob>;
 
     try {
-      await (liveProcessor as any)(job);
+      await liveProcessor(job);
     } catch (error) {
       assert.ok(error instanceof Error);
     }
@@ -139,10 +141,10 @@ describe('Live Worker', () => {
         platformUsername: 'teststreamer',
         startedAt: new Date().toISOString(),
       },
-    } as any;
+    } as unknown as Job<LiveDownloadJob>;
 
     try {
-      await (liveProcessor as any)(job);
+      await liveProcessor(job);
     } catch (error) {
       assert.ok(error instanceof Error);
     }
