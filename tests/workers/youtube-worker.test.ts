@@ -1,82 +1,25 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach, mock } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import youtubeProcessor from '../../src/workers/youtube.worker.js';
-import { RedisService } from '../../src/utils/redis-service.js';
-import { poolManager, resetClientManager } from '../../src/db/streamer-client.js';
-import { resetEnvConfig } from '../../src/config/env.js';
-
-const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
-
-function setupBaseEnv(): void {
-  Object.keys(process.env).forEach((key) => delete process.env[key]);
-  process.env.REDIS_URL = 'redis://localhost';
-  process.env.META_DATABASE_URL = 'postgresql://meta';
-  process.env.PGBOUNCER_URL = 'postgresql://bouncer';
-  process.env.ENCRYPTION_MASTER_KEY = VALID_KEY;
-  process.env.NODE_ENV = 'test';
-}
+import {
+  buildMockDb,
+  setupBaseEnv,
+  setupWorkerMocksWithDb,
+  teardownWorkerMocks,
+} from '../helpers/worker-test-setup.js';
 
 setupBaseEnv();
 
 describe('YouTube Worker', () => {
-  let mockDb: any;
-  let mockClient: any;
-  let originalEnv: NodeJS.ProcessEnv;
+  let mocks: ReturnType<typeof setupWorkerMocksWithDb>;
 
   beforeEach(async () => {
-    originalEnv = { ...process.env };
-
-    mockDb = {
-      selectFrom: () => ({
-        select: () => ({
-          where: () => ({
-            orderBy: () => ({
-              limit: () => ({
-                execute: async () => [],
-              }),
-            }),
-          }),
-        }),
-        insertInto: () => ({
-          values: () => ({
-            onConflict: () => ({
-              doUpdateSet: () => ({
-                execute: async () => undefined,
-              }),
-            }),
-          }),
-        }),
-      }),
-      updateTable: () => ({
-        set: () => ({
-          where: () => ({
-            execute: async () => undefined,
-          }),
-        }),
-      }),
-    };
-
-    mockClient = {
-      get: async () => null,
-      publish: async () => {},
-    };
-
-    (RedisService as any)._instance = {
-      getClient: () => mockClient,
-    };
-
-    resetEnvConfig();
-    resetClientManager();
-    mock.method(poolManager, 'createClient', async () => mockDb);
-    mock.method(poolManager, 'closeClient', async () => {});
+    const mockDb = buildMockDb({ withInsertInto: true });
+    mocks = setupWorkerMocksWithDb(mockDb);
   });
 
   afterEach(async () => {
-    Object.assign(process.env, originalEnv);
-    (RedisService as any)._instance = null;
-    mock.restoreAll();
-    resetClientManager();
-    resetEnvConfig();
+    teardownWorkerMocks(mocks);
   });
 
   it('should throw when file path is not available and no children', async () => {
