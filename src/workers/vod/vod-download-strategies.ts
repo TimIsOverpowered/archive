@@ -16,6 +16,27 @@ export interface VodDownloadResult {
   finalPath: string;
 }
 
+async function withVodAlerts<T>(
+  vodId: string,
+  platform: Platform,
+  config: TenantConfig,
+  fn: (messageId: string | null, updateProgress: (pct: number) => void) => Promise<T>
+): Promise<T> {
+  const alerts = createVodWorkerAlerts();
+  const displayName = getDisplayName(config);
+  const messageId = await initRichAlert(alerts.init(vodId, platform, displayName));
+  try {
+    const result = await fn(messageId, (pct) => {
+      if (messageId !== null) void updateAlert(messageId, alerts.progress(vodId, `Converting ${vodId} (${pct}%)`));
+    });
+    if (messageId !== null) await updateAlert(messageId, alerts.complete(vodId, platform, ''));
+    return result;
+  } catch (error) {
+    if (messageId !== null) await updateAlert(messageId, alerts.error(vodId, platform, extractErrorDetails(error).message.substring(0, 500)));
+    throw error;
+  }
+}
+
 export async function downloadVodWithFfmpeg(
   platform: Platform,
   vodId: string,
@@ -61,43 +82,17 @@ async function downloadKickVodWithFfmpeg(
     throw new Error('Failed to parse Kick HLS playlist');
   }
 
-  const alerts = createVodWorkerAlerts();
-  let messageId: string | null = null;
-
-  try {
-    const streamerName = getDisplayName(config);
-    messageId = await initRichAlert(alerts.init(vodId, PLATFORMS.KICK, streamerName));
-
-    // Download directly to MP4 using ffmpeg HLS streaming
+  await withVodAlerts(vodId, PLATFORMS.KICK, config, async (_messageId, updateProgress) => {
     await convertHlsToMp4(m3u8Url, finalPath, {
       vodId: vodId,
       isFmp4: false,
       onProgress: (percent) => {
-        if (messageId != null) {
-          void updateAlert(messageId, alerts.progress(vodId, `Converting ${vodId} (${percent}%)`));
-        }
+        updateProgress(percent);
       },
     });
 
     log.info(`Downloaded ${vodId}.mp4`);
-
-    // Success alert
-    if (messageId != null) {
-      await updateAlert(messageId, alerts.complete(vodId, PLATFORMS.KICK, finalPath));
-    }
-  } catch (error) {
-    const details = extractErrorDetails(error);
-    const errorMsg = details.message.substring(0, 500);
-
-    log.error(`ffmpeg error occurred: ${errorMsg}`);
-
-    // Failure alert
-    if (messageId != null) {
-      await updateAlert(messageId, alerts.error(vodId, PLATFORMS.KICK, errorMsg));
-    }
-
-    throw error;
-  }
+  });
 }
 
 async function downloadTwitchVodWithFfmpeg(
@@ -108,52 +103,29 @@ async function downloadTwitchVodWithFfmpeg(
 ): Promise<void> {
   const tenantId = config.id;
 
-  const alerts = createVodWorkerAlerts();
-  let messageId: string | null = null;
+  const tokenSig = await getVodTokenSig(vodId, tenantId);
 
-  try {
-    const tokenSig = await getVodTokenSig(vodId, tenantId);
+  if (tokenSig == null) {
+    throw new Error(`Failed to get token/sig for ${vodId}`);
+  }
 
-    if (tokenSig == null) {
-      throw new Error(`Failed to get token/sig for ${vodId}`);
-    }
+  const m3u8Url = `${TWITCH_USHER_BASE_URL}/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h264,hevc&playlist_include_framerate=true&nauthsig=${tokenSig.signature}&nauth=${tokenSig.value}`;
 
-    const m3u8Url = `${TWITCH_USHER_BASE_URL}/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h264,hevc&playlist_include_framerate=true&nauthsig=${tokenSig.signature}&nauth=${tokenSig.value}`;
+  const m3u8Content = await request(m3u8Url, {
+    responseType: 'text',
+    timeoutMs: 30000,
+  });
+  const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
 
-    const streamerName = getDisplayName(config);
-    messageId = await initRichAlert(alerts.init(vodId, PLATFORMS.TWITCH, streamerName));
-
-    const m3u8Content = await request(m3u8Url, {
-      responseType: 'text',
-      timeoutMs: 30000,
-    });
-    const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
-
+  await withVodAlerts(vodId, PLATFORMS.TWITCH, config, async (_messageId, updateProgress) => {
     await convertHlsToMp4(m3u8Url, finalPath, {
       vodId,
       isFmp4,
       onProgress: (percent) => {
-        if (messageId != null) {
-          void updateAlert(messageId, alerts.progress(vodId, `Converting ${vodId} (${percent}%)`));
-        }
+        updateProgress(percent);
       },
     });
 
     log.info(`Downloaded ${vodId}.mp4`);
-
-    if (messageId != null) {
-      await updateAlert(messageId, alerts.complete(vodId, PLATFORMS.TWITCH, finalPath));
-    }
-  } catch (error) {
-    const details = extractErrorDetails(error);
-    const errorMsg = details.message.substring(0, 500);
-
-    log.error(`ffmpeg error occurred: ${errorMsg}`);
-
-    if (messageId != null) {
-      await updateAlert(messageId, alerts.error(vodId, PLATFORMS.TWITCH, errorMsg));
-    }
-
-    throw error;
-  }
+  });
 }

@@ -12,7 +12,7 @@ import {
   downloadSegmentsParallel,
   fetchTwitchPlaylist,
   fetchKickPlaylist,
-  type DownloadStrategy,
+  resolveDownloadStrategy,
 } from './hls-utils.js';
 import { sleep, getRetryDelay } from '../../utils/delay.js';
 import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
@@ -264,8 +264,7 @@ async function runLivePollingLoop(
       noChangePollCount = result.newNoChangeCount;
 
       if (result.newSegments.length > 0) {
-        const strategy: DownloadStrategy =
-          platform === PLATFORMS.KICK && ctx.cycleTLS ? { type: 'cycletls', session: ctx.cycleTLS } : { type: 'fetch' };
+        const strategy = resolveDownloadStrategy(platform, ctx.cycleTLS);
 
         await downloadSegmentsParallel(
           result.newSegments,
@@ -338,8 +337,7 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
 
   log.debug({ vodId, count: segments.length }, `Found ${segments.length} segments to download`);
 
-  const strategy: DownloadStrategy =
-    platform === PLATFORMS.KICK && cycleTLS ? { type: 'cycletls', session: cycleTLS } : { type: 'fetch' };
+  const strategy = resolveDownloadStrategy(platform, cycleTLS);
 
   await downloadSegmentsParallel(
     segments,

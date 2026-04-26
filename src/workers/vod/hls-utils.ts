@@ -12,8 +12,15 @@ import type { AppLogger } from '../../utils/logger.js';
 import { fileExists } from '../../utils/path.js';
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch/index.js';
 import { request, segmentDownloadAgent } from '../../utils/http-client.js';
+import { PLATFORMS } from '../../types/platforms.js';
 
 export type DownloadStrategy = { type: 'fetch'; signal?: AbortSignal } | { type: 'cycletls'; session: CycleTLSSession };
+
+export function resolveDownloadStrategy(platform: typeof PLATFORMS.KICK | typeof PLATFORMS.TWITCH, cycleTLS: CycleTLSSession | null): DownloadStrategy {
+  return platform === PLATFORMS.KICK && cycleTLS
+    ? { type: 'cycletls', session: cycleTLS }
+    : { type: 'fetch' };
+}
 
 export interface FetchPlaylistResult {
   variantM3u8String: string;
