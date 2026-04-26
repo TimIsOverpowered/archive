@@ -41,6 +41,10 @@ export const SWR_FAILURES_TTL_MS = 5 * 60 * 1000; // 5 minutes
 export const SWR_FAILURES_TTL_SECONDS = 300; // 5 minutes in seconds
 export const MAX_SWR_FAILURES = 3; // Max revalidation failures before skipping retries
 
+// ── Cache Inflight Tracking ─────────────────────────────────────────────────
+export const INFLIGHT_TIMEOUT_MS = 30_000; // 30 seconds max for in-flight requests
+export const INFLIGHT_CACHE_MAX = 1000; // Max concurrent in-flight requests per process
+
 // ── Database ─────────────────────────────────────────────────────────────────
 export const INT32_MAX = 2_147_483_647; // PostgreSQL integer column limit
 export const DB_POOL_IDLE_TIMEOUT_MS = 30 * 60 * 1_000;

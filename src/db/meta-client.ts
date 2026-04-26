@@ -22,15 +22,17 @@ let _metaDb: Kysely<MetaDB> | null = null;
 export function initMetaClient(): Promise<Kysely<MetaDB>> {
   if (_metaDb) return Promise.resolve(_metaDb);
 
+  const { NODE_ENV, PGBOUNCER_URL, META_DATABASE_URL } = getBaseConfig();
+
   // In development, share across hot-reload boundaries via globalThis.
   // This guard must match the storage guard below to avoid stale reads.
-  if (getBaseConfig().NODE_ENV !== 'production' && globalForMeta.metaDb) {
+  if (NODE_ENV !== 'production' && globalForMeta.metaDb) {
     _metaDb = globalForMeta.metaDb;
     return Promise.resolve(_metaDb);
   }
 
-  const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
-  const metaDbUrl = getBaseConfig().META_DATABASE_URL;
+  const pgbouncerUrl = PGBOUNCER_URL;
+  const metaDbUrl = META_DATABASE_URL;
   const metaDbName = extractDatabaseName(metaDbUrl);
 
   const url = buildPgBouncerUrl(pgbouncerUrl, metaDbName);
@@ -40,7 +42,7 @@ export function initMetaClient(): Promise<Kysely<MetaDB>> {
   const db = new Kysely<MetaDB>({ dialect });
 
   _metaDb = db;
-  if (getBaseConfig().NODE_ENV !== 'production') globalForMeta.metaDb = db;
+  if (NODE_ENV !== 'production') globalForMeta.metaDb = db;
 
   getLogger().info({ component: 'meta-client' }, 'Initialized (Kysely)');
   return Promise.resolve(_metaDb);

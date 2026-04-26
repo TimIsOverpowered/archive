@@ -67,15 +67,9 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
   const thisMonthStart = dayjs().startOf('month').toDate();
 
   return await withCache(simpleKeys.stats(tenantId), cacheTtl, async () => {
-    let dbStatus = 'connected';
-    try {
-      await sql`SELECT 1`.execute(db);
-    } catch {
-      dbStatus = 'error';
-    }
-
-    const [vodStats, uploadStats, chapterRow, thisMonthRow, uniqueGamesCount, totalUploadsRow, lastUploadRow] =
+    const [healthCheck, vodStats, uploadStats, chapterRow, thisMonthRow, uniqueGamesCount, totalUploadsRow, lastUploadRow] =
       await Promise.all([
+        sql`SELECT 1`.execute(db).then(() => 'connected').catch(() => 'error'),
         db
           .selectFrom('vods')
           .select((eb) => [
@@ -149,7 +143,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
         created_at: config.createdAt,
       },
       database: {
-        status: dbStatus,
+        status: healthCheck,
         lastChecked: new Date(),
       },
       vods: {

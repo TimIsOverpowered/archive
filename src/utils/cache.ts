@@ -3,7 +3,7 @@ import { extractErrorDetails } from './error.js';
 import { getLogger } from '../utils/logger.js';
 import { LRUCache } from 'lru-cache';
 import { retryWithBackoff } from './retry.js';
-import { MAX_SWR_FAILURES, SWR_FAILURES_TTL_MS, SWR_FAILURES_TTL_SECONDS } from '../constants.js';
+import { MAX_SWR_FAILURES, SWR_FAILURES_TTL_MS, SWR_FAILURES_TTL_SECONDS, INFLIGHT_TIMEOUT_MS, INFLIGHT_CACHE_MAX } from '../constants.js';
 import type { SWRKey, SimpleKey } from './cache-keys.js';
 
 /** Metrics for Redis cache hit/miss/error tracking. */
@@ -52,7 +52,11 @@ const SWR_FAILURES = new LRUCache<string, number>({
   allowStale: false,
 });
 
-const inflightSimple = new Map<string, Promise<unknown>>();
+const globalInflight = new LRUCache<string, Promise<unknown>>({
+  max: INFLIGHT_CACHE_MAX,
+  ttl: INFLIGHT_TIMEOUT_MS,
+  allowStale: false,
+});
 
 function isCacheEntry(raw: unknown): raw is CacheEntry<unknown> {
   if (raw == null || typeof raw !== 'object') return false;
@@ -89,7 +93,7 @@ export async function withCache<T>(key: SimpleKey, ttl: number, fetcher: () => P
     getLogger().warn({ err: details, key }, 'Cache read failed, falling back to DB');
   }
 
-  const inflight = inflightSimple.get(key) as Promise<T> | undefined;
+  const inflight = globalInflight.get(key) as Promise<T> | undefined;
   if (inflight) return inflight;
 
   const promise = fetcher()
@@ -102,15 +106,11 @@ export async function withCache<T>(key: SimpleKey, ttl: number, fetcher: () => P
       }
       return result;
     })
-    .finally(() => inflightSimple.delete(key));
+    .finally(() => globalInflight.delete(key));
 
-  inflightSimple.set(key, promise);
+  globalInflight.set(key, promise);
   return promise;
 }
-
-const inflightPromises = new Map<string, Promise<unknown>>();
-
-const INFLIGHT_TIMEOUT_MS = 30_000;
 
 interface CacheEntry<T> {
   data: T;
@@ -155,13 +155,13 @@ export async function withStaleWhileRevalidate<T>(
 
       cacheMetrics.swrStale++;
       // Stale — serve immediately, revalidate in background
-      if (!inflightPromises.get(key)) {
+      if (!globalInflight.get(key)) {
         const revalidatePromise = withTimeout(
-          revalidateWithRetry(client, key, ttl, fetcher).finally(() => inflightPromises.delete(key)),
+          revalidateWithRetry(client, key, ttl, fetcher).finally(() => globalInflight.delete(key)),
           INFLIGHT_TIMEOUT_MS
         );
 
-        inflightPromises.set(key, revalidatePromise);
+        globalInflight.set(key, revalidatePromise);
       }
 
       return entry.data;
@@ -173,15 +173,15 @@ export async function withStaleWhileRevalidate<T>(
     getLogger().warn({ err: details, key }, 'SWR cache read failed, falling back to DB');
   }
 
-  const existing = inflightPromises.get(key);
+  const existing = globalInflight.get(key);
   if (existing) return (await existing) as T;
 
   const fetchPromise = withTimeout(
-    revalidateWithRetry(client, key, ttl, fetcher).finally(() => inflightPromises.delete(key)),
+    revalidateWithRetry(client, key, ttl, fetcher).finally(() => globalInflight.delete(key)),
     INFLIGHT_TIMEOUT_MS
   );
 
-  inflightPromises.set(key, fetchPromise);
+  globalInflight.set(key, fetchPromise);
   return await fetchPromise;
 }
 

@@ -231,9 +231,12 @@ async function runLivePollingLoop(
   let noChangePollCount = 0;
   let lastSegmentUri: string | null = null;
 
-  const downloadedSegments = new Set<string>(await fsPromises.readdir(ctx.vodDir));
+  const downloadedSegments = new Set<string>(
+    await fsPromises.readdir(ctx.vodDir).then((files) => files.filter((f) => f.endsWith('.ts') || f.endsWith('.mp4')))
+  );
 
-  while (true) {
+  let streamEnded = false;
+  while (!streamEnded) {
     try {
       const playlist = await fetchPlaylist(ctx, consecutiveErrors);
 
@@ -253,6 +256,7 @@ async function runLivePollingLoop(
 
       if (result.isStreamEnd) {
         log.info({ vodId }, 'Stream end detected');
+        streamEnded = true;
         break;
       }
 
