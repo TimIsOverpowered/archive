@@ -5,6 +5,7 @@ import {
   tenantMiddleware,
   platformValidationMiddleware,
   asTenantPlatformContext,
+  requireTenant,
 } from '../../middleware/tenant-platform.js';
 import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
@@ -90,7 +91,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const { tenantId, db, platform } = asTenantPlatformContext(request.tenant);
+      const { tenantId, db, platform } = asTenantPlatformContext(requireTenant(request));
       const { vodId, claims, type = SOURCE_TYPES.VOD, part, downloadMethod = DOWNLOAD_METHODS.HLS } = request.body;
       const log = createAutoLogger(tenantId);
 
@@ -100,7 +101,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
 
       // Step 2: Ensure VOD download (like /upload does)
       const { jobId: downloadJobId, filePath } = await ensureVodDownload({
-        ctx: asTenantPlatformContext(request.tenant),
+        ctx: asTenantPlatformContext(requireTenant(request)),
         dbId: vodRecord.id,
         vodId,
         type,

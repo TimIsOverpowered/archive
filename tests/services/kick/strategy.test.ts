@@ -35,7 +35,7 @@ describe('Kick Strategy: createVodData', () => {
     };
 
     const result = strategy.createVodData(meta);
-    assert.strictEqual(result.title, '');
+    assert.strictEqual(result.title, null);
     assert.strictEqual(result.stream_id, '');
   });
 
@@ -95,7 +95,7 @@ describe('Kick Strategy: updateVodData', () => {
     };
 
     const result = strategy.updateVodData(meta);
-    assert.strictEqual(result.title, '');
+    assert.strictEqual(result.title, null);
   });
 
   it('should handle empty string title', () => {

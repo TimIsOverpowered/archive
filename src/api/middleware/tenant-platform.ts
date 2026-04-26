@@ -14,6 +14,17 @@ function hasPlatform(ctx: TenantContext): ctx is TenantPlatformContext {
 }
 
 /**
+ * Assert that request.tenant has been set by tenantMiddleware.
+ * Throws if tenant is undefined — should only be called in handlers where tenantMiddleware runs.
+ */
+export function requireTenant(request: FastifyRequest): TenantContext {
+  if (!request.tenant) {
+    throw new Error('tenantMiddleware must run before this handler');
+  }
+  return request.tenant;
+}
+
+/**
  * Assert TenantContext has been narrowed by platformValidationMiddleware.
  * Throws if platform is not set — platformValidationMiddleware must have run first.
  */

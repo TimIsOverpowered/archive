@@ -7,6 +7,7 @@ import {
   tenantMiddleware,
   platformValidationMiddleware,
   asTenantPlatformContext,
+  requireTenant,
 } from '../../middleware/tenant-platform.js';
 import { fileExists } from '../../../utils/path.js';
 import { RedisService } from '../../../utils/redis-service.js';
@@ -69,7 +70,7 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
     onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
     preValidation: [platformValidationMiddleware],
     handler: async (request) => {
-      const tenantCtx = asTenantPlatformContext(request.tenant);
+      const tenantCtx = asTenantPlatformContext(requireTenant(request));
       const { tenantId, config, db, platform } = tenantCtx;
       const { streamId, path, durationSecs } = request.body;
       const log = createAutoLogger(tenantId);

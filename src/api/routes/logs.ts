@@ -4,7 +4,7 @@ import { getLogsByOffset, getLogsByCursor } from '../../services/logs.service.js
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { RedisService } from '../../utils/redis-service.js';
 import { HttpError } from '../../utils/http-error.js';
-import { tenantMiddleware } from '../middleware/tenant-platform.js';
+import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
 
 const LogsQuerySchema = z.object({
   content_offset_seconds: z.number().nonnegative().optional(),
@@ -65,7 +65,7 @@ export default function logsRoutes(fastify: FastifyInstance, _options: LogsRoute
     },
     async (request) => {
       const { tenantId, vodId } = request.params;
-      const tenantCtx = request.tenant;
+      const tenantCtx = requireTenant(request);
       const { db } = tenantCtx;
       const vodIdNum = Number(vodId);
 

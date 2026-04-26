@@ -4,7 +4,7 @@ import { getEmotesByVodId } from '../../services/emotes.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { RedisService } from '../../utils/redis-service.js';
 import { HttpError } from '../../utils/http-error.js';
-import { tenantMiddleware } from '../middleware/tenant-platform.js';
+import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
 import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
 import { INT32_MAX } from '../../constants.js';
 import type { Kysely } from 'kysely';
@@ -73,7 +73,7 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const tenantCtx = request.tenant;
+      const tenantCtx = requireTenant(request);
       const { tenantId, db } = tenantCtx;
 
       const query = VodQuerySchema.parse(request.query);
@@ -109,7 +109,7 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
     },
     async (request) => {
       const { tenantId, vodId } = request.params;
-      const tenantCtx = request.tenant;
+      const tenantCtx = requireTenant(request);
       const { db } = tenantCtx;
       const vod = await fetchVodByIdSafe(vodId, db, tenantId);
       return { data: vod };
@@ -136,7 +136,7 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
     },
     async (request) => {
       const { tenantId, platform, platformVodId } = request.params;
-      const tenantCtx = request.tenant;
+      const tenantCtx = requireTenant(request);
       const { db } = tenantCtx;
 
       const vod = await getVodByPlatformId(db, tenantId, platform, platformVodId);
@@ -168,7 +168,7 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
     },
     async (request) => {
       const { tenantId, vodId } = request.params;
-      const tenantCtx = request.tenant;
+      const tenantCtx = requireTenant(request);
       const { db } = tenantCtx;
       await fetchVodByIdSafe(vodId, db, tenantId);
       const emotes = await getEmotesByVodId(db, tenantId, Number(vodId));

@@ -12,7 +12,7 @@ declare module 'fastify' {
 
   interface FastifyRequest {
     admin?: AdminContext;
-    tenant: TenantContext;
+    tenant?: TenantContext;
     tenantDisplayName?: string;
     reqId?: string;
   }

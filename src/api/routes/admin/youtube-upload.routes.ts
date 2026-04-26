@@ -5,6 +5,7 @@ import {
   tenantMiddleware,
   platformValidationMiddleware,
   asTenantPlatformContext,
+  requireTenant,
 } from '../../middleware/tenant-platform.js';
 import { RedisService } from '../../../utils/redis-service.js';
 import { HttpError } from '../../../utils/http-error.js';
@@ -86,7 +87,7 @@ export default function youtubeUploadRoutes(fastify: FastifyInstance, _options: 
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const tenantCtx = asTenantPlatformContext(request.tenant);
+      const tenantCtx = asTenantPlatformContext(requireTenant(request));
       const { tenantId, platform, db } = tenantCtx;
       const { vodId, type, downloadMethod, uploadMode } = request.body;
       const log = createAutoLogger(tenantId);

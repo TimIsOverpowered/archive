@@ -6,6 +6,7 @@ import {
   tenantMiddleware,
   platformValidationMiddleware,
   asTenantPlatformContext,
+  requireTenant,
 } from '../../middleware/tenant-platform.js';
 import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
@@ -49,8 +50,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      // Non-null assertion safe: tenantMiddleware runs in onRequest and always sets request.tenant
-      const tenantCtx = request.tenant;
+      const tenantCtx = requireTenant(request);
       const { tenantId, db } = tenantCtx;
 
       const stats = await getTenantStats(db, tenantId, getApiConfig().STATS_CACHE_TTL);
@@ -86,7 +86,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const tenantCtx = asTenantPlatformContext(request.tenant);
+      const tenantCtx = asTenantPlatformContext(requireTenant(request));
       const { tenantId, db, platform } = tenantCtx;
       const { vodId, title, createdAt, duration } = request.body;
       const log = createAutoLogger(tenantId);
@@ -168,7 +168,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const tenantCtx = asTenantPlatformContext(request.tenant);
+      const tenantCtx = asTenantPlatformContext(requireTenant(request));
       const { tenantId, db, platform } = tenantCtx;
       const { vodId } = request.body;
       const log = createAutoLogger(tenantId);

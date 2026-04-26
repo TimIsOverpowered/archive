@@ -5,6 +5,7 @@ import {
   tenantMiddleware,
   platformValidationMiddleware,
   asTenantPlatformContext,
+  requireTenant,
 } from '../../middleware/tenant-platform.js';
 import { ensureVodDownload, ensureVodRecord, findVodRecord } from './utils/vod-helpers.js';
 import { RedisService } from '../../../utils/redis-service.js';
@@ -85,7 +86,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const tenantCtx = asTenantPlatformContext(request.tenant);
+      const tenantCtx = asTenantPlatformContext(requireTenant(request));
       const { tenantId, platform } = tenantCtx;
       const { vodId, type, downloadMethod, uploadMode } = request.body;
       const log = createAutoLogger(tenantId);
@@ -179,7 +180,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const tenantCtx = asTenantPlatformContext(request.tenant);
+      const tenantCtx = asTenantPlatformContext(requireTenant(request));
       const { tenantId, platform, db } = tenantCtx;
       const { vodId, type, downloadMethod } = request.body;
       const log = createAutoLogger(tenantId);

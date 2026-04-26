@@ -5,6 +5,7 @@ import {
   tenantMiddleware,
   platformValidationMiddleware,
   asTenantPlatformContext,
+  requireTenant,
 } from '../../middleware/tenant-platform.js';
 import { saveVodChapters } from '../../../services/twitch/index.js';
 import { RedisService } from '../../../utils/redis-service.js';
@@ -70,7 +71,7 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const tenantCtx = asTenantPlatformContext(request.tenant);
+      const tenantCtx = asTenantPlatformContext(requireTenant(request));
       const { db, platform } = tenantCtx;
       const { vodId } = request.body;
 
@@ -120,7 +121,7 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const tenantCtx = asTenantPlatformContext(request.tenant);
+      const tenantCtx = asTenantPlatformContext(requireTenant(request));
       const { db, platform, config } = tenantCtx;
       const { vodId } = request.body;
 
@@ -167,7 +168,7 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
-      const tenantCtx = asTenantPlatformContext(request.tenant);
+      const tenantCtx = asTenantPlatformContext(requireTenant(request));
       const { db, platform, config, tenantId } = tenantCtx;
       const { vodId, forceRerun = false } = request.body;
 
