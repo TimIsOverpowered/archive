@@ -2,6 +2,7 @@ import fsPromises from 'fs/promises';
 import pathMod from 'path';
 import HLS from 'hls-parser';
 import { extractErrorDetails } from '../../utils/error.js';
+import { DownloadAbortedError } from '../../utils/domain-errors.js';
 import { getVodDirPath, getVodFilePath } from '../../utils/path.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import type { AppLogger } from '../../utils/logger.js';
@@ -291,7 +292,7 @@ async function runLivePollingLoop(
     } catch (error) {
       const details = extractErrorDetails(error);
 
-      if (details.message === 'Download aborted') throw error;
+      if (error instanceof DownloadAbortedError) throw error;
 
       log.error({ ...details, vodId }, 'Poll cycle error');
       consecutiveErrors++;

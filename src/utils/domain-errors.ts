@@ -55,3 +55,11 @@ export class FileNotFound extends DomainError {
     super(`File not found: ${path}`);
   }
 }
+
+export class DownloadAbortedError extends DomainError {
+  readonly code = 'DOWNLOAD_ABORTED';
+
+  constructor() {
+    super('Download aborted');
+  }
+}

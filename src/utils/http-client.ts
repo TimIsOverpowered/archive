@@ -9,6 +9,7 @@ import {
   SEGMENT_DOWNLOAD_PIPELINING,
 } from '../constants.js';
 import { HttpError } from './http-error.js';
+import { DownloadAbortedError } from './domain-errors.js';
 import { Agent } from 'undici';
 
 /** Supported HTTP response types for request/safeRequest functions. */
@@ -201,6 +202,15 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
     return result;
   } catch (error) {
     const duration = Date.now() - startTime;
+
+    if (error instanceof Error && error.name === 'AbortError') {
+      getLogger().error(
+        { component: 'http-client', method, url: scrubbedUrl, duration, error: 'Download aborted' },
+        'FAILED'
+      );
+      throw new DownloadAbortedError();
+    }
+
     const { message } = extractErrorDetails(error);
     getLogger().error(
       { component: 'http-client', method, url: scrubbedUrl, duration, error: message, ...logContext },
