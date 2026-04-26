@@ -13,17 +13,17 @@ export interface WorkerConfig<TData> {
 }
 
 export class WorkerRegistry {
-  private entries = new Map<WorkerName, { name: WorkerName; worker: Worker<Record<string, unknown>, unknown> }>();
+  private entries = new Map<WorkerName, { name: WorkerName; worker: Worker<unknown, unknown> }>();
 
-  register(name: WorkerName, worker: Worker<Record<string, unknown>, unknown>): void {
+  register(name: WorkerName, worker: Worker<unknown, unknown>): void {
     this.entries.set(name, { name, worker });
   }
 
-  get(name: WorkerName): Worker<Record<string, unknown>, unknown> | undefined {
+  get(name: WorkerName): Worker<unknown, unknown> | undefined {
     return this.entries.get(name)?.worker;
   }
 
-  getAll(): { name: WorkerName; worker: Worker<Record<string, unknown>, unknown> }[] {
+  getAll(): { name: WorkerName; worker: Worker<unknown, unknown> }[] {
     return Array.from(this.entries.values());
   }
 
@@ -109,7 +109,7 @@ export function createWorker<TData>(config: WorkerConfig<TData>): Worker<TData, 
     getLogger().error({ component: 'worker', workerName: name, err: details }, 'worker error');
   });
 
-  workerRegistry.register(name, worker as Worker<Record<string, unknown>, unknown>);
+  workerRegistry.register(name, worker as Worker<unknown, unknown>);
   getLogger().info({ name }, 'Worker created');
 
   return worker;

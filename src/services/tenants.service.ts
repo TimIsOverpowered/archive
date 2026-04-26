@@ -186,18 +186,12 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
  * Return all configured tenants with their enabled platforms.
  * Read from config files, not from the database.
  */
-export function getAllTenants(): Array<{
-  id: string;
-  display_name: string | null;
-  platforms: string[];
-  created_at: Date;
-}> {
+export function getAllTenants(): Pick<TenantConfig, 'id' | 'displayName' | 'createdAt'>[] {
   const configs = configService.getAll();
 
   return configs.map((config) => ({
     id: config.id,
-    display_name: config.displayName ?? null,
-    platforms: getEnabledPlatforms(config),
-    created_at: config.createdAt,
+    displayName: config.displayName,
+    createdAt: config.createdAt,
   }));
 }

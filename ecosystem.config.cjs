@@ -1,6 +1,11 @@
 /**
  * PM2 Ecosystem Configuration for Archive API
  *
+ * NOTE: This file MUST remain CommonJS (`ecosystem.config.cjs`, not `.mjs`
+ * or `.ts`). PM2's `--env` flag (`pm2 start --env production`) and the
+ * `pm2` CLI itself both expect a CJS module via `require()`. Converting
+ * to ESM would break `pm2 start`, `pm2 reload`, and `pm2 resurrect`.
+ *
  * Prerequisites:
  * - FlareSolverr must be running on FLARESOLVERR_BASE_URL (default: http://localhost:8191)
  *   See: https://github.com/FlareSolverr/FlareSolverr
