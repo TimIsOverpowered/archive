@@ -367,9 +367,8 @@ async function fetchPlaylist(ctx: LivePollingContext, retryCount: number) {
   );
 }
 
-async function fetchPlaylistForArchived(ctx: ArchivedVodContext & { ctx?: TenantContext }) {
-  const tenantId = ctx.ctx?.tenantId;
-  if (tenantId == null) throw new Error('tenantId required for archived vod download');
+async function fetchPlaylistForArchived(ctx: ArchivedVodContext) {
+  const tenantId = ctx.ctx.tenantId;
   if (ctx.platform === PLATFORMS.TWITCH) {
     return fetchTwitchPlaylist(ctx.vodId, ctx.log, 0, HLS_MAX_CONSECUTIVE_ERRORS, tenantId);
   }

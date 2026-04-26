@@ -12,6 +12,8 @@ export interface CircuitBreakerOptions {
 export interface CircuitBreakerState {
   state: CircuitState;
   failureCount: number;
+  failureThreshold: number;
+  recoveryTimeout: number;
   lastFailureTime: number | null;
   lastSuccessTime: number | null;
 }
@@ -27,13 +29,15 @@ export const breakerCache = new LRUCache<string, CircuitBreakerState>({
   allowStale: false,
 });
 
-function getOrCreateBreaker(key: string, _opts?: Partial<CircuitBreakerOptions>): CircuitBreakerState {
+function getOrCreateBreaker(key: string, opts?: Partial<CircuitBreakerOptions>): CircuitBreakerState {
   let state = breakerCache.get(key);
 
   if (!state) {
     state = {
       state: 'closed',
       failureCount: 0,
+      failureThreshold: opts?.failureThreshold ?? DEFAULT_OPTIONS.failureThreshold,
+      recoveryTimeout: opts?.recoveryTimeout ?? DEFAULT_OPTIONS.recoveryTimeout,
       lastFailureTime: null,
       lastSuccessTime: null,
     };
@@ -48,7 +52,7 @@ export function getCircuitState(key: string, opts?: Partial<CircuitBreakerOption
 
   if (state.state === 'open' && state.lastFailureTime != null) {
     const elapsed = Date.now() - state.lastFailureTime;
-    if (elapsed >= (opts?.recoveryTimeout ?? DEFAULT_OPTIONS.recoveryTimeout)) {
+    if (elapsed >= state.recoveryTimeout) {
       const nextState: CircuitBreakerState = { ...state, state: 'half-open' };
       breakerCache.set(key, nextState);
       return 'half-open';
@@ -73,12 +77,11 @@ export function recordFailure(key: string, opts?: Partial<CircuitBreakerOptions>
   const state = getOrCreateBreaker(key, opts);
 
   const newFailureCount = state.failureCount + 1;
-  const threshold = opts?.failureThreshold ?? DEFAULT_OPTIONS.failureThreshold;
   const nextState: CircuitBreakerState = {
     ...state,
     failureCount: newFailureCount,
     lastFailureTime: Date.now(),
-    state: newFailureCount >= threshold ? 'open' : state.state,
+    state: newFailureCount >= state.failureThreshold ? 'open' : state.state,
   };
   breakerCache.set(key, nextState);
 }
