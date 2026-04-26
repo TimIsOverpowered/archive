@@ -3,7 +3,13 @@ import { extractErrorDetails } from './error.js';
 import { getLogger } from '../utils/logger.js';
 import { LRUCache } from 'lru-cache';
 import { retryWithBackoff } from './retry.js';
-import { MAX_SWR_FAILURES, SWR_FAILURES_TTL_MS, SWR_FAILURES_TTL_SECONDS, INFLIGHT_TIMEOUT_MS, INFLIGHT_CACHE_MAX } from '../constants.js';
+import {
+  MAX_SWR_FAILURES,
+  SWR_FAILURES_TTL_MS,
+  SWR_FAILURES_TTL_SECONDS,
+  INFLIGHT_TIMEOUT_MS,
+  INFLIGHT_CACHE_MAX,
+} from '../constants.js';
 import type { SWRKey, SimpleKey } from './cache-keys.js';
 
 /** Metrics for Redis cache hit/miss/error tracking. */
