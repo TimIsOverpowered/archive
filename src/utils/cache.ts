@@ -4,6 +4,7 @@ import { getLogger } from '../utils/logger.js';
 import { LRUCache } from 'lru-cache';
 import { retryWithBackoff } from './retry.js';
 import { MAX_SWR_FAILURES, SWR_FAILURES_TTL_MS, SWR_FAILURES_TTL_SECONDS } from '../constants.js';
+import type { SWRKey, SimpleKey } from './cache-keys.js';
 
 /** Metrics for Redis cache hit/miss/error tracking. */
 export interface CacheMetrics {
@@ -53,20 +54,33 @@ const SWR_FAILURES = new LRUCache<string, number>({
 
 const inflightSimple = new Map<string, Promise<unknown>>();
 
+function isCacheEntry(raw: unknown): raw is CacheEntry<unknown> {
+  if (raw == null || typeof raw !== 'object') return false;
+  const obj = raw as Record<string, unknown>;
+  return typeof obj.timestamp === 'number' && obj.data !== undefined;
+}
+
 /**
  * Reads from Redis cache, falling back to the fetcher on miss or error.
  * On miss, calls the fetcher and stores the result in Redis with the given TTL.
  * Handles corrupt cache entries gracefully by falling back to the fetcher.
+ * Detects SWR-format entries (written by withStaleWhileRevalidate) and treats them as misses.
  */
-export async function withCache<T>(key: string, ttl: number, fetcher: () => Promise<T>): Promise<T> {
+export async function withCache<T>(key: SimpleKey, ttl: number, fetcher: () => Promise<T>): Promise<T> {
   const client = RedisService.getActiveClient();
   if (!client) return fetcher();
 
   try {
     const cached = await client.get(key);
     if (cached != null && cached !== '') {
+      const parsed: unknown = JSON.parse(cached);
+      if (isCacheEntry(parsed)) {
+        cacheMetrics.misses++;
+        getLogger().debug({ key }, 'Cache miss: SWR-format entry found in simple cache');
+        return fetcher();
+      }
       cacheMetrics.hits++;
-      return JSON.parse(cached) as T;
+      return parsed as T;
     }
     cacheMetrics.misses++;
   } catch (err) {
@@ -112,7 +126,7 @@ interface CacheEntry<T> {
  * Redis write failures during revalidation are silently ignored.
  */
 export async function withStaleWhileRevalidate<T>(
-  key: string,
+  key: SWRKey,
   ttl: number,
   staleAfter: number,
   fetcher: () => Promise<T>
@@ -125,7 +139,13 @@ export async function withStaleWhileRevalidate<T>(
   try {
     const cached = await client.get(key);
     if (cached != null && cached !== '') {
-      const entry = JSON.parse(cached) as unknown as CacheEntry<T>;
+      const parsed: unknown = JSON.parse(cached);
+      if (!isCacheEntry(parsed)) {
+        cacheMetrics.misses++;
+        getLogger().debug({ key }, 'Cache miss: simple-format entry found in SWR cache');
+        return fetcher();
+      }
+      const entry = parsed as CacheEntry<T>;
       const isStale = now - entry.timestamp > staleAfter * 1000;
 
       if (!isStale) {

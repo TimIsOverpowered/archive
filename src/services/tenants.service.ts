@@ -2,6 +2,7 @@ import { sql } from 'kysely';
 import dayjs from 'dayjs';
 import { configService } from '../config/tenant-config.js';
 import { withCache } from '../utils/cache.js';
+import { simpleKeys } from '../utils/cache-keys.js';
 import { PLATFORMS } from '../types/platforms.js';
 import { PERCENTAGE_PRECISION_MULTIPLIER, PERCENTAGE_PRECISION_DIVISOR } from '../constants.js';
 import type { TenantConfig } from '../config/types.js';
@@ -65,9 +66,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
 
   const thisMonthStart = dayjs().startOf('month').toDate();
 
-  const cacheKey = `stats:${tenantId}`;
-
-  return await withCache(cacheKey, cacheTtl, async () => {
+  return await withCache(simpleKeys.stats(tenantId), cacheTtl, async () => {
     let dbStatus = 'connected';
     try {
       await sql`SELECT 1`.execute(db);

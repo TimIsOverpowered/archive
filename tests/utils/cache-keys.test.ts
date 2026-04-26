@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { CacheKeys } from '../../src/utils/cache-keys.js';
+import { CacheKeys, swrKeys, simpleKeys } from '../../src/utils/cache-keys.js';
 
 describe('CacheKeys', () => {
   describe('vodStatic', () => {
@@ -149,5 +149,61 @@ describe('CacheKeys', () => {
       const key = CacheKeys.vodQuery('tenant-1', { a: undefined, b: undefined }, 1, 20);
       assert.strictEqual(key, 'vods:{tenant-1}:page:1:limit:20');
     });
+  });
+});
+
+describe('swrKeys', () => {
+  it('should produce same key strings as CacheKeys.vodStatic', () => {
+    assert.strictEqual(swrKeys.vodStatic('tenant-1', 42), CacheKeys.vodStatic('tenant-1', 42));
+  });
+
+  it('should produce same key strings as CacheKeys.vodPlatform', () => {
+    assert.strictEqual(swrKeys.vodPlatform('tenant-1', 'twitch', '12345'), CacheKeys.vodPlatform('tenant-1', 'twitch', '12345'));
+  });
+
+  it('should produce same key strings as CacheKeys.vodQuery', () => {
+    assert.strictEqual(
+      swrKeys.vodQuery('tenant-1', { title: 'test' }, 1, 20),
+      CacheKeys.vodQuery('tenant-1', { title: 'test' }, 1, 20)
+    );
+  });
+
+  it('should be typed as string (assignable to string)', () => {
+    const key: string = swrKeys.vodStatic('t', 1);
+    assert.ok(typeof key === 'string');
+  });
+});
+
+describe('simpleKeys', () => {
+  it('should produce same key strings as CacheKeys.vodStatic', () => {
+    assert.strictEqual(simpleKeys.vodStatic('tenant-1', 42), CacheKeys.vodStatic('tenant-1', 42));
+  });
+
+  it('should produce same key strings as CacheKeys.emotes', () => {
+    assert.strictEqual(simpleKeys.emotes('tenant-1', 42), CacheKeys.emotes('tenant-1', 42));
+  });
+
+  it('should produce same key strings as CacheKeys.bucket', () => {
+    assert.strictEqual(simpleKeys.bucket('tenant-1', 42, 0), CacheKeys.bucket('tenant-1', 42, 0));
+  });
+
+  it('should produce same key strings as CacheKeys.cursor', () => {
+    assert.strictEqual(simpleKeys.cursor('tenant-1', 42, 'abc'), CacheKeys.cursor('tenant-1', 42, 'abc'));
+  });
+
+  it('should produce same key strings as CacheKeys.vodQuery', () => {
+    assert.strictEqual(
+      simpleKeys.vodQuery('tenant-1', { title: 'test' }, 1, 20),
+      CacheKeys.vodQuery('tenant-1', { title: 'test' }, 1, 20)
+    );
+  });
+
+  it('should have stats factory', () => {
+    assert.strictEqual(simpleKeys.stats('tenant-1'), 'stats:tenant-1');
+  });
+
+  it('should be typed as string (assignable to string)', () => {
+    const key: string = simpleKeys.stats('t');
+    assert.ok(typeof key === 'string');
   });
 });

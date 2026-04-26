@@ -2,6 +2,7 @@ import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import { withCache, withStaleWhileRevalidate } from '../../src/utils/cache.js';
 import { resetEnvConfig } from '../../src/config/env.js';
+import { simpleKeys, swrKeys } from '../../src/utils/cache-keys.js';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
@@ -39,8 +40,8 @@ describe('withCache', () => {
         return { data: 'test', value: fetcherCalled };
       };
 
-      const result1 = await withCache('test-key', 60, fetcher);
-      const result2 = await withCache('test-key', 60, fetcher);
+      const result1 = await withCache(simpleKeys.stats('test-key'), 60, fetcher);
+      const result2 = await withCache(simpleKeys.stats('test-key'), 60, fetcher);
 
       assert.deepStrictEqual(result1, { data: 'test', value: 1 });
       assert.deepStrictEqual(result2, { data: 'test', value: 2 });
@@ -55,7 +56,7 @@ describe('withCache', () => {
       };
 
       for (let i = 0; i < 5; i++) {
-        await withCache('repeat-key', 60, fetcher);
+        await withCache(simpleKeys.stats('repeat-key'), 60, fetcher);
       }
 
       assert.strictEqual(fetcherCalled, 5);
@@ -68,8 +69,8 @@ describe('withCache', () => {
         return { callId: counter, value: `call-${counter}` };
       };
 
-      const result1 = await withCache('counter-key', 60, fetcher);
-      const result2 = await withCache('counter-key', 60, fetcher);
+      const result1 = await withCache(simpleKeys.stats('counter-key'), 60, fetcher);
+      const result2 = await withCache(simpleKeys.stats('counter-key'), 60, fetcher);
 
       assert.strictEqual(result1.callId, 1);
       assert.strictEqual(result2.callId, 2);
@@ -80,7 +81,7 @@ describe('withCache', () => {
   describe('error handling', () => {
     it('should return fetcher result when fetcher succeeds', async () => {
       const fetcher = async () => ({ data: 'success' });
-      const result = await withCache('success-key', 60, fetcher);
+      const result = await withCache(simpleKeys.stats('success-key'), 60, fetcher);
 
       assert.deepStrictEqual(result, { data: 'success' });
     });
@@ -91,7 +92,7 @@ describe('withCache', () => {
       };
 
       try {
-        await withCache('error-key', 60, fetcher);
+        await withCache(simpleKeys.stats('error-key'), 60, fetcher);
         assert.fail('Should have thrown');
       } catch (error) {
         assert.ok(error instanceof Error);
@@ -106,38 +107,38 @@ describe('withCache', () => {
 
       for (const testCase of testCases) {
         const fetcher = async () => testCase;
-        const result = await withCache(`type-test-${JSON.stringify(testCase)}`, 60, fetcher);
+        const result = await withCache(simpleKeys.stats(`type-test-${JSON.stringify(testCase)}`), 60, fetcher);
         assert.deepStrictEqual(result, testCase);
       }
     });
 
     it('should handle empty string result', async () => {
       const fetcher = async () => '';
-      const result = await withCache('empty-key', 60, fetcher);
+      const result = await withCache(simpleKeys.stats('empty-key'), 60, fetcher);
       assert.strictEqual(result, '');
     });
 
     it('should handle zero result', async () => {
       const fetcher = async () => 0;
-      const result = await withCache('zero-key', 60, fetcher);
+      const result = await withCache(simpleKeys.stats('zero-key'), 60, fetcher);
       assert.strictEqual(result, 0);
     });
 
     it('should handle false result', async () => {
       const fetcher = async () => false;
-      const result = await withCache('false-key', 60, fetcher);
+      const result = await withCache(simpleKeys.stats('false-key'), 60, fetcher);
       assert.strictEqual(result, false);
     });
 
     it('should handle empty object result', async () => {
       const fetcher = async () => ({});
-      const result = await withCache('empty-obj-key', 60, fetcher);
+      const result = await withCache(simpleKeys.stats('empty-obj-key'), 60, fetcher);
       assert.deepStrictEqual(result, {});
     });
 
     it('should handle empty array result', async () => {
       const fetcher = async () => [];
-      const result = await withCache('empty-arr-key', 60, fetcher);
+      const result = await withCache(simpleKeys.stats('empty-arr-key'), 60, fetcher);
       assert.deepStrictEqual(result, []);
     });
   });
@@ -166,7 +167,7 @@ describe('withStaleWhileRevalidate', () => {
         return { data: 'swr-test', count: fetcherCalled };
       };
 
-      const result = await withStaleWhileRevalidate('swr-key', 60, 30, fetcher);
+      const result = await withStaleWhileRevalidate(swrKeys.stats('swr-key'), 60, 30, fetcher);
       assert.deepStrictEqual(result, { data: 'swr-test', count: 1 });
       assert.strictEqual(fetcherCalled, 1);
     });
@@ -179,7 +180,7 @@ describe('withStaleWhileRevalidate', () => {
       };
 
       for (let i = 0; i < 3; i++) {
-        await withStaleWhileRevalidate('swr-repeat-key', 60, 30, fetcher);
+        await withStaleWhileRevalidate(swrKeys.stats('swr-repeat-key'), 60, 30, fetcher);
       }
 
       assert.strictEqual(fetcherCalled, 3);
@@ -189,7 +190,7 @@ describe('withStaleWhileRevalidate', () => {
   describe('error handling', () => {
     it('should return fetcher result on success', async () => {
       const fetcher = async () => ({ data: 'swr-success' });
-      const result = await withStaleWhileRevalidate('swr-success-key', 60, 30, fetcher);
+      const result = await withStaleWhileRevalidate(swrKeys.stats('swr-success-key'), 60, 30, fetcher);
 
       assert.deepStrictEqual(result, { data: 'swr-success' });
     });
@@ -200,7 +201,7 @@ describe('withStaleWhileRevalidate', () => {
       };
 
       try {
-        await withStaleWhileRevalidate('swr-fetcher-error', 60, 30, fetcher);
+        await withStaleWhileRevalidate(swrKeys.stats('swr-fetcher-error'), 60, 30, fetcher);
         assert.fail('Should have thrown');
       } catch (error) {
         assert.ok(error instanceof Error);
@@ -221,7 +222,7 @@ describe('withStaleWhileRevalidate', () => {
       };
 
       try {
-        await withStaleWhileRevalidate('swr-custom-error', 60, 30, fetcher);
+        await withStaleWhileRevalidate(swrKeys.stats('swr-custom-error'), 60, 30, fetcher);
         assert.fail('Should have thrown');
       } catch (error) {
         assert.ok(error instanceof CustomError);
@@ -236,20 +237,20 @@ describe('withStaleWhileRevalidate', () => {
 
       for (const testCase of testCases) {
         const fetcher = async () => testCase;
-        const result = await withStaleWhileRevalidate(`swr-type-${JSON.stringify(testCase)}`, 60, 30, fetcher);
+        const result = await withStaleWhileRevalidate(swrKeys.stats(`swr-type-${JSON.stringify(testCase)}`), 60, 30, fetcher);
         assert.deepStrictEqual(result, testCase);
       }
     });
 
     it('should handle null result', async () => {
       const fetcher = async () => null;
-      const result = await withStaleWhileRevalidate('swr-null-key', 60, 30, fetcher);
+      const result = await withStaleWhileRevalidate(swrKeys.stats('swr-null-key'), 60, 30, fetcher);
       assert.strictEqual(result, null);
     });
 
     it('should handle undefined result', async () => {
       const fetcher = async () => undefined;
-      const result = await withStaleWhileRevalidate('swr-undefined-key', 60, 30, fetcher);
+      const result = await withStaleWhileRevalidate(swrKeys.stats('swr-undefined-key'), 60, 30, fetcher);
       assert.strictEqual(result, undefined);
     });
 
@@ -264,7 +265,7 @@ describe('withStaleWhileRevalidate', () => {
       };
 
       const fetcher = async () => complexObj;
-      const result = await withStaleWhileRevalidate('swr-complex-key', 60, 30, fetcher);
+      const result = await withStaleWhileRevalidate(swrKeys.stats('swr-complex-key'), 60, 30, fetcher);
       assert.deepStrictEqual(result, complexObj);
     });
   });

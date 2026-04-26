@@ -8,7 +8,7 @@ import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { badRequest } from '../utils/http-error.js';
 import { LOGS_PAGE_SIZE, LOGS_DEFAULT_BUCKET_SIZE, LOGS_TARGET_COMMENTS_PER_BUCKET } from '../constants.js';
-import { CacheKeys } from '../utils/cache-keys.js';
+import { simpleKeys } from '../utils/cache-keys.js';
 import { VodNotFoundError } from '../utils/domain-errors.js';
 
 const BOUNDARIES = [30, 60, 90, 120, 180, 300, 600, 900, 1800, 3600];
@@ -25,7 +25,7 @@ function computeBucketSize(commentsPer100s: number): number {
 }
 
 async function getVodBucketSize(db: Kysely<StreamerDB>, tenantId: string, vodId: number): Promise<number> {
-  const key = CacheKeys.bucketSize(tenantId, vodId);
+  const key = simpleKeys.bucketSize(tenantId, vodId);
 
   const redis = RedisService.getActiveClient();
   if (redis) {
@@ -78,7 +78,7 @@ export async function getLogsByOffset(
 ): Promise<{ comments: SelectableChatMessages[]; cursor?: string | undefined }> {
   const bucketSize = await getVodBucketSize(db, tenantId, vodId);
   const bucket = Math.floor(offsetSeconds / bucketSize) * bucketSize;
-  const cacheKey = CacheKeys.bucket(tenantId, vodId, bucket);
+  const cacheKey = simpleKeys.bucket(tenantId, vodId, bucket);
   const redis = RedisService.getActiveClient();
 
   if (redis) {
@@ -173,7 +173,7 @@ export async function getLogsByCursor(
   vodId: number,
   cursor: string
 ): Promise<{ comments: SelectableChatMessages[]; cursor?: string | undefined }> {
-  const cacheKey = CacheKeys.cursor(tenantId, vodId, cursor);
+  const cacheKey = simpleKeys.cursor(tenantId, vodId, cursor);
   const redis = RedisService.getActiveClient();
 
   if (redis) {

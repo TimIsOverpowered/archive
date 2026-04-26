@@ -10,7 +10,7 @@ import { EMOTE_CACHE_TTL, FFZ_API_BASE, BTTV_API_BASE, SEVENTV_API_BASE } from '
 import { EmoteUpsertSchema } from '../config/schemas.js';
 import { invalidateEmoteCache } from './vod-cache.js';
 import { publishVodUpdate } from './cache-invalidator.js';
-import { CacheKeys } from '../utils/cache-keys.js';
+import { simpleKeys } from '../utils/cache-keys.js';
 
 /** Single emote from a third-party provider (FFZ, BTTV, 7TV). */
 export interface EmoteData {
@@ -170,7 +170,7 @@ export async function fetchAndSaveEmotes(
  * Compresses and caches results in Redis on cache miss.
  */
 export async function getEmotesByVodId(db: DBClient, tenantId: string, vodId: number): Promise<VodEmotes | null> {
-  const cacheKey = CacheKeys.emotes(tenantId, vodId);
+  const cacheKey = simpleKeys.emotes(tenantId, vodId);
 
   const redis = RedisService.getActiveClient();
   if (redis) {

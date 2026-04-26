@@ -14,7 +14,8 @@ import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
 import type { VodResponse } from '../types/vods.js';
 import { registerVodTags, setVodListCache } from './cache-tags.js';
 import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.js';
-import { CacheKeys } from '../utils/cache-keys.js';
+import type { SWRKey } from '../utils/cache-keys.js';
+import { swrKeys } from '../utils/cache-keys.js';
 import { buildPagination } from '../db/queries/builders.js';
 
 function applyVolatileData(
@@ -27,8 +28,8 @@ function applyVolatileData(
   });
 }
 
-function buildQueryCacheKey(tenantId: string, query: VodQuery, page: number, limit: number): string {
-  return CacheKeys.vodQuery(tenantId, query, page, limit);
+function buildQueryCacheKey(tenantId: string, query: VodQuery, page: number, limit: number): SWRKey {
+  return swrKeys.vodQuery(tenantId, query, page, limit);
 }
 
 function selectVodRelations(eb: ExpressionBuilder<StreamerDB, 'vods'>) {
@@ -177,7 +178,7 @@ export async function getVods(
  * Merges volatile data (duration, is_live) from Redis on top of cached static data.
  */
 export async function getVodById(db: DBClient, tenantId: string, vodId: number): Promise<VodResponse | null> {
-  const cacheKey = CacheKeys.vodStatic(tenantId, vodId);
+  const cacheKey = swrKeys.vodStatic(tenantId, vodId);
 
   const fetcher = async () => {
     const vod = await db
@@ -218,7 +219,7 @@ export async function getVodByPlatformId(
   platform: Platform,
   platformVodId: string
 ): Promise<VodResponse | null> {
-  const cacheKey = CacheKeys.vodPlatform(tenantId, platform, platformVodId);
+  const cacheKey = swrKeys.vodPlatform(tenantId, platform, platformVodId);
 
   const fetcher = async () => {
     const vod = await db
