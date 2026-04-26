@@ -13,7 +13,7 @@ const log = childLogger({ module: 'kick-chapters' });
 export async function updateChapterDuringDownload(ctx: TenantContext, dbId: number, vodId: string): Promise<void> {
   try {
     const { config } = ctx;
-    const username = config?.kick?.username;
+    const username = config.kick?.username;
     if (username == null || username === '') {
       log.warn({ dbId, vodId }, 'Kick username not configured');
       return;

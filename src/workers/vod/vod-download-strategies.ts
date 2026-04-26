@@ -32,7 +32,8 @@ async function withVodAlerts<T>(
     if (messageId !== null) await updateAlert(messageId, alerts.complete(vodId, platform, ''));
     return result;
   } catch (error) {
-    if (messageId !== null) await updateAlert(messageId, alerts.error(vodId, platform, extractErrorDetails(error).message.substring(0, 500)));
+    if (messageId !== null)
+      await updateAlert(messageId, alerts.error(vodId, platform, extractErrorDetails(error).message.substring(0, 500)));
     throw error;
   }
 }
@@ -64,7 +65,7 @@ async function downloadKickVodWithFfmpeg(
   config: TenantConfig,
   log: AppLogger
 ): Promise<void> {
-  const username = config?.kick?.username;
+  const username = config.kick?.username;
 
   if (username == null || username === '') {
     throw new ConfigNotConfiguredError(`Kick username for ${config.id}`);

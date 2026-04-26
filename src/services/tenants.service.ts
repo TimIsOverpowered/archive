@@ -67,48 +67,59 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
   const thisMonthStart = dayjs().startOf('month').toDate();
 
   return await withCache(simpleKeys.stats(tenantId), cacheTtl, async () => {
-    const [healthCheck, vodStats, uploadStats, chapterRow, thisMonthRow, uniqueGamesCount, totalUploadsRow, lastUploadRow] =
-      await Promise.all([
-        sql`SELECT 1`.execute(db).then(() => 'connected').catch(() => 'error'),
-        db
-          .selectFrom('vods')
-          .select((eb) => [
-            'platform',
-            eb.fn.count<number>('id').as('cnt'),
-            eb.fn.sum<number>('duration').as('dur'),
-            eb.fn.max('created_at').as('last'),
-          ])
-          .groupBy('platform')
-          .execute(),
-        db
-          .selectFrom('vod_uploads')
-          .select((eb) => [eb.fn.count<number>('upload_id').as('cnt')])
-          .where('status', '=', 'FAILED')
-          .executeTakeFirst(),
-        db
-          .selectFrom('chapters')
-          .select((eb) => [eb.fn.count<number>('id').as('cnt')])
-          .executeTakeFirst(),
-        db
-          .selectFrom('vods')
-          .select((eb) => [eb.fn.count<number>('id').as('cnt')])
-          .where('created_at', '>=', thisMonthStart)
-          .executeTakeFirst(),
-        db.selectFrom('chapters').select('game_id').where('game_id', 'is not', null).groupBy('game_id').execute(),
-        db
-          .selectFrom('vod_uploads')
-          .select((eb) => [eb.fn.count<number>('upload_id').as('cnt')])
-          .where('status', 'in', ['COMPLETED', 'FAILED'])
-          .executeTakeFirst(),
-        db
-          .selectFrom('vod_uploads')
-          .select((eb) => [eb.fn.max('created_at').as('maxCreatedAt')])
-          .where('status', '=', 'COMPLETED')
-          .executeTakeFirst(),
-      ]);
+    const [
+      healthCheck,
+      vodStats,
+      uploadStats,
+      chapterRow,
+      thisMonthRow,
+      uniqueGamesCount,
+      totalUploadsRow,
+      lastUploadRow,
+    ] = await Promise.all([
+      sql`SELECT 1`
+        .execute(db)
+        .then(() => 'connected')
+        .catch(() => 'error'),
+      db
+        .selectFrom('vods')
+        .select((eb) => [
+          'platform',
+          eb.fn.count('id').as('cnt'),
+          eb.fn.sum('duration').as('dur'),
+          eb.fn.max('created_at').as('last'),
+        ])
+        .groupBy('platform')
+        .execute(),
+      db
+        .selectFrom('vod_uploads')
+        .select((eb) => [eb.fn.count('upload_id').as('cnt')])
+        .where('status', '=', 'FAILED')
+        .executeTakeFirst(),
+      db
+        .selectFrom('chapters')
+        .select((eb) => [eb.fn.count('id').as('cnt')])
+        .executeTakeFirst(),
+      db
+        .selectFrom('vods')
+        .select((eb) => [eb.fn.count('id').as('cnt')])
+        .where('created_at', '>=', thisMonthStart)
+        .executeTakeFirst(),
+      db.selectFrom('chapters').select('game_id').where('game_id', 'is not', null).groupBy('game_id').execute(),
+      db
+        .selectFrom('vod_uploads')
+        .select((eb) => [eb.fn.count('upload_id').as('cnt')])
+        .where('status', 'in', ['COMPLETED', 'FAILED'])
+        .executeTakeFirst(),
+      db
+        .selectFrom('vod_uploads')
+        .select((eb) => [eb.fn.max('created_at').as('maxCreatedAt')])
+        .where('status', '=', 'COMPLETED')
+        .executeTakeFirst(),
+    ]);
 
-    const chapterCount = chapterRow?.cnt ?? 0;
-    const thisMonthCount = thisMonthRow?.cnt ?? 0;
+    const chapterCount = Number(chapterRow?.cnt ?? 0);
+    const thisMonthCount = Number(thisMonthRow?.cnt ?? 0);
 
     const byPlatform: Record<string, number> = {};
     let totalDurationSeconds = 0;
@@ -133,7 +144,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
           PERCENTAGE_PRECISION_DIVISOR
         : 0;
 
-    const uniqueGames = new Set(uniqueGamesCount.map((g: { game_id: string | null }) => g.game_id));
+    const uniqueGames = new Set(uniqueGamesCount.map((g) => g.game_id));
 
     const stats: TenantStats = {
       tenant: {
@@ -147,7 +158,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
         lastChecked: new Date(),
       },
       vods: {
-        totalCount: vodStats.reduce((sum: number, s: { cnt: number | string }) => sum + Number(s.cnt), 0),
+        totalCount: vodStats.reduce((sum, s) => sum + Number(s.cnt), 0),
         byPlatform,
         totalHours: Math.round((totalDurationSeconds / 3600) * 10) / 10,
         lastVodDate,

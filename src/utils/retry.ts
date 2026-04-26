@@ -13,6 +13,7 @@ export interface RetryOptions {
  */
 export async function retryWithBackoff<T>(fn: () => Promise<T>, options: RetryOptions): Promise<T> {
   const { attempts, baseDelayMs, maxDelayMs = 30_000, jitter = true, shouldRetry } = options;
+  if (attempts <= 0) throw new Error('RetryOptions.attempts must be > 0');
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
