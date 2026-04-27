@@ -3,7 +3,7 @@ import { deleteFileIfExists } from '../../utils/path.js';
 import { childLogger } from '../../utils/logger.js';
 import path from 'path';
 import { toHHMMSS } from '../../utils/formatting.js';
-import { concatSegments, extractSegment, generateBlackSegment, getMetadata } from '../utils/ffmpeg.js';
+import { concatSegments, extractSegment, generateBlackSegment, getMetadata, type ConcatSegmentsOptions } from '../utils/ffmpeg.js';
 export { muteAudioSections } from '../utils/ffmpeg.js';
 
 const log = childLogger({ module: 'dmca' });
@@ -94,6 +94,7 @@ export interface BlackoutProgressOptions {
   onProgress?: (percent: number) => void;
   onStep?: (step: string, current: number, total: number) => void;
   onStart?: (cmd: string) => void;
+  audioFilters?: string[];
 }
 
 /**
@@ -182,7 +183,13 @@ export async function blackoutVideoSections(
       reportStep(`extract:${toHHMMSS(prevEnd)}-${toHHMMSS(totalDuration)}`);
     }
 
-    const result = await concatSegments(segmentFiles, outputPath, reportProgress, options?.onStart, totalDuration);
+    const concatOpts: ConcatSegmentsOptions = {
+      onProgress: reportProgress,
+      totalDuration,
+    };
+    if (options?.onStart != null) concatOpts.onStart = options.onStart;
+    if (options?.audioFilters != null) concatOpts.audioFilters = options.audioFilters;
+    const result = await concatSegments(segmentFiles, outputPath, concatOpts);
     reportStep('concat');
     return result;
   } finally {

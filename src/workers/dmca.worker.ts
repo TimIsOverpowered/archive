@@ -7,6 +7,7 @@ import {
   buildMuteFilters,
   muteAudioSections,
   blackoutVideoSections,
+  cleanupTempFiles,
   BlackoutSection,
   CLAIM_TYPES,
   getClaimIdentifier,
@@ -108,6 +109,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
   );
 
   let processedPath = filePath;
+  const tempFiles: string[] = [];
   let ffmpegCmd: string | undefined;
   let currentFfmpegProgress = -1;
   const workDir = getVodDirPath({ config, vodId });
@@ -186,20 +188,23 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     const audioClaims = blockingClaims.filter((claim) => claim.type === CLAIM_TYPES.AUDIO);
     const audioVisualClaims = blockingClaims.filter((claim) => claim.type === CLAIM_TYPES.AUDIOVISUAL);
     const visualClaims = blockingClaims.filter((claim) => claim.type === CLAIM_TYPES.VISUAL);
+    const blackoutClaims = [...visualClaims, ...audioVisualClaims];
+    const muteClaims = [...audioClaims, ...audioVisualClaims];
+    const muteFilters = muteClaims.length > 0 ? buildMuteFilters(muteClaims) : [];
 
-    if (visualClaims.length > 0) {
+    if (blackoutClaims.length > 0) {
       log.info(
         {
           vodId,
-          count: visualClaims.length,
-          claims: visualClaims.map((c) => ({ claimId: c.claimId, identifier: getClaimIdentifier(c) })),
+          count: blackoutClaims.length,
+          claims: blackoutClaims.map((c) => ({ claimId: c.claimId, identifier: getClaimIdentifier(c) })),
         },
         'Processing visual claims (blackout)'
       );
 
       const blackoutSections: BlackoutSection[] = [];
 
-      for (const claim of visualClaims) {
+      for (const claim of blackoutClaims) {
         const startSeconds = parseInt(String(claim.matchDetails.longestMatchStartTimeSeconds)) ?? 0;
         const durationSeconds = parseInt(claim.matchDetails.longestMatchDurationSeconds) ?? 0;
         const endSeconds = startSeconds + durationSeconds;
@@ -230,74 +235,21 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
           ffmpegCmd = cmd;
           currentFfmpegProgress = 0;
         },
+        audioFilters: muteFilters,
       });
 
       if (blackoutedPath == null) {
         throw new Error('Failed to process visual claims');
       }
 
+      if (processedPath !== filePath) tempFiles.push(processedPath);
       processedPath = blackoutedPath;
-      markClaimsCompleted(visualClaims);
+      markClaimsCompleted(blackoutClaims);
+      if (muteFilters.length > 0) {
+        markClaimsCompleted(muteClaims);
+      }
       debouncedAlertUpdate('visual-claims-complete');
-    }
-
-    if (audioVisualClaims.length > 0) {
-      log.info(
-        {
-          vodId,
-          count: audioVisualClaims.length,
-          claims: audioVisualClaims.map((c) => ({ claimId: c.claimId, identifier: getClaimIdentifier(c) })),
-        },
-        'Processing audio-visual claims (blackout)'
-      );
-
-      const blackoutSections: BlackoutSection[] = [];
-
-      for (const claim of audioVisualClaims) {
-        const startSeconds = parseInt(String(claim.matchDetails.longestMatchStartTimeSeconds)) ?? 0;
-        const durationSeconds = parseInt(claim.matchDetails.longestMatchDurationSeconds) ?? 0;
-        const endSeconds = startSeconds + durationSeconds;
-
-        log.info(
-          {
-            vodId,
-            claimId: claim.claimId,
-            claimTitle: getClaimIdentifier(claim),
-            startSeconds,
-            endSeconds,
-          },
-          'Blackouting section'
-        );
-
-        blackoutSections.push({ startSeconds, durationSeconds, endSeconds });
-      }
-
-      const blackoutedPath = await blackoutVideoSections(processedPath, vodId, blackoutSections, workDir, {
-        onProgress: (pct) => {
-          currentFfmpegProgress = pct;
-          debouncedAlertUpdate('blackout-audiovisual', pct);
-        },
-        onStep: (step, current, total) => {
-          debouncedAlertUpdate(`blackout-av [${current}/${total}]: ${step}`);
-        },
-        onStart: (cmd) => {
-          ffmpegCmd = cmd;
-          currentFfmpegProgress = 0;
-        },
-      });
-
-      if (blackoutedPath == null) {
-        throw new Error('Failed to process audio-visual claims');
-      }
-
-      processedPath = blackoutedPath;
-      markClaimsCompleted(audioVisualClaims);
-      debouncedAlertUpdate('audiovisual-claims-complete');
-    }
-
-    if (audioClaims.length > 0 || audioVisualClaims.length > 0) {
-      const muteClaims = [...audioClaims, ...audioVisualClaims];
-
+    } else if (muteClaims.length > 0) {
       log.info(
         {
           vodId,
@@ -307,7 +259,6 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
         'Processing audio claims (mute)'
       );
 
-      const muteFilters = buildMuteFilters(muteClaims);
       const mutedPath = `${processedPath.replace('.mp4', '-muted.mp4')}`;
 
       const mutedResult = await muteAudioSections(
@@ -328,6 +279,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
         throw new Error('Failed to process audio claims');
       }
 
+      if (processedPath !== filePath) tempFiles.push(processedPath);
       processedPath = mutedResult;
       markClaimsCompleted(muteClaims);
       debouncedAlertUpdate('mute-complete');
@@ -340,7 +292,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
 
     log.info({ vodId, part }, 'Queuing YouTube upload');
 
-    const jobId = await queueYoutubeVodUpload(
+    void queueYoutubeVodUpload(
       { tenantId, config, db },
       dbId,
       vodId,
@@ -352,20 +304,16 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       part
     );
 
-    if (jobId == null) {
-      throw new Error('Failed to queue YouTube upload job');
-    }
-
-    log.info({ vodId, jobId }, 'YouTube upload job queued');
-    await updateAlert(messageId, dmcaAlerts.complete(vodId, jobId, claimInfos, platform, displayName));
-
-    return { success: true, youtubeJobId: jobId, vodId };
+    return { success: true, vodId };
   } catch (error) {
     const errorMsg = handleWorkerError(error, log, { vodId, dbId, tenantId, jobId: job.id, platform });
     await updateAlert(messageId, dmcaAlerts.error(vodId, errorMsg));
 
     throw error;
   } finally {
+    if (tempFiles.length > 0) {
+      await cleanupTempFiles(tempFiles);
+    }
     if (alertTimer.current != null) {
       clearTimeout(alertTimer.current);
     }

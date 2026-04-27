@@ -495,22 +495,33 @@ export async function extractSegment(
   });
 }
 
+export interface ConcatSegmentsOptions {
+  onProgress?: (percent: number) => void;
+  onStart?: (cmd: string) => void;
+  totalDuration?: number;
+  audioFilters?: string[];
+}
+
 export async function concatSegments(
   segmentFiles: string[],
   outputPath: string,
-  onProgress?: (percent: number) => void,
-  onStart?: (cmd: string) => void,
-  totalDuration?: number
+  options?: ConcatSegmentsOptions
 ): Promise<string | null> {
   return new Promise((resolve) => {
     const listPath = outputPath.replace('.mp4', '-concat.txt');
     writeFileSync(listPath, segmentFiles.map((f) => `file '${f}'`).join('\n') + '\n');
 
-    const args = ['-v', 'info', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', '-y', outputPath];
+    const args: string[] = ['-v', 'info', '-f', 'concat', '-safe', '0', '-i', listPath];
+    if (options?.audioFilters != null && options.audioFilters.length > 0) {
+      args.push('-c:v', 'copy', '-af', options.audioFilters.join(','), '-c:a', 'aac');
+    } else {
+      args.push('-c', 'copy');
+    }
+    args.push('-y', outputPath);
     const cmdStr = `ffmpeg ${args.join(' ')}`;
 
     const proc = spawn('ffmpeg', args);
-    trackProgress(proc, cmdStr, totalDuration ?? null, onProgress, onStart);
+    trackProgress(proc, cmdStr, options?.totalDuration ?? null, options?.onProgress, options?.onStart);
 
     proc.on('close', (code) => {
       void deleteFileIfExists(listPath);
