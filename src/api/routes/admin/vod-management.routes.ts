@@ -78,9 +78,9 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
             createdAt: { type: 'string' },
             duration: { type: 'number' },
             platform: { type: 'string', enum: PLATFORM_VALUES },
-            source: { type: 'string', enum: ['manual', 'api'] },
+            source: { type: 'string', enum: ['manual', 'api'], default: 'api' },
           },
-          required: ['vodId', 'platform', 'source'],
+          required: ['vodId', 'platform'],
         },
         security: [{ apiKey: [] }],
       },
@@ -97,6 +97,12 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
         throw new HttpError(400, 'vodId is required', 'BAD_REQUEST');
       }
 
+      const vodRecord = await findVodRecord(db, vodId, platform);
+
+      if (vodRecord) {
+        return { data: { message: `${vodId} already exists!`, vodId: vodId } };
+      }
+
       if (source === 'api') {
         const vodRecord = await ensureVodRecord(tenantCtx, vodId, log);
 
@@ -109,12 +115,6 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
 
         log.info(`Created/fetched VOD ${vodId} via API`);
         return { data: { message: `${vodRecord.id} created!`, vodId: vodRecord.id } };
-      }
-
-      const vodRecord = await findVodRecord(db, vodId, platform);
-
-      if (vodRecord) {
-        return { data: { message: `${vodId} already exists!`, vodId: vodId } };
       }
 
       const { title, createdAt, duration } = request.body;

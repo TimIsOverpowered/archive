@@ -7,7 +7,7 @@ export const VOD_MIN_CONCURRENCY = 50; // Minimum concurrent live workers regard
 export const VOD_DURATION_TOLERANCE_SECONDS = 1;
 
 // ── Chat Download ────────────────────────────────────────────────────────────
-export const CHAT_BATCH_SIZE = 500;
+export const CHAT_BATCH_SIZE = 1250;
 export const CHAT_RATE_LIMIT_MS = 150;
 export const CHAT_MAX_RETRIES = 2;
 export const CHAT_RETRY_DELAY_MS = 1_000;
