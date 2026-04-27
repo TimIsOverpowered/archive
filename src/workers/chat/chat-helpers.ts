@@ -48,10 +48,15 @@ export function extractEdges(
 export async function calculateResumeOffset(
   db: Kysely<StreamerDB>,
   vodId: number,
-  manualStartOffset?: number
+  manualStartOffset?: number,
+  forceRerun?: boolean
 ): Promise<{ offset: number; hasExistingData: boolean; lastMessageId?: string }> {
   if (manualStartOffset != null) {
     return { offset: manualStartOffset, hasExistingData: false };
+  }
+
+  if (forceRerun === true) {
+    return { offset: 0, hasExistingData: false };
   }
 
   const lastSavedRecord = await db

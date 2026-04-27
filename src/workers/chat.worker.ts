@@ -55,7 +55,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
     offset: effectiveOffset,
     hasExistingData,
     lastMessageId,
-  } = await calculateResumeOffset(db, dbId, startOffset);
+  } = await calculateResumeOffset(db, dbId, startOffset, forceRerun);
   log.debug(
     { component: 'chat-worker', vodId, startOffset, effectiveOffset, hasExistingData },
     'Resume check completed'
