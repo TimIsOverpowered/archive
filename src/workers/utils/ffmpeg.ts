@@ -259,7 +259,7 @@ export async function generateBlackSegment(
   onStart?: (cmd: string) => void
 ): Promise<string | null> {
   return new Promise((resolve) => {
-    const { width, height, frameRate, pixFmt, audioCodec, sampleRate, channels } = metadata;
+    const { width, height, frameRate, pixFmt, audioCodec, sampleRate, channels, profile } = metadata;
     const videoCodec = resolveVideoEncoder(metadata.videoCodec);
     const fr = frameRate ?? '30';
     const pf = pixFmt ?? 'yuv420p';
@@ -270,7 +270,10 @@ export async function generateBlackSegment(
       .input(colorSrc)
       .duration(duration)
       .videoCodec(videoCodec)
-      .outputOptions(['-pix_fmt', pf])
+      .outputOptions([
+        '-pix_fmt', pf,
+        ...(profile != null && profile !== '' ? ['-profile:v', profile] : []),
+      ])
       .toFormat('mp4');
 
     if (audioCodec != null && sampleRate != null) {
