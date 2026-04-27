@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
-import { getDuration } from './utils/ffmpeg.js';
+import { getMetadata } from './utils/ffmpeg.js';
 import { fileExists, getVodDirPath } from '../utils/path.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { extractErrorDetails } from '../utils/error.js';
@@ -130,7 +130,7 @@ export async function runFinalization(
   ctx: LiveProcessorContext,
   downloadResult: LiveDownloadResult
 ): Promise<number | null> {
-  const actualDuration = await getDuration(downloadResult.finalMp4Path);
+  const actualDuration = (await getMetadata(downloadResult.finalMp4Path))?.duration ?? null;
   await finalizeVod({
     ctx,
     dbId: ctx.dbId,

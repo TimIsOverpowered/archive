@@ -137,17 +137,72 @@ export async function trimVideo(
   });
 }
 
-export async function getDuration(filePath: string): Promise<number | null> {
+export interface VideoMetadata {
+  duration: number;
+  width: number;
+  height: number;
+  videoCodec: string;
+  audioCodec: string | null;
+  videoBitRate: string | null;
+  audioBitRate: string | null;
+  formatBitRate: number | null;
+  fileSize: number | null;
+  formatName: string | null;
+  formatLongName: string | null;
+  sampleRate: number | null;
+  channels: number | null;
+  channelLayout: string | null;
+  frameRate: string | null;
+  pixFmt: string | null;
+  profile: string | null;
+  nbStreams: number | null;
+  nbPrograms: number | null;
+  tags: Record<string, string | number> | null;
+}
+
+export async function getMetadata(filePath: string): Promise<VideoMetadata | null> {
   return new Promise((resolve) => {
-    ffmpeg.ffprobe(filePath, (err, metadata) => {
-      if (err != null || metadata.format?.duration == null) {
+    ffmpeg.ffprobe(filePath, (err, data) => {
+      if (err != null) {
         const errDetails = extractErrorDetails(err);
-        logger.error({ filePath, error: errDetails.message }, `Failed to probe video file`);
+        logger.error({ filePath, error: errDetails.message }, 'Failed to probe file');
         resolve(null);
-      } else {
-        const duration = Math.round(metadata.format.duration);
-        resolve(duration > 0 ? duration : null);
+        return;
       }
+
+      const videoStream = data.streams.find((s) => s.codec_type === 'video');
+      const audioStream = data.streams.find((s) => s.codec_type === 'audio');
+      const fmt = data.format;
+      const duration = fmt?.duration != null ? Math.round(fmt.duration) : 0;
+
+      if (duration <= 0 || !videoStream) {
+        logger.warn({ filePath }, 'Invalid duration or no video stream found');
+        resolve(null);
+        return;
+      }
+
+      resolve({
+        duration,
+        width: videoStream.width ?? 0,
+        height: videoStream.height ?? 0,
+        videoCodec: videoStream.codec_name ?? '',
+        audioCodec: audioStream?.codec_name ?? null,
+        videoBitRate: videoStream.bit_rate ?? null,
+        audioBitRate: audioStream?.bit_rate ?? null,
+        formatBitRate: fmt.bit_rate ?? null,
+        fileSize: fmt.size ?? null,
+        formatName: fmt.format_name ?? null,
+        formatLongName: fmt.format_long_name ?? null,
+        sampleRate: audioStream?.sample_rate ?? null,
+        channels: audioStream?.channels ?? null,
+        channelLayout: audioStream?.channel_layout ?? null,
+        frameRate: videoStream.r_frame_rate ?? null,
+        pixFmt: videoStream.pix_fmt ?? null,
+        profile: videoStream.profile?.toString() ?? null,
+        nbStreams: fmt.nb_streams ?? null,
+        nbPrograms: fmt.nb_programs ?? null,
+        tags: fmt.tags ?? null,
+      });
     });
   });
 }
@@ -155,26 +210,6 @@ export async function getDuration(filePath: string): Promise<number | null> {
 export interface VideoDimensions {
   width: number;
   height: number;
-}
-
-export async function getVideoDimensions(filePath: string): Promise<VideoDimensions | null> {
-  return new Promise((resolve) => {
-    ffmpeg.ffprobe(filePath, (err, metadata) => {
-      if (err !== null || metadata.streams.length === 0) {
-        const errDetails = extractErrorDetails(err);
-        logger.error({ filePath, error: errDetails.message }, `Failed to probe video dimensions`);
-        resolve(null);
-      } else {
-        const videoStream = metadata.streams.find((s) => s.codec_type === 'video');
-        if (videoStream?.width != null && videoStream?.height != null) {
-          resolve({ width: videoStream.width, height: videoStream.height });
-        } else {
-          logger.warn({ filePath }, 'No video stream found');
-          resolve(null);
-        }
-      }
-    });
-  });
 }
 
 export async function generateBlackSegment(

@@ -5,7 +5,7 @@ import { extractErrorDetails } from '../../utils/error.js';
 import { deleteFileIfExists } from '../../utils/path.js';
 import { childLogger } from '../../utils/logger.js';
 import { toHHMMSS } from '../../utils/formatting.js';
-import { generateBlackSegment, getDuration, getVideoDimensions } from '../utils/ffmpeg.js';
+import { generateBlackSegment, getMetadata } from '../utils/ffmpeg.js';
 
 interface ProgressEvent {
   percent?: number;
@@ -78,6 +78,8 @@ export function buildMuteFilters(claims: DMCAClaim[]): string[] {
   const muteSection: string[] = [];
 
   for (const claim of claims) {
+    if (!isBlockingPolicy(claim)) continue;
+
     const startTime = parseInt(claim.matchDetails.longestMatchStartTimeSeconds);
     const endTime = startTime + parseInt(claim.matchDetails.longestMatchDurationSeconds);
 
@@ -252,17 +254,14 @@ export async function blackoutVideoSections(
   if (sections.length === 0) return videoPath;
 
   const outputPath = `${vodId}-blackouted.mp4`;
-  const dims = await getVideoDimensions(videoPath);
-  if (!dims) {
-    log.error({ videoPath, vodId }, 'Failed to get video dimensions');
+  const meta = await getMetadata(videoPath);
+  if (!meta) {
+    log.error({ videoPath, vodId }, 'Failed to get video metadata');
     return null;
   }
 
-  const totalDuration = await getDuration(videoPath);
-  if (totalDuration === null) {
-    log.error({ videoPath, vodId }, 'Failed to get video duration');
-    return null;
-  }
+  const dims = { width: meta.width, height: meta.height };
+  const totalDuration = meta.duration;
 
   const sorted = [...sections].sort((a, b) => a.startSeconds - b.startSeconds);
   const tempFiles: string[] = [];

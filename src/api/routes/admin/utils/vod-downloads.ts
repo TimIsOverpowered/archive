@@ -1,5 +1,5 @@
 import { getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
-import { getDuration } from '../../../../workers/utils/ffmpeg.js';
+import { getMetadata } from '../../../../workers/utils/ffmpeg.js';
 import { type AppLogger } from '../../../../utils/logger.js';
 import type { VodRecord } from '../../../../types/db.js';
 import type { Platform, SourceType, DownloadMethod } from '../../../../types/platforms.js';
@@ -88,7 +88,8 @@ async function checkIfDownloadNeeded(
     return true;
   }
 
-  const actualDuration = await getDuration(filePath);
+  const meta = await getMetadata(filePath);
+  const actualDuration = meta?.duration;
   if (actualDuration == null || Number.isNaN(actualDuration)) {
     log.warn({ filePath }, 'Could not determine file duration');
     return true;

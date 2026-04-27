@@ -1,7 +1,7 @@
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../../db/streamer-types.js';
 import type { AppLogger } from '../../utils/logger.js';
-import { splitVideo, getDuration } from '../utils/ffmpeg.js';
+import { splitVideo, getMetadata } from '../utils/ffmpeg.js';
 import { uploadVideo, saveChaptersAndLinkParts } from '../../services/youtube/index.js';
 import { initRichAlert, updateAlert, createProgressBar } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
@@ -52,7 +52,7 @@ export async function processVodUpload(ctx: VodUploadContext): Promise<VodUpload
   const domainName = config.settings?.domainName ?? 'localhost';
   const privacyStatus = config.youtube?.public === true ? 'public' : 'unlisted';
   const splitDuration = getEffectiveSplitDuration(config.youtube?.splitDuration);
-  const duration = (await getDuration(filePath)) ?? vodRecord.duration;
+  const duration = (await getMetadata(filePath))?.duration ?? vodRecord.duration;
 
   const platformName = vodRecord.platform as Platform;
 
@@ -288,7 +288,7 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
     timestamp: new Date().toISOString(),
   });
 
-  const duration = (await getDuration(filePath)) ?? vodRecord.duration;
+  const duration = (await getMetadata(filePath))?.duration ?? vodRecord.duration;
 
   const onUploadProgress =
     uploadAlertMessageId != null

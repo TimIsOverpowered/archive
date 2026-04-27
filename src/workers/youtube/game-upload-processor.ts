@@ -1,7 +1,7 @@
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../../db/streamer-types.js';
 import type { AppLogger } from '../../utils/logger.js';
-import { trimVideo, splitVideo, getDuration } from '../utils/ffmpeg.js';
+import { trimVideo, splitVideo, getMetadata } from '../utils/ffmpeg.js';
 import { uploadVideo } from '../../services/youtube/index.js';
 import { initRichAlert, updateAlert, createProgressBar } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
@@ -50,7 +50,7 @@ export async function processGameUpload(ctx: GameUploadContext): Promise<GameUpl
     undefined,
     () => {}
   );
-  const trimmedDuration = (await getDuration(trimmedPath)) ?? 0;
+  const trimmedDuration = (await getMetadata(trimmedPath))?.duration ?? 0;
 
   const gameExceedsYoutubeMax = trimmedDuration > YOUTUBE_MAX_DURATION;
 

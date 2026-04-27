@@ -2,7 +2,7 @@ import { withDbRetry } from '../../db/streamer-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
-import { getDuration } from '../utils/ffmpeg.js';
+import { getMetadata } from '../utils/ffmpeg.js';
 import type { TenantContext } from '../../types/context.js';
 import { VodUpdateSchema } from '../../config/schemas.js';
 import { publishVodDurationUpdate } from '../../services/cache-invalidator.js';
@@ -31,12 +31,12 @@ export async function updateVodDurationDuringDownload(
       // Fallback to ffprobe on m3u8 file if tag not found
       if (duration == null && m3u8Path != null) {
         log.debug({ vodId }, 'Twitch tag not found, falling back to ffprobe');
-        duration = await getDuration(m3u8Path);
+        duration = (await getMetadata(m3u8Path))?.duration ?? null;
       }
     }
     // Other platforms: ffprobe on m3u8 file
     else if (m3u8Path != null) {
-      duration = await getDuration(m3u8Path);
+      duration = (await getMetadata(m3u8Path))?.duration ?? null;
     }
 
     // No duration found
