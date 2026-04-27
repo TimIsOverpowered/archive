@@ -472,12 +472,10 @@ export function createDmcaWorkerAlerts(): DmcaWorkerAlerts {
       const claimList = formatClaimList(claims, completedClaimIds, undefined, stepProgress);
       const completed = completedClaimIds.length;
       const total = claims.length;
-      const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
-      const progressBar = createProgressBar(percent);
 
       return {
         title: `⚖️ DMCA Processing ${vodId}`,
-        description: `${completed}/${total} claims processed — ${currentStep}\n${progressBar}\n\n${claimList}`,
+        description: `${completed}/${total} claims processed — ${currentStep}\n\n${claimList}`,
         status: 'warning',
         fields: [{ name: 'VOD ID', value: vodId, inline: false }],
         timestamp: new Date().toISOString(),

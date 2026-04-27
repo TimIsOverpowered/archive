@@ -118,11 +118,11 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     if (ffmpegCmd == null) return '';
     const cmdTruncated = ffmpegCmd.length > 500 ? ffmpegCmd.substring(0, 500) + '...' : ffmpegCmd;
     if (currentFfmpegProgress >= 100) {
-      return `✅ FFmpeg complete\n\`${cmdTruncated}\``;
+      return `✅ Complete\n\`${cmdTruncated}\``;
     }
     const bar =
       '█'.repeat(Math.floor(currentFfmpegProgress / 10)) + '░'.repeat(10 - Math.floor(currentFfmpegProgress / 10));
-    return `FFmpeg [${bar}] ${currentFfmpegProgress}%\n\`${cmdTruncated}\``;
+    return `[${bar}] ${currentFfmpegProgress}%\n\`${cmdTruncated}\``;
   };
   const sendAlertUpdate = () => {
     if (!pendingAlert.current) return;
@@ -132,7 +132,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
         ? dmcaAlerts.progress(vodId, claimInfos, completedClaimIds, step, progress)
         : dmcaAlerts.progress(vodId, claimInfos, completedClaimIds, step);
     if (ffmpegCmd != null) {
-      alertData.fields = [...(alertData.fields ?? []), { name: 'FFmpeg', value: formatFfmpegField(), inline: false }];
+      alertData.fields = [...(alertData.fields ?? []), { name: 'Progress', value: formatFfmpegField(), inline: false }];
     }
     void updateAlert(messageId, alertData).catch((err) => {
       log.warn({ err: extractErrorDetails(err) }, 'Discord alert update failed (non-critical)');
