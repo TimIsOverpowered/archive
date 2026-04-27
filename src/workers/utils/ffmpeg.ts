@@ -266,8 +266,8 @@ export async function generateBlackSegment(
     const colorSrc = `color=c=black:s=${width}x${height}:r=${fr}`;
 
     const proc = ffmpeg()
-      .inputOptions(['-f', 'lavfi'])
       .input(colorSrc)
+      .inputOptions(['-f', 'lavfi'])
       .duration(duration)
       .videoCodec(videoCodec)
       .outputOptions([
@@ -282,8 +282,8 @@ export async function generateBlackSegment(
       const audioSrc = `aevalsrc=0:d=${duration}:s=${sampleRate}:c=${chLayout}`;
 
       proc
-        .inputOptions(['-f', 'lavfi'])
         .input(audioSrc)
+        .inputOptions(['-f', 'lavfi'])
         .audioCodec(audioEncoder)
         .outputOptions(['-map', '0:v:0', '-map', '1:a:0']);
     }
