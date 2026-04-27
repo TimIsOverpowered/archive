@@ -27,13 +27,13 @@ describe('isBlockingPolicy', () => {
     assert.strictEqual(isBlockingPolicy(claim), true);
   });
 
-  it('should return true for POLICY_TYPE_BLOCK', () => {
+  it('should return false for POLICY_TYPE_BLOCK', () => {
     const claim = {
       type: CLAIM_TYPES.AUDIOVISUAL,
       claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_BLOCK' } },
       matchDetails: { longestMatchStartTimeSeconds: 5, longestMatchDurationSeconds: '10' },
     };
-    assert.strictEqual(isBlockingPolicy(claim), true);
+    assert.strictEqual(isBlockingPolicy(claim), false);
   });
 
   it('should return false for non-blocking policies', () => {
@@ -86,7 +86,7 @@ describe('buildMuteFilters', () => {
       },
       {
         type: CLAIM_TYPES.AUDIOVISUAL,
-        claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_BLOCK' } },
+        claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_MOSTLY_GLOBAL_BLOCK' } },
         matchDetails: { longestMatchStartTimeSeconds: 120, longestMatchDurationSeconds: '45' },
       },
     ];
@@ -174,7 +174,7 @@ describe('buildMuteFilters', () => {
       },
       {
         type: CLAIM_TYPES.AUDIOVISUAL,
-        claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_BLOCK' } },
+        claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_MOSTLY_GLOBAL_BLOCK' } },
         matchDetails: { longestMatchStartTimeSeconds: 100, longestMatchDurationSeconds: '5' },
       },
     ];

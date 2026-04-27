@@ -140,6 +140,56 @@ export async function getDuration(filePath: string): Promise<number | null> {
   });
 }
 
+export interface VideoDimensions {
+  width: number;
+  height: number;
+}
+
+export async function getVideoDimensions(filePath: string): Promise<VideoDimensions | null> {
+  return new Promise((resolve) => {
+    ffmpeg.ffprobe(filePath, (err, metadata) => {
+      if (err !== null || metadata.streams.length === 0) {
+        const errDetails = extractErrorDetails(err);
+        logger.error({ filePath, error: errDetails.message }, `Failed to probe video dimensions`);
+        resolve(null);
+      } else {
+        const videoStream = metadata.streams.find((s) => s.codec_type === 'video');
+        if (videoStream?.width != null && videoStream?.height != null) {
+          resolve({ width: videoStream.width, height: videoStream.height });
+        } else {
+          logger.warn({ filePath }, 'No video stream found');
+          resolve(null);
+        }
+      }
+    });
+  });
+}
+
+export async function generateBlackSegment(
+  outputPath: string,
+  duration: number,
+  dims: VideoDimensions
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    const colorSrc = `color=c=black:s=${dims.width}x${dims.height}:d=${duration}`;
+
+    ffmpeg()
+      .inputOptions(['-f', 'lavfi'])
+      .input(colorSrc)
+      .duration(duration)
+      .videoCodec('copy')
+      .toFormat('mp4')
+      .on('end', () => {
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        logger.error(`Black segment error: ${err.message}`);
+        resolve(null);
+      })
+      .saveToFile(outputPath);
+  });
+}
+
 /**
  * Converts HLS stream to MP4 using ffmpeg.
  * Caller is responsible for determining fMP4 status and passing it via options.isFmp4.

@@ -9,14 +9,17 @@ import {
   cleanupTempFiles,
   BlackoutSection,
   CLAIM_TYPES,
+  getClaimIdentifier,
 } from './dmca/dmca.js';
+import { toHHMMSS } from '../utils/formatting.js';
 import { trimVideo as ffmpegTrim } from './utils/ffmpeg.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
 import { handleWorkerError } from './utils/error-handler.js';
 import { fileExists } from '../utils/path.js';
+import { extractErrorDetails } from '../utils/error.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
-import { createDmcaWorkerAlerts } from './utils/alert-factories.js';
+import { createDmcaWorkerAlerts, DmcaClaimInfo } from './utils/alert-factories.js';
 import { ConfigNotConfiguredError, FileNotFound } from '../utils/domain-errors.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
@@ -59,12 +62,28 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
 
   const blockingClaims = receivedClaims.filter(isBlockingPolicy);
 
+  // Build claim info for Discord alerts
+  const buildClaimInfo = (claim: (typeof blockingClaims)[0]): DmcaClaimInfo => {
+    const startSec = parseInt(String(claim.matchDetails.longestMatchStartTimeSeconds)) ?? 0;
+    const durSec = parseInt(claim.matchDetails.longestMatchDurationSeconds) ?? 0;
+    return {
+      claimId: claim.claimId,
+      identifier: getClaimIdentifier(claim),
+      startTimestamp: toHHMMSS(startSec),
+      endTimestamp: toHHMMSS(startSec + durSec),
+      claimType: claim.type,
+    };
+  };
+
+  const claimInfos: DmcaClaimInfo[] = blockingClaims.map(buildClaimInfo);
+  const completedClaimIds: string[] = [];
+
   const dmcaAlerts = createDmcaWorkerAlerts();
-  const messageId = await initRichAlert(dmcaAlerts.processing(vodId, blockingClaims.length, part));
+  const messageId = await initRichAlert(dmcaAlerts.processing(vodId, claimInfos, part));
 
   if (blockingClaims.length === 0) {
     log.info({ vodId }, 'No blocking claims for VOD, uploading original');
-    await updateAlert(messageId, dmcaAlerts.complete(vodId, 'N/A'));
+    await updateAlert(messageId, dmcaAlerts.complete(vodId, 'N/A', []));
 
     return { success: true, message: 'No action needed' };
   }
@@ -77,12 +96,43 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       part,
       claimsCount: blockingClaims.length,
       jobId: job.id,
+      claims: claimInfos.map((c) => ({
+        claimId: c.claimId,
+        identifier: c.identifier,
+        type: c.claimType,
+        range: `${c.startTimestamp}-${c.endTimestamp}`,
+      })),
     },
     'Starting DMCA processing'
   );
 
   let processedPath = filePath;
   const tempFiles: string[] = [];
+
+  // Debounced Discord alert updater to avoid spam
+  const alertTimer = { current: null as ReturnType<typeof setTimeout> | null };
+  const debouncedAlertUpdate = (currentStep: string, stepProgress?: number) => {
+    if (alertTimer.current != null) {
+      clearTimeout(alertTimer.current);
+    }
+    alertTimer.current = setTimeout(() => {
+      void updateAlert(
+        messageId,
+        dmcaAlerts.progress(vodId, claimInfos, completedClaimIds, currentStep, stepProgress)
+      ).catch((err) => {
+        log.warn({ err: extractErrorDetails(err) }, 'Discord alert update failed (non-critical)');
+      });
+    }, 500);
+  };
+
+  const markClaimsCompleted = (claims: typeof blockingClaims) => {
+    for (const claim of claims) {
+      const key = claim.claimId ?? getClaimIdentifier(claim);
+      if (!completedClaimIds.includes(key)) {
+        completedClaimIds.push(key);
+      }
+    }
+  };
 
   try {
     if (part != null) {
@@ -104,61 +154,122 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     const audioVisualClaims = blockingClaims.filter((claim) => claim.type === CLAIM_TYPES.AUDIOVISUAL);
     const visualClaims = blockingClaims.filter((claim) => claim.type === CLAIM_TYPES.VISUAL);
 
-     if (visualClaims.length > 0) {
-      log.info({ vodId, count: visualClaims.length }, 'Processing visual claims');
+    if (visualClaims.length > 0) {
+      log.info(
+        {
+          vodId,
+          count: visualClaims.length,
+          claims: visualClaims.map((c) => ({ claimId: c.claimId, identifier: getClaimIdentifier(c) })),
+        },
+        'Processing visual claims (blackout)'
+      );
 
       const blackoutSections: BlackoutSection[] = [];
 
       for (const claim of visualClaims) {
-        const startSeconds = claim.matchDetails.longestMatchStartTimeSeconds;
+        const startSeconds = parseInt(String(claim.matchDetails.longestMatchStartTimeSeconds)) ?? 0;
         const durationSeconds = parseInt(claim.matchDetails.longestMatchDurationSeconds) ?? 0;
         const endSeconds = startSeconds + durationSeconds;
 
-        log.info({ vodId, startSeconds, endSeconds }, 'Blackouting section');
+        log.info(
+          {
+            vodId,
+            claimId: claim.claimId,
+            claimTitle: getClaimIdentifier(claim),
+            startSeconds,
+            endSeconds,
+          },
+          'Blackouting section'
+        );
 
         blackoutSections.push({ startSeconds, durationSeconds, endSeconds });
       }
 
-      const blackoutedPath = await blackoutVideoSections(processedPath, vodId, blackoutSections);
+      const blackoutedPath = await blackoutVideoSections(processedPath, vodId, blackoutSections, {
+        onProgress: (pct) => {
+          debouncedAlertUpdate('blackout-video', pct);
+        },
+        onStep: (step, current, total) => {
+          debouncedAlertUpdate(`blackout-video [${current}/${total}]: ${step}`);
+        },
+      });
 
       if (blackoutedPath == null) {
         throw new Error('Failed to process visual claims');
       }
 
       processedPath = blackoutedPath;
+      markClaimsCompleted(visualClaims);
+      debouncedAlertUpdate('visual-claims-complete');
     }
 
     if (audioVisualClaims.length > 0) {
-      log.info({ vodId, count: audioVisualClaims.length }, 'Processing audio-visual claims');
+      log.info(
+        {
+          vodId,
+          count: audioVisualClaims.length,
+          claims: audioVisualClaims.map((c) => ({ claimId: c.claimId, identifier: getClaimIdentifier(c) })),
+        },
+        'Processing audio-visual claims (blackout)'
+      );
 
       const blackoutSections: BlackoutSection[] = [];
 
       for (const claim of audioVisualClaims) {
-        const startSeconds = claim.matchDetails.longestMatchStartTimeSeconds;
+        const startSeconds = parseInt(String(claim.matchDetails.longestMatchStartTimeSeconds)) ?? 0;
         const durationSeconds = parseInt(claim.matchDetails.longestMatchDurationSeconds) ?? 0;
         const endSeconds = startSeconds + durationSeconds;
 
-        log.info({ vodId, startSeconds, endSeconds }, 'Blackouting section');
+        log.info(
+          {
+            vodId,
+            claimId: claim.claimId,
+            claimTitle: getClaimIdentifier(claim),
+            startSeconds,
+            endSeconds,
+          },
+          'Blackouting section'
+        );
 
         blackoutSections.push({ startSeconds, durationSeconds, endSeconds });
       }
 
-      const blackoutedPath = await blackoutVideoSections(processedPath, vodId, blackoutSections);
+      const blackoutedPath = await blackoutVideoSections(processedPath, vodId, blackoutSections, {
+        onProgress: (pct) => {
+          debouncedAlertUpdate('blackout-audiovisual', pct);
+        },
+        onStep: (step, current, total) => {
+          debouncedAlertUpdate(`blackout-av [${current}/${total}]: ${step}`);
+        },
+      });
 
       if (blackoutedPath == null) {
         throw new Error('Failed to process audio-visual claims');
       }
 
       processedPath = blackoutedPath;
+      markClaimsCompleted(audioVisualClaims);
+      debouncedAlertUpdate('audiovisual-claims-complete');
     }
 
     if (audioClaims.length > 0 || audioVisualClaims.length > 0) {
-      log.info({ vodId, count: audioClaims.length + audioVisualClaims.length }, 'Processing audio claims');
+      const muteClaims = [...audioClaims, ...audioVisualClaims];
 
-      const muteFilters = buildMuteFilters([...audioClaims, ...audioVisualClaims]);
+      log.info(
+        {
+          vodId,
+          count: muteClaims.length,
+          claims: muteClaims.map((c) => ({ claimId: c.claimId, identifier: getClaimIdentifier(c) })),
+        },
+        'Processing audio claims (mute)'
+      );
+
+      const muteFilters = buildMuteFilters(muteClaims);
       const mutedPath = `${processedPath.replace('.mp4', '-muted.mp4')}`;
 
-      const mutedResult = await muteAudioSections(processedPath, muteFilters, mutedPath);
+      const mutedResult = await muteAudioSections(processedPath, muteFilters, mutedPath, (pct) => {
+        debouncedAlertUpdate('mute-audio', pct);
+      });
 
       if (mutedResult == null) {
         throw new Error('Failed to process audio claims');
@@ -166,6 +277,13 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
 
       tempFiles.push(mutedPath);
       processedPath = mutedResult;
+      markClaimsCompleted(muteClaims);
+      debouncedAlertUpdate('mute-complete');
+    }
+
+    // Flush any pending alert update
+    if (alertTimer.current != null) {
+      clearTimeout(alertTimer.current);
     }
 
     log.info({ vodId, part }, 'Queuing YouTube upload');
@@ -186,7 +304,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     }
 
     log.info({ vodId, jobId }, 'YouTube upload job queued');
-    await updateAlert(messageId, dmcaAlerts.complete(vodId, jobId));
+    await updateAlert(messageId, dmcaAlerts.complete(vodId, jobId, claimInfos));
 
     return { success: true, youtubeJobId: jobId, vodId };
   } catch (error) {
@@ -195,6 +313,9 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
 
     throw error;
   } finally {
+    if (alertTimer.current != null) {
+      clearTimeout(alertTimer.current);
+    }
     await cleanupTempFiles(tempFiles);
   }
 };

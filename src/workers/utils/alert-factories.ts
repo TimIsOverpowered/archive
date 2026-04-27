@@ -403,33 +403,105 @@ export function createYoutubeWorkerAlerts(): YoutubeWorkerAlerts {
 // DMCA Worker Alerts
 // ============================================================================
 
+export interface DmcaClaimInfo {
+  claimId?: string | undefined;
+  identifier: string;
+  startTimestamp: string;
+  endTimestamp: string;
+  claimType: string;
+}
+
 export interface DmcaWorkerAlerts {
-  processing: (vodId: string, claimCount: number, part?: number) => RichEmbedData;
-  complete: (vodId: string, youtubeJobId: string) => RichEmbedData;
+  processing: (vodId: string, claims: DmcaClaimInfo[], part?: number) => RichEmbedData;
+  progress: (
+    vodId: string,
+    claims: DmcaClaimInfo[],
+    completedClaimIds: string[],
+    currentStep: string,
+    stepProgress?: number
+  ) => RichEmbedData;
+  complete: (vodId: string, youtubeJobId: string, claims: DmcaClaimInfo[]) => RichEmbedData;
   error: (vodId: string, errorMsg: string) => RichEmbedData;
+}
+
+function formatClaimList(
+  claims: DmcaClaimInfo[],
+  completedClaimIds: string[],
+  currentStep?: string,
+  stepProgress?: number
+): string {
+  const lines: string[] = [];
+
+  for (const claim of claims) {
+    const claimKey = claim.claimId ?? claim.identifier;
+    const isCompleted = completedClaimIds.includes(claimKey);
+    const isCurrent = !isCompleted && currentStep != null && currentStep.includes(claimKey ?? '');
+
+    let prefix = '⏳';
+    let suffix = '';
+
+    if (isCompleted) {
+      prefix = '✅';
+    } else if (isCurrent) {
+      prefix = '🔄';
+      suffix = stepProgress != null ? ` (${stepProgress}%)` : '';
+    }
+
+    const timeRange = `${claim.startTimestamp} - ${claim.endTimestamp}`;
+    lines.push(`${prefix} ${claim.identifier} \`${timeRange}\`${suffix}`);
+  }
+
+  return lines.join('\n');
 }
 
 export function createDmcaWorkerAlerts(): DmcaWorkerAlerts {
   return {
-    processing: (vodId, claimCount, part) => ({
-      title: `⚖️ DMCA Processing ${vodId}`,
-      description:
-        part != null ? `Processing part ${part} with ${claimCount} claims` : `Processing ${claimCount} claims`,
-      status: 'warning',
-      fields: [{ name: 'VOD ID', value: vodId, inline: false }],
-      timestamp: new Date().toISOString(),
-    }),
+    processing: (vodId, claims, part) => {
+      const claimList = formatClaimList(claims, []);
 
-    complete: (vodId, youtubeJobId) => ({
-      title: `✅ DMCA Processing Complete`,
-      description: `Successfully processed ${vodId}`,
-      status: 'success',
-      fields: [
-        { name: 'VOD ID', value: vodId, inline: false },
-        { name: 'Upload Job ID', value: youtubeJobId, inline: false },
-      ],
-      timestamp: new Date().toISOString(),
-    }),
+      return {
+        title: `⚖️ DMCA Processing ${vodId}`,
+        description: `${part != null ? `Part ${part} — ` : ''}${claims.length} blocking claim${claims.length !== 1 ? 's' : ''} to process:\n\n${claimList}`,
+        status: 'warning',
+        fields: [{ name: 'VOD ID', value: vodId, inline: false }],
+        timestamp: new Date().toISOString(),
+      };
+    },
+
+    progress: (vodId, claims, completedClaimIds, currentStep, stepProgress) => {
+      const claimList = formatClaimList(claims, completedClaimIds, undefined, stepProgress);
+      const completed = completedClaimIds.length;
+      const total = claims.length;
+      const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+      const progressBar = createProgressBar(percent);
+
+      return {
+        title: `⚖️ DMCA Processing ${vodId}`,
+        description: `${completed}/${total} claims processed — ${currentStep}\n${progressBar}\n\n${claimList}`,
+        status: 'warning',
+        fields: [{ name: 'VOD ID', value: vodId, inline: false }],
+        timestamp: new Date().toISOString(),
+        updatedTimestamp: new Date().toISOString(),
+      };
+    },
+
+    complete: (vodId, youtubeJobId, claims) => {
+      const claimList = formatClaimList(
+        claims,
+        claims.map((c) => c.claimId ?? c.identifier)
+      );
+
+      return {
+        title: `✅ DMCA Processing Complete`,
+        description: `All ${claims.length} claims processed for ${vodId}:\n\n${claimList}`,
+        status: 'success',
+        fields: [
+          { name: 'VOD ID', value: vodId, inline: false },
+          { name: 'Upload Job ID', value: youtubeJobId, inline: false },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    },
 
     error: (vodId, errorMsg) => ({
       title: `❌ DMCA Processing Failed`,
