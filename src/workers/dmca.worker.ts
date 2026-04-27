@@ -292,17 +292,21 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
 
     log.info({ vodId, part }, 'Queuing YouTube upload');
 
-    void queueYoutubeVodUpload(
-      { tenantId, config, db },
-      dbId,
-      vodId,
-      processedPath,
-      platform,
-      'vod',
-      true,
-      undefined,
-      part
-    );
+    try {
+      await queueYoutubeVodUpload(
+        { tenantId, config, db },
+        dbId,
+        vodId,
+        processedPath,
+        platform,
+        'vod',
+        true,
+        undefined,
+        part
+      );
+    } catch (err) {
+      log.warn({ err: extractErrorDetails(err), vodId }, 'YouTube upload queue failed');
+    }
 
     return { success: true, vodId };
   } catch (error) {
