@@ -17,28 +17,16 @@ import { handleWorkerError } from './utils/error-handler.js';
 import { fileExists } from '../utils/path.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { createDmcaWorkerAlerts } from './utils/alert-factories.js';
-import { ConfigNotConfiguredError, VodNotFoundError, FileNotFound } from '../utils/domain-errors.js';
+import { ConfigNotConfiguredError, FileNotFound } from '../utils/domain-errors.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
   const { tenantId, dbId, vodId, receivedClaims, platform, part, filePath: providedFilePath } = job.data;
   const log = createAutoLogger(String(tenantId));
 
-  if (receivedClaims == null || receivedClaims.length === 0) {
-    log.warn({ vodId }, 'No claims to process for VOD');
-
-    return { success: true, message: 'No blocking claims found' };
-  }
-
   const { config, db } = await getJobContext(tenantId);
 
   if (!config.youtube) {
     throw new ConfigNotConfiguredError(`YouTube for tenant ${tenantId}`);
-  }
-
-  const vodRecord = await db.selectFrom('vods').where('id', '=', dbId).selectAll().executeTakeFirst();
-
-  if (!vodRecord) {
-    throw new VodNotFoundError(dbId, 'dmca worker');
   }
 
   // Determine file path
@@ -69,24 +57,10 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     throw new FileNotFound(filePath);
   }
 
-  // Log processing start with full context
-  const blockingClaimsCount = receivedClaims.filter(isBlockingPolicy).length;
-  log.info(
-    {
-      vodId,
-      filePath,
-      part,
-      claimsCount: receivedClaims.length,
-      blockingClaimsCount,
-      jobId: job.id,
-    },
-    'Starting DMCA processing'
-  );
+  const blockingClaims = receivedClaims.filter(isBlockingPolicy);
 
   const dmcaAlerts = createDmcaWorkerAlerts();
-  const messageId = await initRichAlert(dmcaAlerts.processing(vodId, blockingClaimsCount, part));
-
-  const blockingClaims = receivedClaims.filter(isBlockingPolicy);
+  const messageId = await initRichAlert(dmcaAlerts.processing(vodId, blockingClaims.length, part));
 
   if (blockingClaims.length === 0) {
     log.info({ vodId }, 'No blocking claims for VOD, uploading original');
@@ -94,6 +68,18 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
 
     return { success: true, message: 'No action needed' };
   }
+
+  // Log processing start with full context
+  log.info(
+    {
+      vodId,
+      filePath,
+      part,
+      claimsCount: blockingClaims.length,
+      jobId: job.id,
+    },
+    'Starting DMCA processing'
+  );
 
   let processedPath = filePath;
   const tempFiles: string[] = [];
@@ -115,30 +101,10 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     }
 
     const audioClaims = blockingClaims.filter((claim) => claim.type === CLAIM_TYPES.AUDIO);
-    const visualClaims = blockingClaims.filter(
-      (claim) => claim.type === CLAIM_TYPES.VISUAL || claim.type === CLAIM_TYPES.AUDIOVISUAL
-    );
+    const audioVisualClaims = blockingClaims.filter((claim) => claim.type === CLAIM_TYPES.AUDIOVISUAL);
+    const visualClaims = blockingClaims.filter((claim) => claim.type === CLAIM_TYPES.VISUAL);
 
-    let intermediateMutedPath: string | null = null;
-
-    if (audioClaims.length > 0) {
-      log.info({ vodId, count: audioClaims.length }, 'Processing audio claims');
-
-      const muteFilters = buildMuteFilters(audioClaims);
-      const mutedPath = `${processedPath.replace('.mp4', '-muted.mp4')}`;
-
-      intermediateMutedPath = mutedPath;
-
-      const mutedResult = await muteAudioSections(processedPath, muteFilters, mutedPath);
-
-      if (mutedResult == null) {
-        throw new Error('Failed to process audio claims');
-      }
-
-      processedPath = mutedResult;
-    }
-
-    if (visualClaims.length > 0) {
+     if (visualClaims.length > 0) {
       log.info({ vodId, count: visualClaims.length }, 'Processing visual claims');
 
       const blackoutSections: BlackoutSection[] = [];
@@ -153,10 +119,6 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
         blackoutSections.push({ startSeconds, durationSeconds, endSeconds });
       }
 
-      if (intermediateMutedPath != null && processedPath.endsWith('-muted.mp4')) {
-        tempFiles.push(intermediateMutedPath);
-      }
-
       const blackoutedPath = await blackoutVideoSections(processedPath, vodId, blackoutSections);
 
       if (blackoutedPath == null) {
@@ -164,6 +126,46 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       }
 
       processedPath = blackoutedPath;
+    }
+
+    if (audioVisualClaims.length > 0) {
+      log.info({ vodId, count: audioVisualClaims.length }, 'Processing audio-visual claims');
+
+      const blackoutSections: BlackoutSection[] = [];
+
+      for (const claim of audioVisualClaims) {
+        const startSeconds = claim.matchDetails.longestMatchStartTimeSeconds;
+        const durationSeconds = parseInt(claim.matchDetails.longestMatchDurationSeconds) ?? 0;
+        const endSeconds = startSeconds + durationSeconds;
+
+        log.info({ vodId, startSeconds, endSeconds }, 'Blackouting section');
+
+        blackoutSections.push({ startSeconds, durationSeconds, endSeconds });
+      }
+
+      const blackoutedPath = await blackoutVideoSections(processedPath, vodId, blackoutSections);
+
+      if (blackoutedPath == null) {
+        throw new Error('Failed to process audio-visual claims');
+      }
+
+      processedPath = blackoutedPath;
+    }
+
+    if (audioClaims.length > 0 || audioVisualClaims.length > 0) {
+      log.info({ vodId, count: audioClaims.length + audioVisualClaims.length }, 'Processing audio claims');
+
+      const muteFilters = buildMuteFilters([...audioClaims, ...audioVisualClaims]);
+      const mutedPath = `${processedPath.replace('.mp4', '-muted.mp4')}`;
+
+      const mutedResult = await muteAudioSections(processedPath, muteFilters, mutedPath);
+
+      if (mutedResult == null) {
+        throw new Error('Failed to process audio claims');
+      }
+
+      tempFiles.push(mutedPath);
+      processedPath = mutedResult;
     }
 
     log.info({ vodId, part }, 'Queuing YouTube upload');
