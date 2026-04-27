@@ -1,11 +1,10 @@
-import { extractErrorDetails, createErrorContext } from '../../utils/error.js';
+import { extractErrorDetails } from '../../utils/error.js';
 import fs from 'fs';
 import pathMod from 'path';
 import HLS from 'hls-parser';
 import { pipeline } from 'stream/promises';
 import { Readable } from 'stream';
 import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
-import { sleep } from '../../utils/delay.js';
 import type { ReadableStream as NodeWebStream } from 'node:stream/web';
 import pLimit from 'p-limit';
 import type { AppLogger } from '../../utils/logger.js';
@@ -148,111 +147,74 @@ export async function cleanupOrphanedTmpFiles(vodDir: string, log: AppLogger): P
 export async function fetchTwitchPlaylist(
   vodId: string,
   log: AppLogger,
-  retryCount: number,
-  maxRetryBeforeEndDetection: number,
-  tenantId?: string
-): Promise<FetchPlaylistResult | null> {
+  tenantId?: string,
+  retryOptions?: { attempts?: number; baseDelayMs?: number; maxDelayMs?: number }
+): Promise<FetchPlaylistResult> {
   const tokenSig = await getVodTokenSig(vodId, tenantId);
 
-  try {
-    const masterPlaylistContent = await getTwitchM3u8(String(vodId), tokenSig.value, tokenSig.signature);
+  const masterPlaylistContent = await getTwitchM3u8(String(vodId), tokenSig.value, tokenSig.signature, retryOptions);
 
-    if (masterPlaylistContent == null || masterPlaylistContent === '') {
-      log.error({ vodId }, 'Failed to fetch Twitch master playlist');
-
-      if (retryCount > maxRetryBeforeEndDetection) {
-        log.warn({ vodId }, 'Too many consecutive failures. Assuming stream ended or platform issue.');
-        return null;
-      }
-
-      await sleep(5000 * Math.min(retryCount, 6));
-      return null;
-    }
-
-    const parsedMaster: HLS.types.MasterPlaylist | HLS.types.MediaPlaylist = HLS.parse(masterPlaylistContent);
-
-    if (parsedMaster == null) {
-      log.error({ vodId }, 'Failed to parse Twitch master playlist');
-
-      await sleep(5000);
-      return null;
-    }
-
-    const bestVariantUrl = (parsedMaster as HLS.types.MasterPlaylist).variants?.[0]?.uri ?? parsedMaster.uri;
-
-    if (bestVariantUrl == null || bestVariantUrl === '') {
-      log.error({ vodId }, 'No variant URL found in master playlist');
-      return null;
-    }
-    let baseURL: string = '';
-    let variantM3u8String: string = '';
-
-    if (!bestVariantUrl.startsWith('http')) {
-      baseURL = masterPlaylistContent.substring(0, masterPlaylistContent.lastIndexOf('/'));
-
-      variantM3u8String = await request(
-        bestVariantUrl.includes('/') ? bestVariantUrl : `${baseURL}/${bestVariantUrl}`,
-        {
-          responseType: 'text',
-        }
-      );
-    } else {
-      baseURL = bestVariantUrl.substring(0, bestVariantUrl.lastIndexOf('/'));
-
-      variantM3u8String = await request(bestVariantUrl, { responseType: 'text' });
-    }
-
-    return { variantM3u8String, baseURL };
-  } catch (error: unknown) {
-    log.error(createErrorContext(error, { vodId }), 'Failed to get Twitch HLS playlist');
-
-    if (retryCount > maxRetryBeforeEndDetection) {
-      log.warn(`[${vodId}] Too many consecutive failures. Assuming stream ended or platform issue.`);
-      return null;
-    }
-
-    await sleep(5000 * Math.min(retryCount, 6));
-    return null;
+  if (masterPlaylistContent == null || masterPlaylistContent === '') {
+    log.error({ vodId }, 'Failed to fetch Twitch master playlist');
+    throw new Error('Empty Twitch master playlist');
   }
+
+  const parsedMaster: HLS.types.MasterPlaylist | HLS.types.MediaPlaylist = HLS.parse(masterPlaylistContent);
+
+  if (parsedMaster == null) {
+    log.error({ vodId }, 'Failed to parse Twitch master playlist');
+    throw new Error('Failed to parse Twitch master playlist');
+  }
+
+  const bestVariantUrl = (parsedMaster as HLS.types.MasterPlaylist).variants?.[0]?.uri ?? parsedMaster.uri;
+
+  if (bestVariantUrl == null || bestVariantUrl === '') {
+    log.error({ vodId }, 'No variant URL found in master playlist');
+    throw new Error('No variant URL found in master playlist');
+  }
+
+  let baseURL: string = '';
+  let variantM3u8String: string = '';
+
+  if (!bestVariantUrl.startsWith('http')) {
+    baseURL = masterPlaylistContent.substring(0, masterPlaylistContent.lastIndexOf('/'));
+
+    variantM3u8String = await request(bestVariantUrl.includes('/') ? bestVariantUrl : `${baseURL}/${bestVariantUrl}`, {
+      responseType: 'text',
+      retryOptions,
+    });
+  } else {
+    baseURL = bestVariantUrl.substring(0, bestVariantUrl.lastIndexOf('/'));
+
+    variantM3u8String = await request(bestVariantUrl, { responseType: 'text', retryOptions });
+  }
+
+  return { variantM3u8String, baseURL };
 }
 
 export async function fetchKickPlaylist(
   vodId: string,
   sourceUrl: string | undefined,
   log: AppLogger,
-  retryCount: number,
-  maxRetryBeforeEndDetection: number,
   session?: CycleTLSSession
-): Promise<FetchPlaylistResult | null> {
-  const fetchUrl = sourceUrl ?? '';
+): Promise<FetchPlaylistResult> {
+  const fetchUrl = sourceUrl;
 
   if (fetchUrl == null || fetchUrl === '') {
     log.error({ vodId }, 'No Kick HLS source URL provided. Cannot continue download.');
-
-    await sleep(5000);
-
-    if (retryCount > maxRetryBeforeEndDetection * 2) {
-      log.error({ vodId }, 'Aborting download - no source URL available after multiple attempts');
-      return null;
-    }
-
-    return null;
+    throw new Error('No Kick HLS source URL provided');
   }
 
   let baseURL: string = '';
 
-  try {
-    const tempSession = session ?? createSession(); // Create if not provided
+  const tempSession = session ?? createSession();
 
+  try {
     if (fetchUrl.includes('master.m3u8')) {
       const baseEndpoint = fetchUrl.substring(0, fetchUrl.lastIndexOf('/'));
       baseURL = `${baseEndpoint}/1080p60`;
 
       const variantM3u8String = await tempSession.fetchText(`${baseURL}/playlist.m3u8`);
-
-      if (!session) {
-        tempSession.close(); // Only close temporary sessions
-      }
 
       return { variantM3u8String, baseURL };
     } else {
@@ -260,22 +222,11 @@ export async function fetchKickPlaylist(
 
       baseURL = fetchUrl.substring(0, fetchUrl.lastIndexOf('/'));
 
-      if (!session) {
-        tempSession.close();
-      }
-
       return { variantM3u8String: response, baseURL };
     }
-  } catch (error: unknown) {
-    log.error(createErrorContext(error, { vodId }), 'Failed to fetch Kick HLS playlist');
-
-    await sleep(5000 * Math.min(retryCount, 6));
-
-    if (retryCount > maxRetryBeforeEndDetection) {
-      log.warn(`[${vodId}] Too many consecutive failures. Assuming stream ended or platform issue.`);
-      return null;
+  } finally {
+    if (!session) {
+      tempSession.close();
     }
-
-    return null;
   }
 }

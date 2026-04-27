@@ -15,6 +15,7 @@ import {
   resolveDownloadStrategy,
 } from './hls-utils.js';
 import { sleep, getRetryDelay } from '../../utils/delay.js';
+
 import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
 import { createVodWorkerAlerts } from '../utils/alert-factories.js';
 import { updateAlert } from '../../utils/discord-alerts.js';
@@ -238,13 +239,7 @@ async function runLivePollingLoop(
   let streamEnded = false;
   while (!streamEnded) {
     try {
-      const playlist = await fetchPlaylist(ctx, consecutiveErrors);
-
-      if (!playlist) {
-        consecutiveErrors++;
-        await sleep(getRetryDelay(consecutiveErrors));
-        continue;
-      }
+      const playlist = await fetchPlaylist(ctx, { attempts: 3, baseDelayMs: 2000 });
 
       const { variantM3u8String, baseURL } = playlist;
       const parsed = HLS.parse(variantM3u8String) as HLS.types.MediaPlaylist;
@@ -322,11 +317,7 @@ interface ArchivedVodContext {
 async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
   const { vodId, platform, vodDir, m3u8Path, cycleTLS, log } = ctx;
 
-  const playlist = await fetchPlaylistForArchived(ctx);
-
-  if (!playlist) {
-    throw new Error(`Failed to fetch HLS playlist for ${vodId}`);
-  }
+  const playlist = await fetchPlaylist(ctx, { attempts: 3, baseDelayMs: 2000 });
 
   const { variantM3u8String, baseURL } = playlist;
 
@@ -354,25 +345,14 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
   );
 }
 
-async function fetchPlaylist(ctx: LivePollingContext, retryCount: number) {
+async function fetchPlaylist(
+  ctx: LivePollingContext | ArchivedVodContext,
+  retryOptions?: { attempts?: number; baseDelayMs?: number; maxDelayMs?: number }
+) {
   const tenantId = ctx.ctx.tenantId;
-  if (ctx.platform === PLATFORMS.TWITCH) {
-    return fetchTwitchPlaylist(ctx.vodId, ctx.log, retryCount, HLS_MAX_CONSECUTIVE_ERRORS, tenantId);
-  }
-  return fetchKickPlaylist(
-    ctx.vodId,
-    ctx.sourceUrl,
-    ctx.log,
-    retryCount,
-    HLS_MAX_CONSECUTIVE_ERRORS,
-    ctx.cycleTLS ?? undefined
-  );
-}
 
-async function fetchPlaylistForArchived(ctx: ArchivedVodContext) {
-  const tenantId = ctx.ctx.tenantId;
   if (ctx.platform === PLATFORMS.TWITCH) {
-    return fetchTwitchPlaylist(ctx.vodId, ctx.log, 0, HLS_MAX_CONSECUTIVE_ERRORS, tenantId);
+    return fetchTwitchPlaylist(ctx.vodId, ctx.log, tenantId, retryOptions);
   }
-  return fetchKickPlaylist(ctx.vodId, ctx.sourceUrl, ctx.log, 0, HLS_MAX_CONSECUTIVE_ERRORS, ctx.cycleTLS ?? undefined);
+  return fetchKickPlaylist(ctx.vodId, ctx.sourceUrl, ctx.log, ctx.cycleTLS ?? undefined);
 }

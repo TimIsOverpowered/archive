@@ -10,7 +10,7 @@ import {
 } from '../constants.js';
 import { HttpError } from './http-error.js';
 import { DownloadAbortedError } from './domain-errors.js';
-import { Agent } from 'undici';
+import { Agent, fetch as undiciFetch, type RequestInit as UndiciRequestInit, type BodyInit as UndiciBodyInit } from 'undici';
 
 /** Supported HTTP response types for request/safeRequest functions. */
 export type ResponseType = 'json' | 'text' | 'blob' | 'arrayBuffer' | 'response';
@@ -157,15 +157,15 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
         if (options?.signal) signals.push(options.signal);
         const combinedSignal = AbortSignal.any(signals);
 
-        const fetchInit: RequestInit & { dispatcher?: Agent | undefined } = {
+        const fetchInit: UndiciRequestInit & { dispatcher?: Agent } = {
           method,
           headers: finalHeaders,
-          ...(preparedBody !== undefined && { body: preparedBody }),
+          ...(preparedBody !== undefined && { body: preparedBody as UndiciBodyInit }),
           signal: combinedSignal,
-          dispatcher,
+          ...(dispatcher !== undefined && { dispatcher }),
         };
 
-        const response = await fetch(scrubbedUrl, fetchInit);
+        const response = await undiciFetch(urlStr, fetchInit);
 
         if (!response.ok) {
           throw new HttpError(response.status, `HTTP ${response.status}: ${response.statusText}`);
