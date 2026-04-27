@@ -59,7 +59,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
 
   // Main download endpoint - creates VOD record if missing, then queues download + emote + chat jobs + upload (Twitch/Kick)
   fastify.post<{ Body: UploadBody; Params: Params }>(
-    '/upload',
+    '/vods/upload',
     {
       schema: {
         tags: ['Admin'],

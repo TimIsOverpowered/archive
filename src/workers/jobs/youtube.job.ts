@@ -21,6 +21,7 @@ export function createVodUploadJob(
   filePath: string | undefined,
   platform: Platform,
   type: SourceType,
+  dmcaProcessed?: boolean,
   part?: number
 ): YoutubeVodUploadJob {
   const { config, tenantId } = ctx;
@@ -36,6 +37,7 @@ export function createVodUploadJob(
     filePath,
     type,
     platform,
+    dmcaProcessed,
     part: part ?? 1,
   };
 }
@@ -278,6 +280,7 @@ export async function enqueueGameUpload(job: YoutubeGameUploadJob, downloadJobId
  * @param vodId - Platform VOD ID
  * @param filePath - Path to video file
  * @param platform - Source platform
+ * @param dmcaProcessed - from dmca worker?
  * @param downloadJobId - Optional: chains upload to wait for download
  * @returns The job ID if successfully enqueued, null otherwise
  */
@@ -288,10 +291,11 @@ export async function queueYoutubeVodUpload(
   filePath: string | undefined,
   platform: Platform,
   type: SourceType,
+  dmcaProcessed?: boolean,
   downloadJobId?: string,
   part?: number
 ): Promise<string | null> {
-  const job = createVodUploadJob(ctx, dbId, vodId, filePath, platform, type, part);
+  const job = createVodUploadJob(ctx, dbId, vodId, filePath, platform, type, dmcaProcessed, part);
   return enqueueVodUpload(job, downloadJobId);
 }
 
@@ -370,6 +374,7 @@ export interface QueueYoutubeUploadsOptions {
   filePath?: string | undefined;
   platform: Platform;
   uploadMode?: UploadMode | undefined;
+  dmcaProcessed?: boolean | undefined;
   /**
    * Optional download job ID. If provided, uploads are chained to wait for
    * download completion. If undefined, uploads are queued immediately (file exists).
@@ -389,7 +394,17 @@ export interface YoutubeUploadJobResult {
  * @returns Promise that resolves when all applicable uploads are queued
  */
 export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): Promise<YoutubeUploadJobResult> {
-  const { ctx, dbId, vodId, filePath, platform, uploadMode = UPLOAD_MODES.ALL, downloadJobId, type } = options;
+  const {
+    ctx,
+    dbId,
+    vodId,
+    filePath,
+    platform,
+    uploadMode = UPLOAD_MODES.ALL,
+    downloadJobId,
+    type,
+    dmcaProcessed,
+  } = options;
   const { config } = ctx;
 
   const result: YoutubeUploadJobResult = {
@@ -400,7 +415,16 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
   // VOD Upload
   if ((uploadMode === UPLOAD_MODES.VOD || uploadMode === UPLOAD_MODES.ALL) && config?.youtube?.vodUpload === true) {
     try {
-      const vodJobId = await queueYoutubeVodUpload(ctx, dbId, vodId, filePath, platform, type, downloadJobId);
+      const vodJobId = await queueYoutubeVodUpload(
+        ctx,
+        dbId,
+        vodId,
+        filePath,
+        platform,
+        type,
+        dmcaProcessed,
+        downloadJobId
+      );
       result.vodJobId = vodJobId;
       log.info({ vodId, chained: downloadJobId != null, vodJobId }, 'Queued YouTube VOD upload');
     } catch (error) {
