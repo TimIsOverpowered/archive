@@ -15,6 +15,15 @@ export function toHHMMSS(seconds: number): string {
   return dayjs.duration(seconds, 'seconds').format('HH:mm:ss');
 }
 
+/** Parse HH:MM:SS.ms timecode string (e.g. "00:01:21.66") to total seconds using dayjs. */
+export function parseTimecode(timecode: string): number {
+  const parts = timecode.split(':');
+  const hours = parts[0] != null ? parseFloat(parts[0]) : 0;
+  const minutes = parts[1] != null ? parseFloat(parts[1]) : 0;
+  const seconds = parts[2] != null ? parseFloat(parts[2]) : 0;
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
 /** Parse Twitch duration string (e.g. "1h23m45s") into total seconds. */
 export function parseTwitchDuration(durationStr: string): number {
   const str = String(durationStr);

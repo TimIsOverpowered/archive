@@ -62,5 +62,16 @@ interface LogContext {
 }
 
 export function childLogger(context: LogContext) {
-  return getLogger().child(context);
+  return new Proxy<AppLogger>({} as AppLogger, {
+    get(_target, key: string | symbol) {
+      const logger = getLogger();
+      const child = logger.child(context);
+      const childAny = child as unknown as Record<string, unknown>;
+      const val = childAny[key as string];
+      if (typeof val === 'function') {
+        return (val as (...args: unknown[]) => unknown).bind(child);
+      }
+      return val;
+    },
+  });
 }

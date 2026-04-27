@@ -3,7 +3,7 @@ import { request } from '../http-client.js';
 import { getLogger } from '../logger.js';
 import { getDiscordAlertWebhookUrl } from '../../config/env.js';
 import { isAlertsEnabled } from './context.js';
-import { constructEmbed } from './embed.js';
+import { constructEmbed, RichEmbedData } from './embed.js';
 
 function getUpdateUrl(webhookUrl: string, messageId: string): string {
   const url = new URL(webhookUrl);
@@ -37,7 +37,7 @@ export async function sendDiscordAlert(message: string): Promise<string | null> 
   }
 }
 
-export async function sendRichAlert(data: import('./embed.js').RichEmbedData): Promise<string | null> {
+export async function sendRichAlert(data: RichEmbedData): Promise<string | null> {
   if (!isAlertsEnabled()) {
     return null;
   }
@@ -75,7 +75,7 @@ export async function sendRichAlert(data: import('./embed.js').RichEmbedData): P
   }
 }
 
-export async function updateDiscordEmbed(messageId: string, data: import('./embed.js').RichEmbedData): Promise<void> {
+export async function updateDiscordEmbed(messageId: string, data: RichEmbedData): Promise<void> {
   if (!isAlertsEnabled()) {
     return;
   }
@@ -98,7 +98,7 @@ export async function updateDiscordEmbed(messageId: string, data: import('./embe
   }
 }
 
-export async function initRichAlert(data: import('./embed.js').RichEmbedData): Promise<string | null> {
+export async function initRichAlert(data: RichEmbedData): Promise<string | null> {
   if (!isAlertsEnabled()) return null;
 
   try {
@@ -108,7 +108,7 @@ export async function initRichAlert(data: import('./embed.js').RichEmbedData): P
   }
 }
 
-export async function updateAlert(messageId: string | null, data: import('./embed.js').RichEmbedData): Promise<void> {
+export async function updateAlert(messageId: string | null, data: RichEmbedData): Promise<void> {
   if (messageId == null || messageId === '' || !isAlertsEnabled()) return;
   await updateDiscordEmbed(messageId, data).catch((err) => {
     const details = extractErrorDetails(err);

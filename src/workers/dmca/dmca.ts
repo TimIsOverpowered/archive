@@ -1,6 +1,7 @@
 import { extractErrorDetails } from '../../utils/error.js';
 import { deleteFileIfExists } from '../../utils/path.js';
 import { childLogger } from '../../utils/logger.js';
+import path from 'path';
 import { toHHMMSS } from '../../utils/formatting.js';
 import { concatSegments, extractSegment, generateBlackSegment, getMetadata } from '../utils/ffmpeg.js';
 export { muteAudioSections } from '../utils/ffmpeg.js';
@@ -103,11 +104,12 @@ export async function blackoutVideoSections(
   videoPath: string,
   vodId: string,
   sections: BlackoutSection[],
+  workDir: string,
   options?: BlackoutProgressOptions
 ): Promise<string | null> {
   if (sections.length === 0) return videoPath;
 
-  const outputPath = `${vodId}-blackouted.mp4`;
+  const outputPath = path.join(workDir, `${vodId}-blackouted.mp4`);
   const meta = await getMetadata(videoPath);
   if (!meta) {
     log.error({ videoPath, vodId }, 'Failed to get video metadata');
@@ -146,7 +148,7 @@ export async function blackoutVideoSections(
     for (const section of sorted) {
       if (section.startSeconds > prevEnd) {
         const dur = section.startSeconds - prevEnd;
-        const file = `${vodId}-seg-normal-${prevEnd}.mp4`;
+        const file = path.join(workDir, `${vodId}-seg-normal-${prevEnd}.mp4`);
         const result = await extractSegment(videoPath, file, prevEnd, dur, reportProgress, options?.onStart);
         if (result === null) return null;
         segmentFiles.push(result);
@@ -154,11 +156,12 @@ export async function blackoutVideoSections(
         reportStep(`extract:${toHHMMSS(prevEnd)}-${toHHMMSS(section.startSeconds)}`);
       }
 
-      const blackFile = `${vodId}-seg-black-${section.startSeconds}.mp4`;
+      const blackFile = path.join(workDir, `${vodId}-seg-black-${section.startSeconds}.mp4`);
       const blackResult = await generateBlackSegment(
         blackFile,
         section.endSeconds - section.startSeconds,
         meta,
+        reportProgress,
         options?.onStart
       );
       if (blackResult === null) return null;
@@ -171,7 +174,7 @@ export async function blackoutVideoSections(
 
     if (prevEnd < totalDuration) {
       const dur = totalDuration - prevEnd;
-      const file = `${vodId}-seg-normal-${prevEnd}.mp4`;
+      const file = path.join(workDir, `${vodId}-seg-normal-${prevEnd}.mp4`);
       const result = await extractSegment(videoPath, file, prevEnd, dur, reportProgress, options?.onStart);
       if (result === null) return null;
       segmentFiles.push(result);
@@ -179,7 +182,7 @@ export async function blackoutVideoSections(
       reportStep(`extract:${toHHMMSS(prevEnd)}-${toHHMMSS(totalDuration)}`);
     }
 
-    const result = await concatSegments(segmentFiles, outputPath, reportProgress, options?.onStart);
+    const result = await concatSegments(segmentFiles, outputPath, reportProgress, options?.onStart, totalDuration);
     reportStep('concat');
     return result;
   } finally {

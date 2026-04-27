@@ -71,7 +71,7 @@ export async function createGameUploadJob(
   }
 
   // Check restricted games
-  if (config.youtube?.restrictedGames.includes(chapter.name)) {
+  if (config.youtube?.restrictedGames != null && config.youtube.restrictedGames.includes(chapter.name)) {
     throw new Error(`Game "${chapter.name}" is in restricted games list`);
   }
 

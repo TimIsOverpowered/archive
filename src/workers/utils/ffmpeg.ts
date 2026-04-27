@@ -1,15 +1,13 @@
-import ffmpeg from 'fluent-ffmpeg';
+import { spawn } from 'child_process';
 import { writeFileSync } from 'fs';
 import { extractErrorDetails } from '../../utils/error.js';
 import path from 'path';
-import events from 'events';
 import { childLogger } from '../../utils/logger.js';
 import { deleteFileIfExists } from '../../utils/path.js';
+import HLS from 'hls-parser';
+import { parseTimecode } from '../../utils/formatting.js';
 
 const logger = childLogger({ module: 'ffmpeg' });
-import HLS from 'hls-parser';
-
-const lastFfmpegProgressBySource = new Map<string, number>();
 
 export interface ProgressEvent {
   percent?: number;
@@ -33,7 +31,6 @@ export function detectFmp4FromPlaylist(m3u8Content: string): boolean {
   try {
     const parsed = HLS.parse(m3u8Content);
 
-    // Check if this is a media playlist (not master) with segments
     if (!('segments' in parsed)) {
       return false;
     }
@@ -42,12 +39,10 @@ export function detectFmp4FromPlaylist(m3u8Content: string): boolean {
       segments: Array<{ uri?: string; map?: { uri?: string } }>;
     };
 
-    // Check for init segment (EXT-X-MAP tag) - strongest fMP4 indicator
     if (mediaPlaylist.segments.some((seg) => seg.map?.uri != null && seg.map.uri !== '')) {
       return true;
     }
 
-    // Check segment extensions (.mp4 or .m4s but not .ts)
     const hasFmp4Segments = mediaPlaylist.segments.some(
       (seg) =>
         seg?.uri?.endsWith('.mp4') ||
@@ -59,6 +54,64 @@ export function detectFmp4FromPlaylist(m3u8Content: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Attach progress/start tracking to an FFmpeg spawn process stderr stream.
+ * Parses "time=HH:MM:SS.xx" from progress lines against a known total duration.
+ * Calls onProgress with bucketed percentage (25% increments).
+ */
+function trackProgress(
+  proc: ReturnType<typeof spawn>,
+  cmd: string,
+  knownDuration: number | null,
+  onProgress?: (percent: number) => void,
+  onStart?: (cmd: string) => void
+): void {
+  proc.on('close', (code) => {
+    if (code === 0) {
+      logger.info(`FFmpeg complete: ${cmd}`);
+    } else {
+      logger.error({ code }, `FFmpeg failed: ${cmd}`);
+    }
+  });
+
+  if (!onProgress && !onStart) return;
+  if (!proc.stderr) return;
+
+  logger.info(`FFmpeg start: ${cmd}`);
+  onStart?.(cmd);
+
+  let totalDuration = knownDuration;
+  let lastBucket = -1;
+
+  const durationRegex = /Duration:\s*(\d{1,2}:\d{2}:\d{2}\.\d+)/;
+  const timeRegex = /time=(\d{1,2}:\d{2}:\d{2}\.\d+)/;
+
+  proc.stderr.on('data', (data: Buffer) => {
+    const chunk = data.toString();
+
+    if (totalDuration === null) {
+      const durMatch = chunk.match(durationRegex);
+      if (durMatch?.[1] != null) {
+        totalDuration = parseTimecode(durMatch[1]);
+        logger.debug({ totalDuration, rawTimecode: durMatch[1] }, 'trackProgress: Duration found');
+      }
+    }
+
+    if (onProgress && totalDuration != null && totalDuration > 0) {
+      const timeMatch = chunk.match(timeRegex);
+      if (timeMatch?.[1] != null) {
+        const elapsed = parseTimecode(timeMatch[1]);
+        const percent = Math.min(Math.round((elapsed / totalDuration) * 100), 100);
+        const bucket = Math.floor(percent / 25) * 25;
+        if (bucket > lastBucket) {
+          lastBucket = bucket;
+          onProgress(bucket);
+        }
+      }
+    }
+  });
 }
 
 export async function splitVideo(
@@ -83,22 +136,37 @@ export async function splitVideo(
     onProgress?.(Math.round(percent), i + 1);
 
     await new Promise<void>((resolve, reject) => {
-      ffmpeg(filePath)
-        .seekInput(start)
-        .duration(partDuration)
-        .outputOptions('-c copy')
-        .save(partFile)
-        .on('start', (cmd) => {
-          logger.info(`FFmpeg start: ${cmd}`);
-          onStart?.(cmd);
-        })
-        .on('end', () => {
+      const args = [
+        '-v',
+        'info',
+        '-ss',
+        start.toString(),
+        '-i',
+        filePath,
+        '-t',
+        partDuration.toString(),
+        '-c',
+        'copy',
+        '-y',
+        partFile,
+      ];
+
+      const cmdStr = `ffmpeg ${args.join(' ')}`;
+      const proc = spawn('ffmpeg', args);
+      trackProgress(proc, cmdStr, partDuration, undefined, onStart);
+
+      proc.on('close', (code) => {
+        if (code === 0) {
           parts.push(partFile);
           resolve();
-        })
-        .on('error', (err: Error) => {
-          reject(err);
-        });
+        } else {
+          reject(new Error(`FFmpeg split exited with code ${code}`));
+        }
+      });
+
+      proc.on('error', (err: Error) => {
+        reject(err);
+      });
     });
   }
 
@@ -118,21 +186,33 @@ export async function trimVideo(
   const outputFile = path.join(outputDir, `${vodId}-${start}-${end}.mp4`);
 
   return new Promise((resolve, reject) => {
-    const proc = ffmpeg(filePath).seekInput(start).duration(duration).outputOptions('-c copy').save(outputFile);
+    const args = [
+      '-v',
+      'info',
+      '-ss',
+      start.toString(),
+      '-i',
+      filePath,
+      '-t',
+      duration.toString(),
+      '-c',
+      'copy',
+      '-y',
+      outputFile,
+    ];
+    const cmdStr = `ffmpeg ${args.join(' ')}`;
 
-    proc.on('start', (cmd) => {
-      logger.info(`FFmpeg start: ${cmd}`);
-      onStart?.(cmd);
-    });
+    const proc = spawn('ffmpeg', args);
+    trackProgress(proc, cmdStr, duration, onProgress, onStart);
 
-    (proc as events.EventEmitter).on('progress', (progress: ProgressEvent) => {
-      if (onProgress && progress.percent != null) {
-        onProgress(Math.round(progress.percent));
+    proc.on('close', (code) => {
+      if (code === 0) {
+        resolve(outputFile);
+      } else {
+        reject(new Error(`FFmpeg trim exited with code ${code}`));
       }
     });
-    proc.on('end', () => {
-      resolve(outputFile);
-    });
+
     proc.on('error', (err: Error) => {
       reject(err);
     });
@@ -164,18 +244,36 @@ export interface VideoMetadata {
 
 export async function getMetadata(filePath: string): Promise<VideoMetadata | null> {
   return new Promise((resolve) => {
-    ffmpeg.ffprobe(filePath, (err, data) => {
-      if (err != null) {
-        const errDetails = extractErrorDetails(err);
+    const proc = spawn('ffprobe', ['-v', 'quiet', '-print_format', 'json', '-show_streams', '-show_format', filePath]);
+
+    let stdout = '';
+
+    proc.stdout.on('data', (data: Buffer) => {
+      stdout += data.toString();
+    });
+
+    proc.on('close', (code) => {
+      if (code !== 0) {
+        const errDetails = extractErrorDetails(new Error(`ffprobe exited with code ${code}`));
         logger.error({ filePath, error: errDetails.message }, 'Failed to probe file');
         resolve(null);
         return;
       }
 
-      const videoStream = data.streams.find((s) => s.codec_type === 'video');
-      const audioStream = data.streams.find((s) => s.codec_type === 'audio');
-      const fmt = data.format;
-      const duration = fmt?.duration != null ? Math.round(fmt.duration) : 0;
+      let data: { streams?: Array<Record<string, unknown>>; format?: Record<string, unknown> } | null = null;
+      try {
+        data = JSON.parse(stdout) as { streams?: Array<Record<string, unknown>>; format?: Record<string, unknown> };
+      } catch {
+        logger.error({ filePath }, 'Failed to parse ffprobe JSON output');
+        resolve(null);
+        return;
+      }
+
+      const videoStream = data?.streams?.find((s) => s.codec_type === 'video');
+      const audioStream = data?.streams?.find((s) => s.codec_type === 'audio');
+      const fmt = data?.format;
+      const fmtDuration = fmt?.duration != null ? Number(fmt.duration) : 0;
+      const duration = fmtDuration != null ? Math.round(fmtDuration) : 0;
 
       if (duration <= 0 || !videoStream) {
         logger.warn({ filePath }, 'Invalid duration or no video stream found');
@@ -185,26 +283,32 @@ export async function getMetadata(filePath: string): Promise<VideoMetadata | nul
 
       resolve({
         duration,
-        width: videoStream.width ?? 0,
-        height: videoStream.height ?? 0,
-        videoCodec: videoStream.codec_name ?? '',
-        audioCodec: audioStream?.codec_name ?? null,
-        videoBitRate: videoStream.bit_rate ?? null,
-        audioBitRate: audioStream?.bit_rate ?? null,
-        formatBitRate: fmt.bit_rate ?? null,
-        fileSize: fmt.size ?? null,
-        formatName: fmt.format_name ?? null,
-        formatLongName: fmt.format_long_name ?? null,
-        sampleRate: audioStream?.sample_rate ?? null,
-        channels: audioStream?.channels ?? null,
-        channelLayout: audioStream?.channel_layout ?? null,
-        frameRate: videoStream.r_frame_rate ?? null,
-        pixFmt: videoStream.pix_fmt ?? null,
-        profile: videoStream.profile?.toString() ?? null,
-        nbStreams: fmt.nb_streams ?? null,
-        nbPrograms: fmt.nb_programs ?? null,
-        tags: fmt.tags ?? null,
+        width: (videoStream.width as number) ?? 0,
+        height: (videoStream.height as number) ?? 0,
+        videoCodec: (videoStream.codec_name as string) ?? '',
+        audioCodec: (audioStream?.codec_name as string) ?? null,
+        videoBitRate: (videoStream.bit_rate as string) ?? null,
+        audioBitRate: (audioStream?.bit_rate as string) ?? null,
+        formatBitRate: (fmt?.bit_rate as number) ?? null,
+        fileSize: (fmt?.size as number) ?? null,
+        formatName: (fmt?.format_name as string) ?? null,
+        formatLongName: (fmt?.format_long_name as string) ?? null,
+        sampleRate: (audioStream?.sample_rate as number) ?? null,
+        channels: (audioStream?.channels as number) ?? null,
+        channelLayout: (audioStream?.channel_layout as string) ?? null,
+        frameRate: (videoStream.r_frame_rate as string) ?? null,
+        pixFmt: (videoStream.pix_fmt as string) ?? null,
+        profile: typeof videoStream.profile === 'string' ? videoStream.profile : null,
+        nbStreams: (fmt?.nb_streams as number) ?? null,
+        nbPrograms: (fmt?.nb_programs as number) ?? null,
+        tags: (fmt?.tags as Record<string, string | number>) ?? null,
       });
+    });
+
+    proc.on('error', (err) => {
+      const errDetails = extractErrorDetails(err);
+      logger.error({ filePath, error: errDetails.message }, 'Failed to probe file');
+      resolve(null);
     });
   });
 }
@@ -256,6 +360,7 @@ export async function generateBlackSegment(
   outputPath: string,
   duration: number,
   metadata: VideoMetadata,
+  onProgress?: (percent: number) => void,
   onStart?: (cmd: string) => void
 ): Promise<string | null> {
   return new Promise((resolve) => {
@@ -263,44 +368,53 @@ export async function generateBlackSegment(
     const videoCodec = resolveVideoEncoder(metadata.videoCodec);
     const fr = frameRate ?? '30';
     const pf = pixFmt ?? 'yuv420p';
-    const colorSrc = `color=c=black:s=${width}x${height}:r=${fr}`;
 
-    const proc = ffmpeg()
-      .input(colorSrc)
-      .inputOptions(['-f', 'lavfi'])
-      .duration(duration)
-      .videoCodec(videoCodec)
-      .outputOptions([
-        '-pix_fmt', pf,
-        ...(profile != null && profile !== '' ? ['-profile:v', profile] : []),
-      ])
-      .toFormat('mp4');
+    const args: string[] = [];
+
+    args.push('-f', 'lavfi');
+    args.push('-i', `color=c=black:s=${width}x${height}:r=${fr}`);
+
+    if (audioCodec != null && sampleRate != null) {
+      const chLayout = resolveAudioChannel(channels);
+      args.push('-f', 'lavfi');
+      args.push('-i', `anullsrc=r=${sampleRate}:cl=${chLayout}`);
+    }
+
+    args.push('-t', duration.toString());
+    args.push('-c:v', videoCodec);
+    args.push('-pix_fmt', pf);
+
+    if (profile != null && profile !== '') {
+      args.push('-profile:v', profile);
+    }
 
     if (audioCodec != null && sampleRate != null) {
       const audioEncoder = resolveAudioEncoder(audioCodec);
-      const chLayout = resolveAudioChannel(channels);
-      const audioSrc = `aevalsrc=0:d=${duration}:s=${sampleRate}:c=${chLayout}`;
-
-      proc
-        .input(audioSrc)
-        .inputOptions(['-f', 'lavfi'])
-        .audioCodec(audioEncoder)
-        .outputOptions(['-map', '0:v:0', '-map', '1:a:0']);
+      args.push('-c:a', audioEncoder);
+      args.push('-map', '0:v:0');
+      args.push('-map', '1:a:0');
     }
 
-    proc
-      .on('start', (cmd) => {
-        logger.info(`FFmpeg start: ${cmd}`);
-        onStart?.(cmd);
-      })
-      .on('end', () => {
+    args.push('-v', 'info');
+    args.push('-y');
+    args.push(outputPath);
+
+    const cmdStr = `ffmpeg ${args.join(' ')}`;
+    const proc = spawn('ffmpeg', args);
+    trackProgress(proc, cmdStr, duration, onProgress, onStart);
+
+    proc.on('close', (code) => {
+      if (code === 0) {
         resolve(outputPath);
-      })
-      .on('error', (err) => {
-        logger.error(`Black segment error: ${err.message}`);
+      } else {
         resolve(null);
-      })
-      .saveToFile(outputPath);
+      }
+    });
+
+    proc.on('error', (err) => {
+      logger.error(`Failed to spawn FFmpeg process: ${err.message}`);
+      resolve(null);
+    });
   });
 }
 
@@ -311,45 +425,30 @@ export async function muteAudioSections(
   onProgress?: (percent: number) => void,
   onStart?: (cmd: string) => void
 ): Promise<string | null> {
-  const lastReported = { val: -1 };
-  const threshold = 25;
+  const meta = await getMetadata(videoPath);
+  const knownDuration = meta?.duration ?? null;
 
   return new Promise((resolve) => {
-    const ffmpegProcess = ffmpeg(videoPath);
+    const afFilter = filters.join(',');
 
-    ffmpegProcess.videoCodec('copy');
+    const args = ['-v', 'info', '-i', videoPath, '-c:v', 'copy', '-af', afFilter, '-c:a', 'aac', '-y', outputPath];
+    const cmdStr = `ffmpeg ${args.join(' ')}`;
 
-    for (const filter of filters) {
-      ffmpegProcess.audioFilters(filter);
-    }
-    ffmpegProcess.audioCodec('aac');
+    const proc = spawn('ffmpeg', args);
+    trackProgress(proc, cmdStr, knownDuration, onProgress, onStart);
 
-    ffmpegProcess
-      .toFormat('mp4')
-      .on('start', (cmd) => {
-        logger.info(`FFmpeg start: ${cmd}`);
-        onStart?.(cmd);
-      })
-      .on('end', () => {
+    proc.on('close', (code) => {
+      if (code === 0) {
         resolve(outputPath);
-      })
-      .on('error', (err) => {
-        logger.error(`FFmpeg mute error: ${err.message}`);
+      } else {
         resolve(null);
-      });
+      }
+    });
 
-    if (onProgress) {
-      (ffmpegProcess as events.EventEmitter).on('progress', (progress: ProgressEvent) => {
-        const percent = progress.percent != null ? Math.round(progress.percent) : 0;
-        const bucket = Math.floor(percent / threshold) * threshold;
-        if (bucket > lastReported.val) {
-          lastReported.val = bucket;
-          onProgress(bucket);
-        }
-      });
-    }
-
-    ffmpegProcess.saveToFile(outputPath);
+    proc.on('error', (err) => {
+      logger.error(`FFmpeg mute error: ${err.message}`);
+      resolve(null);
+    });
   });
 }
 
@@ -361,39 +460,38 @@ export async function extractSegment(
   onProgress?: (percent: number) => void,
   onStart?: (cmd: string) => void
 ): Promise<string | null> {
-  const lastReported = { val: -1 };
-  const threshold = 25;
-
   return new Promise((resolve) => {
-    const proc = ffmpeg(source)
-      .seekInput(start)
-      .duration(duration)
-      .outputOptions('-c copy')
-      .toFormat('mp4')
-      .on('start', (cmd) => {
-        logger.info(`FFmpeg start: ${cmd}`);
-        onStart?.(cmd);
-      })
-      .on('end', () => {
+    const args = [
+      '-v',
+      'info',
+      '-ss',
+      start.toString(),
+      '-i',
+      source,
+      '-t',
+      duration.toString(),
+      '-c',
+      'copy',
+      '-y',
+      outputPath,
+    ];
+    const cmdStr = `ffmpeg ${args.join(' ')}`;
+
+    const proc = spawn('ffmpeg', args);
+    trackProgress(proc, cmdStr, duration, onProgress, onStart);
+
+    proc.on('close', (code) => {
+      if (code === 0) {
         resolve(outputPath);
-      })
-      .on('error', (err) => {
-        logger.error(`Segment extract error: ${err.message}`);
+      } else {
         resolve(null);
-      });
+      }
+    });
 
-    if (onProgress) {
-      (proc as events.EventEmitter).on('progress', (progress: ProgressEvent) => {
-        const percent = progress.percent != null ? Math.round(progress.percent) : 0;
-        const bucket = Math.floor(percent / threshold) * threshold;
-        if (bucket > lastReported.val) {
-          lastReported.val = bucket;
-          onProgress(bucket);
-        }
-      });
-    }
-
-    proc.saveToFile(outputPath);
+    proc.on('error', (err) => {
+      logger.error(`Segment extract error: ${err.message}`);
+      resolve(null);
+    });
   });
 }
 
@@ -401,46 +499,33 @@ export async function concatSegments(
   segmentFiles: string[],
   outputPath: string,
   onProgress?: (percent: number) => void,
-  onStart?: (cmd: string) => void
+  onStart?: (cmd: string) => void,
+  totalDuration?: number
 ): Promise<string | null> {
-  const lastReported = { val: -1 };
-  const threshold = 25;
-
   return new Promise((resolve) => {
     const listPath = outputPath.replace('.mp4', '-concat.txt');
     writeFileSync(listPath, segmentFiles.map((f) => `file '${f}'`).join('\n') + '\n');
 
-    const proc = ffmpeg(listPath)
-      .inputOptions(['-f concat', '-safe 0'])
-      .videoCodec('copy')
-      .audioCodec('copy')
-      .toFormat('mp4')
-      .on('start', (cmd) => {
-        logger.info(`FFmpeg start: ${cmd}`);
-        onStart?.(cmd);
-      })
-      .on('end', () => {
-        void deleteFileIfExists(listPath);
+    const args = ['-v', 'info', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', '-y', outputPath];
+    const cmdStr = `ffmpeg ${args.join(' ')}`;
+
+    const proc = spawn('ffmpeg', args);
+    trackProgress(proc, cmdStr, totalDuration ?? null, onProgress, onStart);
+
+    proc.on('close', (code) => {
+      void deleteFileIfExists(listPath);
+      if (code === 0) {
         resolve(outputPath);
-      })
-      .on('error', (err) => {
-        void deleteFileIfExists(listPath);
-        logger.error(`Concat error: ${err.message}`);
+      } else {
         resolve(null);
-      });
+      }
+    });
 
-    if (onProgress) {
-      (proc as events.EventEmitter).on('progress', (progress: ProgressEvent) => {
-        const percent = progress.percent != null ? Math.round(progress.percent) : 0;
-        const bucket = Math.floor(percent / threshold) * threshold;
-        if (bucket > lastReported.val) {
-          lastReported.val = bucket;
-          onProgress(bucket);
-        }
-      });
-    }
-
-    proc.saveToFile(outputPath);
+    proc.on('error', (err) => {
+      void deleteFileIfExists(listPath);
+      logger.error(`Concat error: ${err.message}`);
+      resolve(null);
+    });
   });
 }
 
@@ -453,52 +538,45 @@ export async function concatSegments(
  * @param options - Optional vodId for logging, progress callback, isFmp4 flag from caller
  */
 export async function convertHlsToMp4(source: string, outputPath: string, options?: HlsToMp4Options): Promise<void> {
-  // Use fMP4 status provided by caller (defaults to false for standard .ts segments)
   const isFmp4 = options?.isFmp4 ?? false;
 
   logger.debug({ vodId: options?.vodId ?? source.substring(0, 30), isFmp4 }, `HLS format determined`);
 
-  // Build ffmpeg output options based on caller-provided fMP4 status
+  const meta = await getMetadata(source);
+  const knownDuration = meta?.duration ?? null;
+
   const baseOptions: string[] = ['-bsf:a', 'aac_adtstoasc', '-movflags', '+faststart'];
 
   if (isFmp4) {
     baseOptions.push('-avoid_negative_ts', 'make_zero', '-fflags', '+genpts');
   }
 
-  // Execute ffmpeg conversion with fluent API
+  const args: string[] = ['-v', 'info', '-i', source, '-c', 'copy', ...baseOptions, '-y', outputPath];
+  const cmdStr = `ffmpeg ${args.join(' ')}`;
+
   return new Promise((resolve, reject) => {
-    const ffmpegProcess = ffmpeg(source);
+    const proc = spawn('ffmpeg', args);
+    trackProgress(proc, cmdStr, knownDuration, options?.onProgress, options?.onStart);
 
-    ffmpegProcess
-      .videoCodec('copy')
-      .audioCodec('copy')
-      .outputOptions(baseOptions)
-      .toFormat('mp4')
-      .saveToFile(outputPath);
-
-    (ffmpegProcess as events.EventEmitter).on('progress', (progress: ProgressEvent) => {
-      const percent = progress.percent != null ? Math.round(progress.percent) : 0;
-      const threshold = Math.floor(percent / 25) * 25;
-      const lastReported = lastFfmpegProgressBySource.get(source) ?? -1;
-
-      if (threshold > lastReported) {
-        lastFfmpegProgressBySource.set(source, threshold);
-        options?.onProgress?.(threshold);
+    const ctx = options?.vodId != null ? `VOD ${options.vodId}` : source.substring(0, 40);
+    let hlsLogged = false;
+    proc.stderr.on('data', () => {
+      if (!hlsLogged) {
+        hlsLogged = true;
+        logger.info({ isFmp4 }, `${ctx} - Converting HLS to MP4${isFmp4 ? ' (fMP4)' : ''}`);
       }
     });
-    ffmpegProcess.on('start', (cmd) => {
-      const ctx = options?.vodId != null ? `VOD ${options.vodId}` : source.substring(0, 40);
 
-      logger.info({ isFmp4 }, `${ctx} - Converting HLS to MP4${isFmp4 ? ' (fMP4)' : ''}`);
-      logger.info(`FFmpeg start: ${cmd}`);
-      options?.onStart?.(cmd);
+    proc.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`FFmpeg HLS conversion exited with code ${code}`));
+      }
     });
-    ffmpegProcess.on('error', (err: Error, _stdout: string | null, stderr: string | null) => {
-      ffmpegProcess.kill('SIGKILL');
-      reject(err ?? new Error(stderr?.toString() ?? 'Unknown error'));
-    });
-    ffmpegProcess.on('end', () => {
-      resolve();
+
+    proc.on('error', (err: Error) => {
+      reject(err);
     });
   });
 }

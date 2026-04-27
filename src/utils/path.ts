@@ -64,7 +64,7 @@ export function getVodFilePath(options: VodPathOptions): string {
     throw new ConfigNotConfiguredError(`VOD path for tenant ${config.id}`);
   }
 
-  return path.join(config.settings.vodPath, config.id, `${vodId}.mp4`);
+  return path.join(config.settings.vodPath, config.id, vodId, `${vodId}.mp4`);
 }
 
 /**
