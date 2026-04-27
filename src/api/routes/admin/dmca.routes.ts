@@ -53,7 +53,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
 
   // Main DMCA endpoint - ensure VOD download, then queue DMCA processing
   fastify.post<{ Body: DmcaRequestBody; Params: { tenantId: string } }>(
-    '/dmca',
+    '/vods/dmca',
     {
       schema: {
         tags: ['Admin'],
@@ -124,6 +124,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         platform,
         part,
         downloadJobId: downloadJobId ?? undefined,
+        filePath,
       });
 
       if (dmcaJobId == null) {
