@@ -412,15 +412,17 @@ export interface DmcaClaimInfo {
 }
 
 export interface DmcaWorkerAlerts {
-  processing: (vodId: string, claims: DmcaClaimInfo[], part?: number) => RichEmbedData;
+  processing: (vodId: string, claims: DmcaClaimInfo[], platform: string, displayName: string, part?: number) => RichEmbedData;
   progress: (
     vodId: string,
     claims: DmcaClaimInfo[],
     completedClaimIds: string[],
     currentStep: string,
+    platform: string,
+    displayName: string,
     stepProgress?: number
   ) => RichEmbedData;
-  complete: (vodId: string, youtubeJobId: string, claims: DmcaClaimInfo[]) => RichEmbedData;
+  complete: (vodId: string, youtubeJobId: string, claims: DmcaClaimInfo[], platform: string, displayName: string) => RichEmbedData;
   error: (vodId: string, errorMsg: string) => RichEmbedData;
 }
 
@@ -431,8 +433,9 @@ function formatClaimList(
   stepProgress?: number
 ): string {
   const lines: string[] = [];
+  const sorted = [...claims].sort((a, b) => a.startTimestamp.localeCompare(b.startTimestamp));
 
-  for (const claim of claims) {
+  for (const claim of sorted) {
     const claimKey = claim.claimId ?? claim.identifier;
     const isCompleted = completedClaimIds.includes(claimKey);
     const isCurrent = !isCompleted && currentStep != null && currentStep.includes(claimKey ?? '');
@@ -456,19 +459,23 @@ function formatClaimList(
 
 export function createDmcaWorkerAlerts(): DmcaWorkerAlerts {
   return {
-    processing: (vodId, claims, part) => {
+    processing: (vodId, claims, platform, displayName, part) => {
       const claimList = formatClaimList(claims, []);
 
       return {
         title: `⚖️ DMCA Processing ${vodId}`,
         description: `${part != null ? `Part ${part} — ` : ''}${claims.length} blocking claim${claims.length !== 1 ? 's' : ''} to process:\n\n${claimList}`,
         status: 'warning',
-        fields: [{ name: 'VOD ID', value: vodId, inline: false }],
+        fields: [
+          { name: 'VOD ID', value: vodId, inline: true },
+          { name: 'Platform', value: platform, inline: true },
+          { name: 'Streamer', value: displayName, inline: true },
+        ],
         timestamp: new Date().toISOString(),
       };
     },
 
-    progress: (vodId, claims, completedClaimIds, currentStep, stepProgress) => {
+    progress: (vodId, claims, completedClaimIds, currentStep, platform, displayName, stepProgress) => {
       const claimList = formatClaimList(claims, completedClaimIds, undefined, stepProgress);
       const completed = completedClaimIds.length;
       const total = claims.length;
@@ -477,13 +484,17 @@ export function createDmcaWorkerAlerts(): DmcaWorkerAlerts {
         title: `⚖️ DMCA Processing ${vodId}`,
         description: `${completed}/${total} claims processed — ${currentStep}\n\n${claimList}`,
         status: 'warning',
-        fields: [{ name: 'VOD ID', value: vodId, inline: false }],
+        fields: [
+          { name: 'VOD ID', value: vodId, inline: true },
+          { name: 'Platform', value: platform, inline: true },
+          { name: 'Streamer', value: displayName, inline: true },
+        ],
         timestamp: new Date().toISOString(),
         updatedTimestamp: new Date().toISOString(),
       };
     },
 
-    complete: (vodId, youtubeJobId, claims) => {
+    complete: (vodId, youtubeJobId, claims, platform, displayName) => {
       const claimList = formatClaimList(
         claims,
         claims.map((c) => c.claimId ?? c.identifier)
@@ -494,7 +505,9 @@ export function createDmcaWorkerAlerts(): DmcaWorkerAlerts {
         description: `All ${claims.length} claims processed for ${vodId}:\n\n${claimList}`,
         status: 'success',
         fields: [
-          { name: 'VOD ID', value: vodId, inline: false },
+          { name: 'VOD ID', value: vodId, inline: true },
+          { name: 'Platform', value: platform, inline: true },
+          { name: 'Streamer', value: displayName, inline: true },
           { name: 'Upload Job ID', value: youtubeJobId, inline: false },
         ],
         timestamp: new Date().toISOString(),

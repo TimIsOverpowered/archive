@@ -79,11 +79,12 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
   const completedClaimIds: string[] = [];
 
   const dmcaAlerts = createDmcaWorkerAlerts();
-  const messageId = await initRichAlert(dmcaAlerts.processing(vodId, claimInfos, part));
+  const displayName = config.displayName ?? config.id;
+  const messageId = await initRichAlert(dmcaAlerts.processing(vodId, claimInfos, platform, displayName, part));
 
   if (blockingClaims.length === 0) {
     log.info({ vodId }, 'No blocking claims for VOD, uploading original');
-    await updateAlert(messageId, dmcaAlerts.complete(vodId, 'N/A', []));
+    await updateAlert(messageId, dmcaAlerts.complete(vodId, 'N/A', [], platform, displayName));
 
     return { success: true, message: 'No action needed' };
   }
@@ -129,8 +130,8 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     const { step, progress } = pendingAlert.current;
     const alertData =
       progress != null
-        ? dmcaAlerts.progress(vodId, claimInfos, completedClaimIds, step, progress)
-        : dmcaAlerts.progress(vodId, claimInfos, completedClaimIds, step);
+        ? dmcaAlerts.progress(vodId, claimInfos, completedClaimIds, step, platform, displayName, progress)
+        : dmcaAlerts.progress(vodId, claimInfos, completedClaimIds, step, platform, displayName);
     if (ffmpegCmd != null) {
       alertData.fields = [...(alertData.fields ?? []), { name: 'Progress', value: formatFfmpegField(), inline: false }];
     }
@@ -356,7 +357,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     }
 
     log.info({ vodId, jobId }, 'YouTube upload job queued');
-    await updateAlert(messageId, dmcaAlerts.complete(vodId, jobId, claimInfos));
+    await updateAlert(messageId, dmcaAlerts.complete(vodId, jobId, claimInfos, platform, displayName));
 
     return { success: true, youtubeJobId: jobId, vodId };
   } catch (error) {
