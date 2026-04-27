@@ -12,11 +12,13 @@ import type { ChatMessageCreateInput } from './chat/chat-types.js';
 import { PLATFORMS, isTwitchPlatform, type Platform } from '../types/platforms.js';
 import { flushChatBatch } from './chat/chat-batch-processor.js';
 import { createChatWorkerAlerts } from './utils/alert-factories.js';
+import { getDisplayName } from '../config/types.js';
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../db/streamer-types.js';
 
 interface ChatProcessorState {
   tenantId: string;
+  displayName: string;
   dbId: number;
   vodId: string;
   // Narrowed to Twitch by isTwitchPlatform() guard above — chat download only supports Twitch.
@@ -45,7 +47,8 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
     return { success: true, skipped: true };
   }
 
-  const { db } = await getJobContext(tenantId);
+  const { db, config } = await getJobContext(tenantId);
+  const displayName = getDisplayName(config);
   const chatAlerts = createChatWorkerAlerts();
 
   const {
@@ -60,7 +63,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
 
   const messageId = await initChatAlert(
     chatAlerts,
-    tenantId,
+    displayName,
     vodId,
     platform,
     effectiveOffset,
@@ -82,8 +85,9 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
       duration,
       lastMessageId,
       chatAlerts,
-      tenantId,
+      displayName,
       messageId,
+      tenantId,
       log
     );
     if (skipResult) return skipResult;
@@ -91,6 +95,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
 
   const state: ChatProcessorState = {
     tenantId,
+    displayName,
     dbId,
     vodId,
     platform,
@@ -112,7 +117,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
   updateAlert(
     messageId,
     chatAlerts.complete(
-      tenantId,
+      displayName,
       vodId,
       platform,
       result.totalMessages,
@@ -127,7 +132,7 @@ const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (
 
 async function initChatAlert(
   chatAlerts: ReturnType<typeof createChatWorkerAlerts>,
-  tenantId: string,
+  displayName: string,
   vodId: string,
   platform: string,
   effectiveOffset: number,
@@ -136,7 +141,7 @@ async function initChatAlert(
 ): Promise<string | null> {
   const isResume = hasExistingData && startOffset == null;
   const alertData = chatAlerts.init(
-    tenantId,
+    displayName,
     vodId,
     platform as Platform,
     isResume,
@@ -184,7 +189,7 @@ async function isCompleteByLastMessage(
 }
 
 function markComplete(
-  tenantId: string,
+  displayName: string,
   vodId: string,
   messageId: string,
   chatAlerts: ReturnType<typeof createChatWorkerAlerts>,
@@ -192,10 +197,10 @@ function markComplete(
   effectiveOffset: number,
   log: ReturnType<typeof createAutoLogger>
 ): ChatDownloadResult {
-  resetFailures(tenantId);
+  resetFailures(displayName);
   updateAlert(
     messageId,
-    chatAlerts.alreadyComplete(tenantId, vodId, PLATFORMS.TWITCH, totalMessages, effectiveOffset)
+    chatAlerts.alreadyComplete(displayName, vodId, PLATFORMS.TWITCH, totalMessages, effectiveOffset)
   ).catch((err) => {
     log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
   });
@@ -210,8 +215,9 @@ async function checkAlreadyComplete(
   duration: number,
   lastMessageId: string | undefined,
   chatAlerts: ReturnType<typeof createChatWorkerAlerts>,
-  tenantId: string,
+  displayName: string,
   messageId: string,
+  tenantId: string,
   log: ReturnType<typeof createAutoLogger>
 ): Promise<ChatDownloadResult | null> {
   const msgCountByOffset = await isCompleteByOffset(db, dbId, effectiveOffset, duration);
@@ -220,7 +226,7 @@ async function checkAlreadyComplete(
       { vodId, effectiveOffset, duration, msgCountByOffset },
       'Chat download already complete (offset exceeds duration)'
     );
-    return markComplete(tenantId, vodId, messageId, chatAlerts, msgCountByOffset, effectiveOffset, log);
+    return markComplete(displayName, vodId, messageId, chatAlerts, msgCountByOffset, effectiveOffset, log);
   }
 
   const msgCountByLastMessage = await isCompleteByLastMessage(
@@ -233,7 +239,7 @@ async function checkAlreadyComplete(
   );
   if (msgCountByLastMessage !== null) {
     log.info({ vodId, lastMessageId, msgCountByLastMessage }, 'Chat download already complete');
-    return markComplete(tenantId, vodId, messageId, chatAlerts, msgCountByLastMessage, effectiveOffset, log);
+    return markComplete(displayName, vodId, messageId, chatAlerts, msgCountByLastMessage, effectiveOffset, log);
   }
 
   return null;
@@ -264,7 +270,7 @@ async function processChatDownload(
   state: ChatProcessorState,
   effectiveOffset: number
 ): Promise<{ totalMessages: number; batchCount: number }> {
-  const { tenantId, dbId, vodId, platform, duration, log, chatAlerts, messageId, db } = state;
+  const { displayName, dbId, vodId, platform, duration, log, chatAlerts, messageId, db, tenantId } = state;
   let totalMessages = 0;
   let batchCount = 0;
   const batchBuffer: ChatMessageCreateInput[] = [];
@@ -288,7 +294,7 @@ async function processChatDownload(
     if (edges.length === 0) {
       log.warn({ vodId, effectiveOffset }, 'No chat messages found for VOD');
       resetFailures(tenantId);
-      updateAlert(messageId, chatAlerts.noMessages(tenantId, vodId, platform, effectiveOffset)).catch((err) => {
+      updateAlert(messageId, chatAlerts.noMessages(displayName, vodId, platform, effectiveOffset)).catch((err) => {
         log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
       });
       return { totalMessages: 0, batchCount: 0 };
@@ -325,7 +331,7 @@ async function processChatDownload(
           reportProgress(offset);
           updateAlert(
             messageId,
-            chatAlerts.progress(tenantId, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)
+            chatAlerts.progress(displayName, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)
           ).catch((err) => {
             log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
           });
@@ -351,7 +357,7 @@ async function processChatDownload(
         reportProgress(offset);
         updateAlert(
           messageId,
-          chatAlerts.progress(tenantId, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)
+          chatAlerts.progress(displayName, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)
         ).catch((err) => {
           log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
         });

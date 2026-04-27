@@ -185,9 +185,9 @@ export function createLiveWorkerAlerts(): LiveWorkerAlerts {
 // ============================================================================
 
 export interface ChatWorkerAlerts {
-  init: (tenantId: string, vodId: string, platform: Platform, isResume: boolean, offset?: number) => RichEmbedData;
+  init: (displayName: string, vodId: string, platform: Platform, isResume: boolean, offset?: number) => RichEmbedData;
   progress: (
-    tenantId: string,
+    displayName: string,
     vodId: string,
     offset: number,
     batchNumber: number,
@@ -196,7 +196,7 @@ export interface ChatWorkerAlerts {
     duration: number
   ) => RichEmbedData;
   complete: (
-    tenantId: string,
+    displayName: string,
     vodId: string,
     platform: Platform,
     totalMessages: number,
@@ -204,15 +204,15 @@ export interface ChatWorkerAlerts {
     startOffset?: number
   ) => RichEmbedData;
   alreadyComplete: (
-    tenantId: string,
+    displayName: string,
     vodId: string,
     platform: Platform,
     totalMessages: number,
     lastOffset: number
   ) => RichEmbedData;
-  noMessages: (tenantId: string, vodId: string, platform: Platform, offset: number) => RichEmbedData;
+  noMessages: (displayName: string, vodId: string, platform: Platform, offset: number) => RichEmbedData;
   error: (
-    tenantId: string,
+    displayName: string,
     vodId: string,
     platform: Platform,
     totalMessages: number,
@@ -222,11 +222,11 @@ export interface ChatWorkerAlerts {
 
 export function createChatWorkerAlerts(): ChatWorkerAlerts {
   return {
-    init: (tenantId, vodId, platform, isResume, offset) => ({
+    init: (displayName, vodId, platform, isResume, offset) => ({
       title: isResume ? `💬 Chat Download Resumed` : `💬 Chat Download Started`,
       description: isResume
-        ? `${tenantId} - Continuing from offset ${offset?.toFixed(2) ?? 0}s`
-        : `${tenantId} - Fetching chat messages for ${vodId}`,
+        ? `${displayName} - Continuing from offset ${offset?.toFixed(2) ?? 0}s`
+        : `${displayName} - Fetching chat messages for ${vodId}`,
       status: 'warning',
       fields: [
         { name: 'Platform', value: capitalizePlatform(platform), inline: true },
@@ -238,27 +238,27 @@ export function createChatWorkerAlerts(): ChatWorkerAlerts {
       timestamp: new Date().toISOString(),
     }),
 
-    progress: (tenantId, vodId, offset, batchNumber, messagesInBatch, _totalMessages, duration) => {
+    progress: (displayName, vodId, offset, batchNumber, messagesInBatch, _totalMessages, duration) => {
       const percent = duration > 0 ? Math.min(Math.round((offset / duration) * 100), 100) : 0;
       const progressBar = createProgressBar(percent);
 
       return {
         title: '💬 Downloading Chat',
-        description: `${tenantId} chat download for ${vodId}`,
+        description: `${displayName} chat download for ${vodId}`,
         status: 'warning',
         fields: [
           { name: 'Current Offset', value: `${offset.toFixed(2)}s`, inline: true },
           { name: 'Batch', value: `#${batchNumber} (${messagesInBatch} messages)`, inline: true },
-          { name: 'Progress', value: `[Chat Download] ${tenantId} ${progressBar}`, inline: false },
+          { name: 'Progress', value: `[Chat Download] ${displayName} ${progressBar}`, inline: false },
         ],
         timestamp: new Date().toISOString(),
         updatedTimestamp: new Date().toISOString(),
       };
     },
 
-    alreadyComplete: (tenantId, vodId, platform, totalMessages, lastOffset) => ({
+    alreadyComplete: (displayName, vodId, platform, totalMessages, lastOffset) => ({
       title: '💬 Chat Download Already Complete',
-      description: `${tenantId} - Chat download for ${vodId} is already complete`,
+      description: `${displayName} - Chat download for ${vodId} is already complete`,
       status: 'success',
       fields: [
         { name: 'Platform', value: capitalizePlatform(platform), inline: true },
@@ -268,9 +268,9 @@ export function createChatWorkerAlerts(): ChatWorkerAlerts {
       timestamp: new Date().toISOString(),
     }),
 
-    complete: (tenantId, vodId, platform, totalMessages, batchCount, startOffset) => ({
+    complete: (displayName, vodId, platform, totalMessages, batchCount, startOffset) => ({
       title: '💬 Chat Download Complete',
-      description: `${tenantId} - Successfully downloaded ${totalMessages} chat messages for ${vodId}`,
+      description: `${displayName} - Successfully downloaded ${totalMessages} chat messages for ${vodId}`,
       status: 'success',
       fields: [
         { name: 'Platform', value: capitalizePlatform(platform), inline: true },
@@ -290,9 +290,9 @@ export function createChatWorkerAlerts(): ChatWorkerAlerts {
       updatedTimestamp: new Date().toISOString(),
     }),
 
-    noMessages: (tenantId, vodId, platform, offset) => ({
+    noMessages: (displayName, vodId, platform, offset) => ({
       title: '[Chat] Download Complete',
-      description: `${tenantId} - No chat messages found for VOD ${vodId}`,
+      description: `${displayName} - No chat messages found for VOD ${vodId}`,
       status: 'warning',
       fields: [
         { name: 'Platform', value: capitalizePlatform(platform), inline: true },
@@ -303,9 +303,9 @@ export function createChatWorkerAlerts(): ChatWorkerAlerts {
       updatedTimestamp: new Date().toISOString(),
     }),
 
-    error: (tenantId, vodId, platform, totalMessages, errorMsg) => ({
+    error: (displayName, vodId, platform, totalMessages, errorMsg) => ({
       title: '[Chat] Download Failed',
-      description: `${tenantId} - Error fetching chat messages for VOD ${vodId}`,
+      description: `${displayName} - Error fetching chat messages for VOD ${vodId}`,
       status: 'error',
       fields: [
         { name: 'Platform', value: capitalizePlatform(platform), inline: true },
@@ -323,7 +323,7 @@ export function createChatWorkerAlerts(): ChatWorkerAlerts {
 // ============================================================================
 
 export interface YoutubeWorkerAlerts {
-  splitting: (tenantId: string, vodId: string, totalParts: number, duration: number) => RichEmbedData;
+  splitting: (displayName: string, vodId: string, totalParts: number, duration: number) => RichEmbedData;
   splittingProgress: (currentPart: number, totalParts: number) => RichEmbedData;
   uploadProgress: (vodId: string, part: number | null, percent: number) => RichEmbedData;
   complete: (vodId: string, videoIds: string[], parts?: number) => RichEmbedData;
@@ -332,9 +332,9 @@ export interface YoutubeWorkerAlerts {
 
 export function createYoutubeWorkerAlerts(): YoutubeWorkerAlerts {
   return {
-    splitting: (tenantId, vodId, totalParts, duration) => ({
+    splitting: (displayName, vodId, totalParts, duration) => ({
       title: `📺 VOD Splitting in Progress`,
-      description: `${tenantId} - Preparing ${totalParts} parts...`,
+      description: `${displayName} - Preparing ${totalParts} parts...`,
       status: 'warning',
       fields: [
         { name: 'VOD ID', value: vodId, inline: true },

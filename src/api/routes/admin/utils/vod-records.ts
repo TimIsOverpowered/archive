@@ -9,7 +9,7 @@ import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { triggerChatDownload } from '../../../../workers/jobs/chat.job.js';
 
 import { getStrategy } from '../../../../services/platforms/index.js';
-import { getPlatformConfig, type PlatformConfig } from '../../../../config/types.js';
+import { getPlatformConfig, getDisplayName, type PlatformConfig } from '../../../../config/types.js';
 
 /**
  * Extracts platform identifiers from tenant config.
@@ -115,6 +115,7 @@ export async function ensureVodRecord(
     await fetchAndSaveEmotes(ctx, vodRecord.id, platform, platformUserId);
     void triggerChatDownload(
       tenantId,
+      getDisplayName(ctx.config),
       platformUserId,
       vodRecord.id,
       vodId,
@@ -171,6 +172,7 @@ export async function refreshVodRecord(
     await fetchAndSaveEmotes(ctx, updatedRecord.id, platform, platformUserId);
     void triggerChatDownload(
       tenantId,
+      getDisplayName(ctx.config),
       platformUserId,
       updatedRecord.id,
       vodId,

@@ -29,8 +29,8 @@ function toInsertableChatMessage(msg: ChatMessageCreateInput): InsertableChatMes
     content_offset_seconds: msg.content_offset_seconds,
     user_color: msg.user_color,
     created_at: msg.createdAt.toISOString(),
-    message: (msg.message as string | null) ?? null,
-    user_badges: (msg.user_badges as string | null) ?? null,
+    message: msg.message != null ? JSON.stringify(msg.message) : null,
+    user_badges: msg.user_badges != null ? JSON.stringify(msg.user_badges) : null,
   };
 }
 

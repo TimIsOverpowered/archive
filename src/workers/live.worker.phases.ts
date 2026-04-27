@@ -164,6 +164,7 @@ export async function runPostProcessing(
   try {
     chatJobId = await triggerChatDownload(
       ctx.tenantId,
+      ctx.streamerName,
       ctx.platformUserId,
       ctx.dbId,
       ctx.vodId,

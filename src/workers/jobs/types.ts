@@ -25,6 +25,7 @@ export interface StandardVodJob {
 
 export interface ChatDownloadJob {
   tenantId: string;
+  displayName?: string | undefined;
   platformUserId?: string | undefined;
   platformUsername?: string | undefined;
   dbId: number;

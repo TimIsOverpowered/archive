@@ -28,6 +28,7 @@ async function enqueue(job: ChatDownloadJob): Promise<string | null> {
 
 export async function triggerChatDownload(
   tenantId: string,
+  displayName: string | undefined,
   platformUserId: string,
   dbId: number,
   vodId: string,
@@ -37,5 +38,5 @@ export async function triggerChatDownload(
   forceRerun?: boolean
 ): Promise<string | null> {
   if (platform === PLATFORMS.KICK) return null;
-  return enqueue({ tenantId, platformUserId, platformUsername, dbId, vodId, platform, duration, forceRerun });
+  return enqueue({ tenantId, displayName, platformUserId, platformUsername, dbId, vodId, platform, duration, forceRerun });
 }

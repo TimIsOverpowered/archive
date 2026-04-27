@@ -15,7 +15,7 @@ import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
 import { findVodRecord } from './utils/vod-helpers.js';
 import { fetchAndSaveEmotes } from '../../../services/emotes.js';
 import { triggerChatDownload } from '../../../workers/jobs/chat.job.js';
-import { getPlatformConfig } from '../../../config/types.js';
+import { getPlatformConfig, getDisplayName } from '../../../config/types.js';
 
 /** Route params shared by metadata endpoints. */
 type RouteParams = { tenantId: string };
@@ -185,6 +185,7 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
 
       const jobId = await triggerChatDownload(
         tenantId,
+        getDisplayName(config),
         platformId,
         vodRecord.id,
         vodId,
