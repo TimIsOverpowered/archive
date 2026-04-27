@@ -17,6 +17,7 @@ interface HlsToMp4Options {
   vodId?: string | number;
   onProgress?: (percent: number) => void;
   isFmp4?: boolean;
+  onStart?: (cmd: string) => void;
 }
 
 /**
@@ -63,7 +64,8 @@ export async function splitVideo(
   duration: number,
   splitDuration: number,
   vodId: string,
-  onProgress?: (percent: number, part: number) => void
+  onProgress?: (percent: number, part: number) => void,
+  onStart?: (cmd: string) => void
 ): Promise<string[]> {
   const outputDir = path.dirname(filePath);
   const parts: string[] = [];
@@ -84,6 +86,10 @@ export async function splitVideo(
         .duration(partDuration)
         .outputOptions('-c copy')
         .save(partFile)
+        .on('start', (cmd) => {
+          logger.info(`FFmpeg start: ${cmd}`);
+          onStart?.(cmd);
+        })
         .on('end', () => {
           parts.push(partFile);
           resolve();
@@ -102,7 +108,8 @@ export async function trimVideo(
   start: number,
   end: number,
   vodId: string,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  onStart?: (cmd: string) => void
 ): Promise<string> {
   const outputDir = path.dirname(filePath);
   const duration = end - start;
@@ -110,6 +117,11 @@ export async function trimVideo(
 
   return new Promise((resolve, reject) => {
     const proc = ffmpeg(filePath).seekInput(start).duration(duration).outputOptions('-c copy').save(outputFile);
+
+    proc.on('start', (cmd) => {
+      logger.info(`FFmpeg start: ${cmd}`);
+      onStart?.(cmd);
+    });
 
     (proc as events.EventEmitter).on('progress', (progress: ProgressEvent) => {
       if (onProgress && progress.percent != null) {
@@ -168,7 +180,8 @@ export async function getVideoDimensions(filePath: string): Promise<VideoDimensi
 export async function generateBlackSegment(
   outputPath: string,
   duration: number,
-  dims: VideoDimensions
+  dims: VideoDimensions,
+  onStart?: (cmd: string) => void
 ): Promise<string | null> {
   return new Promise((resolve) => {
     const colorSrc = `color=c=black:s=${dims.width}x${dims.height}:d=${duration}`;
@@ -179,6 +192,10 @@ export async function generateBlackSegment(
       .duration(duration)
       .videoCodec('copy')
       .toFormat('mp4')
+      .on('start', (cmd) => {
+        logger.info(`FFmpeg start: ${cmd}`);
+        onStart?.(cmd);
+      })
       .on('end', () => {
         resolve(outputPath);
       })
@@ -232,10 +249,12 @@ export async function convertHlsToMp4(source: string, outputPath: string, option
         options?.onProgress?.(threshold);
       }
     });
-    ffmpegProcess.on('start', () => {
+    ffmpegProcess.on('start', (cmd) => {
       const ctx = options?.vodId != null ? `VOD ${options.vodId}` : source.substring(0, 40);
 
       logger.info({ isFmp4 }, `${ctx} - Converting HLS to MP4${isFmp4 ? ' (fMP4)' : ''}`);
+      logger.info(`FFmpeg start: ${cmd}`);
+      options?.onStart?.(cmd);
     });
     ffmpegProcess.on('error', (err: Error, _stdout: string | null, stderr: string | null) => {
       ffmpegProcess.kill('SIGKILL');

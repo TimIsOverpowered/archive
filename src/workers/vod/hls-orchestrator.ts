@@ -61,6 +61,7 @@ interface HlsConvertOptions {
   config: TenantConfig;
   onConversionProgress?: (percent: number) => void;
   discordMessageId?: string | null;
+  onFfmpegStart?: (cmd: string) => void;
 }
 
 interface HlsSegmentFilterResult {
@@ -114,6 +115,7 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
       });
     }
 
+    let hlsFfmpegCmd: string | undefined;
     const result = await convertAndCleanup(
       m3u8Path,
       finalMp4Path,
@@ -124,8 +126,18 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
         config,
         onConversionProgress: (percent) => {
           if (options.discordMessageId != null) {
-            void updateAlert(options.discordMessageId, createVodWorkerAlerts().converting(vodId, percent));
+            const alertData = createVodWorkerAlerts().converting(vodId, percent);
+            if (hlsFfmpegCmd != null) {
+              alertData.fields = [
+                ...(alertData.fields ?? []),
+                { name: 'FFmpeg', value: `\`${hlsFfmpegCmd.substring(0, 500)}\``, inline: false },
+              ];
+            }
+            void updateAlert(options.discordMessageId, alertData);
           }
+        },
+        onFfmpegStart: (cmd) => {
+          hlsFfmpegCmd = cmd;
         },
         discordMessageId: options.discordMessageId ?? null,
       },
@@ -166,6 +178,7 @@ async function convertAndCleanup(
     vodId,
     isFmp4,
     ...(options.onConversionProgress && { onProgress: options.onConversionProgress }),
+    ...(options.onFfmpegStart && { onStart: options.onFfmpegStart }),
   });
 
   const files = await fsPromises.readdir(vodDir);

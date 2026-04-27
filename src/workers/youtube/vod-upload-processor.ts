@@ -128,22 +128,36 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
     timestamp: new Date().toISOString(),
   });
 
-  const parts = await splitVideo(filePath, duration, splitDuration, vodId, (percent: number, partNum: number) => {
-    updateAlert(splitAlertMessageId, {
-      title: '📺 Splitting VOD',
-      description: `${channelName} - Processing part ${partNum}/${totalParts}`,
-      status: 'warning',
-      fields: [
+  let splitFfmpegCmd: string | undefined;
+  const parts = await splitVideo(
+    filePath,
+    duration,
+    splitDuration,
+    vodId,
+    (percent: number, partNum: number) => {
+      const alertFields: Array<{ name: string; value: string; inline: boolean }> = [
         { name: 'VOD ID', value: vodId, inline: true },
         { name: 'Part Progress', value: `${partNum}/${totalParts}`, inline: true },
         { name: 'Overall Progress', value: createProgressBar(percent), inline: false },
-      ],
-      timestamp: new Date().toISOString(),
-      updatedTimestamp: new Date().toISOString(),
-    }).catch((err) => {
-      log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
-    });
-  });
+      ];
+      if (splitFfmpegCmd != null) {
+        alertFields.push({ name: 'FFmpeg', value: `\`${splitFfmpegCmd.substring(0, 500)}\``, inline: false });
+      }
+      updateAlert(splitAlertMessageId, {
+        title: '📺 Splitting VOD',
+        description: `${channelName} - Processing part ${partNum}/${totalParts}`,
+        status: 'warning',
+        fields: alertFields,
+        timestamp: new Date().toISOString(),
+        updatedTimestamp: new Date().toISOString(),
+      }).catch((err) => {
+        log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
+      });
+    },
+    (cmd) => {
+      splitFfmpegCmd = cmd;
+    }
+  );
 
   const uploadedVideos: Array<{ id: string; part: number; duration: number }> = [];
 

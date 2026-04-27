@@ -6,7 +6,6 @@ import {
   buildMuteFilters,
   muteAudioSections,
   blackoutVideoSections,
-  cleanupTempFiles,
   BlackoutSection,
   CLAIM_TYPES,
   getClaimIdentifier,
@@ -107,7 +106,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
   );
 
   let processedPath = filePath;
-  const tempFiles: string[] = [];
+  let ffmpegCmd: string | undefined;
 
   // Debounced Discord alert updater to avoid spam
   const alertTimer = { current: null as ReturnType<typeof setTimeout> | null };
@@ -116,10 +115,14 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       clearTimeout(alertTimer.current);
     }
     alertTimer.current = setTimeout(() => {
-      void updateAlert(
-        messageId,
-        dmcaAlerts.progress(vodId, claimInfos, completedClaimIds, currentStep, stepProgress)
-      ).catch((err) => {
+      const alertData = dmcaAlerts.progress(vodId, claimInfos, completedClaimIds, currentStep, stepProgress);
+      if (ffmpegCmd != null) {
+        alertData.fields = [
+          ...(alertData.fields ?? []),
+          { name: 'FFmpeg', value: `\`${ffmpegCmd.substring(0, 500)}\``, inline: false },
+        ];
+      }
+      void updateAlert(messageId, alertData).catch((err) => {
         log.warn({ err: extractErrorDetails(err) }, 'Discord alert update failed (non-critical)');
       });
     }, 500);
@@ -146,7 +149,10 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
         startOffset,
         startOffset + splitDuration,
         `${vodId}-part-${part}`,
-        () => {}
+        () => {},
+        (cmd) => {
+          ffmpegCmd = cmd;
+        }
       );
     }
 
@@ -191,6 +197,9 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
         },
         onStep: (step, current, total) => {
           debouncedAlertUpdate(`blackout-video [${current}/${total}]: ${step}`);
+        },
+        onStart: (cmd) => {
+          ffmpegCmd = cmd;
         },
       });
 
@@ -241,6 +250,9 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
         onStep: (step, current, total) => {
           debouncedAlertUpdate(`blackout-av [${current}/${total}]: ${step}`);
         },
+        onStart: (cmd) => {
+          ffmpegCmd = cmd;
+        },
       });
 
       if (blackoutedPath == null) {
@@ -267,15 +279,22 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       const muteFilters = buildMuteFilters(muteClaims);
       const mutedPath = `${processedPath.replace('.mp4', '-muted.mp4')}`;
 
-      const mutedResult = await muteAudioSections(processedPath, muteFilters, mutedPath, (pct) => {
-        debouncedAlertUpdate('mute-audio', pct);
-      });
+      const mutedResult = await muteAudioSections(
+        processedPath,
+        muteFilters,
+        mutedPath,
+        (pct) => {
+          debouncedAlertUpdate('mute-audio', pct);
+        },
+        (cmd) => {
+          ffmpegCmd = cmd;
+        }
+      );
 
       if (mutedResult == null) {
         throw new Error('Failed to process audio claims');
       }
 
-      tempFiles.push(mutedPath);
       processedPath = mutedResult;
       markClaimsCompleted(muteClaims);
       debouncedAlertUpdate('mute-complete');
@@ -295,6 +314,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       processedPath,
       platform,
       'vod',
+      true,
       undefined,
       part
     );
@@ -316,7 +336,6 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     if (alertTimer.current != null) {
       clearTimeout(alertTimer.current);
     }
-    await cleanupTempFiles(tempFiles);
   }
 };
 

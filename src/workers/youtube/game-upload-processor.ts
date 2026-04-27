@@ -42,7 +42,14 @@ export async function processGameUpload(ctx: GameUploadContext): Promise<GameUpl
     throw new Error('File path is required for game upload');
   }
 
-  const trimmedPath = await trimVideo(filePath, chapterStart, chapterEnd, `${ctx.vodId}-${ctx.chapterName}`);
+  const trimmedPath = await trimVideo(
+    filePath,
+    chapterStart,
+    chapterEnd,
+    `${ctx.vodId}-${ctx.chapterName}`,
+    undefined,
+    () => {}
+  );
   const trimmedDuration = (await getDuration(trimmedPath)) ?? 0;
 
   const gameExceedsYoutubeMax = trimmedDuration > YOUTUBE_MAX_DURATION;
@@ -164,22 +171,32 @@ async function processSplitGameUpload(
     timestamp: new Date().toISOString(),
   });
 
+  let splitGameFfmpegCmd: string | undefined;
   const splitPaths = await splitVideo(
     trimmedPath,
     trimmedDuration,
     YOUTUBE_MAX_DURATION,
     `${vodId}-game`,
     (percent: number) => {
+      const alertFields: Array<{ name: string; value: string; inline: boolean }> = [
+        { name: 'Progress', value: createProgressBar(percent), inline: false },
+      ];
+      if (splitGameFfmpegCmd != null) {
+        alertFields.push({ name: 'FFmpeg', value: `\`${splitGameFfmpegCmd.substring(0, 500)}\``, inline: false });
+      }
       updateAlert(splitAlertMessageId, {
         title: `✂️ Splitting Game Clip`,
         description: `${channelName} - Game clip exceeds YouTube max duration`,
         status: 'warning',
-        fields: [{ name: 'Progress', value: createProgressBar(percent), inline: false }],
+        fields: alertFields,
         timestamp: new Date().toISOString(),
         updatedTimestamp: new Date().toISOString(),
       }).catch((err) => {
         log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
       });
+    },
+    (cmd) => {
+      splitGameFfmpegCmd = cmd;
     }
   );
 

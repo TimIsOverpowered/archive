@@ -35,7 +35,7 @@ export interface DMCAClaim {
     };
   };
   claimPolicy: { primaryPolicy: { policyType: string } };
-  matchDetails: { longestMatchStartTimeSeconds: number; longestMatchDurationSeconds: string };
+  matchDetails: { longestMatchStartTimeSeconds: string; longestMatchDurationSeconds: string };
 }
 
 const BLOCKING_POLICY_TYPES = ['POLICY_TYPE_GLOBAL_BLOCK', 'POLICY_TYPE_MOSTLY_GLOBAL_BLOCK'];
@@ -78,9 +78,7 @@ export function buildMuteFilters(claims: DMCAClaim[]): string[] {
   const muteSection: string[] = [];
 
   for (const claim of claims) {
-    if (!isBlockingPolicy(claim)) continue;
-
-    const startTime = claim.matchDetails.longestMatchStartTimeSeconds;
+    const startTime = parseInt(claim.matchDetails.longestMatchStartTimeSeconds);
     const endTime = startTime + parseInt(claim.matchDetails.longestMatchDurationSeconds);
 
     muteSection.push(`volume=0:enable='between(t,${startTime},${endTime})'`);
@@ -93,7 +91,8 @@ export async function muteAudioSections(
   videoPath: string,
   filters: string[],
   outputPath: string,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  onStart?: (cmd: string) => void
 ): Promise<string | null> {
   const lastReported = { val: -1 };
   const threshold = 25;
@@ -101,16 +100,19 @@ export async function muteAudioSections(
   return new Promise((resolve) => {
     const ffmpegProcess = ffmpeg(videoPath);
 
-    if (filters.length > 0) {
-      for (const filter of filters) {
-        ffmpegProcess.audioFilters(filter);
-      }
-    } else {
-      ffmpegProcess.videoCodec('copy');
+    ffmpegProcess.videoCodec('copy');
+
+    for (const filter of filters) {
+      ffmpegProcess.audioFilters(filter);
     }
+    ffmpegProcess.audioCodec('aac');
 
     ffmpegProcess
       .toFormat('mp4')
+      .on('start', (cmd) => {
+        log.info(`FFmpeg start: ${cmd}`);
+        onStart?.(cmd);
+      })
       .on('end', () => {
         resolve(outputPath);
       })
@@ -143,6 +145,7 @@ export interface BlackoutSection {
 export interface BlackoutProgressOptions {
   onProgress?: (percent: number) => void;
   onStep?: (step: string, current: number, total: number) => void;
+  onStart?: (cmd: string) => void;
 }
 
 async function extractSegment(
@@ -150,7 +153,8 @@ async function extractSegment(
   outputPath: string,
   start: number,
   duration: number,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  onStart?: (cmd: string) => void
 ): Promise<string | null> {
   const lastReported = { val: -1 };
   const threshold = 25;
@@ -161,6 +165,10 @@ async function extractSegment(
       .duration(duration)
       .outputOptions('-c copy')
       .toFormat('mp4')
+      .on('start', (cmd) => {
+        log.info(`FFmpeg start: ${cmd}`);
+        onStart?.(cmd);
+      })
       .on('end', () => {
         resolve(outputPath);
       })
@@ -187,7 +195,8 @@ async function extractSegment(
 async function concatSegments(
   segmentFiles: string[],
   outputPath: string,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  onStart?: (cmd: string) => void
 ): Promise<string | null> {
   const lastReported = { val: -1 };
   const threshold = 25;
@@ -201,6 +210,10 @@ async function concatSegments(
       .videoCodec('copy')
       .audioCodec('copy')
       .toFormat('mp4')
+      .on('start', (cmd) => {
+        log.info(`FFmpeg start: ${cmd}`);
+        onStart?.(cmd);
+      })
       .on('end', () => {
         void deleteFileIfExists(listPath);
         resolve(outputPath);
@@ -282,7 +295,7 @@ export async function blackoutVideoSections(
       if (section.startSeconds > prevEnd) {
         const dur = section.startSeconds - prevEnd;
         const file = `${vodId}-seg-normal-${prevEnd}.mp4`;
-        const result = await extractSegment(videoPath, file, prevEnd, dur, reportProgress);
+        const result = await extractSegment(videoPath, file, prevEnd, dur, reportProgress, options?.onStart);
         if (result === null) return null;
         segmentFiles.push(result);
         tempFiles.push(result);
@@ -290,7 +303,12 @@ export async function blackoutVideoSections(
       }
 
       const blackFile = `${vodId}-seg-black-${section.startSeconds}.mp4`;
-      const blackResult = await generateBlackSegment(blackFile, section.endSeconds - section.startSeconds, dims);
+      const blackResult = await generateBlackSegment(
+        blackFile,
+        section.endSeconds - section.startSeconds,
+        dims,
+        options?.onStart
+      );
       if (blackResult === null) return null;
       segmentFiles.push(blackResult);
       tempFiles.push(blackResult);
@@ -302,14 +320,14 @@ export async function blackoutVideoSections(
     if (prevEnd < totalDuration) {
       const dur = totalDuration - prevEnd;
       const file = `${vodId}-seg-normal-${prevEnd}.mp4`;
-      const result = await extractSegment(videoPath, file, prevEnd, dur, reportProgress);
+      const result = await extractSegment(videoPath, file, prevEnd, dur, reportProgress, options?.onStart);
       if (result === null) return null;
       segmentFiles.push(result);
       tempFiles.push(result);
       reportStep(`extract:${toHHMMSS(prevEnd)}-${toHHMMSS(totalDuration)}`);
     }
 
-    const result = await concatSegments(segmentFiles, outputPath, reportProgress);
+    const result = await concatSegments(segmentFiles, outputPath, reportProgress, options?.onStart);
     reportStep('concat');
     return result;
   } finally {

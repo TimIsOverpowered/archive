@@ -21,15 +21,22 @@ async function withVodAlerts<T>(
   vodId: string,
   platform: Platform,
   config: TenantConfig,
-  fn: (messageId: string | null, updateProgress: (pct: number) => void) => Promise<T>
+  fn: (messageId: string | null, updateProgress: (pct: number, ffmpegCmd?: string) => void) => Promise<T>
 ): Promise<T> {
   const alerts = createVodWorkerAlerts();
   const displayName = getDisplayName(config);
   const messageId = await initRichAlert(alerts.init(vodId, platform, displayName));
   try {
-    const result = await fn(messageId, (pct) => {
+    const result = await fn(messageId, (pct, ffmpegCmd) => {
       if (messageId !== null) {
-        updateAlert(messageId, alerts.converting(vodId, pct)).catch((err) => {
+        const alertData = alerts.converting(vodId, pct);
+        if (ffmpegCmd != null) {
+          alertData.fields = [
+            ...(alertData.fields ?? []),
+            { name: 'FFmpeg', value: `\`${ffmpegCmd.substring(0, 500)}\``, inline: false },
+          ];
+        }
+        updateAlert(messageId, alertData).catch((err) => {
           getLogger().debug({ err: extractErrorDetails(err) }, 'Progress alert update failed');
         });
       }
@@ -89,11 +96,16 @@ async function downloadKickVodWithFfmpeg(
   }
 
   await withVodAlerts(vodId, PLATFORMS.KICK, config, async (_messageId, updateProgress) => {
+    let kickFfmpegCmd: string | undefined;
     await convertHlsToMp4(m3u8Url, finalPath, {
       vodId: vodId,
       isFmp4: false,
       onProgress: (percent) => {
-        updateProgress(percent);
+        const cmd = kickFfmpegCmd;
+        updateProgress(percent, cmd);
+      },
+      onStart: (cmd) => {
+        kickFfmpegCmd = cmd;
       },
     });
 
@@ -124,11 +136,16 @@ async function downloadTwitchVodWithFfmpeg(
   const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
 
   await withVodAlerts(vodId, PLATFORMS.TWITCH, config, async (_messageId, updateProgress) => {
+    let twitchFfmpegCmd: string | undefined;
     await convertHlsToMp4(m3u8Url, finalPath, {
       vodId,
       isFmp4,
       onProgress: (percent) => {
-        updateProgress(percent);
+        const cmd = twitchFfmpegCmd;
+        updateProgress(percent, cmd);
+      },
+      onStart: (cmd) => {
+        twitchFfmpegCmd = cmd;
       },
     });
 
