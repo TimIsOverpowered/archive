@@ -478,6 +478,7 @@ module.exports = function (app) {
           vod: vod_data,
           type: type,
           duration: duration,
+          part: 1,
         },
         app,
       );
