@@ -11,7 +11,7 @@ import {
 import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { HttpError } from '../../../utils/http-error.js';
-import { findVodRecord } from './utils/vod-helpers.js';
+import { findVodRecord, ensureVodRecord } from './utils/vod-helpers.js';
 import { getStrategy } from '../../../services/platforms/index.js';
 import { getApiConfig } from '../../../config/env.js';
 import { VodCreateSchema } from '../../../config/schemas.js';
@@ -64,7 +64,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
     {
       schema: {
         tags: ['Admin'],
-        description: 'Create a VOD record manually',
+        description: 'Create a VOD record (manual or via platform API)',
         params: {
           type: 'object',
           properties: { tenantId: { type: 'string', description: 'Tenant ID' } },
@@ -78,7 +78,9 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
             createdAt: { type: 'string' },
             duration: { type: 'number' },
             platform: { type: 'string', enum: PLATFORM_VALUES },
+            source: { type: 'string', enum: ['manual', 'api'] },
           },
+          required: ['vodId', 'platform', 'source'],
         },
         security: [{ apiKey: [] }],
       },
@@ -88,12 +90,25 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
     async (request) => {
       const tenantCtx = asTenantPlatformContext(requireTenant(request));
       const { tenantId, db, platform } = tenantCtx;
-      const { vodId, title, createdAt, duration } = request.body;
+      const { vodId, source } = request.body;
       const log = createAutoLogger(tenantId);
 
-      // Validate vodId is provided
       if (vodId === '') {
         throw new HttpError(400, 'vodId is required', 'BAD_REQUEST');
+      }
+
+      if (source === 'api') {
+        const vodRecord = await ensureVodRecord(tenantCtx, vodId, log);
+
+        if (!vodRecord) {
+          throw new HttpError(404, `VOD ${vodId} not found on ${platform}`, 'NOT_FOUND');
+        }
+
+        await invalidateVodStaticCache(tenantId, vodRecord.id);
+        await invalidateVodVolatileCache(tenantId, vodRecord.id);
+
+        log.info(`Created/fetched VOD ${vodId} via API`);
+        return { data: { message: `${vodRecord.id} created!`, vodId: vodRecord.id } };
       }
 
       const vodRecord = await findVodRecord(db, vodId, platform);
@@ -101,6 +116,8 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
       if (vodRecord) {
         return { data: { message: `${vodId} already exists!`, vodId: vodId } };
       }
+
+      const { title, createdAt, duration } = request.body;
 
       const strategy = getStrategy(platform);
       const validatedData = VodCreateSchema.parse({

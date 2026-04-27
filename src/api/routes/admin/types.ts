@@ -19,6 +19,7 @@ export interface CreateVodBody {
   createdAt?: string;
   duration?: number;
   platform: Platform;
+  source: 'manual' | 'api';
 }
 
 /** Body for deleting a VOD and related data. */
