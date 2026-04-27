@@ -22,9 +22,23 @@ import { extractErrorDetails } from '../utils/error.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { createDmcaWorkerAlerts, DmcaClaimInfo } from './utils/alert-factories.js';
 import { ConfigNotConfiguredError, FileNotFound } from '../utils/domain-errors.js';
+import { uploadAndUpsertGame } from './youtube/game-upload-processor.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
-  const { tenantId, dbId, vodId, receivedClaims, platform, part, filePath: providedFilePath } = job.data;
+  const {
+    tenantId,
+    dbId,
+    vodId,
+    receivedClaims,
+    platform,
+    part,
+    filePath: providedFilePath,
+    gameId,
+    chapterId,
+    chapterStart,
+    chapterEnd,
+  } = job.data;
+  const isGameUpload = gameId != null && chapterId != null && chapterStart != null && chapterEnd != null;
   const log = createAutoLogger(String(tenantId));
 
   const { config, db } = await getJobContext(tenantId);
@@ -39,7 +53,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
   if (providedFilePath != null) {
     // File path provided by route (file already exists)
     filePath = providedFilePath;
-    log.info({ vodId, filePath, part }, 'DMCA processing started (file exists)');
+    log.info({ vodId, filePath, part, gameId, isGameUpload }, 'DMCA processing started (file exists)');
   } else {
     // Retrieve file path from download job result (FlowProducer child)
     const childResults = await job.getChildrenValues();
@@ -53,7 +67,10 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     }
 
     filePath = downloadResult.finalPath;
-    log.info({ vodId, filePath, part, jobId: job.id }, 'DMCA processing started (file path from download job)');
+    log.info(
+      { vodId, filePath, part, gameId, isGameUpload, jobId: job.id },
+      'DMCA processing started (file path from download job)'
+    );
   }
 
   // Verify file exists (safety check)
@@ -185,6 +202,28 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       );
     }
 
+    // For game DMCA: trim VOD to chapter range before processing
+    if (isGameUpload) {
+      log.info({ vodId, gameId, chapterStart, chapterEnd }, 'Trimming VOD to game chapter range');
+
+      const trimmedPath = await ffmpegTrim(
+        processedPath,
+        chapterStart,
+        chapterEnd,
+        path.join(workDir, `${vodId}-game-${gameId}-trimmed`),
+        (pct) => {
+          currentFfmpegProgress = pct;
+        },
+        (cmd) => {
+          ffmpegCmd = cmd;
+          currentFfmpegProgress = 0;
+        }
+      );
+
+      if (processedPath !== filePath) tempFiles.push(processedPath);
+      processedPath = trimmedPath;
+    }
+
     const audioClaims = blockingClaims.filter((claim) => claim.type === CLAIM_TYPES.AUDIO);
     const audioVisualClaims = blockingClaims.filter((claim) => claim.type === CLAIM_TYPES.AUDIOVISUAL);
     const visualClaims = blockingClaims.filter((claim) => claim.type === CLAIM_TYPES.VISUAL);
@@ -290,22 +329,49 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       clearTimeout(alertTimer.current);
     }
 
-    log.info({ vodId, part }, 'Queuing YouTube upload');
+    log.info({ vodId, part, gameId, isGameUpload }, 'Queuing YouTube upload');
 
-    try {
-      await queueYoutubeVodUpload(
-        { tenantId, config, db },
-        dbId,
-        vodId,
-        processedPath,
-        platform,
-        'vod',
-        true,
-        undefined,
-        part
-      );
-    } catch (err) {
-      log.warn({ err: extractErrorDetails(err), vodId }, 'YouTube upload queue failed');
+    if (isGameUpload) {
+     // Fetch existing game metadata for YouTube upload
+       const game = await db.selectFrom('games').selectAll().where('id', '=', gameId).executeTakeFirst();
+       const gameName = game?.game_name ?? '';
+       const gameTitle = game?.title ?? gameName;
+
+       try {
+         await uploadAndUpsertGame({
+           tenantId,
+           dbId,
+           vodId,
+           filePath: processedPath,
+           chapterStart: chapterStart,
+           chapterEnd: chapterEnd,
+           chapterName: gameName,
+           title: gameTitle,
+           description: gameTitle,
+          db,
+          config,
+          log,
+        });
+      } catch (err) {
+        log.warn({ err: extractErrorDetails(err), vodId }, 'Game upload failed');
+      }
+    } else {
+      // VOD upload (existing flow)
+      try {
+        await queueYoutubeVodUpload(
+          { tenantId, config, db },
+          dbId,
+          vodId,
+          processedPath,
+          platform,
+          'vod',
+          true,
+          undefined,
+          part
+        );
+      } catch (err) {
+        log.warn({ err: extractErrorDetails(err), vodId }, 'YouTube upload queue failed');
+      }
     }
 
     return { success: true, vodId };

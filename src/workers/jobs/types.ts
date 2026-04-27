@@ -76,6 +76,10 @@ export interface DmcaProcessingJob {
   platform: Platform;
   part?: number | undefined;
   filePath?: string | undefined;
+  gameId?: number | undefined;
+  chapterId?: number | undefined;
+  chapterStart?: number | undefined;
+  chapterEnd?: number | undefined;
 }
 
 export interface MonitorJob {

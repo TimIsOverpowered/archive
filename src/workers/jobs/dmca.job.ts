@@ -16,12 +16,31 @@ export interface QueueDmcaProcessingOptions {
   part?: number | undefined;
   downloadJobId?: string | undefined;
   filePath?: string | undefined;
+  gameId?: number | undefined;
+  chapterId?: number | undefined;
+  chapterStart?: number | undefined;
+  chapterEnd?: number | undefined;
 }
 
 export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): Promise<string | null> {
-  const { tenantId, dbId, vodId, claims, type, platform, part, downloadJobId, filePath } = options;
+  const {
+    tenantId,
+    dbId,
+    vodId,
+    claims,
+    type,
+    platform,
+    part,
+    downloadJobId,
+    filePath,
+    gameId,
+    chapterId,
+    chapterStart,
+    chapterEnd,
+  } = options;
 
-  const jobId = part !== undefined ? `dmca_${vodId}_p${part}` : `dmca_${vodId}`;
+  const isGameUpload = gameId != null;
+  const jobId = isGameUpload ? `dmca_game_${gameId}` : part !== undefined ? `dmca_${vodId}_p${part}` : `dmca_${vodId}`;
 
   const job: DmcaProcessingJob = {
     tenantId,
@@ -32,6 +51,10 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
     platform,
     ...(part !== undefined && { part }),
     ...(filePath !== undefined && { filePath }),
+    ...(gameId != null && { gameId }),
+    ...(chapterId != null && { chapterId }),
+    ...(chapterStart != null && { chapterStart }),
+    ...(chapterEnd != null && { chapterEnd }),
   };
 
   try {
@@ -56,7 +79,7 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
 
       const resultJobId = flow.job.id ?? null;
       log.info(
-        { vodId, jobId: resultJobId, part, chained: true, claimsCount: claims.length },
+        { vodId, jobId: resultJobId, part, gameId, chained: true, claimsCount: claims.length },
         'DMCA processing job queued (chained to download)'
       );
       return resultJobId;
@@ -70,7 +93,7 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
 
     const resultJobId = addedJob.id ?? null;
     log.info(
-      { vodId, jobId: resultJobId, part, chained: false, claimsCount: claims.length },
+      { vodId, jobId: resultJobId, part, gameId, chained: false, claimsCount: claims.length },
       'DMCA processing job queued (file exists)'
     );
     return resultJobId;

@@ -30,10 +30,119 @@ export interface GameUploadContext {
   log: AppLogger;
 }
 
+export interface GameUploadAndUpsertParams {
+  tenantId: string;
+  dbId: number;
+  vodId: string;
+  filePath: string;
+  chapterStart: number;
+  chapterEnd: number;
+  chapterName: string;
+  chapterGameId?: string | undefined;
+  title: string;
+  description: string;
+  part?: number | undefined;
+  totalParts?: number | undefined;
+  db: Kysely<StreamerDB>;
+  config: TenantConfig;
+  log: AppLogger;
+}
+
 export type GameUploadResult =
   | { success: true; videoId: string; gameId: string }
   | { success: true; videos: Array<{ id: string; part: number; startTime: number; endTime: number; gameId: string }> }
   | { success: true; videoId: ''; gameId: '' };
+
+export async function uploadAndUpsertGame(
+  params: GameUploadAndUpsertParams
+): Promise<{ videoId: string; gameId: string }> {
+  const {
+    tenantId,
+    dbId,
+    vodId,
+    filePath,
+    chapterStart,
+    chapterEnd,
+    chapterName,
+    chapterGameId,
+    title,
+    description,
+    part,
+    totalParts,
+    db,
+    config,
+  } = params;
+  const channelName = getDisplayName(config);
+  const duration = chapterEnd - chapterStart;
+  const currentPartNum = part ?? 1;
+  const partTitle = part != null && part > 1 ? `${title} PART ${part}` : title;
+
+  const uploadAlertMessageId = await initRichAlert({
+    title: part != null ? `🎮 Game Upload (Part ${currentPartNum}/${totalParts})` : '🎮 Game Upload Started',
+    description: `${channelName} - Uploading game clip to YouTube...`,
+    status: 'warning',
+    fields: [
+      { name: 'Game Name', value: chapterName, inline: true },
+      { name: 'VOD ID', value: vodId, inline: false },
+    ],
+    timestamp: new Date().toISOString(),
+  });
+
+  const onUploadProgress =
+    uploadAlertMessageId != null
+      ? createGameUploadProgressHandler({
+          messageId: uploadAlertMessageId,
+          type: 'game',
+          channelName,
+          gameName: chapterName,
+          videoTitle: partTitle,
+          privacyStatus: 'public',
+          ...(part != null && totalParts != null && { part: currentPartNum, totalParts }),
+        })
+      : () => {};
+
+  const result = await uploadVideo(
+    tenantId,
+    channelName,
+    filePath,
+    partTitle,
+    description,
+    'public',
+    onUploadProgress,
+    duration
+  );
+
+  GameUpsertSchema.parse({
+    game_id: chapterGameId,
+    game_name: chapterName,
+  });
+  const gameRecord = await db
+    .insertInto('games')
+    .values({
+      vod_id: dbId,
+      start_time: chapterStart,
+      end_time: chapterEnd,
+      video_provider: 'youtube',
+      video_id: result.videoId,
+      thumbnail_url: result.thumbnailUrl ?? null,
+      game_id: chapterGameId,
+      game_name: chapterName,
+      title: chapterName,
+    })
+    .onConflict((oc) =>
+      oc.columns(['vod_id', 'start_time', 'end_time']).doUpdateSet({
+        video_id: result.videoId,
+        thumbnail_url: result.thumbnailUrl ?? null,
+      })
+    )
+    .returning('id')
+    .executeTakeFirst();
+
+  await publishVodUpdate(tenantId, dbId);
+
+  if (gameRecord == null) throw new Error('Failed to insert game record');
+  return { videoId: result.videoId, gameId: String(gameRecord.id) };
+}
 
 export async function processGameUpload(ctx: GameUploadContext): Promise<GameUploadResult> {
   const { filePath, chapterStart, chapterEnd } = ctx;
@@ -65,6 +174,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
   const {
     tenantId,
     dbId,
+    vodId,
     chapterStart,
     chapterEnd,
     chapterGameId,
@@ -72,82 +182,29 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     description,
     db,
     chapterName,
-    vodId,
     config,
+    log,
   } = ctx;
-  const channelName = getDisplayName(config);
-  const duration = chapterEnd - chapterStart;
 
-  const uploadAlertMessageId = await initRichAlert({
-    title: '🎮 Game Upload Started',
-    description: `${channelName} - Uploading game clip to YouTube...`,
-    status: 'warning',
-    fields: [
-      { name: 'Game Name', value: chapterName, inline: true },
-      { name: 'VOD ID', value: vodId, inline: false },
-    ],
-    timestamp: new Date().toISOString(),
-  });
-
-  const onUploadProgress =
-    uploadAlertMessageId != null
-      ? createGameUploadProgressHandler({
-          messageId: uploadAlertMessageId,
-          type: 'game',
-          channelName,
-          gameName: chapterName,
-          videoTitle: title,
-          privacyStatus: 'public',
-        })
-      : () => {};
-
-  const result = await uploadVideo(
+  const result = await uploadAndUpsertGame({
     tenantId,
-    channelName,
-    trimmedPath,
+    dbId,
+    vodId,
+    filePath: trimmedPath,
+    chapterStart,
+    chapterEnd,
+    chapterName,
+    chapterGameId,
     title,
     description,
-    'public',
-    onUploadProgress,
-    duration
-  );
-
-  GameUpsertSchema.parse({
-    game_id: chapterGameId,
-    game_name: chapterName,
+    db,
+    config,
+    log,
   });
-  const gameRecord = await db
-    .insertInto('games')
-    .values({
-      vod_id: dbId,
-      start_time: chapterStart,
-      end_time: chapterEnd,
-      video_provider: 'youtube',
-      video_id: result.videoId,
-      thumbnail_url: result.thumbnailUrl ?? null,
-      game_id: chapterGameId,
-      game_name: chapterName,
-      title: chapterName,
-    })
-    .onConflict((oc) =>
-      oc.columns(['vod_id', 'start_time', 'end_time']).doUpdateSet({
-        video_provider: 'youtube',
-        video_id: result.videoId,
-        thumbnail_url: result.thumbnailUrl ?? null,
-        game_id: chapterGameId,
-        game_name: chapterName,
-        title: chapterName,
-      })
-    )
-    .returning('id')
-    .executeTakeFirst();
-
-  await publishVodUpdate(tenantId, dbId);
 
   await deleteFileIfExists(trimmedPath);
 
-  if (gameRecord == null) throw new Error('Failed to insert game record');
-  return { success: true, videoId: result.videoId, gameId: String(gameRecord.id) };
+  return { success: true, ...result };
 }
 
 async function processSplitGameUpload(
@@ -207,91 +264,36 @@ async function processSplitGameUpload(
     const currentPartNum = i + 1;
     const startTime = i * YOUTUBE_MAX_DURATION;
     const endTime = Math.min(startTime + YOUTUBE_MAX_DURATION, trimmedDuration);
-    const partDuration = endTime - startTime;
-    const partTitle = i > 0 ? `${title} PART ${i + 1}` : title;
-
     const splitPath = splitPaths[i];
     if (splitPath == null) {
       log.warn({ part: currentPartNum, totalParts }, `Missing split path for part ${currentPartNum}`);
       continue;
     }
 
-    const uploadAlertMessageId = await initRichAlert({
-      title: `🎮 Game Upload (Part ${currentPartNum}/${totalParts})`,
-      description: `${channelName} - Uploading game clip part to YouTube...`,
-      status: 'warning',
-      fields: [
-        { name: 'Game Name', value: chapterName, inline: true },
-        { name: 'VOD ID', value: vodId, inline: true },
-        { name: 'Part', value: `${currentPartNum} of ${totalParts}`, inline: false },
-      ],
-      timestamp: new Date().toISOString(),
-    });
-
-    const onUploadProgress =
-      uploadAlertMessageId != null
-        ? createGameUploadProgressHandler({
-            messageId: uploadAlertMessageId,
-            type: 'game',
-            channelName: getDisplayName(config),
-            gameName: chapterName,
-            videoTitle: partTitle,
-            part: currentPartNum,
-            totalParts,
-            privacyStatus: 'public',
-          })
-        : () => {};
-
-    const result = await uploadVideo(
+    const uploadResult = await uploadAndUpsertGame({
       tenantId,
-      getDisplayName(config),
-      splitPath,
-      partTitle,
+      dbId,
+      vodId,
+      filePath: splitPath,
+      chapterStart: startTime + chapterStart,
+      chapterEnd: endTime + chapterStart,
+      chapterName,
+      chapterGameId,
+      title,
       description,
-      'public',
-      onUploadProgress,
-      partDuration
-    );
-
-    GameUpsertSchema.parse({
-      game_id: chapterGameId,
-      game_name: chapterName,
+      part: currentPartNum,
+      totalParts,
+      db,
+      config,
+      log,
     });
-    const gameRecord = await db
-      .insertInto('games')
-      .values({
-        vod_id: dbId,
-        start_time: startTime + chapterStart,
-        end_time: endTime + chapterStart,
-        video_provider: 'youtube',
-        video_id: result.videoId,
-        thumbnail_url: result.thumbnailUrl ?? null,
-        game_id: chapterGameId,
-        game_name: chapterName,
-        title: chapterName,
-      })
-      .onConflict((oc) =>
-        oc.columns(['vod_id', 'start_time', 'end_time']).doUpdateSet({
-          video_provider: 'youtube',
-          video_id: result.videoId,
-          thumbnail_url: result.thumbnailUrl ?? null,
-          game_id: chapterGameId,
-          game_name: chapterName,
-          title: chapterName,
-        })
-      )
-      .returning('id')
-      .executeTakeFirst();
 
-    await publishVodUpdate(tenantId, dbId);
-
-    if (gameRecord == null) throw new Error('Failed to insert game record');
     uploadedGameVideos.push({
-      id: result.videoId,
+      id: uploadResult.videoId,
       part: currentPartNum,
       startTime,
       endTime,
-      gameId: String(gameRecord.id),
+      gameId: uploadResult.gameId,
     });
 
     if (!config.settings.saveMP4) {

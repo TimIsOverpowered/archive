@@ -50,7 +50,8 @@ export async function createGameUploadJob(
   vodId: string,
   filePath: string | undefined,
   platform: Platform,
-  chapter: { id: number; name: string; start: number; end: number; gameId?: string | undefined }
+  chapter: { id: number; name: string; start: number; end: number; gameId?: string | undefined },
+  options?: { title?: string | undefined; description?: string | undefined }
 ): Promise<YoutubeGameUploadJob> {
   const { config, tenantId } = ctx;
   if (config.youtube?.upload === false) {
@@ -96,11 +97,11 @@ export async function createGameUploadJob(
   const vodStreamTitle = vodRecord.title != null && vodRecord.title !== '' ? vodRecord.title.replace(/>|</gi, '') : '';
   const domainName = config.settings?.domainName;
 
-  // Generate title with EP number
-  const title = `${channelName} plays ${chapter.name} EP ${epNumber} - ${dateFormatted}`;
-
-  // Generate description
-  const description = `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube?.description}`;
+  // Use provided title/description or generate new ones
+  const generatedTitle = `${channelName} plays ${chapter.name} EP ${epNumber} - ${dateFormatted}`;
+  const generatedDescription = `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube?.description}`;
+  const title = options?.title ?? generatedTitle;
+  const description = options?.description ?? generatedDescription;
 
   return {
     kind: 'game',
@@ -331,6 +332,43 @@ export async function queueYoutubeGameUpload(
     start: chapter.start ?? 0,
     end: chapter.end ?? 0,
     gameId: chapter.game_id ?? undefined,
+  });
+
+  return enqueueGameUpload(job, downloadJobId);
+}
+
+/**
+ * Creates and enqueues a YouTube game upload job for a specific game record.
+ * Uses the game's own start/end times, NOT the chapter's full range.
+ * This ensures re-uploading a gameId only re-uploads that exact segment.
+ * @param ctx - Tenant context
+ * @param dbId - Database VOD ID
+ * @param vodId - Platform VOD ID
+ * @param filePath - Path to video file
+ * @param platform - Source platform
+ * @param game - Game record with id, name, start_time, end_time, game_id
+ * @param chapterName - Chapter name for metadata/title generation
+ * @param downloadJobId - Optional: chains upload to wait for download
+ * @returns The job ID if successfully enqueued, null otherwise
+ */
+export async function queueYoutubeGameUploadByGame(
+  ctx: TenantContext,
+  dbId: number,
+  vodId: string,
+  filePath: string | undefined,
+  platform: Platform,
+  game: { id: number; name: string; start: number; end: number; gameId?: string | undefined; title?: string | undefined },
+  chapterName: string,
+  downloadJobId?: string
+): Promise<string | null> {
+  const job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, {
+    id: game.id,
+    name: chapterName,
+    start: game.start,
+    end: game.end,
+    gameId: game.gameId,
+  }, {
+    title: game.title,
   });
 
   return enqueueGameUpload(job, downloadJobId);
