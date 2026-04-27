@@ -110,8 +110,8 @@ export async function runDownload(ctx: LiveProcessorContext): Promise<LiveDownlo
     isLive: true,
     discordMessageId: ctx.messageId ?? undefined,
     streamerName: ctx.streamerName,
-    onProgress: (segmentsDownloaded) => {
-      void updateAlert(ctx.messageId, ctx.alerts.progress(ctx.vodId, segmentsDownloaded)).catch((err) => {
+    onProgress: (segmentsDownloaded, duration) => {
+      void updateAlert(ctx.messageId, ctx.alerts.progress(ctx.vodId, segmentsDownloaded, duration)).catch((err) => {
         ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Discord alert update failed (non-critical)');
       });
     },

@@ -15,7 +15,8 @@ import type { LiveCompletionData } from '../live.worker.phases.js';
 
 export interface VodWorkerAlerts {
   init: (vodId: string, platform: Platform, streamerName: string) => RichEmbedData;
-  progress: (vodId: string, message: string) => RichEmbedData;
+  progress: (vodId: string, segmentsDownloaded: number, totalSegments: number) => RichEmbedData;
+  converting: (vodId: string, percent: number) => RichEmbedData;
   complete: (vodId: string, platform: Platform, finalPath: string) => RichEmbedData;
   error: (vodId: string, platform: Platform, errorMsg: string) => RichEmbedData;
 }
@@ -33,9 +34,25 @@ export function createVodWorkerAlerts(): VodWorkerAlerts {
       timestamp: new Date().toISOString(),
     }),
 
-    progress: (vodId, message) => ({
-      title: `[VOD] ${vodId} In Progress`,
-      description: message,
+    progress: (vodId, segmentsDownloaded, totalSegments) => {
+      const percent = totalSegments > 0 ? Math.round((segmentsDownloaded / totalSegments) * 100) : 0;
+      const progressBar = createProgressBar(percent);
+
+      return {
+        title: `[VOD] ${vodId} In Progress`,
+        description: `Downloading segments (${percent}%)`,
+        status: 'warning',
+        fields: [
+          { name: 'Segments', value: `${segmentsDownloaded}/${totalSegments}`, inline: true },
+          { name: 'Progress', value: progressBar, inline: false },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    },
+
+    converting: (vodId, percent) => ({
+      title: `[VOD] ${vodId} Converting`,
+      description: `Converting ${vodId} (${percent}%)`,
       status: 'warning',
       fields: [{ name: 'VOD ID', value: vodId, inline: false }],
       timestamp: new Date().toISOString(),
@@ -68,7 +85,7 @@ export function createVodWorkerAlerts(): VodWorkerAlerts {
 
 export interface LiveWorkerAlerts {
   init: (vodId: string, platform: Platform, streamerName: string, startedAt?: string) => RichEmbedData;
-  progress: (vodId: string, segmentsDownloaded: number) => RichEmbedData;
+  progress: (vodId: string, segmentsDownloaded: number, duration: number) => RichEmbedData;
   converting: (vodId: string, segmentCount: number) => RichEmbedData;
   emotesSaved: (vodId: string) => RichEmbedData;
   chatQueued: (vodId: string) => RichEmbedData;
@@ -91,9 +108,9 @@ export function createLiveWorkerAlerts(): LiveWorkerAlerts {
       timestamp: new Date().toISOString(),
     }),
 
-    progress: (vodId, segmentsDownloaded) => ({
+    progress: (vodId, segmentsDownloaded, duration) => ({
       title: `[Live] Downloading ${vodId}`,
-      description: `${segmentsDownloaded} segments downloaded`,
+      description: `${segmentsDownloaded} segments downloaded (${toHHMMSS(duration)})`,
       status: 'warning',
       fields: [],
       timestamp: new Date().toISOString(),

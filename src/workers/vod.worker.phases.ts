@@ -2,6 +2,7 @@ import { Job } from 'bullmq';
 import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
 import { getVodFilePath, getVodDirPath, fileExists } from '../utils/path.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
+import { extractErrorDetails } from '../utils/error.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
 import { createVodWorkerAlerts } from './utils/alert-factories.js';
@@ -111,6 +112,18 @@ export async function runVodDownload(ctx: VodProcessorContext): Promise<void> {
       isLive: false,
       discordMessageId: ctx.messageId ?? undefined,
       streamerName: ctx.streamerName,
+      onProgress: (segmentsDownloaded, totalSegments) => {
+        const percent = totalSegments > 0 ? Math.round((segmentsDownloaded / totalSegments) * 100) : 0;
+        void ctx.job.updateProgress(percent).catch(() => {});
+        void updateAlert(ctx.messageId, ctx.alerts.progress(ctx.vodId, segmentsDownloaded, totalSegments)).catch(
+          (err) => {
+            ctx.log.warn(
+              { err: extractErrorDetails(err), vodId: ctx.vodId },
+              'Discord alert update failed (non-critical)'
+            );
+          }
+        );
+      },
     });
 
     ctx.log.info({ vodId: ctx.vodId, platform: ctx.platform }, `Downloaded ${ctx.vodId}.mp4`);

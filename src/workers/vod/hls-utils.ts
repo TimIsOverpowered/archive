@@ -40,7 +40,7 @@ export async function downloadSegmentsParallel(
   concurrency: number,
   retryAttempts: number,
   log: AppLogger,
-  onBatchComplete?: (completedCount: number) => void
+  onBatchComplete?: (completedCount: number, totalSegments: number) => void
 ): Promise<void> {
   const limit = pLimit(concurrency);
   let completedCount = 0;
@@ -118,7 +118,7 @@ export async function downloadSegmentsParallel(
   if (isAborted() !== true) {
     log.debug({ total: totalSegments }, `All segments downloaded successfully`);
     if (onBatchComplete) {
-      onBatchComplete(completedCount);
+      onBatchComplete(completedCount, totalSegments);
     }
   }
 }

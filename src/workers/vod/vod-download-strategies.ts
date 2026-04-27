@@ -29,7 +29,7 @@ async function withVodAlerts<T>(
   try {
     const result = await fn(messageId, (pct) => {
       if (messageId !== null) {
-        updateAlert(messageId, alerts.progress(vodId, `Converting ${vodId} (${pct}%)`)).catch((err) => {
+        updateAlert(messageId, alerts.converting(vodId, pct)).catch((err) => {
           getLogger().debug({ err: extractErrorDetails(err) }, 'Progress alert update failed');
         });
       }

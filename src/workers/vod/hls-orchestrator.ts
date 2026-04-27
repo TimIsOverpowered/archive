@@ -44,7 +44,7 @@ export interface HlsDownloadOptions {
   isLive?: boolean | undefined;
   discordMessageId?: string | null | undefined;
   streamerName?: string | undefined;
-  onProgress?: ((segmentsDownloaded: number) => void) | undefined;
+  onProgress?: ((segmentsDownloaded: number, totalSegments: number) => void) | undefined;
 }
 
 export interface HlsDownloadResult {
@@ -86,22 +86,20 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
 
   try {
     if (isLive) {
-      await runLivePollingLoop(
-        {
-          ctx,
-          vodId,
-          platform,
-          dbId,
-          sourceUrl,
-          startedAt,
-          vodDir,
-          m3u8Path,
-          cycleTLS,
-          log,
-          concurrency: HLS_SEGMENT_CONCURRENCY,
-        },
-        onProgress
-      );
+      await runLivePollingLoop({
+        ctx,
+        vodId,
+        platform,
+        dbId,
+        sourceUrl,
+        startedAt,
+        vodDir,
+        m3u8Path,
+        cycleTLS,
+        log,
+        concurrency: HLS_SEGMENT_CONCURRENCY,
+        onProgress,
+      });
     } else {
       await downloadArchivedVod({
         ctx,
@@ -112,6 +110,7 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
         m3u8Path,
         cycleTLS,
         log,
+        onProgress,
       });
     }
 
@@ -125,10 +124,7 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
         config,
         onConversionProgress: (percent) => {
           if (options.discordMessageId != null) {
-            void updateAlert(
-              options.discordMessageId,
-              createVodWorkerAlerts().progress(vodId, `Converting ${vodId} (${percent}%)`)
-            );
+            void updateAlert(options.discordMessageId, createVodWorkerAlerts().converting(vodId, percent));
           }
         },
         discordMessageId: options.discordMessageId ?? null,
@@ -220,13 +216,11 @@ interface LivePollingContext {
   cycleTLS: CycleTLSSession | null;
   log: AppLogger;
   concurrency: number;
+  onProgress?: ((segmentsDownloaded: number, totalSegments: number) => void) | undefined;
 }
 
-async function runLivePollingLoop(
-  ctx: LivePollingContext,
-  onProgress?: (segmentsDownloaded: number) => void
-): Promise<void> {
-  const { vodId, platform, log, concurrency } = ctx;
+async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
+  const { vodId, platform, log, concurrency, onProgress } = ctx;
 
   let consecutiveErrors = 0;
   let noChangePollCount = 0;
@@ -265,6 +259,8 @@ async function runLivePollingLoop(
       if (result.newSegments.length > 0) {
         const strategy = resolveDownloadStrategy(platform, ctx.cycleTLS);
 
+        const totalDuration = segments.reduce((sum, seg) => sum + (seg.duration ?? 0), 0);
+
         await downloadSegmentsParallel(
           result.newSegments,
           ctx.vodDir,
@@ -273,7 +269,7 @@ async function runLivePollingLoop(
           concurrency,
           HLS_SEGMENT_RETRY_ATTEMPTS,
           log,
-          () => onProgress?.(downloadedSegments.size)
+          (_completedCount) => onProgress?.(downloadedSegments.size, totalDuration)
         );
 
         for (const seg of result.newSegments) downloadedSegments.add(seg.uri);
@@ -312,10 +308,11 @@ interface ArchivedVodContext {
   m3u8Path: string;
   cycleTLS: CycleTLSSession | null;
   log: AppLogger;
+  onProgress?: ((segmentsDownloaded: number, totalSegments: number) => void) | undefined;
 }
 
 async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
-  const { vodId, platform, vodDir, m3u8Path, cycleTLS, log } = ctx;
+  const { vodId, platform, vodDir, m3u8Path, cycleTLS, log, onProgress } = ctx;
 
   const playlist = await fetchPlaylist(ctx, { attempts: 3, baseDelayMs: 2000 });
 
@@ -341,7 +338,8 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
     strategy,
     HLS_SEGMENT_CONCURRENCY,
     HLS_SEGMENT_RETRY_ATTEMPTS,
-    log
+    log,
+    (completedCount) => onProgress?.(completedCount, segments.length)
   );
 }
 
