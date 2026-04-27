@@ -1,15 +1,9 @@
-import ffmpeg from 'fluent-ffmpeg';
-import { writeFileSync } from 'fs';
-import events from 'events';
 import { extractErrorDetails } from '../../utils/error.js';
 import { deleteFileIfExists } from '../../utils/path.js';
 import { childLogger } from '../../utils/logger.js';
 import { toHHMMSS } from '../../utils/formatting.js';
-import { generateBlackSegment, getMetadata } from '../utils/ffmpeg.js';
-
-interface ProgressEvent {
-  percent?: number;
-}
+import { concatSegments, extractSegment, generateBlackSegment, getMetadata } from '../utils/ffmpeg.js';
+export { muteAudioSections } from '../utils/ffmpeg.js';
 
 const log = childLogger({ module: 'dmca' });
 
@@ -89,55 +83,6 @@ export function buildMuteFilters(claims: DMCAClaim[]): string[] {
   return muteSection;
 }
 
-export async function muteAudioSections(
-  videoPath: string,
-  filters: string[],
-  outputPath: string,
-  onProgress?: (percent: number) => void,
-  onStart?: (cmd: string) => void
-): Promise<string | null> {
-  const lastReported = { val: -1 };
-  const threshold = 25;
-
-  return new Promise((resolve) => {
-    const ffmpegProcess = ffmpeg(videoPath);
-
-    ffmpegProcess.videoCodec('copy');
-
-    for (const filter of filters) {
-      ffmpegProcess.audioFilters(filter);
-    }
-    ffmpegProcess.audioCodec('aac');
-
-    ffmpegProcess
-      .toFormat('mp4')
-      .on('start', (cmd) => {
-        log.info(`FFmpeg start: ${cmd}`);
-        onStart?.(cmd);
-      })
-      .on('end', () => {
-        resolve(outputPath);
-      })
-      .on('error', (err) => {
-        log.error(`FFmpeg mute error: ${err.message}`);
-        resolve(null);
-      });
-
-    if (onProgress) {
-      (ffmpegProcess as events.EventEmitter).on('progress', (progress: ProgressEvent) => {
-        const percent = progress.percent != null ? Math.round(progress.percent) : 0;
-        const bucket = Math.floor(percent / threshold) * threshold;
-        if (bucket > lastReported.val) {
-          lastReported.val = bucket;
-          onProgress(bucket);
-        }
-      });
-    }
-
-    ffmpegProcess.saveToFile(outputPath);
-  });
-}
-
 export interface BlackoutSection {
   startSeconds: number;
   durationSeconds: number;
@@ -148,97 +93,6 @@ export interface BlackoutProgressOptions {
   onProgress?: (percent: number) => void;
   onStep?: (step: string, current: number, total: number) => void;
   onStart?: (cmd: string) => void;
-}
-
-async function extractSegment(
-  source: string,
-  outputPath: string,
-  start: number,
-  duration: number,
-  onProgress?: (percent: number) => void,
-  onStart?: (cmd: string) => void
-): Promise<string | null> {
-  const lastReported = { val: -1 };
-  const threshold = 25;
-
-  return new Promise((resolve) => {
-    const proc = ffmpeg(source)
-      .seekInput(start)
-      .duration(duration)
-      .outputOptions('-c copy')
-      .toFormat('mp4')
-      .on('start', (cmd) => {
-        log.info(`FFmpeg start: ${cmd}`);
-        onStart?.(cmd);
-      })
-      .on('end', () => {
-        resolve(outputPath);
-      })
-      .on('error', (err) => {
-        log.error(`Segment extract error: ${err.message}`);
-        resolve(null);
-      });
-
-    if (onProgress) {
-      (proc as events.EventEmitter).on('progress', (progress: ProgressEvent) => {
-        const percent = progress.percent != null ? Math.round(progress.percent) : 0;
-        const bucket = Math.floor(percent / threshold) * threshold;
-        if (bucket > lastReported.val) {
-          lastReported.val = bucket;
-          onProgress(bucket);
-        }
-      });
-    }
-
-    proc.saveToFile(outputPath);
-  });
-}
-
-async function concatSegments(
-  segmentFiles: string[],
-  outputPath: string,
-  onProgress?: (percent: number) => void,
-  onStart?: (cmd: string) => void
-): Promise<string | null> {
-  const lastReported = { val: -1 };
-  const threshold = 25;
-
-  return new Promise((resolve) => {
-    const listPath = outputPath.replace('.mp4', '-concat.txt');
-    writeFileSync(listPath, segmentFiles.map((f) => `file '${f}'`).join('\n') + '\n');
-
-    const proc = ffmpeg(listPath)
-      .inputOptions(['-f concat', '-safe 0'])
-      .videoCodec('copy')
-      .audioCodec('copy')
-      .toFormat('mp4')
-      .on('start', (cmd) => {
-        log.info(`FFmpeg start: ${cmd}`);
-        onStart?.(cmd);
-      })
-      .on('end', () => {
-        void deleteFileIfExists(listPath);
-        resolve(outputPath);
-      })
-      .on('error', (err) => {
-        void deleteFileIfExists(listPath);
-        log.error(`Concat error: ${err.message}`);
-        resolve(null);
-      });
-
-    if (onProgress) {
-      (proc as events.EventEmitter).on('progress', (progress: ProgressEvent) => {
-        const percent = progress.percent != null ? Math.round(progress.percent) : 0;
-        const bucket = Math.floor(percent / threshold) * threshold;
-        if (bucket > lastReported.val) {
-          lastReported.val = bucket;
-          onProgress(bucket);
-        }
-      });
-    }
-
-    proc.saveToFile(outputPath);
-  });
 }
 
 /**
@@ -260,7 +114,6 @@ export async function blackoutVideoSections(
     return null;
   }
 
-  const dims = { width: meta.width, height: meta.height };
   const totalDuration = meta.duration;
 
   const sorted = [...sections].sort((a, b) => a.startSeconds - b.startSeconds);
@@ -305,7 +158,7 @@ export async function blackoutVideoSections(
       const blackResult = await generateBlackSegment(
         blackFile,
         section.endSeconds - section.startSeconds,
-        dims,
+        meta,
         options?.onStart
       );
       if (blackResult === null) return null;

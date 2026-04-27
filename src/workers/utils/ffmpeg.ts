@@ -1,15 +1,17 @@
 import ffmpeg from 'fluent-ffmpeg';
+import { writeFileSync } from 'fs';
 import { extractErrorDetails } from '../../utils/error.js';
 import path from 'path';
 import events from 'events';
 import { childLogger } from '../../utils/logger.js';
+import { deleteFileIfExists } from '../../utils/path.js';
 
 const logger = childLogger({ module: 'ffmpeg' });
 import HLS from 'hls-parser';
 
 const lastFfmpegProgressBySource = new Map<string, number>();
 
-interface ProgressEvent {
+export interface ProgressEvent {
   percent?: number;
 }
 
@@ -207,26 +209,68 @@ export async function getMetadata(filePath: string): Promise<VideoMetadata | nul
   });
 }
 
-export interface VideoDimensions {
-  width: number;
-  height: number;
+function resolveVideoEncoder(codecName: string): string {
+  switch (codecName) {
+    case 'h264':
+      return 'libx264';
+    case 'hevc':
+      return 'libx265';
+    case 'vp9':
+      return 'libvpx-vp9';
+    case 'vp8':
+      return 'libvpx';
+    default:
+      return 'libx264';
+  }
+}
+
+function resolveAudioEncoder(codecName: string): string {
+  switch (codecName) {
+    case 'aac':
+      return 'aac';
+    case 'opus':
+      return 'libopus';
+    case 'mp3':
+      return 'libmp3lame';
+    default:
+      return 'aac';
+  }
 }
 
 export async function generateBlackSegment(
   outputPath: string,
   duration: number,
-  dims: VideoDimensions,
+  metadata: VideoMetadata,
   onStart?: (cmd: string) => void
 ): Promise<string | null> {
   return new Promise((resolve) => {
-    const colorSrc = `color=c=black:s=${dims.width}x${dims.height}:d=${duration}`;
+    const { width, height, frameRate, pixFmt, audioCodec, sampleRate, channels } = metadata;
+    const videoCodec = resolveVideoEncoder(metadata.videoCodec);
+    const fr = frameRate ?? '30';
+    const pf = pixFmt ?? 'yuv420p';
+    const colorSrc = `color=c=black:s=${width}x${height}:r=${fr}`;
 
-    ffmpeg()
+    const proc = ffmpeg()
       .inputOptions(['-f', 'lavfi'])
       .input(colorSrc)
       .duration(duration)
-      .videoCodec('copy')
-      .toFormat('mp4')
+      .videoCodec(videoCodec)
+      .outputOptions(['-pix_fmt', pf])
+      .toFormat('mp4');
+
+    if (audioCodec != null && sampleRate != null) {
+      const audioEncoder = resolveAudioEncoder(audioCodec);
+      const chLayout = channels === 1 ? '1' : 'stereo';
+      const audioSrc = `aevalsrc=0:d=${duration}:s=${sampleRate}:c=${chLayout}`;
+
+      proc
+        .inputOptions(['-f', 'lavfi'])
+        .input(audioSrc)
+        .audioCodec(audioEncoder)
+        .outputOptions(['-map', '0:v:0', '-map', '1:a:0']);
+    }
+
+    proc
       .on('start', (cmd) => {
         logger.info(`FFmpeg start: ${cmd}`);
         onStart?.(cmd);
@@ -239,6 +283,146 @@ export async function generateBlackSegment(
         resolve(null);
       })
       .saveToFile(outputPath);
+  });
+}
+
+export async function muteAudioSections(
+  videoPath: string,
+  filters: string[],
+  outputPath: string,
+  onProgress?: (percent: number) => void,
+  onStart?: (cmd: string) => void
+): Promise<string | null> {
+  const lastReported = { val: -1 };
+  const threshold = 25;
+
+  return new Promise((resolve) => {
+    const ffmpegProcess = ffmpeg(videoPath);
+
+    ffmpegProcess.videoCodec('copy');
+
+    for (const filter of filters) {
+      ffmpegProcess.audioFilters(filter);
+    }
+    ffmpegProcess.audioCodec('aac');
+
+    ffmpegProcess
+      .toFormat('mp4')
+      .on('start', (cmd) => {
+        logger.info(`FFmpeg start: ${cmd}`);
+        onStart?.(cmd);
+      })
+      .on('end', () => {
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        logger.error(`FFmpeg mute error: ${err.message}`);
+        resolve(null);
+      });
+
+    if (onProgress) {
+      (ffmpegProcess as events.EventEmitter).on('progress', (progress: ProgressEvent) => {
+        const percent = progress.percent != null ? Math.round(progress.percent) : 0;
+        const bucket = Math.floor(percent / threshold) * threshold;
+        if (bucket > lastReported.val) {
+          lastReported.val = bucket;
+          onProgress(bucket);
+        }
+      });
+    }
+
+    ffmpegProcess.saveToFile(outputPath);
+  });
+}
+
+export async function extractSegment(
+  source: string,
+  outputPath: string,
+  start: number,
+  duration: number,
+  onProgress?: (percent: number) => void,
+  onStart?: (cmd: string) => void
+): Promise<string | null> {
+  const lastReported = { val: -1 };
+  const threshold = 25;
+
+  return new Promise((resolve) => {
+    const proc = ffmpeg(source)
+      .seekInput(start)
+      .duration(duration)
+      .outputOptions('-c copy')
+      .toFormat('mp4')
+      .on('start', (cmd) => {
+        logger.info(`FFmpeg start: ${cmd}`);
+        onStart?.(cmd);
+      })
+      .on('end', () => {
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        logger.error(`Segment extract error: ${err.message}`);
+        resolve(null);
+      });
+
+    if (onProgress) {
+      (proc as events.EventEmitter).on('progress', (progress: ProgressEvent) => {
+        const percent = progress.percent != null ? Math.round(progress.percent) : 0;
+        const bucket = Math.floor(percent / threshold) * threshold;
+        if (bucket > lastReported.val) {
+          lastReported.val = bucket;
+          onProgress(bucket);
+        }
+      });
+    }
+
+    proc.saveToFile(outputPath);
+  });
+}
+
+export async function concatSegments(
+  segmentFiles: string[],
+  outputPath: string,
+  onProgress?: (percent: number) => void,
+  onStart?: (cmd: string) => void
+): Promise<string | null> {
+  const lastReported = { val: -1 };
+  const threshold = 25;
+
+  return new Promise((resolve) => {
+    const listPath = outputPath.replace('.mp4', '-concat.txt');
+    writeFileSync(listPath, segmentFiles.map((f) => `file '${f}'`).join('\n') + '\n');
+
+    const proc = ffmpeg(listPath)
+      .inputOptions(['-f concat', '-safe 0'])
+      .videoCodec('copy')
+      .audioCodec('copy')
+      .toFormat('mp4')
+      .on('start', (cmd) => {
+        logger.info(`FFmpeg start: ${cmd}`);
+        onStart?.(cmd);
+      })
+      .on('end', () => {
+        void deleteFileIfExists(listPath);
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        void deleteFileIfExists(listPath);
+        logger.error(`Concat error: ${err.message}`);
+        resolve(null);
+      });
+
+    if (onProgress) {
+      (proc as events.EventEmitter).on('progress', (progress: ProgressEvent) => {
+        const percent = progress.percent != null ? Math.round(progress.percent) : 0;
+        const bucket = Math.floor(percent / threshold) * threshold;
+        if (bucket > lastReported.val) {
+          lastReported.val = bucket;
+          onProgress(bucket);
+        }
+      });
+    }
+
+    proc.saveToFile(outputPath);
   });
 }
 
