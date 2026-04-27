@@ -412,7 +412,13 @@ export interface DmcaClaimInfo {
 }
 
 export interface DmcaWorkerAlerts {
-  processing: (vodId: string, claims: DmcaClaimInfo[], platform: string, displayName: string, part?: number) => RichEmbedData;
+  processing: (
+    vodId: string,
+    claims: DmcaClaimInfo[],
+    platform: string,
+    displayName: string,
+    part?: number
+  ) => RichEmbedData;
   progress: (
     vodId: string,
     claims: DmcaClaimInfo[],
@@ -422,7 +428,13 @@ export interface DmcaWorkerAlerts {
     displayName: string,
     stepProgress?: number
   ) => RichEmbedData;
-  complete: (vodId: string, youtubeJobId: string, claims: DmcaClaimInfo[], platform: string, displayName: string) => RichEmbedData;
+  complete: (
+    vodId: string,
+    youtubeJobId: string,
+    claims: DmcaClaimInfo[],
+    platform: string,
+    displayName: string
+  ) => RichEmbedData;
   error: (vodId: string, errorMsg: string) => RichEmbedData;
 }
 

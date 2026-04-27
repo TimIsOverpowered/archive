@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import downloadJobsRoutes from './download.routes';
 import youtubeUploadRoutes from './youtube-upload.routes';
+import gameUploadRoutes from './game-upload.routes';
 import dmcaProcessingRoutes from './dmca.routes';
 import metadataFetchingRoutes from './metadata.routes';
 import liveCallbackRoutes from './live-callback.routes';
@@ -18,6 +19,8 @@ export default async function adminRoutes(fastify: FastifyInstance, _options: Ad
   await fastify.register(downloadJobsRoutes);
 
   await fastify.register(youtubeUploadRoutes);
+
+  await fastify.register(gameUploadRoutes);
 
   await fastify.register(dmcaProcessingRoutes);
 

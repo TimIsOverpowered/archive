@@ -3,7 +3,13 @@ import { deleteFileIfExists } from '../../utils/path.js';
 import { childLogger } from '../../utils/logger.js';
 import path from 'path';
 import { toHHMMSS } from '../../utils/formatting.js';
-import { concatSegments, extractSegment, generateBlackSegment, getMetadata, type ConcatSegmentsOptions } from '../utils/ffmpeg.js';
+import {
+  concatSegments,
+  extractSegment,
+  generateBlackSegment,
+  getMetadata,
+  type ConcatSegmentsOptions,
+} from '../utils/ffmpeg.js';
 export { muteAudioSections } from '../utils/ffmpeg.js';
 
 const log = childLogger({ module: 'dmca' });

@@ -63,3 +63,11 @@ export class DownloadAbortedError extends DomainError {
     super('Download aborted');
   }
 }
+
+export class GameNotFoundError extends DomainError {
+  readonly code = 'GAME_NOT_FOUND';
+
+  constructor(gameId: number) {
+    super(`Game not found: ${gameId}`);
+  }
+}
