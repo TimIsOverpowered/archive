@@ -25,7 +25,7 @@ export function createVodUploadJob(
   part?: number
 ): YoutubeVodUploadJob {
   const { config, tenantId } = ctx;
-  if (config?.youtube?.upload == null) {
+  if (config.youtube?.upload === false) {
     throw new ConfigNotConfiguredError(`YouTube upload for tenant ${tenantId}`);
   }
 
@@ -53,7 +53,7 @@ export async function createGameUploadJob(
   chapter: { id: number; name: string; start: number; end: number; gameId?: string | undefined }
 ): Promise<YoutubeGameUploadJob> {
   const { config, tenantId } = ctx;
-  if (config?.youtube?.upload == null) {
+  if (config.youtube?.upload === false) {
     throw new ConfigNotConfiguredError(`YouTube upload for tenant ${tenantId}`);
   }
 
@@ -71,7 +71,7 @@ export async function createGameUploadJob(
   }
 
   // Check restricted games
-  if (config.youtube.restrictedGames.includes(chapter.name)) {
+  if (config.youtube?.restrictedGames.includes(chapter.name)) {
     throw new Error(`Game "${chapter.name}" is in restricted games list`);
   }
 
@@ -100,7 +100,7 @@ export async function createGameUploadJob(
   const title = `${channelName} plays ${chapter.name} EP ${epNumber} - ${dateFormatted}`;
 
   // Generate description
-  const description = `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube.description}`;
+  const description = `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube?.description}`;
 
   return {
     kind: 'game',
@@ -130,11 +130,11 @@ export async function createGameUploadJobsForVod(
   platform: Platform
 ): Promise<YoutubeGameUploadJob[]> {
   const { config, tenantId } = ctx;
-  if (config?.youtube?.perGameUpload !== true) {
+  if (config.youtube?.perGameUpload !== true) {
     return [];
   }
 
-  if (config?.youtube?.upload == null) {
+  if (config.youtube?.upload == false) {
     throw new ConfigNotConfiguredError(`YouTube upload for tenant ${tenantId}`);
   }
 
@@ -413,7 +413,11 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
   };
 
   // VOD Upload
-  if ((uploadMode === UPLOAD_MODES.VOD || uploadMode === UPLOAD_MODES.ALL) && config?.youtube?.vodUpload === true) {
+  if (
+    (uploadMode === UPLOAD_MODES.VOD || uploadMode === UPLOAD_MODES.ALL) &&
+    config.youtube?.upload === true &&
+    config.youtube?.vodUpload === true
+  ) {
     try {
       const vodJobId = await queueYoutubeVodUpload(
         ctx,
