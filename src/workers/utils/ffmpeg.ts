@@ -237,6 +237,21 @@ function resolveAudioEncoder(codecName: string): string {
   }
 }
 
+function resolveAudioChannel(audioChannel: number | null): string {
+  switch (audioChannel) {
+    case 1:
+      return 'mono';
+    case 2:
+      return 'stereo';
+    case 6:
+      return '5.1';
+    case 8:
+      return '7.1';
+    default:
+      return 'stereo';
+  }
+}
+
 export async function generateBlackSegment(
   outputPath: string,
   duration: number,
@@ -260,7 +275,7 @@ export async function generateBlackSegment(
 
     if (audioCodec != null && sampleRate != null) {
       const audioEncoder = resolveAudioEncoder(audioCodec);
-      const chLayout = channels === 1 ? '1' : 'stereo';
+      const chLayout = resolveAudioChannel(channels);
       const audioSrc = `aevalsrc=0:d=${duration}:s=${sampleRate}:c=${chLayout}`;
 
       proc
