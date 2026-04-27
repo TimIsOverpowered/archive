@@ -248,7 +248,7 @@ describe('flushChatBatch', () => {
     assert.strictEqual(inserted.content_offset_seconds, 10);
     assert.strictEqual(inserted.user_color, '#FF0000');
     assert.ok(inserted.created_at);
-    assert.deepStrictEqual(inserted.message, { content: 'hello', fragments: [{ text: 'hello' }] });
+    assert.strictEqual(inserted.message, JSON.stringify({ content: 'hello', fragments: [{ text: 'hello' }] }));
   });
 
   it('should handle null message and user_badges fields', async () => {

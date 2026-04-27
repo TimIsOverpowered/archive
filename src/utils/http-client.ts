@@ -10,12 +10,7 @@ import {
 } from '../constants.js';
 import { HttpError } from './http-error.js';
 import { DownloadAbortedError } from './domain-errors.js';
-import {
-  Agent,
-  fetch as undiciFetch,
-  type RequestInit as UndiciRequestInit,
-  type BodyInit as UndiciBodyInit,
-} from 'undici';
+import { Agent, type RequestInit as UndiciRequestInit, type BodyInit as UndiciBodyInit } from 'undici';
 
 /** Supported HTTP response types for request/safeRequest functions. */
 export type ResponseType = 'json' | 'text' | 'blob' | 'arrayBuffer' | 'response';
@@ -170,7 +165,7 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
           ...(dispatcher !== undefined && { dispatcher }),
         };
 
-        const response = await undiciFetch(urlStr, fetchInit);
+        const response = await globalThis.fetch(urlStr, fetchInit as RequestInit);
 
         if (!response.ok) {
           throw new HttpError(response.status, `HTTP ${response.status}: ${response.statusText}`);

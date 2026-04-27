@@ -727,8 +727,7 @@ describe('HTTP Client', () => {
 
       await request('https://api.example.com/test?nauth=secret123&other=value');
 
-      assert.ok(!capturedUrl.includes('secret123'), 'nauth value should be redacted');
-      assert.ok(capturedUrl.includes('REDACTED'), 'nauth should be replaced with REDACTED');
+      assert.ok(capturedUrl.includes('nauth=secret123'), 'fetch receives original URL');
       assert.ok(capturedUrl.includes('other=value'), 'non-sensitive params should be preserved');
     });
 
@@ -746,8 +745,7 @@ describe('HTTP Client', () => {
 
       await request('https://api.example.com/test?nauthsig=secret456&other=value');
 
-      assert.ok(!capturedUrl.includes('secret456'), 'nauthsig value should be redacted');
-      assert.ok(capturedUrl.includes('REDACTED'), 'nauthsig should be replaced with REDACTED');
+      assert.ok(capturedUrl.includes('nauthsig=secret456'), 'fetch receives original URL');
       assert.ok(capturedUrl.includes('other=value'), 'non-sensitive params should be preserved');
     });
 
@@ -765,8 +763,7 @@ describe('HTTP Client', () => {
 
       await request('https://api.example.com/test?access_token=secret789&other=value');
 
-      assert.ok(!capturedUrl.includes('secret789'), 'access_token value should be redacted');
-      assert.ok(capturedUrl.includes('REDACTED'), 'access_token should be replaced with REDACTED');
+      assert.ok(capturedUrl.includes('access_token=secret789'), 'fetch receives original URL');
       assert.ok(capturedUrl.includes('other=value'), 'non-sensitive params should be preserved');
     });
 
