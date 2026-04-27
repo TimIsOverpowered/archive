@@ -45,9 +45,7 @@ async function getVodBucketSize(db: Kysely<StreamerDB>, tenantId: string, vodId:
         .executeTakeFirst();
 
       const commentsPer100sValue = parseFloat(String(result?.comments_per_100s ?? ''));
-      return isFinite(commentsPer100sValue)
-        ? computeBucketSize(commentsPer100sValue)
-        : LOGS_DEFAULT_BUCKET_SIZE;
+      return isFinite(commentsPer100sValue) ? computeBucketSize(commentsPer100sValue) : LOGS_DEFAULT_BUCKET_SIZE;
     }
   );
 }

@@ -24,7 +24,10 @@ export default function createTenantLoggerMiddleware() {
       tenantId = String(params.tenantId);
     }
 
-    if (tenantId == null) { done(); return; } // No tenant context available for this route (e.g., health check, root paths)
+    if (tenantId == null) {
+      done();
+      return;
+    } // No tenant context available for this route (e.g., health check, root paths)
 
     const config = configService.get(tenantId);
     const displayName = config?.displayName ?? tenantId;

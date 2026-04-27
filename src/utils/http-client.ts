@@ -10,7 +10,12 @@ import {
 } from '../constants.js';
 import { HttpError } from './http-error.js';
 import { DownloadAbortedError } from './domain-errors.js';
-import { Agent, fetch as undiciFetch, type RequestInit as UndiciRequestInit, type BodyInit as UndiciBodyInit } from 'undici';
+import {
+  Agent,
+  fetch as undiciFetch,
+  type RequestInit as UndiciRequestInit,
+  type BodyInit as UndiciBodyInit,
+} from 'undici';
 
 /** Supported HTTP response types for request/safeRequest functions. */
 export type ResponseType = 'json' | 'text' | 'blob' | 'arrayBuffer' | 'response';

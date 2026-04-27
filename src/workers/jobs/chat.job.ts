@@ -38,5 +38,15 @@ export async function triggerChatDownload(
   forceRerun?: boolean
 ): Promise<string | null> {
   if (platform === PLATFORMS.KICK) return null;
-  return enqueue({ tenantId, displayName, platformUserId, platformUsername, dbId, vodId, platform, duration, forceRerun });
+  return enqueue({
+    tenantId,
+    displayName,
+    platformUserId,
+    platformUsername,
+    dbId,
+    vodId,
+    platform,
+    duration,
+    forceRerun,
+  });
 }

@@ -20,9 +20,7 @@ export interface EnqueueJobWithLoggingOpts {
   extraContext?: Record<string, unknown>;
 }
 
-export async function enqueueJobWithLogging(
-  opts: EnqueueJobWithLoggingOpts,
-): Promise<JobEnqueueResult> {
+export async function enqueueJobWithLogging(opts: EnqueueJobWithLoggingOpts): Promise<JobEnqueueResult> {
   const { queue, jobName, data, options, logger, successMessage, extraContext } = opts;
   const jobId = options.jobId;
 
