@@ -154,7 +154,7 @@ export async function processGameUpload(ctx: GameUploadContext): Promise<GameUpl
   const trimmedPath = await trimVideo(
     filePath,
     chapterStart,
-    chapterEnd - chapterStart,
+    chapterEnd,
     `${ctx.vodId}-game-${ctx.chapterGameId ?? 'unknown'}`,
     undefined,
     () => {}

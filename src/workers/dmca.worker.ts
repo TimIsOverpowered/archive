@@ -13,7 +13,7 @@ import {
   getClaimIdentifier,
 } from './dmca/dmca.js';
 import { toHHMMSS } from '../utils/formatting.js';
-import { trimVideo as ffmpegTrim } from './utils/ffmpeg.js';
+import { trimVideo } from './utils/ffmpeg.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
 import { handleWorkerError } from './utils/error-handler.js';
@@ -186,7 +186,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
 
       log.info({ vodId, part }, 'Extracting part from VOD');
 
-      processedPath = await ffmpegTrim(
+      processedPath = await trimVideo(
         filePath,
         startOffset,
         splitDuration,
@@ -205,10 +205,10 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     if (isGameUpload) {
       log.info({ vodId, gameId, gameStart, gameEnd }, 'Trimming VOD to game range');
 
-      const trimmedPath = await ffmpegTrim(
+      const trimmedPath = await trimVideo(
         processedPath,
         gameStart,
-        gameEnd - gameStart,
+        gameEnd,
         path.join(workDir, `${vodId}-game-${gameId}-trimmed`),
         (pct) => {
           currentFfmpegProgress = pct;
