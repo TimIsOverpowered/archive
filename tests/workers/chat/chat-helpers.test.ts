@@ -27,10 +27,7 @@ describe('stripTypename', () => {
     };
     const result = stripTypename(input);
     assert.deepStrictEqual(result, {
-      edges: [
-        { node: { id: '1' } },
-        { node: { id: '2' } },
-      ],
+      edges: [{ node: { id: '1' } }, { node: { id: '2' } }],
     });
   });
 
@@ -110,12 +107,7 @@ describe('extractEdges', () => {
 
   it('should filter out null edges', () => {
     const input = {
-      edges: [
-        null,
-        { node: { id: '1' }, cursor: 'abc' },
-        null,
-        { node: { id: '2' }, cursor: 'def' },
-      ],
+      edges: [null, { node: { id: '1' }, cursor: 'abc' }, null, { node: { id: '2' }, cursor: 'def' }],
     };
     const result = extractEdges(input as any);
     assert.strictEqual(result.length, 2);
@@ -123,11 +115,7 @@ describe('extractEdges', () => {
 
   it('should filter out edges missing node or cursor', () => {
     const input = {
-      edges: [
-        { node: { id: '1' } },
-        { cursor: 'abc' },
-        { node: { id: '2' }, cursor: 'def' },
-      ],
+      edges: [{ node: { id: '1' } }, { cursor: 'abc' }, { node: { id: '2' }, cursor: 'def' }],
     };
     const result = extractEdges(input as any);
     assert.strictEqual(result.length, 1);
@@ -136,11 +124,7 @@ describe('extractEdges', () => {
 
   it('should filter out non-object edges', () => {
     const input = {
-      edges: [
-        'string-edge',
-        42,
-        { node: { id: '1' }, cursor: 'abc' },
-      ],
+      edges: ['string-edge', 42, { node: { id: '1' }, cursor: 'abc' }],
     };
     const result = extractEdges(input as any);
     assert.strictEqual(result.length, 1);
@@ -192,10 +176,7 @@ describe('extractMessageData', () => {
   it('should strip __typename from fragments', () => {
     const node = {
       message: {
-        fragments: [
-          { __typename: 'EmoteFragment', text: 'hello' },
-          { text: ' world' },
-        ],
+        fragments: [{ __typename: 'EmoteFragment', text: 'hello' }, { text: ' world' }],
         userBadges: null,
       },
     };
@@ -208,15 +189,11 @@ describe('extractMessageData', () => {
     const node = {
       message: {
         fragments: [],
-        userBadges: [
-          { __typename: 'BadgeSetItem', badgeVersionId: '1', setID: 'subscriber' },
-        ],
+        userBadges: [{ __typename: 'BadgeSetItem', badgeVersionId: '1', setID: 'subscriber' }],
       },
     };
     const result = extractMessageData(node as any);
-    assert.deepStrictEqual(result.userBadges, [
-      { badgeVersionId: '1', setID: 'subscriber' },
-    ]);
+    assert.deepStrictEqual(result.userBadges, [{ badgeVersionId: '1', setID: 'subscriber' }]);
   });
 
   it('should handle node with no userBadges property', () => {
@@ -243,11 +220,7 @@ describe('extractMessageData', () => {
   it('should handle fragments with null/undefined text', () => {
     const node = {
       message: {
-        fragments: [
-          { text: null },
-          { text: undefined },
-          { text: 'valid' },
-        ],
+        fragments: [{ text: null }, { text: undefined }, { text: 'valid' }],
         userBadges: null,
       },
     };

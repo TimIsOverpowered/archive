@@ -76,13 +76,13 @@ function createMockCtx(overrides: Partial<LiveProcessorContext> = {}): LiveProce
     ...overrides,
     log: {
       info: (...args: unknown[]) => {
-        (calls.info as any[]) = [...(calls.info as any[] ?? []), args];
+        (calls.info as any[]) = [...((calls.info as any[]) ?? []), args];
       },
       warn: (...args: unknown[]) => {
-        (calls.warn as any[]) = [...(calls.warn as any[] ?? []), args];
+        (calls.warn as any[]) = [...((calls.warn as any[]) ?? []), args];
       },
       error: (...args: unknown[]) => {
-        (calls.error as any[]) = [...(calls.error as any[] ?? []), args];
+        (calls.error as any[]) = [...((calls.error as any[]) ?? []), args];
       },
     },
     alerts: {

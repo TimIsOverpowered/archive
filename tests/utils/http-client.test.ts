@@ -1,27 +1,36 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import { request } from '../../src/utils/http-client.js';
+import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import { HttpError } from '../../src/utils/http-error.js';
 
+// 1. Create the mock function first
+const mockUndiciRequest = mock.fn<(...args: any[]) => Promise<any>>();
+const mockAgentInstances: Array<Record<string, unknown>> = [];
+
+// 2. Register the module mock BEFORE importing the file that uses it
+mock.module('undici', {
+  namedExports: {
+    request: mockUndiciRequest,
+    Agent: class MockAgent {
+      constructor(opts?: Record<string, unknown>) {
+        mockAgentInstances.push(opts ?? {});
+      }
+    },
+  },
+});
+
+// 3. Dynamically import the system-under-test AFTER the mock is registered
+const { request } = await import('../../src/utils/http-client.js');
+
 describe('HTTP Client', () => {
-  const originalFetch = global.fetch;
-  const originalTimeout = global.setTimeout;
+  const originalSetTimeout = global.setTimeout;
   const originalClearTimeout = global.clearTimeout;
 
   beforeEach(() => {
-    global.fetch = async () =>
-      ({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        json: async () => ({ success: true }),
-        text: async () => 'success',
-        blob: async () => new Blob(['success']),
-        arrayBuffer: async () => new ArrayBuffer(8),
-      }) as Response;
+    mockUndiciRequest.mock.resetCalls();
+    mockUndiciRequest.mock.restore();
 
     global.setTimeout = ((callback: TimerHandler, delay?: number) => {
-      const id = originalTimeout(callback, delay);
+      const id = originalSetTimeout(callback, delay);
       return id as number;
     }) as typeof global.setTimeout;
 
@@ -29,79 +38,84 @@ describe('HTTP Client', () => {
   });
 
   afterEach(() => {
-    global.fetch = originalFetch;
-    global.setTimeout = originalTimeout;
+    global.setTimeout = originalSetTimeout;
     global.clearTimeout = originalClearTimeout;
   });
 
+  /** Create a mock undici ResponseData. */
+  function makeMockResponse(
+    opts: {
+      statusCode?: number;
+      statusMessage?: string;
+      body?: {
+        json?: () => Promise<unknown>;
+        text?: () => Promise<string>;
+        arrayBuffer?: () => Promise<ArrayBuffer>;
+      };
+    } = {}
+  ) {
+    return {
+      statusCode: opts.statusCode ?? 200,
+      statusMessage: opts.statusMessage ?? 'OK',
+      headers: {},
+      body: {
+        json: opts.body?.json ?? (() => Promise.resolve({})),
+        text: opts.body?.text ?? (() => Promise.resolve('')),
+        arrayBuffer: opts.body?.arrayBuffer ?? (() => Promise.resolve(new ArrayBuffer(0))),
+      },
+      trailers: {},
+      opaque: null,
+      context: {},
+    };
+  }
+
   describe('successful requests', () => {
     it('should perform GET request with JSON response', async () => {
-      global.fetch = async () =>
-        ({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({ foo: 'bar' }),
-        }) as Response;
+      const expected = { foo: 'bar' };
+      mockUndiciRequest.mock.mockImplementation(() =>
+        Promise.resolve(makeMockResponse({ body: { json: () => Promise.resolve(expected) } }))
+      );
 
       const result = await request<{ foo: string }>('https://api.example.com/test');
 
-      assert.deepStrictEqual(result, { foo: 'bar' });
+      assert.deepStrictEqual(result, expected);
+      assert.strictEqual(mockUndiciRequest.mock.calls.length, 1);
     });
 
     it('should perform POST request with auto-JSON serialization', async () => {
-      let capturedBody: unknown = undefined;
-      let capturedHeaders: Record<string, string> | undefined;
-
-      global.fetch = ((_input: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
-        capturedBody = init?.body;
-        capturedHeaders = init?.headers as Record<string, string>;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({ created: true }),
-        } as Response);
-      }) as typeof global.fetch;
+      const expected = { created: true };
+      mockUndiciRequest.mock.mockImplementation(() =>
+        Promise.resolve(makeMockResponse({ body: { json: () => Promise.resolve(expected) } }))
+      );
 
       const result = await request<{ created: boolean }>('https://api.example.com/test', {
         method: 'POST',
         body: { name: 'test' },
       });
 
-      assert.deepStrictEqual(result, { created: true });
-      assert.strictEqual(capturedBody, JSON.stringify({ name: 'test' }));
-      assert.strictEqual(capturedHeaders?.['Content-Type'], 'application/json');
+      assert.deepStrictEqual(result, expected);
+      const callArgs = mockUndiciRequest.mock.calls[0]!.arguments as [string, Record<string, unknown>];
+      assert.strictEqual(callArgs[0], 'https://api.example.com/test');
+      assert.strictEqual(callArgs[1].method, 'POST');
+      assert.strictEqual(callArgs[1].body, JSON.stringify({ name: 'test' }));
+      assert.strictEqual((callArgs[1].headers as Record<string, string>)['Content-Type'], 'application/json');
     });
 
     it('should pass through custom headers', async () => {
-      let capturedHeaders: Record<string, string> | undefined;
-
-      global.fetch = ((_input: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
-        capturedHeaders = init?.headers as Record<string, string>;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({}),
-        } as Response);
-      }) as typeof global.fetch;
+      mockUndiciRequest.mock.mockImplementation(() => Promise.resolve(makeMockResponse()));
 
       await request('https://api.example.com/test', {
         headers: { 'X-Custom-Header': 'custom-value' },
       });
 
-      assert.strictEqual(capturedHeaders?.['X-Custom-Header'], 'custom-value');
+      const callArgs = mockUndiciRequest.mock.calls[0]!.arguments as [string, Record<string, unknown>];
+      assert.strictEqual((callArgs[1].headers as Record<string, string>)['X-Custom-Header'], 'custom-value');
     });
 
     it('should handle text response type', async () => {
-      global.fetch = async () =>
-        ({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          text: async () => 'plain text response',
-        }) as Response;
+      mockUndiciRequest.mock.mockImplementation(() =>
+        Promise.resolve(makeMockResponse({ body: { text: () => Promise.resolve('plain text response') } }))
+      );
 
       const result = await request('https://api.example.com/test', { responseType: 'text' });
 
@@ -109,15 +123,9 @@ describe('HTTP Client', () => {
     });
 
     it('should handle blob response type', async () => {
-      const mockBlob = new Blob(['binary data']);
-
-      global.fetch = async () =>
-        ({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          blob: async () => mockBlob,
-        }) as Response;
+      mockUndiciRequest.mock.mockImplementation(() =>
+        Promise.resolve(makeMockResponse({ body: { arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) } }))
+      );
 
       const result = await request('https://api.example.com/test', { responseType: 'blob' });
 
@@ -126,14 +134,9 @@ describe('HTTP Client', () => {
 
     it('should handle arrayBuffer response type', async () => {
       const mockBuffer = new ArrayBuffer(16);
-
-      global.fetch = async () =>
-        ({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          arrayBuffer: async () => mockBuffer,
-        }) as Response;
+      mockUndiciRequest.mock.mockImplementation(() =>
+        Promise.resolve(makeMockResponse({ body: { arrayBuffer: () => Promise.resolve(mockBuffer) } }))
+      );
 
       const result = await request('https://api.example.com/test', { responseType: 'arrayBuffer' });
 
@@ -142,165 +145,91 @@ describe('HTTP Client', () => {
     });
 
     it('should handle response type (raw Response)', async () => {
-      const mockResponse = {
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-      } as Response;
-
-      global.fetch = async () => mockResponse;
+      const rawResponse = makeMockResponse({ statusCode: 200 });
+      mockUndiciRequest.mock.mockImplementation(() => Promise.resolve(rawResponse));
 
       const result = await request('https://api.example.com/test', { responseType: 'response' });
 
-      assert.strictEqual(result, mockResponse);
+      assert.strictEqual(result, rawResponse);
+      assert.strictEqual(result.statusCode, 200);
     });
 
     it('should handle null body', async () => {
-      let capturedBody: unknown = undefined;
-
-      global.fetch = ((_input: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
-        capturedBody = init?.body;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({}),
-        } as Response);
-      }) as typeof global.fetch;
+      mockUndiciRequest.mock.mockImplementation(() => Promise.resolve(makeMockResponse()));
 
       await request('https://api.example.com/test', { method: 'POST', body: null });
 
-      assert.strictEqual(capturedBody, undefined);
+      const callArgs = mockUndiciRequest.mock.calls[0]!.arguments as [string, Record<string, unknown>];
+      assert.strictEqual(callArgs[1].body, undefined);
     });
 
     it('should handle undefined body', async () => {
-      let capturedBody: unknown = undefined;
-
-      global.fetch = ((_input: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
-        capturedBody = init?.body;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({}),
-        } as Response);
-      }) as typeof global.fetch;
+      mockUndiciRequest.mock.mockImplementation(() => Promise.resolve(makeMockResponse()));
 
       await request('https://api.example.com/test', { method: 'POST' });
 
-      assert.strictEqual(capturedBody, undefined);
+      const callArgs = mockUndiciRequest.mock.calls[0]!.arguments as [string, Record<string, unknown>];
+      assert.strictEqual(callArgs[1].body, undefined);
     });
 
     it('should pass through FormData without modification', async () => {
-      let capturedBody: unknown = undefined;
-      let capturedHeaders: Record<string, string> | undefined;
+      mockUndiciRequest.mock.mockImplementation(() => Promise.resolve(makeMockResponse()));
 
       const formData = new FormData();
       formData.append('field', 'value');
 
-      global.fetch = ((_input: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
-        capturedBody = init?.body;
-        capturedHeaders = init?.headers as Record<string, string>;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({}),
-        } as Response);
-      }) as typeof global.fetch;
-
       await request('https://api.example.com/test', { method: 'POST', body: formData });
 
-      assert.strictEqual(capturedBody, formData);
-      assert.notStrictEqual(capturedHeaders?.['Content-Type'], 'application/json');
+      const callArgs = mockUndiciRequest.mock.calls[0]!.arguments as [string, Record<string, unknown>];
+      assert.strictEqual(callArgs[1].body, formData);
+      assert.notStrictEqual((callArgs[1].headers as Record<string, string>)['Content-Type'], 'application/json');
     });
 
     it('should pass through Blob without modification', async () => {
-      let capturedBody: unknown = undefined;
-      let capturedHeaders: Record<string, string> | undefined;
+      mockUndiciRequest.mock.mockImplementation(() => Promise.resolve(makeMockResponse()));
 
       const blob = new Blob(['data']);
 
-      global.fetch = ((_input: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
-        capturedBody = init?.body;
-        capturedHeaders = init?.headers as Record<string, string>;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({}),
-        } as Response);
-      }) as typeof global.fetch;
-
       await request('https://api.example.com/test', { method: 'POST', body: blob });
 
-      assert.strictEqual(capturedBody, blob);
-      assert.notStrictEqual(capturedHeaders?.['Content-Type'], 'application/json');
+      const callArgs = mockUndiciRequest.mock.calls[0]!.arguments as [string, Record<string, unknown>];
+      assert.strictEqual(callArgs[1].body, blob);
+      assert.notStrictEqual((callArgs[1].headers as Record<string, string>)['Content-Type'], 'application/json');
     });
 
     it('should pass through ArrayBuffer without modification', async () => {
-      let capturedBody: unknown = undefined;
-      let capturedHeaders: Record<string, string> | undefined;
+      mockUndiciRequest.mock.mockImplementation(() => Promise.resolve(makeMockResponse()));
 
       const buffer = new ArrayBuffer(8);
 
-      global.fetch = ((_input: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
-        capturedBody = init?.body;
-        capturedHeaders = init?.headers as Record<string, string>;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({}),
-        } as Response);
-      }) as typeof global.fetch;
-
       await request('https://api.example.com/test', { method: 'POST', body: buffer });
 
-      assert.strictEqual(capturedBody, buffer);
-      assert.notStrictEqual(capturedHeaders?.['Content-Type'], 'application/json');
+      const callArgs = mockUndiciRequest.mock.calls[0]!.arguments as [string, Record<string, unknown>];
+      assert.strictEqual(callArgs[1].body, buffer);
+      assert.notStrictEqual((callArgs[1].headers as Record<string, string>)['Content-Type'], 'application/json');
     });
 
     it('should pass dispatcher to fetch when provided', async () => {
-      let capturedDispatcher: unknown = undefined;
+      mockUndiciRequest.mock.mockImplementation(() => Promise.resolve(makeMockResponse()));
 
-      global.fetch = ((_input: URL | RequestInfo, init?: RequestInit & { dispatcher?: unknown }): Promise<Response> => {
-        capturedDispatcher = init?.dispatcher;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({ success: true }),
-        } as Response);
-      }) as typeof global.fetch;
+      const mockAgent = { name: 'test-agent' };
+      await request('https://api.example.com/test', { dispatcher: mockAgent as any });
 
-      const mockAgent = {} as any;
-      await request('https://api.example.com/test', { dispatcher: mockAgent });
-
-      assert.strictEqual(capturedDispatcher, mockAgent, 'dispatcher should be passed through to fetch');
+      const callArgs = mockUndiciRequest.mock.calls[0]!.arguments as [string, Record<string, unknown>];
+      assert.strictEqual(callArgs[1].dispatcher, mockAgent);
     });
   });
 
   describe('retry logic', () => {
     it('should retry on 500 error', async () => {
       let attempts = 0;
-
-      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
+      mockUndiciRequest.mock.mockImplementation(() => {
         attempts++;
         if (attempts < 2) {
-          return Promise.resolve({
-            ok: false,
-            status: 500,
-            statusText: 'Internal Server Error',
-          } as Response);
+          return Promise.resolve(makeMockResponse({ statusCode: 500, statusMessage: 'Internal Server Error' }));
         }
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({ success: true }),
-        } as Response);
-      }) as typeof global.fetch;
+        return Promise.resolve(makeMockResponse({ body: { json: () => Promise.resolve({ success: true }) } }));
+      });
 
       const result = await request<{ success: boolean }>('https://api.example.com/test', {
         retryOptions: { attempts: 3, baseDelayMs: 1, maxDelayMs: 1 },
@@ -312,23 +241,13 @@ describe('HTTP Client', () => {
 
     it('should retry on 502 error', async () => {
       let attempts = 0;
-
-      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
+      mockUndiciRequest.mock.mockImplementation(() => {
         attempts++;
         if (attempts < 3) {
-          return Promise.resolve({
-            ok: false,
-            status: 502,
-            statusText: 'Bad Gateway',
-          } as Response);
+          return Promise.resolve(makeMockResponse({ statusCode: 502, statusMessage: 'Bad Gateway' }));
         }
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({ success: true }),
-        } as Response);
-      }) as typeof global.fetch;
+        return Promise.resolve(makeMockResponse({ body: { json: () => Promise.resolve({ success: true }) } }));
+      });
 
       const result = await request<{ success: boolean }>('https://api.example.com/test', {
         retryOptions: { attempts: 3, baseDelayMs: 1, maxDelayMs: 1 },
@@ -340,23 +259,13 @@ describe('HTTP Client', () => {
 
     it('should retry on 503 error', async () => {
       let attempts = 0;
-
-      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
+      mockUndiciRequest.mock.mockImplementation(() => {
         attempts++;
         if (attempts < 2) {
-          return Promise.resolve({
-            ok: false,
-            status: 503,
-            statusText: 'Service Unavailable',
-          } as Response);
+          return Promise.resolve(makeMockResponse({ statusCode: 503, statusMessage: 'Service Unavailable' }));
         }
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({ success: true }),
-        } as Response);
-      }) as typeof global.fetch;
+        return Promise.resolve(makeMockResponse({ body: { json: () => Promise.resolve({ success: true }) } }));
+      });
 
       const result = await request<{ success: boolean }>('https://api.example.com/test', {
         retryOptions: { attempts: 3, baseDelayMs: 1, maxDelayMs: 1 },
@@ -368,23 +277,13 @@ describe('HTTP Client', () => {
 
     it('should retry on 504 error', async () => {
       let attempts = 0;
-
-      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
+      mockUndiciRequest.mock.mockImplementation(() => {
         attempts++;
         if (attempts < 2) {
-          return Promise.resolve({
-            ok: false,
-            status: 504,
-            statusText: 'Gateway Timeout',
-          } as Response);
+          return Promise.resolve(makeMockResponse({ statusCode: 504, statusMessage: 'Gateway Timeout' }));
         }
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({ success: true }),
-        } as Response);
-      }) as typeof global.fetch;
+        return Promise.resolve(makeMockResponse({ body: { json: () => Promise.resolve({ success: true }) } }));
+      });
 
       const result = await request<{ success: boolean }>('https://api.example.com/test', {
         retryOptions: { attempts: 3, baseDelayMs: 1, maxDelayMs: 1 },
@@ -396,23 +295,13 @@ describe('HTTP Client', () => {
 
     it('should retry on 429 rate limit', async () => {
       let attempts = 0;
-
-      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
+      mockUndiciRequest.mock.mockImplementation(() => {
         attempts++;
         if (attempts < 2) {
-          return Promise.resolve({
-            ok: false,
-            status: 429,
-            statusText: 'Too Many Requests',
-          } as Response);
+          return Promise.resolve(makeMockResponse({ statusCode: 429, statusMessage: 'Too Many Requests' }));
         }
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({ success: true }),
-        } as Response);
-      }) as typeof global.fetch;
+        return Promise.resolve(makeMockResponse({ body: { json: () => Promise.resolve({ success: true }) } }));
+      });
 
       const result = await request<{ success: boolean }>('https://api.example.com/test', {
         retryOptions: { attempts: 3, baseDelayMs: 1, maxDelayMs: 1 },
@@ -424,23 +313,13 @@ describe('HTTP Client', () => {
 
     it('should retry on 408 request timeout', async () => {
       let attempts = 0;
-
-      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
+      mockUndiciRequest.mock.mockImplementation(() => {
         attempts++;
         if (attempts < 2) {
-          return Promise.resolve({
-            ok: false,
-            status: 408,
-            statusText: 'Request Timeout',
-          } as Response);
+          return Promise.resolve(makeMockResponse({ statusCode: 408, statusMessage: 'Request Timeout' }));
         }
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({ success: true }),
-        } as Response);
-      }) as typeof global.fetch;
+        return Promise.resolve(makeMockResponse({ body: { json: () => Promise.resolve({ success: true }) } }));
+      });
 
       const result = await request<{ success: boolean }>('https://api.example.com/test', {
         retryOptions: { attempts: 3, baseDelayMs: 1, maxDelayMs: 1 },
@@ -452,15 +331,10 @@ describe('HTTP Client', () => {
 
     it('should exhaust retries and throw after max attempts', async () => {
       let attempts = 0;
-
-      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
+      mockUndiciRequest.mock.mockImplementation(() => {
         attempts++;
-        return Promise.resolve({
-          ok: false,
-          status: 500,
-          statusText: 'Internal Server Error',
-        } as Response);
-      }) as typeof global.fetch;
+        return Promise.resolve(makeMockResponse({ statusCode: 500, statusMessage: 'Internal Server Error' }));
+      });
 
       try {
         await request('https://api.example.com/test', {
@@ -476,23 +350,13 @@ describe('HTTP Client', () => {
 
     it('should respect custom retry options', async () => {
       let attempts = 0;
-
-      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
+      mockUndiciRequest.mock.mockImplementation(() => {
         attempts++;
         if (attempts < 5) {
-          return Promise.resolve({
-            ok: false,
-            status: 500,
-            statusText: 'Internal Server Error',
-          } as Response);
+          return Promise.resolve(makeMockResponse({ statusCode: 500, statusMessage: 'Internal Server Error' }));
         }
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({ success: true }),
-        } as Response);
-      }) as typeof global.fetch;
+        return Promise.resolve(makeMockResponse({ body: { json: () => Promise.resolve({ success: true }) } }));
+      });
 
       const result = await request<{ success: boolean }>('https://api.example.com/test', {
         retryOptions: { attempts: 5, baseDelayMs: 1, maxDelayMs: 1 },
@@ -506,15 +370,10 @@ describe('HTTP Client', () => {
   describe('non-retryable errors', () => {
     it('should NOT retry on 401 unauthorized', async () => {
       let attempts = 0;
-
-      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
+      mockUndiciRequest.mock.mockImplementation(() => {
         attempts++;
-        return Promise.resolve({
-          ok: false,
-          status: 401,
-          statusText: 'Unauthorized',
-        } as Response);
-      }) as typeof global.fetch;
+        return Promise.resolve(makeMockResponse({ statusCode: 401, statusMessage: 'Unauthorized' }));
+      });
 
       try {
         await request('https://api.example.com/test', {
@@ -530,15 +389,10 @@ describe('HTTP Client', () => {
 
     it('should NOT retry on 403 forbidden', async () => {
       let attempts = 0;
-
-      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
+      mockUndiciRequest.mock.mockImplementation(() => {
         attempts++;
-        return Promise.resolve({
-          ok: false,
-          status: 403,
-          statusText: 'Forbidden',
-        } as Response);
-      }) as typeof global.fetch;
+        return Promise.resolve(makeMockResponse({ statusCode: 403, statusMessage: 'Forbidden' }));
+      });
 
       try {
         await request('https://api.example.com/test', {
@@ -554,15 +408,10 @@ describe('HTTP Client', () => {
 
     it('should NOT retry on 404 not found', async () => {
       let attempts = 0;
-
-      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
+      mockUndiciRequest.mock.mockImplementation(() => {
         attempts++;
-        return Promise.resolve({
-          ok: false,
-          status: 404,
-          statusText: 'Not Found',
-        } as Response);
-      }) as typeof global.fetch;
+        return Promise.resolve(makeMockResponse({ statusCode: 404, statusMessage: 'Not Found' }));
+      });
 
       try {
         await request('https://api.example.com/test', {
@@ -578,15 +427,10 @@ describe('HTTP Client', () => {
 
     it('should NOT retry on 400 bad request', async () => {
       let attempts = 0;
-
-      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
+      mockUndiciRequest.mock.mockImplementation(() => {
         attempts++;
-        return Promise.resolve({
-          ok: false,
-          status: 400,
-          statusText: 'Bad Request',
-        } as Response);
-      }) as typeof global.fetch;
+        return Promise.resolve(makeMockResponse({ statusCode: 400, statusMessage: 'Bad Request' }));
+      });
 
       try {
         await request('https://api.example.com/test', {
@@ -603,12 +447,9 @@ describe('HTTP Client', () => {
 
   describe('HttpError throwing', () => {
     it('should throw HttpError for non-ok responses', async () => {
-      global.fetch = async () =>
-        ({
-          ok: false,
-          status: 404,
-          statusText: 'Not Found',
-        }) as Response;
+      mockUndiciRequest.mock.mockImplementation(() =>
+        Promise.resolve(makeMockResponse({ statusCode: 404, statusMessage: 'Not Found' }))
+      );
 
       try {
         await request('https://api.example.com/test');
@@ -619,12 +460,9 @@ describe('HTTP Client', () => {
     });
 
     it('should preserve status code in HttpError', async () => {
-      global.fetch = async () =>
-        ({
-          ok: false,
-          status: 503,
-          statusText: 'Service Unavailable',
-        }) as Response;
+      mockUndiciRequest.mock.mockImplementation(() =>
+        Promise.resolve(makeMockResponse({ statusCode: 503, statusMessage: 'Service Unavailable' }))
+      );
 
       try {
         await request('https://api.example.com/test');
@@ -635,12 +473,9 @@ describe('HTTP Client', () => {
     });
 
     it('should include status in HttpError message', async () => {
-      global.fetch = async () =>
-        ({
-          ok: false,
-          status: 422,
-          statusText: 'Unprocessable Entity',
-        }) as Response;
+      mockUndiciRequest.mock.mockImplementation(() =>
+        Promise.resolve(makeMockResponse({ statusCode: 422, statusMessage: 'Unprocessable Entity' }))
+      );
 
       try {
         await request('https://api.example.com/test');
@@ -654,16 +489,10 @@ describe('HTTP Client', () => {
   describe('timeout handling', () => {
     it('should use default 10s timeout', async () => {
       let capturedSignal: AbortSignal | undefined;
-
-      global.fetch = ((_input: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
-        capturedSignal = init?.signal ?? undefined;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({ success: true }),
-        } as Response);
-      }) as typeof global.fetch;
+      mockUndiciRequest.mock.mockImplementation((_url: string, opts: Record<string, unknown>) => {
+        capturedSignal = opts.signal as AbortSignal | undefined;
+        return Promise.resolve(makeMockResponse({ body: { json: () => Promise.resolve({ success: true }) } }));
+      });
 
       const result = await request<{ success: boolean }>('https://api.example.com/test');
 
@@ -673,16 +502,10 @@ describe('HTTP Client', () => {
 
     it('should respect custom timeoutMs', async () => {
       let capturedSignal: AbortSignal | undefined;
-
-      global.fetch = ((_input: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
-        capturedSignal = init?.signal ?? undefined;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({ success: true }),
-        } as Response);
-      }) as typeof global.fetch;
+      mockUndiciRequest.mock.mockImplementation((_url: string, opts: Record<string, unknown>) => {
+        capturedSignal = opts.signal as AbortSignal | undefined;
+        return Promise.resolve(makeMockResponse({ body: { json: () => Promise.resolve({ success: true }) } }));
+      });
 
       const result = await request<{ success: boolean }>('https://api.example.com/test', {
         timeoutMs: 5000,
@@ -693,15 +516,18 @@ describe('HTTP Client', () => {
     });
 
     it('should abort on timeout', async () => {
-      global.fetch = async (_url: URL | RequestInfo, init?: RequestInit) => {
+      mockUndiciRequest.mock.mockImplementation((_url: string, opts: Record<string, unknown>) => {
         return new Promise((_resolve, reject) => {
-          if (init?.signal) {
-            init.signal.addEventListener('abort', () => {
-              reject(new DOMException('The user aborted a request.', 'AbortError'));
+          const signal = opts.signal as AbortSignal | undefined;
+          if (signal) {
+            signal.addEventListener('abort', () => {
+              const err = new Error('The operation was aborted.');
+              err.name = 'AbortError';
+              reject(err);
             });
           }
         });
-      };
+      });
 
       try {
         await request('https://api.example.com/test', { timeoutMs: 50, retryOptions: { attempts: 1 } });
@@ -715,69 +541,49 @@ describe('HTTP Client', () => {
   describe('URL scrubbing', () => {
     it('should redact nauth param', async () => {
       let capturedUrl = '';
-      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
-        capturedUrl = String(_input);
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({}),
-        } as Response);
-      }) as typeof global.fetch;
+      mockUndiciRequest.mock.mockImplementation((url: string) => {
+        capturedUrl = url;
+        return Promise.resolve(makeMockResponse());
+      });
 
       await request('https://api.example.com/test?nauth=secret123&other=value');
 
-      assert.ok(capturedUrl.includes('nauth=secret123'), 'fetch receives original URL');
+      assert.ok(capturedUrl.includes('nauth=secret123'), 'undici receives original URL');
       assert.ok(capturedUrl.includes('other=value'), 'non-sensitive params should be preserved');
     });
 
     it('should redact nauthsig param', async () => {
       let capturedUrl = '';
-      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
-        capturedUrl = String(_input);
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({}),
-        } as Response);
-      }) as typeof global.fetch;
+      mockUndiciRequest.mock.mockImplementation((url: string) => {
+        capturedUrl = url;
+        return Promise.resolve(makeMockResponse());
+      });
 
       await request('https://api.example.com/test?nauthsig=secret456&other=value');
 
-      assert.ok(capturedUrl.includes('nauthsig=secret456'), 'fetch receives original URL');
+      assert.ok(capturedUrl.includes('nauthsig=secret456'), 'undici receives original URL');
       assert.ok(capturedUrl.includes('other=value'), 'non-sensitive params should be preserved');
     });
 
     it('should redact access_token param', async () => {
       let capturedUrl = '';
-      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
-        capturedUrl = String(_input);
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({}),
-        } as Response);
-      }) as typeof global.fetch;
+      mockUndiciRequest.mock.mockImplementation((url: string) => {
+        capturedUrl = url;
+        return Promise.resolve(makeMockResponse());
+      });
 
       await request('https://api.example.com/test?access_token=secret789&other=value');
 
-      assert.ok(capturedUrl.includes('access_token=secret789'), 'fetch receives original URL');
+      assert.ok(capturedUrl.includes('access_token=secret789'), 'undici receives original URL');
       assert.ok(capturedUrl.includes('other=value'), 'non-sensitive params should be preserved');
     });
 
     it('should preserve non-sensitive params', async () => {
       let capturedUrl = '';
-      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
-        capturedUrl = String(_input);
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({}),
-        } as Response);
-      }) as typeof global.fetch;
+      mockUndiciRequest.mock.mockImplementation((url: string) => {
+        capturedUrl = url;
+        return Promise.resolve(makeMockResponse());
+      });
 
       await request('https://api.example.com/test?public=data&other=value');
 
@@ -787,93 +593,56 @@ describe('HTTP Client', () => {
 
     it('should handle URL without query params', async () => {
       let capturedUrl = '';
-      global.fetch = ((_input: URL | RequestInfo): Promise<Response> => {
-        capturedUrl = String(_input);
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({}),
-        } as Response);
-      }) as typeof global.fetch;
+      mockUndiciRequest.mock.mockImplementation((url: string) => {
+        capturedUrl = url;
+        return Promise.resolve(makeMockResponse());
+      });
 
       await request('https://api.example.com/test');
 
-      assert.strictEqual(capturedUrl, 'https://api.example.com/test', 'URL without query params should pass through unchanged');
+      assert.strictEqual(
+        capturedUrl,
+        'https://api.example.com/test',
+        'URL without query params should pass through unchanged'
+      );
     });
   });
 
   describe('HTTP methods', () => {
     it('should default to GET method', async () => {
-      let capturedMethod: string | undefined;
-
-      global.fetch = ((_input: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
-        capturedMethod = init?.method;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({}),
-        } as Response);
-      }) as typeof global.fetch;
+      mockUndiciRequest.mock.mockImplementation(() => Promise.resolve(makeMockResponse()));
 
       await request('https://api.example.com/test');
 
-      assert.strictEqual(capturedMethod, 'GET');
+      const callArgs = mockUndiciRequest.mock.calls[0]!.arguments as [string, Record<string, unknown>];
+      assert.strictEqual(callArgs[1].method, 'GET');
     });
 
     it('should support PUT method', async () => {
-      let capturedMethod: string | undefined;
-
-      global.fetch = ((_input: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
-        capturedMethod = init?.method;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({}),
-        } as Response);
-      }) as typeof global.fetch;
+      mockUndiciRequest.mock.mockImplementation(() => Promise.resolve(makeMockResponse()));
 
       await request('https://api.example.com/test', { method: 'PUT', body: { data: 'test' } });
 
-      assert.strictEqual(capturedMethod, 'PUT');
+      const callArgs = mockUndiciRequest.mock.calls[0]!.arguments as [string, Record<string, unknown>];
+      assert.strictEqual(callArgs[1].method, 'PUT');
     });
 
     it('should support PATCH method', async () => {
-      let capturedMethod: string | undefined;
-
-      global.fetch = ((_input: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
-        capturedMethod = init?.method;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({}),
-        } as Response);
-      }) as typeof global.fetch;
+      mockUndiciRequest.mock.mockImplementation(() => Promise.resolve(makeMockResponse()));
 
       await request('https://api.example.com/test', { method: 'PATCH', body: { data: 'test' } });
 
-      assert.strictEqual(capturedMethod, 'PATCH');
+      const callArgs = mockUndiciRequest.mock.calls[0]!.arguments as [string, Record<string, unknown>];
+      assert.strictEqual(callArgs[1].method, 'PATCH');
     });
 
     it('should support DELETE method', async () => {
-      let capturedMethod: string | undefined;
-
-      global.fetch = ((_input: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
-        capturedMethod = init?.method;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: async () => ({}),
-        } as Response);
-      }) as typeof global.fetch;
+      mockUndiciRequest.mock.mockImplementation(() => Promise.resolve(makeMockResponse()));
 
       await request('https://api.example.com/test', { method: 'DELETE' });
 
-      assert.strictEqual(capturedMethod, 'DELETE');
+      const callArgs = mockUndiciRequest.mock.calls[0]!.arguments as [string, Record<string, unknown>];
+      assert.strictEqual(callArgs[1].method, 'DELETE');
     });
   });
 });

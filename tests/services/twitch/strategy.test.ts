@@ -120,9 +120,7 @@ describe('Twitch Strategy: finalizeChapters', () => {
       db: null,
     };
 
-    await assert.doesNotReject(
-      (strategy as any).finalizeChapters?.(ctx as any, 42, 'vod-123', 3600)
-    );
+    await assert.doesNotReject((strategy as any).finalizeChapters?.(ctx as any, 42, 'vod-123', 3600));
   });
 });
 

@@ -1,6 +1,14 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach } from 'node:test';
-import { encrypt, decrypt, encryptScalar, decryptScalar, encryptObject, decryptObject, validateEncryptionKey } from '../../src/utils/encryption.js';
+import {
+  encrypt,
+  decrypt,
+  encryptScalar,
+  decryptScalar,
+  encryptObject,
+  decryptObject,
+  validateEncryptionKey,
+} from '../../src/utils/encryption.js';
 
 describe('Encryption', () => {
   const originalEnv = process.env;
@@ -18,7 +26,10 @@ describe('Encryption', () => {
 
   describe('validateEncryptionKey', () => {
     it('should validate correct 32-byte hex key', () => {
-      assert.strictEqual(validateEncryptionKey('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'), true);
+      assert.strictEqual(
+        validateEncryptionKey('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'),
+        true
+      );
     });
 
     it('should reject key that is too short', () => {
@@ -81,7 +92,13 @@ describe('Encryption', () => {
     });
 
     it('should handle encrypt-decrypt round-trip', () => {
-      const testCases = ['simple text', 'text with spaces and punctuation!', 'unicode: café', 'numbers: 12345', 'mixed: Hello 世界 123'];
+      const testCases = [
+        'simple text',
+        'text with spaces and punctuation!',
+        'unicode: café',
+        'numbers: 12345',
+        'mixed: Hello 世界 123',
+      ];
 
       for (const testCase of testCases) {
         const encrypted = encrypt(testCase);

@@ -34,7 +34,7 @@ describe('adminApiKeyMiddleware', () => {
 
     await adminApiKeyMiddleware(request as any, reply as any);
 
-  assert.strictEqual(reply.getSentStatus(), 401);
+    assert.strictEqual(reply.getSentStatus(), 401);
     const body = reply.getSentBody();
     assert.strictEqual(body.code, 'UNAUTHORIZED');
   });

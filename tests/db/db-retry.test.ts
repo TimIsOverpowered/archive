@@ -12,16 +12,17 @@ process.env.META_DATABASE_URL = 'postgresql://localhost/test';
 process.env.ENCRYPTION_MASTER_KEY = '0000000000000000000000000000000000000000000000000000000000000000';
 process.env.PGBOUNCER_URL = 'postgresql://localhost/placeholder';
 
-const createMockConfig = (id: string) => createMockTenantConfig({
-  id,
-  displayName: id,
-  database: {
-    url: `postgresql://test:test@localhost:5432/${id}`,
-  },
-  settings: {
-    domainName: `${id}.example.com`,
-  },
-});
+const createMockConfig = (id: string) =>
+  createMockTenantConfig({
+    id,
+    displayName: id,
+    database: {
+      url: `postgresql://test:test@localhost:5432/${id}`,
+    },
+    settings: {
+      domainName: `${id}.example.com`,
+    },
+  });
 
 class MockPool extends EventEmitter {
   query = mock.fn(() => Promise.resolve({ rows: [] }));
@@ -87,8 +88,10 @@ describe('withDbRetry integration', () => {
     const pm = createPoolManager(MockPool as unknown as typeof Pool);
     const config = createMockConfig('tenant-integration-1');
     const mockDb = {
-      selectFrom: () => ({ select: () => ({ where: () => ({ orderBy: () => ({ limit: () => ({ execute: async () => [] })})})})}),
-      updateTable: () => ({ set: () => ({ where: () => ({ execute: async () => undefined })})}),
+      selectFrom: () => ({
+        select: () => ({ where: () => ({ orderBy: () => ({ limit: () => ({ execute: async () => [] }) }) }) }),
+      }),
+      updateTable: () => ({ set: () => ({ where: () => ({ execute: async () => undefined }) }) }),
     };
 
     mock.method(pm, 'createClient', async () => mockDb);
@@ -114,8 +117,10 @@ describe('withDbRetry integration', () => {
     const config = createMockConfig('tenant-integration-2');
     let receivedDb: any = null;
     const mockDb = {
-      selectFrom: () => ({ select: () => ({ where: () => ({ orderBy: () => ({ limit: () => ({ execute: async () => [] })})})})}),
-      updateTable: () => ({ set: () => ({ where: () => ({ execute: async () => undefined })})}),
+      selectFrom: () => ({
+        select: () => ({ where: () => ({ orderBy: () => ({ limit: () => ({ execute: async () => [] }) }) }) }),
+      }),
+      updateTable: () => ({ set: () => ({ where: () => ({ execute: async () => undefined }) }) }),
     };
 
     mock.method(pm, 'createClient', async () => mockDb);
@@ -141,8 +146,10 @@ describe('withDbRetry integration', () => {
     const config = createMockConfig('tenant-integration-3');
     const expectedData = { id: 1, name: 'test', tags: ['a', 'b', 'c'] };
     const mockDb = {
-      selectFrom: () => ({ select: () => ({ where: () => ({ orderBy: () => ({ limit: () => ({ execute: async () => [] })})})})}),
-      updateTable: () => ({ set: () => ({ where: () => ({ execute: async () => undefined })})}),
+      selectFrom: () => ({
+        select: () => ({ where: () => ({ orderBy: () => ({ limit: () => ({ execute: async () => [] }) }) }) }),
+      }),
+      updateTable: () => ({ set: () => ({ where: () => ({ execute: async () => undefined }) }) }),
     };
 
     mock.method(pm, 'createClient', async () => mockDb);
@@ -164,8 +171,10 @@ describe('withDbRetry integration', () => {
     const pm = createPoolManager(MockPool as unknown as typeof Pool);
     const config = createMockConfig('tenant-integration-4');
     const mockDb = {
-      selectFrom: () => ({ select: () => ({ where: () => ({ orderBy: () => ({ limit: () => ({ execute: async () => [] })})})})}),
-      updateTable: () => ({ set: () => ({ where: () => ({ execute: async () => undefined })})}),
+      selectFrom: () => ({
+        select: () => ({ where: () => ({ orderBy: () => ({ limit: () => ({ execute: async () => [] }) }) }) }),
+      }),
+      updateTable: () => ({ set: () => ({ where: () => ({ execute: async () => undefined }) }) }),
     };
 
     mock.method(pm, 'createClient', async () => mockDb);

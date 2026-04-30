@@ -1,6 +1,10 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { tenantMiddleware, platformValidationMiddleware, asTenantPlatformContext } from '../../../src/api/middleware/tenant-platform.js';
+import {
+  tenantMiddleware,
+  platformValidationMiddleware,
+  asTenantPlatformContext,
+} from '../../../src/api/middleware/tenant-platform.js';
 import { PLATFORMS } from '../../../src/types/platforms.js';
 
 function createMockReply(statusCode = 200, _body: any = null): any {

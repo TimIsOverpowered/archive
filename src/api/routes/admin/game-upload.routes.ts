@@ -108,76 +108,76 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
       const type: SourceType = SOURCE_TYPES.VOD;
 
       // Ensure VOD file is downloaded and valid
-       const { jobId, filePath } = await ensureVodDownload({
-         ctx: tenantPlatformCtx,
-         dbId,
-         vodId,
-         type,
-         downloadMethod,
-         log,
-       });
+      const { jobId, filePath } = await ensureVodDownload({
+        ctx: tenantPlatformCtx,
+        dbId,
+        vodId,
+        type,
+        downloadMethod,
+        log,
+      });
 
-       // Find containing chapter for name metadata only
-       const chapter = await db
-         .selectFrom('chapters')
-         .select('name')
-         .where('vod_id', '=', dbId)
-         .where('start', '<=', game.start_time)
-         .where('end', '>=', game.end_time)
-         .executeTakeFirst();
+      // Find containing chapter for name metadata only
+      const chapter = await db
+        .selectFrom('chapters')
+        .select('name')
+        .where('vod_id', '=', dbId)
+        .where('start', '<=', game.start_time)
+        .where('end', '>=', game.end_time)
+        .executeTakeFirst();
 
-       if (!chapter) {
-         throw new HttpError(
-           404,
-           `No containing chapter found for game ${gameId} (start: ${game.start_time}, end: ${game.end_time})`,
-           'NOT_FOUND'
-         );
-       }
+      if (!chapter) {
+        throw new HttpError(
+          404,
+          `No containing chapter found for game ${gameId} (start: ${game.start_time}, end: ${game.end_time})`,
+          'NOT_FOUND'
+        );
+      }
 
-       // Queue game upload using the game's own time range, not the chapter's
-       const gameJobId = await queueYoutubeGameUploadByGame(
-         tenantPlatformCtx,
-         dbId,
-         vodId,
-         filePath,
-         platform,
+      // Queue game upload using the game's own time range, not the chapter's
+      const gameJobId = await queueYoutubeGameUploadByGame(
+        tenantPlatformCtx,
+        dbId,
+        vodId,
+        filePath,
+        platform,
         {
-            id: game.id,
-            name: game.game_name ?? '',
-            start: game.start_time,
-            end: game.end_time,
-            gameId: game.game_id ?? undefined,
-            title: game.title ?? undefined,
-          },
-         chapter.name ?? '',
-         jobId ?? undefined
-       );
+          id: game.id,
+          name: game.game_name ?? '',
+          start: game.start_time,
+          end: game.end_time,
+          gameId: game.game_id ?? undefined,
+          title: game.title ?? undefined,
+        },
+        chapter.name ?? '',
+        jobId ?? undefined
+      );
 
-       if (gameJobId == null) {
-          throw new Error('Failed to queue game upload job');
-        }
+      if (gameJobId == null) {
+        throw new Error('Failed to queue game upload job');
+      }
 
-        if (jobId != null) {
-          return {
-            data: {
-              message: 'VOD download queued, game upload will be triggered after completion',
-              gameId,
-              vodId,
-              downloadJobId: jobId,
-              gameJobId,
-            },
-          };
-        }
-
+      if (jobId != null) {
         return {
           data: {
-            message: 'Game upload queued',
+            message: 'VOD download queued, game upload will be triggered after completion',
             gameId,
             vodId,
-            filePath,
+            downloadJobId: jobId,
             gameJobId,
           },
-       };
+        };
+      }
+
+      return {
+        data: {
+          message: 'Game upload queued',
+          gameId,
+          vodId,
+          filePath,
+          gameJobId,
+        },
+      };
     }
   );
 
@@ -260,13 +260,13 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
       });
 
       // Find containing chapter for metadata
-       const chapter = await db
-         .selectFrom('chapters')
-         .select(['id', 'name'])
-         .where('vod_id', '=', dbId)
-         .where('start', '<=', game.start_time)
-         .where('end', '>=', game.end_time)
-         .executeTakeFirst();
+      const chapter = await db
+        .selectFrom('chapters')
+        .select(['id', 'name'])
+        .where('vod_id', '=', dbId)
+        .where('start', '<=', game.start_time)
+        .where('end', '>=', game.end_time)
+        .executeTakeFirst();
 
       if (!chapter) {
         throw new HttpError(

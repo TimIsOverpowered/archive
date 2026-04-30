@@ -124,14 +124,19 @@ describe('CacheKeys', () => {
     });
 
     it('should handle mixed valid and invalid values', () => {
-      const key = CacheKeys.vodQuery('tenant-1', {
-        title: 'test',
-        status: undefined,
-        platform: 'twitch',
-        tag: undefined as string | undefined,
-        genre: '',
-        year: 2024,
-      }, 1, 20);
+      const key = CacheKeys.vodQuery(
+        'tenant-1',
+        {
+          title: 'test',
+          status: undefined,
+          platform: 'twitch',
+          tag: undefined as string | undefined,
+          genre: '',
+          year: 2024,
+        },
+        1,
+        20
+      );
 
       assert.ok(key.includes('title:test'));
       assert.ok(key.includes('platform:twitch'));
@@ -158,7 +163,10 @@ describe('swrKeys', () => {
   });
 
   it('should produce same key strings as CacheKeys.vodPlatform', () => {
-    assert.strictEqual(swrKeys.vodPlatform('tenant-1', 'twitch', '12345'), CacheKeys.vodPlatform('tenant-1', 'twitch', '12345'));
+    assert.strictEqual(
+      swrKeys.vodPlatform('tenant-1', 'twitch', '12345'),
+      CacheKeys.vodPlatform('tenant-1', 'twitch', '12345')
+    );
   });
 
   it('should produce same key strings as CacheKeys.vodQuery', () => {

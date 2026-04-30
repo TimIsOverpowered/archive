@@ -10,7 +10,7 @@ import {
 } from '../constants.js';
 import { HttpError } from './http-error.js';
 import { DownloadAbortedError } from './domain-errors.js';
-import { Agent, request as undiciRequest, type BodyInit as UndiciBodyInit } from 'undici';
+import { Agent, request as undiciRequest, type BodyInit as UndiciBodyInit, type Dispatcher } from 'undici';
 
 /** Supported HTTP response types for request/safeRequest functions. */
 export type ResponseType = 'json' | 'text' | 'blob' | 'arrayBuffer' | 'response';
@@ -43,7 +43,7 @@ export type RequestResult<T, R extends ResponseType> = R extends 'json'
       ? Blob
       : R extends 'arrayBuffer'
         ? ArrayBuffer
-        : Response;
+        : Dispatcher.ResponseData;
 
 /** Undici agent configured for high-concurrency segment downloads. */
 export const segmentDownloadAgent = new Agent({
@@ -109,7 +109,7 @@ export function request<T = unknown>(url: string | URL, options?: RequestOptions
 export function request(url: string | URL, options: RequestOptions<'text'>): Promise<string>;
 export function request(url: string | URL, options: RequestOptions<'blob'>): Promise<Blob>;
 export function request(url: string | URL, options: RequestOptions<'arrayBuffer'>): Promise<ArrayBuffer>;
-export function request(url: string | URL, options: RequestOptions<'response'>): Promise<Response>;
+export function request(url: string | URL, options: RequestOptions<'response'>): Promise<Dispatcher.ResponseData>;
 export async function request<T = unknown, R extends ResponseType = 'json'>(
   url: string | URL,
   options?: RequestOptions<R>
@@ -169,10 +169,13 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
           undiciOpts.dispatcher = dispatcher;
         }
 
-        const response = await undiciRequest(urlStr, undiciOpts as Record<string, unknown>);
+        const response = await undiciRequest(urlStr, undiciOpts);
 
         if (response.statusCode < 200 || response.statusCode >= 300) {
-          throw new HttpError(response.statusCode, `HTTP ${response.statusCode}: ${(response as unknown as Record<string, unknown>).statusMessage as string ?? ''}`);
+          throw new HttpError(
+            response.statusCode,
+            `HTTP ${response.statusCode}: ${((response as unknown as Record<string, unknown>).statusMessage as string) ?? ''}`
+          );
         }
 
         let parsedData: unknown;
@@ -190,7 +193,7 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
             parsedData = await response.body.arrayBuffer();
             break;
           case 'response':
-            return response as unknown as RequestResult<T, R>;
+            return response;
         }
 
         return parsedData as RequestResult<T, R>;
@@ -203,7 +206,7 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
       }
     );
 
-    return result;
+    return result as RequestResult<T, R>;
   } catch (error) {
     const duration = Date.now() - startTime;
 
@@ -251,9 +254,9 @@ export function safeRequest(
 ): Promise<ArrayBuffer>;
 export function safeRequest(
   url: string | URL,
-  defaultValue: Response,
+  defaultValue: Dispatcher.ResponseData,
   options?: SafeRequestOptions<'response'>
-): Promise<Response>;
+): Promise<Dispatcher.ResponseData>;
 export async function safeRequest(
   url: string | URL,
   defaultValue: unknown,

@@ -104,7 +104,12 @@ describe('finalizeVod', () => {
   it('should update VOD with is_live: false', async () => {
     const ctx = {
       tenantId: 'tenant-1',
-      config: createMockTenantConfig({ id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false } }),
+      config: createMockTenantConfig({
+        id: 'tenant-1',
+        twitch: { enabled: true },
+        database: { url: 'postgresql://test' },
+        settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false },
+      }),
       db: mockDb,
     };
 
@@ -118,7 +123,12 @@ describe('finalizeVod', () => {
   it('should call strategy.finalizeChapters when duration is provided and strategy has finalizeChapters', async () => {
     const ctx = {
       tenantId: 'tenant-1',
-      config: createMockTenantConfig({ id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false } }),
+      config: createMockTenantConfig({
+        id: 'tenant-1',
+        twitch: { enabled: true },
+        database: { url: 'postgresql://test' },
+        settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false },
+      }),
       db: mockDb,
     };
 
@@ -133,7 +143,12 @@ describe('finalizeVod', () => {
   it('should not call finalizeChapters when durationSeconds is null', async () => {
     const ctx = {
       tenantId: 'tenant-1',
-      config: createMockTenantConfig({ id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false } }),
+      config: createMockTenantConfig({
+        id: 'tenant-1',
+        twitch: { enabled: true },
+        database: { url: 'postgresql://test' },
+        settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false },
+      }),
       db: mockDb,
     };
 
@@ -142,13 +157,18 @@ describe('finalizeVod', () => {
     assert.strictEqual(operationCalls.length, 0);
   });
 
-it('should not call finalizeChapters when strategy does not have finalizeChapters', async () => {
+  it('should not call finalizeChapters when strategy does not have finalizeChapters', async () => {
     const mockStrategyNoChapters = {} as any;
     registerStrategy('twitch' as any, mockStrategyNoChapters);
 
     const ctx = {
       tenantId: 'tenant-1',
-      config: createMockTenantConfig({ id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false } }),
+      config: createMockTenantConfig({
+        id: 'tenant-1',
+        twitch: { enabled: true },
+        database: { url: 'postgresql://test' },
+        settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false },
+      }),
       db: mockDb,
     };
 
@@ -160,7 +180,12 @@ it('should not call finalizeChapters when strategy does not have finalizeChapter
   it('should not include duration in update when durationSeconds is null', async () => {
     const ctx = {
       tenantId: 'tenant-1',
-      config: createMockTenantConfig({ id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false } }),
+      config: createMockTenantConfig({
+        id: 'tenant-1',
+        twitch: { enabled: true },
+        database: { url: 'postgresql://test' },
+        settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false },
+      }),
       db: mockDb,
     };
 
@@ -174,7 +199,12 @@ it('should not call finalizeChapters when strategy does not have finalizeChapter
   it('should publish VOD duration update event', async () => {
     const ctx = {
       tenantId: 'tenant-1',
-      config: createMockTenantConfig({ id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false } }),
+      config: createMockTenantConfig({
+        id: 'tenant-1',
+        twitch: { enabled: true },
+        database: { url: 'postgresql://test' },
+        settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false },
+      }),
       db: mockDb,
     };
 
@@ -196,7 +226,12 @@ it('should not call finalizeChapters when strategy does not have finalizeChapter
 
     const ctx = {
       tenantId: 'tenant-1',
-      config: createMockTenantConfig({ id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false } }),
+      config: createMockTenantConfig({
+        id: 'tenant-1',
+        twitch: { enabled: true },
+        database: { url: 'postgresql://test' },
+        settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false },
+      }),
       db: mockDb,
     };
 

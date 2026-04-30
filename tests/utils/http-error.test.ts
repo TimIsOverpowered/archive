@@ -1,6 +1,12 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { HttpError, badRequest, notFound, serviceUnavailable, internalServerError } from '../../src/utils/http-error.js';
+import {
+  HttpError,
+  badRequest,
+  notFound,
+  serviceUnavailable,
+  internalServerError,
+} from '../../src/utils/http-error.js';
 
 describe('HttpError', () => {
   describe('constructor', () => {

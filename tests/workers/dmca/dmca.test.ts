@@ -1,11 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import {
-  isBlockingPolicy,
-  buildMuteFilters,
-  CLAIM_TYPES,
-  cleanupTempFiles,
-} from '../../../src/workers/dmca/dmca.js';
+import { isBlockingPolicy, buildMuteFilters, CLAIM_TYPES, cleanupTempFiles } from '../../../src/workers/dmca/dmca.js';
 import { createAutoLogger as _createAutoLogger } from '../../../src/utils/auto-tenant-logger.js';
 
 describe('isBlockingPolicy', () => {
@@ -70,7 +65,7 @@ describe('buildMuteFilters', () => {
       {
         type: CLAIM_TYPES.AUDIO,
         claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_GLOBAL_BLOCK' } },
-matchDetails: { longestMatchStartTimeSeconds: '10', longestMatchDurationSeconds: '30' },
+        matchDetails: { longestMatchStartTimeSeconds: '10', longestMatchDurationSeconds: '30' },
       },
     ];
     const result = buildMuteFilters(claims);
@@ -82,7 +77,7 @@ matchDetails: { longestMatchStartTimeSeconds: '10', longestMatchDurationSeconds:
       {
         type: CLAIM_TYPES.AUDIO,
         claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_GLOBAL_BLOCK' } },
-matchDetails: { longestMatchStartTimeSeconds: '0', longestMatchDurationSeconds: '60' },
+        matchDetails: { longestMatchStartTimeSeconds: '0', longestMatchDurationSeconds: '60' },
       },
       {
         type: CLAIM_TYPES.AUDIOVISUAL,
@@ -101,7 +96,7 @@ matchDetails: { longestMatchStartTimeSeconds: '0', longestMatchDurationSeconds: 
       {
         type: CLAIM_TYPES.AUDIO,
         claimPolicy: { primaryPolicy: { policyType: 'MONETIZE' } },
-matchDetails: { longestMatchStartTimeSeconds: '0', longestMatchDurationSeconds: '30' },
+        matchDetails: { longestMatchStartTimeSeconds: '0', longestMatchDurationSeconds: '30' },
       },
       {
         type: CLAIM_TYPES.AUDIO,

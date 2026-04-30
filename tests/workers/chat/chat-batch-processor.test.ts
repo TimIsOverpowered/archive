@@ -83,7 +83,9 @@ describe('flushChatBatch', () => {
       buffer: [],
       log,
       vodId: 'vod-123',
-      onProgress: () => { onProgressCalled = true; },
+      onProgress: () => {
+        onProgressCalled = true;
+      },
       lastOffset: 100,
       totalMessages: 50,
       batchCount: 5,
@@ -312,7 +314,9 @@ describe('flushChatBatch', () => {
       buffer: [],
       log,
       vodId: 'vod-123',
-      onProgress: () => { onProgressCalled = true; },
+      onProgress: () => {
+        onProgressCalled = true;
+      },
       lastOffset: 100,
       totalMessages: 50,
       batchCount: 5,

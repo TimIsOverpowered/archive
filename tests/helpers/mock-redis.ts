@@ -157,7 +157,12 @@ export class MockRedisPipeline {
       let result: unknown;
       switch (cmd) {
         case 'set':
-          result = await this.client.set(args[0] as string, args[1] as string, args[2] as 'EX' | 'PX' | undefined, args[3] as number | undefined);
+          result = await this.client.set(
+            args[0] as string,
+            args[1] as string,
+            args[2] as 'EX' | 'PX' | undefined,
+            args[3] as number | undefined
+          );
           break;
         case 'incr':
           result = await this.client.incr(args[0] as string);

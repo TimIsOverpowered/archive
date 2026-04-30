@@ -357,19 +357,34 @@ export async function queueYoutubeGameUploadByGame(
   vodId: string,
   filePath: string | undefined,
   platform: Platform,
-  game: { id: number; name: string; start: number; end: number; gameId?: string | undefined; title?: string | undefined },
+  game: {
+    id: number;
+    name: string;
+    start: number;
+    end: number;
+    gameId?: string | undefined;
+    title?: string | undefined;
+  },
   chapterName: string,
   downloadJobId?: string
 ): Promise<string | null> {
-  const job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, {
-    id: game.id,
-    name: chapterName,
-    start: game.start,
-    end: game.end,
-    gameId: game.gameId,
-  }, {
-    title: game.title,
-  });
+  const job = await createGameUploadJob(
+    ctx,
+    dbId,
+    vodId,
+    filePath,
+    platform,
+    {
+      id: game.id,
+      name: chapterName,
+      start: game.start,
+      end: game.end,
+      gameId: game.gameId,
+    },
+    {
+      title: game.title,
+    }
+  );
 
   return enqueueGameUpload(job, downloadJobId);
 }

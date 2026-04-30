@@ -2,7 +2,14 @@ import { mock } from 'node:test';
 import { RedisService } from '../../src/utils/redis-service.js';
 import { poolManager, resetClientManager } from '../../src/db/streamer-client.js';
 import { resetEnvConfig } from '../../src/config/env.js';
-import type { TenantConfig, TwitchConfig, YouTubeConfig, KickConfig, TenantSettings, DatabaseConfig } from '../../src/config/types.js';
+import type {
+  TenantConfig,
+  TwitchConfig,
+  YouTubeConfig,
+  KickConfig,
+  TenantSettings,
+  DatabaseConfig,
+} from '../../src/config/types.js';
 
 export interface MockTenantConfigOverrides {
   id?: string;

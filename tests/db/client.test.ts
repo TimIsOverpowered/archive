@@ -2,10 +2,7 @@ import { EventEmitter } from 'node:events';
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import { resetEnvConfig } from '../../src/config/env.js';
-import {
-  stopClientCleanup,
-  createPoolManager,
-} from '../../src/db/streamer-client.js';
+import { stopClientCleanup, createPoolManager } from '../../src/db/streamer-client.js';
 import type { Pool } from 'pg';
 import { TenantConfig } from '../../src/config/types.js';
 import { createMockTenantConfig } from '../helpers/worker-test-setup.js';
@@ -15,16 +12,17 @@ process.env.META_DATABASE_URL = 'postgresql://localhost/test';
 process.env.ENCRYPTION_MASTER_KEY = '0000000000000000000000000000000000000000000000000000000000000000';
 process.env.PGBOUNCER_URL = 'postgresql://localhost/placeholder';
 
-const createMockConfig = (id: string): TenantConfig => createMockTenantConfig({
-  id,
-  displayName: id,
-  database: {
-    url: `postgresql://test:test@localhost:5432/${id}`,
-  },
-  settings: {
-    domainName: `${id}.example.com`,
-  },
-});
+const createMockConfig = (id: string): TenantConfig =>
+  createMockTenantConfig({
+    id,
+    displayName: id,
+    database: {
+      url: `postgresql://test:test@localhost:5432/${id}`,
+    },
+    settings: {
+      domainName: `${id}.example.com`,
+    },
+  });
 
 class MockPool extends EventEmitter {
   query = mock.fn(() => Promise.resolve({ rows: [] }));

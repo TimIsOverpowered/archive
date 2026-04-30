@@ -332,22 +332,22 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     log.info({ vodId, part, gameId, isGameUpload }, 'Queuing YouTube upload');
 
     if (isGameUpload) {
-     // Fetch existing game metadata for YouTube upload
-       const game = await db.selectFrom('games').selectAll().where('id', '=', gameId).executeTakeFirst();
-       const gameName = game?.game_name ?? '';
-       const gameTitle = game?.title ?? gameName;
+      // Fetch existing game metadata for YouTube upload
+      const game = await db.selectFrom('games').selectAll().where('id', '=', gameId).executeTakeFirst();
+      const gameName = game?.game_name ?? '';
+      const gameTitle = game?.title ?? gameName;
 
-       try {
-         await uploadAndUpsertGame({
-           tenantId,
-           dbId,
-           vodId,
-           filePath: processedPath,
-           chapterStart: chapterStart,
-           chapterEnd: chapterEnd,
-           chapterName: gameName,
-           title: gameTitle,
-           description: gameTitle,
+      try {
+        await uploadAndUpsertGame({
+          tenantId,
+          dbId,
+          vodId,
+          filePath: processedPath,
+          chapterStart: chapterStart,
+          chapterEnd: chapterEnd,
+          chapterName: gameName,
+          title: gameTitle,
+          description: gameTitle,
           db,
           config,
           log,

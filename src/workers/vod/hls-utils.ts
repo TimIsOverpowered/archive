@@ -3,9 +3,7 @@ import fs from 'fs';
 import pathMod from 'path';
 import HLS from 'hls-parser';
 import { pipeline } from 'stream/promises';
-import { Readable } from 'stream';
 import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
-import type { ReadableStream as NodeWebStream } from 'node:stream/web';
 import pLimit from 'p-limit';
 import type { AppLogger } from '../../utils/logger.js';
 import { fileExists } from '../../utils/path.js';
@@ -87,8 +85,7 @@ export async function downloadSegmentsParallel(
             });
 
             const writer = fs.createWriteStream(tempPath);
-            const nodeWebStream = response.body as NodeWebStream<Uint8Array>;
-            await pipeline(Readable.fromWeb(nodeWebStream), writer);
+            await pipeline(response.body, writer);
           } else {
             await strategy.session.streamToFile(`${baseURL}/${segment.uri}`, tempPath);
           }

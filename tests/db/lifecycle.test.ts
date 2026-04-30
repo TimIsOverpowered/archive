@@ -1,20 +1,27 @@
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert';
-import { poolManager, withDbRetry, resetClientManager, createClient, ensureClient } from '../../src/db/streamer-client.js';
+import {
+  poolManager,
+  withDbRetry,
+  resetClientManager,
+  createClient,
+  ensureClient,
+} from '../../src/db/streamer-client.js';
 import { isConnectionError } from '../../src/db/utils/errors.js';
 import type { TenantConfig } from '../../src/config/types.js';
 import { createMockTenantConfig } from '../helpers/worker-test-setup.js';
 
-const createMockConfig = (id: string): TenantConfig => createMockTenantConfig({
-  id,
-  displayName: id,
-  database: {
-    url: `postgresql://test:test@localhost:5432/${id}`,
-  },
-  settings: {
-    domainName: `${id}.example.com`,
-  },
-});
+const createMockConfig = (id: string): TenantConfig =>
+  createMockTenantConfig({
+    id,
+    displayName: id,
+    database: {
+      url: `postgresql://test:test@localhost:5432/${id}`,
+    },
+    settings: {
+      domainName: `${id}.example.com`,
+    },
+  });
 
 const mockDb: any = {
   selectFrom: () => mockDb,
@@ -90,7 +97,12 @@ describe('DB Client Lifecycle Management', () => {
     });
 
     it('returns false for non-connection errors', () => {
-      const nonConnectionErrors = [new Error('Query timeout'), new Error('Constraint violation'), { code: '23505', message: 'unique violation' }, 'Some random string error'];
+      const nonConnectionErrors = [
+        new Error('Query timeout'),
+        new Error('Constraint violation'),
+        { code: '23505', message: 'unique violation' },
+        'Some random string error',
+      ];
 
       for (const error of nonConnectionErrors) {
         const result = isConnectionError(error);

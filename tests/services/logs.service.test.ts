@@ -23,10 +23,7 @@ describe('LogsService: getLogsByOffset', () => {
   let mockClient: any;
   let originalEnv: NodeJS.ProcessEnv;
 
-  function chainableBuilder(
-    executeResult: any,
-    executeTakeFirstResult: any
-  ): any {
+  function chainableBuilder(executeResult: any, executeTakeFirstResult: any): any {
     return {
       where: () => chainableBuilder(executeResult, executeTakeFirstResult),
       orderBy: () => ({
@@ -46,10 +43,13 @@ describe('LogsService: getLogsByOffset', () => {
     };
   }
 
-  function createMockDb(chatMessagesResult: any = [], vodResult: any = {
-    created_at: new Date('2024-01-01T00:00:00Z'),
-    duration: 3600,
-  }): any {
+  function createMockDb(
+    chatMessagesResult: any = [],
+    vodResult: any = {
+      created_at: new Date('2024-01-01T00:00:00Z'),
+      duration: 3600,
+    }
+  ): any {
     return {
       selectFrom: () => ({
         select: () => chainableBuilder(chatMessagesResult, vodResult),
@@ -184,7 +184,18 @@ describe('LogsService: getLogsByOffset', () => {
 
   it('should return cached result when Redis has bucket data', async () => {
     const cachedData = {
-      comments: [{ id: 'cached-msg', vod_id: 1, display_name: 'cached', content_offset_seconds: 0, user_color: '#FFF', created_at: new Date(), message: 'Cached', user_badges: [] }],
+      comments: [
+        {
+          id: 'cached-msg',
+          vod_id: 1,
+          display_name: 'cached',
+          content_offset_seconds: 0,
+          user_color: '#FFF',
+          created_at: new Date(),
+          message: 'Cached',
+          user_badges: [],
+        },
+      ],
       cursor: 'cached-cursor',
     };
     const { compressChatData } = await import('../../src/utils/compression.js');
@@ -246,10 +257,11 @@ describe('LogsService: getLogsByOffset', () => {
 
     mockDb = {
       selectFrom: () => ({
-        select: () => countingBuilder([], {
-          created_at: new Date('2024-01-01T00:00:00Z'),
-          duration: 3600,
-        }),
+        select: () =>
+          countingBuilder([], {
+            created_at: new Date('2024-01-01T00:00:00Z'),
+            duration: 3600,
+          }),
       }),
     };
 
@@ -264,10 +276,7 @@ describe('LogsService: getLogsByCursor', () => {
   let mockClient: any;
   let originalEnv: NodeJS.ProcessEnv;
 
-  function chainableBuilder(
-    executeResult: any,
-    executeTakeFirstResult: any
-  ): any {
+  function chainableBuilder(executeResult: any, executeTakeFirstResult: any): any {
     return {
       where: () => chainableBuilder(executeResult, executeTakeFirstResult),
       orderBy: () => ({
@@ -287,10 +296,13 @@ describe('LogsService: getLogsByCursor', () => {
     };
   }
 
-  function createMockDb(chatMessagesResult: any = [], vodResult: any = {
-    created_at: new Date('2024-01-01T00:00:00Z'),
-    duration: 3600,
-  }): any {
+  function createMockDb(
+    chatMessagesResult: any = [],
+    vodResult: any = {
+      created_at: new Date('2024-01-01T00:00:00Z'),
+      duration: 3600,
+    }
+  ): any {
     return {
       selectFrom: () => ({
         select: () => chainableBuilder(chatMessagesResult, vodResult),
@@ -348,11 +360,13 @@ describe('LogsService: getLogsByCursor', () => {
   it('should throw bad request for cursor with invalid date', async () => {
     mockDb = createMockDb();
 
-    const cursor = Buffer.from(JSON.stringify({
-      offset: 100,
-      createdAt: 'not-a-date',
-      id: 'msg-1',
-    })).toString('base64');
+    const cursor = Buffer.from(
+      JSON.stringify({
+        offset: 100,
+        createdAt: 'not-a-date',
+        id: 'msg-1',
+      })
+    ).toString('base64');
     try {
       await getLogsByCursor(mockDb, 'tenant-1', 1, cursor);
       assert.fail('Should have thrown');
@@ -362,11 +376,13 @@ describe('LogsService: getLogsByCursor', () => {
   });
 
   it('should throw when VOD not found', async () => {
-    const cursor = Buffer.from(JSON.stringify({
-      offset: 100,
-      createdAt: new Date().toISOString(),
-      id: 'msg-1',
-    })).toString('base64');
+    const cursor = Buffer.from(
+      JSON.stringify({
+        offset: 100,
+        createdAt: new Date().toISOString(),
+        id: 'msg-1',
+      })
+    ).toString('base64');
 
     const neverResolveDb = {
       selectFrom: () => ({
@@ -389,11 +405,13 @@ describe('LogsService: getLogsByCursor', () => {
   });
 
   it('should return empty comments when no messages after cursor', async () => {
-    const cursor = Buffer.from(JSON.stringify({
-      offset: 100,
-      createdAt: new Date().toISOString(),
-      id: 'msg-1',
-    })).toString('base64');
+    const cursor = Buffer.from(
+      JSON.stringify({
+        offset: 100,
+        createdAt: new Date().toISOString(),
+        id: 'msg-1',
+      })
+    ).toString('base64');
 
     mockDb = createMockDb([], {
       created_at: new Date('2024-01-01T00:00:00Z'),
@@ -428,11 +446,13 @@ describe('LogsService: getLogsByCursor', () => {
       duration: 3600,
     });
 
-    const cursor = Buffer.from(JSON.stringify({
-      offset: 100,
-      createdAt: new Date('2024-01-01T00:01:40Z').toISOString(),
-      id: 'msg-9',
-    })).toString('base64');
+    const cursor = Buffer.from(
+      JSON.stringify({
+        offset: 100,
+        createdAt: new Date('2024-01-01T00:01:40Z').toISOString(),
+        id: 'msg-9',
+      })
+    ).toString('base64');
 
     const result = await getLogsByCursor(mockDb, 'tenant-1', 1, cursor);
     assert.strictEqual(result.comments.length, LOGS_PAGE_SIZE);
@@ -445,7 +465,18 @@ describe('LogsService: getLogsByCursor', () => {
 
   it('should return cached result when Redis has cursor data', async () => {
     const cachedData = {
-      comments: [{ id: 'cached-msg', vod_id: 1, display_name: 'cached', content_offset_seconds: 110, user_color: '#FFF', created_at: new Date(), message: 'Cached from cursor', user_badges: [] }],
+      comments: [
+        {
+          id: 'cached-msg',
+          vod_id: 1,
+          display_name: 'cached',
+          content_offset_seconds: 110,
+          user_color: '#FFF',
+          created_at: new Date(),
+          message: 'Cached from cursor',
+          user_badges: [],
+        },
+      ],
       cursor: 'next-cursor',
     };
     const { compressChatData } = await import('../../src/utils/compression.js');
@@ -455,11 +486,13 @@ describe('LogsService: getLogsByCursor', () => {
 
     mockDb = createMockDb();
 
-    const cursor = Buffer.from(JSON.stringify({
-      offset: 100,
-      createdAt: new Date().toISOString(),
-      id: 'msg-1',
-    })).toString('base64');
+    const cursor = Buffer.from(
+      JSON.stringify({
+        offset: 100,
+        createdAt: new Date().toISOString(),
+        id: 'msg-1',
+      })
+    ).toString('base64');
 
     const result = await getLogsByCursor(mockDb, 'tenant-1', 1, cursor);
     assert.strictEqual(result.comments.length, 1);
@@ -477,11 +510,13 @@ describe('LogsService: getLogsByCursor', () => {
       duration: 3600,
     });
 
-    const cursor = Buffer.from(JSON.stringify({
-      offset: 100,
-      createdAt: new Date().toISOString(),
-      id: 'msg-1',
-    })).toString('base64');
+    const cursor = Buffer.from(
+      JSON.stringify({
+        offset: 100,
+        createdAt: new Date().toISOString(),
+        id: 'msg-1',
+      })
+    ).toString('base64');
 
     const result = await getLogsByCursor(mockDb, 'tenant-1', 1, cursor);
     assert.deepStrictEqual(result, { comments: [], cursor: undefined });

@@ -237,7 +237,12 @@ describe('withStaleWhileRevalidate', () => {
 
       for (const testCase of testCases) {
         const fetcher = async () => testCase;
-        const result = await withStaleWhileRevalidate(swrKeys.stats(`swr-type-${JSON.stringify(testCase)}`), 60, 30, fetcher);
+        const result = await withStaleWhileRevalidate(
+          swrKeys.stats(`swr-type-${JSON.stringify(testCase)}`),
+          60,
+          30,
+          fetcher
+        );
         assert.deepStrictEqual(result, testCase);
       }
     });

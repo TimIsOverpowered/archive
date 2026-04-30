@@ -75,39 +75,57 @@ describe('VodService: VodQuerySchema', () => {
   });
 
   it('should reject invalid platform', () => {
-    assert.throws(() => VodQuerySchema.parse({ platform: 'invalid' as any }), (err: any) => {
-      return err.name === 'ZodError';
-    });
+    assert.throws(
+      () => VodQuerySchema.parse({ platform: 'invalid' as any }),
+      (err: any) => {
+        return err.name === 'ZodError';
+      }
+    );
   });
 
   it('should reject invalid sort value', () => {
-    assert.throws(() => VodQuerySchema.parse({ sort: 'invalid' as any }), (err: any) => {
-      return err.name === 'ZodError';
-    });
+    assert.throws(
+      () => VodQuerySchema.parse({ sort: 'invalid' as any }),
+      (err: any) => {
+        return err.name === 'ZodError';
+      }
+    );
   });
 
   it('should reject invalid order value', () => {
-    assert.throws(() => VodQuerySchema.parse({ order: 'invalid' as any }), (err: any) => {
-      return err.name === 'ZodError';
-    });
+    assert.throws(
+      () => VodQuerySchema.parse({ order: 'invalid' as any }),
+      (err: any) => {
+        return err.name === 'ZodError';
+      }
+    );
   });
 
   it('should reject limit below 1', () => {
-    assert.throws(() => VodQuerySchema.parse({ limit: 0 }), (err: any) => {
-      return err.name === 'ZodError';
-    });
+    assert.throws(
+      () => VodQuerySchema.parse({ limit: 0 }),
+      (err: any) => {
+        return err.name === 'ZodError';
+      }
+    );
   });
 
   it('should reject limit above 100', () => {
-    assert.throws(() => VodQuerySchema.parse({ limit: 101 }), (err: any) => {
-      return err.name === 'ZodError';
-    });
+    assert.throws(
+      () => VodQuerySchema.parse({ limit: 101 }),
+      (err: any) => {
+        return err.name === 'ZodError';
+      }
+    );
   });
 
   it('should reject page below 1', () => {
-    assert.throws(() => VodQuerySchema.parse({ page: 0 }), (err: any) => {
-      return err.name === 'ZodError';
-    });
+    assert.throws(
+      () => VodQuerySchema.parse({ page: 0 }),
+      (err: any) => {
+        return err.name === 'ZodError';
+      }
+    );
   });
 
   it('should accept all valid platforms', () => {
@@ -190,33 +208,39 @@ describe('VodService: VodResponse type', () => {
       updated_at: new Date(),
       is_live: false,
       started_at: new Date(),
-      vod_uploads: [{
-        upload_id: 'yt-1',
-        type: 'youtube',
-        duration: 3600,
-        part: 0,
-        status: 'COMPLETED',
-        thumbnail_url: 'https://example.com/thumb.jpg',
-        created_at: '2024-01-01T00:00:00Z',
-      }],
-      chapters: [{
-        name: 'Intro',
-        image: null,
-        duration: null,
-        start: 0,
-        end: 60,
-      }],
-      games: [{
-        start_time: 120,
-        end_time: 300,
-        video_provider: null,
-        video_id: null,
-        thumbnail_url: null,
-        game_id: '123',
-        game_name: 'FPS Game',
-        title: 'Playing FPS',
-        chapter_image: null,
-      }],
+      vod_uploads: [
+        {
+          upload_id: 'yt-1',
+          type: 'youtube',
+          duration: 3600,
+          part: 0,
+          status: 'COMPLETED',
+          thumbnail_url: 'https://example.com/thumb.jpg',
+          created_at: '2024-01-01T00:00:00Z',
+        },
+      ],
+      chapters: [
+        {
+          name: 'Intro',
+          image: null,
+          duration: null,
+          start: 0,
+          end: 60,
+        },
+      ],
+      games: [
+        {
+          start_time: 120,
+          end_time: 300,
+          video_provider: null,
+          video_id: null,
+          thumbnail_url: null,
+          game_id: '123',
+          game_name: 'FPS Game',
+          title: 'Playing FPS',
+          chapter_image: null,
+        },
+      ],
     };
     assert.strictEqual(vod.vod_uploads.length, 1);
     assert.strictEqual(vod.chapters.length, 1);
