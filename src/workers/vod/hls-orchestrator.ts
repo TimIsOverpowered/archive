@@ -190,7 +190,7 @@ async function convertAndCleanup(
   } else {
     log.info({ vodId }, 'Cleaning up HLS files');
   }
-  await cleanupHlsFiles(vodDir, shouldKeepHls, log);
+  await cleanupHlsFiles(vodDir, shouldKeepHls, finalMp4Path, log);
 
   return { segmentCount, finalMp4Path };
 }

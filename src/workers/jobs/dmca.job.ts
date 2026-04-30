@@ -22,20 +22,8 @@ export interface QueueDmcaProcessingOptions {
 }
 
 export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): Promise<string | null> {
-  const {
-    tenantId,
-    dbId,
-    vodId,
-    claims,
-    type,
-    platform,
-    part,
-    downloadJobId,
-    filePath,
-    gameId,
-    gameStart,
-    gameEnd,
-  } = options;
+  const { tenantId, dbId, vodId, claims, type, platform, part, downloadJobId, filePath, gameId, gameStart, gameEnd } =
+    options;
 
   const isGameUpload = gameId != null;
   const jobId = isGameUpload ? `dmca_game_${gameId}` : part !== undefined ? `dmca_${vodId}_p${part}` : `dmca_${vodId}`;

@@ -86,7 +86,9 @@ export async function createGameUploadJob(
 
   if (options?.title != null) {
     title = options.title;
-    description = options?.description ?? `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube?.description}`;
+    description =
+      options?.description ??
+      `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube?.description}`;
   } else {
     const gameCount = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
       const result = await db
@@ -103,7 +105,9 @@ export async function createGameUploadJob(
       .format('MMMM DD YYYY')
       .toUpperCase();
     title = `${channelName} plays ${chapter.name} EP ${epNumber} - ${dateFormatted}`;
-    description = options?.description ?? `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube?.description}`;
+    description =
+      options?.description ??
+      `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube?.description}`;
   }
 
   return {
