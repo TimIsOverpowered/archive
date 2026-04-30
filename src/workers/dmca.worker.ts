@@ -21,7 +21,9 @@ import { extractErrorDetails } from '../utils/error.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { createDmcaWorkerAlerts, DmcaClaimInfo } from './utils/alert-factories.js';
 import { ConfigNotConfiguredError, FileNotFound } from '../utils/domain-errors.js';
+import { getDisplayName } from '../config/types.js';
 import { uploadAndUpsertGame } from './youtube/game-upload-processor.js';
+import { buildYoutubeMetadata } from './youtube/metadata-builder.js';
 
 const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async (job: Job<DmcaProcessingJob>) => {
   const {
@@ -330,29 +332,43 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     log.info({ vodId, part, gameId, isGameUpload }, 'Queuing YouTube upload');
 
     if (isGameUpload) {
-      // Fetch existing game metadata for YouTube upload
       const game = await db.selectFrom('games').selectAll().where('id', '=', gameId).executeTakeFirst();
       const gameName = game?.game_name ?? '';
       const gameTitle = game?.title ?? '';
+      const vodRecord = await db.selectFrom('vods').where('id', '=', dbId).selectAll().executeTakeFirst();
 
-      try {
-        await uploadAndUpsertGame({
-          tenantId,
-          dbId,
-          vodId,
-          filePath: processedPath,
-          chapterStart: gameStart,
-          chapterEnd: gameEnd,
-          chapterName: gameName,
-          chapterGameId: game?.game_id ?? '',
-          title: gameTitle,
-          description: gameTitle,
-          db,
-          config,
-          log,
+      if (!vodRecord) {
+        log.warn({ vodId, dbId }, 'VOD record not found for game upload');
+      } else {
+        const { title, description } = buildYoutubeMetadata({
+          channelName: getDisplayName(config),
+          platform,
+          domainName: config.settings?.domainName ?? '',
+          timezone: config.settings?.timezone ?? 'UTC',
+          youtubeDescription: config.youtube?.description,
+          gameName: gameTitle,
+          vodRecord,
         });
-      } catch (err) {
-        log.warn({ err: extractErrorDetails(err), vodId }, 'Game upload failed');
+
+        try {
+          await uploadAndUpsertGame({
+            tenantId,
+            dbId,
+            vodId,
+            filePath: processedPath,
+            chapterStart: gameStart,
+            chapterEnd: gameEnd,
+            chapterName: gameName,
+            chapterGameId: game?.game_id ?? '',
+            title,
+            description,
+            db,
+            config,
+            log,
+          });
+        } catch (err) {
+          log.warn({ err: extractErrorDetails(err), vodId }, 'Game upload failed');
+        }
       }
     } else {
       // VOD upload (existing flow)

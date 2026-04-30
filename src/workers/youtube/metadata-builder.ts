@@ -10,10 +10,11 @@ export interface YoutubeMetadataOptions {
   timezone: string;
   youtubeDescription?: string | undefined;
   part?: number | undefined;
-  type: SourceType;
+  type?: SourceType;
   gameName?: string | undefined;
   epNumber?: number | undefined;
   vodRecord: VodRecord;
+  replayPath?: string | undefined;
 }
 
 export interface YoutubeMetadata {
@@ -22,15 +23,39 @@ export interface YoutubeMetadata {
 }
 
 export function buildYoutubeMetadata(options: YoutubeMetadataOptions): YoutubeMetadata {
-  const { channelName, platform, vodRecord, domainName, timezone, youtubeDescription, part, type } = options;
+  const {
+    channelName,
+    platform,
+    vodRecord,
+    domainName,
+    timezone,
+    youtubeDescription,
+    part,
+    type,
+    gameName,
+    epNumber,
+    replayPath,
+  } = options;
 
-  const platformName = capitalizePlatform(platform);
   const dateFormatted = dayjs(vodRecord.created_at).tz(timezone).format('MMMM DD YYYY').toUpperCase();
+  const isGameUpload = gameName != null && gameName !== '';
 
-  const baseTitle = `${channelName} ${platformName}${type === SOURCE_TYPES.LIVE ? ' LIVE' : ''} VOD - ${dateFormatted}`;
-  const title = part != null && part > 0 ? `${baseTitle} PART ${part}` : baseTitle;
-  const replayPath = `/vods/${vodRecord.id}`;
-  const description = `Chat Replay: https://${domainName}${replayPath}\nStream Title: ${vodRecord.title?.replace(/<[^>]*>/g, '') ?? ''}\n${youtubeDescription ?? ''}`;
+  let title: string;
+  const resolvedReplayPath = replayPath ?? (isGameUpload ? `/games/${vodRecord.id}` : `/vods/${vodRecord.id}`);
+
+  if (isGameUpload) {
+    if (epNumber != null) {
+      title = `${channelName} plays ${gameName} EP ${epNumber} - ${dateFormatted}`;
+    } else {
+      title = `${channelName} plays ${gameName} - ${dateFormatted}`;
+    }
+  } else {
+    const platformName = capitalizePlatform(platform);
+    const baseTitle = `${channelName} ${platformName}${type === SOURCE_TYPES.LIVE ? ' LIVE' : ''} VOD - ${dateFormatted}`;
+    title = part != null && part > 0 ? `${baseTitle} PART ${part}` : baseTitle;
+  }
+
+  const description = `Chat Replay: https://${domainName}${resolvedReplayPath}\nStream Title: ${vodRecord.title?.replace(/<[^>]*>/g, '') ?? ''}\n${youtubeDescription ?? ''}`;
 
   return { title, description };
 }

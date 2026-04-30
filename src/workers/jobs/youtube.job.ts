@@ -1,6 +1,5 @@
 import { getFlowProducer, getStandardVodQueue, getYoutubeUploadQueue } from '../queues/queue.js';
 import type { YoutubeVodUploadJob, YoutubeGameUploadJob } from './types.js';
-import dayjs from '../../utils/dayjs.js';
 import { childLogger } from '../../utils/logger.js';
 import type { Platform, SourceType, UploadMode } from '../../types/platforms.js';
 import { UPLOAD_MODES } from '../../types/platforms.js';
@@ -9,6 +8,7 @@ import { withDbRetry } from '../../db/streamer-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getPlatformConfig, getDisplayName } from '../../config/types.js';
 import { ConfigNotConfiguredError, VodNotFoundError } from '../../utils/domain-errors.js';
+import { buildYoutubeMetadata } from '../youtube/metadata-builder.js';
 
 const log = childLogger({ module: 'youtube-job' });
 
@@ -76,20 +76,13 @@ export async function createGameUploadJob(
     throw new Error(`Game "${chapter.name}" is in restricted games list`);
   }
 
-  // Use provided title/description or generate new ones
   const channelName = getDisplayName(config);
-  const vodStreamTitle = vodRecord.title != null && vodRecord.title !== '' ? vodRecord.title.replace(/>|</gi, '') : '';
-  const domainName = config.settings?.domainName;
 
-  let title: string;
-  const description: string = `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube?.description}`;
-  const dateFormatted = dayjs(vodRecord.created_at)
-    .tz(config.settings?.timezone ?? 'UTC')
-    .format('MMMM DD YYYY')
-    .toUpperCase();
+  let gameName: string;
+  let epNumber: number | undefined;
 
   if (options?.title != null) {
-    title = `${channelName} plays ${options.title} - ${dateFormatted}`;
+    gameName = options.title;
   } else {
     const gameCount = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
       const result = await db
@@ -100,9 +93,20 @@ export async function createGameUploadJob(
         .executeTakeFirst();
       return result?.cnt ?? 0;
     });
-    const epNumber = gameCount + 1;
-    title = `${channelName} plays ${chapter.name} EP ${epNumber} - ${dateFormatted}`;
+    epNumber = gameCount + 1;
+    gameName = chapter.name;
   }
+
+  const { title, description } = buildYoutubeMetadata({
+    channelName,
+    platform,
+    domainName: config.settings?.domainName ?? '',
+    timezone: config.settings?.timezone ?? 'UTC',
+    youtubeDescription: config.youtube?.description,
+    gameName,
+    epNumber,
+    vodRecord,
+  });
 
   return {
     kind: 'game',
