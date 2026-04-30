@@ -128,8 +128,6 @@ export async function splitVideo(
 
   for (let i = 0; i < totalParts; i++) {
     const start = i * splitDuration;
-    const end = Math.min(start + splitDuration, duration);
-    const partDuration = end - start;
     const partFile = path.join(outputDir, `${vodId}-part-${i + 1}.mp4`);
 
     const percent = ((i + 1) / totalParts) * 100;
@@ -144,7 +142,7 @@ export async function splitVideo(
         '-i',
         filePath,
         '-t',
-        partDuration.toString(),
+        splitDuration.toString(),
         '-c',
         'copy',
         '-y',
@@ -153,7 +151,7 @@ export async function splitVideo(
 
       const cmdStr = `ffmpeg ${args.join(' ')}`;
       const proc = spawn('ffmpeg', args);
-      trackProgress(proc, cmdStr, partDuration, undefined, onStart);
+      trackProgress(proc, cmdStr, splitDuration, undefined, onStart);
 
       proc.on('close', (code) => {
         if (code === 0) {
@@ -176,14 +174,13 @@ export async function splitVideo(
 export async function trimVideo(
   filePath: string,
   start: number,
-  end: number,
+  duration: number,
   vodId: string,
   onProgress?: (percent: number) => void,
   onStart?: (cmd: string) => void
 ): Promise<string> {
   const outputDir = path.dirname(filePath);
-  const duration = end - start;
-  const outputFile = path.join(outputDir, `${vodId}-${start}-${end}.mp4`);
+  const outputFile = path.join(outputDir, `${vodId}-${start}-${duration}.mp4`);
 
   return new Promise((resolve, reject) => {
     const args = [

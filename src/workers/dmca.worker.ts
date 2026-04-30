@@ -189,7 +189,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       processedPath = await ffmpegTrim(
         filePath,
         startOffset,
-        startOffset + splitDuration,
+        splitDuration,
         path.join(workDir, `${vodId}-part-${part}`),
         (pct) => {
           currentFfmpegProgress = pct;
@@ -208,7 +208,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       const trimmedPath = await ffmpegTrim(
         processedPath,
         gameStart,
-        gameEnd,
+        gameEnd - gameStart,
         path.join(workDir, `${vodId}-game-${gameId}-trimmed`),
         (pct) => {
           currentFfmpegProgress = pct;
