@@ -1,5 +1,4 @@
 import { Processor, Job } from 'bullmq';
-import path from 'path';
 import type { DmcaProcessingJob, DmcaProcessingResult } from './jobs/types.js';
 import { queueYoutubeVodUpload } from './jobs/youtube.job.js';
 import {
@@ -100,7 +99,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
   const messageId = await initRichAlert(dmcaAlerts.processing(vodId, claimInfos, platform, displayName, part));
 
   if (blockingClaims.length === 0) {
-    log.info({ vodId }, 'No blocking claims for VOD, uploading original');
+    log.info({ vodId }, 'No blocking claims for VOD');
     await updateAlert(messageId, dmcaAlerts.complete(vodId, 'N/A', [], platform, displayName));
 
     return { success: true, message: 'No action needed' };
@@ -190,7 +189,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
         filePath,
         startOffset,
         splitDuration,
-        path.join(workDir, `${vodId}-part-${part}`),
+        `${vodId}-part-${part}`,
         (pct) => {
           currentFfmpegProgress = pct;
         },
@@ -209,7 +208,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
         processedPath,
         gameStart,
         gameEnd,
-        path.join(workDir, `${vodId}-game-${gameId}-trimmed`),
+        `${vodId}-game-${gameId}-trimmed`,
         (pct) => {
           currentFfmpegProgress = pct;
         },
@@ -345,6 +344,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
           chapterStart: gameStart,
           chapterEnd: gameEnd,
           chapterName: gameName,
+          chapterGameId: game?.game_id ?? '',
           title: gameTitle,
           description: gameTitle,
           db,
