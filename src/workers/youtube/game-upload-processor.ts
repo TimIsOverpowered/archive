@@ -139,6 +139,7 @@ export async function uploadAndUpsertGame(
     .executeTakeFirst();
 
   await publishVodUpdate(tenantId, dbId);
+  await deleteFileIfExists(filePath);
 
   if (gameRecord == null) throw new Error('Failed to insert game record');
   return { videoId: result.videoId, gameId: String(gameRecord.id) };
@@ -205,8 +206,6 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     config,
     log,
   });
-
-  await deleteFileIfExists(trimmedPath);
 
   return { success: true, ...result };
 }
@@ -299,10 +298,6 @@ async function processSplitGameUpload(
       endTime,
       gameId: uploadResult.gameId,
     });
-
-    if (!config.settings.saveMP4) {
-      await deleteFileIfExists(splitPath);
-    }
   }
 
   updateAlert(splitAlertMessageId, {

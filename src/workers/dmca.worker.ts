@@ -16,7 +16,7 @@ import { trimVideo } from './utils/ffmpeg.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
 import { handleWorkerError } from './utils/error-handler.js';
-import { deleteFileIfExists, fileExists, getVodDirPath } from '../utils/path.js';
+import { fileExists, getVodDirPath } from '../utils/path.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { createDmcaWorkerAlerts, DmcaClaimInfo } from './utils/alert-factories.js';
@@ -374,7 +374,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     }
 
     if (!config.settings.saveMP4) {
-      await deleteFileIfExists(filePath);
+      tempFiles.push(filePath);
     }
     return { success: true, vodId };
   } catch (error) {
