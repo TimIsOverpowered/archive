@@ -52,7 +52,11 @@ export async function processVodUpload(ctx: VodUploadContext): Promise<VodUpload
   const domainName = config.settings?.domainName ?? 'localhost';
   const privacyStatus = config.youtube?.public === true ? 'public' : 'unlisted';
   const splitDuration = getEffectiveSplitDuration(config.youtube?.splitDuration);
-  const duration = (await getMetadata(filePath))?.duration ?? vodRecord.duration;
+  const metadata = await getMetadata(filePath);
+  if (!metadata) {
+    throw new Error(`VOD file has invalid duration or no video stream: ${filePath}`);
+  }
+  const duration = metadata.duration;
 
   const platformName = vodRecord.platform as Platform;
 
@@ -288,7 +292,11 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
     timestamp: new Date().toISOString(),
   });
 
-  const duration = (await getMetadata(filePath))?.duration ?? vodRecord.duration;
+  const metadata = await getMetadata(filePath);
+  if (!metadata) {
+    throw new Error(`VOD file has invalid duration or no video stream: ${filePath}`);
+  }
+  const duration = metadata.duration;
 
   const onUploadProgress =
     uploadAlertMessageId != null

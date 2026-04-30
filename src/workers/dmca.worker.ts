@@ -334,7 +334,7 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       // Fetch existing game metadata for YouTube upload
       const game = await db.selectFrom('games').selectAll().where('id', '=', gameId).executeTakeFirst();
       const gameName = game?.game_name ?? '';
-      const gameTitle = game?.title ?? gameName;
+      const gameTitle = game?.title ?? '';
 
       try {
         await uploadAndUpsertGame({

@@ -51,7 +51,7 @@ export async function createGameUploadJob(
   filePath: string | undefined,
   platform: Platform,
   chapter: { id: number; name: string; start: number; end: number; gameId?: string | undefined },
-  options?: { title?: string | undefined; description?: string | undefined }
+  options?: { title?: string | undefined }
 ): Promise<YoutubeGameUploadJob> {
   const { config, tenantId } = ctx;
   if (config.youtube?.upload === false) {
@@ -82,13 +82,14 @@ export async function createGameUploadJob(
   const domainName = config.settings?.domainName;
 
   let title: string;
-  let description: string;
+  const description: string = `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube?.description}`;
+  const dateFormatted = dayjs(vodRecord.created_at)
+    .tz(config.settings?.timezone ?? 'UTC')
+    .format('MMMM DD YYYY')
+    .toUpperCase();
 
   if (options?.title != null) {
-    title = options.title;
-    description =
-      options?.description ??
-      `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube?.description}`;
+    title = `${channelName} plays ${options.title} - ${dateFormatted}`;
   } else {
     const gameCount = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
       const result = await db
@@ -100,14 +101,7 @@ export async function createGameUploadJob(
       return result?.cnt ?? 0;
     });
     const epNumber = gameCount + 1;
-    const dateFormatted = dayjs(vodRecord.created_at)
-      .tz(config.settings?.timezone ?? 'UTC')
-      .format('MMMM DD YYYY')
-      .toUpperCase();
     title = `${channelName} plays ${chapter.name} EP ${epNumber} - ${dateFormatted}`;
-    description =
-      options?.description ??
-      `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube?.description}`;
   }
 
   return {

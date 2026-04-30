@@ -155,11 +155,15 @@ export async function processGameUpload(ctx: GameUploadContext): Promise<GameUpl
     filePath,
     chapterStart,
     chapterEnd,
-    `${ctx.vodId}-${ctx.chapterName}`,
+    `${ctx.vodId}-game-${ctx.chapterGameId ?? 'unknown'}`,
     undefined,
     () => {}
   );
-  const trimmedDuration = (await getMetadata(trimmedPath))?.duration ?? 0;
+  const metadata = await getMetadata(trimmedPath);
+  if (!metadata) {
+    throw new Error(`Trimmed file has invalid duration or no video stream: ${trimmedPath}`);
+  }
+  const trimmedDuration = metadata.duration;
 
   const gameExceedsYoutubeMax = trimmedDuration > YOUTUBE_MAX_DURATION;
 
