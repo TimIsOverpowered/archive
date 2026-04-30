@@ -34,11 +34,10 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
     part,
     filePath: providedFilePath,
     gameId,
-    chapterId,
-    chapterStart,
-    chapterEnd,
+    gameStart,
+    gameEnd,
   } = job.data;
-  const isGameUpload = gameId != null && chapterId != null && chapterStart != null && chapterEnd != null;
+  const isGameUpload = gameId != null && gameStart != null && gameEnd != null;
   const log = createAutoLogger(String(tenantId));
 
   const { config, db } = await getJobContext(tenantId);
@@ -202,14 +201,14 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
       );
     }
 
-    // For game DMCA: trim VOD to chapter range before processing
+    // For game DMCA: trim VOD to game range before processing
     if (isGameUpload) {
-      log.info({ vodId, gameId, chapterStart, chapterEnd }, 'Trimming VOD to game chapter range');
+      log.info({ vodId, gameId, gameStart, gameEnd }, 'Trimming VOD to game range');
 
       const trimmedPath = await ffmpegTrim(
         processedPath,
-        chapterStart,
-        chapterEnd,
+        gameStart,
+        gameEnd,
         path.join(workDir, `${vodId}-game-${gameId}-trimmed`),
         (pct) => {
           currentFfmpegProgress = pct;
@@ -343,8 +342,8 @@ const dmcaProcessor: Processor<DmcaProcessingJob, DmcaProcessingResult> = async 
           dbId,
           vodId,
           filePath: processedPath,
-          chapterStart: chapterStart,
-          chapterEnd: chapterEnd,
+          chapterStart: gameStart,
+          chapterEnd: gameEnd,
           chapterName: gameName,
           title: gameTitle,
           description: gameTitle,

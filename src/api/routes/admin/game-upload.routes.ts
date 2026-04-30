@@ -117,24 +117,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
         log,
       });
 
-      // Find containing chapter for name metadata only
-      const chapter = await db
-        .selectFrom('chapters')
-        .select('name')
-        .where('vod_id', '=', dbId)
-        .where('start', '<=', game.start_time)
-        .where('end', '>=', game.end_time)
-        .executeTakeFirst();
-
-      if (!chapter) {
-        throw new HttpError(
-          404,
-          `No containing chapter found for game ${gameId} (start: ${game.start_time}, end: ${game.end_time})`,
-          'NOT_FOUND'
-        );
-      }
-
-      // Queue game upload using the game's own time range, not the chapter's
+      // Queue game upload using the game's own time range
       const gameJobId = await queueYoutubeGameUploadByGame(
         tenantPlatformCtx,
         dbId,
@@ -149,12 +132,17 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
           gameId: game.game_id ?? undefined,
           title: game.title ?? undefined,
         },
-        chapter.name ?? '',
         jobId ?? undefined
       );
 
       if (gameJobId == null) {
-        throw new Error('Failed to queue game upload job');
+        return {
+          data: {
+            message: 'Game upload skipped (restricted game)',
+            gameId,
+            vodId,
+          },
+        };
       }
 
       if (jobId != null) {
@@ -259,23 +247,6 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
         log,
       });
 
-      // Find containing chapter for metadata
-      const chapter = await db
-        .selectFrom('chapters')
-        .select(['id', 'name'])
-        .where('vod_id', '=', dbId)
-        .where('start', '<=', game.start_time)
-        .where('end', '>=', game.end_time)
-        .executeTakeFirst();
-
-      if (!chapter) {
-        throw new HttpError(
-          404,
-          `No matching chapter found for game ${gameId} (start: ${game.start_time}, end: ${game.end_time})`,
-          'NOT_FOUND'
-        );
-      }
-
       // Parse claims (lenient - no validation)
       const claimsArray: unknown[] = Array.isArray(claims)
         ? claims
@@ -290,9 +261,8 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
         type,
         platform,
         gameId,
-        chapterId: chapter.id,
-        chapterStart: game.start_time,
-        chapterEnd: game.end_time,
+        gameStart: game.start_time,
+        gameEnd: game.end_time,
         downloadJobId: jobId ?? undefined,
         filePath,
       });
@@ -307,7 +277,6 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
             message: 'VOD download queued, DMCA processing will be triggered after completion',
             gameId,
             vodId,
-            chapterId: chapter.id,
             downloadJobId: jobId,
             dmcaJobId,
           },
@@ -319,7 +288,6 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
           message: 'DMCA processing queued',
           gameId,
           vodId,
-          chapterId: chapter.id,
           filePath,
           dmcaJobId,
         },

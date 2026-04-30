@@ -76,32 +76,35 @@ export async function createGameUploadJob(
     throw new Error(`Game "${chapter.name}" is in restricted games list`);
   }
 
-  // Calculate EP number (global count across all VODs)
-  const gameCount = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-    const result = await db
-      .selectFrom('games')
-      .select((eb) => eb.fn.count<number>('id').as('cnt'))
-      .where('game_name', '=', chapter.name)
-      .where('vod_id', '!=', dbId)
-      .executeTakeFirst();
-    return result?.cnt ?? 0;
-  });
-  const epNumber = gameCount + 1;
-
+  // Use provided title/description or generate new ones
   const channelName = getDisplayName(config);
-  const dateFormatted = dayjs(vodRecord.created_at)
-    .tz(config.settings?.timezone ?? 'UTC')
-    .format('MMMM DD YYYY')
-    .toUpperCase();
-
   const vodStreamTitle = vodRecord.title != null && vodRecord.title !== '' ? vodRecord.title.replace(/>|</gi, '') : '';
   const domainName = config.settings?.domainName;
 
-  // Use provided title/description or generate new ones
-  const generatedTitle = `${channelName} plays ${chapter.name} EP ${epNumber} - ${dateFormatted}`;
-  const generatedDescription = `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube?.description}`;
-  const title = options?.title ?? generatedTitle;
-  const description = options?.description ?? generatedDescription;
+  let title: string;
+  let description: string;
+
+  if (options?.title != null) {
+    title = options.title;
+    description = options?.description ?? `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube?.description}`;
+  } else {
+    const gameCount = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+      const result = await db
+        .selectFrom('games')
+        .select((eb) => eb.fn.count<number>('id').as('cnt'))
+        .where('game_name', '=', chapter.name)
+        .where('vod_id', '!=', dbId)
+        .executeTakeFirst();
+      return result?.cnt ?? 0;
+    });
+    const epNumber = gameCount + 1;
+    const dateFormatted = dayjs(vodRecord.created_at)
+      .tz(config.settings?.timezone ?? 'UTC')
+      .format('MMMM DD YYYY')
+      .toUpperCase();
+    title = `${channelName} plays ${chapter.name} EP ${epNumber} - ${dateFormatted}`;
+    description = options?.description ?? `Chat Replay: https://${domainName}/games/${vodId}\nStream Title: ${vodStreamTitle}\n${config.youtube?.description}`;
+  }
 
   return {
     kind: 'game',
@@ -188,7 +191,7 @@ export async function enqueueVodUpload(job: YoutubeVodUploadJob, downloadJobId?:
       const flow = await getFlowProducer().add({
         name: 'youtube_upload',
         queueName: queue.name,
-        data: job,
+        data: { ...job, filePath: undefined },
         opts: {
           jobId,
           deduplication: { id: jobId },
@@ -237,7 +240,7 @@ export async function enqueueGameUpload(job: YoutubeGameUploadJob, downloadJobId
       const flow = await getFlowProducer().add({
         name: 'youtube_upload',
         queueName: queue.name,
-        data: job,
+        data: { ...job, filePath: undefined },
         opts: {
           jobId,
           deduplication: { id: jobId },
@@ -326,13 +329,20 @@ export async function queueYoutubeGameUpload(
 
   if (!chapter) return null;
 
-  const job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, {
-    id: chapter.id,
-    name: chapter.name ?? '',
-    start: chapter.start ?? 0,
-    end: chapter.end ?? 0,
-    gameId: chapter.game_id ?? undefined,
-  });
+  let job: YoutubeGameUploadJob;
+  try {
+    job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, {
+      id: chapter.id,
+      name: chapter.name ?? '',
+      start: chapter.start ?? 0,
+      end: chapter.end ?? 0,
+      gameId: chapter.game_id ?? undefined,
+    });
+  } catch (error) {
+    const details = extractErrorDetails(error);
+    log.warn({ chapterId, tenantId: ctx.tenantId, ...details }, 'Skipping game upload job');
+    return null;
+  }
 
   return enqueueGameUpload(job, downloadJobId);
 }
@@ -347,7 +357,6 @@ export async function queueYoutubeGameUpload(
  * @param filePath - Path to video file
  * @param platform - Source platform
  * @param game - Game record with id, name, start_time, end_time, game_id
- * @param chapterName - Chapter name for metadata/title generation
  * @param downloadJobId - Optional: chains upload to wait for download
  * @returns The job ID if successfully enqueued, null otherwise
  */
@@ -365,26 +374,32 @@ export async function queueYoutubeGameUploadByGame(
     gameId?: string | undefined;
     title?: string | undefined;
   },
-  chapterName: string,
   downloadJobId?: string
 ): Promise<string | null> {
-  const job = await createGameUploadJob(
-    ctx,
-    dbId,
-    vodId,
-    filePath,
-    platform,
-    {
-      id: game.id,
-      name: chapterName,
-      start: game.start,
-      end: game.end,
-      gameId: game.gameId,
-    },
-    {
-      title: game.title,
-    }
-  );
+  let job: YoutubeGameUploadJob;
+  try {
+    job = await createGameUploadJob(
+      ctx,
+      dbId,
+      vodId,
+      filePath,
+      platform,
+      {
+        id: game.id,
+        name: game.name,
+        start: game.start,
+        end: game.end,
+        gameId: game.gameId,
+      },
+      {
+        title: game.title,
+      }
+    );
+  } catch (error) {
+    const details = extractErrorDetails(error);
+    log.warn({ gameId: game.id, tenantId: ctx.tenantId, ...details }, 'Skipping game upload job');
+    return null;
+  }
 
   return enqueueGameUpload(job, downloadJobId);
 }

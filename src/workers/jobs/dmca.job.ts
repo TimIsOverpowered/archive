@@ -17,9 +17,8 @@ export interface QueueDmcaProcessingOptions {
   downloadJobId?: string | undefined;
   filePath?: string | undefined;
   gameId?: number | undefined;
-  chapterId?: number | undefined;
-  chapterStart?: number | undefined;
-  chapterEnd?: number | undefined;
+  gameStart?: number | undefined;
+  gameEnd?: number | undefined;
 }
 
 export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): Promise<string | null> {
@@ -34,9 +33,8 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
     downloadJobId,
     filePath,
     gameId,
-    chapterId,
-    chapterStart,
-    chapterEnd,
+    gameStart,
+    gameEnd,
   } = options;
 
   const isGameUpload = gameId != null;
@@ -52,9 +50,8 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
     ...(part !== undefined && { part }),
     ...(filePath !== undefined && { filePath }),
     ...(gameId != null && { gameId }),
-    ...(chapterId != null && { chapterId }),
-    ...(chapterStart != null && { chapterStart }),
-    ...(chapterEnd != null && { chapterEnd }),
+    ...(gameStart != null && { gameStart }),
+    ...(gameEnd != null && { gameEnd }),
   };
 
   try {
