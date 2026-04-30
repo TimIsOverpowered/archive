@@ -1,12 +1,12 @@
-const axios = require("axios");
-const config = require("../../config/config.json");
-const fs = require("fs");
-const path = require("path");
-const HLS = require("hls-parser");
+const axios = require('axios');
+const config = require('../../config/config.json');
+const fs = require('fs');
+const path = require('path');
+const HLS = require('hls-parser');
 
 module.exports.checkToken = async () => {
   await axios(`https://id.twitch.tv/oauth2/validate`, {
-    method: "GET",
+    method: 'GET',
     headers: {
       Authorization: `Bearer ${config.twitch.auth.access_token}`,
     },
@@ -14,7 +14,7 @@ module.exports.checkToken = async () => {
     .then(() => true)
     .catch(async (e) => {
       if (e.response && e.response.status === 401) {
-        console.info("Twitch App Token Expired");
+        console.info('Twitch App Token Expired');
         await this.refreshToken();
       }
       console.error(e.response ? e.response.data : e);
@@ -24,19 +24,15 @@ module.exports.checkToken = async () => {
 module.exports.refreshToken = async () => {
   await axios
     .post(
-      `https://id.twitch.tv/oauth2/token?client_id=${config.twitch.auth.client_id}&client_secret=${config.twitch.auth.client_secret}&grant_type=client_credentials`
+      `https://id.twitch.tv/oauth2/token?client_id=${config.twitch.auth.client_id}&client_secret=${config.twitch.auth.client_secret}&grant_type=client_credentials`,
     )
     .then((response) => {
       const data = response.data;
       config.twitch.auth.access_token = data.access_token;
-      fs.writeFile(
-        path.resolve(__dirname, "../../config/config.json"),
-        JSON.stringify(config, null, 4),
-        (err) => {
-          if (err) return console.error(err);
-          console.info("Refreshed Twitch App Token");
-        }
-      );
+      fs.writeFile(path.resolve(__dirname, '../../config/config.json'), JSON.stringify(config, null, 4), (err) => {
+        if (err) return console.error(err);
+        console.info('Refreshed Twitch App Token');
+      });
     })
     .catch((e) => {
       console.error(e.response ? e.response.data : e);
@@ -45,29 +41,27 @@ module.exports.refreshToken = async () => {
 
 module.exports.getVodTokenSig = async (vodID) => {
   const data = await axios({
-    url: "https://gql.twitch.tv/gql",
-    method: "POST",
+    url: 'https://gql.twitch.tv/gql',
+    method: 'POST',
     headers: {
-      Accept: "*/*",
-      "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko", //twitch's
-      "Content-Type": "text/plain;charset=UTF-8",
+      Accept: '*/*',
+      'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko', //twitch's
+      'Content-Type': 'text/plain;charset=UTF-8',
     },
     data: {
-      operationName: "PlaybackAccessToken",
+      operationName: 'PlaybackAccessToken',
       variables: {
         isLive: false,
-        login: "",
+        login: '',
         isVod: true,
         vodID: vodID,
-        platform: "web",
-        playerBackend: "mediaplayer",
-        playerType: "site",
+        platform: 'web',
+        playerType: 'site',
       },
       extensions: {
         persistedQuery: {
           version: 1,
-          sha256Hash:
-            "0828119ded1c13477966434e15800ff57ddacf13ba1911c129dc2200705b0712",
+          sha256Hash: 'ed230aa1e33e07eebb8928504583da78a5173989fadfb1ac94be06a04f3cdbe9',
         },
       },
     },
@@ -83,7 +77,7 @@ module.exports.getVodTokenSig = async (vodID) => {
 module.exports.getM3u8 = async (vodId, token, sig) => {
   const data = await axios
     .get(
-      `https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h265,h264&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`
+      `https://usher.ttvnw.net/vod/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h265,h264&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`,
     )
     .then((response) => response.data)
     .catch((e) => {
@@ -119,7 +113,7 @@ module.exports.getLatestVodData = async (userId) => {
     .get(`https://api.twitch.tv/helix/videos?user_id=${userId}`, {
       headers: {
         Authorization: `Bearer ${config.twitch.auth.access_token}`,
-        "Client-Id": config.twitch.auth.client_id,
+        'Client-Id': config.twitch.auth.client_id,
       },
     })
     .then((response) => response.data.data[0])
@@ -136,7 +130,7 @@ module.exports.getVodData = async (vod_id) => {
     .get(`https://api.twitch.tv/helix/videos?id=${vod_id}`, {
       headers: {
         Authorization: `Bearer ${config.twitch.auth.access_token}`,
-        "Client-Id": config.twitch.auth.client_id,
+        'Client-Id': config.twitch.auth.client_id,
       },
     })
     .then((response) => response.data.data[0])
@@ -153,7 +147,7 @@ module.exports.getGameData = async (gameId) => {
     .get(`https://api.twitch.tv/helix/games?id=${gameId}`, {
       headers: {
         Authorization: `Bearer ${config.twitch.auth.access_token}`,
-        "Client-Id": config.twitch.auth.client_id,
+        'Client-Id': config.twitch.auth.client_id,
       },
     })
     .then((response) => response.data.data[0])
@@ -166,15 +160,15 @@ module.exports.getGameData = async (gameId) => {
 
 module.exports.fetchComments = async (vodId, offset = 0) => {
   const data = await axios({
-    url: "https://gql.twitch.tv/gql",
-    method: "POST",
+    url: 'https://gql.twitch.tv/gql',
+    method: 'POST',
     headers: {
-      Accept: "*/*",
-      "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko", //twitch's
-      "Content-Type": "text/plain;charset=UTF-8",
+      Accept: '*/*',
+      'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko', //twitch's
+      'Content-Type': 'text/plain;charset=UTF-8',
     },
     data: {
-      operationName: "VideoCommentsByOffsetOrCursor",
+      operationName: 'VideoCommentsByOffsetOrCursor',
       variables: {
         videoID: vodId,
         contentOffsetSeconds: offset,
@@ -182,8 +176,7 @@ module.exports.fetchComments = async (vodId, offset = 0) => {
       extensions: {
         persistedQuery: {
           version: 1,
-          sha256Hash:
-            "b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a",
+          sha256Hash: 'b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a',
         },
       },
     },
@@ -202,15 +195,15 @@ module.exports.fetchComments = async (vodId, offset = 0) => {
 
 module.exports.fetchNextComments = async (vodId, cursor) => {
   const data = await axios({
-    url: "https://gql.twitch.tv/gql",
-    method: "POST",
+    url: 'https://gql.twitch.tv/gql',
+    method: 'POST',
     headers: {
-      Accept: "*/*",
-      "Client-Id": "kd1unb4b3q4t58fwlpcbzcbnm76a8fp",
-      "Content-Type": "text/plain;charset=UTF-8",
+      Accept: '*/*',
+      'Client-Id': 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
+      'Content-Type': 'text/plain;charset=UTF-8',
     },
     data: {
-      operationName: "VideoCommentsByOffsetOrCursor",
+      operationName: 'VideoCommentsByOffsetOrCursor',
       variables: {
         videoID: vodId,
         cursor: cursor,
@@ -218,8 +211,7 @@ module.exports.fetchNextComments = async (vodId, cursor) => {
       extensions: {
         persistedQuery: {
           version: 1,
-          sha256Hash:
-            "b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a",
+          sha256Hash: 'b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a',
         },
       },
     },
@@ -238,23 +230,22 @@ module.exports.fetchNextComments = async (vodId, cursor) => {
 
 module.exports.getChapters = async (vodID) => {
   const data = await axios({
-    url: "https://gql.twitch.tv/gql",
-    method: "POST",
+    url: 'https://gql.twitch.tv/gql',
+    method: 'POST',
     headers: {
-      Accept: "*/*",
-      "Client-Id": "kd1unb4b3q4t58fwlpcbzcbnm76a8fp",
-      "Content-Type": "text/plain;charset=UTF-8",
+      Accept: '*/*',
+      'Client-Id': 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
+      'Content-Type': 'text/plain;charset=UTF-8',
     },
     data: {
-      operationName: "VideoPreviewCard__VideoMoments",
+      operationName: 'VideoPreviewCard__VideoMoments',
       variables: {
         videoId: vodID,
       },
       extensions: {
         persistedQuery: {
           version: 1,
-          sha256Hash:
-            "7399051b2d46f528d5f0eedf8b0db8d485bb1bb4c0a2c6707be6f1290cdcb31a",
+          sha256Hash: '7399051b2d46f528d5f0eedf8b0db8d485bb1bb4c0a2c6707be6f1290cdcb31a',
         },
       },
     },
@@ -271,28 +262,27 @@ module.exports.getChapters = async (vodID) => {
 
 module.exports.getChapter = async (vodID) => {
   const data = await axios({
-    url: "https://gql.twitch.tv/gql",
-    method: "POST",
+    url: 'https://gql.twitch.tv/gql',
+    method: 'POST',
     headers: {
-      Accept: "*/*",
-      "Client-Id": "kimne78kx3ncx6brgo4mv6wki5h1ko", //twitch's
-      "Content-Type": "text/plain;charset=UTF-8",
+      Accept: '*/*',
+      'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko', //twitch's
+      'Content-Type': 'text/plain;charset=UTF-8',
     },
     data: {
-      operationName: "NielsenContentMetadata",
+      operationName: 'NielsenContentMetadata',
       variables: {
         isCollectionContent: false,
         isLiveContent: false,
         isVODContent: true,
-        collectionID: "",
-        login: "",
+        collectionID: '',
+        login: '',
         vodID: vodID,
       },
       extensions: {
         persistedQuery: {
           version: 1,
-          sha256Hash:
-            "2dbf505ee929438369e68e72319d1106bb3c142e295332fac157c90638968586",
+          sha256Hash: '2dbf505ee929438369e68e72319d1106bb3c142e295332fac157c90638968586',
         },
       },
     },
@@ -311,7 +301,7 @@ module.exports.getStream = async (twitchId) => {
     .get(`https://api.twitch.tv/helix/streams?user_id=${twitchId}`, {
       headers: {
         Authorization: `Bearer ${config.twitch.auth.access_token}`,
-        "Client-Id": config.twitch.auth.client_id,
+        'Client-Id': config.twitch.auth.client_id,
       },
     })
     .then((response) => response.data.data)
@@ -325,15 +315,12 @@ module.exports.getStream = async (twitchId) => {
 module.exports.getChannelBadges = async () => {
   await this.checkToken();
   const badges = await axios
-    .get(
-      `https://api.twitch.tv/helix/chat/badges?broadcaster_id=${config.twitch.id}`,
-      {
-        headers: {
-          Authorization: `Bearer ${config.twitch.auth.access_token}`,
-          "Client-Id": config.twitch.auth.client_id,
-        },
-      }
-    )
+    .get(`https://api.twitch.tv/helix/chat/badges?broadcaster_id=${config.twitch.id}`, {
+      headers: {
+        Authorization: `Bearer ${config.twitch.auth.access_token}`,
+        'Client-Id': config.twitch.auth.client_id,
+      },
+    })
     .then((response) => response.data.data)
     .catch((e) => {
       console.error(e.response ? e.response.data : e);
@@ -348,7 +335,7 @@ module.exports.getGlobalBadges = async () => {
     .get(`https://api.twitch.tv/helix/chat/badges/global`, {
       headers: {
         Authorization: `Bearer ${config.twitch.auth.access_token}`,
-        "Client-Id": config.twitch.auth.client_id,
+        'Client-Id': config.twitch.auth.client_id,
       },
     })
     .then((response) => response.data.data)
@@ -362,7 +349,7 @@ module.exports.getGlobalBadges = async () => {
 module.exports.badges = function (app) {
   const _this = this;
   return async function (req, res, next) {
-    const redisClient = app.get("redisClient");
+    const redisClient = app.get('redisClient');
     const key = `${config.channel}-badges`;
     const cachedBadges = await redisClient
       .get(key)
@@ -379,7 +366,7 @@ module.exports.badges = function (app) {
     if (!badges)
       return res.status(500).json({
         error: true,
-        msg: "Something went wrong trying to retrieve channel badges..",
+        msg: 'Something went wrong trying to retrieve channel badges..',
       });
 
     res.json(badges);
