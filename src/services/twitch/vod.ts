@@ -46,17 +46,16 @@ export async function getVodTokenSig(vodId: string, tenantId?: string): Promise<
     operationName: 'PlaybackAccessToken',
     variables: {
       isLive: false,
-      login: '',
       isVod: true,
-      vodID: vodId,
+      login: '',
       platform: 'web',
-      playerBackend: 'mediaplayer',
       playerType: 'site',
+      vodID: vodId,
     },
     extensions: {
       persistedQuery: {
         version: 1,
-        sha256Hash: '0828119ded1c13477966434e15800ff57ddacf13ba1911c129dc2200705b0712',
+        sha256Hash: 'ed230aa1e33e07eebb8928504583da78a5173989fadfb1ac94be06a04f3cdbe9',
       },
     },
   });

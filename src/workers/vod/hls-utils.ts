@@ -166,7 +166,7 @@ export async function fetchTwitchPlaylist(
     throw new Error('Failed to parse Twitch master playlist');
   }
 
-  const bestVariantUrl = (parsedMaster as HLS.types.MasterPlaylist).variants?.[0]?.uri ?? parsedMaster.uri;
+  const bestVariantUrl = (parsedMaster as HLS.types.MasterPlaylist).variants?.[0]?.uri;
 
   if (bestVariantUrl == null || bestVariantUrl === '') {
     log.error({ vodId }, 'No variant URL found in master playlist');
@@ -176,18 +176,8 @@ export async function fetchTwitchPlaylist(
   let baseURL: string = '';
   let variantM3u8String: string = '';
 
-  if (!bestVariantUrl.startsWith('http')) {
-    baseURL = masterPlaylistContent.substring(0, masterPlaylistContent.lastIndexOf('/'));
-
-    variantM3u8String = await request(bestVariantUrl.includes('/') ? bestVariantUrl : `${baseURL}/${bestVariantUrl}`, {
-      responseType: 'text',
-      retryOptions,
-    });
-  } else {
-    baseURL = bestVariantUrl.substring(0, bestVariantUrl.lastIndexOf('/'));
-
-    variantM3u8String = await request(bestVariantUrl, { responseType: 'text', retryOptions });
-  }
+  baseURL = bestVariantUrl.substring(0, bestVariantUrl.lastIndexOf('/'));
+  variantM3u8String = await request(bestVariantUrl, { responseType: 'text', retryOptions });
 
   return { variantM3u8String, baseURL };
 }

@@ -10,7 +10,7 @@ import {
 } from '../constants.js';
 import { HttpError } from './http-error.js';
 import { DownloadAbortedError } from './domain-errors.js';
-import { Agent, type RequestInit as UndiciRequestInit, type BodyInit as UndiciBodyInit } from 'undici';
+import { Agent, request as undiciRequest, type BodyInit as UndiciBodyInit } from 'undici';
 
 /** Supported HTTP response types for request/safeRequest functions. */
 export type ResponseType = 'json' | 'text' | 'blob' | 'arrayBuffer' | 'response';
@@ -157,36 +157,40 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
         if (options?.signal) signals.push(options.signal);
         const combinedSignal = AbortSignal.any(signals);
 
-        const fetchInit: UndiciRequestInit & { dispatcher?: Agent } = {
+        const undiciOpts: Record<string, unknown> = {
           method,
           headers: finalHeaders,
-          ...(preparedBody !== undefined && { body: preparedBody as UndiciBodyInit }),
           signal: combinedSignal,
-          ...(dispatcher !== undefined && { dispatcher }),
         };
+        if (preparedBody !== undefined) {
+          undiciOpts.body = preparedBody as UndiciBodyInit;
+        }
+        if (dispatcher !== undefined) {
+          undiciOpts.dispatcher = dispatcher;
+        }
 
-        const response = await globalThis.fetch(urlStr, fetchInit as RequestInit);
+        const response = await undiciRequest(urlStr, undiciOpts as Record<string, unknown>);
 
-        if (!response.ok) {
-          throw new HttpError(response.status, `HTTP ${response.status}: ${response.statusText}`);
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          throw new HttpError(response.statusCode, `HTTP ${response.statusCode}: ${(response as unknown as Record<string, unknown>).statusMessage as string ?? ''}`);
         }
 
         let parsedData: unknown;
         switch (actualResponseType) {
           case 'json':
-            parsedData = await response.json();
+            parsedData = await response.body.json();
             break;
           case 'text':
-            parsedData = await response.text();
+            parsedData = await response.body.text();
             break;
           case 'blob':
-            parsedData = await response.blob();
+            parsedData = new Blob([await response.body.arrayBuffer()]);
             break;
           case 'arrayBuffer':
-            parsedData = await response.arrayBuffer();
+            parsedData = await response.body.arrayBuffer();
             break;
           case 'response':
-            return response as RequestResult<T, R>;
+            return response as unknown as RequestResult<T, R>;
         }
 
         return parsedData as RequestResult<T, R>;
