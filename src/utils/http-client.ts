@@ -137,10 +137,10 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
   const shouldRetry = (error: unknown): boolean => {
     if (error instanceof HttpError) {
       const { statusCode } = error;
-      if (statusCode === 429 || statusCode === 408 || (statusCode >= 500 && statusCode < 600)) {
-        return true;
+      if (statusCode === 400 || statusCode === 401 || statusCode === 403 || statusCode === 404) {
+        return false;
       }
-      return false;
+      return true;
     }
 
     if (error instanceof Error && error.name === 'AbortError') {

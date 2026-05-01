@@ -91,7 +91,7 @@ export class CycleTLSSession {
       const captured = match?.[1];
       if (captured == null || captured === '') return false;
       const status = parseInt(captured, 10);
-      return status === 0 || status === 429 || status === 408 || (status >= 500 && status < 600);
+      return status !== 400 && status !== 401 && status !== 403 && status !== 404;
     };
   }
 

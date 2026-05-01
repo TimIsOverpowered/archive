@@ -12,13 +12,31 @@ import { request, segmentDownloadAgent } from '../../utils/http-client.js';
 import { PLATFORMS } from '../../types/platforms.js';
 import type { RetryOptions } from '../../utils/retry.js';
 
-export type DownloadStrategy = { type: 'fetch'; signal?: AbortSignal } | { type: 'cycletls'; session: CycleTLSSession };
+export type DownloadStrategy =
+  | { type: 'fetch'; signal?: AbortSignal; abort: () => void }
+  | { type: 'cycletls'; session: CycleTLSSession; abort: () => void };
 
 export function resolveDownloadStrategy(
   platform: typeof PLATFORMS.KICK | typeof PLATFORMS.TWITCH,
   cycleTLS: CycleTLSSession | null
 ): DownloadStrategy {
-  return platform === PLATFORMS.KICK && cycleTLS ? { type: 'cycletls', session: cycleTLS } : { type: 'fetch' };
+  if (platform === PLATFORMS.KICK && cycleTLS) {
+    return {
+      type: 'cycletls',
+      session: cycleTLS,
+      abort: () => {
+        cycleTLS.close();
+      },
+    };
+  }
+  const controller = new AbortController();
+  return {
+    type: 'fetch',
+    signal: controller.signal,
+    abort: () => {
+      controller.abort();
+    },
+  };
 }
 
 export interface FetchPlaylistResult {
@@ -30,6 +48,7 @@ export interface FetchPlaylistResult {
  * Download segments in parallel using p-limit for concurrency control
  * Universal function - works with both .ts and .mp4 (fMP4) segments
  * Supports both fetch (Twitch) and CycleTLS (Kick) download strategies
+ * Uses Promise.allSettled with abort-on-first-failure to stop in-flight downloads
  */
 export async function downloadSegmentsParallel(
   segments: { uri: string }[],
@@ -50,9 +69,18 @@ export async function downloadSegmentsParallel(
     `Starting parallel segment download`
   );
 
-  const isAborted = () => (strategy.type === 'fetch' ? strategy.signal?.aborted : strategy.session.closed);
+  const abortRef = {
+    aborted: false,
+    trigger: () => {
+      abortRef.aborted = true;
+      strategy.abort();
+    },
+  };
 
-  await Promise.all(
+  const isAborted = () =>
+    abortRef.aborted || (strategy.type === 'fetch' ? strategy.signal?.aborted : strategy.session.closed);
+
+  const results = await Promise.allSettled(
     segments.map(async (segment) => {
       if (isAborted() === true) {
         return;
@@ -110,12 +138,19 @@ export async function downloadSegmentsParallel(
         } catch {}
 
         log.debug({ uri: segment.uri, error: lastError.message }, `Failed to download segment`);
+        abortRef.trigger();
         throw lastError;
       }
     })
   );
 
-  if (isAborted() !== true) {
+  const firstRejected = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+  if (firstRejected) {
+    const err = firstRejected.reason instanceof Error ? firstRejected.reason : new Error(String(firstRejected.reason));
+    throw err;
+  }
+
+  if (abortRef.aborted !== true) {
     log.debug({ total: totalSegments }, `All segments downloaded successfully`);
     if (onBatchComplete) {
       onBatchComplete(completedCount, totalSegments);
