@@ -41,7 +41,7 @@ export function buildYoutubeMetadata(options: YoutubeMetadataOptions): YoutubeMe
   const isGameUpload = gameName != null && gameName !== '';
 
   let title: string;
-  const resolvedReplayPath = replayPath ?? (isGameUpload ? `/games/${vodRecord.id}` : `/vods/${vodRecord.id}`);
+  const resolvedReplayPath = replayPath ?? (isGameUpload ? `/games/${vodRecord.id}` : `/youtube/${vodRecord.id}`);
 
   if (isGameUpload) {
     if (epNumber != null) {
