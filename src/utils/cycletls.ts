@@ -1,4 +1,4 @@
-import cycletls, { CycleTLSRequestOptions } from 'cycletls';
+import cycletls from 'cycletls';
 import fs from 'fs';
 import { pipeline } from 'node:stream/promises';
 import { getLogger } from './logger.js';
@@ -43,12 +43,6 @@ const BROWSER_PROFILES: [BrowserProfile, ...BrowserProfile[]] = [
 
 const DEFAULT_PROFILE = BROWSER_PROFILES[0];
 
-function pickFingerprint(): BrowserProfile {
-  const idx = Math.floor(Math.random() * BROWSER_PROFILES.length);
-  const profile = BROWSER_PROFILES[idx];
-  return profile ?? DEFAULT_PROFILE;
-}
-
 let cycleTLSInstance: CycleTLSClient | null = null;
 let initPromise: Promise<CycleTLSClient> | null = null;
 
@@ -89,10 +83,8 @@ async function getCycleTLS(): Promise<CycleTLSClient> {
  */
 export class CycleTLSSession {
   private _closed: boolean = false;
-  private _profile: BrowserProfile;
 
   constructor() {
-    this._profile = pickFingerprint();
     this.shouldRetryFn = (error) => {
       const msg = error instanceof Error ? error.message : String(error);
       const match = msg.match(/status\s+(\d+)/);
@@ -105,6 +97,11 @@ export class CycleTLSSession {
 
   get closed(): boolean {
     return this._closed;
+  }
+
+  private getProfile(): BrowserProfile {
+    const idx = Math.floor(Math.random() * BROWSER_PROFILES.length);
+    return BROWSER_PROFILES[idx] ?? DEFAULT_PROFILE;
   }
 
   private readonly shouldRetryFn: (error: unknown) => boolean;
@@ -133,13 +130,13 @@ export class CycleTLSSession {
     getLogger().debug({ url }, 'CycleTLS fetching text');
 
     const fn = async (): Promise<string> => {
+      const profile = this.getProfile();
       const response = await client.get(url, {
-        ja3: this._profile.ja3,
-        userAgent: this._profile.userAgent,
-        http2Fingerprint: this._profile.http2Fingerprint,
+        ja3: profile.ja3,
+        userAgent: profile.userAgent,
+        http2Fingerprint: profile.http2Fingerprint,
         responseType: 'text',
-        enableConnectionReuse: true, // missing from type defs
-      } as CycleTLSRequestOptions);
+      });
 
       if (response.status < 200 || response.status >= 300) {
         throw new Error(`CycleTLS request failed with status ${response.status}`);
@@ -164,13 +161,13 @@ export class CycleTLSSession {
     getLogger().debug({ url, outputPath }, 'CycleTLS streaming to file');
 
     const fn = async (): Promise<void> => {
+      const profile = this.getProfile();
       const response = await client.get(url, {
-        ja3: this._profile.ja3,
-        userAgent: this._profile.userAgent,
-        http2Fingerprint: this._profile.http2Fingerprint,
+        ja3: profile.ja3,
+        userAgent: profile.userAgent,
+        http2Fingerprint: profile.http2Fingerprint,
         responseType: 'stream',
-        enableConnectionReuse: true, // missing from type defs
-      } as CycleTLSRequestOptions);
+      });
 
       if (response.status < 200 || response.status >= 300) {
         throw new Error(`CycleTLS request failed with status ${response.status}`);
