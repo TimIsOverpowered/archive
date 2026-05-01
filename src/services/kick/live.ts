@@ -2,21 +2,6 @@ import { fetchUrl } from '../../utils/flaresolverr-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
 import { KICK_LIVE_API_TIMEOUT_MS } from '../../constants.js';
-import { LRUCache } from 'lru-cache';
-
-const kickStreamCache = new LRUCache<string, KickStreamStatus>({
-  max: 100,
-  ttl: 30_000,
-  allowStale: true,
-});
-
-function _cacheKickStream(username: string, status: KickStreamStatus | null): void {
-  if (status === null) {
-    kickStreamCache.set(username, { id: '__offline__', session_title: null, created_at: '' });
-    return;
-  }
-  kickStreamCache.set(username, status);
-}
 
 interface KickApiResponse {
   data?: Record<string, unknown>;
@@ -50,11 +35,6 @@ export interface KickStreamStatus {
 }
 
 export async function getKickStreamStatus(username: string): Promise<KickStreamStatus | null> {
-  const cached = kickStreamCache.get(username);
-  if (cached !== undefined) {
-    return cached;
-  }
-
   try {
     const apiUrl = `https://kick.com/api/v2/channels/${username}/livestream`;
 
@@ -66,8 +46,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
     });
 
     if (!result.success) {
-      getLogger().warn({ username }, 'Failed to reach Kick API endpoint');
-      _cacheKickStream(username, null);
+      getLogger().warn({ username, code: result.code, error: result.error }, 'Failed to reach Kick API endpoint');
       return null;
     }
 
@@ -75,13 +54,11 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
 
     if (response == null) {
       getLogger().debug({ username }, 'Kick channel is offline (no livestream data)');
-      _cacheKickStream(username, null);
       return null;
     }
 
     if ('error' in response && typeof response.error === 'string') {
       getLogger().warn({ username, error: response.error }, 'Kick API request blocked or errored');
-      _cacheKickStream(username, null);
       return null;
     }
 
@@ -89,7 +66,6 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
 
     if (!data || typeof data !== 'object') {
       getLogger().debug({ username }, 'Kick channel is offline (no livestream data object)');
-      _cacheKickStream(username, null);
       return null;
     }
 
@@ -100,7 +76,6 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
         { username, availableKeys: Object.keys(data), idField: data.id },
         `Channel ${username} is offline (no livestream id in data)`
       );
-      _cacheKickStream(username, null);
       return null;
     }
 
@@ -150,7 +125,6 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
       'Kick live stream detected'
     );
 
-    _cacheKickStream(username, streamData);
     return streamData;
   } catch (error) {
     const details = extractErrorDetails(error);
@@ -174,7 +148,10 @@ export async function getLatestKickVodObject(
     });
 
     if (!result.success) {
-      getLogger().warn({ username }, 'Failed to reach Kick videos API endpoint');
+      getLogger().warn(
+        { username, code: result.code, error: result.error },
+        'Failed to reach Kick videos API endpoint'
+      );
       return null;
     }
 

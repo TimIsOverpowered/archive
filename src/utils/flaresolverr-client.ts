@@ -1,3 +1,4 @@
+import * as cheerio from 'cheerio';
 import { extractErrorDetails } from './error.js';
 import { childLogger } from './logger.js';
 import { getBaseConfig } from '../config/env.js';
@@ -34,15 +35,16 @@ export interface FetchUrlOptions {
 }
 
 interface FlareSolverrResponse {
-  solution: {
+  status: string;
+  message?: string;
+  error?: string;
+  solution?: {
     status: number;
     headers?: Record<string, string>;
     cookies: Array<{ name: string; value: string; domain?: string; path?: string }>;
     response: string;
     userCurrentUrl?: string;
   };
-  error?: string;
-  message?: string;
 }
 
 async function fetchFromFlareSolverr(
@@ -66,11 +68,15 @@ async function fetchFromFlareSolverr(
 
   const body = (await response.json()) as unknown as FlareSolverrResponse;
 
-  if (body.error != null || body.message != null) {
-    throw new Error(body.error ?? body.message);
+  if (body.status === 'error' || body.error != null) {
+    throw new Error(body.error ?? body.message ?? 'Unknown FlareSolverr error');
   }
 
   const solution = body.solution;
+  if (!solution) {
+    throw new Error(body.message ?? 'Missing FlareSolverr solution');
+  }
+
   const status = solution.status;
 
   if (status >= 400) {
@@ -83,13 +89,13 @@ async function fetchFromFlareSolverr(
   try {
     data = JSON.parse(content);
   } catch {
-    if (content.startsWith('{') || content.startsWith('[')) {
-      try {
-        data = JSON.parse(content);
-      } catch {
-        throw new Error('Failed to parse response as JSON');
-      }
-    } else {
+    const $ = cheerio.load(content);
+    const cleanText = $('pre').text() !== '' ? $('pre').text() : $('body').text() !== '' ? $('body').text() : '';
+
+    // Add a nested try/catch here
+    try {
+      data = JSON.parse(cleanText);
+    } catch {
       throw new Error('Response is not valid JSON (possible CAPTCHA)');
     }
   }
@@ -113,7 +119,15 @@ export async function fetchUrl<T = unknown>(url: string, options?: FetchUrlOptio
     const details = extractErrorDetails(error);
     const message = details.message.toLowerCase();
 
-    if (message.includes('json') || message.includes('captcha')) {
+    if (message.includes('timeout')) {
+      return { success: false, error: details.message, code: 'NAVIGATION_TIMEOUT' };
+    }
+
+    if (message.includes('captcha')) {
+      return { success: false, error: details.message, code: 'CAPTCHA_DETECTED' };
+    }
+
+    if (message.includes('json')) {
       return { success: false, error: details.message, code: 'INVALID_JSON_RESPONSE' };
     }
 
