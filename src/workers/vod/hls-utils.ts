@@ -10,6 +10,7 @@ import { fileExists } from '../../utils/path.js';
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch/index.js';
 import { request, segmentDownloadAgent } from '../../utils/http-client.js';
 import { PLATFORMS } from '../../types/platforms.js';
+import type { RetryOptions } from '../../utils/retry.js';
 
 export type DownloadStrategy = { type: 'fetch'; signal?: AbortSignal } | { type: 'cycletls'; session: CycleTLSSession };
 
@@ -185,7 +186,8 @@ export async function fetchKickPlaylist(
   vodId: string,
   sourceUrl: string | undefined,
   log: AppLogger,
-  session?: CycleTLSSession
+  session?: CycleTLSSession,
+  retryOptions?: { attempts?: number; maxDelayMs?: number; shouldRetry?: RetryOptions['shouldRetry'] }
 ): Promise<FetchPlaylistResult> {
   const fetchUrl = sourceUrl;
 
@@ -201,13 +203,22 @@ export async function fetchKickPlaylist(
   try {
     if (fetchUrl.includes('master.m3u8')) {
       const baseEndpoint = fetchUrl.substring(0, fetchUrl.lastIndexOf('/'));
-      baseURL = `${baseEndpoint}/1080p60`;
 
-      const variantM3u8String = await tempSession.fetchText(`${baseURL}/playlist.m3u8`);
+      const masterContent = await tempSession.fetchText(fetchUrl, retryOptions);
+      const parsedMaster = HLS.parse(masterContent) as HLS.types.MasterPlaylist;
+      const bestVariant = parsedMaster.variants?.[0];
+      if (!bestVariant) {
+        log.error({ vodId }, 'No variants found in Kick master playlist');
+        throw new Error('No variants found in Kick master playlist');
+      }
+
+      const variantUrl = `${baseEndpoint}/${bestVariant.uri}`;
+      baseURL = variantUrl.substring(0, variantUrl.lastIndexOf('/'));
+      const variantM3u8String = await tempSession.fetchText(variantUrl, retryOptions);
 
       return { variantM3u8String, baseURL };
     } else {
-      const response = await tempSession.fetchText(fetchUrl);
+      const response = await tempSession.fetchText(fetchUrl, retryOptions);
 
       baseURL = fetchUrl.substring(0, fetchUrl.lastIndexOf('/'));
 

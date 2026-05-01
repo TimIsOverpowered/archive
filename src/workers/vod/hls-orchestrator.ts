@@ -365,5 +365,5 @@ async function fetchPlaylist(
   if (ctx.platform === PLATFORMS.TWITCH) {
     return fetchTwitchPlaylist(ctx.vodId, ctx.log, tenantId, retryOptions);
   }
-  return fetchKickPlaylist(ctx.vodId, ctx.sourceUrl, ctx.log, ctx.cycleTLS ?? undefined);
+  return fetchKickPlaylist(ctx.vodId, ctx.sourceUrl, ctx.log, ctx.cycleTLS ?? undefined, retryOptions);
 }

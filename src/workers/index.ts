@@ -15,6 +15,7 @@ import { VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY, SHUTDOWN_TIMEOUT_MS } from '../
 import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/streamer-client.js';
 import { registerPlatformStrategies } from '../services/platforms/index.js';
 import { closeMetaClient } from '../db/meta-client.js';
+import { initCycleTLS, closeCycleTLS } from '../utils/cycletls.js';
 
 process.on('unhandledRejection', (reason) => {
   getLogger().error({ error: extractErrorDetails(reason) }, 'Unhandled promise rejection');
@@ -70,6 +71,8 @@ export async function bootstrap() {
     startClientCleanup();
     getLogger().info('DB client cleanup started');
 
+    await initCycleTLS();
+
     getLogger().info('All workers started successfully');
   } catch (error) {
     getLogger().error(extractErrorDetails(error), 'Failed to start workers');
@@ -95,6 +98,8 @@ function registerShutdownHandlers() {
       }
 
       await closeQueues();
+
+      await closeCycleTLS();
 
       stopClientCleanup();
       await closeAllClients();

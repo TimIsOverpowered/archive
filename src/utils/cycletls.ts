@@ -1,4 +1,4 @@
-import initCycleTLS, { CycleTLSRequestOptions } from 'cycletls';
+import cycletls, { CycleTLSRequestOptions } from 'cycletls';
 import fs from 'fs';
 import { pipeline } from 'node:stream/promises';
 import { getLogger } from './logger.js';
@@ -8,7 +8,7 @@ import type { RetryOptions } from './retry.js';
 import { retryWithBackoff } from './retry.js';
 import { HTTP_DEFAULT_BASE_DELAY_MS, HTTP_DEFAULT_MAX_DELAY_MS } from '../constants.js';
 
-type CycleTLSClient = Awaited<ReturnType<typeof initCycleTLS>>;
+type CycleTLSClient = Awaited<ReturnType<typeof cycletls>>;
 
 interface BrowserProfile {
   ja3: string;
@@ -60,9 +60,7 @@ async function getCycleTLS(): Promise<CycleTLSClient> {
 
   initPromise ??= (async () => {
     try {
-      getLogger().debug('Initializing CycleTLS with Firefox fingerprint');
-
-      const instance = await initCycleTLS({
+      const instance = await cycletls({
         debug: getBaseConfig().NODE_ENV === 'development',
         timeout: 30000,
       });
@@ -101,7 +99,7 @@ export class CycleTLSSession {
       const captured = match?.[1];
       if (captured == null || captured === '') return false;
       const status = parseInt(captured, 10);
-      return status === 429 || status === 408 || (status >= 500 && status < 600);
+      return status === 0 || status === 429 || status === 408 || (status >= 500 && status < 600);
     };
   }
 
@@ -112,12 +110,12 @@ export class CycleTLSSession {
   private readonly shouldRetryFn: (error: unknown) => boolean;
 
   private resolveRetryOpts(opts: {
-    attempts: number;
+    attempts?: number;
     maxDelayMs?: number;
     shouldRetry?: RetryOptions['shouldRetry'];
   }): RetryOptions {
     return {
-      attempts: opts.attempts,
+      attempts: opts.attempts ?? 1,
       baseDelayMs: HTTP_DEFAULT_BASE_DELAY_MS,
       maxDelayMs: opts.maxDelayMs ?? HTTP_DEFAULT_MAX_DELAY_MS,
       shouldRetry: opts.shouldRetry ?? this.shouldRetryFn,
@@ -126,7 +124,7 @@ export class CycleTLSSession {
 
   async fetchText(
     url: string,
-    retryOpts?: { attempts: number; maxDelayMs?: number; shouldRetry?: RetryOptions['shouldRetry'] }
+    retryOpts?: { attempts?: number; maxDelayMs?: number; shouldRetry?: RetryOptions['shouldRetry'] }
   ): Promise<string> {
     if (this.closed) throw new Error('Session is closed');
 
@@ -140,8 +138,8 @@ export class CycleTLSSession {
         userAgent: this._profile.userAgent,
         http2Fingerprint: this._profile.http2Fingerprint,
         responseType: 'text',
-        enableConnectionReuse: true, // missing from CycleTLSRequestOptions
-      } as unknown as CycleTLSRequestOptions);
+        enableConnectionReuse: true, // missing from type defs
+      } as CycleTLSRequestOptions);
 
       if (response.status < 200 || response.status >= 300) {
         throw new Error(`CycleTLS request failed with status ${response.status}`);
@@ -150,14 +148,14 @@ export class CycleTLSSession {
       return response.data as string;
     };
 
-    if (!retryOpts) return fn();
+    if (!retryOpts || retryOpts.attempts == null) return fn();
     return retryWithBackoff(fn, this.resolveRetryOpts(retryOpts));
   }
 
   async streamToFile(
     url: string,
     outputPath: string,
-    retryOpts?: { attempts: number; maxDelayMs?: number; shouldRetry?: RetryOptions['shouldRetry'] }
+    retryOpts?: { attempts?: number; maxDelayMs?: number; shouldRetry?: RetryOptions['shouldRetry'] }
   ): Promise<void> {
     if (this.closed) throw new Error('Session is closed');
 
@@ -171,8 +169,8 @@ export class CycleTLSSession {
         userAgent: this._profile.userAgent,
         http2Fingerprint: this._profile.http2Fingerprint,
         responseType: 'stream',
-        enableConnectionReuse: true, // missing from CycleTLSRequestOptions
-      } as unknown as CycleTLSRequestOptions);
+        enableConnectionReuse: true, // missing from type defs
+      } as CycleTLSRequestOptions);
 
       if (response.status < 200 || response.status >= 300) {
         throw new Error(`CycleTLS request failed with status ${response.status}`);
@@ -193,7 +191,7 @@ export class CycleTLSSession {
       }
     };
 
-    if (!retryOpts) return fn();
+    if (!retryOpts || retryOpts.attempts == null) return fn();
     return retryWithBackoff(fn, this.resolveRetryOpts(retryOpts));
   }
 
@@ -211,6 +209,14 @@ export class CycleTLSSession {
 export function createSession(): CycleTLSSession {
   getLogger().debug('CycleTLS session created');
   return new CycleTLSSession();
+}
+
+/**
+ * Eagerly initialize CycleTLS at startup so the Go binary is ready before first request.
+ */
+export async function initCycleTLS(): Promise<void> {
+  await getCycleTLS();
+  getLogger().info('CycleTLS initialized');
 }
 
 /**
