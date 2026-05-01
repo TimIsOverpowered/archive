@@ -87,7 +87,9 @@ export async function downloadSegmentsParallel(
             const writer = fs.createWriteStream(tempPath);
             await pipeline(response.body, writer);
           } else {
-            await strategy.session.streamToFile(`${baseURL}/${segment.uri}`, tempPath);
+            await strategy.session.streamToFile(`${baseURL}/${segment.uri}`, tempPath, {
+              attempts: retryAttempts,
+            });
           }
         });
 
