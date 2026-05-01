@@ -12,6 +12,7 @@ import { DOWNLOAD_METHODS, PLATFORMS, type DownloadMethod, type Platform } from 
 import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { getDisplayName } from '../config/types.js';
 import { PlatformNotConfiguredError } from '../utils/domain-errors.js';
+import { getVod } from '../services/kick/vod.js';
 import type { TenantConfig } from '../config/types.js';
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../db/streamer-types.js';
@@ -98,7 +99,20 @@ export async function runVodDownload(ctx: VodProcessorContext): Promise<void> {
     }
 
     if (ctx.platform === PLATFORMS.KICK && ctx.sourceUrl == null) {
-      throw new Error('Kick source URL not available for VOD');
+      const username = ctx.platformUsername;
+      if (username == null) {
+        throw new Error('Kick source URL not available for VOD: platformUsername is missing');
+      }
+      try {
+        const vodData = await getVod(username, ctx.vodId);
+        ctx.sourceUrl = vodData.source ?? undefined;
+      } catch (err) {
+        ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Failed to fetch Kick VOD source URL');
+      }
+      if (ctx.sourceUrl == null) {
+        throw new Error('Kick source URL not available for VOD');
+      }
+      ctx.log.info({ vodId: ctx.vodId }, 'Fetched Kick source URL from API');
     }
 
     await downloadHlsStream({
