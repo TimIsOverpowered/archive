@@ -103,7 +103,7 @@ describe('buildYoutubeMetadata', () => {
 
   it('should use vodRecord id in replay path', () => {
     const result = buildYoutubeMetadata(baseOptions);
-    assert.ok(result.description.includes('/vods/42'));
+    assert.ok(result.description.includes('/youtube/42'));
   });
 
   it('should handle different timezone formatting', () => {
