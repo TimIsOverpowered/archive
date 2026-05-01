@@ -270,8 +270,7 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
     throw new Error('File path is required for VOD upload');
   }
 
-  const title = vodRecord.title?.replace(/>|</gi, '') ?? '';
-  const { description: youtubeDescription } = buildYoutubeMetadata({
+  const { title, description: youtubeDescription } = buildYoutubeMetadata({
     channelName,
     platform: platformName,
     vodRecord,
