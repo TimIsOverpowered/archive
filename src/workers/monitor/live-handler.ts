@@ -246,6 +246,14 @@ async function handleExistingVodBecameLive(ctx: ExistingVodLiveContext): Promise
 
   ctx.log.info({ vodId: ctx.existingVod.vod_id }, '[Monitor]: Queuing HLS download');
 
+  const vodMetadata = ctx.strategy.fetchVodObjectForLiveStream
+    ? await ctx.strategy.fetchVodObjectForLiveStream(ctx.streamStatus.id, {
+        tenantId: ctx.tenantId,
+        config: ctx.config,
+        platform: ctx.platform,
+      })
+    : null;
+
   await enqueueLiveHlsDownload({
     dbId: ctx.existingVod.id,
     vodId: ctx.existingVod.vod_id,
@@ -254,11 +262,20 @@ async function handleExistingVodBecameLive(ctx: ExistingVodLiveContext): Promise
     platformUserId: ctx.platformUserId,
     platformUsername: ctx.platformUsername,
     startedAt: new Date(ctx.streamStatus.startedAt),
+    sourceUrl: vodMetadata?.sourceUrl ?? undefined,
   });
 }
 
 async function handleAlreadyLiveStream(ctx: AlreadyLiveContext): Promise<void> {
   ctx.log.debug({ component: 'monitor', vodId: ctx.existingVod.vod_id }, 'VOD is live, ensuring download queued');
+
+  const vodMetadata = ctx.strategy.fetchVodObjectForLiveStream
+    ? await ctx.strategy.fetchVodObjectForLiveStream(ctx.streamStatus.id, {
+        tenantId: ctx.tenantId,
+        config: ctx.config,
+        platform: ctx.platform,
+      })
+    : null;
 
   await enqueueLiveHlsDownload({
     dbId: ctx.existingVod.id,
@@ -268,6 +285,7 @@ async function handleAlreadyLiveStream(ctx: AlreadyLiveContext): Promise<void> {
     platformUserId: ctx.platformUserId,
     platformUsername: ctx.platformUsername,
     startedAt: ctx.existingVod.started_at ?? new Date(ctx.streamStatus.startedAt),
+    sourceUrl: vodMetadata?.sourceUrl ?? undefined,
     skipValidation: true,
   });
 }
