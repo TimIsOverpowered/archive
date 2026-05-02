@@ -152,7 +152,6 @@ async function main(): Promise<void> {
     // Phase 5: Update Meta DB (preserve existing config)
     console.log(`Storing in meta database for tenant "${tenantId}"...\n`);
 
-     
     let updatedTwitchConfig: any;
 
     if (tenant.twitch) {

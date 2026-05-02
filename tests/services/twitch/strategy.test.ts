@@ -3,7 +3,6 @@ import { describe, it } from 'node:test';
 import { strategy } from '../../../src/services/twitch/strategy.js';
 import { registerStrategy, getStrategy } from '../../../src/services/platforms/strategy.js';
 
-
 describe('Twitch Strategy: createVodData', () => {
   it('should create correct VodCreateData from platform metadata', () => {
     const meta = {

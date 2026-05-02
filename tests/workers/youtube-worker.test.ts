@@ -39,7 +39,7 @@ describe('YouTube Worker', () => {
       assert.fail('Should have thrown');
     } catch (error) {
       assert.ok(error instanceof Error);
-      assert.ok((error).message.includes('File path not available'));
+      assert.ok(error.message.includes('File path not available'));
     }
   });
 
@@ -191,7 +191,7 @@ describe('YouTube Worker', () => {
       assert.fail('Should have thrown');
     } catch (error) {
       assert.ok(error instanceof Error);
-      assert.ok((error).message.includes('File path not available'));
+      assert.ok(error.message.includes('File path not available'));
     }
   });
 

@@ -3,7 +3,6 @@ import { describe, it } from 'node:test';
 import { strategy } from '../../../src/services/kick/strategy.js';
 import { registerStrategy, getStrategy } from '../../../src/services/platforms/strategy.js';
 
-
 describe('Kick Strategy: createVodData', () => {
   it('should create correct VodCreateData from platform metadata', () => {
     const meta = {

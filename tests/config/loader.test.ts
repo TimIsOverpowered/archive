@@ -57,7 +57,9 @@ describe('API Config Loader', () => {
   });
 
   describe('optional fields with defaults', () => {
-    beforeEach(() => { setupBaseEnv(); });
+    beforeEach(() => {
+      setupBaseEnv();
+    });
 
     it('should apply default for NODE_ENV', () => {
       delete process.env.NODE_ENV;
@@ -164,7 +166,9 @@ describe('API Config Loader', () => {
   });
 
   describe('caching', () => {
-    beforeEach(() => { setupBaseEnv(); });
+    beforeEach(() => {
+      setupBaseEnv();
+    });
 
     it('should cache config after first load', () => {
       const config1 = loadApiConfig();

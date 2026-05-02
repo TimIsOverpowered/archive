@@ -100,10 +100,10 @@ function displayField(name: string, value: DecryptionResult): void {
       console.log(lines.join('\n'));
     }
   } else if (value.decrypted && typeof value.decrypted === 'object' && 'error' in value.decrypted) {
-    console.log(`\n⚠️  Decryption: ${(value.decrypted).error}`);
+    console.log(`\n⚠️  Decryption: ${value.decrypted.error}`);
 
-    if ((value.decrypted).rawValue) {
-      console.log(`   Preview: ${(value.decrypted)?.rawValue || 'N/A'}`);
+    if (value.decrypted.rawValue) {
+      console.log(`   Preview: ${value.decrypted?.rawValue || 'N/A'}`);
     }
   } else {
     console.log('\nDecrypted: (no data available for decryption)');
@@ -180,11 +180,11 @@ async function main(): Promise<void> {
     console.warn('⚠️  DANGEROUS: This displays decrypted secrets! ⚠️');
     console.log('='.repeat(70));
     console.log(`\nTenant ID: ${tenant.id}`);
-    console.log(`Display Name: ${(tenant).displayName || 'N/A'}`);
+    console.log(`Display Name: ${tenant.displayName || 'N/A'}`);
 
     if (showTwitchOnly) {
       // Show Twitch fields only
-      const twitch = (tenant)?.twitch;
+      const twitch = tenant?.twitch;
 
       if (!twitch) {
         console.log('\nNo Twitch configuration found for this tenant.');
@@ -205,7 +205,7 @@ async function main(): Promise<void> {
       }
     } else if (showYoutubeOnly) {
       // Show YouTube fields only
-      const youtube = (tenant)?.youtube;
+      const youtube = tenant?.youtube;
 
       if (!youtube) {
         console.log('\nNo YouTube configuration found for this tenant.');
@@ -257,7 +257,7 @@ async function main(): Promise<void> {
       }
     } else if (showKickOnly) {
       // Show Kick fields only
-      const kick = (tenant)?.kick;
+      const kick = tenant?.kick;
 
       if (!kick) {
         console.log('\nNo Kick configuration found for this tenant.');
@@ -270,22 +270,22 @@ async function main(): Promise<void> {
     } else {
       // Show ALL encrypted fields (default behavior)
 
-      if ((tenant).twitch?.auth) {
-        const twitchAuthResult = await decryptField(String((tenant).twitch.auth));
+      if (tenant.twitch?.auth) {
+        const twitchAuthResult = await decryptField(String(tenant.twitch.auth));
 
         console.log('\nTwitch Configuration:');
         displayField('Auth Credentials', twitchAuthResult);
       }
 
-      if ((tenant).youtube?.apiKey) {
-        const youtubeApiKeyResult = await decryptField(String((tenant).youtube.apiKey));
+      if (tenant.youtube?.apiKey) {
+        const youtubeApiKeyResult = await decryptField(String(tenant.youtube.apiKey));
 
         console.log('\nYouTube API Key:');
         displayField('API Key', youtubeApiKeyResult);
       }
 
-      if ((tenant).youtube?.auth) {
-        const youtubeAuthResult = await decryptField(String((tenant).youtube.auth));
+      if (tenant.youtube?.auth) {
+        const youtubeAuthResult = await decryptField(String(tenant.youtube.auth));
 
         console.log('\nYouTube OAuth Tokens:');
         displayField('Auth Credentials', youtubeAuthResult);

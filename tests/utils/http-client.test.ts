@@ -343,7 +343,7 @@ describe('HTTP Client', () => {
         assert.fail('Should have thrown');
       } catch (error) {
         assert.ok(error instanceof HttpError);
-        assert.strictEqual((error).statusCode, 500);
+        assert.strictEqual(error.statusCode, 500);
         assert.strictEqual(attempts, 3);
       }
     });
@@ -382,7 +382,7 @@ describe('HTTP Client', () => {
         assert.fail('Should have thrown');
       } catch (error) {
         assert.ok(error instanceof HttpError);
-        assert.strictEqual((error).statusCode, 401);
+        assert.strictEqual(error.statusCode, 401);
         assert.strictEqual(attempts, 1);
       }
     });
@@ -401,7 +401,7 @@ describe('HTTP Client', () => {
         assert.fail('Should have thrown');
       } catch (error) {
         assert.ok(error instanceof HttpError);
-        assert.strictEqual((error).statusCode, 403);
+        assert.strictEqual(error.statusCode, 403);
         assert.strictEqual(attempts, 1);
       }
     });
@@ -420,7 +420,7 @@ describe('HTTP Client', () => {
         assert.fail('Should have thrown');
       } catch (error) {
         assert.ok(error instanceof HttpError);
-        assert.strictEqual((error).statusCode, 404);
+        assert.strictEqual(error.statusCode, 404);
         assert.strictEqual(attempts, 1);
       }
     });
@@ -439,7 +439,7 @@ describe('HTTP Client', () => {
         assert.fail('Should have thrown');
       } catch (error) {
         assert.ok(error instanceof HttpError);
-        assert.strictEqual((error).statusCode, 400);
+        assert.strictEqual(error.statusCode, 400);
         assert.strictEqual(attempts, 1);
       }
     });
