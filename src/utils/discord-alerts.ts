@@ -1,6 +1,3 @@
-// Barrel file — re-exports from split modules for backward compatibility
-// New code should import directly from src/utils/discord/*
-
 // Context & config
 export { isAlertsEnabled, createAlertContext } from './discord/context.js';
 export type { AlertContext } from './discord/context.js';

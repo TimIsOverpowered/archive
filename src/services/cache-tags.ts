@@ -7,16 +7,6 @@ import { isConnectionError } from '../db/utils/errors.js';
 import { CacheKeys, swrKeys } from '../utils/cache-keys.js';
 import { HttpError } from '../utils/http-error.js';
 
-function extractPageFromKey(key: string): number | null {
-  const parts = key.split(':');
-  const pageIdx = parts.indexOf('page');
-  if (pageIdx === -1 || pageIdx + 1 >= parts.length) return null;
-  const pageStr = parts[pageIdx + 1];
-  if (pageStr == null || pageStr === '') return null;
-  const page = parseInt(pageStr, 10);
-  return isNaN(page) ? null : page;
-}
-
 /**
  * Cache a VOD list query result and register tag-based associations for all VODs in the list.
  * Enables batch invalidation by VOD ID later.
@@ -38,7 +28,8 @@ export async function registerVodTags(
   vods: { id: number }[],
   cacheKey: string,
   data: string,
-  ttl: number
+  ttl: number,
+  page: number
 ): Promise<void> {
   const client = RedisService.getActiveClient();
   if (!client) return;
@@ -47,8 +38,7 @@ export async function registerVodTags(
     return;
   }
 
-  const page = extractPageFromKey(cacheKey);
-  if (page !== null && page > Cache.MAX_PAGES) {
+  if (page > Cache.MAX_PAGES) {
     return;
   }
 
