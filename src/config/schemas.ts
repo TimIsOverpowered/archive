@@ -9,10 +9,13 @@ import { decryptObject, decryptScalar } from '../utils/encryption.js';
  * Empty or undefined values pass through unchanged.
  */
 function encryptedString() {
-  return z.string().optional().transform((val) => {
-    if (val == null || val === '') return val ?? '';
-    return decryptScalar(val);
-  });
+  return z
+    .string()
+    .optional()
+    .transform((val) => {
+      if (val == null || val === '') return val ?? '';
+      return decryptScalar(val);
+    });
 }
 
 function normalizePathForSchema(basePath?: string): string | undefined {
@@ -97,7 +100,7 @@ export const YoutubeSchema = z.object({
   /** Custom upload description template */
   description: z.string().default(''),
   /** Decrypted YouTube API auth object (decrypted at parse time) */
-  auth: encryptedYoutubeAuth(),
+  auth: encryptedYoutubeAuth().optional(),
   /** Encrypted YouTube API key (decrypted at parse time) */
   apiKey: encryptedString().optional(),
 });
@@ -134,7 +137,7 @@ export const TwitchSchema = z.object({
   /** Mark as the primary platform (default: false) */
   mainPlatform: z.boolean().default(false),
   /** Decrypted Twitch API auth object (decrypted at parse time) */
-  auth: encryptedTwitchAuth(),
+  auth: encryptedTwitchAuth().optional(),
   /** Twitch username / display name */
   username: z
     .string()
@@ -196,7 +199,7 @@ export const VodUpdateSchema = z.object({
   created_at: z.coerce.date().optional(),
   /** Duration in seconds (optional) */
   duration: z.number().optional(),
-  /** Platform stream/session ID (nullable) */
+  /** Platform stream ID (nullable) */
   stream_id: z.string().nullable().default(null),
 });
 
