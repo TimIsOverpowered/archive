@@ -6,7 +6,7 @@ import { handleWorkerError } from '../utils/error-handler.js';
 import { PLATFORM_VALUES } from '../../types/platforms.js';
 import { getLiveDownloadQueue, LIVE_JOB_ID_PREFIX } from '../queues/queue.js';
 import { findActiveLiveVod } from '../../services/vods.service.js';
-import { getPlatformConfig } from '../../config/types.js';
+import { requirePlatformConfig } from '../../config/types.js';
 
 const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async (job: Job<{ tenantId: string }>) => {
   const { tenantId } = job.data;
@@ -24,8 +24,7 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
   const liveQueue = getLiveDownloadQueue();
 
   for (const platform of PLATFORM_VALUES) {
-    const platformConfig = getPlatformConfig(config, platform);
-    if (platformConfig == null || platformConfig.enabled !== true || platformConfig.username == null) {
+    if (!requirePlatformConfig(config, platform)) {
       continue;
     }
 

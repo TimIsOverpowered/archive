@@ -3,7 +3,7 @@ import path from 'path';
 import type { Kysely } from 'kysely';
 import type { StreamerDB, InsertableVods, SelectableVods } from '../../db/streamer-types.js';
 import type { TenantConfig } from '../../config/types.js';
-import { getPlatformConfig } from '../../config/types.js';
+import { requirePlatformConfig } from '../../config/types.js';
 import type { Platform } from '../../types/platforms.js';
 import { getStrategy, type PlatformStreamStatus, type PlatformVodMetadata } from '../../services/platforms/index.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
@@ -50,14 +50,12 @@ export async function handlePlatformLiveCheck(
     return;
   }
 
-  const platformCfg = getPlatformConfig(config, platform);
-  const platformUsername = platformCfg?.username;
-  const platformUserId = platformCfg?.id;
-
-  if (platformUserId == null || platformUsername == null) {
-    log.debug({ component: 'monitor', platform, username: platformUsername }, 'Platform not fully configured');
+  const platformInfo = requirePlatformConfig(config, platform);
+  if (!platformInfo) {
+    log.debug({ component: 'monitor', platform }, 'Platform not fully configured');
     return;
   }
+  const { platformUserId, platformUsername } = platformInfo;
 
   let streamStatus: PlatformStreamStatus | null;
 

@@ -43,6 +43,18 @@ export function getPlatformConfig(config: TenantConfig, platform: Platform): Pla
   }
 }
 
+export function requirePlatformConfig(
+  config: TenantConfig,
+  platform: Platform
+): { platformUserId: string; platformUsername: string } | null {
+  const platformCfg = getPlatformConfig(config, platform);
+  if (platformCfg?.enabled !== true) return null;
+  const id = platformCfg?.id;
+  const username = platformCfg?.username;
+  if (id == null || username == null) return null;
+  return { platformUserId: id, platformUsername: username };
+}
+
 export function getDisplayName(config: TenantConfig): string {
   return config.displayName ?? config.id;
 }

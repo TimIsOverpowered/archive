@@ -11,23 +11,15 @@ import type {
 import { parseTwitchDuration } from '../../utils/formatting.js';
 import { createErrorContext } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
-import { getPlatformConfig } from '../../config/types.js';
+import { requirePlatformConfig } from '../../config/types.js';
 
 export const strategy: PlatformStrategy = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
     const { tenantId, config, platform } = ctx;
-    const platformCfg = getPlatformConfig(config, platform);
+    const cfg = requirePlatformConfig(config, platform);
+    if (!cfg) return null;
 
-    if (platformCfg?.enabled !== true) {
-      return null;
-    }
-
-    const userId = platformCfg?.id;
-    if (userId == null) {
-      return null;
-    }
-
-    const streamStatus = await getTwitchStreamStatus(userId, tenantId);
+    const streamStatus = await getTwitchStreamStatus(cfg.platformUserId, tenantId);
 
     if (streamStatus == null || streamStatus.type !== 'live') {
       return null;
@@ -59,13 +51,10 @@ export const strategy: PlatformStrategy = {
 
   async fetchVodObjectForLiveStream(streamId: string, ctx): Promise<PlatformVodMetadata | null> {
     const { tenantId, config, platform } = ctx;
-    const platformCfg = getPlatformConfig(config, platform);
-    const userId = platformCfg?.id;
-    if (userId == null) {
-      return null;
-    }
+    const cfg = requirePlatformConfig(config, platform);
+    if (!cfg) return null;
 
-    const vodObject = await getLatestTwitchVodObject(userId, streamId, tenantId);
+    const vodObject = await getLatestTwitchVodObject(cfg.platformUserId, streamId, tenantId);
 
     if (vodObject == null || vodObject.stream_id !== streamId) {
       return null;

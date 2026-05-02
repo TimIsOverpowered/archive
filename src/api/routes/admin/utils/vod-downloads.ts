@@ -2,13 +2,13 @@ import { getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/p
 import { getMetadata } from '../../../../workers/utils/ffmpeg.js';
 import { type AppLogger } from '../../../../utils/logger.js';
 import type { VodRecord } from '../../../../types/db.js';
-import type { Platform, SourceType, DownloadMethod } from '../../../../types/platforms.js';
+import type { SourceType, DownloadMethod } from '../../../../types/platforms.js';
 import { DOWNLOAD_METHODS, SOURCE_TYPES } from '../../../../types/platforms.js';
 import { VOD_DURATION_TOLERANCE_SECONDS } from '../../../../constants.js';
 import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
 import { refreshVodRecord } from './vod-records.js';
-import { getPlatformConfig } from '../../../../config/types.js';
+import { requirePlatformConfig } from '../../../../config/types.js';
 import { PlatformNotConfiguredError, VodNotFoundError } from '../../../../utils/domain-errors.js';
 
 export interface EnsureVodDownloadOptions {
@@ -35,7 +35,7 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
   const { ctx, dbId, vodId, type, downloadMethod = DOWNLOAD_METHODS.HLS, log } = options;
   const { tenantId, platform, config, db } = ctx;
 
-  const platformConfig = validatePlatformConfig(ctx, platform);
+  const platformConfig = requirePlatformConfig(ctx.config, platform);
   if (!platformConfig) throw new PlatformNotConfiguredError(platform, `tenant ${tenantId}`);
   const { platformUserId, platformUsername } = platformConfig;
 
@@ -106,17 +106,4 @@ async function checkIfDownloadNeeded(
   return false;
 }
 
-function validatePlatformConfig(
-  ctx: TenantPlatformContext,
-  platform: Platform
-): { platformUserId: string; platformUsername: string } | null {
-  const platformCfg = getPlatformConfig(ctx.config, platform);
-  const platformUserId = platformCfg?.id;
-  const platformUsername = platformCfg?.username;
 
-  if (platformUserId == null || platformUsername == null) {
-    return null;
-  }
-
-  return { platformUserId, platformUsername };
-}

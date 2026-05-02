@@ -9,26 +9,7 @@ import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { triggerChatDownload } from '../../../../workers/jobs/chat.job.js';
 
 import { getStrategy } from '../../../../services/platforms/index.js';
-import { getPlatformConfig, getDisplayName, type PlatformConfig } from '../../../../config/types.js';
-
-/**
- * Extracts platform identifiers from tenant config.
- * Returns null if platform is not configured for tenant.
- */
-function extractPlatformConfig(
-  ctx: TenantPlatformContext,
-  platform: Platform
-): { platformUserId: string; platformUsername: string; platformCfg: PlatformConfig } | null {
-  const platformCfg = getPlatformConfig(ctx.config, platform);
-  const platformUserId = platformCfg?.id;
-  const platformUsername = platformCfg?.username;
-
-  if (platformUserId == null || platformUsername == null) {
-    return null;
-  }
-
-  return { platformUserId, platformUsername, platformCfg };
-}
+import { getDisplayName, requirePlatformConfig } from '../../../../config/types.js';
 
 /**
  * Fetches VOD record or returns null if not found
@@ -77,11 +58,11 @@ export async function ensureVodRecord(
 ): Promise<VodRecord | null> {
   const { db, tenantId, platform } = ctx;
 
-  const platformConfig = extractPlatformConfig(ctx, platform);
+  const platformConfig = requirePlatformConfig(ctx.config, platform);
   if (!platformConfig) {
     return null;
   }
-  const { platformUserId, platformCfg } = platformConfig;
+  const { platformUserId, platformUsername } = platformConfig;
 
   const rawVodRecord = await findVodRecord(db, vodId, platform);
 
@@ -121,7 +102,7 @@ export async function ensureVodRecord(
       vodId,
       platform,
       duration: Math.round(vodRecord.duration),
-      platformUsername: platformCfg?.username,
+      platformUsername,
     });
   }
 
