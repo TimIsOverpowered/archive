@@ -6,14 +6,7 @@ import { extractErrorDetails } from '../../utils/error.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { getWorkersConfig } from '../../config/env.js';
 import { ConfigNotConfiguredError } from '../../utils/domain-errors.js';
-
-interface AuthObject {
-  access_token?: string;
-  refresh_token: string;
-  expiry_date: number;
-  scope?: string;
-  token_type?: string;
-}
+import type { YoutubeAuthObject } from '../../config/schemas.js';
 
 const REDIRECT_URI = 'https://developers.google.com/oauthplayground';
 
@@ -32,7 +25,7 @@ async function updateYoutubeTokenInDb(
   }
 
   try {
-    const updatedAuth: AuthObject = {
+    const updatedAuth: YoutubeAuthObject = {
       access_token: newAccessToken,
       refresh_token: refreshToken,
       expiry_date: newExpiryDate,
@@ -46,7 +39,8 @@ async function updateYoutubeTokenInDb(
       .where('id', '=', tenantId)
       .execute();
 
-    configService.updateYoutubeAuth(tenantId, encryptedAuth);
+    configService.updateYoutubeAuth(tenantId, updatedAuth);
+    configService.publishConfigChanged(tenantId);
 
     logger.info({ tenantId }, 'Updated YouTube token in database');
   } catch (err) {
@@ -57,7 +51,7 @@ async function updateYoutubeTokenInDb(
 
 async function refreshToken(
   tenantId: string,
-  refreshToken: string,
+  refreshTokenVal: string,
   accessToken?: string
 ): Promise<{
   accessToken: string;
@@ -70,7 +64,7 @@ async function refreshToken(
 
   const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, REDIRECT_URI);
   oauth2Client.setCredentials({
-    refresh_token: refreshToken,
+    refresh_token: refreshTokenVal,
     access_token: accessToken ?? null,
   });
 
@@ -100,7 +94,7 @@ async function refreshToken(
     return {
       accessToken: credentials.access_token,
       expiryDate: credentials.expiry_date,
-      refreshToken: credentials.refresh_token ?? refreshToken,
+      refreshToken: credentials.refresh_token ?? refreshTokenVal,
     };
   } catch (error: unknown) {
     const details = extractErrorDetails(error);
@@ -128,7 +122,7 @@ export async function getYoutubeAuth(tenantId: string): Promise<{
     throw new ConfigNotConfiguredError(`YouTube auth for ${tenantId}`);
   }
 
-  const authObj = JSON.parse(config.youtube.auth) as AuthObject;
+  const authObj = config.youtube.auth;
 
   if (
     authObj.refresh_token == null ||
@@ -159,4 +153,3 @@ export async function getYoutubeAuth(tenantId: string): Promise<{
 }
 
 export { updateYoutubeTokenInDb, REDIRECT_URI };
-export type { AuthObject };

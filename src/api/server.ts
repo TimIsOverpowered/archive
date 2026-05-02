@@ -18,6 +18,7 @@ import logsRoutes from './routes/logs.js';
 import badgesRoutes from './routes/badges.js';
 import { globalAdminRoutes, default as adminRoutes } from './routes/admin/index.js';
 import { registerCacheSubscriber } from '../services/cache-invalidator.js';
+import { registerTenantConfigSubscriber } from '../config/tenant-config-subscriber.js';
 import { BODY_LIMIT, COMPRESSION_THRESHOLD } from '../constants.js';
 import { randomUUID } from 'node:crypto';
 
@@ -123,6 +124,9 @@ export async function buildServer() {
 
   // Pub/Sub subscriber for cache invalidation events from workers
   registerCacheSubscriber(fastify);
+
+  // Pub/Sub subscriber for tenant config invalidation events
+  registerTenantConfigSubscriber(fastify);
 
   // Swagger/OpenAPI documentation
   await fastify.register(swagger, {

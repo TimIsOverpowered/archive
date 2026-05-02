@@ -8,13 +8,7 @@ import { getAppAccessToken } from '../../src/services/twitch/index.js';
 import { getTwitchCredentials } from '../../src/utils/credentials.js';
 import { humanizeDuration } from '../../src/utils/formatting.js';
 import { getAllTenants, getTenantById } from '../../src/services/meta-tenants.service.js';
-
-interface TwitchAuth {
-  client_id: string;
-  client_secret: string;
-  access_token?: string | undefined;
-  expiry_date?: number | undefined;
-}
+import type { TwitchAuthObject } from '../../src/config/schemas.js';
 
 program
   .name('test-twitch-token')
@@ -69,7 +63,7 @@ program
           process.exit(1);
         }
 
-        let decrypted = JSON.parse(config.twitch.auth!) as TwitchAuth;
+        let decrypted = config.twitch.auth;
 
         console.log('\nCurrent Token State:');
         console.log('-'.repeat(50));
@@ -103,7 +97,7 @@ program
               process.exit(1);
             }
 
-            let decryptedAfter = JSON.parse(configAfter.twitch.auth!) as TwitchAuth;
+            let decryptedAfter = configAfter.twitch.auth;
 
             console.log('\n\nToken State After Refresh:');
             console.log('-'.repeat(50));
@@ -226,7 +220,7 @@ program
 
 program.parse(process.argv);
 
-function displayTokenState(auth: TwitchAuth, label: string, verbose = false): boolean {
+function displayTokenState(auth: TwitchAuthObject, label: string, verbose = false): boolean {
   console.log(`\n[${label}]`);
 
   const nowMs = Date.now();

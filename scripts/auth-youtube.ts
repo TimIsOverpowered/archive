@@ -9,7 +9,7 @@ import { initMetaClient } from '../src/db/meta-client.js';
 import { extractErrorDetails } from '../src/utils/error.js';
 import { YoutubeAuthSchema, YoutubeAuthObject, YoutubeSchema } from '../src/config/schemas.js';
 import { getTenantById, updateTenant } from '../src/services/meta-tenants.service.js';
-import { encryptScalar, decryptObject } from '../src/utils/encryption.js';
+import { encryptObject, decryptObject } from '../src/utils/encryption.js';
 
 const clientId = process.env.YOUTUBE_CLIENT_ID;
 const clientSecret = process.env.YOUTUBE_CLIENT_SECRET;
@@ -436,9 +436,9 @@ async function storeAuthObject(tenantId: string, authObject: YoutubeAuthObject):
     }
 
     // Update ONLY the .auth subfield - encrypt it separately so it stays encrypted in DB
-    const encryptedAuthValue = encryptScalar(JSON.stringify(authObject));
+    const encryptedAuthValue = encryptObject(authObject);
 
-    youtubeConfig.auth = encryptedAuthValue;
+    (youtubeConfig as Record<string, unknown>).auth = encryptedAuthValue;
 
     // Store as JSON object - DO NOT stringify here!
     await updateTenant(tenantId, { youtube: youtubeConfig as any });

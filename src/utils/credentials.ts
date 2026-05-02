@@ -1,8 +1,5 @@
 import { configService } from '../config/tenant-config.js';
-import { decryptObject } from './encryption.js';
 import { createAutoLogger } from './auto-tenant-logger.js';
-import { extractErrorDetails } from './error.js';
-import type { TwitchAuthObject } from '../config/schemas.js';
 
 const loggerCache = new Map<string, ReturnType<typeof createAutoLogger>>();
 
@@ -31,22 +28,17 @@ export function getTwitchCredentials(tenantId: string): TwitchCredentials | null
     return null;
   }
 
-  try {
-    const auth = decryptObject<TwitchAuthObject>(config.twitch.auth);
+  const auth = config.twitch.auth;
 
-    if (auth.client_id == null || auth.client_id === '' || auth.client_secret == null || auth.client_secret === '') {
-      log.error({ component: 'credentials' }, 'Missing client_id or client_secret in decrypted credentials');
-      return null;
-    }
-
-    return {
-      clientId: auth.client_id,
-      clientSecret: auth.client_secret,
-      accessToken: auth.access_token,
-      expiryDate: auth.expiry_date,
-    };
-  } catch (error) {
-    log.warn({ component: 'credentials', error: extractErrorDetails(error) }, 'Failed to decrypt credentials');
+  if (auth.client_id == null || auth.client_id === '' || auth.client_secret == null || auth.client_secret === '') {
+    log.error({ component: 'credentials' }, 'Missing client_id or client_secret in credentials');
     return null;
   }
+
+  return {
+    clientId: auth.client_id,
+    clientSecret: auth.client_secret,
+    accessToken: auth.access_token,
+    expiryDate: auth.expiry_date,
+  };
 }

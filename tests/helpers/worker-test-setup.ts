@@ -45,7 +45,7 @@ export function createMockTenantConfig(overrides: MockTenantConfigOverrides = {}
       perGameUpload: false,
       restrictedGames: [],
       description: '',
-      auth: '',
+      auth: undefined,
       ...(overrides.youtube ?? {}),
     },
     kick: {

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { pathToFileURL } from 'node:url';
 import { extractErrorDetails } from '../utils/error.js';
 import { configService } from '../config/tenant-config.js';
+import { registerTenantConfigSubscriberWorker } from '../config/tenant-config-subscriber.js';
 import { QUEUE_NAMES, closeQueues } from './queues/queue.js';
 import { Queue } from 'bullmq';
 import { getRedisInstance, initWorkersRedis, closeWorkersRedis, waitForRedisReady } from './redis.js';
@@ -57,6 +58,10 @@ export async function bootstrap() {
     registerPlatformStrategies();
     const configs = await configService.loadAll();
     await waitForRedisReady();
+
+    const tenantConfigSubscriber = registerTenantConfigSubscriberWorker();
+    getLogger().info('Tenant config subscriber registered');
+
     startTokenHealthCron();
     await clearAllJobsOnStartup(workerConfig);
 
@@ -64,7 +69,7 @@ export async function bootstrap() {
 
     await waitForWorkersReady(workerRegistry.getAll().map((entry) => entry.worker));
 
-    registerShutdownHandlers();
+    registerShutdownHandlers(tenantConfigSubscriber);
 
     await startMonitorService();
 
@@ -80,7 +85,7 @@ export async function bootstrap() {
   }
 }
 
-function registerShutdownHandlers() {
+function registerShutdownHandlers(tenantConfigSubscriber: ReturnType<typeof registerTenantConfigSubscriberWorker>) {
   const shutdown = async () => {
     getLogger().info('Shutting down workers...');
 
@@ -104,6 +109,13 @@ function registerShutdownHandlers() {
       stopClientCleanup();
       await closeAllClients();
       await closeMetaClient();
+
+      try {
+        await tenantConfigSubscriber.quit();
+      } catch {
+        /* subscriber already closed */
+      }
+
       await closeWorkersRedis();
       configService.reset();
 

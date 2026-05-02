@@ -1,12 +1,29 @@
 import { LRUCache } from 'lru-cache';
 import { initMetaClient } from '../db/meta-client.js';
-import { getAllTenants } from '../services/meta-tenants.service.js';
+import { getAllTenants, getTenantById } from '../services/meta-tenants.service.js';
 import { decryptScalar } from '../utils/encryption.js';
-import { SettingsSchema, YoutubeSchema, TwitchSchema, KickSchema } from './schemas.js';
+import { RedisService } from '../utils/redis-service.js';
+import { getLogger } from '../utils/logger.js';
+import { extractErrorDetails } from '../utils/error.js';
+import {
+  SettingsSchema,
+  YoutubeSchema,
+  TwitchSchema,
+  KickSchema,
+  type TwitchAuthObject,
+  type YoutubeAuthObject,
+} from './schemas.js';
 import { TenantConfig } from './types.js';
 import { getBaseConfig } from './env.js';
 import type { TenantResult } from '../db/meta-types.js';
 import { asJsonObject } from '../utils/object.js';
+
+const CONFIG_CHANNEL = 'cache:tenant';
+
+interface ConfigChangeEvent {
+  type: 'TENANT_CONFIG_CHANGED';
+  tenantId: string;
+}
 
 /**
  * Build a TenantConfig from a raw database tenant row.
@@ -38,12 +55,6 @@ export function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
 
   const youtubeObj = asJsonObject(tenant.youtube);
   if (youtubeObj) {
-    if ('auth' in youtubeObj && typeof youtubeObj.auth === 'string' && youtubeObj.auth !== '') {
-      youtubeObj.auth = decryptScalar(youtubeObj.auth);
-    }
-    if ('apiKey' in youtubeObj && typeof youtubeObj.apiKey === 'string' && youtubeObj.apiKey !== '') {
-      youtubeObj.apiKey = decryptScalar(youtubeObj.apiKey);
-    }
     tenantConfig.youtube = YoutubeSchema.parse(youtubeObj);
   }
 
@@ -114,32 +125,67 @@ export class ConfigService {
   }
 
   /**
-   * Mutates the cached config object in-place. LRUCache stores by reference,
-   * so this does NOT create a new object — callers that hold a reference to
-   * the config returned by .get() will see the auth field update.
+   * Mutates the cached config object in-place with a decrypted Twitch auth object.
+   * LRUCache stores by reference, so this does NOT create a new object — callers
+   * that hold a reference to the config returned by .get() will see the auth update.
    *
    * DO NOT replace this with a spread + set() unless you verify no external
    * code holds a reference to the cached TenantConfig.
    */
-  updateTwitchAuth(tenantId: string, encryptedAuth: string): void {
+  updateTwitchAuth(tenantId: string, auth: TwitchAuthObject): void {
     const config = this.cache.get(tenantId);
     if (config?.twitch?.auth == null) return;
-    config.twitch.auth = encryptedAuth;
+    config.twitch.auth = auth;
   }
 
   /**
-   * Mutates the cached config object in-place. LRUCache stores by reference,
-   * so this does NOT create a new object — callers that hold a reference to
-   * the config returned by .get() will see the auth field update.
+   * Mutates the cached config object in-place with a decrypted YouTube auth object.
+   * LRUCache stores by reference, so this does NOT create a new object — callers
+   * that hold a reference to the config returned by .get() will see the auth update.
    *
    * DO NOT replace this with a spread + set() unless you verify no external
    * code holds a reference to the cached TenantConfig.
    */
-  updateYoutubeAuth(tenantId: string, encryptedAuth: string): void {
+  updateYoutubeAuth(tenantId: string, auth: YoutubeAuthObject): void {
     const config = this.cache.get(tenantId);
     if (config?.youtube?.auth == null) return;
-    const decryptedAuth = decryptScalar(encryptedAuth);
-    config.youtube.auth = decryptedAuth;
+    config.youtube.auth = auth;
+  }
+
+  /**
+   * Reload a single tenant from the database, replacing the cached entry.
+   * Used by the Redis Pub/Sub subscriber to keep cross-process caches in sync.
+   */
+  async reloadTenant(tenantId: string): Promise<void> {
+    initMetaClient();
+    const tenant = await getTenantById(tenantId);
+    if (!tenant) {
+      this.cache.delete(tenantId);
+      return;
+    }
+    const config = buildTenantConfig(tenant);
+    if (config) {
+      this.cache.set(config.id, config);
+    }
+  }
+
+  /**
+   * Publish a tenant config change event on Redis so other processes reload.
+   * Fire-and-forget — errors are logged but not thrown.
+   */
+  publishConfigChanged(tenantId: string): void {
+    const client = RedisService.getActiveClient();
+    if (!client) return;
+
+    const event: ConfigChangeEvent = { type: 'TENANT_CONFIG_CHANGED', tenantId };
+
+    void client.publish(CONFIG_CHANNEL, JSON.stringify(event)).catch((err) => {
+      const details = extractErrorDetails(err);
+      getLogger().warn(
+        { err: details, tenantId },
+        'Failed to publish tenant config change event'
+      );
+    });
   }
 }
 

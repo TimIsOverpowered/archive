@@ -1,6 +1,19 @@
 import { z } from 'zod';
 import path from 'path';
 import { YOUTUBE_MAX_DURATION } from '../constants.js';
+import { decryptObject, decryptScalar } from '../utils/encryption.js';
+
+/**
+ * Zod schema for an encrypted string field.
+ * Decrypts non-empty values automatically at parse time.
+ * Empty or undefined values pass through unchanged.
+ */
+function encryptedString() {
+  return z.string().optional().transform((val) => {
+    if (val == null || val === '') return val ?? '';
+    return decryptScalar(val);
+  });
+}
 
 function normalizePathForSchema(basePath?: string): string | undefined {
   if (basePath == null || basePath === '') return undefined;
@@ -52,6 +65,17 @@ export const YoutubeAuthSchema = z.object({
 
 export type YoutubeAuthObject = z.infer<typeof YoutubeAuthSchema>;
 
+/**
+ * Zod schema for an encrypted YouTube auth JSON object field.
+ * Decrypts and parses non-empty values automatically at parse time.
+ */
+function encryptedYoutubeAuth() {
+  return z.any().transform((val) => {
+    if (typeof val !== 'string' || val === '') return undefined;
+    return decryptObject<YoutubeAuthObject>(val);
+  });
+}
+
 /** YouTube upload configuration for a tenant. */
 export const YoutubeSchema = z.object({
   /** Make uploads publicly visible (default: true) */
@@ -72,8 +96,10 @@ export const YoutubeSchema = z.object({
   restrictedGames: z.array(z.string().nullable()).default([]),
   /** Custom upload description template */
   description: z.string().default(''),
-  /** Base64-encoded YouTube API auth credentials */
-  auth: z.string().default(''),
+  /** Decrypted YouTube API auth object (decrypted at parse time) */
+  auth: encryptedYoutubeAuth(),
+  /** Encrypted YouTube API key (decrypted at parse time) */
+  apiKey: encryptedString().optional(),
 });
 
 /** Twitch API OAuth credentials. */
@@ -90,18 +116,25 @@ export const TwitchAuthSchema = z.object({
 
 export type TwitchAuthObject = z.infer<typeof TwitchAuthSchema>;
 
+/**
+ * Zod schema for an encrypted Twitch auth JSON object field.
+ * Decrypts and parses non-empty values automatically at parse time.
+ */
+function encryptedTwitchAuth() {
+  return z.any().transform((val) => {
+    if (typeof val !== 'string' || val === '') return undefined;
+    return decryptObject<TwitchAuthObject>(val);
+  });
+}
+
 /** Twitch platform configuration for a tenant. */
 export const TwitchSchema = z.object({
   /** Enable Twitch streaming (default: false) */
   enabled: z.boolean().default(false),
   /** Mark as the primary platform (default: false) */
   mainPlatform: z.boolean().default(false),
-  /** Twitch API auth string (base64) */
-  auth: z
-    .string()
-    .optional()
-    .nullable()
-    .transform((val) => val ?? undefined),
+  /** Decrypted Twitch API auth object (decrypted at parse time) */
+  auth: encryptedTwitchAuth(),
   /** Twitch username / display name */
   username: z
     .string()

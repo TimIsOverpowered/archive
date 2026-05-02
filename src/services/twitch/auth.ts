@@ -1,7 +1,8 @@
 import { getTwitchCredentials } from '../../utils/credentials.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { configService } from '../../config/tenant-config.js';
-import { encryptObject, decryptObject } from '../../utils/encryption.js';
+import { encryptObject } from '../../utils/encryption.js';
+import type { TwitchAuthObject } from '../../config/schemas.js';
 import { getMetaClient } from '../../db/meta-client.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { request } from '../../utils/http-client.js';
@@ -18,13 +19,6 @@ const accessTokenCache = new LRUCache<string, { token: string; expiresAt: number
   allowStale: false,
   updateAgeOnGet: true,
 });
-
-interface TwitchAuth {
-  client_id: string;
-  client_secret: string;
-  access_token?: string | undefined;
-  expiry_date?: number | undefined;
-}
 
 export async function getAppAccessToken(tenantId: string): Promise<string> {
   const cached = accessTokenCache.get(tenantId);
@@ -79,9 +73,9 @@ export async function updateTwitchTokenInDb(tenantId: string, newToken: string, 
   }
 
   try {
-    const auth: TwitchAuth = decryptObject(config.twitch.auth);
+    const auth = config.twitch.auth;
 
-    const updatedAuth = {
+    const updatedAuth: TwitchAuthObject = {
       client_id: auth.client_id,
       client_secret: auth.client_secret,
       access_token: newToken,
@@ -96,7 +90,8 @@ export async function updateTwitchTokenInDb(tenantId: string, newToken: string, 
       .where('id', '=', tenantId)
       .execute();
 
-    configService.updateTwitchAuth(tenantId, encryptedAuth);
+    configService.updateTwitchAuth(tenantId, updatedAuth);
+    configService.publishConfigChanged(tenantId);
 
     log.info({ tenantId, expiry_date: expiryDate }, 'Updated Twitch token');
   } catch (err) {
