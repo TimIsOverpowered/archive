@@ -63,8 +63,8 @@ export const strategy: PlatformStrategy<VodCreateData, VodUpdateData> = {
     }
 
     return {
-      id: vodObject.id,
-      title: vodObject.title ?? '',
+      id: String(vodObject.id),
+      title: vodObject.session_title ?? '',
       createdAt: new Date().toISOString(),
       duration: 0,
       streamId,
