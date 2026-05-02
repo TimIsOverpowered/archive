@@ -5,6 +5,7 @@ import {
   recordSuccess,
   recordFailure,
   isCircuitOpen,
+  isCircuitHalfOpen,
   clearAllCircuits,
 } from '../../src/utils/circuit-breaker';
 
@@ -136,20 +137,47 @@ describe('Circuit Breaker', () => {
       assert.strictEqual(isCircuitOpen('test-key'), true);
     });
 
-    it('should return true when half-open', () => {
+    it('should return false when half-open', () => {
       clearAllCircuits();
       const opts = { failureThreshold: 2, recoveryTimeout: 50 };
       recordFailure('test-key', opts);
       recordFailure('test-key', opts);
 
-      // Wait for recovery timeout
       const start = Date.now();
       while (Date.now() - start < 100) {
         // spin
       }
 
       assert.strictEqual(getCircuitState('test-key', opts), 'half-open');
-      assert.strictEqual(isCircuitOpen('test-key', opts), true);
+      assert.strictEqual(isCircuitOpen('test-key', opts), false);
+    });
+  });
+
+  describe('isCircuitHalfOpen', () => {
+    it('should return false when closed', () => {
+      assert.strictEqual(isCircuitHalfOpen('test-key'), false);
+    });
+
+    it('should return false when open', () => {
+      for (let i = 0; i < 5; i++) {
+        recordFailure('test-key');
+      }
+      assert.strictEqual(isCircuitHalfOpen('test-key'), false);
+    });
+
+    it('should return true when half-open', () => {
+      clearAllCircuits();
+      const opts = { failureThreshold: 2, recoveryTimeout: 50 };
+      recordFailure('test-key', opts);
+      recordFailure('test-key', opts);
+
+      const start = Date.now();
+      while (Date.now() - start < 100) {
+        // spin
+      }
+
+      assert.strictEqual(getCircuitState('test-key', opts), 'half-open');
+      assert.strictEqual(isCircuitHalfOpen('test-key', opts), true);
     });
   });
 

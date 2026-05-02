@@ -23,45 +23,45 @@ function simpleKey(s: string): SimpleKey {
 }
 
 export const swrKeys = {
-  vodStatic: (tenantId: string, dbId: number): SWRKey => swrKey(`vod:{${tenantId}}:${dbId}`),
-  vodVolatile: (tenantId: string, dbId: number): SWRKey => swrKey(`vod:volatile:{${tenantId}}:${dbId}`),
-  vodTags: (tenantId: string, dbId: number): SWRKey => swrKey(`vods:tags:{${tenantId}}:${dbId}`),
-  bucketSize: (tenantId: string, vodId: number): SWRKey => swrKey(`{${tenantId}}:${vodId}:bucketSize`),
+  vodStatic: (tenantId: string, dbId: number): SWRKey => swrKey(`swr:vod:{${tenantId}}:${dbId}`),
+  vodVolatile: (tenantId: string, dbId: number): SWRKey => swrKey(`swr:vod:volatile:{${tenantId}}:${dbId}`),
+  vodTags: (tenantId: string, dbId: number): SWRKey => swrKey(`swr:vods:tags:{${tenantId}}:${dbId}`),
+  bucketSize: (tenantId: string, vodId: number): SWRKey => swrKey(`swr:{${tenantId}}:${vodId}:bucketSize`),
   bucket: (tenantId: string, vodId: number, bucket: number): SWRKey =>
-    swrKey(`{${tenantId}}:${vodId}:bucket:${bucket}`),
+    swrKey(`swr:{${tenantId}}:${vodId}:bucket:${bucket}`),
   cursor: (tenantId: string, vodId: number, cursor: string): SWRKey =>
-    swrKey(`{${tenantId}}:${vodId}:cursor:${cursor}`),
-  emotes: (tenantId: string, vodId: number): SWRKey => swrKey(`emotes:{${tenantId}}:${vodId}`),
+    swrKey(`swr:{${tenantId}}:${vodId}:cursor:${cursor}`),
+  emotes: (tenantId: string, vodId: number): SWRKey => swrKey(`swr:emotes:{${tenantId}}:${vodId}`),
   vodPlatform: (tenantId: string, platform: string, platformVodId: string): SWRKey =>
-    swrKey(`vod:platform:{${tenantId}}:${platform}:${platformVodId}`),
+    swrKey(`swr:vod:platform:{${tenantId}}:${platform}:${platformVodId}`),
   vodQuery: (
     tenantId: string,
     query: Record<string, string | number | undefined>,
     page: number,
     limit: number
-  ): SWRKey => swrKey(buildVodQueryKey(tenantId, query, page, limit)),
-  stats: (tenantId: string): SWRKey => swrKey(`stats:${tenantId}`),
+  ): SWRKey => swrKey(`swr:${buildVodQueryKey(tenantId, query, page, limit)}`),
+  stats: (tenantId: string): SWRKey => swrKey(`swr:stats:${tenantId}`),
 } as const;
 
 export const simpleKeys = {
-  vodStatic: (tenantId: string, dbId: number): SimpleKey => simpleKey(`vod:{${tenantId}}:${dbId}`),
-  vodVolatile: (tenantId: string, dbId: number): SimpleKey => simpleKey(`vod:volatile:{${tenantId}}:${dbId}`),
-  vodTags: (tenantId: string, dbId: number): SimpleKey => simpleKey(`vods:tags:{${tenantId}}:${dbId}`),
-  bucketSize: (tenantId: string, vodId: number): SimpleKey => simpleKey(`{${tenantId}}:${vodId}:bucketSize`),
+  vodStatic: (tenantId: string, dbId: number): SimpleKey => simpleKey(`simple:vod:{${tenantId}}:${dbId}`),
+  vodVolatile: (tenantId: string, dbId: number): SimpleKey => simpleKey(`simple:vod:volatile:{${tenantId}}:${dbId}`),
+  vodTags: (tenantId: string, dbId: number): SimpleKey => simpleKey(`simple:vods:tags:{${tenantId}}:${dbId}`),
+  bucketSize: (tenantId: string, vodId: number): SimpleKey => simpleKey(`simple:{${tenantId}}:${vodId}:bucketSize`),
   bucket: (tenantId: string, vodId: number, bucket: number): SimpleKey =>
-    simpleKey(`{${tenantId}}:${vodId}:bucket:${bucket}`),
+    simpleKey(`simple:{${tenantId}}:${vodId}:bucket:${bucket}`),
   cursor: (tenantId: string, vodId: number, cursor: string): SimpleKey =>
-    simpleKey(`{${tenantId}}:${vodId}:cursor:${cursor}`),
-  emotes: (tenantId: string, vodId: number): SimpleKey => simpleKey(`emotes:{${tenantId}}:${vodId}`),
+    simpleKey(`simple:{${tenantId}}:${vodId}:cursor:${cursor}`),
+  emotes: (tenantId: string, vodId: number): SimpleKey => simpleKey(`simple:emotes:{${tenantId}}:${vodId}`),
   vodPlatform: (tenantId: string, platform: string, platformVodId: string): SimpleKey =>
-    simpleKey(`vod:platform:{${tenantId}}:${platform}:${platformVodId}`),
+    simpleKey(`simple:vod:platform:{${tenantId}}:${platform}:${platformVodId}`),
   vodQuery: (
     tenantId: string,
     query: Record<string, string | number | undefined>,
     page: number,
     limit: number
-  ): SimpleKey => simpleKey(buildVodQueryKey(tenantId, query, page, limit)),
-  stats: (tenantId: string): SimpleKey => simpleKey(`stats:${tenantId}`),
+  ): SimpleKey => simpleKey(`simple:${buildVodQueryKey(tenantId, query, page, limit)}`),
+  stats: (tenantId: string): SimpleKey => simpleKey(`simple:stats:${tenantId}`),
 } as const;
 
 export const CacheKeys = {

@@ -105,7 +105,11 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
         .select((eb) => [eb.fn.count('id').as('cnt')])
         .where('created_at', '>=', thisMonthStart)
         .executeTakeFirst(),
-      db.selectFrom('chapters').select(sql<string>`COUNT(DISTINCT game_id)`.as('cnt')).where('game_id', 'is not', null).executeTakeFirst(),
+      db
+        .selectFrom('chapters')
+        .select(sql<string>`COUNT(DISTINCT game_id)`.as('cnt'))
+        .where('game_id', 'is not', null)
+        .executeTakeFirst(),
       db
         .selectFrom('vod_uploads')
         .select((eb) => [eb.fn.count('upload_id').as('cnt')])

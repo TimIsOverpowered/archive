@@ -158,22 +158,24 @@ describe('CacheKeys', () => {
 });
 
 describe('swrKeys', () => {
-  it('should produce same key strings as CacheKeys.vodStatic', () => {
-    assert.strictEqual(swrKeys.vodStatic('tenant-1', 42), CacheKeys.vodStatic('tenant-1', 42));
+  it('should produce swr-prefixed key strings distinct from CacheKeys.vodStatic', () => {
+    assert.strictEqual(swrKeys.vodStatic('tenant-1', 42), 'swr:vod:{tenant-1}:42');
+    assert.notStrictEqual(swrKeys.vodStatic('tenant-1', 42), CacheKeys.vodStatic('tenant-1', 42));
   });
 
-  it('should produce same key strings as CacheKeys.vodPlatform', () => {
-    assert.strictEqual(
+  it('should produce swr-prefixed key strings distinct from CacheKeys.vodPlatform', () => {
+    assert.strictEqual(swrKeys.vodPlatform('tenant-1', 'twitch', '12345'), 'swr:vod:platform:{tenant-1}:twitch:12345');
+    assert.notStrictEqual(
       swrKeys.vodPlatform('tenant-1', 'twitch', '12345'),
       CacheKeys.vodPlatform('tenant-1', 'twitch', '12345')
     );
   });
 
-  it('should produce same key strings as CacheKeys.vodQuery', () => {
-    assert.strictEqual(
-      swrKeys.vodQuery('tenant-1', { title: 'test' }, 1, 20),
-      CacheKeys.vodQuery('tenant-1', { title: 'test' }, 1, 20)
-    );
+  it('should produce swr-prefixed key strings distinct from CacheKeys.vodQuery', () => {
+    const swrKey = swrKeys.vodQuery('tenant-1', { title: 'test' }, 1, 20);
+    const cacheKey = CacheKeys.vodQuery('tenant-1', { title: 'test' }, 1, 20);
+    assert.ok(swrKey.startsWith('swr:'));
+    assert.notStrictEqual(swrKey, cacheKey);
   });
 
   it('should be typed as string (assignable to string)', () => {
@@ -182,32 +184,54 @@ describe('swrKeys', () => {
   });
 });
 
-describe('simpleKeys', () => {
-  it('should produce same key strings as CacheKeys.vodStatic', () => {
-    assert.strictEqual(simpleKeys.vodStatic('tenant-1', 42), CacheKeys.vodStatic('tenant-1', 42));
-  });
-
-  it('should produce same key strings as CacheKeys.emotes', () => {
-    assert.strictEqual(simpleKeys.emotes('tenant-1', 42), CacheKeys.emotes('tenant-1', 42));
-  });
-
-  it('should produce same key strings as CacheKeys.bucket', () => {
-    assert.strictEqual(simpleKeys.bucket('tenant-1', 42, 0), CacheKeys.bucket('tenant-1', 42, 0));
-  });
-
-  it('should produce same key strings as CacheKeys.cursor', () => {
-    assert.strictEqual(simpleKeys.cursor('tenant-1', 42, 'abc'), CacheKeys.cursor('tenant-1', 42, 'abc'));
-  });
-
-  it('should produce same key strings as CacheKeys.vodQuery', () => {
-    assert.strictEqual(
-      simpleKeys.vodQuery('tenant-1', { title: 'test' }, 1, 20),
-      CacheKeys.vodQuery('tenant-1', { title: 'test' }, 1, 20)
+describe('namespace separation', () => {
+  it('should ensure swrKeys and simpleKeys never collide', () => {
+    assert.notStrictEqual(swrKeys.vodStatic('tenant-1', 42), simpleKeys.vodStatic('tenant-1', 42));
+    assert.notStrictEqual(swrKeys.emotes('tenant-1', 42), simpleKeys.emotes('tenant-1', 42));
+    assert.notStrictEqual(swrKeys.bucket('tenant-1', 42, 0), simpleKeys.bucket('tenant-1', 42, 0));
+    assert.notStrictEqual(swrKeys.cursor('tenant-1', 42, 'abc'), simpleKeys.cursor('tenant-1', 42, 'abc'));
+    assert.notStrictEqual(
+      swrKeys.vodPlatform('tenant-1', 'twitch', '12345'),
+      simpleKeys.vodPlatform('tenant-1', 'twitch', '12345')
     );
   });
 
+  it('should ensure neither swrKeys nor simpleKeys collide with CacheKeys', () => {
+    assert.notStrictEqual(swrKeys.vodStatic('tenant-1', 42), CacheKeys.vodStatic('tenant-1', 42));
+    assert.notStrictEqual(simpleKeys.vodStatic('tenant-1', 42), CacheKeys.vodStatic('tenant-1', 42));
+  });
+});
+
+describe('simpleKeys', () => {
+  it('should produce simple-prefixed key strings distinct from CacheKeys.vodStatic', () => {
+    assert.strictEqual(simpleKeys.vodStatic('tenant-1', 42), 'simple:vod:{tenant-1}:42');
+    assert.notStrictEqual(simpleKeys.vodStatic('tenant-1', 42), CacheKeys.vodStatic('tenant-1', 42));
+  });
+
+  it('should produce simple-prefixed key strings distinct from CacheKeys.emotes', () => {
+    assert.strictEqual(simpleKeys.emotes('tenant-1', 42), 'simple:emotes:{tenant-1}:42');
+    assert.notStrictEqual(simpleKeys.emotes('tenant-1', 42), CacheKeys.emotes('tenant-1', 42));
+  });
+
+  it('should produce simple-prefixed key strings distinct from CacheKeys.bucket', () => {
+    assert.strictEqual(simpleKeys.bucket('tenant-1', 42, 0), 'simple:{tenant-1}:42:bucket:0');
+    assert.notStrictEqual(simpleKeys.bucket('tenant-1', 42, 0), CacheKeys.bucket('tenant-1', 42, 0));
+  });
+
+  it('should produce simple-prefixed key strings distinct from CacheKeys.cursor', () => {
+    assert.strictEqual(simpleKeys.cursor('tenant-1', 42, 'abc'), 'simple:{tenant-1}:42:cursor:abc');
+    assert.notStrictEqual(simpleKeys.cursor('tenant-1', 42, 'abc'), CacheKeys.cursor('tenant-1', 42, 'abc'));
+  });
+
+  it('should produce simple-prefixed key strings distinct from CacheKeys.vodQuery', () => {
+    const simpleKey = simpleKeys.vodQuery('tenant-1', { title: 'test' }, 1, 20);
+    const cacheKey = CacheKeys.vodQuery('tenant-1', { title: 'test' }, 1, 20);
+    assert.ok(simpleKey.startsWith('simple:'));
+    assert.notStrictEqual(simpleKey, cacheKey);
+  });
+
   it('should have stats factory', () => {
-    assert.strictEqual(simpleKeys.stats('tenant-1'), 'stats:tenant-1');
+    assert.strictEqual(simpleKeys.stats('tenant-1'), 'simple:stats:tenant-1');
   });
 
   it('should be typed as string (assignable to string)', () => {

@@ -87,8 +87,11 @@ export function recordFailure(key: string, opts?: Partial<CircuitBreakerOptions>
 }
 
 export function isCircuitOpen(key: string, opts?: Partial<CircuitBreakerOptions>): boolean {
-  const state = getCircuitState(key, opts);
-  return state === 'open' || state === 'half-open';
+  return getCircuitState(key, opts) === 'open';
+}
+
+export function isCircuitHalfOpen(key: string, opts?: Partial<CircuitBreakerOptions>): boolean {
+  return getCircuitState(key, opts) === 'half-open';
 }
 
 export function clearCircuit(key: string): void {

@@ -74,7 +74,8 @@ function isCacheEntry(raw: unknown): raw is CacheEntry<unknown> {
  * Reads from Redis cache, falling back to the fetcher on miss or error.
  * On miss, calls the fetcher and stores the result in Redis with the given TTL.
  * Handles corrupt cache entries gracefully by falling back to the fetcher.
- * Detects SWR-format entries (written by withStaleWhileRevalidate) and treats them as misses.
+ * Namespaces are physically separated (simple: prefix) so SWR entries won't collide,
+ * but the defensive check remains as a safety net for manual Redis operations.
  */
 export async function withCache<T>(key: SimpleKey, ttl: number, fetcher: () => Promise<T>): Promise<T> {
   const client = RedisService.getActiveClient();
@@ -86,7 +87,7 @@ export async function withCache<T>(key: SimpleKey, ttl: number, fetcher: () => P
       const parsed: unknown = JSON.parse(cached);
       if (isCacheEntry(parsed)) {
         cacheMetrics.misses++;
-        getLogger().debug({ key }, 'Cache miss: SWR-format entry found in simple cache');
+        getLogger().debug({ key }, 'Cache miss: unexpected SWR-format entry in simple cache');
         return fetcher();
       }
       cacheMetrics.hits++;
@@ -148,7 +149,7 @@ export async function withStaleWhileRevalidate<T>(
       const parsed: unknown = JSON.parse(cached);
       if (!isCacheEntry(parsed)) {
         cacheMetrics.misses++;
-        getLogger().debug({ key }, 'Cache miss: simple-format entry found in SWR cache');
+        getLogger().debug({ key }, 'Cache miss: unexpected simple-format entry in SWR cache');
         return fetcher();
       }
       const entry = parsed as CacheEntry<T>;

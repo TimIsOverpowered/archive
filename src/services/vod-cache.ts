@@ -4,7 +4,7 @@ import { extractErrorDetails } from '../utils/error.js';
 import { invalidateVodTags, invalidateVodVolatileCache } from './cache-tags.js';
 import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
 import { isConnectionError } from '../db/utils/errors.js';
-import { CacheKeys } from '../utils/cache-keys.js';
+import { CacheKeys, swrKeys, simpleKeys } from '../utils/cache-keys.js';
 
 export { invalidateVodVolatileCache };
 
@@ -120,7 +120,7 @@ export async function invalidateVodStaticCache(tenantId: string, dbId: number): 
   if (!client) return;
 
   try {
-    await client.unlink(CacheKeys.vodStatic(tenantId, dbId));
+    await client.unlink(CacheKeys.vodStatic(tenantId, dbId), swrKeys.vodStatic(tenantId, dbId));
     await invalidateVodTags(tenantId, dbId);
 
     if (isConnectionFailed(tenantId)) {
@@ -149,9 +149,10 @@ export async function invalidateEmoteCache(tenantId: string, vodId: number): Pro
   if (!client) return;
 
   const cacheKey = CacheKeys.emotes(tenantId, vodId);
+  const simpleCacheKey = simpleKeys.emotes(tenantId, vodId);
 
   try {
-    await client.unlink(cacheKey);
+    await client.unlink(cacheKey, simpleCacheKey);
 
     if (isConnectionFailed(tenantId)) {
       markConnectionRestored(tenantId);

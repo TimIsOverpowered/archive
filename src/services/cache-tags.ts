@@ -4,7 +4,7 @@ import { extractErrorDetails } from '../utils/error.js';
 import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
 import { MAX_CACHE_PAGES, CACHE_TAG_TTL_BUFFER_MS } from '../constants.js';
 import { isConnectionError } from '../db/utils/errors.js';
-import { CacheKeys } from '../utils/cache-keys.js';
+import { CacheKeys, swrKeys } from '../utils/cache-keys.js';
 import { HttpError } from '../utils/http-error.js';
 
 function extractPageFromKey(key: string): number | null {
@@ -138,7 +138,7 @@ export async function invalidateVodVolatileCache(tenantId: string, dbId: number)
   if (!client) return;
 
   try {
-    await client.unlink(CacheKeys.vodVolatile(tenantId, dbId));
+    await client.unlink(CacheKeys.vodVolatile(tenantId, dbId), swrKeys.vodVolatile(tenantId, dbId));
 
     if (isConnectionFailed(tenantId)) {
       markConnectionRestored(tenantId);
