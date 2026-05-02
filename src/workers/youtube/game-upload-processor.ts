@@ -244,14 +244,19 @@ async function processSplitGameUpload(
       if (splitGameFfmpegCmd != null) {
         alertFields.push({ name: 'FFmpeg', value: `\`${splitGameFfmpegCmd.substring(0, 500)}\``, inline: false });
       }
-      safeUpdateAlert(splitAlertMessageId, {
-        title: `✂️ Splitting Game Clip`,
-        description: `${channelName} - Game clip exceeds YouTube max duration`,
-        status: 'warning',
-        fields: alertFields,
-        timestamp: new Date().toISOString(),
-        updatedTimestamp: new Date().toISOString(),
-      }, log, vodId);
+      safeUpdateAlert(
+        splitAlertMessageId,
+        {
+          title: `✂️ Splitting Game Clip`,
+          description: `${channelName} - Game clip exceeds YouTube max duration`,
+          status: 'warning',
+          fields: alertFields,
+          timestamp: new Date().toISOString(),
+          updatedTimestamp: new Date().toISOString(),
+        },
+        log,
+        vodId
+      );
     },
     (cmd) => {
       splitGameFfmpegCmd = cmd;
@@ -298,17 +303,22 @@ async function processSplitGameUpload(
     });
   }
 
-  safeUpdateAlert(splitAlertMessageId, {
-    title: `✅ Game Clip Splitting Complete`,
-    description: `${channelName} - Successfully split into ${totalParts} parts`,
-    status: 'success',
-    fields: [
-      { name: 'Total Duration', value: toHHMMSS(trimmedDuration), inline: true },
-      { name: 'Parts Count', value: String(totalParts), inline: false },
-    ],
-    timestamp: new Date().toISOString(),
-    updatedTimestamp: new Date().toISOString(),
-  }, log, vodId);
+  safeUpdateAlert(
+    splitAlertMessageId,
+    {
+      title: `✅ Game Clip Splitting Complete`,
+      description: `${channelName} - Successfully split into ${totalParts} parts`,
+      status: 'success',
+      fields: [
+        { name: 'Total Duration', value: toHHMMSS(trimmedDuration), inline: true },
+        { name: 'Parts Count', value: String(totalParts), inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+      updatedTimestamp: new Date().toISOString(),
+    },
+    log,
+    vodId
+  );
 
   return { success: true, videos: uploadedGameVideos };
 }

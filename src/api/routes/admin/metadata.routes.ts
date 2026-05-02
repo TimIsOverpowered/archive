@@ -8,7 +8,6 @@ import {
   requireTenant,
 } from '../../middleware/tenant-platform.js';
 import { saveVodChapters } from '../../../services/twitch/index.js';
-import { RedisService } from '../../../utils/redis-service.js';
 import { HttpError } from '../../../utils/http-error.js';
 import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
@@ -39,9 +38,7 @@ interface SaveBody {
  * Requires admin API key authentication, tenant middleware, and rate limiting.
  */
 export default function metadataFetchingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const adminRateLimiter = RedisService.requireLimiter('rate:admin');
-
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
+  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
 
   // Fetch and save game chapters from Twitch API (Twitch only)
   fastify.post<{ Params: RouteParams; Body: ChaptersBody }>(

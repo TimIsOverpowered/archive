@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { RedisService } from '../utils/redis-service.js';
-import { getLogger } from '../utils/logger.js';
+import { createRedisSubscriber } from '../utils/redis-subscriber.js';
 import { extractErrorDetails } from '../utils/error.js';
+import { getLogger } from '../utils/logger.js';
 import { invalidateVodVolatileCache } from './cache-tags.js';
 import { setVodVolatileCache, invalidateVodStaticCache } from './vod-cache.js';
 import { Cache } from '../constants.js';
@@ -81,54 +82,11 @@ export async function publishVodDurationUpdate(
  * Subscribes to the cache channel and hooks into fastify's onClose for cleanup.
  */
 export function registerCacheSubscriber(fastify: FastifyInstance): void {
-  const mainClient = RedisService.getActiveClient();
-  if (!mainClient) return;
-
-  const subClient = mainClient.duplicate();
-  const log = getLogger().child({ module: 'cache-subscriber' });
-
-  subClient.on('error', (err) => {
-    log.warn({ err: extractErrorDetails(err) }, 'Cache subscriber client error');
+  const { destroy } = createRedisSubscriber({
+    channel: CACHE_CHANNEL,
+    handler: handleCacheEvent,
+    loggerModule: 'cache-subscriber',
   });
 
-  subClient.on('subscribe', (channel) => {
-    log.debug({ channel }, 'Cache subscriber connected');
-  });
-
-  subClient.on('unsubscribe', (channel) => {
-    log.debug({ channel }, 'Cache subscriber disconnected');
-  });
-
-  subClient.on('reconnect', () => {
-    log.warn('Cache subscriber redis reconnecting, re-subscribing');
-    void subClient.subscribe(CACHE_CHANNEL);
-  });
-
-  subClient.on('message', (_channel: string, message: string) => {
-    if (_channel !== CACHE_CHANNEL) return;
-
-    let event: VodUpdateEvent;
-    try {
-      event = JSON.parse(message) as VodUpdateEvent;
-    } catch {
-      log.warn({ message }, 'Failed to parse cache event');
-      return;
-    }
-
-    void handleCacheEvent(event).catch((error) => {
-      const details = extractErrorDetails(error);
-      log.warn({ err: details, event }, 'Failed to process cache event');
-    });
-  });
-
-  void subClient.subscribe(CACHE_CHANNEL);
-
-  fastify.addHook('onClose', async () => {
-    try {
-      await subClient.unsubscribe(CACHE_CHANNEL);
-    } finally {
-      await subClient.quit();
-    }
-    log.debug('Cache subscriber disconnected');
-  });
+  fastify.addHook('onClose', destroy);
 }

@@ -2,7 +2,6 @@ import { FastifyInstance } from 'fastify';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import { tenantMiddleware, requireTenant } from '../../middleware/tenant-platform.js';
-import { RedisService } from '../../../utils/redis-service.js';
 import { internalServerError } from '../../../utils/http-error.js';
 import type { SourceType, DownloadMethod } from '../../../types/platforms.js';
 import { DOWNLOAD_METHODS, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
@@ -38,9 +37,7 @@ interface DmcaGameBody {
 }
 
 export default function gameUploadRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const adminRateLimiter = RedisService.requireLimiter('rate:admin');
-
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
+  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
 
   fastify.post<{ Params: ReUploadGameParams; Body: ReUploadGameBody }>(
     '/games/re-upload',
@@ -196,7 +193,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
       });
 
       if (dmcaJobId == null) {
-        throw internalServerError('Failed to queue DMCA processing job');
+        return internalServerError('Failed to queue DMCA processing job');
       }
 
       return buildVodJobResponse({

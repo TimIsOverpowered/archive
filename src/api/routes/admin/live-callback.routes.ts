@@ -10,7 +10,6 @@ import {
   requireTenant,
 } from '../../middleware/tenant-platform.js';
 import { fileExists } from '../../../utils/path.js';
-import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { HttpError } from '../../../utils/http-error.js';
 import type { Platform } from '../../../types/platforms.js';
@@ -37,9 +36,7 @@ type LiveCallbackParams = { tenantId: string };
  * Validates recording file, updates duration, queues YouTube upload.
  */
 export default function liveCallbackRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const adminRateLimiter = RedisService.requireLimiter('rate:admin');
-
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
+  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
 
   // Callback endpoint for twitch-recorder-go when live stream recording completes
   fastify.route<{ Params: LiveCallbackParams; Body: LiveCallbackBody }>({

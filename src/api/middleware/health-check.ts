@@ -22,8 +22,6 @@ export default async function healthCheckMiddleware(request: FastifyRequest, rep
   const expectedToken = getHealthToken();
 
   if (token == null || expectedToken == null || !timingSafeEqual(token, expectedToken)) {
-    return reply.status(401).send(
-      errorResponse(401, 'Invalid health check token', 'UNAUTHORIZED')
-    );
+    return reply.status(401).send(errorResponse(401, 'Invalid health check token', 'UNAUTHORIZED'));
   }
 }

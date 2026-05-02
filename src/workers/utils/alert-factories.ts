@@ -5,10 +5,9 @@
 
 import { toHHMMSS } from '../../utils/formatting.js';
 import type { RichEmbedData } from '../../utils/discord-alerts.js';
-import { createProgressBar } from '../../utils/discord-alerts.js';
+import { createProgressBar, updateAlert } from '../../utils/discord-alerts.js';
 import { capitalizePlatform, Platform } from '../../types/platforms.js';
 import type { LiveCompletionData } from '../live.worker.phases.js';
-import { updateAlert } from '../../utils/discord-alerts.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import type { AppLogger } from '../../utils/logger.js';
 
@@ -16,12 +15,7 @@ import type { AppLogger } from '../../utils/logger.js';
  * Safely updates a Discord alert, logging any errors without throwing.
  * This eliminates the repeated `void updateAlert(...).catch((err) => { log.warn(...) })` pattern.
  */
-export function safeUpdateAlert(
-  messageId: string | null,
-  alert: RichEmbedData,
-  log: AppLogger,
-  vodId: string
-): void {
+export function safeUpdateAlert(messageId: string | null, alert: RichEmbedData, log: AppLogger, vodId: string): void {
   void updateAlert(messageId, alert).catch((err) => {
     log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
   });

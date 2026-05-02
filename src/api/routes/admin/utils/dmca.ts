@@ -12,5 +12,5 @@ interface DmcaClaim {
 export function parseDmcaClaims(claims: DmcaClaim[] | string): unknown[] {
   return Array.isArray(claims)
     ? claims
-    : JSON.parse(typeof claims === 'string' ? claims : JSON.stringify(claims)) as unknown[];
+    : (JSON.parse(typeof claims === 'string' ? claims : JSON.stringify(claims)) as unknown[]);
 }

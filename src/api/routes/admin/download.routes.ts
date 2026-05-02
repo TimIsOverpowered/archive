@@ -9,7 +9,6 @@ import {
 } from '../../middleware/tenant-platform.js';
 import { ensureVodDownload, ensureVodRecord, findVodRecord } from './utils/vod-helpers.js';
 import { buildVodJobResponse } from './utils/vod-job-response.js';
-import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { HttpError } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
@@ -52,9 +51,7 @@ interface UploadBody {
  * Requires admin API key authentication, tenant middleware, and rate limiting.
  */
 export default function downloadJobsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const adminLimiter = RedisService.requireLimiter('rate:admin');
-
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminLimiter });
+  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
 
   // Main download endpoint - creates VOD record if missing, then queues download + emote + chat jobs + upload (Twitch/Kick)
   fastify.post<{ Body: UploadBody; Params: Params }>(

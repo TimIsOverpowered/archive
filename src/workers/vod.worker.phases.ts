@@ -1,10 +1,8 @@
 import { Job } from 'bullmq';
 import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
 import { getVodFilePath, getVodDirPath, fileExists } from '../utils/path.js';
-import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
+import { updateAlert } from '../utils/discord-alerts.js';
 import { extractErrorDetails } from '../utils/error.js';
-import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { getJobContext } from './utils/job-context.js';
 import { createVodWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
 import type { StandardVodJob } from './jobs/types.js';
 import { downloadVodWithFfmpeg } from './vod/vod-download-strategies.js';
@@ -15,6 +13,7 @@ import { PlatformNotConfiguredError } from '../utils/domain-errors.js';
 import { getStrategy } from '../services/platforms/strategy.js';
 import type { VodWorkerAlerts } from './utils/alert-factories.js';
 import type { BaseWorkerContext } from './types.js';
+import { buildWorkerContext } from './utils/job-context.js';
 
 export interface VodProcessorContext extends BaseWorkerContext {
   job: Job<StandardVodJob, unknown, string>;
@@ -40,38 +39,34 @@ export async function buildVodProcessorContext(
     platformUsername,
     sourceUrl,
   } = job.data;
-  const log = createAutoLogger(tenantId);
 
-  log.info({ component: 'vod-worker', jobId: job.id, dbId, vodId, platform, tenantId }, 'Starting job');
-  await job.updateProgress(0);
-
-  const ctx = await getJobContext(tenantId);
-  const { config, db } = ctx;
-
-  const finalPath = getVodFilePath({ config, vodId });
-  const streamerName = getDisplayName(config);
-  const alerts = createVodWorkerAlerts();
-
-  const messageId = await initRichAlert(alerts.init(vodId, platform, streamerName));
-
-  return {
+  return buildWorkerContext<
+    VodProcessorContext,
+    {
+      platformUserId: string;
+      platformUsername: string | undefined;
+      sourceUrl: string | undefined;
+      downloadMethod: DownloadMethod;
+      job: Job<StandardVodJob, unknown, string>;
+      streamerName: string;
+      finalPath: string;
+    }
+  >(
     job,
-    config,
-    db,
     tenantId,
-    log,
-    alerts,
-    messageId,
     dbId,
     vodId,
     platform,
-    platformUserId,
-    platformUsername,
-    sourceUrl,
-    streamerName,
-    downloadMethod,
-    finalPath,
-  };
+    (config) => {
+      const streamerName = getDisplayName(config);
+      const finalPath = getVodFilePath({ config, vodId });
+      return {
+        extra: { platformUserId, platformUsername, sourceUrl, downloadMethod, job, streamerName, finalPath },
+        alertInitArgs: [vodId, platform, streamerName],
+      };
+    },
+    createVodWorkerAlerts
+  );
 }
 
 export async function runVodDownload(ctx: VodProcessorContext): Promise<void> {
@@ -129,7 +124,12 @@ export async function runVodDownload(ctx: VodProcessorContext): Promise<void> {
       onProgress: (segmentsDownloaded, totalSegments) => {
         const percent = totalSegments > 0 ? Math.round((segmentsDownloaded / totalSegments) * 100) : 0;
         void ctx.job.updateProgress(percent).catch(() => {});
-        safeUpdateAlert(ctx.messageId, ctx.alerts.progress(ctx.vodId, segmentsDownloaded, totalSegments), ctx.log, ctx.vodId);
+        safeUpdateAlert(
+          ctx.messageId,
+          ctx.alerts.progress(ctx.vodId, segmentsDownloaded, totalSegments),
+          ctx.log,
+          ctx.vodId
+        );
       },
     });
 

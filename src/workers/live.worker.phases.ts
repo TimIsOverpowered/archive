@@ -2,10 +2,8 @@ import { Job } from 'bullmq';
 import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
 import { getMetadata } from './utils/ffmpeg.js';
 import { fileExists, getVodDirPath } from '../utils/path.js';
-import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
+import { updateAlert } from '../utils/discord-alerts.js';
 import { extractErrorDetails } from '../utils/error.js';
-import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { getJobContext } from './utils/job-context.js';
 import { finalizeVod } from '../services/vod-finalization.js';
 import { queueYoutubeUploads, type YoutubeUploadJobResult } from './jobs/youtube.job.js';
 import { downloadHlsStream } from './vod/hls-orchestrator.js';
@@ -17,6 +15,7 @@ import { SOURCE_TYPES } from '../types/platforms.js';
 import { getDisplayName } from '../config/types.js';
 import type { LiveWorkerAlerts } from './utils/alert-factories.js';
 import type { BaseWorkerContext } from './types.js';
+import { buildWorkerContext } from './utils/job-context.js';
 
 export interface LiveCompletionData {
   emotesSaved: boolean;
@@ -46,36 +45,32 @@ export async function buildLiveProcessorContext(
   job: Job<LiveDownloadJob, unknown, string>
 ): Promise<LiveProcessorContext> {
   const { dbId, vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl } = job.data;
-  const log = createAutoLogger(tenantId);
 
-  log.info({ component: 'live-worker', jobId: job.id, dbId, vodId, platform, tenantId }, 'Starting job');
-  await job.updateProgress(0);
-
-  const ctx = await getJobContext(tenantId);
-  const { config, db } = ctx;
-
-  const streamerName = getDisplayName(config);
-  const alerts = createLiveWorkerAlerts();
-
-  const messageId = await initRichAlert(alerts.init(vodId, platform, streamerName, startedAt));
-
-  return {
+  return buildWorkerContext<
+    LiveProcessorContext,
+    {
+      platformUserId: string;
+      platformUsername: string | undefined;
+      startedAt: string | undefined;
+      sourceUrl: string | undefined;
+      job: Job<LiveDownloadJob, unknown, string>;
+      streamerName: string;
+    }
+  >(
     job,
-    config,
-    db,
     tenantId,
-    log,
-    alerts,
-    messageId,
     dbId,
     vodId,
     platform,
-    platformUserId,
-    platformUsername,
-    startedAt,
-    sourceUrl,
-    streamerName,
-  };
+    (config) => {
+      const streamerName = getDisplayName(config);
+      return {
+        extra: { platformUserId, platformUsername, startedAt, sourceUrl, job, streamerName },
+        alertInitArgs: [vodId, platform, streamerName, startedAt],
+      };
+    },
+    createLiveWorkerAlerts
+  );
 }
 
 export async function prepareVodDirectory(ctx: LiveProcessorContext): Promise<void> {

@@ -1,21 +1,20 @@
 import { Job } from 'bullmq';
 import { sleep } from '../utils/delay.js';
 import { fetchComments, fetchNextComments, type TwitchVideoCommentResponse } from '../services/twitch/index.js';
-import { initRichAlert, resetFailures } from '../utils/discord-alerts.js';
+import { resetFailures } from '../utils/discord-alerts.js';
 import type { ChatDownloadJob, ChatDownloadResult } from './jobs/types.js';
-import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { getJobContext } from './utils/job-context.js';
 import { Chat } from '../constants.js';
 import { extractEdges, calculateResumeOffset, extractMessageData } from './chat/chat-helpers.js';
 import type { ChatMessageCreateInput } from './chat/chat-types.js';
 import { type Platform } from '../types/platforms.js';
 import { flushChatBatch } from './chat/chat-batch-processor.js';
 import { createChatWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
-import { getDisplayName } from '../config/types.js';
+import { getDisplayName, type TenantConfig } from '../config/types.js';
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../db/streamer-types.js';
 import type { ChatWorkerAlerts } from './utils/alert-factories.js';
 import type { AppLogger } from '../utils/logger.js';
+import { buildWorkerContext } from './utils/job-context.js';
 
 /**
  * Context for chat download processing.
@@ -23,6 +22,7 @@ import type { AppLogger } from '../utils/logger.js';
  */
 export interface ChatProcessorContext {
   job: Job<ChatDownloadJob>;
+  config: TenantConfig;
   db: Kysely<StreamerDB>;
   tenantId: string;
   dbId: number;
@@ -31,7 +31,7 @@ export interface ChatProcessorContext {
   duration: number;
   displayName: string;
   log: AppLogger;
-  chatAlerts: ChatWorkerAlerts;
+  alerts: ChatWorkerAlerts;
   messageId: string;
   /** Pagination cursor — mutated during download to track last processed offset */
   effectiveOffset: number;
@@ -41,48 +41,39 @@ export interface ChatProcessorContext {
 
 export async function buildChatProcessorContext(job: Job<ChatDownloadJob>): Promise<ChatProcessorContext> {
   const { tenantId, dbId, vodId, platform, duration, startOffset, forceRerun } = job.data;
-  const log = createAutoLogger(tenantId);
 
-  log.debug(
-    { component: 'chat-worker', jobId: job.id, tenantId, dbId, vodId, platform, duration, startOffset, forceRerun },
-    'Job received'
-  );
-
-  const { db, config } = await getJobContext(tenantId);
-  const displayName = getDisplayName(config);
-  const chatAlerts = createChatWorkerAlerts();
-
-  const { offset: effectiveOffset, hasExistingData } = await calculateResumeOffset(db, dbId, startOffset, forceRerun);
-  log.debug(
-    { component: 'chat-worker', vodId, startOffset, effectiveOffset, hasExistingData },
-    'Resume check completed'
-  );
-
-  const isResume = hasExistingData && startOffset == null;
-  const alertData = chatAlerts.init(displayName, vodId, platform, isResume, isResume ? effectiveOffset : undefined);
-  const messageId = await initRichAlert(alertData);
-
-  if (messageId == null) {
-    log.error({ component: 'chat-worker' }, 'Failed to initialize alert');
-    throw new Error('Failed to initialize chat alert');
-  }
-
-  return {
+  return buildWorkerContext<
+    ChatProcessorContext,
+    {
+      job: Job<ChatDownloadJob>;
+      duration: number;
+      forceRerun: boolean;
+      displayName: string;
+      effectiveOffset: number;
+      hasExistingData: boolean;
+    }
+  >(
     job,
-    db,
     tenantId,
     dbId,
     vodId,
     platform,
-    duration,
-    displayName,
-    log,
-    chatAlerts,
-    messageId,
-    effectiveOffset,
-    hasExistingData,
-    forceRerun: forceRerun ?? false,
-  };
+    async (config, db) => {
+      const displayName = getDisplayName(config);
+      const { offset: effectiveOffset, hasExistingData } = await calculateResumeOffset(
+        db,
+        dbId,
+        startOffset,
+        forceRerun
+      );
+      const isResume = hasExistingData && startOffset == null;
+      return {
+        extra: { job, duration, forceRerun: forceRerun ?? false, displayName, effectiveOffset, hasExistingData },
+        alertInitArgs: [displayName, vodId, platform, isResume, isResume ? effectiveOffset : undefined],
+      };
+    },
+    createChatWorkerAlerts
+  );
 }
 
 export async function checkChatCompletion(ctx: ChatProcessorContext): Promise<ChatDownloadResult | null> {
@@ -149,7 +140,12 @@ async function isCompleteByLastMessage(
 
 function markChatComplete(ctx: ChatProcessorContext, totalMessages: number): ChatDownloadResult {
   resetFailures(ctx.tenantId);
-  safeUpdateAlert(ctx.messageId, ctx.chatAlerts.alreadyComplete(ctx.displayName, ctx.vodId, ctx.platform, totalMessages, ctx.effectiveOffset), ctx.log, ctx.vodId);
+  safeUpdateAlert(
+    ctx.messageId,
+    ctx.alerts.alreadyComplete(ctx.displayName, ctx.vodId, ctx.platform, totalMessages, ctx.effectiveOffset),
+    ctx.log,
+    ctx.vodId
+  );
   return { success: true, totalMessages, skipped: true };
 }
 
@@ -165,7 +161,7 @@ async function countChatMessages(db: Kysely<StreamerDB>, dbId: number): Promise<
 export async function downloadChatMessages(
   ctx: ChatProcessorContext
 ): Promise<{ totalMessages: number; batchCount: number }> {
-  const { displayName, dbId, vodId, platform, duration, log, chatAlerts, messageId, db, tenantId } = ctx;
+  const { displayName, dbId, vodId, platform, duration, log, alerts, messageId, db, tenantId } = ctx;
   let totalMessages = 0;
   let batchCount = 0;
   const batchBuffer: ChatMessageCreateInput[] = [];
@@ -189,7 +185,7 @@ export async function downloadChatMessages(
     if (edges.length === 0) {
       log.warn({ vodId, effectiveOffset: ctx.effectiveOffset }, 'No chat messages found for VOD');
       resetFailures(tenantId);
-      safeUpdateAlert(messageId, chatAlerts.noMessages(displayName, vodId, platform, ctx.effectiveOffset), log, vodId);
+      safeUpdateAlert(messageId, alerts.noMessages(displayName, vodId, platform, ctx.effectiveOffset), log, vodId);
       return { totalMessages: 0, batchCount: 0 };
     }
 
@@ -223,7 +219,12 @@ export async function downloadChatMessages(
         vodId,
         onProgress: (offset, batchNumber, messagesInBatch) => {
           reportProgress(offset);
-          safeUpdateAlert(messageId, chatAlerts.progress(displayName, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration), log, vodId);
+          safeUpdateAlert(
+            messageId,
+            alerts.progress(displayName, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration),
+            log,
+            vodId
+          );
         },
         lastOffset,
         totalMessages,
@@ -244,7 +245,12 @@ export async function downloadChatMessages(
       vodId,
       onProgress: (offset, batchNumber, messagesInBatch) => {
         reportProgress(offset);
-        safeUpdateAlert(messageId, chatAlerts.progress(displayName, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration), log, vodId);
+        safeUpdateAlert(
+          messageId,
+          alerts.progress(displayName, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration),
+          log,
+          vodId
+        );
       },
       lastOffset: ctx.effectiveOffset,
       totalMessages,
@@ -288,5 +294,10 @@ export function sendChatCompletionAlert(
     'Download completed successfully'
   );
 
-  safeUpdateAlert(ctx.messageId, ctx.chatAlerts.complete(ctx.displayName, ctx.vodId, ctx.platform, result.totalMessages, result.batchCount), ctx.log, ctx.vodId);
+  safeUpdateAlert(
+    ctx.messageId,
+    ctx.alerts.complete(ctx.displayName, ctx.vodId, ctx.platform, result.totalMessages, result.batchCount),
+    ctx.log,
+    ctx.vodId
+  );
 }

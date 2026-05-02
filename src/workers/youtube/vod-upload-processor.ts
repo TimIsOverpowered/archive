@@ -148,14 +148,19 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
       if (splitFfmpegCmd != null) {
         alertFields.push({ name: 'FFmpeg', value: `\`${splitFfmpegCmd.substring(0, 500)}\``, inline: false });
       }
-      safeUpdateAlert(splitAlertMessageId, {
-        title: '📺 Splitting VOD',
-        description: `${channelName} - Processing part ${partNum}/${totalParts}`,
-        status: 'warning',
-        fields: alertFields,
-        timestamp: new Date().toISOString(),
-        updatedTimestamp: new Date().toISOString(),
-      }, log, vodId);
+      safeUpdateAlert(
+        splitAlertMessageId,
+        {
+          title: '📺 Splitting VOD',
+          description: `${channelName} - Processing part ${partNum}/${totalParts}`,
+          status: 'warning',
+          fields: alertFields,
+          timestamp: new Date().toISOString(),
+          updatedTimestamp: new Date().toISOString(),
+        },
+        log,
+        vodId
+      );
     },
     (cmd) => {
       splitFfmpegCmd = cmd;
@@ -223,18 +228,23 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
     await deleteFileIfExists(partPath);
   }
 
-  safeUpdateAlert(splitAlertMessageId, {
-    title: `✅ VOD Splitting Complete`,
-    description: `${channelName} - Successfully split into ${totalParts} parts`,
-    status: 'success',
-    fields: [
-      { name: 'VOD ID', value: vodId, inline: true },
-      { name: 'Total Duration', value: toHHMMSS(duration), inline: true },
-      { name: 'Parts Created', value: `${totalParts} parts`, inline: false },
-    ],
-    timestamp: new Date().toISOString(),
-    updatedTimestamp: new Date().toISOString(),
-  }, log, vodId);
+  safeUpdateAlert(
+    splitAlertMessageId,
+    {
+      title: `✅ VOD Splitting Complete`,
+      description: `${channelName} - Successfully split into ${totalParts} parts`,
+      status: 'success',
+      fields: [
+        { name: 'VOD ID', value: vodId, inline: true },
+        { name: 'Total Duration', value: toHHMMSS(duration), inline: true },
+        { name: 'Parts Created', value: `${totalParts} parts`, inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+      updatedTimestamp: new Date().toISOString(),
+    },
+    log,
+    vodId
+  );
 
   return { uploadedVideos, needsPartLinking: uploadedVideos.length > 1 };
 }

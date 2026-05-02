@@ -41,14 +41,10 @@ export default function createRateLimitMiddleware(options: RateLimitOptions) {
 
         reply.header('Retry-After', String(retryAfter));
 
-        return reply.status(429).send(
-          errorResponse(429, 'Too Many Requests', 'RATE_LIMITED', retryAfter)
-        );
+        return reply.status(429).send(errorResponse(429, 'Too Many Requests', 'RATE_LIMITED', retryAfter));
       }
 
-       return reply.status(500).send(
-          errorResponse(500, 'Internal server error', 'INTERNAL_SERVER_ERROR')
-        );
+      return reply.status(500).send(errorResponse(500, 'Internal server error', 'INTERNAL_SERVER_ERROR'));
     }
   };
 }

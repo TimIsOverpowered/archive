@@ -1,10 +1,53 @@
 import fs from 'fs';
 import fsPromises from 'fs/promises';
+import type { Kysely } from 'kysely';
+import type { StreamerDB } from '../../db/streamer-types.js';
 import { createYoutubeClient } from './client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { ProgressStream } from '../../utils/progress-stream.js';
 import { YouTube } from '../../constants.js';
+
+export interface UploadedVideo {
+  id: string;
+  part: number;
+  duration: number;
+}
+
+export async function saveUploadResult(
+  db: Kysely<StreamerDB>,
+  vodId: number,
+  type: string,
+  videos: UploadedVideo[]
+): Promise<void> {
+  for (const video of videos) {
+    await db
+      .insertInto('vod_uploads')
+      .values({
+        vod_id: vodId,
+        upload_id: video.id,
+        type,
+        duration: video.duration,
+        part: video.part,
+        status: 'COMPLETED',
+      })
+      .onConflict((oc) =>
+        oc
+          .columns(['vod_id', 'type', 'part'])
+          .doUpdateSet({ upload_id: video.id, status: 'COMPLETED', duration: video.duration })
+      )
+      .execute();
+  }
+}
+
+export async function markUploadFailed(db: Kysely<StreamerDB>, vodId: number, type: string): Promise<void> {
+  await db
+    .updateTable('vod_uploads')
+    .set({ status: 'FAILED' })
+    .where('vod_id', '=', vodId)
+    .where('type', '=', type)
+    .execute();
+}
 
 /** Progress callback data for YouTube video upload events. */
 export interface UploadProgressCallbackData {

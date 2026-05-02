@@ -7,7 +7,6 @@ import {
   asTenantPlatformContext,
   requireTenant,
 } from '../../middleware/tenant-platform.js';
-import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { HttpError, internalServerError } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod } from '../../../types/platforms.js';
@@ -46,9 +45,7 @@ interface DmcaRequestBody {
  * Requires admin API key authentication, tenant middleware, and rate limiting.
  */
 export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const adminRateLimiter = RedisService.requireLimiter('rate:admin');
-
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
+  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
 
   // Main DMCA endpoint - ensure VOD download, then queue DMCA processing
   fastify.post<{ Body: DmcaRequestBody; Params: { tenantId: string } }>(
@@ -125,7 +122,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
       });
 
       if (dmcaJobId == null) {
-        throw internalServerError('Failed to queue DMCA processing job');
+        return internalServerError('Failed to queue DMCA processing job');
       }
 
       // Step 5: Return appropriate response

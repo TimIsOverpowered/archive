@@ -63,9 +63,7 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
       { tenantId, error: extractErrorDetails(err) },
       'Failed to initialize database client during request'
     );
-    return reply.status(503).send(
-      errorResponse(503, 'Database not available', 'SERVICE_UNAVAILABLE')
-    );
+    return reply.status(503).send(errorResponse(503, 'Database not available', 'SERVICE_UNAVAILABLE'));
   }
 
   request.tenant = {
@@ -88,24 +86,20 @@ export async function platformValidationMiddleware(request: FastifyRequest, repl
 
   const requestPlatform = rawPlatform.toLowerCase();
   if (!isValidPlatform(requestPlatform)) {
-    return reply.status(400).send(
-      errorResponse(400, `Invalid platform: ${requestPlatform}`, 'BAD_REQUEST')
-    );
+    return reply.status(400).send(errorResponse(400, `Invalid platform: ${requestPlatform}`, 'BAD_REQUEST'));
   }
 
   const tenant = request.tenant;
   if (tenant == null) {
-    return reply.status(500).send(
-      errorResponse(500, 'Tenant context not found', 'INTERNAL_SERVER_ERROR')
-    );
+    return reply.status(500).send(errorResponse(500, 'Tenant context not found', 'INTERNAL_SERVER_ERROR'));
   }
 
   const config = tenant.config;
 
   if (config[requestPlatform]?.enabled !== true) {
-    return reply.status(400).send(
-      errorResponse(400, `${requestPlatform} is not enabled for this tenant`, 'BAD_REQUEST')
-    );
+    return reply
+      .status(400)
+      .send(errorResponse(400, `${requestPlatform} is not enabled for this tenant`, 'BAD_REQUEST'));
   }
 
   (request.tenant as TenantPlatformContext).platform = requestPlatform;

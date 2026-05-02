@@ -57,6 +57,36 @@ export function detectFmp4FromPlaylist(m3u8Content: string): boolean {
 }
 
 /**
+ * Run an FFmpeg/FFprobe command with standardized spawn, progress tracking, and error handling.
+ * Returns the result of onSuccess on success, or onError/onSpawnError on failure.
+ */
+function runFfmpeg(
+  args: string[],
+  knownDuration: number | null,
+  onProgress?: (percent: number) => void,
+  onStart?: (cmd: string) => void
+): Promise<void> {
+  const cmdStr = `ffmpeg ${args.join(' ')}`;
+
+  return new Promise<void>((_resolve, reject) => {
+    const proc = spawn('ffmpeg', args);
+    trackProgress(proc, cmdStr, knownDuration, onProgress, onStart);
+
+    proc.on('close', (code) => {
+      if (code === 0) {
+        logger.info(`FFmpeg complete: ${cmdStr}`);
+      } else {
+        logger.error({ code }, `FFmpeg failed: ${cmdStr}`);
+      }
+    });
+
+    proc.on('error', (err: Error) => {
+      reject(err);
+    });
+  });
+}
+
+/**
  * Attach progress/start tracking to an FFmpeg spawn process stderr stream.
  * Parses "time=HH:MM:SS.xx" from progress lines against a known total duration.
  * Calls onProgress with bucketed percentage (25% increments).
@@ -182,38 +212,24 @@ export async function trimVideo(
   const outputDir = path.dirname(filePath);
   const outputFile = path.join(outputDir, `${vodId}-${start}-${duration}.mp4`);
 
-  return new Promise((resolve, reject) => {
-    const args = [
-      '-v',
-      'info',
-      '-ss',
-      start.toString(),
-      '-i',
-      filePath,
-      '-t',
-      duration.toString(),
-      '-c',
-      'copy',
-      '-y',
-      outputFile,
-    ];
-    const cmdStr = `ffmpeg ${args.join(' ')}`;
+  const args = [
+    '-v',
+    'info',
+    '-ss',
+    start.toString(),
+    '-i',
+    filePath,
+    '-t',
+    duration.toString(),
+    '-c',
+    'copy',
+    '-y',
+    outputFile,
+  ];
 
-    const proc = spawn('ffmpeg', args);
-    trackProgress(proc, cmdStr, duration, onProgress, onStart);
+  await runFfmpeg(args, duration, onProgress, onStart);
 
-    proc.on('close', (code) => {
-      if (code === 0) {
-        resolve(outputFile);
-      } else {
-        reject(new Error(`FFmpeg trim exited with code ${code}`));
-      }
-    });
-
-    proc.on('error', (err: Error) => {
-      reject(err);
-    });
-  });
+  return outputFile;
 }
 
 export interface VideoMetadata {
@@ -360,59 +376,42 @@ export async function generateBlackSegment(
   onProgress?: (percent: number) => void,
   onStart?: (cmd: string) => void
 ): Promise<string | null> {
-  return new Promise((resolve) => {
-    const { width, height, frameRate, pixFmt, audioCodec, sampleRate, channels, profile } = metadata;
-    const videoCodec = resolveVideoEncoder(metadata.videoCodec);
-    const fr = frameRate ?? '30';
-    const pf = pixFmt ?? 'yuv420p';
+  const { width, height, frameRate, pixFmt, audioCodec, sampleRate, channels, profile } = metadata;
+  const videoCodec = resolveVideoEncoder(metadata.videoCodec);
+  const fr = frameRate ?? '30';
+  const pf = pixFmt ?? 'yuv420p';
 
-    const args: string[] = [];
+  const args: string[] = [];
+  args.push('-f', 'lavfi');
+  args.push('-i', `color=c=black:s=${width}x${height}:r=${fr}`);
 
+  if (audioCodec != null && sampleRate != null) {
+    const chLayout = resolveAudioChannel(channels);
     args.push('-f', 'lavfi');
-    args.push('-i', `color=c=black:s=${width}x${height}:r=${fr}`);
+    args.push('-i', `anullsrc=r=${sampleRate}:cl=${chLayout}`);
+  }
 
-    if (audioCodec != null && sampleRate != null) {
-      const chLayout = resolveAudioChannel(channels);
-      args.push('-f', 'lavfi');
-      args.push('-i', `anullsrc=r=${sampleRate}:cl=${chLayout}`);
-    }
+  args.push('-t', duration.toString());
+  args.push('-c:v', videoCodec);
+  args.push('-pix_fmt', pf);
 
-    args.push('-t', duration.toString());
-    args.push('-c:v', videoCodec);
-    args.push('-pix_fmt', pf);
+  if (profile != null && profile !== '') {
+    args.push('-profile:v', profile);
+  }
 
-    if (profile != null && profile !== '') {
-      args.push('-profile:v', profile);
-    }
+  if (audioCodec != null && sampleRate != null) {
+    const audioEncoder = resolveAudioEncoder(audioCodec);
+    args.push('-c:a', audioEncoder);
+    args.push('-map', '0:v:0');
+    args.push('-map', '1:a:0');
+  }
 
-    if (audioCodec != null && sampleRate != null) {
-      const audioEncoder = resolveAudioEncoder(audioCodec);
-      args.push('-c:a', audioEncoder);
-      args.push('-map', '0:v:0');
-      args.push('-map', '1:a:0');
-    }
+  args.push('-v', 'info');
+  args.push('-y');
+  args.push(outputPath);
 
-    args.push('-v', 'info');
-    args.push('-y');
-    args.push(outputPath);
-
-    const cmdStr = `ffmpeg ${args.join(' ')}`;
-    const proc = spawn('ffmpeg', args);
-    trackProgress(proc, cmdStr, duration, onProgress, onStart);
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        resolve(outputPath);
-      } else {
-        resolve(null);
-      }
-    });
-
-    proc.on('error', (err) => {
-      logger.error(`Failed to spawn FFmpeg process: ${err.message}`);
-      resolve(null);
-    });
-  });
+  await runFfmpeg(args, duration, onProgress, onStart);
+  return outputPath;
 }
 
 export async function muteAudioSections(
@@ -424,29 +423,12 @@ export async function muteAudioSections(
 ): Promise<string | null> {
   const meta = await getMetadata(videoPath);
   const knownDuration = meta?.duration ?? null;
+  const afFilter = filters.join(',');
 
-  return new Promise((resolve) => {
-    const afFilter = filters.join(',');
+  const args = ['-v', 'info', '-i', videoPath, '-c:v', 'copy', '-af', afFilter, '-c:a', 'aac', '-y', outputPath];
 
-    const args = ['-v', 'info', '-i', videoPath, '-c:v', 'copy', '-af', afFilter, '-c:a', 'aac', '-y', outputPath];
-    const cmdStr = `ffmpeg ${args.join(' ')}`;
-
-    const proc = spawn('ffmpeg', args);
-    trackProgress(proc, cmdStr, knownDuration, onProgress, onStart);
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        resolve(outputPath);
-      } else {
-        resolve(null);
-      }
-    });
-
-    proc.on('error', (err) => {
-      logger.error(`FFmpeg mute error: ${err.message}`);
-      resolve(null);
-    });
-  });
+  await runFfmpeg(args, knownDuration, onProgress, onStart);
+  return outputPath;
 }
 
 export async function extractSegment(
@@ -457,39 +439,23 @@ export async function extractSegment(
   onProgress?: (percent: number) => void,
   onStart?: (cmd: string) => void
 ): Promise<string | null> {
-  return new Promise((resolve) => {
-    const args = [
-      '-v',
-      'info',
-      '-ss',
-      start.toString(),
-      '-i',
-      source,
-      '-t',
-      duration.toString(),
-      '-c',
-      'copy',
-      '-y',
-      outputPath,
-    ];
-    const cmdStr = `ffmpeg ${args.join(' ')}`;
+  const args = [
+    '-v',
+    'info',
+    '-ss',
+    start.toString(),
+    '-i',
+    source,
+    '-t',
+    duration.toString(),
+    '-c',
+    'copy',
+    '-y',
+    outputPath,
+  ];
 
-    const proc = spawn('ffmpeg', args);
-    trackProgress(proc, cmdStr, duration, onProgress, onStart);
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        resolve(outputPath);
-      } else {
-        resolve(null);
-      }
-    });
-
-    proc.on('error', (err) => {
-      logger.error(`Segment extract error: ${err.message}`);
-      resolve(null);
-    });
-  });
+  await runFfmpeg(args, duration, onProgress, onStart);
+  return outputPath;
 }
 
 export interface ConcatSegmentsOptions {
@@ -504,37 +470,23 @@ export async function concatSegments(
   outputPath: string,
   options?: ConcatSegmentsOptions
 ): Promise<string | null> {
-  return new Promise((resolve) => {
-    const listPath = outputPath.replace('.mp4', '-concat.txt');
-    writeFileSync(listPath, segmentFiles.map((f) => `file '${f}'`).join('\n') + '\n');
+  const listPath = outputPath.replace('.mp4', '-concat.txt');
+  writeFileSync(listPath, segmentFiles.map((f) => `file '${f}'`).join('\n') + '\n');
 
-    const args: string[] = ['-v', 'info', '-f', 'concat', '-safe', '0', '-i', listPath];
-    if (options?.audioFilters != null && options.audioFilters.length > 0) {
-      args.push('-c:v', 'copy', '-af', options.audioFilters.join(','), '-c:a', 'aac');
-    } else {
-      args.push('-c', 'copy');
-    }
-    args.push('-y', outputPath);
-    const cmdStr = `ffmpeg ${args.join(' ')}`;
+  const args: string[] = ['-v', 'info', '-f', 'concat', '-safe', '0', '-i', listPath];
+  if (options?.audioFilters != null && options.audioFilters.length > 0) {
+    args.push('-c:v', 'copy', '-af', options.audioFilters.join(','), '-c:a', 'aac');
+  } else {
+    args.push('-c', 'copy');
+  }
+  args.push('-y', outputPath);
 
-    const proc = spawn('ffmpeg', args);
-    trackProgress(proc, cmdStr, options?.totalDuration ?? null, options?.onProgress, options?.onStart);
-
-    proc.on('close', (code) => {
-      void deleteFileIfExists(listPath);
-      if (code === 0) {
-        resolve(outputPath);
-      } else {
-        resolve(null);
-      }
-    });
-
-    proc.on('error', (err) => {
-      void deleteFileIfExists(listPath);
-      logger.error(`Concat error: ${err.message}`);
-      resolve(null);
-    });
-  });
+  try {
+    await runFfmpeg(args, options?.totalDuration ?? null, options?.onProgress, options?.onStart);
+    return outputPath;
+  } finally {
+    await deleteFileIfExists(listPath);
+  }
 }
 
 /**
@@ -560,31 +512,15 @@ export async function convertHlsToMp4(source: string, outputPath: string, option
   }
 
   const args: string[] = ['-v', 'info', '-i', source, '-c', 'copy', ...baseOptions, '-y', outputPath];
-  const cmdStr = `ffmpeg ${args.join(' ')}`;
 
-  return new Promise((resolve, reject) => {
-    const proc = spawn('ffmpeg', args);
-    trackProgress(proc, cmdStr, knownDuration, options?.onProgress, options?.onStart);
+  const ctx = options?.vodId != null ? `VOD ${options.vodId}` : source.substring(0, 40);
+  let hlsLogged = false;
+  const customOnStart = (_cmd: string) => {
+    if (!hlsLogged) {
+      hlsLogged = true;
+      logger.info({ isFmp4 }, `${ctx} - Converting HLS to MP4${isFmp4 ? ' (fMP4)' : ''}`);
+    }
+  };
 
-    const ctx = options?.vodId != null ? `VOD ${options.vodId}` : source.substring(0, 40);
-    let hlsLogged = false;
-    proc.stderr.on('data', () => {
-      if (!hlsLogged) {
-        hlsLogged = true;
-        logger.info({ isFmp4 }, `${ctx} - Converting HLS to MP4${isFmp4 ? ' (fMP4)' : ''}`);
-      }
-    });
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`FFmpeg HLS conversion exited with code ${code}`));
-      }
-    });
-
-    proc.on('error', (err: Error) => {
-      reject(err);
-    });
-  });
+  await runFfmpeg(args, knownDuration, options?.onProgress, customOnStart);
 }

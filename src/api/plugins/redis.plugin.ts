@@ -28,9 +28,14 @@ const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, opti
 
   // Register on Fastify instance for backward compatibility
   fastify.decorate('redis', RedisService.getClient());
-  fastify.decorate('publicRateLimiter', RedisService.getLimiter('rate:vods'));
-  fastify.decorate('chatRateLimiter', RedisService.getLimiter('rate:chat'));
-  fastify.decorate('adminRateLimiter', RedisService.getLimiter('rate:admin'));
+  const vodsLimiter = RedisService.getLimiter('rate:vods');
+  const chatLimiter = RedisService.getLimiter('rate:chat');
+  const adminLimiter = RedisService.getLimiter('rate:admin');
+  if (vodsLimiter && chatLimiter && adminLimiter) {
+    fastify.decorate('publicRateLimiter', vodsLimiter);
+    fastify.decorate('chatRateLimiter', chatLimiter);
+    fastify.decorate('adminRateLimiter', adminLimiter);
+  }
 
   getLogger().info({ vodLimit, chatLimit, adminGetLimit }, 'Rate limiters initialized');
 };

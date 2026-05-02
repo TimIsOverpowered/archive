@@ -9,7 +9,7 @@ import healthCheckMiddleware from '../middleware/health-check.js';
 import { RedisService } from '../../utils/redis-service.js';
 import { getCacheMetrics } from '../../utils/cache.js';
 import { QUEUE_NAMES } from '../../workers/queues/queue.js';
-import type { QueueJob } from '../../workers/queues/types.js';
+import type { AllJobData } from '../../workers/worker-definitions.js';
 import { getRedisInstance } from '../../workers/redis.js';
 import { ok } from '../response.js';
 
@@ -130,7 +130,7 @@ async function getQueueMetrics(): Promise<
   try {
     const redis = getRedisInstance();
     for (const queueName of Object.values(QUEUE_NAMES)) {
-      const queue = new Queue<QueueJob, QueueJob, string>(queueName, { connection: redis });
+      const queue = new Queue<AllJobData, AllJobData, string>(queueName, { connection: redis });
       try {
         const counts = await queue.getJobCounts();
         result[queueName] = {

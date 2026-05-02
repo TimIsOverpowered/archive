@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { RedisService } from '../../utils/redis-service.js';
 import { configService } from '../../config/tenant-config.js';
@@ -6,7 +6,7 @@ import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { HttpError } from '../../utils/http-error.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getChannelBadges, getGlobalBadges } from '../../services/twitch/index.js';
-import { ok } from '../response.js';
+import { ok, errorResponse } from '../response.js';
 
 /** Options for registering the badges routes plugin. */
 interface BadgesRoutesOptions {
@@ -18,14 +18,12 @@ interface BadgesRoutesOptions {
  * Requires rate limiting.
  */
 export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesRoutesOptions) {
-  const badgesRateLimiter = RedisService.requireLimiter('rate:vods');
-
   const rateLimitMiddleware = createRateLimitMiddleware({
-    limiter: badgesRateLimiter,
+    limiter: fastify.publicRateLimiter,
   });
 
   // Get Twitch badges for a channel (global + subscriber) with Redis caching
-  fastify.get(
+  fastify.get<{ Params: { tenantId: string } }>(
     '/:tenantId/badges/twitch',
     {
       schema: {
@@ -39,7 +37,7 @@ export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesR
       },
       onRequest: [rateLimitMiddleware],
     },
-    async (request: FastifyRequest<{ Params: { tenantId: string }; Body?: unknown }>): Promise<unknown> => {
+    async (request, reply) => {
       const tenantId = request.params.tenantId;
       const log = createAutoLogger(tenantId);
 
@@ -90,7 +88,7 @@ export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesR
         const details = extractErrorDetails(err);
         log.error({ err: details }, 'Failed to fetch Twitch badges');
 
-        return ok({ channel: null, global: null });
+        return reply.status(502).send(errorResponse(502, 'Failed to fetch badges from Twitch', 'BADGES_FETCH_FAILED'));
       }
     }
   );

@@ -78,16 +78,14 @@ export async function buildServer() {
       getLogger().error(createErrorContext(error), 'Request error');
     }
 
-    return reply.status(statusCode).send(
-      errorResponse(statusCode, isClientError ? message : 'Internal server error', code)
-    );
+    return reply
+      .status(statusCode)
+      .send(errorResponse(statusCode, isClientError ? message : 'Internal server error', code));
   });
 
   // Set 404 handler immediately after error handler
   fastify.setNotFoundHandler((_request, reply) => {
-    return reply.status(404).send(
-      errorResponse(404, 'Route not found', 'NOT_FOUND')
-    );
+    return reply.status(404).send(errorResponse(404, 'Route not found', 'NOT_FOUND'));
   });
 
   // Add tenant display name to logger for routes with streamer ID

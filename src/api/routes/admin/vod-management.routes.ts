@@ -8,7 +8,6 @@ import {
   asTenantPlatformContext,
   requireTenant,
 } from '../../middleware/tenant-platform.js';
-import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { HttpError } from '../../../utils/http-error.js';
 import { findVodRecord, ensureVodRecord } from './utils/vod-helpers.js';
@@ -27,9 +26,7 @@ import type { InsertableVods, SelectableVods } from '../../../db/streamer-types.
  * Requires admin API key authentication, tenant middleware, and rate limiting.
  */
 export default function vodManagementRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const adminRateLimiter = RedisService.requireLimiter('rate:admin');
-
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
+  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
 
   // Get detailed stats for a tenant
   fastify.get<{ Params: StatsParams }>(
@@ -111,8 +108,8 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
         await invalidateVodStaticCache(tenantId, fetchedVod.id);
         await invalidateVodVolatileCache(tenantId, fetchedVod.id);
 
-    log.info(`Created/fetched VOD ${vodId} via API`);
-         return ok({ message: `${fetchedVod.id} created!`, vodId: fetchedVod.id });
+        log.info(`Created/fetched VOD ${vodId} via API`);
+        return ok({ message: `${fetchedVod.id} created!`, vodId: fetchedVod.id });
       }
 
       const { title, createdAt, duration } = request.body;

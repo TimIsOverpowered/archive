@@ -7,7 +7,6 @@ import {
   asTenantPlatformContext,
   requireTenant,
 } from '../../middleware/tenant-platform.js';
-import { RedisService } from '../../../utils/redis-service.js';
 import { HttpError } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
 import {
@@ -42,9 +41,7 @@ interface ReUploadYoutubeBody {
  * Requires admin API key authentication, tenant middleware, and rate limiting.
  */
 export default function youtubeUploadRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const adminRateLimiter = RedisService.requireLimiter('rate:admin');
-
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
+  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
 
   // Manually trigger YouTube re-upload for a VOD
   fastify.post<{ Params: ReUploadYoutubeParams; Body: ReUploadYoutubeBody }>(

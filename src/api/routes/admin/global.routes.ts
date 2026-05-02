@@ -2,7 +2,6 @@ import { FastifyInstance } from 'fastify';
 import { getAllTenants } from '../../../services/tenants.service.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import { RedisService } from '../../../utils/redis-service.js';
 import { ok } from '../../response.js';
 
 /**
@@ -10,9 +9,7 @@ import { ok } from '../../response.js';
  * Requires admin API key authentication and rate limiting.
  */
 export default function globalAdminRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const adminRateLimiter = RedisService.requireLimiter('rate:admin');
-
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
+  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
 
   fastify.get(
     '/tenants',

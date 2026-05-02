@@ -67,13 +67,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
   const thisMonthStart = dayjs().startOf('month').toDate();
 
   return await withCache(simpleKeys.stats(tenantId), cacheTtl, async () => {
-    const [
-      healthCheck,
-      vodStats,
-      uploadStats,
-      chapterRow,
-      uniqueGamesCount,
-    ] = await Promise.all([
+    const [healthCheck, vodStats, uploadStats, chapterRow, uniqueGamesCount] = await Promise.all([
       sql`SELECT 1`
         .execute(db)
         .then(() => 'connected')
@@ -85,10 +79,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
           eb.fn.count('id').as('cnt'),
           eb.fn.sum('duration').as('dur'),
           eb.fn.max('created_at').as('last'),
-          eb.fn
-            .count('id')
-            .filterWhere('created_at', '>=', thisMonthStart)
-            .as('this_month_cnt'),
+          eb.fn.count('id').filterWhere('created_at', '>=', thisMonthStart).as('this_month_cnt'),
         ])
         .groupBy('platform')
         .execute(),
@@ -96,10 +87,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
         .selectFrom('vod_uploads')
         .select((eb) => [
           eb.fn.count('upload_id').filterWhere('status', '=', 'FAILED').as('failed_cnt'),
-          eb.fn
-            .count('upload_id')
-            .filterWhere('status', 'in', ['COMPLETED', 'FAILED'])
-            .as('total_cnt'),
+          eb.fn.count('upload_id').filterWhere('status', 'in', ['COMPLETED', 'FAILED']).as('total_cnt'),
           eb.fn.max('created_at').filterWhere('status', '=', 'COMPLETED').as('last_upload'),
         ])
         .executeTakeFirst(),

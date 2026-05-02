@@ -9,7 +9,7 @@ export interface BaseWorkerContext {
   db: Kysely<StreamerDB>;
   tenantId: string;
   log: AppLogger;
-  messageId: string | null;
+  messageId: string;
   dbId: number;
   vodId: string;
   platform: Platform;

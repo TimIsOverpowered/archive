@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { getVods, getVodById, getVodByPlatformId, VodQuerySchema } from '../../services/vods.service.js';
 import { getEmotesByVodId } from '../../services/emotes.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
-import { RedisService } from '../../utils/redis-service.js';
 import { HttpError } from '../../utils/http-error.js';
 import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
 import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
@@ -33,10 +32,8 @@ async function fetchVodByIdSafe(vodId: number, db: Kysely<StreamerDB>, tenantId:
  * All routes require tenant middleware and rate limiting.
  */
 export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutesOptions) {
-  const publicRateLimiter = RedisService.requireLimiter('rate:vods');
-
   const rateLimitMiddleware = createRateLimitMiddleware({
-    limiter: publicRateLimiter,
+    limiter: fastify.publicRateLimiter,
   });
 
   fastify.get(

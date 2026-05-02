@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import type { DmcaProcessingJob } from './jobs/types.js';
-import { queueYoutubeVodUpload } from './jobs/youtube.job.js';
+import { queueYoutubeVodUpload, queueYoutubeGameUploadByGame } from './jobs/youtube.job.js';
 import {
   isBlockingPolicy,
   buildMuteFilters,
@@ -19,9 +19,7 @@ import { extractErrorDetails } from '../utils/error.js';
 import { initRichAlert } from '../utils/discord-alerts.js';
 import { createDmcaWorkerAlerts, DmcaClaimInfo, safeUpdateAlert } from './utils/alert-factories.js';
 import { ConfigNotConfiguredError, FileNotFound } from '../utils/domain-errors.js';
-import { getDisplayName } from '../config/types.js';
-import { uploadAndUpsertGame } from './youtube/game-upload-processor.js';
-import { buildYoutubeMetadata } from './youtube/metadata-builder.js';
+
 import type { TenantConfig } from '../config/types.js';
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../db/streamer-types.js';
@@ -29,7 +27,6 @@ import type { AppLogger } from '../utils/logger.js';
 import type { Platform, SourceType } from '../types/platforms.js';
 import type { DmcaWorkerAlerts } from './utils/alert-factories.js';
 import type { DMCAClaim } from './dmca/dmca.js';
-import type { VodRecord } from '../types/db.js';
 
 export interface DmcaProcessorContext {
   job: Job<DmcaProcessingJob>;
@@ -51,7 +48,7 @@ export interface DmcaProcessorContext {
   gameEnd: number | undefined;
   part: number | undefined;
   log: AppLogger;
-  dmcaAlerts: DmcaWorkerAlerts;
+  alerts: DmcaWorkerAlerts;
   messageId: string;
   workDir: string;
   tempFiles: string[];
@@ -123,9 +120,9 @@ export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Pr
   };
 
   const claimInfos: DmcaClaimInfo[] = blockingClaims.map(buildClaimInfo);
-  const dmcaAlerts = createDmcaWorkerAlerts();
+  const alerts = createDmcaWorkerAlerts();
   const displayName = config.displayName ?? config.id;
-  const messageId = await initRichAlert(dmcaAlerts.processing(vodId, claimInfos, platform, displayName, part));
+  const messageId = await initRichAlert(alerts.processing(vodId, claimInfos, platform, displayName, part));
   if (messageId == null) {
     throw new Error('Failed to initialize DMCA alert');
   }
@@ -167,7 +164,7 @@ export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Pr
     gameEnd,
     part,
     log,
-    dmcaAlerts,
+    alerts,
     messageId,
     workDir: getVodDirPath({ config, vodId }),
     tempFiles: [],
@@ -226,7 +223,7 @@ export async function processDmcaClaims(ctx: DmcaProcessorContext): Promise<void
   const sendAlert = (step: string, progress?: number) => {
     const alertData =
       progress != null
-        ? ctx.dmcaAlerts.progress(
+        ? ctx.alerts.progress(
             ctx.vodId,
             ctx.claimInfos,
             ctx.completedClaimIds,
@@ -235,14 +232,7 @@ export async function processDmcaClaims(ctx: DmcaProcessorContext): Promise<void
             ctx.displayName,
             progress
           )
-        : ctx.dmcaAlerts.progress(
-            ctx.vodId,
-            ctx.claimInfos,
-            ctx.completedClaimIds,
-            step,
-            ctx.platform,
-            ctx.displayName
-          );
+        : ctx.alerts.progress(ctx.vodId, ctx.claimInfos, ctx.completedClaimIds, step, ctx.platform, ctx.displayName);
     safeUpdateAlert(ctx.messageId, alertData, ctx.log, ctx.vodId);
   };
 
@@ -335,42 +325,25 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
     const game = await ctx.db.selectFrom('games').selectAll().where('id', '=', ctx.gameId).executeTakeFirst();
     const gameName = game?.game_name ?? '';
     const gameTitle = game?.title ?? '';
-    const vodRecord = (await ctx.db.selectFrom('vods').where('id', '=', ctx.dbId).selectAll().executeTakeFirst()) as
-      | VodRecord
-      | undefined;
 
-    if (!vodRecord) {
-      ctx.log.warn({ vodId: ctx.vodId, dbId: ctx.dbId }, 'VOD record not found for game upload');
-    } else {
-      const { title, description } = buildYoutubeMetadata({
-        channelName: getDisplayName(ctx.config),
-        platform: ctx.platform,
-        domainName: ctx.config.settings?.domainName ?? '',
-        timezone: ctx.config.settings?.timezone ?? 'UTC',
-        youtubeDescription: ctx.config.youtube?.description,
-        gameName: gameTitle,
-        vodRecord,
-      });
-
-      try {
-        await uploadAndUpsertGame({
-          tenantId: ctx.tenantId,
-          dbId: ctx.dbId,
-          vodId: ctx.vodId,
-          filePath: ctx.processedPath,
-          chapterStart: ctx.gameStart,
-          chapterEnd: ctx.gameEnd,
-          chapterName: gameName,
-          chapterGameId: game?.game_id ?? '',
-          title,
-          description,
-          db: ctx.db,
-          config: ctx.config,
-          log: ctx.log,
-        });
-      } catch (err) {
-        ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Game upload failed');
-      }
+    try {
+      await queueYoutubeGameUploadByGame(
+        { tenantId: ctx.tenantId, config: ctx.config, db: ctx.db },
+        ctx.dbId,
+        ctx.vodId,
+        ctx.processedPath,
+        ctx.platform,
+        {
+          id: ctx.gameId,
+          name: gameName,
+          start: ctx.gameStart,
+          end: ctx.gameEnd,
+          gameId: game?.game_id ?? undefined,
+          title: gameTitle,
+        }
+      );
+    } catch (err) {
+      ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Game upload queue failed');
     }
   } else {
     try {

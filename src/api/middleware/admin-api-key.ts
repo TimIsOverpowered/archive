@@ -42,9 +42,7 @@ export default async function adminApiKeyMiddleware(request: FastifyRequest, rep
   } catch (err) {
     const retryAfter = err instanceof RateLimiterRes ? Math.ceil(err.msBeforeNext / 1000) : 1;
     reply.header('Retry-After', String(retryAfter));
-    return reply.status(429).send(
-      errorResponse(429, 'Too Many Requests', 'RATE_LIMITED', retryAfter)
-    );
+    return reply.status(429).send(errorResponse(429, 'Too Many Requests', 'RATE_LIMITED', retryAfter));
   }
 
   const admin = await findAdminByApiKey(apiKey);

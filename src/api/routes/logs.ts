@@ -2,7 +2,6 @@ import { FastifyInstance, FastifySchema } from 'fastify';
 import { z } from 'zod';
 import { getLogsByOffset, getLogsByCursor } from '../../services/logs.service.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
-import { RedisService } from '../../utils/redis-service.js';
 import { HttpError, badRequest } from '../../utils/http-error.js';
 import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
 import { ok } from '../response.js';
@@ -22,10 +21,8 @@ interface LogsRoutesOptions {
  * Requires tenant middleware and rate limiting.
  */
 export default function logsRoutes(fastify: FastifyInstance, _options: LogsRoutesOptions) {
-  const chatRateLimiter = RedisService.requireLimiter('rate:chat');
-
   const rateLimitMiddleware = createRateLimitMiddleware({
-    limiter: chatRateLimiter,
+    limiter: fastify.chatRateLimiter,
   });
 
   fastify.get<{
@@ -66,7 +63,7 @@ export default function logsRoutes(fastify: FastifyInstance, _options: LogsRoute
       const tenantCtx = requireTenant(request);
       const { db } = tenantCtx;
       const vodIdNum = Number(vodId);
-      if (isNaN(vodIdNum)) throw badRequest('Invalid VOD ID');
+      if (isNaN(vodIdNum)) return badRequest('Invalid VOD ID');
 
       const parsed = LogsQuerySchema.safeParse(request.query);
       if (!parsed.success) {
