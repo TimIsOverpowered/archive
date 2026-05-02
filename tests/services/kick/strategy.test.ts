@@ -126,8 +126,8 @@ describe('Kick Strategy: finalizeChapters', () => {
 
 describe('Kick Strategy: registration', () => {
   it('should be registerable as kick strategy', () => {
-    registerStrategy('kick' as Platform, strategy);
-    const registered = getStrategy('kick' as Platform);
+    registerStrategy('kick', strategy);
+    const registered = getStrategy('kick');
     assert.strictEqual(registered, strategy);
   });
 

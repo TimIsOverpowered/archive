@@ -48,7 +48,7 @@ describe('HttpError', () => {
         assert.fail('Should have thrown');
       } catch (error) {
         assert.ok(error instanceof HttpError);
-        assert.strictEqual((error as HttpError).statusCode, 400);
+        assert.strictEqual((error).statusCode, 400);
         assert.strictEqual((error as Error).message, 'Invalid request parameters');
       }
     });
@@ -71,7 +71,7 @@ describe('HttpError', () => {
         assert.fail('Should have thrown');
       } catch (error) {
         assert.ok(error instanceof HttpError);
-        assert.strictEqual((error as HttpError).statusCode, 404);
+        assert.strictEqual((error).statusCode, 404);
         assert.strictEqual((error as Error).message, 'Resource not found');
       }
     });
@@ -84,7 +84,7 @@ describe('HttpError', () => {
         assert.fail('Should have thrown');
       } catch (error) {
         assert.ok(error instanceof HttpError);
-        assert.strictEqual((error as HttpError).statusCode, 503);
+        assert.strictEqual((error).statusCode, 503);
         assert.strictEqual((error as Error).message, 'Service temporarily unavailable');
       }
     });
@@ -97,7 +97,7 @@ describe('HttpError', () => {
         assert.fail('Should have thrown');
       } catch (error) {
         assert.ok(error instanceof HttpError);
-        assert.strictEqual((error as HttpError).statusCode, 500);
+        assert.strictEqual((error).statusCode, 500);
         assert.strictEqual((error as Error).message, 'An unexpected error occurred');
       }
     });

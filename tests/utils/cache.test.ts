@@ -96,7 +96,7 @@ describe('withCache', () => {
         assert.fail('Should have thrown');
       } catch (error) {
         assert.ok(error instanceof Error);
-        assert.strictEqual((error as Error).message, 'Fetcher failed');
+        assert.strictEqual((error).message, 'Fetcher failed');
       }
     });
   });
@@ -205,7 +205,7 @@ describe('withStaleWhileRevalidate', () => {
         assert.fail('Should have thrown');
       } catch (error) {
         assert.ok(error instanceof Error);
-        assert.strictEqual((error as Error).message, 'SWR Fetcher failed');
+        assert.strictEqual((error).message, 'SWR Fetcher failed');
       }
     });
 
@@ -226,7 +226,7 @@ describe('withStaleWhileRevalidate', () => {
         assert.fail('Should have thrown');
       } catch (error) {
         assert.ok(error instanceof CustomError);
-        assert.strictEqual((error as CustomError).name, 'CustomSWRError');
+        assert.strictEqual((error).name, 'CustomSWRError');
       }
     });
   });

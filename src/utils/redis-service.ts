@@ -117,6 +117,14 @@ export class RedisService {
     return instance.close();
   }
 
+  static reset(): void {
+    if (this._instance) {
+      this._instance.limiters.clear();
+    }
+    this._instance = null;
+    RedisService._readyPromise = null;
+  }
+
   async connect(): Promise<void> {
     if (!this._options) {
       throw new Error('RedisService options not provided. Call RedisService.init() first.');

@@ -1,4 +1,5 @@
 import Fastify, { FastifyInstance } from 'fastify';
+import { hasStatusCode, extractErrorDetails } from '../../src/utils/error.js';
 
 export interface TestServerOptions {
   disableRedis?: boolean;
@@ -21,10 +22,11 @@ export async function buildTestServer(_options: TestServerOptions = {}): Promise
   });
 
   server.setErrorHandler((error: unknown, _request, reply) => {
-    const statusCode = (error instanceof Error && (error as any).statusCode) ?? 500;
+    const statusCode = hasStatusCode(error) ? error.statusCode : 500;
+    const { message } = extractErrorDetails(error);
     return reply.status(statusCode).send({
       statusCode,
-      message: 'Internal server error',
+      message: statusCode >= 500 ? 'Internal server error' : message,
       code: 'INTERNAL_SERVER_ERROR',
     });
   });

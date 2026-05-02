@@ -6,7 +6,7 @@ import fsPromises from 'fs/promises';
 describe('cleanupOrphanedTmpFiles', () => {
   it('should not throw when directory is empty', async () => {
     const mockReaddir = fsPromises.readdir;
-    let files: string[] = [];
+    const files: string[] = [];
 
     (fsPromises as any).readdir = async () => files;
 

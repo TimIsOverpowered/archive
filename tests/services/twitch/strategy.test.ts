@@ -126,8 +126,8 @@ describe('Twitch Strategy: finalizeChapters', () => {
 
 describe('Twitch Strategy: registration', () => {
   it('should be registerable as twitch strategy', () => {
-    registerStrategy('twitch' as Platform, strategy);
-    const registered = getStrategy('twitch' as Platform);
+    registerStrategy('twitch', strategy);
+    const registered = getStrategy('twitch');
     assert.strictEqual(registered, strategy);
   });
 

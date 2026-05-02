@@ -230,7 +230,7 @@ describe('Live Worker Phases', () => {
       await sendCompletionAlert(ctx, completionData, 180);
 
       assert.strictEqual(ctx.calls.progress, 100);
-      assert.ok((ctx.calls.info as unknown[])?.length! > 0);
+      assert.ok((ctx.calls.info as unknown[])?.length > 0);
     });
   });
 

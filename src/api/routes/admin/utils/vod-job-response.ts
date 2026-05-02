@@ -28,7 +28,7 @@ export function buildVodJobResponse(opts: BuildVodJobResponseOptions): ReturnTyp
   if (hasDownload) {
     return ok({
       message: `VOD download queued, ${downstreamLabel} will be triggered after completion`,
-      downloadJobId: null,
+      downloadJobId: downstreamJobId,
       downstreamJobId,
       ...base,
       ...extra,

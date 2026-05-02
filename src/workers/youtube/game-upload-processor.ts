@@ -5,7 +5,7 @@ import { trimVideo, splitVideo, getMetadata } from '../utils/ffmpeg.js';
 import { uploadVideo } from '../../services/youtube/index.js';
 import { initRichAlert, createProgressBar } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
-import { createYoutubeUploadProgressHandler as createGameUploadProgressHandler } from './youtube-upload-progress.js';
+import { createYoutubeUploadProgressHandler } from './youtube-upload-progress.js';
 import { YouTube } from '../../constants.js';
 import type { TenantConfig } from '../../config/types.js';
 import { getDisplayName } from '../../config/types.js';
@@ -90,7 +90,7 @@ export async function uploadAndUpsertGame(
 
   const onUploadProgress =
     uploadAlertMessageId != null
-      ? createGameUploadProgressHandler({
+      ? createYoutubeUploadProgressHandler({
           messageId: uploadAlertMessageId,
           type: 'game',
           channelName,

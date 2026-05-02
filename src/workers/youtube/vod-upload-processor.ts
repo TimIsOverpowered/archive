@@ -7,7 +7,7 @@ import { initRichAlert, createProgressBar } from '../../utils/discord-alerts.js'
 import { toHHMMSS } from '../../utils/formatting.js';
 import { getEffectiveSplitDuration } from './validation.js';
 import { buildYoutubeMetadata } from './metadata-builder.js';
-import { createYoutubeUploadProgressHandler as createVodUploadProgressHandler } from './youtube-upload-progress.js';
+import { createYoutubeUploadProgressHandler } from './youtube-upload-progress.js';
 import type { TenantConfig } from '../../config/types.js';
 import { getDisplayName } from '../../config/types.js';
 import type { SourceType, Platform } from '../../types/platforms.js';
@@ -201,7 +201,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
 
     const onUploadProgress =
       uploadAlertMessageId != null
-        ? createVodUploadProgressHandler({
+        ? createYoutubeUploadProgressHandler({
             messageId: uploadAlertMessageId,
             type: UPLOAD_TYPES.VOD,
             channelName,
@@ -306,7 +306,7 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
 
   const onUploadProgress =
     uploadAlertMessageId != null
-      ? createVodUploadProgressHandler({
+      ? createYoutubeUploadProgressHandler({
           messageId: uploadAlertMessageId,
           type: UPLOAD_TYPES.VOD,
           channelName,

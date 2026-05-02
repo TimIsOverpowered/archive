@@ -7,7 +7,7 @@ import type {
   DmcaProcessingJob,
   MonitorJob,
 } from '../jobs/types.js';
-import { getRedisInstance } from '../../workers/redis.js';
+import { getRedisInstance } from '../redis.js';
 
 export const QUEUE_NAMES = {
   VOD_LIVE: 'vod_live',
@@ -96,7 +96,10 @@ export async function closeQueues(): Promise<void> {
     await queue.close();
   }
   queueCache.clear();
-  await getFlowProducer().close();
+  if (_flowProducer != null) {
+    await _flowProducer.close();
+    _flowProducer = null;
+  }
   // Don't quit redis here - it's managed by workers/redis.ts
   // The redis instance is shared and should only be closed during worker shutdown
 }

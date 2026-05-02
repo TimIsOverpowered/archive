@@ -23,7 +23,7 @@ function createMockStrategy(vodId: string): PlatformStrategy {
 
 describe('Platform Strategy Registry', () => {
   it('should return undefined for unregistered platform', () => {
-    const result = getStrategy('twitch' as Platform);
+    const result = getStrategy('twitch');
     assert.strictEqual(result, undefined);
   });
 
@@ -47,10 +47,10 @@ describe('Platform Strategy Registry', () => {
   it('should support registering multiple platforms', () => {
     const twitchStrategy = createMockStrategy('twitch');
     const kickStrategy = createMockStrategy('kick');
-    registerStrategy('twitch' as Platform, twitchStrategy);
-    registerStrategy('kick' as Platform, kickStrategy);
-    assert.strictEqual(getStrategy('twitch' as Platform), twitchStrategy);
-    assert.strictEqual(getStrategy('kick' as Platform), kickStrategy);
+    registerStrategy('twitch', twitchStrategy);
+    registerStrategy('kick', kickStrategy);
+    assert.strictEqual(getStrategy('twitch'), twitchStrategy);
+    assert.strictEqual(getStrategy('kick'), kickStrategy);
   });
 
   it('should return undefined for completely unknown platform string', () => {

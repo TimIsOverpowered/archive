@@ -57,7 +57,7 @@ describe('API Config Loader', () => {
   });
 
   describe('optional fields with defaults', () => {
-    beforeEach(() => setupBaseEnv());
+    beforeEach(() => { setupBaseEnv(); });
 
     it('should apply default for NODE_ENV', () => {
       delete process.env.NODE_ENV;
@@ -153,18 +153,18 @@ describe('API Config Loader', () => {
     });
 
     it('should reject invalid NODE_ENV', () => {
-      process.env.NODE_ENV = 'invalid' as any;
+      process.env.NODE_ENV = 'invalid';
       assert.throws(() => loadApiConfig());
     });
 
     it('should reject invalid LOG_LEVEL', () => {
-      process.env.LOG_LEVEL = 'invalid' as any;
+      process.env.LOG_LEVEL = 'invalid';
       assert.throws(() => loadApiConfig());
     });
   });
 
   describe('caching', () => {
-    beforeEach(() => setupBaseEnv());
+    beforeEach(() => { setupBaseEnv(); });
 
     it('should cache config after first load', () => {
       const config1 = loadApiConfig();

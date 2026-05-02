@@ -98,7 +98,7 @@ describe('LogsService: getLogsByOffset', () => {
       assert.fail('Should have thrown');
     } catch (error) {
       assert.ok(error instanceof Error);
-      assert.ok((error as Error).message.startsWith('VOD not found'));
+      assert.ok((error).message.startsWith('VOD not found'));
     }
   });
 
@@ -176,7 +176,7 @@ describe('LogsService: getLogsByOffset', () => {
     assert.strictEqual(result.comments.length, Logs.PAGE_SIZE);
     assert.ok(result.cursor);
     assert.ok(typeof result.cursor === 'string');
-    const decoded = JSON.parse(Buffer.from(result.cursor!, 'base64').toString());
+    const decoded = JSON.parse(Buffer.from(result.cursor, 'base64').toString());
     assert.ok(decoded.offset !== undefined);
     assert.ok(decoded.createdAt !== undefined);
     assert.ok(decoded.id !== undefined);
@@ -201,7 +201,7 @@ describe('LogsService: getLogsByOffset', () => {
     const { compressChatData } = await import('../../src/utils/compression.js');
     const compressed = await compressChatData(cachedData);
 
-    mockClient.getBuffer = async () => Buffer.from(compressed as Buffer);
+    mockClient.getBuffer = async () => Buffer.from(compressed);
 
     mockDb = createMockDb();
 
@@ -400,7 +400,7 @@ describe('LogsService: getLogsByCursor', () => {
       assert.fail('Should have thrown');
     } catch (error) {
       assert.ok(error instanceof Error);
-      assert.ok((error as Error).message.startsWith('VOD not found'));
+      assert.ok((error).message.startsWith('VOD not found'));
     }
   });
 
@@ -457,7 +457,7 @@ describe('LogsService: getLogsByCursor', () => {
     const result = await getLogsByCursor(mockDb, 'tenant-1', 1, cursor);
     assert.strictEqual(result.comments.length, Logs.PAGE_SIZE);
     assert.ok(result.cursor);
-    const decoded = JSON.parse(Buffer.from(result.cursor!, 'base64').toString());
+    const decoded = JSON.parse(Buffer.from(result.cursor, 'base64').toString());
     assert.ok(decoded.offset !== undefined);
     assert.ok(decoded.createdAt !== undefined);
     assert.ok(decoded.id !== undefined);
@@ -482,7 +482,7 @@ describe('LogsService: getLogsByCursor', () => {
     const { compressChatData } = await import('../../src/utils/compression.js');
     const compressed = await compressChatData(cachedData);
 
-    mockClient.getBuffer = async () => Buffer.from(compressed as Buffer);
+    mockClient.getBuffer = async () => Buffer.from(compressed);
 
     mockDb = createMockDb();
 

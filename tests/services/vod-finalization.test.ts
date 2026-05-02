@@ -75,7 +75,7 @@ describe('finalizeVod', () => {
       },
     };
 
-    registerStrategy('twitch' as any, mockStrategy);
+    registerStrategy('twitch', mockStrategy);
 
     mockClient = {
       publish: async (channel: string, message: string) => {
@@ -159,7 +159,7 @@ describe('finalizeVod', () => {
 
   it('should not call finalizeChapters when strategy does not have finalizeChapters', async () => {
     const mockStrategyNoChapters = {} as any;
-    registerStrategy('twitch' as any, mockStrategyNoChapters);
+    registerStrategy('twitch', mockStrategyNoChapters);
 
     const ctx = {
       tenantId: 'tenant-1',

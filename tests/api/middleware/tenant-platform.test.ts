@@ -50,7 +50,7 @@ describe('tenantMiddleware', () => {
     const request = { params: {} };
     const reply = createMockReply();
 
-    await tenantMiddleware(request as any, reply as any);
+    await tenantMiddleware(request as any, reply);
 
     assert.strictEqual(reply.getSentStatus(), 404);
     const body = reply.getSentBody();
@@ -62,7 +62,7 @@ describe('tenantMiddleware', () => {
     const request = { params: { tenantId: 'non-existent' } };
     const reply = createMockReply();
 
-    await tenantMiddleware(request as any, reply as any);
+    await tenantMiddleware(request as any, reply);
 
     assert.strictEqual(reply.getSentStatus(), 404);
     const body = reply.getSentBody();
@@ -84,7 +84,7 @@ describe('platformValidationMiddleware', () => {
     const request = { body: {}, tenant: null };
     const reply = createMockReply();
 
-    await platformValidationMiddleware(request as any, reply as any);
+    await platformValidationMiddleware(request as any, reply);
 
     assert.strictEqual(reply.getSentStatus(), 400);
     const body = reply.getSentBody();
@@ -100,7 +100,7 @@ describe('platformValidationMiddleware', () => {
     };
     const reply = createMockReply();
 
-    await platformValidationMiddleware(request as any, reply as any);
+    await platformValidationMiddleware(request as any, reply);
 
     assert.strictEqual(reply.getSentStatus(), 400);
     const body = reply.getSentBody();
@@ -116,7 +116,7 @@ describe('platformValidationMiddleware', () => {
     };
     const reply = createMockReply();
 
-    await platformValidationMiddleware(request as any, reply as any);
+    await platformValidationMiddleware(request as any, reply);
 
     assert.strictEqual(reply.getSentStatus(), 200);
     assert.strictEqual((request.tenant as any).platform, PLATFORMS.TWITCH);
@@ -130,7 +130,7 @@ describe('platformValidationMiddleware', () => {
     };
     const reply = createMockReply();
 
-    await platformValidationMiddleware(request as any, reply as any);
+    await platformValidationMiddleware(request as any, reply);
 
     assert.strictEqual(reply.getSentStatus(), 200);
     assert.strictEqual((request.tenant as any).platform, PLATFORMS.TWITCH);
@@ -143,7 +143,7 @@ describe('platformValidationMiddleware', () => {
     };
     const reply = createMockReply();
 
-    await platformValidationMiddleware(request as any, reply as any);
+    await platformValidationMiddleware(request as any, reply);
 
     assert.strictEqual(reply.getSentStatus(), 500);
     const body = reply.getSentBody();
@@ -159,7 +159,7 @@ describe('platformValidationMiddleware', () => {
     };
     const reply = createMockReply();
 
-    await platformValidationMiddleware(request as any, reply as any);
+    await platformValidationMiddleware(request as any, reply);
 
     assert.strictEqual(reply.getSentStatus(), 200);
     assert.strictEqual((request.tenant as any).platform, PLATFORMS.KICK);

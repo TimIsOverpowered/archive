@@ -69,17 +69,14 @@ export function createWorker<TData>(config: WorkerConfig<TData>): Worker<TData, 
   worker.on('active', (job) => {
     if (job == null) return;
     getLogger().debug(
-      { jobId: String(job.id), ...extractJobMeta(job.data as Record<string, unknown>), attemptsMade: job.attemptsMade },
+      { jobId: String(job.id), ...extractJobMeta(job.data), attemptsMade: job.attemptsMade },
       `[${name}] job started`
     );
   });
 
   worker.on('completed', (job) => {
     if (job == null) return;
-    getLogger().debug(
-      { jobId: String(job.id), ...extractJobMeta(job.data as Record<string, unknown>) },
-      `[${name}] job completed`
-    );
+    getLogger().debug({ jobId: String(job.id), ...extractJobMeta(job.data) }, `[${name}] job completed`);
   });
 
   worker.on('failed', (job, err) => {
@@ -87,7 +84,7 @@ export function createWorker<TData>(config: WorkerConfig<TData>): Worker<TData, 
     getLogger().error(
       {
         jobId: String(job.id),
-        ...extractJobMeta(job.data as Record<string, unknown>),
+        ...extractJobMeta(job.data),
         attemptsMade: job.attemptsMade,
         maxAttempts: (job.opts as Partial<BaseJobOptions>).attempts ?? 3,
         errorMessage: err.message,
@@ -119,12 +116,16 @@ export function createWorker<TData>(config: WorkerConfig<TData>): Worker<TData, 
  * Extracts job metadata from raw job data.
  * All returned values will be `unknown | undefined` when the key is absent.
  */
-function extractJobMeta(data: Record<string, unknown>) {
+function extractJobMeta(data: unknown) {
+  if (typeof data !== 'object' || data == null) {
+    return { vodId: undefined, platform: undefined, tenantId: undefined, type: undefined, reqId: undefined };
+  }
+  const obj = data as Record<string, unknown>;
   return {
-    vodId: data.vodId,
-    platform: data.platform,
-    tenantId: data.tenantId,
-    type: data.type,
-    reqId: data.reqId,
+    vodId: obj.vodId,
+    platform: obj.platform,
+    tenantId: obj.tenantId,
+    type: obj.type,
+    reqId: obj.reqId,
   };
 }

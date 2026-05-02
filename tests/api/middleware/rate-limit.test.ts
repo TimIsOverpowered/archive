@@ -47,7 +47,7 @@ describe('createRateLimitMiddleware', () => {
     const request = createMockRequest({ 'cf-connecting-ip': '1.2.3.4' });
     const reply = createMockReply();
 
-    await middleware(request as any, reply as any);
+    await middleware(request, reply);
 
     const headers = reply.getHeaders();
     assert.ok('X-RateLimit-Limit' in headers);
@@ -64,7 +64,7 @@ describe('createRateLimitMiddleware', () => {
     const request = createMockRequest({ 'cf-connecting-ip': '1.2.3.4' }, 'POST');
     const reply = createMockReply();
 
-    await middleware(request as any, reply as any);
+    await middleware(request, reply);
 
     const headers = reply.getHeaders();
     assert.strictEqual(headers['X-RateLimit-Limit'], 5);
@@ -75,7 +75,7 @@ describe('createRateLimitMiddleware', () => {
     const request = createMockRequest({ 'cf-connecting-ip': '1.2.3.4' }, 'PUT');
     const reply = createMockReply();
 
-    await middleware(request as any, reply as any);
+    await middleware(request, reply);
 
     const headers = reply.getHeaders();
     assert.strictEqual(headers['X-RateLimit-Limit'], 10);
@@ -86,7 +86,7 @@ describe('createRateLimitMiddleware', () => {
     const request = createMockRequest({ 'cf-connecting-ip': '10.20.30.40' });
     const reply = createMockReply();
 
-    await middleware(request as any, reply as any);
+    await middleware(request, reply);
 
     assert.strictEqual(reply.getStatusCode(), 200);
   });
@@ -96,7 +96,7 @@ describe('createRateLimitMiddleware', () => {
     const request = createMockRequest({ 'x-real-ip': '10.20.30.40' });
     const reply = createMockReply();
 
-    await middleware(request as any, reply as any);
+    await middleware(request, reply);
 
     assert.strictEqual(reply.getStatusCode(), 200);
   });
@@ -106,7 +106,7 @@ describe('createRateLimitMiddleware', () => {
     const request = createMockRequest({ 'x-forwarded-for': '10.20.30.40, 50.60.70.80' });
     const reply = createMockReply();
 
-    await middleware(request as any, reply as any);
+    await middleware(request, reply);
 
     assert.strictEqual(reply.getStatusCode(), 200);
   });
@@ -116,7 +116,7 @@ describe('createRateLimitMiddleware', () => {
     const request = createMockRequest({});
     const reply = createMockReply();
 
-    await middleware(request as any, reply as any);
+    await middleware(request, reply);
 
     assert.strictEqual(reply.getStatusCode(), 200);
   });

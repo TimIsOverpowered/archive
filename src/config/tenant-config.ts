@@ -136,31 +136,29 @@ export class ConfigService {
   }
 
   /**
-   * Mutates the cached config object in-place with a decrypted Twitch auth object.
-   * LRUCache stores by reference, so this does NOT create a new object — callers
-   * that hold a reference to the config returned by .get() will see the auth update.
-   *
-   * DO NOT replace this with a spread + set() unless you verify no external
-   * code holds a reference to the cached TenantConfig.
+   * Replaces the cached config with an immutable update containing the decrypted Twitch auth object.
+   * Creates a new config object so all callers get the updated version.
+   * Publishes a config change event via Redis Pub/Sub to notify other processes.
    */
   updateTwitchAuth(tenantId: string, auth: TwitchAuthObject): void {
     const config = this.cache.get(tenantId);
-    if (config?.twitch?.auth == null) return;
-    config.twitch.auth = auth;
+    if (!config || !config.twitch) return;
+    const updated = { ...config, twitch: { ...config.twitch, auth } };
+    this.cache.set(tenantId, updated);
+    this.publishConfigChanged(tenantId);
   }
 
   /**
-   * Mutates the cached config object in-place with a decrypted YouTube auth object.
-   * LRUCache stores by reference, so this does NOT create a new object — callers
-   * that hold a reference to the config returned by .get() will see the auth update.
-   *
-   * DO NOT replace this with a spread + set() unless you verify no external
-   * code holds a reference to the cached TenantConfig.
+   * Replaces the cached config with an immutable update containing the decrypted YouTube auth object.
+   * Creates a new config object so all callers get the updated version.
+   * Publishes a config change event via Redis Pub/Sub to notify other processes.
    */
   updateYoutubeAuth(tenantId: string, auth: YoutubeAuthObject): void {
     const config = this.cache.get(tenantId);
-    if (config?.youtube?.auth == null) return;
-    config.youtube.auth = auth;
+    if (!config || !config.youtube) return;
+    const updated = { ...config, youtube: { ...config.youtube, auth } };
+    this.cache.set(tenantId, updated);
+    this.publishConfigChanged(tenantId);
   }
 
   /**

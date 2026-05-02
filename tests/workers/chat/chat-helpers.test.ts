@@ -95,7 +95,7 @@ describe('extractEdges', () => {
 
   it('should return empty array when edges is null', () => {
     const input = { edges: null };
-    const result = extractEdges(input as any);
+    const result = extractEdges(input);
     assert.deepStrictEqual(result, []);
   });
 
@@ -132,7 +132,7 @@ describe('extractEdges', () => {
 
   it('should handle empty edges array', () => {
     const input = { edges: [] };
-    const result = extractEdges(input as any);
+    const result = extractEdges(input);
     assert.deepStrictEqual(result, []);
   });
 });
@@ -160,14 +160,14 @@ describe('extractMessageData', () => {
   });
 
   it('should handle undefined node', () => {
-    const result = extractMessageData(undefined as any);
+    const result = extractMessageData(undefined);
     assert.strictEqual(result.message.content, '');
     assert.deepStrictEqual(result.message.fragments, []);
     assert.strictEqual(result.userBadges, undefined);
   });
 
   it('should handle null node', () => {
-    const result = extractMessageData(null as any);
+    const result = extractMessageData(null);
     assert.strictEqual(result.message.content, '');
     assert.deepStrictEqual(result.message.fragments, []);
     assert.strictEqual(result.userBadges, undefined);

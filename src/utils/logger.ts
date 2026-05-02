@@ -64,3 +64,8 @@ interface LogContext {
 export function childLogger(context: LogContext): AppLogger {
   return getLogger().child(context);
 }
+
+export function resetLogger(): void {
+  _logger = null;
+  _loggerConfig = null;
+}

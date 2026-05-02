@@ -32,7 +32,7 @@ describe('adminApiKeyMiddleware', () => {
     const request = createMockRequest({});
     const reply = createMockReply();
 
-    await adminApiKeyMiddleware(request as any, reply as any);
+    await adminApiKeyMiddleware(request, reply);
 
     assert.strictEqual(reply.getSentStatus(), 401);
     const body = reply.getSentBody();
@@ -43,7 +43,7 @@ describe('adminApiKeyMiddleware', () => {
     const request = createMockRequest({ 'x-api-key': 'invalid_key' });
     const reply = createMockReply();
 
-    await adminApiKeyMiddleware(request as any, reply as any);
+    await adminApiKeyMiddleware(request, reply);
 
     assert.strictEqual(reply.getSentStatus(), 401);
     const body = reply.getSentBody();
@@ -54,7 +54,7 @@ describe('adminApiKeyMiddleware', () => {
     const request = createMockRequest({ authorization: 'Bearer invalid_key' });
     const reply = createMockReply();
 
-    await adminApiKeyMiddleware(request as any, reply as any);
+    await adminApiKeyMiddleware(request, reply);
 
     assert.strictEqual(reply.getSentStatus(), 401);
     const body = reply.getSentBody();
@@ -66,7 +66,7 @@ describe('adminApiKeyMiddleware', () => {
     const reply = createMockReply();
 
     try {
-      await adminApiKeyMiddleware(request as any, reply as any);
+      await adminApiKeyMiddleware(request, reply);
     } catch {
       // DB connection error is expected in test environment
     }
@@ -81,7 +81,7 @@ describe('adminApiKeyMiddleware', () => {
     const reply = createMockReply();
 
     try {
-      await adminApiKeyMiddleware(request as any, reply as any);
+      await adminApiKeyMiddleware(request, reply);
     } catch {
       // DB connection error is expected
     }
@@ -98,7 +98,7 @@ describe('adminApiKeyMiddleware', () => {
     const reply = createMockReply();
 
     try {
-      await adminApiKeyMiddleware(request as any, reply as any);
+      await adminApiKeyMiddleware(request, reply);
     } catch {
       // DB connection error is expected
     }
@@ -111,7 +111,7 @@ describe('adminApiKeyMiddleware', () => {
     const reply = createMockReply();
 
     try {
-      await adminApiKeyMiddleware(request as any, reply as any);
+      await adminApiKeyMiddleware(request, reply);
     } catch {
       // May throw if DB is not available
     }
@@ -133,7 +133,7 @@ describe('adminApiKeyMiddleware', () => {
     const reply = createMockReply();
 
     try {
-      await adminApiKeyMiddleware(request as any, reply as any);
+      await adminApiKeyMiddleware(request, reply);
     } catch {
       // Expected in test env without DB
     }
@@ -144,10 +144,10 @@ describe('adminApiKeyMiddleware', () => {
   });
 
   it('should handle x-api-key as non-string (array) gracefully', async () => {
-    const request = createMockRequest({ 'x-api-key': ['key1', 'key2'] as any });
+    const request = createMockRequest({ 'x-api-key': ['key1', 'key2'] });
     const reply = createMockReply();
 
-    await adminApiKeyMiddleware(request as any, reply as any);
+    await adminApiKeyMiddleware(request, reply);
 
     assert.strictEqual(reply.getSentStatus(), 401);
   });
@@ -156,7 +156,7 @@ describe('adminApiKeyMiddleware', () => {
     const request = createMockRequest({ authorization: 'Bearer ' });
     const reply = createMockReply();
 
-    await adminApiKeyMiddleware(request as any, reply as any);
+    await adminApiKeyMiddleware(request, reply);
 
     assert.strictEqual(reply.getSentStatus(), 401);
   });
@@ -165,7 +165,7 @@ describe('adminApiKeyMiddleware', () => {
     const request = createMockRequest({ 'x-api-key': '' });
     const reply = createMockReply();
 
-    await adminApiKeyMiddleware(request as any, reply as any);
+    await adminApiKeyMiddleware(request, reply);
 
     assert.strictEqual(reply.getSentStatus(), 401);
   });

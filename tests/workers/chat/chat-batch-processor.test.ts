@@ -5,7 +5,7 @@ import type { FlushBatchOptions, FlushBatchResult } from '../../../src/workers/c
 import type { ChatMessageCreateInput } from '../../../src/workers/chat/chat-types.js';
 
 function createMockDb(): any {
-  let insertCalls: any[] = [];
+  const insertCalls: any[] = [];
   let insertValue: any = { onConflict: () => ({ execute: async () => undefined }) };
 
   return {
@@ -259,8 +259,8 @@ describe('flushChatBatch', () => {
 
     const msg = createMockMessage({
       id: 'msg-1',
-      message: null as any,
-      user_badges: null as any,
+      message: null,
+      user_badges: null,
     });
     const options: FlushBatchOptions = {
       db,

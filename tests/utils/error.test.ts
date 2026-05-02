@@ -141,7 +141,7 @@ describe('extractErrorDetails', () => {
     const result = extractErrorDetails(error);
 
     assert.ok(result.stack);
-    assert.ok(result.stack!.includes('error.test.ts'));
+    assert.ok(result.stack.includes('error.test.ts'));
   });
 });
 
@@ -204,25 +204,25 @@ describe('throwOnHttpError', () => {
   it('should not throw when response is ok', () => {
     const response = { ok: true, status: 200, statusText: 'OK' } as Response;
 
-    assert.doesNotThrow(() => throwOnHttpError(response));
+    assert.doesNotThrow(() => { throwOnHttpError(response); });
   });
 
   it('should not throw for 2xx status codes', () => {
     const response = { ok: true, status: 201, statusText: 'Created' } as Response;
 
-    assert.doesNotThrow(() => throwOnHttpError(response));
+    assert.doesNotThrow(() => { throwOnHttpError(response); });
   });
 
   it('should throw when response is not ok', () => {
     const response = { ok: false, status: 404, statusText: 'Not Found' } as Response;
 
-    assert.throws(() => throwOnHttpError(response), { message: 'HTTP request failed with status 404 Not Found' });
+    assert.throws(() => { throwOnHttpError(response); }, { message: 'HTTP request failed with status 404 Not Found' });
   });
 
   it('should throw with custom context', () => {
     const response = { ok: false, status: 500, statusText: 'Internal Server Error' } as Response;
 
-    assert.throws(() => throwOnHttpError(response, 'Upload to S3'), {
+    assert.throws(() => { throwOnHttpError(response, 'Upload to S3'); }, {
       message: 'Upload to S3 failed with status 500 Internal Server Error',
     });
   });
@@ -230,7 +230,7 @@ describe('throwOnHttpError', () => {
   it('should throw with empty context when not provided', () => {
     const response = { ok: false, status: 502, statusText: 'Bad Gateway' } as Response;
 
-    assert.throws(() => throwOnHttpError(response), { message: 'HTTP request failed with status 502 Bad Gateway' });
+    assert.throws(() => { throwOnHttpError(response); }, { message: 'HTTP request failed with status 502 Bad Gateway' });
   });
 
   it('should assert response type on success', () => {

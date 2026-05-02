@@ -9,6 +9,12 @@ export interface ErrorDetails {
   stack?: string | undefined;
 }
 
+export function hasStatusCode(e: unknown): e is { statusCode: number } {
+  if (typeof e !== 'object' || e === null) return false;
+  const val = (e as Record<string, unknown>).statusCode;
+  return 'statusCode' in e && typeof val === 'number';
+}
+
 /**
  * Extracts safe error details from any unknown value without losing type information.
  * Avoids casting to `any` which loses stack traces and structured data.
