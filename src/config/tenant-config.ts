@@ -54,7 +54,10 @@ export function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
     if (twitchParsed.success) {
       tenantConfig.twitch = twitchParsed.data;
     } else {
-      getLogger().warn({ tenantId: tenant.id, errors: twitchParsed.error.issues }, 'Invalid Twitch config, skipping platform');
+      getLogger().warn(
+        { tenantId: tenant.id, errors: twitchParsed.error.issues },
+        'Invalid Twitch config, skipping platform'
+      );
     }
   }
 
@@ -64,7 +67,10 @@ export function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
     if (youtubeParsed.success) {
       tenantConfig.youtube = youtubeParsed.data;
     } else {
-      getLogger().warn({ tenantId: tenant.id, errors: youtubeParsed.error.issues }, 'Invalid YouTube config, skipping platform');
+      getLogger().warn(
+        { tenantId: tenant.id, errors: youtubeParsed.error.issues },
+        'Invalid YouTube config, skipping platform'
+      );
     }
   }
 
@@ -74,7 +80,10 @@ export function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
     if (kickParsed.success) {
       tenantConfig.kick = kickParsed.data;
     } else {
-      getLogger().warn({ tenantId: tenant.id, errors: kickParsed.error.issues }, 'Invalid Kick config, skipping platform');
+      getLogger().warn(
+        { tenantId: tenant.id, errors: kickParsed.error.issues },
+        'Invalid Kick config, skipping platform'
+      );
     }
   }
 

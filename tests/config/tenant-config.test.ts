@@ -138,7 +138,7 @@ describe('ConfigService', () => {
       fakeAllTenants = [makeTenant({ id: 't1', displayName: 'Original' })];
       await configService.loadAll();
 
-      fakeById = async (id) => id === 't1' ? makeTenant({ id: 't1', displayName: 'Updated' }) : undefined;
+      fakeById = async (id) => (id === 't1' ? makeTenant({ id: 't1', displayName: 'Updated' }) : undefined);
       await configService.reloadTenant('t1');
 
       assert.strictEqual(configService.get('t1')?.displayName, 'Updated');

@@ -8,7 +8,12 @@ import { TenantContext } from '../../types/context.js';
 import { withDbRetry } from '../../db/streamer-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getPlatformConfig, getDisplayName } from '../../config/types.js';
-import { ConfigNotConfiguredError, PlatformNotMainSourceError, RestrictedGameError, VodNotFoundError } from '../../utils/domain-errors.js';
+import {
+  ConfigNotConfiguredError,
+  PlatformNotMainSourceError,
+  RestrictedGameError,
+  VodNotFoundError,
+} from '../../utils/domain-errors.js';
 import { buildYoutubeMetadata } from '../youtube/metadata-builder.js';
 
 const log = childLogger({ module: 'youtube-job' });
