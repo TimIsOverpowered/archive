@@ -188,7 +188,7 @@ async function convertAndCleanup(
   return { segmentCount, finalMp4Path };
 }
 
-function filterNewSegments(
+export function filterNewSegments(
   segments: HLS.types.Segment[],
   downloadedSegments: Set<string>,
   lastSegmentUri: string | null,
@@ -349,7 +349,7 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
   );
 }
 
-async function fetchPlaylist(
+export async function fetchPlaylist(
   ctx: LivePollingContext | ArchivedVodContext,
   retryOptions?: { attempts?: number; baseDelayMs?: number; maxDelayMs?: number }
 ) {
