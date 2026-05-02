@@ -1,7 +1,7 @@
 import { fetchUrl } from '../../utils/flaresolverr-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
-import { KICK_LIVE_API_TIMEOUT_MS } from '../../constants.js';
+import { Kick } from '../../constants.js';
 
 interface KickApiResponse {
   data?: Record<string, unknown>;
@@ -41,7 +41,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
     getLogger().debug({ username, apiUrl }, 'Fetching Kick livestream data');
 
     const result = await fetchUrl<KickApiResponse>(apiUrl, {
-      timeoutMs: KICK_LIVE_API_TIMEOUT_MS,
+      timeoutMs: Kick.LIVE_API_TIMEOUT_MS,
       maxRetries: 2,
     });
 
@@ -143,7 +143,7 @@ export async function getLatestKickVodObject(
     getLogger().debug({ username, videosUrl }, 'Fetching Kick video data');
 
     const result = await fetchUrl<unknown[]>(videosUrl, {
-      timeoutMs: KICK_LIVE_API_TIMEOUT_MS,
+      timeoutMs: Kick.LIVE_API_TIMEOUT_MS,
       maxRetries: 2,
     });
 

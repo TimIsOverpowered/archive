@@ -10,7 +10,7 @@ import { getDisplayName } from '../../config/types.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { request } from '../../utils/http-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
-import { TWITCH_USHER_BASE_URL } from '../../constants.js';
+import { Twitch } from '../../constants.js';
 import { ConfigNotConfiguredError } from '../../utils/domain-errors.js';
 
 export interface VodDownloadResult {
@@ -127,7 +127,7 @@ async function downloadTwitchVodWithFfmpeg(
     throw new Error(`Failed to get token/sig for ${vodId}`);
   }
 
-  const m3u8Url = `${TWITCH_USHER_BASE_URL}/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h264,hevc&playlist_include_framerate=true&nauthsig=${tokenSig.signature}&nauth=${tokenSig.value}`;
+  const m3u8Url = `${Twitch.USHER_BASE_URL}/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h264,hevc&playlist_include_framerate=true&nauthsig=${tokenSig.signature}&nauth=${tokenSig.value}`;
 
   const m3u8Content = await request(m3u8Url, {
     responseType: 'text',

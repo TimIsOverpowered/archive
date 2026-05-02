@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CHAT_CURSOR_TTL, CHAT_OFFSET_TTL, CHAT_BUCKET_SIZE_TTL } from '../constants.js';
+import { Cache } from '../constants.js';
 
 function envBoolWithDefault(defaultsTo: boolean) {
   return z.preprocess(
@@ -50,9 +50,9 @@ export const ApiConfigSchema = BaseConfigSchema.extend({
   RATE_LIMIT_ADMIN_GET: z.coerce.number().int().positive().default(60),
   RATE_LIMIT_ADMIN_AUTH: z.coerce.number().int().positive().default(20),
   RATE_LIMIT_BLOCK_DURATION: z.coerce.number().int().positive().default(60),
-  CHAT_CURSOR_TTL: z.coerce.number().int().positive().default(CHAT_CURSOR_TTL),
-  CHAT_OFFSET_TTL: z.coerce.number().int().positive().default(CHAT_OFFSET_TTL),
-  CHAT_BUCKET_SIZE_TTL: z.coerce.number().int().positive().default(CHAT_BUCKET_SIZE_TTL),
+  CHAT_CURSOR_TTL: z.coerce.number().int().positive().default(Cache.CHAT_CURSOR_TTL),
+  CHAT_OFFSET_TTL: z.coerce.number().int().positive().default(Cache.CHAT_OFFSET_TTL),
+  CHAT_BUCKET_SIZE_TTL: z.coerce.number().int().positive().default(Cache.CHAT_BUCKET_SIZE_TTL),
   HEALTH_TOKEN: z.string().optional(),
 });
 

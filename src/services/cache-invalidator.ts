@@ -4,7 +4,7 @@ import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { invalidateVodVolatileCache } from './cache-tags.js';
 import { setVodVolatileCache, invalidateVodStaticCache } from './vod-cache.js';
-import { VOD_VOLATILE_CACHE_TTL } from '../constants.js';
+import { Cache } from '../constants.js';
 
 const CACHE_CHANNEL = 'cache:vod';
 
@@ -26,7 +26,7 @@ async function handleCacheEvent(event: VodUpdateEvent): Promise<void> {
       event.tenantId,
       event.dbId,
       { duration: event.duration, is_live: event.is_live ?? false },
-      VOD_VOLATILE_CACHE_TTL
+      Cache.VOD_VOLATILE_TTL
     );
   } else {
     await invalidateVodStaticCache(event.tenantId, event.dbId);

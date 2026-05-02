@@ -4,7 +4,7 @@ import type { MetaDB } from './meta-types.js';
 import { getLogger } from '../utils/logger.js';
 import { getBaseConfig } from '../config/env.js';
 import { extractDatabaseName } from '../utils/formatting.js';
-import { DB_STATEMENT_TIMEOUT_MS } from '../constants.js';
+import { Db } from '../constants.js';
 import { buildPgBouncerUrl } from './utils/pg-bouncer.js';
 
 // Double-cast pattern: globalThis is `object`-typed, so we cast through `unknown` first
@@ -40,7 +40,7 @@ export function initMetaClient(): Kysely<MetaDB> {
 
   const url = buildPgBouncerUrl(pgbouncerUrl, metaDbName);
 
-  const pool = new Pool({ connectionString: url, statement_timeout: DB_STATEMENT_TIMEOUT_MS });
+  const pool = new Pool({ connectionString: url, statement_timeout: Db.STATEMENT_TIMEOUT_MS });
   const dialect = new PostgresDialect({ pool });
   const db = new Kysely<MetaDB>({ dialect });
 

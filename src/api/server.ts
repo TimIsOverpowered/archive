@@ -19,7 +19,7 @@ import badgesRoutes from './routes/badges.js';
 import { globalAdminRoutes, default as adminRoutes } from './routes/admin/index.js';
 import { registerCacheSubscriber } from '../services/cache-invalidator.js';
 import { registerTenantConfigSubscriber } from '../config/tenant-config-subscriber.js';
-import { BODY_LIMIT, COMPRESSION_THRESHOLD } from '../constants.js';
+import { Server } from '../constants.js';
 import { randomUUID } from 'node:crypto';
 
 interface FormattedError {
@@ -56,7 +56,7 @@ export async function buildServer() {
   setGlobalLogger(logger);
 
   const fastify = Fastify({
-    bodyLimit: BODY_LIMIT,
+    bodyLimit: Server.BODY_LIMIT,
     exposeHeadRoutes: true,
     loggerInstance: logger as unknown as FastifyBaseLogger,
     trustProxy: true,
@@ -111,7 +111,7 @@ export async function buildServer() {
 
   // Compression for large responses (>10KB)
   await fastify.register(compress, {
-    threshold: COMPRESSION_THRESHOLD,
+    threshold: Server.COMPRESSION_THRESHOLD,
   });
 
   // Load streamer configs and initialize database clients

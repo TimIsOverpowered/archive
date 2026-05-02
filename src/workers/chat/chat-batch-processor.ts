@@ -3,7 +3,7 @@ import type { StreamerDB, InsertableChatMessages } from '../../db/streamer-types
 import type { ChatMessageCreateInput } from './chat-types.js';
 import type { AppLogger } from '../../utils/logger.js';
 import { retryWithBackoff } from '../../utils/retry.js';
-import { CHAT_MAX_RETRIES, CHAT_RETRY_DELAY_MS } from '../../constants.js';
+import { Chat } from '../../constants.js';
 
 export interface FlushBatchResult {
   totalMessages: number;
@@ -49,8 +49,8 @@ export async function flushChatBatch(options: FlushBatchOptions): Promise<FlushB
         .onConflict((oc) => oc.columns(['id', 'created_at']).doNothing())
         .execute(),
     {
-      attempts: CHAT_MAX_RETRIES,
-      baseDelayMs: CHAT_RETRY_DELAY_MS,
+      attempts: Chat.MAX_RETRIES,
+      baseDelayMs: Chat.RETRY_DELAY_MS,
     }
   );
 

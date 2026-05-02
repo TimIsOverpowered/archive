@@ -149,9 +149,9 @@ describe('LogsService: getLogsByOffset', () => {
   });
 
   it('should return cursor when there are more messages (page size + 1)', async () => {
-    const { LOGS_PAGE_SIZE } = await import('../../src/constants.js');
+    const { Logs } = await import('../../src/constants.js');
     const messages: any[] = [];
-    for (let i = 0; i <= LOGS_PAGE_SIZE; i++) {
+    for (let i = 0; i <= Logs.PAGE_SIZE; i++) {
       const totalSeconds = i * 10;
       const mins = Math.floor(totalSeconds / 60);
       const secs = totalSeconds % 60;
@@ -173,7 +173,7 @@ describe('LogsService: getLogsByOffset', () => {
     });
 
     const result = await getLogsByOffset(mockDb, 'tenant-1', 1, 0);
-    assert.strictEqual(result.comments.length, LOGS_PAGE_SIZE);
+    assert.strictEqual(result.comments.length, Logs.PAGE_SIZE);
     assert.ok(result.cursor);
     assert.ok(typeof result.cursor === 'string');
     const decoded = JSON.parse(Buffer.from(result.cursor!, 'base64').toString());
@@ -423,9 +423,9 @@ describe('LogsService: getLogsByCursor', () => {
   });
 
   it('should return comments with next cursor when paginated', async () => {
-    const { LOGS_PAGE_SIZE } = await import('../../src/constants.js');
+    const { Logs } = await import('../../src/constants.js');
     const messages: any[] = [];
-    for (let i = 0; i <= LOGS_PAGE_SIZE; i++) {
+    for (let i = 0; i <= Logs.PAGE_SIZE; i++) {
       const totalSeconds = 60 + 10 + i * 10;
       const mins = Math.floor(totalSeconds / 60);
       const secs = totalSeconds % 60;
@@ -455,7 +455,7 @@ describe('LogsService: getLogsByCursor', () => {
     ).toString('base64');
 
     const result = await getLogsByCursor(mockDb, 'tenant-1', 1, cursor);
-    assert.strictEqual(result.comments.length, LOGS_PAGE_SIZE);
+    assert.strictEqual(result.comments.length, Logs.PAGE_SIZE);
     assert.ok(result.cursor);
     const decoded = JSON.parse(Buffer.from(result.cursor!, 'base64').toString());
     assert.ok(decoded.offset !== undefined);

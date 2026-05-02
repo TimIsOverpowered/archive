@@ -1,7 +1,7 @@
 import { fetchUrl } from '../../utils/flaresolverr-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
-import { KICK_API_TIMEOUT_MS, KICK_SUBCATEGORIES_URL } from '../../constants.js';
+import { Kick } from '../../constants.js';
 import { LRUCache } from 'lru-cache';
 
 const log = childLogger({ module: 'kick-category' });
@@ -19,8 +19,8 @@ export async function getKickCategoryInfo(slug: string): Promise<Record<string, 
   }
 
   try {
-    const result = await fetchUrl<Record<string, unknown>>(`${KICK_SUBCATEGORIES_URL}/${slug}`, {
-      timeoutMs: KICK_API_TIMEOUT_MS,
+    const result = await fetchUrl<Record<string, unknown>>(`${Kick.SUBCATEGORIES_URL}/${slug}`, {
+      timeoutMs: Kick.API_TIMEOUT_MS,
     });
 
     if (!result.success) return null;

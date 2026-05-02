@@ -5,12 +5,7 @@ import { getBaseConfig } from '../config/env.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { extractDatabaseName } from '../utils/formatting.js';
-import {
-  DB_POOL_IDLE_TIMEOUT_MS,
-  DB_POOL_MAX_CLIENTS,
-  DB_POOL_CLEANUP_INTERVAL_MS,
-  DB_STATEMENT_TIMEOUT_MS,
-} from '../constants.js';
+import { Db } from '../constants.js';
 import { sleep } from '../utils/delay.js';
 import type { StreamerDB } from './streamer-types.js';
 import { buildPgBouncerUrl } from './utils/pg-bouncer.js';
@@ -46,7 +41,7 @@ class PoolManager {
     const inflight = this.creationLocks.get(config.id);
     if (inflight) return inflight;
 
-    if (this.pools.size >= DB_POOL_MAX_CLIENTS) {
+    if (this.pools.size >= Db.POOL_MAX_CLIENTS) {
       await this.evictOldestIdleClient();
     }
 
@@ -65,7 +60,7 @@ class PoolManager {
     const pool = new this.PoolCtor({
       connectionString: url,
       max: connectionLimit,
-      statement_timeout: DB_STATEMENT_TIMEOUT_MS,
+      statement_timeout: Db.STATEMENT_TIMEOUT_MS,
     });
     const db = new Kysely<StreamerDB>({ dialect: new PostgresDialect({ pool }) });
 
@@ -105,7 +100,7 @@ class PoolManager {
 
   async evictIdleClients(): Promise<void> {
     const now = Date.now();
-    const cutoff = now - DB_POOL_IDLE_TIMEOUT_MS;
+    const cutoff = now - Db.POOL_IDLE_TIMEOUT_MS;
 
     for (const [tenantId, entry] of this.pools.entries()) {
       const isFullyIdle = entry.pool.idleCount === entry.pool.totalCount;
@@ -137,7 +132,7 @@ class PoolManager {
       this.evictIdleClients().catch((error) => {
         getLogger().error({ error: extractErrorDetails(error) }, 'Error during idle pool eviction');
       });
-    }, DB_POOL_CLEANUP_INTERVAL_MS);
+    }, Db.POOL_CLEANUP_INTERVAL_MS);
   }
 
   stopCleanup(): void {
@@ -160,7 +155,7 @@ class PoolManager {
   isPoolValid(tenantId: string): boolean {
     const entry = this.pools.get(tenantId);
     if (!entry) return false;
-    return Date.now() - entry.lastAccessedAt <= DB_POOL_IDLE_TIMEOUT_MS;
+    return Date.now() - entry.lastAccessedAt <= Db.POOL_IDLE_TIMEOUT_MS;
   }
 
   touchPool(tenantId: string): boolean {

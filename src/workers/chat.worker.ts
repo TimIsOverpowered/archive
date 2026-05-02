@@ -6,7 +6,7 @@ import type { ChatDownloadJob, ChatDownloadResult } from './jobs/types.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
 import { extractErrorDetails } from '../utils/error.js';
-import { CHAT_BATCH_SIZE, CHAT_RATE_LIMIT_MS } from '../constants.js';
+import { Chat } from '../constants.js';
 import { extractEdges, calculateResumeOffset, extractMessageData } from './chat/chat-helpers.js';
 import type { ChatMessageCreateInput } from './chat/chat-types.js';
 import { PLATFORMS, isTwitchPlatform, type Platform } from '../types/platforms.js';
@@ -261,7 +261,7 @@ async function* paginateChatComments(
     const cursor = edges.at(-1)?.cursor ?? null;
     if (cursor == null || cursor === lastCursor) break;
     lastCursor = cursor;
-    await sleep(CHAT_RATE_LIMIT_MS);
+    await sleep(Chat.RATE_LIMIT_MS);
     page = await fetchNextComments(vodId, cursor, tenantId);
   }
 }
@@ -321,7 +321,7 @@ async function processChatDownload(
 
     lastOffset = edges[edges.length - 1]?.node?.contentOffsetSeconds ?? lastOffset;
 
-    if (batchBuffer.length >= CHAT_BATCH_SIZE) {
+    if (batchBuffer.length >= Chat.BATCH_SIZE) {
       const result = await flushChatBatch({
         db,
         buffer: batchBuffer,

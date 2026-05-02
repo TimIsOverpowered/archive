@@ -4,12 +4,7 @@ import { sql } from 'kysely';
 import type { Expression, ExpressionBuilder, Kysely, Selectable, SqlBool } from 'kysely';
 import type { StreamerDB, DBClient } from '../db/streamer-types.js';
 import { withStaleWhileRevalidate } from '../utils/cache.js';
-import {
-  VOD_DETAILS_CACHE_TTL,
-  VOD_LIST_CACHE_TTL,
-  VOD_VOLATILE_CACHE_TTL,
-  VOD_DETAILS_STALE_RATIO,
-} from '../constants.js';
+import { Cache, CacheSwr } from '../constants.js';
 import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
 import type { VodResponse } from '../types/vods.js';
 import { registerVodTags, setVodListCache } from './cache-tags.js';
@@ -163,7 +158,7 @@ export async function getVods(
     const mergedVods = applyVolatileData(resultVods, volatileMap);
 
     const hasLiveVod = mergedVods.some((vod) => vod.is_live);
-    const ttl = hasLiveVod ? VOD_VOLATILE_CACHE_TTL : VOD_LIST_CACHE_TTL;
+    const ttl = hasLiveVod ? Cache.VOD_VOLATILE_TTL : Cache.VOD_LIST_TTL;
     const serialized = JSON.stringify({ vods: mergedVods, total });
     await setVodListCache(cacheKey, serialized, ttl);
     await registerVodTags(tenantId, mergedVods, cacheKey, serialized, ttl);
@@ -171,7 +166,7 @@ export async function getVods(
     return { vods: mergedVods, total };
   };
 
-  return withStaleWhileRevalidate(cacheKey, VOD_LIST_CACHE_TTL, VOD_LIST_CACHE_TTL * VOD_DETAILS_STALE_RATIO, fetcher);
+  return withStaleWhileRevalidate(cacheKey, Cache.VOD_LIST_TTL, Cache.VOD_LIST_TTL * CacheSwr.STALE_RATIO, fetcher);
 }
 
 /**
@@ -195,8 +190,8 @@ export async function getVodById(db: DBClient, tenantId: string, vodId: number):
 
   const staticData = await withStaleWhileRevalidate(
     cacheKey,
-    VOD_DETAILS_CACHE_TTL,
-    VOD_DETAILS_CACHE_TTL * VOD_DETAILS_STALE_RATIO,
+    Cache.VOD_DETAILS_TTL,
+    Cache.VOD_DETAILS_TTL * CacheSwr.STALE_RATIO,
     fetcher
   );
 
@@ -237,8 +232,8 @@ export async function getVodByPlatformId(
 
   const staticData = await withStaleWhileRevalidate(
     cacheKey,
-    VOD_VOLATILE_CACHE_TTL,
-    VOD_VOLATILE_CACHE_TTL * VOD_DETAILS_STALE_RATIO,
+    Cache.VOD_VOLATILE_TTL,
+    Cache.VOD_VOLATILE_TTL * CacheSwr.STALE_RATIO,
     fetcher
   );
 

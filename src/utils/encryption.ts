@@ -1,12 +1,12 @@
 import crypto from 'crypto';
 import { getEncryptionKeyBuffer } from '../config/env.js';
-import { ENCRYPTION_KEY_LENGTH, ENCRYPTION_IV_LENGTH, ENCRYPTION_AUTH_TAG_LENGTH } from '../constants.js';
+import { Encryption } from '../constants.js';
 
 const ALGORITHM = 'aes-256-gcm';
 
 export function validateEncryptionKey(key: string): boolean {
   if (key == null || key === '') return false;
-  if (key.length !== ENCRYPTION_KEY_LENGTH * 2) return false;
+  if (key.length !== Encryption.KEY_LENGTH * 2) return false;
   return /^[0-9a-fA-F]+$/.test(key);
 }
 
@@ -16,7 +16,7 @@ export function getKeyBuffer(): Buffer {
 
 export function encrypt(plaintext: string): Buffer {
   const key = getKeyBuffer();
-  const iv = crypto.randomBytes(ENCRYPTION_IV_LENGTH);
+  const iv = crypto.randomBytes(Encryption.IV_LENGTH);
 
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
 
@@ -33,15 +33,15 @@ export function decrypt(ciphertext: Uint8Array): string {
   const key = getKeyBuffer();
 
   // Extract IV (first 12 bytes), auth tag (next 16 bytes), and actual ciphertext
-  if (ciphertext.length < ENCRYPTION_IV_LENGTH + ENCRYPTION_AUTH_TAG_LENGTH) {
+  if (ciphertext.length < Encryption.IV_LENGTH + Encryption.AUTH_TAG_LENGTH) {
     throw new Error('Invalid ciphertext length');
   }
 
-  const iv = Buffer.from(ciphertext.subarray(0, ENCRYPTION_IV_LENGTH));
+  const iv = Buffer.from(ciphertext.subarray(0, Encryption.IV_LENGTH));
   const authTag = Buffer.from(
-    ciphertext.subarray(ENCRYPTION_IV_LENGTH, ENCRYPTION_IV_LENGTH + ENCRYPTION_AUTH_TAG_LENGTH)
+    ciphertext.subarray(Encryption.IV_LENGTH, Encryption.IV_LENGTH + Encryption.AUTH_TAG_LENGTH)
   );
-  const encryptedData = ciphertext.subarray(ENCRYPTION_IV_LENGTH + ENCRYPTION_AUTH_TAG_LENGTH);
+  const encryptedData = ciphertext.subarray(Encryption.IV_LENGTH + Encryption.AUTH_TAG_LENGTH);
 
   const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
   decipher.setAuthTag(authTag);

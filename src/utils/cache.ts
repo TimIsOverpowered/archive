@@ -21,13 +21,7 @@ import { extractErrorDetails } from './error.js';
 import { getLogger } from '../utils/logger.js';
 import { LRUCache } from 'lru-cache';
 import { retryWithBackoff } from './retry.js';
-import {
-  MAX_SWR_FAILURES,
-  SWR_FAILURES_TTL_MS,
-  SWR_FAILURES_TTL_SECONDS,
-  INFLIGHT_TIMEOUT_MS,
-  INFLIGHT_CACHE_MAX,
-} from '../constants.js';
+import { CacheSwr, CacheInflight } from '../constants.js';
 import type { SWRKey, SimpleKey } from './cache-keys.js';
 
 /** Metrics for Redis cache hit/miss/error tracking. */
@@ -72,13 +66,13 @@ export function resetCacheMetrics(): void {
 // during revalidation — each process then tracks failures independently.
 const SWR_FAILURES = new LRUCache<string, number>({
   max: 5000,
-  ttl: SWR_FAILURES_TTL_MS,
+  ttl: CacheSwr.FAILURES_TTL_MS,
   allowStale: false,
 });
 
 const globalInflight = new LRUCache<string, Promise<unknown>>({
-  max: INFLIGHT_CACHE_MAX,
-  ttl: INFLIGHT_TIMEOUT_MS,
+  max: CacheInflight.CACHE_MAX,
+  ttl: CacheInflight.TIMEOUT_MS,
   allowStale: false,
 });
 
@@ -183,7 +177,7 @@ export async function withStaleWhileRevalidate<T>(
       if (!globalInflight.get(key)) {
         const revalidatePromise = withTimeout(
           revalidateWithRetry(client, key, ttl, fetcher).finally(() => globalInflight.delete(key)),
-          INFLIGHT_TIMEOUT_MS
+          CacheInflight.TIMEOUT_MS
         );
 
         globalInflight.set(key, revalidatePromise);
@@ -203,7 +197,7 @@ export async function withStaleWhileRevalidate<T>(
 
   const fetchPromise = withTimeout(
     revalidateWithRetry(client, key, ttl, fetcher).finally(() => globalInflight.delete(key)),
-    INFLIGHT_TIMEOUT_MS
+    CacheInflight.TIMEOUT_MS
   );
 
   globalInflight.set(key, fetchPromise);
@@ -231,7 +225,7 @@ async function revalidateWithRetry<T>(
   const failureKey = `swr:failures:${key}`;
   const failures = await getSwrFailureCount(client, failureKey);
 
-  if (failures >= MAX_SWR_FAILURES) {
+  if (failures >= CacheSwr.MAX_FAILURES) {
     SWR_FAILURES.delete(key);
     log.warn('SWR revalidation failing repeatedly, skipping retry');
     throw new Error('SWR revalidation limit exceeded');
@@ -275,7 +269,7 @@ async function incrementSwrFailureCount(
   try {
     const pipeline = client.pipeline();
     pipeline.incr(failureKey);
-    pipeline.expire(failureKey, SWR_FAILURES_TTL_SECONDS);
+    pipeline.expire(failureKey, CacheSwr.FAILURES_TTL_SECONDS);
     await pipeline.exec();
   } catch {
     const current = SWR_FAILURES.get(failureKey) ?? 0;

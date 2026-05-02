@@ -3,7 +3,7 @@ import { createSession } from '../../utils/cycletls.js';
 import { fetchUrl } from '../../utils/flaresolverr-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
-import { KICK_API_BASE } from '../../constants.js';
+import { Kick } from '../../constants.js';
 import { VodNotFoundError } from '../../utils/domain-errors.js';
 
 const log = childLogger({ module: 'kick-vod' });
@@ -88,7 +88,7 @@ function getKickParsedM3u8(m3u8: string, baseURL: string): string | null {
 }
 
 export async function getVod(channelName: string, vodId: string): Promise<KickVod> {
-  const result = await fetchUrl<KickVod[]>(`${KICK_API_BASE}/api/v2/channels/${channelName}/videos`);
+  const result = await fetchUrl<KickVod[]>(`${Kick.API_BASE}/api/v2/channels/${channelName}/videos`);
 
   if (!result.success) {
     throw new Error('Failed to load Kick videos API after retries');

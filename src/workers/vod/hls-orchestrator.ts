@@ -20,13 +20,7 @@ import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
 import { createVodWorkerAlerts } from '../utils/alert-factories.js';
 import { updateAlert } from '../../utils/discord-alerts.js';
 import { cleanupHlsFiles } from './hls-cleanup.js';
-import {
-  HLS_MAX_CONSECUTIVE_ERRORS,
-  HLS_NO_CHANGE_THRESHOLD,
-  HLS_POLL_INTERVAL_MS,
-  HLS_SEGMENT_CONCURRENCY,
-  HLS_SEGMENT_RETRY_ATTEMPTS,
-} from '../../constants.js';
+import { Hls } from '../../constants.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { TenantContext } from '../../types/context.js';
 import type { TenantConfig } from '../../config/types.js';
@@ -98,7 +92,7 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
         m3u8Path,
         cycleTLS,
         log,
-        concurrency: HLS_SEGMENT_CONCURRENCY,
+        concurrency: Hls.SEGMENT_CONCURRENCY,
         onProgress,
       });
     } else {
@@ -210,7 +204,7 @@ function filterNewSegments(
     noChangeCount = 0;
   }
 
-  const isStreamEnd = noChangeCount >= HLS_NO_CHANGE_THRESHOLD;
+  const isStreamEnd = noChangeCount >= Hls.NO_CHANGE_THRESHOLD;
 
   const newSegments = segments.filter((seg) => !downloadedSegments.has(seg.uri));
 
@@ -280,7 +274,7 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
           baseURL,
           strategy,
           concurrency,
-          HLS_SEGMENT_RETRY_ATTEMPTS,
+          Hls.SEGMENT_RETRY_ATTEMPTS,
           log,
           (_completedCount) => onProgress?.(downloadedSegments.size, totalDuration)
         );
@@ -295,7 +289,7 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
       }
       void updateVodDurationDuringDownload(ctx.ctx, ctx.dbId, vodId, platform, ctx.m3u8Path, variantM3u8String);
 
-      await sleep(HLS_POLL_INTERVAL_MS);
+      await sleep(Hls.POLL_INTERVAL_MS);
     } catch (error) {
       const details = extractErrorDetails(error);
 
@@ -305,7 +299,7 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
       consecutiveErrors++;
       await sleep(getRetryDelay(consecutiveErrors));
 
-      if (consecutiveErrors > HLS_MAX_CONSECUTIVE_ERRORS) {
+      if (consecutiveErrors > Hls.MAX_CONSECUTIVE_ERRORS) {
         throw new Error(`Live HLS polling failed after ${consecutiveErrors} consecutive errors`);
       }
     }
@@ -349,8 +343,8 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
     vodDir,
     baseURL,
     strategy,
-    HLS_SEGMENT_CONCURRENCY,
-    HLS_SEGMENT_RETRY_ATTEMPTS,
+    Hls.SEGMENT_CONCURRENCY,
+    Hls.SEGMENT_RETRY_ATTEMPTS,
     log,
     (completedCount) => onProgress?.(completedCount, segments.length)
   );

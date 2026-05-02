@@ -7,7 +7,7 @@ import { compressChatData, decompressChatData } from '../utils/compression.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { badRequest } from '../utils/http-error.js';
-import { LOGS_PAGE_SIZE, LOGS_DEFAULT_BUCKET_SIZE, LOGS_TARGET_COMMENTS_PER_BUCKET } from '../constants.js';
+import { Logs } from '../constants.js';
 import { simpleKeys } from '../utils/cache-keys.js';
 import { withCache } from '../utils/cache.js';
 import { VodNotFoundError } from '../utils/domain-errors.js';
@@ -21,7 +21,7 @@ interface CursorData {
 }
 
 function computeBucketSize(commentsPer100s: number): number {
-  const raw = (LOGS_TARGET_COMMENTS_PER_BUCKET / commentsPer100s) * 100;
+  const raw = (Logs.TARGET_COMMENTS_PER_BUCKET / commentsPer100s) * 100;
   return BOUNDARIES.reduce((prev, curr) => (Math.abs(curr - raw) < Math.abs(prev - raw) ? curr : prev));
 }
 
@@ -40,7 +40,7 @@ async function getVodBucketSize(db: Kysely<StreamerDB>, tenantId: string, vodId:
       .executeTakeFirst();
 
     const commentsPer100sValue = parseFloat(String(result?.comments_per_100s ?? ''));
-    return isFinite(commentsPer100sValue) ? computeBucketSize(commentsPer100sValue) : LOGS_DEFAULT_BUCKET_SIZE;
+    return isFinite(commentsPer100sValue) ? computeBucketSize(commentsPer100sValue) : Logs.DEFAULT_BUCKET_SIZE;
   });
 }
 
@@ -102,18 +102,18 @@ export async function getLogsByOffset(
     .where('created_at', '<=', streamEnd)
     .orderBy('content_offset_seconds', 'asc')
     .orderBy('created_at', 'asc')
-    .limit(LOGS_PAGE_SIZE + 1)
+    .limit(Logs.PAGE_SIZE + 1)
     .execute();
 
   if (data.length === 0) {
     return { comments: [], cursor: undefined };
   }
 
-  const comments = data.slice(0, LOGS_PAGE_SIZE);
+  const comments = data.slice(0, Logs.PAGE_SIZE);
 
   let cursor: string | undefined;
-  if (data.length === LOGS_PAGE_SIZE + 1) {
-    const lastMsg = data[LOGS_PAGE_SIZE];
+  if (data.length === Logs.PAGE_SIZE + 1) {
+    const lastMsg = data[Logs.PAGE_SIZE];
     if (lastMsg == null) throw new Error('Missing last message in data array');
     if (lastMsg.created_at == null) {
       throw new Error(`Missing created_at on message ${lastMsg.id}`);
@@ -224,18 +224,18 @@ export async function getLogsByCursor(
     )
     .orderBy('content_offset_seconds', 'asc')
     .orderBy('created_at', 'asc')
-    .limit(LOGS_PAGE_SIZE + 1)
+    .limit(Logs.PAGE_SIZE + 1)
     .execute();
 
   if (data.length === 0) {
     return { comments: [], cursor: undefined };
   }
 
-  const comments = data.slice(0, LOGS_PAGE_SIZE);
+  const comments = data.slice(0, Logs.PAGE_SIZE);
 
   let nextCursor: string | undefined;
-  if (data.length === LOGS_PAGE_SIZE + 1) {
-    const lastMsg = data[LOGS_PAGE_SIZE];
+  if (data.length === Logs.PAGE_SIZE + 1) {
+    const lastMsg = data[Logs.PAGE_SIZE];
     if (lastMsg == null) throw new Error('Missing last message in data array');
     if (lastMsg.created_at == null) {
       throw new Error(`Missing created_at on message ${lastMsg.id}`);

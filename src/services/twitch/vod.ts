@@ -1,7 +1,7 @@
 import { getTwitchClient } from './auth.js';
 import { createTwitchGqlClient } from './client.js';
 import { request } from '../../utils/http-client.js';
-import { TWITCH_USHER_BASE_URL } from '../../constants.js';
+import { Twitch } from '../../constants.js';
 import { VodNotFoundError } from '../../utils/domain-errors.js';
 
 export interface VodData {
@@ -77,7 +77,7 @@ export async function getM3u8(
   retryOptions?: { attempts?: number; baseDelayMs?: number; maxDelayMs?: number }
 ): Promise<string> {
   const codecs = encodeURIComponent('av1,h265,h264');
-  const url = `${TWITCH_USHER_BASE_URL}/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=${codecs}&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`;
+  const url = `${Twitch.USHER_BASE_URL}/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=${codecs}&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`;
 
   return request(url, {
     responseType: 'text',

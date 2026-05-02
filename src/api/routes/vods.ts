@@ -6,7 +6,7 @@ import { RedisService } from '../../utils/redis-service.js';
 import { HttpError } from '../../utils/http-error.js';
 import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
 import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
-import { INT32_MAX } from '../../constants.js';
+import { Db } from '../../constants.js';
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../../db/streamer-types.js';
 
@@ -20,7 +20,7 @@ interface VodRoutesOptions {
  */
 async function fetchVodByIdSafe(vodId: string, db: Kysely<StreamerDB>, tenantId: string) {
   const vodIdNum = Number(vodId);
-  if (isNaN(vodIdNum) || vodIdNum < 0 || vodIdNum > INT32_MAX) {
+  if (isNaN(vodIdNum) || vodIdNum < 0 || vodIdNum > Db.INT32_MAX) {
     throw new HttpError(404, 'VOD not found', 'NOT_FOUND');
   }
   const vod = await getVodById(db, tenantId, vodIdNum);

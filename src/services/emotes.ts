@@ -6,7 +6,7 @@ import { withDbRetry } from '../db/streamer-client.js';
 import { safeRequest } from '../utils/http-client.js';
 import { RedisService } from '../utils/redis-service.js';
 import { compressChatData, decompressChatData } from '../utils/compression.js';
-import { EMOTE_CACHE_TTL, FFZ_API_BASE, BTTV_API_BASE, SEVENTV_API_BASE } from '../constants.js';
+import { Cache, Emote } from '../constants.js';
 import { EmoteUpsertSchema } from '../config/schemas.js';
 import { invalidateEmoteCache } from './vod-cache.js';
 import { publishVodUpdate } from './cache-invalidator.js';
@@ -77,19 +77,19 @@ export async function fetchAndSaveEmotes(
 
   if (platform === PLATFORMS.TWITCH && platformId != null && platformId !== '') {
     const [ffzRes, bttvGlobalRes, bttvChannelRes, sevenTvRes, sevenTvGlobalRes] = await Promise.all([
-      safeRequest<FFZResponse>(`${FFZ_API_BASE}/${platformId}`, {}, { timeoutMs: 5000 }),
-      safeRequest<BTTVGlobalResponse>(`${BTTV_API_BASE}/emotes/global`, { emotes: [] }, { timeoutMs: 5000 }),
+      safeRequest<FFZResponse>(`${Emote.FFZ_API_BASE}/${platformId}`, {}, { timeoutMs: 5000 }),
+      safeRequest<BTTVGlobalResponse>(`${Emote.BTTV_API_BASE}/emotes/global`, { emotes: [] }, { timeoutMs: 5000 }),
       safeRequest<BTTVChannelResponse>(
-        `${BTTV_API_BASE}/users/twitch/${platformId}`,
+        `${Emote.BTTV_API_BASE}/users/twitch/${platformId}`,
         { channelEmotes: [] },
         { timeoutMs: 5000 }
       ),
       safeRequest<SevenTVResponse>(
-        `${SEVENTV_API_BASE}/users/twitch/${platformId}`,
+        `${Emote.SEVENTV_API_BASE}/users/twitch/${platformId}`,
         { emotes: [] },
         { timeoutMs: 5000 }
       ),
-      safeRequest<SevenTVResponse>(`${SEVENTV_API_BASE}/emote-sets/global`, { emotes: [] }, { timeoutMs: 5000 }),
+      safeRequest<SevenTVResponse>(`${Emote.SEVENTV_API_BASE}/emote-sets/global`, { emotes: [] }, { timeoutMs: 5000 }),
     ]);
 
     ffzEmotes = (ffzRes.channels?.[platformId]?.emotes ?? []).map((e) => ({ id: String(e.id), code: e.code })) ?? [];
@@ -106,11 +106,11 @@ export async function fetchAndSaveEmotes(
   } else if (platform === PLATFORMS.KICK && platformId != null && platformId !== '') {
     const [sevenTvRes, sevenTvGlobalRes] = await Promise.all([
       safeRequest<SevenTVResponse>(
-        `${SEVENTV_API_BASE}/users/twitch/${platformId}`,
+        `${Emote.SEVENTV_API_BASE}/users/twitch/${platformId}`,
         { emotes: [] },
         { timeoutMs: 5000 }
       ),
-      safeRequest<SevenTVResponse>(`${SEVENTV_API_BASE}/emote-sets/global`, { emotes: [] }, { timeoutMs: 5000 }),
+      safeRequest<SevenTVResponse>(`${Emote.SEVENTV_API_BASE}/emote-sets/global`, { emotes: [] }, { timeoutMs: 5000 }),
     ]);
 
     ffzEmotes = [];
@@ -211,7 +211,7 @@ export async function getEmotesByVodId(db: DBClient, tenantId: string, vodId: nu
   if (redis) {
     try {
       const compressed = await compressChatData(result);
-      await redis.set(cacheKey, compressed, 'EX', EMOTE_CACHE_TTL);
+      await redis.set(cacheKey, compressed, 'EX', Cache.EMOTE_TTL);
     } catch (err) {
       getLogger().warn({ err, cacheKey }, 'Emote cache write failed');
     }

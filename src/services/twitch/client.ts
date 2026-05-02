@@ -1,7 +1,7 @@
 import { request } from '../../utils/http-client.js';
 import { getTwitchCredentials } from '../../utils/credentials.js';
 import { getLogger } from '../../utils/logger.js';
-import { TWITCH_HELIX_BASE_URL, TWITCH_GQL_URL, TWITCH_GQL_CLIENT_ID } from '../../constants.js';
+import { Twitch } from '../../constants.js';
 import { ConfigNotConfiguredError } from '../../utils/domain-errors.js';
 
 export interface TwitchClient {
@@ -22,7 +22,7 @@ export function createTwitchClient(tenantId: string, getAccessToken: () => Promi
     helix: {
       async get<T = unknown>(endpoint: string): Promise<T> {
         const accessToken = await getAccessToken();
-        return request<T>(`${TWITCH_HELIX_BASE_URL}${endpoint}`, {
+        return request<T>(`${Twitch.HELIX_BASE_URL}${endpoint}`, {
           method: 'GET',
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -33,7 +33,7 @@ export function createTwitchClient(tenantId: string, getAccessToken: () => Promi
       },
       async post<T = unknown>(endpoint: string, body?: object): Promise<T> {
         const accessToken = await getAccessToken();
-        return request<T>(`${TWITCH_HELIX_BASE_URL}${endpoint}`, {
+        return request<T>(`${Twitch.HELIX_BASE_URL}${endpoint}`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -53,11 +53,11 @@ export function createTwitchGqlClient(
 ): {
   post: <T = unknown>(body: object) => Promise<T>;
 } {
-  const actualClientId = clientId ?? TWITCH_GQL_CLIENT_ID;
+  const actualClientId = clientId ?? Twitch.GQL_CLIENT_ID;
 
   return {
     async post<T = unknown>(body: object): Promise<T> {
-      const result = await request<T>(TWITCH_GQL_URL, {
+      const result = await request<T>(Twitch.GQL_URL, {
         method: 'POST',
         headers: {
           Accept: '*/*',

@@ -6,7 +6,7 @@ import { Readable } from 'node:stream';
 import { getBaseConfig } from '../config/env.js';
 import type { RetryOptions } from './retry.js';
 import { retryWithBackoff } from './retry.js';
-import { HTTP_DEFAULT_BASE_DELAY_MS, HTTP_DEFAULT_MAX_DELAY_MS } from '../constants.js';
+import { Http } from '../constants.js';
 
 type CycleTLSClient = Awaited<ReturnType<typeof cycletls>>;
 
@@ -113,8 +113,8 @@ export class CycleTLSSession {
   }): RetryOptions {
     return {
       attempts: opts.attempts ?? 1,
-      baseDelayMs: HTTP_DEFAULT_BASE_DELAY_MS,
-      maxDelayMs: opts.maxDelayMs ?? HTTP_DEFAULT_MAX_DELAY_MS,
+      baseDelayMs: Http.DEFAULT_BASE_DELAY_MS,
+      maxDelayMs: opts.maxDelayMs ?? Http.DEFAULT_MAX_DELAY_MS,
       shouldRetry: opts.shouldRetry ?? this.shouldRetryFn,
     };
   }

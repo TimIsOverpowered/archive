@@ -1,6 +1,6 @@
 import { getTwitchClient } from './auth.js';
 import { createTwitchGqlClient } from './client.js';
-import { BACKUP_GQL_TWITCH_CLIENT_ID } from '../../constants.js';
+import { Twitch } from '../../constants.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { TenantContext } from '../../types/context.js';
@@ -16,7 +16,7 @@ const gameDataCache = new LRUCache<string, Record<string, unknown>>({
 });
 
 export async function getChapters(vodId: string, tenantId?: string): Promise<unknown[] | null> {
-  const client = createTwitchGqlClient(tenantId, BACKUP_GQL_TWITCH_CLIENT_ID);
+  const client = createTwitchGqlClient(tenantId, Twitch.BACKUP_GQL_CLIENT_ID);
   const data = await client.post<{ data?: Record<string, unknown> }>({
     operationName: 'VideoPreviewCard__VideoMoments',
     variables: {

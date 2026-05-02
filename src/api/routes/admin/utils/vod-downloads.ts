@@ -4,7 +4,7 @@ import { type AppLogger } from '../../../../utils/logger.js';
 import type { VodRecord } from '../../../../types/db.js';
 import type { SourceType, DownloadMethod } from '../../../../types/platforms.js';
 import { DOWNLOAD_METHODS, SOURCE_TYPES } from '../../../../types/platforms.js';
-import { VOD_DURATION_TOLERANCE_SECONDS } from '../../../../constants.js';
+import { Vod } from '../../../../constants.js';
 import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
 import { refreshVodRecord } from './vod-records.js';
@@ -98,7 +98,7 @@ async function checkIfDownloadNeeded(
   const expectedDuration = vodRecord.duration;
   const diff = Math.abs(actualDuration - expectedDuration);
 
-  if (diff > VOD_DURATION_TOLERANCE_SECONDS) {
+  if (diff > Vod.DURATION_TOLERANCE_SECONDS) {
     log.debug({ dbId, expectedDuration, actualDuration, diff }, 'Duration mismatch exceeds tolerance');
     return true;
   }

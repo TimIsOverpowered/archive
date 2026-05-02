@@ -6,7 +6,7 @@ import { uploadVideo } from '../../services/youtube/index.js';
 import { initRichAlert, updateAlert, createProgressBar } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 import { createYoutubeUploadProgressHandler as createGameUploadProgressHandler } from './youtube-upload-progress.js';
-import { YOUTUBE_MAX_DURATION } from '../../constants.js';
+import { YouTube } from '../../constants.js';
 import type { TenantConfig } from '../../config/types.js';
 import { getDisplayName } from '../../config/types.js';
 import { deleteFileIfExists } from '../../utils/path.js';
@@ -166,7 +166,7 @@ export async function processGameUpload(ctx: GameUploadContext): Promise<GameUpl
   }
   const trimmedDuration = metadata.duration;
 
-  const gameExceedsYoutubeMax = trimmedDuration > YOUTUBE_MAX_DURATION;
+  const gameExceedsYoutubeMax = trimmedDuration > YouTube.MAX_DURATION;
 
   if (gameExceedsYoutubeMax === true) {
     return await processSplitGameUpload(ctx, trimmedPath, trimmedDuration);
@@ -217,7 +217,7 @@ async function processSplitGameUpload(
 ): Promise<GameUploadResult> {
   const { tenantId, dbId, chapterStart, chapterGameId, chapterName, title, description, config, db, vodId, log } = ctx;
   const channelName = getDisplayName(config);
-  const totalParts = Math.ceil(trimmedDuration / YOUTUBE_MAX_DURATION);
+  const totalParts = Math.ceil(trimmedDuration / YouTube.MAX_DURATION);
 
   const splitAlertMessageId = await initRichAlert({
     title: `✂️ Game Clip Splitting in Progress`,
@@ -235,7 +235,7 @@ async function processSplitGameUpload(
   const splitPaths = await splitVideo(
     trimmedPath,
     trimmedDuration,
-    YOUTUBE_MAX_DURATION,
+    YouTube.MAX_DURATION,
     `${vodId}-game`,
     (percent: number) => {
       const alertFields: Array<{ name: string; value: string; inline: boolean }> = [
@@ -265,8 +265,8 @@ async function processSplitGameUpload(
 
   for (let i = 0; i < totalParts; i++) {
     const currentPartNum = i + 1;
-    const startTime = i * YOUTUBE_MAX_DURATION;
-    const endTime = Math.min(startTime + YOUTUBE_MAX_DURATION, trimmedDuration);
+    const startTime = i * YouTube.MAX_DURATION;
+    const endTime = Math.min(startTime + YouTube.MAX_DURATION, trimmedDuration);
     const splitPath = splitPaths[i];
     if (splitPath == null) {
       log.warn({ part: currentPartNum, totalParts }, `Missing split path for part ${currentPartNum}`);

@@ -12,7 +12,7 @@ import { getLogger, setLoggerConfig } from '../utils/logger.js';
 import { registerWorkers } from './worker-definitions.js';
 import { waitForWorkersReady, workerRegistry } from './create-worker.js';
 import { loadWorkersConfig } from '../config/env.js';
-import { VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY, SHUTDOWN_TIMEOUT_MS } from '../constants.js';
+import { Vod, Server } from '../constants.js';
 import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/streamer-client.js';
 import { registerPlatformStrategies } from '../services/platforms/index.js';
 import { closeMetaClient } from '../db/meta-client.js';
@@ -65,7 +65,7 @@ export async function bootstrap() {
     startTokenHealthCron();
     await clearAllJobsOnStartup(workerConfig);
 
-    registerWorkers(getRedisInstance(), configs, VOD_LIVE_HEADROOM, VOD_MIN_CONCURRENCY);
+    registerWorkers(getRedisInstance(), configs, Vod.LIVE_HEADROOM, Vod.LIVE_MIN_CONCURRENCY);
 
     await waitForWorkersReady(workerRegistry.getAll().map((entry) => entry.worker));
 
@@ -92,7 +92,7 @@ function registerShutdownHandlers(tenantConfigSubscriber: ReturnType<typeof regi
     const forceExitTimer = setTimeout(() => {
       getLogger().error('Forced shutdown after timeout');
       process.exit(1);
-    }, SHUTDOWN_TIMEOUT_MS);
+    }, Server.SHUTDOWN_TIMEOUT_MS);
 
     try {
       stopMonitorService();

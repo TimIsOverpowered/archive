@@ -2,7 +2,7 @@ import ipaddr from 'ipaddr.js';
 import { RedisService } from '../utils/redis-service.js';
 import { getLogger } from './logger.js';
 import { request } from './http-client.js';
-import { CF_IP_RANGES_TTL } from '../constants.js';
+import { Cloudflare } from '../constants.js';
 import { getBaseConfig } from '../config/env.js';
 
 const CF_IP_RANGES_KEY = 'cloudflare:ip_ranges';
@@ -61,7 +61,7 @@ export async function getCloudflareIpRanges(): Promise<CloudflareIpRanges | null
 
   if (client) {
     try {
-      await client.set(CF_IP_RANGES_KEY, JSON.stringify(ranges), 'EX', CF_IP_RANGES_TTL);
+      await client.set(CF_IP_RANGES_KEY, JSON.stringify(ranges), 'EX', Cloudflare.IP_RANGES_TTL);
     } catch {
       // Ignore cache errors
     }
@@ -149,7 +149,7 @@ export async function getCachedRangeInfo(): Promise<CloudflareCacheInfo | null> 
 
     const ranges = JSON.parse(cached) as CloudflareIpRanges;
     const age = Date.now() - ranges.lastUpdated;
-    const ttlRemaining = Math.max(0, CF_IP_RANGES_TTL * 1000 - age);
+    const ttlRemaining = Math.max(0, Cloudflare.IP_RANGES_TTL * 1000 - age);
 
     return {
       status: 'ok',
@@ -169,7 +169,7 @@ export async function refreshCloudflareRanges(): Promise<void> {
   const client = RedisService.getActiveClient();
 
   if (client) {
-    await client.set(CF_IP_RANGES_KEY, JSON.stringify(ranges), 'EX', CF_IP_RANGES_TTL);
+    await client.set(CF_IP_RANGES_KEY, JSON.stringify(ranges), 'EX', Cloudflare.IP_RANGES_TTL);
   }
 
   getLogger().info({ v4Count: ranges.v4.length, v6Count: ranges.v6.length }, 'Cloudflare IP ranges refreshed');

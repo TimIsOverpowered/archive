@@ -1,13 +1,7 @@
 import { retryWithBackoff } from './retry.js';
 import { extractErrorDetails } from './error.js';
 import { getLogger } from './logger.js';
-import {
-  HTTP_DEFAULT_ATTEMPTS,
-  HTTP_DEFAULT_BASE_DELAY_MS,
-  HTTP_DEFAULT_MAX_DELAY_MS,
-  SEGMENT_DOWNLOAD_MAX_CONNECTIONS,
-  SEGMENT_DOWNLOAD_PIPELINING,
-} from '../constants.js';
+import { Http } from '../constants.js';
 import { HttpError } from './http-error.js';
 import { DownloadAbortedError } from './domain-errors.js';
 import { Agent, request as undiciRequest, type BodyInit as UndiciBodyInit, type Dispatcher } from 'undici';
@@ -47,8 +41,8 @@ export type RequestResult<T, R extends ResponseType> = R extends 'json'
 
 /** Undici agent configured for high-concurrency segment downloads. */
 export const segmentDownloadAgent = new Agent({
-  connections: SEGMENT_DOWNLOAD_MAX_CONNECTIONS,
-  pipelining: SEGMENT_DOWNLOAD_PIPELINING,
+  connections: Http.SEGMENT_DOWNLOAD_MAX_CONNECTIONS,
+  pipelining: Http.SEGMENT_DOWNLOAD_PIPELINING,
 });
 
 const SENSITIVE_PARAM_PATTERNS = [/^nauthsig$/i, /^nauth$/i, /token/i, /secret/i, /_key$/i];
@@ -199,9 +193,9 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
         return parsedData as RequestResult<T, R>;
       },
       {
-        attempts: retryOptions?.attempts ?? HTTP_DEFAULT_ATTEMPTS,
-        baseDelayMs: retryOptions?.baseDelayMs ?? HTTP_DEFAULT_BASE_DELAY_MS,
-        maxDelayMs: retryOptions?.maxDelayMs ?? HTTP_DEFAULT_MAX_DELAY_MS,
+        attempts: retryOptions?.attempts ?? Http.DEFAULT_ATTEMPTS,
+        baseDelayMs: retryOptions?.baseDelayMs ?? Http.DEFAULT_BASE_DELAY_MS,
+        maxDelayMs: retryOptions?.maxDelayMs ?? Http.DEFAULT_MAX_DELAY_MS,
         shouldRetry,
       }
     );

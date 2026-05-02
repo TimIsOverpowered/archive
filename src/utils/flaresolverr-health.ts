@@ -1,7 +1,7 @@
 import { extractErrorDetails } from './error.js';
 import { getLogger } from './logger.js';
 import { getBaseConfig } from '../config/env.js';
-import { FLARESOLVERR_HEALTH_CACHE_TTL_MS } from '../constants.js';
+import { Flaresolverr } from '../constants.js';
 import { LRUCache } from 'lru-cache';
 
 export interface FlareSolverrHealthStats {
@@ -22,7 +22,7 @@ interface FlareSolverrStatusResponse {
 
 const healthCache = new LRUCache<string, FlareSolverrHealthResult>({
   max: 1,
-  ttl: FLARESOLVERR_HEALTH_CACHE_TTL_MS,
+  ttl: Flaresolverr.HEALTH_CACHE_TTL_MS,
   allowStale: false,
 });
 

@@ -9,7 +9,7 @@ import { startCloudflareIpRangesCron } from './cron/cloudflare-ip-ranges.js';
 import { getCachedRangeInfo, getCloudflareIpRanges } from './utils/cloudflare-ip-validator.js';
 import { registerPlatformStrategies } from './services/platforms/index.js';
 import { closeMetaClient } from './db/meta-client.js';
-import { SHUTDOWN_TIMEOUT_MS } from './constants.js';
+import { Server } from './constants.js';
 
 process.on('unhandledRejection', (reason) => {
   getLogger().error({ error: extractErrorDetails(reason) }, 'Unhandled promise rejection');
@@ -73,7 +73,7 @@ async function shutdown(signal: string) {
   const shutdownTimeout = setTimeout(() => {
     getLogger().error('Forced shutdown after timeout');
     process.exit(1);
-  }, SHUTDOWN_TIMEOUT_MS);
+  }, Server.SHUTDOWN_TIMEOUT_MS);
 
   if (!server) {
     clearTimeout(shutdownTimeout);

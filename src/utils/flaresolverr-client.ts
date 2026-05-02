@@ -2,7 +2,7 @@ import * as cheerio from 'cheerio';
 import { extractErrorDetails } from './error.js';
 import { childLogger } from './logger.js';
 import { getBaseConfig } from '../config/env.js';
-import { FLARESOLVERR_TIMEOUT_MS } from '../constants.js';
+import { Flaresolverr } from '../constants.js';
 import { retryWithBackoff } from './retry.js';
 
 const log = childLogger({ module: 'flaresolverr-client' });
@@ -104,7 +104,7 @@ async function fetchFromFlareSolverr(
 }
 
 export async function fetchUrl<T = unknown>(url: string, options?: FetchUrlOptions): Promise<FetchUrlResult<T>> {
-  const timeoutMs = options?.timeoutMs ?? FLARESOLVERR_TIMEOUT_MS;
+  const timeoutMs = options?.timeoutMs ?? Flaresolverr.TIMEOUT_MS;
   const maxRetries = options?.maxRetries ?? 3;
   const sessionTTL = getBaseConfig().FLARESOLVERR_SESSION_TTL;
 

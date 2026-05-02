@@ -5,7 +5,7 @@ import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { configService } from '../config/tenant-config.js';
-import { TOKEN_MAX_FAILURES } from '../constants.js';
+import { Token } from '../constants.js';
 
 export async function checkTokenHealth(): Promise<void> {
   const streamerConfigs: ConfigType[] = configService.getAll();
@@ -24,9 +24,9 @@ export async function checkTokenHealth(): Promise<void> {
         const { message } = extractErrorDetails(err);
         log.error({ error: message, platform: 'Twitch' }, `Token health check failed for ${tenantId}`);
 
-        if (trackFailure(`${tenantId}:twitch`, TOKEN_MAX_FAILURES)) {
+        if (trackFailure(`${tenantId}:twitch`, Token.MAX_FAILURES)) {
           await sendDiscordAlert(
-            `🚨 Twitch token health check failed for ${tenantId} after ${TOKEN_MAX_FAILURES} attempts`
+            `🚨 Twitch token health check failed for ${tenantId} after ${Token.MAX_FAILURES} attempts`
           );
         }
       }
