@@ -9,7 +9,7 @@ import { Pool } from 'pg';
 import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
 import { encryptScalar, validateEncryptionKey } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
-import { normalizePath as pathNormalize } from '../src/utils/path';
+import { normalizePath as pathNormalize } from '../src/utils/path.js';
 import { getTenantById, createTenant, deleteTenant } from '../src/services/meta-tenants.service.js';
 import type { InsertableTenants } from '../src/db/meta-types.js';
 
@@ -200,7 +200,7 @@ async function createDatabase(
         const forceMigrations = forceAnswer === 'y' || forceAnswer === 'yes';
         // If user wants to run migrations on existing DB, treat as "isNew" (needs migrations)
         return { success: true, isNew: forceMigrations };
-      } catch (verifyError) {
+      } catch (_verifyError) {
         console.error(`❌ Could not connect to database '${dbName}' after manual creation`);
         return { success: false, isNew: false };
       }
@@ -560,7 +560,7 @@ async function main(): Promise<void> {
       }
       console.log('\nThese scripts will guide you through the OAuth flow and securely store credentials.');
     }
-  } catch (error: unknown) {
+  } catch (_error: unknown) {
     console.error('\n❌ Error during tenant creation:');
 
     // Rollback if tenant was created

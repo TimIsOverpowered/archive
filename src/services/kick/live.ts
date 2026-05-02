@@ -2,6 +2,7 @@ import { fetchUrl } from '../../utils/flaresolverr-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
 import { Kick } from '../../constants.js';
+import { KickVod } from './vod.js';
 
 interface KickApiResponse {
   data?: Record<string, unknown>;
@@ -133,10 +134,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
   }
 }
 
-export async function getLatestKickVodObject(
-  username: string,
-  expectedStreamId: string
-): Promise<{ id: string; title?: string | undefined; source?: string | undefined } | null> {
+export async function getLatestKickVodObject(username: string, expectedStreamId: string): Promise<KickVod | null> {
   try {
     const videosUrl = `https://kick.com/api/v2/channels/${username}/videos`;
 
@@ -155,19 +153,16 @@ export async function getLatestKickVodObject(
       return null;
     }
 
-    const dataArray = result.data;
+    const dataArray = result.data as unknown as KickVod[];
 
     if (dataArray == null || !Array.isArray(dataArray)) {
       getLogger().debug({ username }, 'Kick has no video data');
       return null;
     }
 
-    const vodObject = dataArray.find((v: unknown) => {
+    const vodObject = dataArray.find((v: KickVod) => {
       if (v == null || typeof v !== 'object') return false;
-      const vid = (v as Record<string, unknown>).id;
-      return typeof vid === 'string' || typeof vid === 'number'
-        ? vid == expectedStreamId || String(vid) == String(expectedStreamId)
-        : false;
+      return String(v.id) == expectedStreamId;
     });
 
     if (vodObject == null) {
@@ -175,18 +170,9 @@ export async function getLatestKickVodObject(
       return null;
     }
 
-    const vod = vodObject as Record<string, unknown>;
+    getLogger().debug({ username, expectedStreamId, title: vodObject.session_title }, 'Kick video object ready');
 
-    getLogger().debug(
-      { username, expectedStreamId, sessionTitle: vod.session_title, title: vod.title },
-      'Kick video object ready'
-    );
-
-    return {
-      id: String(expectedStreamId),
-      title: vod.session_title as string,
-      source: (vod.source as string) ?? undefined,
-    };
+    return vodObject;
   } catch (error) {
     const details = extractErrorDetails(error);
     getLogger().error({ username, ...details }, 'Failed to get Kick video object');

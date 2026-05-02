@@ -69,7 +69,7 @@ async function embed() {
     if (!response.ok) throw new Error(`Status ${response.status}`);
 
     console.log(colors.green + '✅ Embed sent! ' + colors.reset + '\n');
-  } catch (e) {
+  } catch (_e) {
     console.error('\n❌ Failed\n');
   }
 }

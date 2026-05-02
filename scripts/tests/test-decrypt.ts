@@ -36,7 +36,7 @@ async function decryptField(value: string | null): Promise<DecryptionResult> {
       // Try decryptScalar first (for fields like apiKey that are simple strings)
       try {
         result.decrypted = decryptScalar(value);
-      } catch (scalarError: any) {
+      } catch (_scalarError: any) {
         // If scalar fails, try decryptObject for complex objects
         try {
           result.decrypted = decryptObject(value);

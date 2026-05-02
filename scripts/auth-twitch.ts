@@ -152,7 +152,7 @@ async function main(): Promise<void> {
     // Phase 5: Update Meta DB (preserve existing config)
     console.log(`Storing in meta database for tenant "${tenantId}"...\n`);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     let updatedTwitchConfig: any;
 
     if (tenant.twitch) {

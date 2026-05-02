@@ -80,7 +80,7 @@ function extractAuthCode(input: string, expectedState: string): { error?: string
       }
 
       return {}; // Valid - no errors
-    } catch (parseError: any) {
+    } catch (_parseError: any) {
       return { error: `Could not parse the provided URL. Please ensure it's a valid callback URL from Google.` };
     }
   } else {
@@ -412,7 +412,7 @@ async function storeAuthObject(tenantId: string, authObject: YoutubeAuthObject):
           console.warn(`Unexpected decrypted type: ${typeof decryptedValue}. Starting with clean config.`);
           youtubeConfig = {};
         }
-      } catch (decryptError) {
+      } catch (_decryptError) {
         // Failed to decrypt - previous data might be unencrypted JSON or invalid
         try {
           const parsedJson =
@@ -425,7 +425,7 @@ async function storeAuthObject(tenantId: string, authObject: YoutubeAuthObject):
             console.warn(`Could not parse previous YouTube data. Starting with clean slate.`);
             youtubeConfig = {};
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Completely invalid/unknown format - start fresh
           console.warn('Previous YouTube config could not be parsed or decrypted. Starting with new configuration.');
           youtubeConfig = {};
