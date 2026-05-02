@@ -29,19 +29,11 @@ interface LiveStreamContext {
   log: ReturnType<typeof createAutoLogger>;
 }
 
-interface ExistingVodInfo {
-  id: number;
-  vod_id: string;
-  started_at?: Date | null;
-}
-
 // ExistingVodLiveContext: stream came back online on an existing VOD that was marked is_live=false.
-// Only needs id and vod_id — the VOD hasn't started a new session yet.
-type ExistingVodLiveContext = LiveStreamContext & { existingVod: { id: number; vod_id: string } };
+type ExistingVodLiveContext = LiveStreamContext & { existingVod: SelectableVods };
 
 // AlreadyLiveContext: stream is currently live on an existing VOD.
-// Has full ExistingVodInfo including started_at for queueing the download with the correct timestamp.
-type AlreadyLiveContext = LiveStreamContext & { existingVod: ExistingVodInfo };
+type AlreadyLiveContext = LiveStreamContext & { existingVod: SelectableVods };
 
 export async function handlePlatformLiveCheck(
   db: StreamerDbClient,
@@ -149,14 +141,11 @@ async function handleLiveStream(ctx: LiveStreamContext): Promise<void> {
   }
 
   if (!existingVod.is_live) {
-    await handleExistingVodBecameLive({ ...ctx, existingVod: { id: existingVod.id, vod_id: existingVod.vod_id } });
+    await handleExistingVodBecameLive({ ...ctx, existingVod });
     return;
   }
 
-  await handleAlreadyLiveStream({
-    ...ctx,
-    existingVod: { id: existingVod.id, vod_id: existingVod.vod_id, started_at: existingVod.started_at },
-  });
+  await handleAlreadyLiveStream({ ...ctx, existingVod });
 }
 
 async function handleNewLiveStream(ctx: LiveStreamContext): Promise<void> {

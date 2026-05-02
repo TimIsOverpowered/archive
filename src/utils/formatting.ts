@@ -47,6 +47,12 @@ export function humanizeDuration(seconds: number): string {
   return dayjs.duration(seconds, 'seconds').humanize(true);
 }
 
+/** Rounds a 0–1 ratio to a percentage with the given decimal places (e.g. 0.956, 1 → 95.6). */
+export function toPercentage(ratio: number, decimals = 1): number {
+  const factor = 10 ** (decimals);
+  return Math.round(ratio * 100 * factor) / factor;
+}
+
 /** Extract the database name from a PostgreSQL connection string. */
 export function extractDatabaseName(connectionString: string): string {
   try {

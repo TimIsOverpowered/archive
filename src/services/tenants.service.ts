@@ -4,7 +4,7 @@ import { configService } from '../config/tenant-config.js';
 import { withCache } from '../utils/cache.js';
 import { simpleKeys } from '../utils/cache-keys.js';
 import { PLATFORMS } from '../types/platforms.js';
-import { PERCENTAGE_PRECISION_MULTIPLIER, PERCENTAGE_PRECISION_DIVISOR } from '../constants.js';
+import { toPercentage } from '../utils/formatting.js';
 import type { TenantConfig } from '../config/types.js';
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../db/streamer-types.js';
@@ -138,11 +138,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
     const completedUploads = totalUploadsCnt - failedUploads;
     const lastUploadDate = lastUploadRow?.maxCreatedAt ?? null;
 
-    const uploadSuccessRate =
-      totalUploadsCnt > 0
-        ? Math.round((completedUploads / totalUploadsCnt) * PERCENTAGE_PRECISION_MULTIPLIER) /
-          PERCENTAGE_PRECISION_DIVISOR
-        : 0;
+    const uploadSuccessRate = totalUploadsCnt > 0 ? toPercentage(completedUploads / totalUploadsCnt) : 0;
 
     const uniqueGameCount = Number(uniqueGamesCount?.cnt ?? 0);
 

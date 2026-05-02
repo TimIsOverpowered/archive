@@ -22,7 +22,7 @@ export function generateApiKey(username: string): string {
  * then verifies with bcrypt. Returns undefined if the key is invalid or doesn't match any admin.
  */
 export async function findAdminByApiKey(apiKey: string): Promise<SelectableAdmins | undefined> {
-  if (apiKey == null || apiKey === '' || !apiKey.startsWith('archive_')) return;
+  if (apiKey === '' || !apiKey.startsWith('archive_')) return;
 
   const parts = apiKey.split('_');
   const username = parts[1];
