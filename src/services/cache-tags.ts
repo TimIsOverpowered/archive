@@ -2,7 +2,7 @@ import { RedisService } from '../utils/redis-service.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
-import { Cache, CacheTag } from '../constants.js';
+import { Cache, CacheTag, RedisBatch } from '../constants.js';
 import { isConnectionError } from '../db/utils/errors.js';
 import { CacheKeys, swrKeys } from '../utils/cache-keys.js';
 
@@ -44,15 +44,13 @@ export async function registerVodTags(
   const tagTtlMs = ttl * 1000 + CacheTag.TTL_BUFFER_MS;
 
   try {
-    const CHUNK_SIZE = 50;
-
-    for (let i = 0; i < vods.length; i += CHUNK_SIZE) {
+    for (let i = 0; i < vods.length; i += RedisBatch.CHUNK_SIZE) {
       const chunk = client.pipeline();
       if (i === 0) {
         chunk.set(cacheKey, data, 'EX', ttl);
       }
 
-      for (const vod of vods.slice(i, i + CHUNK_SIZE)) {
+      for (const vod of vods.slice(i, i + RedisBatch.CHUNK_SIZE)) {
         const tagKey = CacheKeys.vodTags(tenantId, vod.id);
         chunk.sadd(tagKey, cacheKey);
         chunk.pexpire(tagKey, tagTtlMs);
@@ -92,7 +90,7 @@ export async function invalidateVodTags(tenantId: string, dbId: number): Promise
     let cursor = '0';
 
     do {
-      const result = await client.sscan(tagKey, cursor, 'COUNT', 50);
+      const result = await client.sscan(tagKey, cursor, 'COUNT', RedisBatch.SCAN_COUNT);
       cursor = result[0];
       const taggedKeys = result[1];
 

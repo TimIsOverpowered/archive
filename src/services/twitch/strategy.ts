@@ -12,6 +12,7 @@ import { parseTwitchDuration } from '../../utils/formatting.js';
 import { createErrorContext } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
 import { requirePlatformConfig } from '../../config/types.js';
+import { PLATFORMS } from '../../types/platforms.js';
 
 export const strategy: PlatformStrategy = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
@@ -76,7 +77,7 @@ export const strategy: PlatformStrategy = {
       created_at: new Date(meta.createdAt),
       duration: meta.duration,
       stream_id: meta.streamId ?? null,
-      platform: 'twitch',
+      platform: PLATFORMS.TWITCH,
       is_live: false,
     };
   },

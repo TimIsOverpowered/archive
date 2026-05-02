@@ -167,3 +167,17 @@ export const Server = {
   /** Grace period before force-exit on SIGTERM/SIGINT */
   SHUTDOWN_TIMEOUT_MS: 5_000,
 } as const;
+
+// ── Redis ────────────────────────────────────────────────────────────────────
+export const RedisBatch = {
+  /** Pipeline chunk size for tag registration */
+  CHUNK_SIZE: 50,
+  /** SSCAN COUNT for tag invalidation iteration */
+  SCAN_COUNT: 50,
+} as const;
+
+// ── Cache ────────────────────────────────────────────────────────────────────
+export const CacheRefresh = {
+  /** Pre-fetch threshold — refresh if TTL remaining is under 1 hour */
+  TTL_REMAINING_THRESHOLD: 3_600,
+} as const;

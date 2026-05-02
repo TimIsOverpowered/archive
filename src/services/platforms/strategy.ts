@@ -6,7 +6,7 @@ import type { TenantPlatformContext } from '../../api/middleware/tenant-platform
 /** Data shape for creating a VOD record from platform metadata. */
 export interface VodCreateData {
   vod_id: string;
-  platform: string;
+  platform: Platform;
   title: string | null;
   created_at: Date;
   duration: number;

@@ -21,7 +21,9 @@ export async function getVodStaticCache(tenantId: string, dbId: number): Promise
 
   try {
     return await client.get(CacheKeys.vodStatic(tenantId, dbId));
-  } catch {
+  } catch (err) {
+    const details = extractErrorDetails(err);
+    getLogger().debug({ err: details, tenantId, dbId }, 'Static cache read failed');
     return null;
   }
 }
@@ -97,8 +99,9 @@ export async function getVodVolatileCacheBatch(
         if (values[i] != null && values[i] !== '') {
           try {
             result.set(id, JSON.parse(values[i]) as VodVolatileData);
-          } catch {
-            // Corrupt entry, skip
+          } catch (err) {
+            const details = extractErrorDetails(err);
+            getLogger().debug({ err: details, id }, 'Skipping corrupt volatile cache entry');
           }
         }
       });

@@ -9,11 +9,15 @@ export interface WrapWorkerProcessorOptions<TCtx> {
   finally?: (ctx: TCtx) => Promise<void>;
 }
 
+const noopFinally = async <TCtx>(_ctx: TCtx): Promise<void> => {};
+
 export function wrapWorkerProcessor<TJobData, TCtx extends { log: AppLogger }, TResult>(
   buildCtx: (job: Job<TJobData>) => Promise<TCtx>,
   processor: (ctx: TCtx) => Promise<TResult>,
   options: WrapWorkerProcessorOptions<TCtx>
 ): Processor<TJobData, TResult> {
+  const { finally: finallyHook = noopFinally } = options;
+
   return async (job: Job<TJobData>): Promise<TResult> => {
     let ctx: TCtx | undefined;
 
@@ -28,7 +32,7 @@ export function wrapWorkerProcessor<TJobData, TCtx extends { log: AppLogger }, T
       throw error;
     } finally {
       if (ctx) {
-        await options.finally?.(ctx);
+        await finallyHook(ctx);
       }
     }
   };

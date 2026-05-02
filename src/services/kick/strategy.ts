@@ -9,6 +9,7 @@ import type {
 import { createErrorContext } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
 import { requirePlatformConfig } from '../../config/types.js';
+import { PLATFORMS } from '../../types/platforms.js';
 export const strategy: PlatformStrategy<VodCreateData, VodUpdateData> = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
     const { config, platform } = ctx;
@@ -79,7 +80,7 @@ export const strategy: PlatformStrategy<VodCreateData, VodUpdateData> = {
       created_at: new Date(meta.createdAt),
       duration: meta.duration,
       stream_id: meta.streamId ?? null,
-      platform: 'kick',
+      platform: PLATFORMS.KICK,
       is_live: false,
     };
   },

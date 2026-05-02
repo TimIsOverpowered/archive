@@ -9,6 +9,7 @@ import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { triggerChatDownload } from '../../../../workers/jobs/chat.job.js';
 
 import { getStrategy } from '../../../../services/platforms/index.js';
+import { PLATFORMS } from '../../../../types/platforms.js';
 import { getDisplayName, requirePlatformConfig } from '../../../../config/types.js';
 import { VodNotFoundError } from '../../../../utils/domain-errors.js';
 import { findVodByPlatformId } from '../../../../db/queries/vods.js';
@@ -66,7 +67,7 @@ export async function ensureVodRecord(
     .returning(['id', 'vod_id', 'platform', 'title', 'duration', 'stream_id', 'created_at'])
     .executeTakeFirst()) as VodRecord;
 
-  if (platform === 'twitch') {
+  if (platform === PLATFORMS.TWITCH) {
     await saveVodChapters(ctx, vodRecord.id, vodRecord.vod_id, vodRecord.duration);
     await fetchAndSaveEmotes(ctx, vodRecord.id, platform, platformUserId);
     void triggerChatDownload({
@@ -123,7 +124,7 @@ export async function refreshVodRecord(
 
   log.info({ vodId, platform, duration: updatedRecord.duration }, 'VOD metadata refreshed');
 
-  if (platform === 'twitch') {
+  if (platform === PLATFORMS.TWITCH) {
     await saveVodChapters(ctx, updatedRecord.id, updatedRecord.vod_id, updatedRecord.duration);
     await fetchAndSaveEmotes(ctx, updatedRecord.id, platform, platformUserId);
     void triggerChatDownload({

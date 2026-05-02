@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import { registerStrategy, getStrategy } from '../../../src/services/platforms/strategy.js';
 import type { PlatformStrategy } from '../../../src/services/platforms/strategy.js';
 import type { Platform } from '../../../src/types/platforms.js';
+import { PLATFORMS } from '../../../src/types/platforms.js';
 
 function createMockStrategy(vodId: string): PlatformStrategy {
   return {
@@ -10,7 +11,7 @@ function createMockStrategy(vodId: string): PlatformStrategy {
     fetchVodMetadata: async () => null,
     createVodData: () => ({
       vod_id: vodId,
-      platform: vodId,
+      platform: PLATFORMS.TWITCH,
       title: null,
       created_at: new Date(),
       duration: 0,

@@ -10,6 +10,7 @@ import { startCloudflareIpRangesCron } from './cron/cloudflare-ip-ranges.js';
 import { getCachedRangeInfo, getCloudflareIpRanges } from './utils/cloudflare-ip-validator.js';
 import { registerPlatformStrategies } from './services/platforms/index.js';
 import { closeMetaClient } from './db/meta-client.js';
+import { CacheRefresh } from './constants.js';
 
 process.on('unhandledRejection', (reason) => {
   getLogger().error({ error: extractErrorDetails(reason) }, 'Unhandled promise rejection');
@@ -46,7 +47,11 @@ async function start() {
     // Pre-fetch Cloudflare IP ranges (only if missing or expiring soon)
     try {
       const cacheInfo = await getCachedRangeInfo();
-      if (!cacheInfo || cacheInfo.status === 'missing' || (cacheInfo.ttlRemaining ?? 0) < 3600) {
+      if (
+        !cacheInfo ||
+        cacheInfo.status === 'missing' ||
+        (cacheInfo.ttlRemaining ?? 0) < CacheRefresh.TTL_REMAINING_THRESHOLD
+      ) {
         await getCloudflareIpRanges();
         getLogger().info('Cloudflare IP ranges pre-fetched (cache was missing/expired)');
       } else {
