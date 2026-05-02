@@ -1,19 +1,15 @@
 #!/usr/bin/env node
 
 import 'dotenv/config';
-import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
 import { extractErrorDetails } from '../src/utils/error.js';
-import { findAdminByUsername, updateAdmin } from '../src/services/admin.service.js';
+import { findAdminByUsername, updateAdmin, generateApiKey } from '../src/services/admin.service.js';
 
-const API_KEY_PREFIX = 'archive_';
-const API_KEY_LENGTH = 64; // hex chars after prefix
 const BCRYPT_COST = 10;
 
 async function resetAdminKey(username: string): Promise<void> {
   await initMetaClient();
-  // Check if admin exists
   const admin = await findAdminByUsername(username);
 
   if (!admin) {
@@ -21,11 +17,7 @@ async function resetAdminKey(username: string): Promise<void> {
     process.exit(1);
   }
 
-  // Generate new random API key
-  const randomBytes = crypto.randomBytes(API_KEY_LENGTH / 2);
-  const newApiKey = `${API_KEY_PREFIX}${randomBytes.toString('hex')}`;
-
-  // Hash the new API key
+  const newApiKey = generateApiKey(username);
   const newApiKeyHash = await bcrypt.hash(newApiKey, BCRYPT_COST);
 
   // Update database

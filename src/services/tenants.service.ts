@@ -105,7 +105,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
         .select((eb) => [eb.fn.count('id').as('cnt')])
         .where('created_at', '>=', thisMonthStart)
         .executeTakeFirst(),
-      db.selectFrom('chapters').select('game_id').where('game_id', 'is not', null).groupBy('game_id').execute(),
+      db.selectFrom('chapters').select(sql<string>`COUNT(DISTINCT game_id)`.as('cnt')).where('game_id', 'is not', null).executeTakeFirst(),
       db
         .selectFrom('vod_uploads')
         .select((eb) => [eb.fn.count('upload_id').as('cnt')])
@@ -144,7 +144,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
           PERCENTAGE_PRECISION_DIVISOR
         : 0;
 
-    const uniqueGames = new Set(uniqueGamesCount.map((g) => g.game_id));
+    const uniqueGameCount = Number(uniqueGamesCount?.cnt ?? 0);
 
     const stats: TenantStats = {
       tenant: {
@@ -174,7 +174,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
         count: chapterCount,
       },
       games: {
-        count: uniqueGames.size,
+        count: uniqueGameCount,
       },
     };
 

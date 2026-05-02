@@ -18,9 +18,12 @@ let _metaDb: Kysely<MetaDB> | null = null;
  * Initialize the meta database client. Must be called before getMetaClient().
  * Call from entry points (API config plugin or workers bootstrap) before
  * any code that reads from the meta database.
+ *
+ * Note: Synchronous — PgPool defers actual connection until the first query.
+ * Callers using `await` are unaffected (await on a non-Thenable is a no-op).
  */
-export function initMetaClient(): Promise<Kysely<MetaDB>> {
-  if (_metaDb) return Promise.resolve(_metaDb);
+export function initMetaClient(): Kysely<MetaDB> {
+  if (_metaDb) return _metaDb;
 
   const { NODE_ENV, PGBOUNCER_URL, META_DATABASE_URL } = getBaseConfig();
 
@@ -28,7 +31,7 @@ export function initMetaClient(): Promise<Kysely<MetaDB>> {
   // This guard must match the storage guard below to avoid stale reads.
   if (NODE_ENV !== 'production' && globalForMeta.metaDb) {
     _metaDb = globalForMeta.metaDb;
-    return Promise.resolve(_metaDb);
+    return _metaDb;
   }
 
   const pgbouncerUrl = PGBOUNCER_URL;
@@ -45,7 +48,7 @@ export function initMetaClient(): Promise<Kysely<MetaDB>> {
   if (NODE_ENV !== 'production') globalForMeta.metaDb = db;
 
   getLogger().info({ component: 'meta-client' }, 'Initialized (Kysely)');
-  return Promise.resolve(_metaDb);
+  return _metaDb;
 }
 
 /**

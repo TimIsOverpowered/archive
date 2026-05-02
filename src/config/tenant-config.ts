@@ -74,7 +74,7 @@ export class ConfigService {
   }
 
   async loadAll(): Promise<TenantConfig[]> {
-    await initMetaClient();
+    initMetaClient();
     const tenants = await getAllTenants();
     if (tenants.length === 0) return [];
 

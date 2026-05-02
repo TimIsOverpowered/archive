@@ -35,19 +35,9 @@ export const queueRetryOptions: Record<string, QueueOptions['defaultJobOptions']
 
 const queueCache = new Map<string, Queue<unknown, unknown, string>>();
 
-function normalizeOptions(options: unknown): string {
-  if (options == null) return '';
-  return JSON.stringify(sortObject(options as Record<string, unknown>));
-}
-
-function sortObject(obj: Record<string, unknown>): unknown {
-  if (obj === null || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(sortObject);
-  return Object.fromEntries(
-    Object.entries(obj)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => [k, sortObject(v as Record<string, unknown>)])
-  );
+/** Simple cache key for the queue options. Options are fixed literals, so no recursive sorting needed. */
+function cacheKeyForOptions(options: QueueOptions['defaultJobOptions'] | undefined): string {
+  return options ? JSON.stringify(options) : '';
 }
 
 let _flowProducer: FlowProducer | null = null;
@@ -63,7 +53,7 @@ function getQueue<TData = unknown, TFinishedData = unknown>(
   name: string,
   jobOptions?: QueueOptions['defaultJobOptions']
 ): Queue<TData, TFinishedData, string> {
-  const cacheKey = `${name}:${normalizeOptions(jobOptions)}`;
+  const cacheKey = `${name}:${cacheKeyForOptions(jobOptions)}`;
 
   const cached = queueCache.get(cacheKey);
   if (cached) {

@@ -164,8 +164,9 @@ export async function getVods(
 
     const hasLiveVod = mergedVods.some((vod) => vod.is_live);
     const ttl = hasLiveVod ? VOD_VOLATILE_CACHE_TTL : VOD_LIST_CACHE_TTL;
-    await setVodListCache(cacheKey, JSON.stringify({ vods: mergedVods, total }), ttl);
-    await registerVodTags(tenantId, mergedVods, cacheKey, JSON.stringify({ vods: mergedVods, total }), ttl);
+    const serialized = JSON.stringify({ vods: mergedVods, total });
+    await setVodListCache(cacheKey, serialized, ttl);
+    await registerVodTags(tenantId, mergedVods, cacheKey, serialized, ttl);
 
     return { vods: mergedVods, total };
   };

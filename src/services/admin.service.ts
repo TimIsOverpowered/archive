@@ -1,4 +1,5 @@
 import bcrypt from 'bcrypt';
+import { randomBytes } from 'node:crypto';
 import { getMetaClient } from '../db/meta-client.js';
 import type { SelectableAdmins, InsertableAdmins, UpdateableAdmins } from '../db/meta-types.js';
 
@@ -8,21 +9,34 @@ const adminAuthSelect = [...adminSelect, 'api_key_hash'] as const;
 type PublicAdmin = Pick<SelectableAdmins, 'id' | 'username' | 'created_at'>;
 
 /**
- * Look up an admin by API key using constant-time bcrypt comparison.
- * Returns undefined if the key is invalid or doesn't match any admin.
+ * Generate a new API key for an admin.
+ * Format: archive_<username>_<random> — the username segment enables fast single-row lookup.
+ */
+export function generateApiKey(username: string): string {
+  const random = randomBytes(32).toString('base64url');
+  return `archive_${username}_${random}`;
+}
+
+/**
+ * Look up an admin by API key. Extracts the username from the key for a targeted single-row query,
+ * then verifies with bcrypt. Returns undefined if the key is invalid or doesn't match any admin.
  */
 export async function findAdminByApiKey(apiKey: string): Promise<SelectableAdmins | undefined> {
   if (apiKey == null || apiKey === '' || !apiKey.startsWith('archive_')) return;
 
-  const admins = await getMetaClient().selectFrom('admins').select(adminAuthSelect).execute();
+  const parts = apiKey.split('_');
+  const username = parts[1];
+  if (username == null || username === '') return;
 
-  for (const admin of admins) {
-    if (await bcrypt.compare(apiKey, admin.api_key_hash)) {
-      return admin;
-    }
-  }
+  const admin = await getMetaClient()
+    .selectFrom('admins')
+    .select(adminAuthSelect)
+    .where('username', '=', username)
+    .executeTakeFirst();
 
-  return undefined;
+  if (!admin) return;
+
+  return (await bcrypt.compare(apiKey, admin.api_key_hash)) ? admin : undefined;
 }
 
 /** Look up an admin by username, excluding sensitive fields. */

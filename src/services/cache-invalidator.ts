@@ -17,6 +17,24 @@ interface VodUpdateEvent {
 }
 
 /**
+ * Handle a parsed cache event by updating volatile cache or invalidating static cache.
+ * Fire-and-forget from the Redis message listener; errors are caught and logged.
+ */
+async function handleCacheEvent(event: VodUpdateEvent): Promise<void> {
+  if (event.type === 'VOD_DURATION_UPDATED' && event.duration !== undefined) {
+    await setVodVolatileCache(
+      event.tenantId,
+      event.dbId,
+      { duration: event.duration, is_live: event.is_live ?? false },
+      VOD_VOLATILE_CACHE_TTL
+    );
+  } else {
+    await invalidateVodStaticCache(event.tenantId, event.dbId);
+    await invalidateVodVolatileCache(event.tenantId, event.dbId);
+  }
+}
+
+/**
  * Publish a VOD update event to Redis for cache invalidation.
  * Subscribers will invalidate the static cache for the VOD.
  */
@@ -97,24 +115,10 @@ export function registerCacheSubscriber(fastify: FastifyInstance): void {
       return;
     }
 
-    void (async () => {
-      try {
-        if (event.type === 'VOD_DURATION_UPDATED' && event.duration !== undefined) {
-          await setVodVolatileCache(
-            event.tenantId,
-            event.dbId,
-            { duration: event.duration, is_live: event.is_live ?? false },
-            VOD_VOLATILE_CACHE_TTL
-          );
-        } else {
-          await invalidateVodStaticCache(event.tenantId, event.dbId);
-          await invalidateVodVolatileCache(event.tenantId, event.dbId);
-        }
-      } catch (error) {
-        const details = extractErrorDetails(error);
-        log.warn({ err: details, event }, 'Failed to process cache event');
-      }
-    })();
+    void handleCacheEvent(event).catch((error) => {
+      const details = extractErrorDetails(error);
+      log.warn({ err: details, event }, 'Failed to process cache event');
+    });
   });
 
   void subClient.subscribe(CACHE_CHANNEL);

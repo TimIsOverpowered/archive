@@ -40,8 +40,8 @@ export const VOD_DETAILS_STALE_RATIO = 0.8; // Revalidate when 80% of TTL has el
 export const CACHE_TAG_TTL_BUFFER_MS = 60_000; // 1 minute grace period past cache TTL
 
 // ── Cache SWR Failure Tracking ──────────────────────────────────────────────
-export const SWR_FAILURES_TTL_MS = 5 * 60 * 1000; // 5 minutes
-export const SWR_FAILURES_TTL_SECONDS = 300; // 5 minutes in seconds
+export const SWR_FAILURES_TTL_MS = 5 * 60 * 1_000; // 5 minutes
+export const SWR_FAILURES_TTL_SECONDS = Math.floor(SWR_FAILURES_TTL_MS / 1_000);
 export const MAX_SWR_FAILURES = 3; // Max revalidation failures before skipping retries
 
 // ── Cache Inflight Tracking ─────────────────────────────────────────────────

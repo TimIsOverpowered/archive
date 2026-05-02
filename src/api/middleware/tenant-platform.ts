@@ -3,7 +3,7 @@ import { configService } from '../../config/tenant-config.js';
 import { ensureClient } from '../../db/streamer-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import type { TenantContext } from '../../types/context.js';
-import { type Platform } from '../../types/platforms.js';
+import { isValidPlatform, type Platform } from '../../types/platforms.js';
 
 export interface TenantPlatformContext extends TenantContext {
   platform: Platform;
@@ -99,7 +99,14 @@ export async function platformValidationMiddleware(request: FastifyRequest, repl
     });
   }
 
-  const requestPlatform = rawPlatform.toLowerCase() as Platform;
+  const requestPlatform = rawPlatform.toLowerCase();
+  if (!isValidPlatform(requestPlatform)) {
+    return reply.status(400).send({
+      statusCode: 400,
+      message: `Invalid platform: ${requestPlatform}`,
+      code: 'BAD_REQUEST',
+    });
+  }
 
   const tenant = request.tenant;
   if (tenant == null) {
