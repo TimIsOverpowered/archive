@@ -19,7 +19,12 @@ import type { TenantResult } from '../db/meta-types.js';
 import { asJsonObject } from '../utils/object.js';
 import type { ZodType } from 'zod';
 
-function parsePlatformConfig<T>(tenantId: string, raw: unknown, schema: ZodType<T>, platformName: string): T | undefined {
+function parsePlatformConfig<T>(
+  tenantId: string,
+  raw: unknown,
+  schema: ZodType<T>,
+  platformName: string
+): T | undefined {
   const obj = asJsonObject(raw);
   if (!obj) return undefined;
 

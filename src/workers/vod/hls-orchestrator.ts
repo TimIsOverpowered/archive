@@ -127,7 +127,9 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
                 { name: 'FFmpeg', value: `\`${hlsFfmpegCmd.substring(0, 500)}\``, inline: false },
               ];
             }
-            void updateAlert(options.discordMessageId, alertData);
+            void updateAlert(options.discordMessageId, alertData).catch((err) => {
+              log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
+            });
           }
         },
         onFfmpegStart: (cmd) => {

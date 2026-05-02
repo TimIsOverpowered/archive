@@ -5,7 +5,6 @@ import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from
 import { Cache, CacheTag } from '../constants.js';
 import { isConnectionError } from '../db/utils/errors.js';
 import { CacheKeys, swrKeys } from '../utils/cache-keys.js';
-import { HttpError } from '../utils/http-error.js';
 
 /**
  * Cache a VOD list query result and register tag-based associations for all VODs in the list.
@@ -61,7 +60,7 @@ export async function registerVodTags(
 
       const results = await chunk.exec();
       if (results != null && results.some(([err]) => err !== null && err !== undefined)) {
-        throw new HttpError(500, 'Pipeline command failed', 'INTERNAL_SERVER_ERROR');
+        getLogger().warn({ tenantId, cacheKey, page }, 'Redis pipeline failed, skipping tag registration');
       }
     }
 

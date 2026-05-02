@@ -10,7 +10,10 @@ function envBoolWithDefault(defaultsTo: boolean) {
 
 function throwConfigError(label: string, error: unknown): never {
   if (error instanceof z.ZodError) {
-    const msgs = error.issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n');
+    const flat = error.flatten();
+    const msgs = Object.entries(flat.fieldErrors)
+      .map(([path, errs]) => `  - ${path}: ${(errs as string[])?.join(', ')}`)
+      .join('\n');
     throw new Error(`${label} config validation failed:\n${msgs}`);
   }
   throw error;

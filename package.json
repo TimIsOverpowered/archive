@@ -20,6 +20,7 @@
   },
   "scripts": {
     "test": "node --test --import tsx --import ./tests/setup.ts --test-timeout 10000 --test-concurrency 4 --experimental-test-module-mocks \"tests/**/*.test.ts\"",
+    "test:coverage": "node --test --import tsx --import ./tests/setup.ts --test-timeout 10000 --test-concurrency 4 --experimental-test-module-mocks --experimental-test-coverage \"tests/**/*.test.ts\"",
     "lint": "eslint \"src/**/*.ts\" --fix",
     "fix": "npm run format && npm run lint",
     "format": "prettier --write \"src/**/*.ts\" \"scripts/**/*.ts\" tests/**/*.ts",

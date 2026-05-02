@@ -18,6 +18,12 @@ import { registerPlatformStrategies } from '../services/platforms/index.js';
 import { closeMetaClient } from '../db/meta-client.js';
 import { initCycleTLS, closeCycleTLS } from '../utils/cycletls.js';
 
+interface AppContext {
+  workerConfig: ReturnType<typeof loadWorkersConfig>;
+  configs: Awaited<ReturnType<typeof configService.loadAll>>;
+  tenantConfigSubscriber: ReturnType<typeof registerTenantConfigSubscriberWorker>;
+}
+
 process.on('unhandledRejection', (reason) => {
   getLogger().error({ error: extractErrorDetails(reason) }, 'Unhandled promise rejection');
 });
@@ -48,35 +54,22 @@ async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkers
 }
 
 export async function bootstrap() {
-  const workerConfig = loadWorkersConfig();
-  setLoggerConfig({ level: workerConfig.LOG_LEVEL, isProduction: workerConfig.NODE_ENV === 'production' });
-  await initWorkersRedis();
+  const ctx: AppContext = {
+    workerConfig: loadWorkersConfig(),
+    configs: {} as Awaited<ReturnType<typeof configService.loadAll>>,
+    tenantConfigSubscriber: {} as ReturnType<typeof registerTenantConfigSubscriberWorker>,
+  };
 
-  getLogger().info({ nodeEnv: workerConfig.NODE_ENV }, 'Starting worker process');
+  setLoggerConfig({ level: ctx.workerConfig.LOG_LEVEL, isProduction: ctx.workerConfig.NODE_ENV === 'production' });
+
+  getLogger().info({ nodeEnv: ctx.workerConfig.NODE_ENV }, 'Starting worker process');
 
   try {
-    registerPlatformStrategies();
-    const configs = await configService.loadAll();
-    await waitForRedisReady();
-
-    const tenantConfigSubscriber = registerTenantConfigSubscriberWorker();
-    getLogger().info('Tenant config subscriber registered');
-
-    startTokenHealthCron();
-    await clearAllJobsOnStartup(workerConfig);
-
-    registerWorkers(getRedisInstance(), configs, Vod.LIVE_HEADROOM, Vod.LIVE_MIN_CONCURRENCY);
-
-    await waitForWorkersReady(workerRegistry.getAll().map((entry) => entry.worker));
-
-    registerShutdownHandlers(tenantConfigSubscriber);
-
-    await startMonitorService();
-
-    startClientCleanup();
-    getLogger().info('DB client cleanup started');
-
-    await initCycleTLS();
+    await initInfrastructure();
+    await initApplicationState(ctx);
+    await initWorkers(ctx);
+    await initBackgroundServices(ctx);
+    registerShutdownHandlers(ctx);
 
     getLogger().info('All workers started successfully');
   } catch (error) {
@@ -85,7 +78,53 @@ export async function bootstrap() {
   }
 }
 
-function registerShutdownHandlers(tenantConfigSubscriber: ReturnType<typeof registerTenantConfigSubscriberWorker>) {
+async function initInfrastructure() {
+  getLogger().info({ component: 'infrastructure' }, 'Initializing infrastructure');
+
+  await initWorkersRedis();
+  await waitForRedisReady();
+  getLogger().info({ component: 'redis' }, 'Redis connected');
+
+  startClientCleanup();
+  getLogger().info({ component: 'db' }, 'DB client cleanup started');
+
+  await initCycleTLS();
+  getLogger().info({ component: 'cycletls' }, 'CycleTLS initialized');
+}
+
+async function initApplicationState(ctx: AppContext) {
+  getLogger().info({ component: 'application' }, 'Initializing application state');
+
+  registerPlatformStrategies();
+
+  ctx.configs = await configService.loadAll();
+
+  ctx.tenantConfigSubscriber = registerTenantConfigSubscriberWorker();
+  getLogger().info({ component: 'tenant-config' }, 'Tenant config subscriber registered');
+}
+
+async function initWorkers(ctx: AppContext) {
+  getLogger().info({ component: 'workers' }, 'Initializing workers');
+
+  await clearAllJobsOnStartup(ctx.workerConfig);
+
+  registerWorkers(getRedisInstance(), ctx.configs, Vod.LIVE_HEADROOM, Vod.LIVE_MIN_CONCURRENCY);
+
+  await waitForWorkersReady(workerRegistry.getAll().map((entry) => entry.worker));
+  getLogger().info({ component: 'workers' }, 'All workers ready');
+}
+
+async function initBackgroundServices(_ctx: AppContext) {
+  getLogger().info({ component: 'background' }, 'Initializing background services');
+
+  startTokenHealthCron();
+  getLogger().info({ component: 'cron' }, 'Token health cron started');
+
+  await startMonitorService();
+  getLogger().info({ component: 'monitor' }, 'Monitor service started');
+}
+
+function registerShutdownHandlers(ctx: AppContext) {
   const shutdown = async () => {
     getLogger().info('Shutting down workers...');
 
@@ -111,7 +150,7 @@ function registerShutdownHandlers(tenantConfigSubscriber: ReturnType<typeof regi
       await closeMetaClient();
 
       try {
-        await tenantConfigSubscriber.quit();
+        await ctx.tenantConfigSubscriber.quit();
       } catch {
         /* subscriber already closed */
       }
