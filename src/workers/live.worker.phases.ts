@@ -162,16 +162,16 @@ export async function runPostProcessing(
 
   // 5. Queue chat download (non-fatal)
   try {
-    chatJobId = await triggerChatDownload(
-      ctx.tenantId,
-      ctx.streamerName,
-      ctx.platformUserId,
-      ctx.dbId,
-      ctx.vodId,
-      ctx.platform,
-      actualDuration != null ? Math.round(actualDuration) : 0,
-      ctx.platformUsername
-    );
+    chatJobId = await triggerChatDownload({
+      tenantId: ctx.tenantId,
+      displayName: ctx.streamerName,
+      platformUserId: ctx.platformUserId,
+      dbId: ctx.dbId,
+      vodId: ctx.vodId,
+      platform: ctx.platform,
+      duration: actualDuration != null ? Math.round(actualDuration) : 0,
+      platformUsername: ctx.platformUsername,
+    });
     if (chatJobId != null) {
       await updateAlert(ctx.messageId, ctx.alerts.chatQueued(ctx.vodId));
     }

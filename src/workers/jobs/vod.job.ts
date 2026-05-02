@@ -6,15 +6,18 @@ import type { Platform, DownloadMethod } from '../../types/platforms.js';
 
 const log = childLogger({ module: 'vod-job' });
 
-export async function triggerVodDownload(
-  tenantId: string,
-  dbId: number,
-  vodId: string,
-  platform: Platform,
-  platformUserId: string,
-  platformUsername: string,
-  downloadMethod?: DownloadMethod
-): Promise<string | null> {
+export interface TriggerVodOptions {
+  tenantId: string;
+  dbId: number;
+  vodId: string;
+  platform: Platform;
+  platformUserId: string;
+  platformUsername: string;
+  downloadMethod?: DownloadMethod | undefined;
+}
+
+export async function triggerVodDownload(opts: TriggerVodOptions): Promise<string | null> {
+  const { tenantId, dbId, vodId, platform, platformUserId, platformUsername, downloadMethod } = opts;
   const jobId = `vod_${vodId}`;
   const job: StandardVodJob = {
     tenantId,

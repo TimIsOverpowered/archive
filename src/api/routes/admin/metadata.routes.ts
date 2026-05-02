@@ -183,17 +183,17 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
       if (platformId == null)
         throw new HttpError(400, `No platform ID available for ${platform} ${vodId}`, 'BAD_REQUEST');
 
-      const jobId = await triggerChatDownload(
+      const jobId = await triggerChatDownload({
         tenantId,
-        getDisplayName(config),
-        platformId,
-        vodRecord.id,
+        displayName: getDisplayName(config),
+        platformUserId: platformId,
+        dbId: vodRecord.id,
         vodId,
         platform,
-        Math.round(vodRecord.duration),
-        platformCfg?.username,
-        forceRerun
-      );
+        duration: Math.round(vodRecord.duration),
+        platformUsername: platformCfg?.username,
+        forceRerun,
+      });
 
       return { data: { message: `Queueing chat job ${vodId}`, vodId, platform, jobId } };
     }

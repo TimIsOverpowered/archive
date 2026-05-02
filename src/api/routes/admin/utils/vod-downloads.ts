@@ -59,15 +59,15 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
 
   log.info({ vodId, filePath, type }, 'Queuing VOD download');
 
-  const jobId = await triggerVodDownload(
+  const jobId = await triggerVodDownload({
     tenantId,
     dbId,
     vodId,
     platform,
     platformUserId,
     platformUsername,
-    downloadMethod
-  );
+    downloadMethod,
+  });
 
   log.info({ jobId, vodId, filePath, type }, 'VOD download queued');
   return { filePath, jobId };

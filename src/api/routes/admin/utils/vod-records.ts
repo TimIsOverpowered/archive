@@ -113,16 +113,16 @@ export async function ensureVodRecord(
   if (platform === 'twitch') {
     await saveVodChapters(ctx, vodRecord.id, vodRecord.vod_id, vodRecord.duration);
     await fetchAndSaveEmotes(ctx, vodRecord.id, platform, platformUserId);
-    void triggerChatDownload(
+    void triggerChatDownload({
       tenantId,
-      getDisplayName(ctx.config),
+      displayName: getDisplayName(ctx.config),
       platformUserId,
-      vodRecord.id,
+      dbId: vodRecord.id,
       vodId,
       platform,
-      Math.round(vodRecord.duration),
-      platformCfg?.username
-    );
+      duration: Math.round(vodRecord.duration),
+      platformUsername: platformCfg?.username,
+    });
   }
 
   log.info({ vodId, platform, duration: vodRecord.duration }, 'VOD record created');
@@ -170,16 +170,16 @@ export async function refreshVodRecord(
   if (platform === 'twitch') {
     await saveVodChapters(ctx, updatedRecord.id, updatedRecord.vod_id, updatedRecord.duration);
     await fetchAndSaveEmotes(ctx, updatedRecord.id, platform, platformUserId);
-    void triggerChatDownload(
+    void triggerChatDownload({
       tenantId,
-      getDisplayName(ctx.config),
+      displayName: getDisplayName(ctx.config),
       platformUserId,
-      updatedRecord.id,
+      dbId: updatedRecord.id,
       vodId,
       platform,
-      Math.round(updatedRecord.duration),
-      platformUsername
-    );
+      duration: Math.round(updatedRecord.duration),
+      platformUsername,
+    });
   }
 
   return updatedRecord;
