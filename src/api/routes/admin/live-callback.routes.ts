@@ -36,10 +36,7 @@ type LiveCallbackParams = { tenantId: string };
  * Validates recording file, updates duration, queues YouTube upload.
  */
 export default function liveCallbackRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const adminRateLimiter = RedisService.getLimiter('rate:admin');
-  if (!adminRateLimiter) {
-    throw new Error('Rate limiter not initialized');
-  }
+  const adminRateLimiter = RedisService.requireLimiter('rate:admin');
 
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
 

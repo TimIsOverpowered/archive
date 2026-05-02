@@ -15,12 +15,8 @@ import { triggerChatDownload } from './jobs/chat.job.js';
 import { fetchAndSaveEmotes } from '../services/emotes.js';
 import { SOURCE_TYPES } from '../types/platforms.js';
 import { getDisplayName } from '../config/types.js';
-import type { TenantConfig } from '../config/types.js';
-import type { Kysely } from 'kysely';
-import type { StreamerDB } from '../db/streamer-types.js';
-import type { AppLogger } from '../utils/logger.js';
-import type { Platform } from '../types/platforms.js';
 import type { LiveWorkerAlerts } from './utils/alert-factories.js';
+import type { BaseWorkerContext } from './types.js';
 
 export interface LiveCompletionData {
   emotesSaved: boolean;
@@ -36,17 +32,9 @@ export interface LiveDownloadResult {
   finalMp4Path: string;
 }
 
-export interface LiveProcessorContext {
+export interface LiveProcessorContext extends BaseWorkerContext {
   job: Job<LiveDownloadJob, unknown, string>;
-  config: TenantConfig;
-  db: Kysely<StreamerDB>;
-  tenantId: string;
-  log: AppLogger;
   alerts: LiveWorkerAlerts;
-  messageId: string | null;
-  dbId: number;
-  vodId: string;
-  platform: Platform;
   platformUserId: string;
   platformUsername?: string | undefined;
   startedAt?: string | undefined;

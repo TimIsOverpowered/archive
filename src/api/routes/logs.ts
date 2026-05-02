@@ -21,10 +21,7 @@ interface LogsRoutesOptions {
  * Requires tenant middleware and rate limiting.
  */
 export default function logsRoutes(fastify: FastifyInstance, _options: LogsRoutesOptions) {
-  const chatRateLimiter = RedisService.getLimiter('rate:chat');
-  if (!chatRateLimiter) {
-    throw new Error('Rate limiter not initialized');
-  }
+  const chatRateLimiter = RedisService.requireLimiter('rate:chat');
 
   const rateLimitMiddleware = createRateLimitMiddleware({
     limiter: chatRateLimiter,

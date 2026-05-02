@@ -17,6 +17,18 @@ import { TenantConfig } from './types.js';
 import { getBaseConfig } from './env.js';
 import type { TenantResult } from '../db/meta-types.js';
 import { asJsonObject } from '../utils/object.js';
+import type { ZodType } from 'zod';
+
+function parsePlatformConfig<T>(tenantId: string, raw: unknown, schema: ZodType<T>, platformName: string): T | undefined {
+  const obj = asJsonObject(raw);
+  if (!obj) return undefined;
+
+  const result = schema.safeParse(obj);
+  if (result.success) return result.data;
+
+  getLogger().warn({ tenantId, errors: result.error.issues }, `Invalid ${platformName} config, skipping platform`);
+  return undefined;
+}
 
 const CONFIG_CHANNEL = 'cache:tenant';
 
@@ -48,44 +60,14 @@ export function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
     settings,
   };
 
-  const twitchObj = asJsonObject(tenant.twitch);
-  if (twitchObj) {
-    const twitchParsed = TwitchSchema.safeParse(twitchObj);
-    if (twitchParsed.success) {
-      tenantConfig.twitch = twitchParsed.data;
-    } else {
-      getLogger().warn(
-        { tenantId: tenant.id, errors: twitchParsed.error.issues },
-        'Invalid Twitch config, skipping platform'
-      );
-    }
-  }
+  const twitch = parsePlatformConfig(tenant.id, tenant.twitch, TwitchSchema, 'Twitch');
+  if (twitch != null) tenantConfig.twitch = twitch;
 
-  const youtubeObj = asJsonObject(tenant.youtube);
-  if (youtubeObj) {
-    const youtubeParsed = YoutubeSchema.safeParse(youtubeObj);
-    if (youtubeParsed.success) {
-      tenantConfig.youtube = youtubeParsed.data;
-    } else {
-      getLogger().warn(
-        { tenantId: tenant.id, errors: youtubeParsed.error.issues },
-        'Invalid YouTube config, skipping platform'
-      );
-    }
-  }
+  const youtube = parsePlatformConfig(tenant.id, tenant.youtube, YoutubeSchema, 'YouTube');
+  if (youtube != null) tenantConfig.youtube = youtube;
 
-  const kickObj = asJsonObject(tenant.kick);
-  if (kickObj) {
-    const kickParsed = KickSchema.safeParse(kickObj);
-    if (kickParsed.success) {
-      tenantConfig.kick = kickParsed.data;
-    } else {
-      getLogger().warn(
-        { tenantId: tenant.id, errors: kickParsed.error.issues },
-        'Invalid Kick config, skipping platform'
-      );
-    }
-  }
+  const kick = parsePlatformConfig(tenant.id, tenant.kick, KickSchema, 'Kick');
+  if (kick != null) tenantConfig.kick = kick;
 
   return tenantConfig;
 }

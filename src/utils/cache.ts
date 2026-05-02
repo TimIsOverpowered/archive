@@ -269,7 +269,7 @@ async function incrementSwrFailureCount(
   try {
     const pipeline = client.pipeline();
     pipeline.incr(failureKey);
-    pipeline.expire(failureKey, CacheSwr.FAILURES_TTL_SECONDS);
+    pipeline.expire(failureKey, CacheSwr.FAILURES_TTL_MS / 1_000);
     await pipeline.exec();
   } catch {
     const current = SWR_FAILURES.get(failureKey) ?? 0;

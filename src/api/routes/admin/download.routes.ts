@@ -50,10 +50,7 @@ interface UploadBody {
  * Requires admin API key authentication, tenant middleware, and rate limiting.
  */
 export default function downloadJobsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const adminLimiter = RedisService.getLimiter('rate:admin');
-  if (!adminLimiter) {
-    throw new Error('Rate limiter not initialized');
-  }
+  const adminLimiter = RedisService.requireLimiter('rate:admin');
 
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminLimiter });
 

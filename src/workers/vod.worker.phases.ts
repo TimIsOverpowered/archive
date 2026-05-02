@@ -8,28 +8,17 @@ import { getJobContext } from './utils/job-context.js';
 import { createVodWorkerAlerts } from './utils/alert-factories.js';
 import type { StandardVodJob } from './jobs/types.js';
 import { downloadVodWithFfmpeg } from './vod/vod-download-strategies.js';
-import { DOWNLOAD_METHODS, PLATFORMS, type DownloadMethod, type Platform } from '../types/platforms.js';
+import { DOWNLOAD_METHODS, PLATFORMS, type DownloadMethod } from '../types/platforms.js';
 import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { getDisplayName } from '../config/types.js';
 import { PlatformNotConfiguredError } from '../utils/domain-errors.js';
 import { getVod } from '../services/kick/vod.js';
-import type { TenantConfig } from '../config/types.js';
-import type { Kysely } from 'kysely';
-import type { StreamerDB } from '../db/streamer-types.js';
 import type { VodWorkerAlerts } from './utils/alert-factories.js';
-import type { AppLogger } from '../utils/logger.js';
+import type { BaseWorkerContext } from './types.js';
 
-export interface VodProcessorContext {
+export interface VodProcessorContext extends BaseWorkerContext {
   job: Job<StandardVodJob, unknown, string>;
-  config: TenantConfig;
-  db: Kysely<StreamerDB>;
-  tenantId: string;
-  log: AppLogger;
   alerts: VodWorkerAlerts;
-  messageId: string | null;
-  dbId: number;
-  vodId: string;
-  platform: Platform;
   platformUserId: string;
   platformUsername?: string;
   sourceUrl?: string | undefined;

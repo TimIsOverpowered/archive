@@ -17,10 +17,7 @@ interface BadgesRoutesOptions {
  * Requires rate limiting.
  */
 export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesRoutesOptions) {
-  const badgesRateLimiter = RedisService.getLimiter('rate:vods');
-  if (!badgesRateLimiter) {
-    throw new Error('Rate limiter not initialized');
-  }
+  const badgesRateLimiter = RedisService.requireLimiter('rate:vods');
 
   const rateLimitMiddleware = createRateLimitMiddleware({
     limiter: badgesRateLimiter,

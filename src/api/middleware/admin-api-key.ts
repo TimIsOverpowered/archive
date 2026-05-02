@@ -36,14 +36,7 @@ export default async function adminApiKeyMiddleware(request: FastifyRequest, rep
     });
   }
 
-  const limiter = RedisService.getLimiter('rate:admin:auth');
-  if (!limiter) {
-    return reply.status(503).send({
-      statusCode: 503,
-      message: 'Service unavailable',
-      code: 'SERVICE_UNAVAILABLE',
-    });
-  }
+  const limiter = RedisService.requireLimiter('rate:admin:auth');
   const ip = getClientIp(request);
 
   try {

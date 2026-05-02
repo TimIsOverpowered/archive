@@ -4,7 +4,7 @@ import { registerVodTags } from '../../src/services/cache-tags.js';
 import { RedisService } from '../../src/utils/redis-service.js';
 import { resetEnvConfig } from '../../src/config/env.js';
 import { markConnectionFailed, markConnectionRestored } from '../../src/utils/cache-state.js';
-import { clearAllCircuits } from '../../src/utils/circuit-breaker.js';
+import { defaultCircuitBreaker } from '../../src/utils/circuit-breaker.js';
 import { Cache } from '../../src/constants.js';
 
 describe('CacheTags: registerVodTags', () => {
@@ -15,7 +15,7 @@ describe('CacheTags: registerVodTags', () => {
   beforeEach(() => {
     pipelineCalls = [];
     pipelineItems = [];
-    clearAllCircuits();
+    defaultCircuitBreaker.clearAllCircuits();
     mockClient = {
       pipeline: () => {
         const pipe = {

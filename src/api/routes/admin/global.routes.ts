@@ -9,10 +9,7 @@ import { RedisService } from '../../../utils/redis-service.js';
  * Requires admin API key authentication and rate limiting.
  */
 export default function globalAdminRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const adminRateLimiter = RedisService.getLimiter('rate:admin');
-  if (!adminRateLimiter) {
-    throw new Error('Rate limiter not initialized');
-  }
+  const adminRateLimiter = RedisService.requireLimiter('rate:admin');
 
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
 

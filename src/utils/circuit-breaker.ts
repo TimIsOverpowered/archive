@@ -47,57 +47,61 @@ function getOrCreateBreaker(key: string, opts?: Partial<CircuitBreakerOptions>):
   return state;
 }
 
-export function getCircuitState(key: string, opts?: Partial<CircuitBreakerOptions>): CircuitState {
-  const state = getOrCreateBreaker(key, opts);
+export class CircuitBreaker {
+  getState(key: string, opts?: Partial<CircuitBreakerOptions>): CircuitState {
+    const state = getOrCreateBreaker(key, opts);
 
-  if (state.state === 'open' && state.lastFailureTime != null) {
-    const elapsed = Date.now() - state.lastFailureTime;
-    if (elapsed >= state.recoveryTimeout) {
-      const nextState: CircuitBreakerState = { ...state, state: 'half-open' };
-      breakerCache.set(key, nextState);
-      return 'half-open';
+    if (state.state === 'open' && state.lastFailureTime != null) {
+      const elapsed = Date.now() - state.lastFailureTime;
+      if (elapsed >= state.recoveryTimeout) {
+        const nextState: CircuitBreakerState = { ...state, state: 'half-open' };
+        breakerCache.set(key, nextState);
+        return 'half-open';
+      }
     }
+
+    return state.state;
   }
 
-  return state.state;
+  recordSuccess(key: string, opts?: Partial<CircuitBreakerOptions>): void {
+    const state = getOrCreateBreaker(key, opts);
+    const nextState: CircuitBreakerState = {
+      ...state,
+      failureCount: 0,
+      lastSuccessTime: Date.now(),
+      state: 'closed',
+    };
+    breakerCache.set(key, nextState);
+  }
+
+  recordFailure(key: string, opts?: Partial<CircuitBreakerOptions>): void {
+    const state = getOrCreateBreaker(key, opts);
+
+    const newFailureCount = state.failureCount + 1;
+    const nextState: CircuitBreakerState = {
+      ...state,
+      failureCount: newFailureCount,
+      lastFailureTime: Date.now(),
+      state: newFailureCount >= state.failureThreshold ? 'open' : state.state,
+    };
+    breakerCache.set(key, nextState);
+  }
+
+  isCircuitOpen(key: string, opts?: Partial<CircuitBreakerOptions>): boolean {
+    return this.getState(key, opts) === 'open';
+  }
+
+  isCircuitHalfOpen(key: string, opts?: Partial<CircuitBreakerOptions>): boolean {
+    return this.getState(key, opts) === 'half-open';
+  }
+
+  clearCircuit(key: string): void {
+    breakerCache.delete(key);
+  }
+
+  clearAllCircuits(): void {
+    breakerCache.clear();
+  }
 }
 
-export function recordSuccess(key: string, opts?: Partial<CircuitBreakerOptions>): void {
-  const state = getOrCreateBreaker(key, opts);
-  const nextState: CircuitBreakerState = {
-    ...state,
-    failureCount: 0,
-    lastSuccessTime: Date.now(),
-    state: 'closed',
-  };
-  breakerCache.set(key, nextState);
-}
-
-export function recordFailure(key: string, opts?: Partial<CircuitBreakerOptions>): void {
-  const state = getOrCreateBreaker(key, opts);
-
-  const newFailureCount = state.failureCount + 1;
-  const nextState: CircuitBreakerState = {
-    ...state,
-    failureCount: newFailureCount,
-    lastFailureTime: Date.now(),
-    state: newFailureCount >= state.failureThreshold ? 'open' : state.state,
-  };
-  breakerCache.set(key, nextState);
-}
-
-export function isCircuitOpen(key: string, opts?: Partial<CircuitBreakerOptions>): boolean {
-  return getCircuitState(key, opts) === 'open';
-}
-
-export function isCircuitHalfOpen(key: string, opts?: Partial<CircuitBreakerOptions>): boolean {
-  return getCircuitState(key, opts) === 'half-open';
-}
-
-export function clearCircuit(key: string): void {
-  breakerCache.delete(key);
-}
-
-export function clearAllCircuits(): void {
-  breakerCache.clear();
-}
+export const defaultCircuitBreaker = new CircuitBreaker();

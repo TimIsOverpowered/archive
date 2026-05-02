@@ -74,6 +74,14 @@ export class RedisService {
     return entry.limiter;
   }
 
+  static requireLimiter(key: string): RateLimiterRedis | RateLimiterMemory {
+    const limiter = this.getLimiter(key);
+    if (!limiter) {
+      throw new Error(`Rate limiter '${key}' not initialized. Ensure RedisService.init() was called with this key in rateLimiters config.`);
+    }
+    return limiter;
+  }
+
   static getStatus(): { status: string; connected: boolean } {
     if (!this._instance?.client) {
       return { status: 'not-initialized', connected: false };

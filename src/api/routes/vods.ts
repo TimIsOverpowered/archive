@@ -33,10 +33,7 @@ async function fetchVodByIdSafe(vodId: string, db: Kysely<StreamerDB>, tenantId:
  * All routes require tenant middleware and rate limiting.
  */
 export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutesOptions) {
-  const publicRateLimiter = RedisService.getLimiter('rate:vods');
-  if (!publicRateLimiter) {
-    throw new Error('Rate limiter not initialized');
-  }
+  const publicRateLimiter = RedisService.requireLimiter('rate:vods');
 
   const rateLimitMiddleware = createRateLimitMiddleware({
     limiter: publicRateLimiter,

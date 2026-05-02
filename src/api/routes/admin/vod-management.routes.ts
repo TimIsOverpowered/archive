@@ -26,10 +26,7 @@ import type { InsertableVods, SelectableVods } from '../../../db/streamer-types.
  * Requires admin API key authentication, tenant middleware, and rate limiting.
  */
 export default function vodManagementRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const adminRateLimiter = RedisService.getLimiter('rate:admin');
-  if (!adminRateLimiter) {
-    throw new Error('Rate limiter not initialized');
-  }
+  const adminRateLimiter = RedisService.requireLimiter('rate:admin');
 
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: adminRateLimiter });
 

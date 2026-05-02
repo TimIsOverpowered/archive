@@ -63,7 +63,6 @@ export const CacheSwr = {
   STALE_RATIO: 0.8,
   /** 5 minutes */
   FAILURES_TTL_MS: 5 * 60 * 1_000,
-  FAILURES_TTL_SECONDS: Math.floor((5 * 60 * 1_000) / 1_000),
   /** Max revalidation failures before skipping retries */
   MAX_FAILURES: 3,
 } as const;

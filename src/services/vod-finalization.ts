@@ -33,9 +33,10 @@ export async function finalizeVod(options: FinalizeVodOptions): Promise<void> {
   await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
     if (dur != null) {
       const strategy = getStrategy(platform);
-      if (strategy?.finalizeChapters != null) {
+      if (strategy != null && strategy.finalizeChapters != null) {
+        const fn = strategy.finalizeChapters.bind(strategy);
         await db.transaction().execute(async (trx) => {
-          await strategy.finalizeChapters({ ...ctx, platform, db: trx }, dbId, vodId, dur);
+          await fn({ ...ctx, platform, db: trx }, dbId, vodId, dur);
           await trx.updateTable('vods').set({ is_live: false, duration: dur }).where('id', '=', dbId).execute();
         });
       } else {
