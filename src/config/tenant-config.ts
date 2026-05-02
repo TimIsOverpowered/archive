@@ -50,17 +50,32 @@ export function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
 
   const twitchObj = asJsonObject(tenant.twitch);
   if (twitchObj) {
-    tenantConfig.twitch = TwitchSchema.parse(twitchObj);
+    const twitchParsed = TwitchSchema.safeParse(twitchObj);
+    if (twitchParsed.success) {
+      tenantConfig.twitch = twitchParsed.data;
+    } else {
+      getLogger().warn({ tenantId: tenant.id, errors: twitchParsed.error.issues }, 'Invalid Twitch config, skipping platform');
+    }
   }
 
   const youtubeObj = asJsonObject(tenant.youtube);
   if (youtubeObj) {
-    tenantConfig.youtube = YoutubeSchema.parse(youtubeObj);
+    const youtubeParsed = YoutubeSchema.safeParse(youtubeObj);
+    if (youtubeParsed.success) {
+      tenantConfig.youtube = youtubeParsed.data;
+    } else {
+      getLogger().warn({ tenantId: tenant.id, errors: youtubeParsed.error.issues }, 'Invalid YouTube config, skipping platform');
+    }
   }
 
   const kickObj = asJsonObject(tenant.kick);
   if (kickObj) {
-    tenantConfig.kick = KickSchema.parse(kickObj);
+    const kickParsed = KickSchema.safeParse(kickObj);
+    if (kickParsed.success) {
+      tenantConfig.kick = kickParsed.data;
+    } else {
+      getLogger().warn({ tenantId: tenant.id, errors: kickParsed.error.issues }, 'Invalid Kick config, skipping platform');
+    }
   }
 
   return tenantConfig;
