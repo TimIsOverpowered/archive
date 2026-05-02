@@ -5,7 +5,7 @@ import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
-import { createVodWorkerAlerts } from './utils/alert-factories.js';
+import { createVodWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
 import type { StandardVodJob } from './jobs/types.js';
 import { downloadVodWithFfmpeg } from './vod/vod-download-strategies.js';
 import { DOWNLOAD_METHODS, PLATFORMS, type DownloadMethod } from '../types/platforms.js';
@@ -118,14 +118,7 @@ export async function runVodDownload(ctx: VodProcessorContext): Promise<void> {
       onProgress: (segmentsDownloaded, totalSegments) => {
         const percent = totalSegments > 0 ? Math.round((segmentsDownloaded / totalSegments) * 100) : 0;
         void ctx.job.updateProgress(percent).catch(() => {});
-        void updateAlert(ctx.messageId, ctx.alerts.progress(ctx.vodId, segmentsDownloaded, totalSegments)).catch(
-          (err) => {
-            ctx.log.warn(
-              { err: extractErrorDetails(err), vodId: ctx.vodId },
-              'Discord alert update failed (non-critical)'
-            );
-          }
-        );
+        safeUpdateAlert(ctx.messageId, ctx.alerts.progress(ctx.vodId, segmentsDownloaded, totalSegments), ctx.log, ctx.vodId);
       },
     });
 

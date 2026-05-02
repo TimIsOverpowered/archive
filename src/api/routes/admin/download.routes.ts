@@ -8,6 +8,7 @@ import {
   requireTenant,
 } from '../../middleware/tenant-platform.js';
 import { ensureVodDownload, ensureVodRecord, findVodRecord } from './utils/vod-helpers.js';
+import { buildVodJobResponse } from './utils/vod-job-response.js';
 import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { HttpError } from '../../../utils/http-error.js';
@@ -119,23 +120,13 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
         type,
       });
 
-      if (jobId != null) {
-        return {
-          data: {
-            message: 'VOD download queued, YouTube upload will be triggered after completion',
-            dbId: vodRecord.id,
-            vodId: vodRecord.vod_id,
-            jobId,
-          },
-        };
-      } else {
-        return {
-          data: {
-            message: 'Youtube upload queued!',
-            filePath,
-          },
-        };
-      }
+      return buildVodJobResponse({
+        hasDownload: jobId != null,
+        filePath,
+        downstreamJobId: jobId ?? '',
+        downstreamLabel: 'YouTube upload',
+        base: jobId != null ? { dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId } : {},
+      });
     }
   );
 

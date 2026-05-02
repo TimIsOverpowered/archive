@@ -2,6 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { RateLimiterRedis, RateLimiterMemory, RateLimiterRes } from 'rate-limiter-flexible';
 import { validateCloudflareRequest } from '../../utils/cloudflare-ip-validator.js';
 import { getClientIp } from './ip.js';
+import { RedisService } from '../../utils/redis-service.js';
 
 type RateLimiter = RateLimiterRedis | RateLimiterMemory;
 
@@ -58,4 +59,22 @@ export default function createRateLimitMiddleware(options: RateLimitOptions) {
       });
     }
   };
+}
+
+/**
+ * Create a rate limit middleware for admin routes.
+ * Uses the 'rate:admin' Redis limiter.
+ */
+export function createAdminRateLimitMiddleware() {
+  const limiter = RedisService.requireLimiter('rate:admin');
+  return createRateLimitMiddleware({ limiter });
+}
+
+/**
+ * Create a rate limit middleware for public routes.
+ * Uses the 'rate:vods' Redis limiter.
+ */
+export function createPublicRateLimitMiddleware() {
+  const limiter = RedisService.requireLimiter('rate:vods');
+  return createRateLimitMiddleware({ limiter });
 }

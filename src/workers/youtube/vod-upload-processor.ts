@@ -3,7 +3,7 @@ import type { StreamerDB } from '../../db/streamer-types.js';
 import type { AppLogger } from '../../utils/logger.js';
 import { splitVideo, getMetadata } from '../utils/ffmpeg.js';
 import { uploadVideo, saveChaptersAndLinkParts } from '../../services/youtube/index.js';
-import { initRichAlert, updateAlert, createProgressBar } from '../../utils/discord-alerts.js';
+import { initRichAlert, createProgressBar } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 import { getEffectiveSplitDuration } from './validation.js';
 import { buildYoutubeMetadata } from './metadata-builder.js';
@@ -15,6 +15,7 @@ import { UPLOAD_TYPES } from '../../types/platforms.js';
 import type { VodRecord } from '../../types/db.js';
 import { deleteFileIfExists } from '../../utils/path.js';
 import { extractErrorDetails } from '../../utils/error.js';
+import { safeUpdateAlert } from '../utils/alert-factories.js';
 import { VodNotFoundError } from '../../utils/domain-errors.js';
 
 export interface VodUploadContext {
@@ -147,16 +148,14 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
       if (splitFfmpegCmd != null) {
         alertFields.push({ name: 'FFmpeg', value: `\`${splitFfmpegCmd.substring(0, 500)}\``, inline: false });
       }
-      updateAlert(splitAlertMessageId, {
+      safeUpdateAlert(splitAlertMessageId, {
         title: '📺 Splitting VOD',
         description: `${channelName} - Processing part ${partNum}/${totalParts}`,
         status: 'warning',
         fields: alertFields,
         timestamp: new Date().toISOString(),
         updatedTimestamp: new Date().toISOString(),
-      }).catch((err) => {
-        log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
-      });
+      }, log, vodId);
     },
     (cmd) => {
       splitFfmpegCmd = cmd;
@@ -224,7 +223,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
     await deleteFileIfExists(partPath);
   }
 
-  updateAlert(splitAlertMessageId, {
+  safeUpdateAlert(splitAlertMessageId, {
     title: `✅ VOD Splitting Complete`,
     description: `${channelName} - Successfully split into ${totalParts} parts`,
     status: 'success',
@@ -235,9 +234,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
     ],
     timestamp: new Date().toISOString(),
     updatedTimestamp: new Date().toISOString(),
-  }).catch((err) => {
-    log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
-  });
+  }, log, vodId);
 
   return { uploadedVideos, needsPartLinking: uploadedVideos.length > 1 };
 }

@@ -9,7 +9,7 @@ import {
 } from '../../middleware/tenant-platform.js';
 import { RedisService } from '../../../utils/redis-service.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { HttpError } from '../../../utils/http-error.js';
+import { HttpError, internalServerError } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod } from '../../../types/platforms.js';
 import {
   PLATFORM_VALUES,
@@ -19,6 +19,8 @@ import {
   DOWNLOAD_METHODS,
 } from '../../../types/platforms.js';
 import { findVodRecord, ensureVodDownload } from './utils/vod-helpers.js';
+import { parseDmcaClaims } from './utils/dmca.js';
+import { buildVodJobResponse } from './utils/vod-job-response.js';
 import { queueDmcaProcessing } from '../../../workers/jobs/dmca.job.js';
 
 /** DMCA claim entry with optional typed fields. */
@@ -107,9 +109,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
       });
 
       // Step 3: Parse claims (lenient - no validation)
-      const claimsArray: unknown[] = Array.isArray(claims)
-        ? claims
-        : (JSON.parse(typeof claims === 'string' ? claims : JSON.stringify(claims)) as unknown[]);
+      const claimsArray = parseDmcaClaims(claims);
 
       // Step 4: Queue DMCA processing (chained to download if needed)
       const dmcaJobId = await queueDmcaProcessing({
@@ -125,37 +125,25 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
       });
 
       if (dmcaJobId == null) {
-        throw new Error('Failed to queue DMCA processing job');
+        throw internalServerError('Failed to queue DMCA processing job');
       }
 
       // Step 5: Return appropriate response
       if (downloadJobId != null) {
         const context = { vodId, downloadJobId, dmcaJobId, part, claimsCount: claimsArray.length };
         log.info(context, 'VOD download queued, DMCA processing will be triggered after completion');
-        return {
-          data: {
-            message: 'VOD download queued, DMCA processing will be triggered after completion',
-            dbId: vodRecord.id,
-            vodId: vodRecord.vod_id,
-            downloadJobId,
-            dmcaJobId,
-            ...(part !== undefined && { part }),
-          },
-        };
       } else {
         const context = { vodId, dmcaJobId, filePath, part, claimsCount: claimsArray.length };
         log.info(context, 'DMCA processing queued');
-        return {
-          data: {
-            message: 'DMCA processing queued!',
-            dbId: vodRecord.id,
-            vodId: vodRecord.vod_id,
-            dmcaJobId,
-            filePath,
-            ...(part !== undefined && { part }),
-          },
-        };
       }
+      return buildVodJobResponse({
+        hasDownload: downloadJobId != null,
+        filePath,
+        downstreamJobId: dmcaJobId,
+        downstreamLabel: 'DMCA processing',
+        base: { dbId: vodRecord.id, vodId: vodRecord.vod_id },
+        extra: part !== undefined ? { part } : {},
+      });
     }
   );
 

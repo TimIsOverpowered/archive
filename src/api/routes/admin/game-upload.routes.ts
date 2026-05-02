@@ -1,16 +1,18 @@
 import { FastifyInstance } from 'fastify';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import { tenantMiddleware, requireTenant, TenantPlatformContext } from '../../middleware/tenant-platform.js';
+import { tenantMiddleware, requireTenant } from '../../middleware/tenant-platform.js';
 import { RedisService } from '../../../utils/redis-service.js';
-import { HttpError } from '../../../utils/http-error.js';
-import type { Platform, SourceType, DownloadMethod } from '../../../types/platforms.js';
+import { internalServerError } from '../../../utils/http-error.js';
+import type { SourceType, DownloadMethod } from '../../../types/platforms.js';
 import { DOWNLOAD_METHODS, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
 import { ensureVodDownload } from './utils/vod-helpers.js';
+import { parseDmcaClaims } from './utils/dmca.js';
+import { buildVodJobResponse } from './utils/vod-job-response.js';
+import { resolveGameWithContext } from './utils/game-context.js';
 import { queueYoutubeGameUploadByGame } from '../../../workers/jobs/youtube.job.js';
 import { queueDmcaProcessing } from '../../../workers/jobs/dmca.job.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { GameNotFoundError } from '../../../utils/domain-errors.js';
 
 interface ReUploadGameParams {
   tenantId: string;
@@ -73,35 +75,8 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
       const { gameId, downloadMethod } = request.body;
       const log = createAutoLogger(tenantId);
 
-      // Check if game exists
-      const game = await db.selectFrom('games').selectAll().where('id', '=', gameId).executeTakeFirst();
-
-      if (!game) {
-        throw new GameNotFoundError(gameId);
-      }
-
-      // Look up associated VOD
-      const vodRecord = await db.selectFrom('vods').selectAll().where('id', '=', game.vod_id).executeTakeFirst();
-
-      if (!vodRecord) {
-        throw new HttpError(404, `VOD ${game.vod_id} not found for game ${gameId}`, 'NOT_FOUND');
-      }
-
-      const platform = vodRecord.platform as Platform;
-
-      // Validate platform is enabled for tenant
-      if (config[platform]?.enabled !== true) {
-        throw new HttpError(400, `${platform} is not enabled for this tenant`, 'BAD_REQUEST');
-      }
-
-      // Build platform-aware context for downstream helpers
-      const tenantPlatformCtx: TenantPlatformContext = {
-        ...tenantCtx,
-        platform,
-      };
-
-      const dbId = vodRecord.id;
-      const vodId = vodRecord.vod_id;
+      const resolved = await resolveGameWithContext(gameId, db, tenantCtx, config);
+      const { game, dbId, vodId, platform, tenantPlatformCtx } = resolved;
       const type: SourceType = SOURCE_TYPES.VOD;
 
       // Ensure VOD file is downloaded and valid
@@ -142,27 +117,13 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
         };
       }
 
-      if (jobId != null) {
-        return {
-          data: {
-            message: 'VOD download queued, game upload will be triggered after completion',
-            gameId,
-            vodId,
-            downloadJobId: jobId,
-            gameJobId,
-          },
-        };
-      }
-
-      return {
-        data: {
-          message: 'Game upload queued',
-          gameId,
-          vodId,
-          filePath,
-          gameJobId,
-        },
-      };
+      return buildVodJobResponse({
+        hasDownload: jobId != null,
+        filePath,
+        downstreamJobId: gameJobId,
+        downstreamLabel: 'Game upload',
+        base: { gameId, vodId },
+      });
     }
   );
 
@@ -203,35 +164,8 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
       const { gameId, claims, downloadMethod } = request.body;
       const log = createAutoLogger(tenantId);
 
-      // Check if game exists
-      const game = await db.selectFrom('games').selectAll().where('id', '=', gameId).executeTakeFirst();
-
-      if (!game) {
-        throw new GameNotFoundError(gameId);
-      }
-
-      // Look up associated VOD
-      const vodRecord = await db.selectFrom('vods').selectAll().where('id', '=', game.vod_id).executeTakeFirst();
-
-      if (!vodRecord) {
-        throw new HttpError(404, `VOD ${game.vod_id} not found for game ${gameId}`, 'NOT_FOUND');
-      }
-
-      const platform = vodRecord.platform as Platform;
-
-      // Validate platform is enabled for tenant
-      if (config[platform]?.enabled !== true) {
-        throw new HttpError(400, `${platform} is not enabled for this tenant`, 'BAD_REQUEST');
-      }
-
-      // Build platform-aware context for downstream helpers
-      const tenantPlatformCtx: TenantPlatformContext = {
-        ...tenantCtx,
-        platform,
-      };
-
-      const dbId = vodRecord.id;
-      const vodId = vodRecord.vod_id;
+      const resolved = await resolveGameWithContext(gameId, db, tenantCtx, config);
+      const { game, dbId, vodId, platform, tenantPlatformCtx } = resolved;
       const type: SourceType = SOURCE_TYPES.VOD;
 
       // Ensure VOD file is downloaded and valid
@@ -245,15 +179,13 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
       });
 
       // Parse claims (lenient - no validation)
-      const claimsArray: unknown[] = Array.isArray(claims)
-        ? claims
-        : (JSON.parse(typeof claims === 'string' ? claims : JSON.stringify(claims)) as unknown[]);
+      const claimsArray = parseDmcaClaims(claims);
 
       // Queue DMCA processing with game fields
       const dmcaJobId = await queueDmcaProcessing({
         tenantId,
         dbId,
-        vodId: String(vodId),
+        vodId,
         claims: claimsArray,
         type,
         platform,
@@ -265,30 +197,16 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
       });
 
       if (dmcaJobId == null) {
-        throw new Error('Failed to queue DMCA processing job');
+        throw internalServerError('Failed to queue DMCA processing job');
       }
 
-      if (jobId != null) {
-        return {
-          data: {
-            message: 'VOD download queued, DMCA processing will be triggered after completion',
-            gameId,
-            vodId,
-            downloadJobId: jobId,
-            dmcaJobId,
-          },
-        };
-      }
-
-      return {
-        data: {
-          message: 'DMCA processing queued',
-          gameId,
-          vodId,
-          filePath,
-          dmcaJobId,
-        },
-      };
+      return buildVodJobResponse({
+        hasDownload: jobId != null,
+        filePath,
+        downstreamJobId: dmcaJobId,
+        downstreamLabel: 'DMCA processing',
+        base: { gameId, vodId },
+      });
     }
   );
 

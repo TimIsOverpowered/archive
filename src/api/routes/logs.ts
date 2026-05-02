@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { getLogsByOffset, getLogsByCursor } from '../../services/logs.service.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { RedisService } from '../../utils/redis-service.js';
-import { HttpError } from '../../utils/http-error.js';
+import { HttpError, badRequest } from '../../utils/http-error.js';
 import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
 
 const LogsQuerySchema = z.object({
@@ -65,6 +65,7 @@ export default function logsRoutes(fastify: FastifyInstance, _options: LogsRoute
       const tenantCtx = requireTenant(request);
       const { db } = tenantCtx;
       const vodIdNum = Number(vodId);
+      if (isNaN(vodIdNum)) throw badRequest('Invalid VOD ID');
 
       const parsed = LogsQuerySchema.safeParse(request.query);
       if (!parsed.success) {

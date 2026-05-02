@@ -16,8 +16,8 @@ import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
 import { fileExists, getVodDirPath } from '../utils/path.js';
 import { extractErrorDetails } from '../utils/error.js';
-import { initRichAlert, updateAlert } from '../utils/discord-alerts.js';
-import { createDmcaWorkerAlerts, DmcaClaimInfo } from './utils/alert-factories.js';
+import { initRichAlert } from '../utils/discord-alerts.js';
+import { createDmcaWorkerAlerts, DmcaClaimInfo, safeUpdateAlert } from './utils/alert-factories.js';
 import { ConfigNotConfiguredError, FileNotFound } from '../utils/domain-errors.js';
 import { getDisplayName } from '../config/types.js';
 import { uploadAndUpsertGame } from './youtube/game-upload-processor.js';
@@ -243,9 +243,7 @@ export async function processDmcaClaims(ctx: DmcaProcessorContext): Promise<void
             ctx.platform,
             ctx.displayName
           );
-    void updateAlert(ctx.messageId, alertData).catch((err: unknown) => {
-      ctx.log.warn({ err: extractErrorDetails(err) }, 'Discord alert update failed (non-critical)');
-    });
+    safeUpdateAlert(ctx.messageId, alertData, ctx.log, ctx.vodId);
   };
 
   if (blackoutClaims.length > 0) {

@@ -9,7 +9,7 @@ import { getJobContext } from './utils/job-context.js';
 import { finalizeVod } from '../services/vod-finalization.js';
 import { queueYoutubeUploads, type YoutubeUploadJobResult } from './jobs/youtube.job.js';
 import { downloadHlsStream } from './vod/hls-orchestrator.js';
-import { createLiveWorkerAlerts } from './utils/alert-factories.js';
+import { createLiveWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
 import type { LiveDownloadJob } from './jobs/types.js';
 import { triggerChatDownload } from './jobs/chat.job.js';
 import { fetchAndSaveEmotes } from '../services/emotes.js';
@@ -99,9 +99,7 @@ export async function runDownload(ctx: LiveProcessorContext): Promise<LiveDownlo
     discordMessageId: ctx.messageId ?? undefined,
     streamerName: ctx.streamerName,
     onProgress: (segmentsDownloaded, duration) => {
-      void updateAlert(ctx.messageId, ctx.alerts.progress(ctx.vodId, segmentsDownloaded, duration)).catch((err) => {
-        ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Discord alert update failed (non-critical)');
-      });
+      safeUpdateAlert(ctx.messageId, ctx.alerts.progress(ctx.vodId, segmentsDownloaded, duration), ctx.log, ctx.vodId);
     },
   });
 

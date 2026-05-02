@@ -10,6 +10,7 @@ import { triggerChatDownload } from '../../../../workers/jobs/chat.job.js';
 
 import { getStrategy } from '../../../../services/platforms/index.js';
 import { getDisplayName, requirePlatformConfig } from '../../../../config/types.js';
+import { HttpError } from '../../../../utils/http-error.js';
 
 /**
  * Fetches VOD record or returns null if not found
@@ -27,6 +28,19 @@ export async function findVodRecord(
       .where('vod_id', '=', vodId)
       .executeTakeFirst()) ?? null
   );
+}
+
+/**
+ * Fetches VOD record or throws 404 if not found
+ */
+export async function requireVodRecord(
+  db: Kysely<StreamerDB>,
+  vodId: string,
+  platform: Platform
+): Promise<VodRecord> {
+  const record = await findVodRecord(db, vodId, platform);
+  if (!record) throw new HttpError(404, `VOD ${vodId} not found`, 'NOT_FOUND');
+  return record;
 }
 
 /**

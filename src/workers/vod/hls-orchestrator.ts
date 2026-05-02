@@ -17,8 +17,7 @@ import {
 import { sleep, getRetryDelay } from '../../utils/delay.js';
 
 import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
-import { createVodWorkerAlerts } from '../utils/alert-factories.js';
-import { updateAlert } from '../../utils/discord-alerts.js';
+import { createVodWorkerAlerts, safeUpdateAlert } from '../utils/alert-factories.js';
 import { cleanupHlsFiles } from './hls-cleanup.js';
 import { Hls } from '../../constants.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
@@ -127,9 +126,7 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
                 { name: 'FFmpeg', value: `\`${hlsFfmpegCmd.substring(0, 500)}\``, inline: false },
               ];
             }
-            void updateAlert(options.discordMessageId, alertData).catch((err) => {
-              log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
-            });
+            safeUpdateAlert(options.discordMessageId, alertData, log, vodId);
           }
         },
         onFfmpegStart: (cmd) => {

@@ -1,17 +1,16 @@
 import { Job } from 'bullmq';
 import { sleep } from '../utils/delay.js';
 import { fetchComments, fetchNextComments, type TwitchVideoCommentResponse } from '../services/twitch/index.js';
-import { initRichAlert, resetFailures, updateAlert } from '../utils/discord-alerts.js';
+import { initRichAlert, resetFailures } from '../utils/discord-alerts.js';
 import type { ChatDownloadJob, ChatDownloadResult } from './jobs/types.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { getJobContext } from './utils/job-context.js';
-import { extractErrorDetails } from '../utils/error.js';
 import { Chat } from '../constants.js';
 import { extractEdges, calculateResumeOffset, extractMessageData } from './chat/chat-helpers.js';
 import type { ChatMessageCreateInput } from './chat/chat-types.js';
 import { type Platform } from '../types/platforms.js';
 import { flushChatBatch } from './chat/chat-batch-processor.js';
-import { createChatWorkerAlerts } from './utils/alert-factories.js';
+import { createChatWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
 import { getDisplayName } from '../config/types.js';
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../db/streamer-types.js';
@@ -150,12 +149,7 @@ async function isCompleteByLastMessage(
 
 function markChatComplete(ctx: ChatProcessorContext, totalMessages: number): ChatDownloadResult {
   resetFailures(ctx.tenantId);
-  updateAlert(
-    ctx.messageId,
-    ctx.chatAlerts.alreadyComplete(ctx.displayName, ctx.vodId, ctx.platform, totalMessages, ctx.effectiveOffset)
-  ).catch((err: unknown) => {
-    ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Discord alert update failed (non-critical)');
-  });
+  safeUpdateAlert(ctx.messageId, ctx.chatAlerts.alreadyComplete(ctx.displayName, ctx.vodId, ctx.platform, totalMessages, ctx.effectiveOffset), ctx.log, ctx.vodId);
   return { success: true, totalMessages, skipped: true };
 }
 
@@ -195,9 +189,7 @@ export async function downloadChatMessages(
     if (edges.length === 0) {
       log.warn({ vodId, effectiveOffset: ctx.effectiveOffset }, 'No chat messages found for VOD');
       resetFailures(tenantId);
-      updateAlert(messageId, chatAlerts.noMessages(displayName, vodId, platform, ctx.effectiveOffset)).catch((err) => {
-        log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
-      });
+      safeUpdateAlert(messageId, chatAlerts.noMessages(displayName, vodId, platform, ctx.effectiveOffset), log, vodId);
       return { totalMessages: 0, batchCount: 0 };
     }
 
@@ -231,12 +223,7 @@ export async function downloadChatMessages(
         vodId,
         onProgress: (offset, batchNumber, messagesInBatch) => {
           reportProgress(offset);
-          updateAlert(
-            messageId,
-            chatAlerts.progress(displayName, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)
-          ).catch((err: unknown) => {
-            log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
-          });
+          safeUpdateAlert(messageId, chatAlerts.progress(displayName, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration), log, vodId);
         },
         lastOffset,
         totalMessages,
@@ -257,12 +244,7 @@ export async function downloadChatMessages(
       vodId,
       onProgress: (offset, batchNumber, messagesInBatch) => {
         reportProgress(offset);
-        updateAlert(
-          messageId,
-          chatAlerts.progress(displayName, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration)
-        ).catch((err: unknown) => {
-          log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
-        });
+        safeUpdateAlert(messageId, chatAlerts.progress(displayName, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration), log, vodId);
       },
       lastOffset: ctx.effectiveOffset,
       totalMessages,
@@ -306,10 +288,5 @@ export function sendChatCompletionAlert(
     'Download completed successfully'
   );
 
-  updateAlert(
-    ctx.messageId,
-    ctx.chatAlerts.complete(ctx.displayName, ctx.vodId, ctx.platform, result.totalMessages, result.batchCount)
-  ).catch((err: unknown) => {
-    ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Discord alert update failed (non-critical)');
-  });
+  safeUpdateAlert(ctx.messageId, ctx.chatAlerts.complete(ctx.displayName, ctx.vodId, ctx.platform, result.totalMessages, result.batchCount), ctx.log, ctx.vodId);
 }

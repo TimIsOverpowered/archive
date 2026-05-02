@@ -23,8 +23,6 @@ export const LIVE_JOB_ID_PREFIX = 'live_hls_';
 export const defaultJobOptions = {
   attempts: 3,
   backoff: { type: 'exponential' as const, delay: 5000 },
-  removeOnComplete: { count: 0 },
-  removeOnFail: { count: 50 },
 };
 
 export const queueRetryOptions: Record<string, QueueOptions['defaultJobOptions']> = {

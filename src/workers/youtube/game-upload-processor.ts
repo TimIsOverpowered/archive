@@ -3,7 +3,7 @@ import type { StreamerDB } from '../../db/streamer-types.js';
 import type { AppLogger } from '../../utils/logger.js';
 import { trimVideo, splitVideo, getMetadata } from '../utils/ffmpeg.js';
 import { uploadVideo } from '../../services/youtube/index.js';
-import { initRichAlert, updateAlert, createProgressBar } from '../../utils/discord-alerts.js';
+import { initRichAlert, createProgressBar } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 import { createYoutubeUploadProgressHandler as createGameUploadProgressHandler } from './youtube-upload-progress.js';
 import { YouTube } from '../../constants.js';
@@ -12,7 +12,7 @@ import { getDisplayName } from '../../config/types.js';
 import { deleteFileIfExists } from '../../utils/path.js';
 import { GameUpsertSchema } from '../../config/schemas.js';
 import { publishVodUpdate } from '../../services/cache-invalidator.js';
-import { extractErrorDetails } from '../../utils/error.js';
+import { safeUpdateAlert } from '../utils/alert-factories.js';
 
 export interface GameUploadContext {
   tenantId: string;
@@ -244,16 +244,14 @@ async function processSplitGameUpload(
       if (splitGameFfmpegCmd != null) {
         alertFields.push({ name: 'FFmpeg', value: `\`${splitGameFfmpegCmd.substring(0, 500)}\``, inline: false });
       }
-      updateAlert(splitAlertMessageId, {
+      safeUpdateAlert(splitAlertMessageId, {
         title: `✂️ Splitting Game Clip`,
         description: `${channelName} - Game clip exceeds YouTube max duration`,
         status: 'warning',
         fields: alertFields,
         timestamp: new Date().toISOString(),
         updatedTimestamp: new Date().toISOString(),
-      }).catch((err) => {
-        log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
-      });
+      }, log, vodId);
     },
     (cmd) => {
       splitGameFfmpegCmd = cmd;
@@ -300,7 +298,7 @@ async function processSplitGameUpload(
     });
   }
 
-  updateAlert(splitAlertMessageId, {
+  safeUpdateAlert(splitAlertMessageId, {
     title: `✅ Game Clip Splitting Complete`,
     description: `${channelName} - Successfully split into ${totalParts} parts`,
     status: 'success',
@@ -310,9 +308,7 @@ async function processSplitGameUpload(
     ],
     timestamp: new Date().toISOString(),
     updatedTimestamp: new Date().toISOString(),
-  }).catch((err) => {
-    log.warn({ err: extractErrorDetails(err), vodId }, 'Discord alert update failed (non-critical)');
-  });
+  }, log, vodId);
 
   return { success: true, videos: uploadedGameVideos };
 }

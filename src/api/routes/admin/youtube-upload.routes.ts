@@ -20,6 +20,7 @@ import {
   UPLOAD_MODES,
 } from '../../../types/platforms.js';
 import { ensureVodDownload, findVodRecord } from './utils/vod-helpers.js';
+import { buildVodJobResponse } from './utils/vod-job-response.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 /** Route params for YouTube re-upload endpoint. */
@@ -120,23 +121,13 @@ export default function youtubeUploadRoutes(fastify: FastifyInstance, _options: 
         type,
       });
 
-      if (jobId != null) {
-        return {
-          data: {
-            message: 'VOD download queued, YouTube upload will be triggered after completion',
-            dbId: vodRecord.id,
-            vodId: vodRecord.vod_id,
-            jobId,
-          },
-        };
-      } else {
-        return {
-          data: {
-            message: 'Youtube upload queued!',
-            filePath,
-          },
-        };
-      }
+      return buildVodJobResponse({
+        hasDownload: jobId != null,
+        filePath,
+        downstreamJobId: jobId ?? '',
+        downstreamLabel: 'YouTube upload',
+        base: jobId != null ? { dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId } : {},
+      });
     }
   );
 
