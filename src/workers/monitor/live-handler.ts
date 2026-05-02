@@ -16,10 +16,8 @@ import { configService } from '../../config/tenant-config.js';
 import { publishVodUpdate } from '../../services/cache-invalidator.js';
 import { findVodByStreamId, findVodByPlatformId } from '../../db/queries/vods.js';
 
-type StreamerDbClient = Kysely<StreamerDB>;
-
 interface LiveStreamContext {
-  db: StreamerDbClient;
+  db: Kysely<StreamerDB>;
   streamStatus: PlatformStreamStatus;
   platform: Platform;
   platformUserId: string;
@@ -37,7 +35,7 @@ type ExistingVodLiveContext = LiveStreamContext & { existingVod: SelectableVods 
 type AlreadyLiveContext = LiveStreamContext & { existingVod: SelectableVods };
 
 export async function handlePlatformLiveCheck(
-  db: StreamerDbClient,
+  db: Kysely<StreamerDB>,
   tenantId: string,
   platform: Platform,
   config: TenantConfig,
@@ -99,7 +97,7 @@ export async function handlePlatformLiveCheck(
 }
 
 async function handleOfflineStream(
-  db: StreamerDbClient,
+  db: Kysely<StreamerDB>,
   tenantId: string,
   platform: Platform,
   username: string | undefined,

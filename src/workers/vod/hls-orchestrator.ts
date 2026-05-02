@@ -1,5 +1,5 @@
-import fsPromises from 'fs/promises';
-import pathMod from 'path';
+import { mkdir, readdir, readFile, writeFile } from 'fs/promises';
+import { join } from 'path';
 import HLS from 'hls-parser';
 import { extractErrorDetails } from '../../utils/error.js';
 import { DownloadAbortedError } from '../../utils/domain-errors.js';
@@ -71,9 +71,9 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
 
   const vodDir = getVodDirPath({ config, vodId });
   const finalMp4Path = getVodFilePath({ config, vodId });
-  await fsPromises.mkdir(vodDir, { recursive: true });
+  await mkdir(vodDir, { recursive: true });
 
-  const m3u8Path = pathMod.join(vodDir, `${vodId}.m3u8`);
+  const m3u8Path = join(vodDir, `${vodId}.m3u8`);
 
   const cycleTLS = platform === PLATFORMS.KICK ? createSession() : null;
   if (cycleTLS) log.info({ vodId }, 'CycleTLS session created');
@@ -163,7 +163,7 @@ async function convertAndCleanup(
 ): Promise<{ segmentCount: number; finalMp4Path: string }> {
   const { vodId, config } = options;
 
-  const m3u8Content = await fsPromises.readFile(m3u8Path, 'utf8');
+  const m3u8Content = await readFile(m3u8Path, 'utf8');
   const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
 
   log.info({ vodId, isFmp4 }, 'Converting HLS to MP4');
@@ -174,7 +174,7 @@ async function convertAndCleanup(
     ...(options.onFfmpegStart && { onStart: options.onFfmpegStart }),
   });
 
-  const files = await fsPromises.readdir(vodDir);
+  const files = await readdir(vodDir);
   const segmentCount = files.filter((f) => f.endsWith('.mp4') || f.endsWith('.ts')).length;
 
   const shouldKeepHls = config.settings.saveHLS ?? false;
@@ -233,7 +233,7 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
   let lastSegmentUri: string | null = null;
 
   const downloadedSegments = new Set<string>(
-    await fsPromises.readdir(ctx.vodDir).then((files) => files.filter((f) => f.endsWith('.ts') || f.endsWith('.mp4')))
+    await readdir(ctx.vodDir).then((files) => files.filter((f) => f.endsWith('.ts') || f.endsWith('.mp4')))
   );
 
   let streamEnded = false;
@@ -245,7 +245,7 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
       const parsed = HLS.parse(variantM3u8String) as HLS.types.MediaPlaylist;
       const segments = parsed.segments ?? [];
 
-      await fsPromises.writeFile(ctx.m3u8Path, variantM3u8String);
+      await writeFile(ctx.m3u8Path, variantM3u8String);
 
       const result = filterNewSegments(segments, downloadedSegments, lastSegmentUri, noChangePollCount);
 
@@ -324,7 +324,7 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
 
   const { variantM3u8String, baseURL } = playlist;
 
-  await fsPromises.writeFile(m3u8Path, variantM3u8String);
+  await writeFile(m3u8Path, variantM3u8String);
 
   const parsed = HLS.parse(variantM3u8String) as HLS.types.MediaPlaylist;
   const segments = parsed.segments ?? [];

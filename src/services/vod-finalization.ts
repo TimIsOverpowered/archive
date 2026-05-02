@@ -45,7 +45,7 @@ export async function finalizeVod(options: FinalizeVodOptions): Promise<void> {
     } else {
       await db.updateTable('vods').set({ is_live: false }).where('id', '=', dbId).execute();
     }
-
-    await publishVodDurationUpdate(ctx.tenantId, dbId, dur ?? 0, false);
   });
+
+  await publishVodDurationUpdate(ctx.tenantId, dbId, dur ?? 0, false);
 }
