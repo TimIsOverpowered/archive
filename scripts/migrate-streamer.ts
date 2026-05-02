@@ -508,7 +508,7 @@ const main = async () => {
     }
 
     try {
-      dbUrl = decryptScalar(tenant.database_url as string);
+      dbUrl = decryptScalar(tenant.database_url);
     } catch (decryptError) {
       const details = extractErrorDetails(decryptError);
       console.error('❌ Failed to decrypt database URL:', details.message);

@@ -183,8 +183,8 @@ async function importConfig(channelName: string, dbUrl: string): Promise<void> {
 
   const platformCount = (twitch ? 1 : 0) + (kick ? 1 : 0);
   if (platformCount === 1) {
-    if (twitch) (twitch as Record<string, unknown>).mainPlatform = true;
-    if (kick) (kick as Record<string, unknown>).mainPlatform = true;
+    if (twitch) (twitch).mainPlatform = true;
+    if (kick) (kick).mainPlatform = true;
   }
 
   const encryptedDbUrl = encryptScalar(dbUrl);

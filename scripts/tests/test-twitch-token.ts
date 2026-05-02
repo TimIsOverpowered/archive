@@ -63,7 +63,7 @@ program
           process.exit(1);
         }
 
-        let decrypted = config.twitch.auth;
+        const decrypted = config.twitch.auth;
 
         console.log('\nCurrent Token State:');
         console.log('-'.repeat(50));
@@ -97,7 +97,7 @@ program
               process.exit(1);
             }
 
-            let decryptedAfter = configAfter.twitch.auth;
+            const decryptedAfter = configAfter.twitch.auth;
 
             console.log('\n\nToken State After Refresh:');
             console.log('-'.repeat(50));

@@ -74,7 +74,7 @@ program
         process.exit(1);
       }
 
-      let decrypted = await decryptYoutubeAuth(youtubeConfig.auth);
+      const decrypted = await decryptYoutubeAuth(youtubeConfig.auth);
 
       if (!decrypted) {
         console.error('Failed to decrypt YouTube auth data');
@@ -128,7 +128,7 @@ program
 
         const updatedYoutubeConfig = updatedTenant.youtube as any;
 
-        let decryptedAfter = await decryptYoutubeAuth(updatedYoutubeConfig.auth);
+        const decryptedAfter = await decryptYoutubeAuth(updatedYoutubeConfig.auth);
 
         if (!decryptedAfter) {
           console.error('Failed to decrypt YouTube auth data after refresh');

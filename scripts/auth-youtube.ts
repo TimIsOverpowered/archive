@@ -396,7 +396,7 @@ async function storeAuthObject(tenantId: string, authObject: YoutubeAuthObject):
         // If decryption succeeds, use it directly - should be an object with youtube config fields
         if (typeof decryptedValue === 'object' && decryptedValue !== null) {
           console.log('Preserving existing YouTube configuration...');
-          youtubeConfig = decryptedValue as Partial<z.infer<typeof YoutubeSchema>>;
+          youtubeConfig = decryptedValue;
 
           // Check if previous run stored only auth token as string instead of full config
           const hasAuthFieldOnly =

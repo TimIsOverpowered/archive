@@ -187,7 +187,7 @@ async function main(): Promise<void> {
       };
     }
 
-    await updateTenant(tenantId, { twitch: updatedTwitchConfig as any });
+    await updateTenant(tenantId, { twitch: updatedTwitchConfig });
 
     // Track the ID for potential rollback on error (though we're past that point)
     tenantIdToUpdate = tenantId;

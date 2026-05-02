@@ -249,7 +249,7 @@ async function main(): Promise<void> {
     console.log('BASIC INFORMATION');
     console.log('='.repeat(50));
 
-    let channelName = await prompt('Channel Name (tenant ID, lowercase alphanumeric + underscore, max 25 chars): ');
+    const channelName = await prompt('Channel Name (tenant ID, lowercase alphanumeric + underscore, max 25 chars): ');
 
     // Validate format
     if (!/^[a-z0-9_]+$/.test(channelName)) {
