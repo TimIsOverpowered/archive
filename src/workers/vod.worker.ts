@@ -3,7 +3,7 @@ import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
 import type { StandardVodJob } from './jobs/types.js';
 import type { VodProcessorContext } from './vod.worker.phases.js';
 import { updateAlert } from '../utils/discord-alerts.js';
-import type { Job } from 'bullmq';
+import type { Job, Processor } from 'bullmq';
 
 const errorMeta = (ctx: VodProcessorContext) => ({
   vodId: ctx.vodId,
@@ -25,6 +25,6 @@ const vodProcessor = wrapWorkerProcessor(
     return { success: true, finalPath: ctx.finalPath };
   },
   { errorMeta, errorAlert }
-) as unknown as import('bullmq').Processor<StandardVodJob, unknown, string>;
+) as unknown as Processor<StandardVodJob, unknown, string>;
 
 export default vodProcessor;

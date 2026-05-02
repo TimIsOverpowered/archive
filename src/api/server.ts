@@ -32,12 +32,7 @@ interface FormattedError {
 }
 
 function formatErrorResponse(error: unknown): FormattedError {
-  if (error instanceof HttpError) {
-    const { statusCode, message, code } = error;
-    return { statusCode, message, code, isClientError: statusCode >= 400 && statusCode < 500 };
-  }
-
-  if (error instanceof DomainError) {
+  if (error instanceof HttpError || error instanceof DomainError) {
     const { statusCode, message, code } = error;
     return { statusCode, message, code, isClientError: statusCode >= 400 && statusCode < 500 };
   }

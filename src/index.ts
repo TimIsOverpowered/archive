@@ -5,11 +5,11 @@ import { closeAllClients, startClientCleanup, stopClientCleanup } from './db/str
 import { getLogger, setLoggerConfig } from './utils/logger.js';
 import { closeRedisClient } from './api/plugins/redis.plugin.js';
 import { extractErrorDetails } from './utils/error.js';
+import { registerShutdownHandlers } from './utils/shutdown.js';
 import { startCloudflareIpRangesCron } from './cron/cloudflare-ip-ranges.js';
 import { getCachedRangeInfo, getCloudflareIpRanges } from './utils/cloudflare-ip-validator.js';
 import { registerPlatformStrategies } from './services/platforms/index.js';
 import { closeMetaClient } from './db/meta-client.js';
-import { Server } from './constants.js';
 
 process.on('unhandledRejection', (reason) => {
   getLogger().error({ error: extractErrorDetails(reason) }, 'Unhandled promise rejection');
@@ -67,56 +67,33 @@ async function start() {
   }
 }
 
-async function shutdown(signal: string) {
-  getLogger().info({ signal }, 'Received shutdown signal');
-
-  const shutdownTimeout = setTimeout(() => {
-    getLogger().error('Forced shutdown after timeout');
-    process.exit(1);
-  }, Server.SHUTDOWN_TIMEOUT_MS);
-
-  if (!server) {
-    clearTimeout(shutdownTimeout);
-    getLogger().warn('No server instance found, exiting immediately');
-    process.exit(0);
-  }
-
-  try {
-    // Close HTTP server (waits for in-flight requests)
-    await server.close();
-    getLogger().info('HTTP server closed');
-
-    // Close Redis client connection
-    await closeRedisClient();
-    getLogger().info('Redis connections closed');
-
-    // Stop DB client cleanup interval
-    stopClientCleanup();
-    getLogger().info('DB client cleanup stopped');
-
-    // Close all DB clients (Kysely streamer + meta)
-    await closeAllClients();
-    await closeMetaClient();
-    getLogger().info('Database connections closed');
-
-    clearTimeout(shutdownTimeout);
-    getLogger().info('Graceful shutdown complete');
-    process.exit(0);
-  } catch (error) {
-    clearTimeout(shutdownTimeout);
-    const details = extractErrorDetails(error);
-    getLogger().error({ ...details }, 'Error during shutdown');
-    process.exit(1);
-  }
-}
-
-// Handle graceful shutdown signals
-process.on('SIGTERM', () => {
-  void shutdown('SIGTERM');
-});
-process.on('SIGINT', () => {
-  void shutdown('SIGINT');
-});
+registerShutdownHandlers([
+  {
+    name: 'http-server',
+    close: async () => {
+      if (!server) {
+        getLogger().warn('No server instance found, skipping shutdown');
+        return;
+      }
+      await server.close();
+    },
+  },
+  { name: 'redis', close: closeRedisClient },
+  {
+    name: 'db-client-cleanup',
+    close: () => {
+      stopClientCleanup();
+      return Promise.resolve();
+    },
+  },
+  {
+    name: 'database',
+    close: async () => {
+      await closeAllClients();
+      await closeMetaClient();
+    },
+  },
+]);
 
 // Start the server
 void start();

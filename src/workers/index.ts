@@ -9,10 +9,11 @@ import { getRedisInstance, initWorkersRedis, closeWorkersRedis, waitForRedisRead
 import { startTokenHealthCron } from '../cron/token-health.js';
 import { startMonitorService, stopMonitorService } from './monitor/index.js';
 import { getLogger, setLoggerConfig } from '../utils/logger.js';
+import { registerShutdownHandlers as registerShutdown } from '../utils/shutdown.js';
 import { registerWorkers } from './worker-definitions.js';
 import { waitForWorkersReady, workerRegistry } from './create-worker.js';
 import { loadWorkersConfig } from '../config/env.js';
-import { Vod, Server } from '../constants.js';
+import { Vod } from '../constants.js';
 import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/streamer-client.js';
 import { registerPlatformStrategies } from '../services/platforms/index.js';
 import { closeMetaClient } from '../db/meta-client.js';
@@ -125,56 +126,57 @@ async function initBackgroundServices(_ctx: AppContext) {
 }
 
 function registerShutdownHandlers(ctx: AppContext) {
-  const shutdown = async () => {
-    getLogger().info('Shutting down workers...');
-
-    const forceExitTimer = setTimeout(() => {
-      getLogger().error('Forced shutdown after timeout');
-      process.exit(1);
-    }, Server.SHUTDOWN_TIMEOUT_MS);
-
-    try {
-      stopMonitorService();
-
-      for (const { name, worker } of workerRegistry.getAll()) {
-        await worker.close(true);
-        getLogger().info({ name }, 'Worker closed');
-      }
-
-      await closeQueues();
-
-      await closeCycleTLS();
-
-      stopClientCleanup();
-      await closeAllClients();
-      await closeMetaClient();
-
-      try {
-        await ctx.tenantConfigSubscriber.quit();
-      } catch {
-        /* subscriber already closed */
-      }
-
-      await closeWorkersRedis();
-      configService.reset();
-
-      clearTimeout(forceExitTimer);
-      getLogger().info('Graceful shutdown complete');
-      process.exit(0);
-    } catch (error) {
-      clearTimeout(forceExitTimer);
-      const details = extractErrorDetails(error);
-      getLogger().error({ ...details }, 'Error during shutdown');
-      process.exit(1);
-    }
-  };
-
-  process.on('SIGTERM', () => {
-    void shutdown();
-  });
-  process.on('SIGINT', () => {
-    void shutdown();
-  });
+  registerShutdown([
+    {
+      name: 'monitor',
+      close: () => {
+        stopMonitorService();
+        return Promise.resolve();
+      },
+    },
+    {
+      name: 'workers',
+      close: async () => {
+        for (const { worker } of workerRegistry.getAll()) {
+          await worker.close(true);
+        }
+      },
+    },
+    { name: 'queues', close: closeQueues },
+    { name: 'cycletls', close: closeCycleTLS },
+    {
+      name: 'db-client-cleanup',
+      close: () => {
+        stopClientCleanup();
+        return Promise.resolve();
+      },
+    },
+    {
+      name: 'database',
+      close: async () => {
+        await closeAllClients();
+        await closeMetaClient();
+      },
+    },
+    {
+      name: 'tenant-subscriber',
+      close: async () => {
+        try {
+          await ctx.tenantConfigSubscriber.quit();
+        } catch {
+          /* subscriber already closed */
+        }
+      },
+    },
+    { name: 'workers-redis', close: closeWorkersRedis },
+    {
+      name: 'config',
+      close: () => {
+        configService.reset();
+        return Promise.resolve();
+      },
+    },
+  ]);
 }
 
 const scriptPath = process.argv[1];
