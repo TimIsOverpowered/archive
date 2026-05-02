@@ -2,6 +2,7 @@ import type { StandardVodJob } from './types.js';
 import { getStandardVodQueue } from '../queues/queue.js';
 import { childLogger } from '../../utils/logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
+import { enqueueJobWithLogging } from './enqueue.js';
 import type { Platform, DownloadMethod } from '../../types/platforms.js';
 
 const log = childLogger({ module: 'vod-job' });
@@ -30,19 +31,22 @@ export async function triggerVodDownload(opts: TriggerVodOptions): Promise<strin
   };
 
   try {
-    const added = await getStandardVodQueue().add('standard_vod_download', job, {
-      jobId,
-      deduplication: { id: jobId },
-      removeOnComplete: true,
-      removeOnFail: true,
+    const result = await enqueueJobWithLogging({
+      queue: getStandardVodQueue(),
+      jobName: 'standard_vod_download',
+      data: job,
+      options: {
+        jobId,
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+      logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
+      successMessage: 'VOD download job enqueued',
+      extraContext: { tenantId, vodId, platform },
     });
-    return added.id ?? null;
+    return result.isNew ? result.jobId : null;
   } catch (error) {
-    const msg = extractErrorDetails(error).message;
-    const isDedup = msg.includes('deduplication');
-    if (!isDedup) {
-      log.error({ jobId, tenantId, error: msg }, 'Failed to enqueue VOD job');
-    }
+    log.error({ jobId, tenantId, error: extractErrorDetails(error).message }, 'Failed to enqueue VOD job');
     return null;
   }
 }

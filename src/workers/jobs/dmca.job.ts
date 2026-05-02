@@ -1,4 +1,5 @@
 import { defaultJobOptions, getDmcaProcessingQueue, getFlowProducer, getStandardVodQueue } from '../queues/queue.js';
+import { enqueueJobWithLogging } from './enqueue.js';
 import type { DmcaProcessingJob } from './types.js';
 import { childLogger } from '../../utils/logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
@@ -70,22 +71,25 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
       return resultJobId;
     }
 
-    const addedJob = await getDmcaProcessingQueue().add('dmca_processing', job, {
-      jobId,
-      deduplication: { id: jobId },
-      ...defaultJobOptions,
+    const result = await enqueueJobWithLogging({
+      queue: getDmcaProcessingQueue(),
+      jobName: 'dmca_processing',
+      data: job,
+      options: {
+        jobId,
+        ...defaultJobOptions,
+      },
+      logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
+      successMessage: 'DMCA processing job queued (file exists)',
+      extraContext: { vodId, part, gameId, chained: false, claimsCount: claims.length },
     });
-
-    const resultJobId = addedJob.id ?? null;
-    log.info(
-      { vodId, jobId: resultJobId, part, gameId, chained: false, claimsCount: claims.length },
-      'DMCA processing job queued (file exists)'
-    );
-    return resultJobId;
+    return result.isNew ? result.jobId : null;
   } catch (error) {
     const msg = extractErrorDetails(error).message;
-    if (!msg.includes('deduplication')) {
-      log.info({ jobId, tenantId, error: msg }, 'Failed to enqueue DMCA processing job');
+    if (downloadJobId == null) {
+      log.error({ jobId, tenantId, error: msg }, 'Failed to enqueue DMCA processing job');
+    } else {
+      log.debug({ jobId, tenantId, error: msg }, 'DMCA processing enqueue failed (chained)');
     }
     return null;
   }

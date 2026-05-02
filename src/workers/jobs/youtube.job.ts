@@ -1,4 +1,5 @@
 import { getFlowProducer, getStandardVodQueue, getYoutubeUploadQueue } from '../queues/queue.js';
+import { enqueueJobWithLogging } from './enqueue.js';
 import type { YoutubeVodUploadJob, YoutubeGameUploadJob } from './types.js';
 import { childLogger } from '../../utils/logger.js';
 import type { Platform, SourceType, UploadMode } from '../../types/platforms.js';
@@ -211,17 +212,26 @@ export async function enqueueVodUpload(job: YoutubeVodUploadJob, downloadJobId?:
       return flow.job.id ?? null;
     }
 
-    const addedJob = await queue.add('youtube_upload', job, {
-      jobId,
-      deduplication: { id: jobId },
-      removeOnComplete: true,
-      removeOnFail: true,
+    const result = await enqueueJobWithLogging({
+      queue,
+      jobName: 'youtube_upload',
+      data: job,
+      options: {
+        jobId,
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+      logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
+      successMessage: 'YouTube VOD upload job enqueued',
+      extraContext: { tenantId: job.tenantId, vodId: job.vodId, part: job.part },
     });
-    return addedJob.id ?? null;
+    return result.isNew ? result.jobId : null;
   } catch (error) {
     const msg = extractErrorDetails(error).message;
-    if (!msg.includes('deduplication')) {
+    if (downloadJobId == null) {
       log.error({ jobId, tenantId: job.tenantId, error: msg }, 'Failed to enqueue YouTube VOD upload');
+    } else {
+      log.debug({ jobId, tenantId: job.tenantId, error: msg }, 'YouTube VOD upload enqueue failed (chained)');
     }
     return null;
   }
@@ -261,17 +271,26 @@ export async function enqueueGameUpload(job: YoutubeGameUploadJob, downloadJobId
       return flow.job.id ?? null;
     }
 
-    const addedJob = await queue.add('youtube_upload', job, {
-      jobId,
-      deduplication: { id: jobId },
-      removeOnComplete: true,
-      removeOnFail: true,
+    const result = await enqueueJobWithLogging({
+      queue,
+      jobName: 'youtube_upload',
+      data: job,
+      options: {
+        jobId,
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+      logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
+      successMessage: 'YouTube game upload job enqueued',
+      extraContext: { tenantId: job.tenantId, vodId: job.vodId, chapterId: job.chapterId },
     });
-    return addedJob.id ?? null;
+    return result.isNew ? result.jobId : null;
   } catch (error) {
     const msg = extractErrorDetails(error).message;
-    if (!msg.includes('deduplication')) {
+    if (downloadJobId == null) {
       log.error({ jobId, tenantId: job.tenantId, error: msg }, 'Failed to enqueue YouTube game upload');
+    } else {
+      log.debug({ jobId, tenantId: job.tenantId, error: msg }, 'YouTube game upload enqueue failed (chained)');
     }
     return null;
   }

@@ -2,6 +2,7 @@ import type { ChatDownloadJob } from './types.js';
 import { getChatDownloadQueue } from '../queues/queue.js';
 import { childLogger } from '../../utils/logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
+import { enqueueJobWithLogging } from './enqueue.js';
 import { Platform, PLATFORMS } from '../../types/platforms.js';
 
 const log = childLogger({ module: 'chat-job' });
@@ -9,19 +10,22 @@ const log = childLogger({ module: 'chat-job' });
 async function enqueue(job: ChatDownloadJob): Promise<string | null> {
   const jobId = `chat_${job.vodId}`;
   try {
-    const added = await getChatDownloadQueue().add('chat_download', job, {
-      jobId,
-      deduplication: { id: jobId },
-      removeOnComplete: true,
-      removeOnFail: true,
+    const result = await enqueueJobWithLogging({
+      queue: getChatDownloadQueue(),
+      jobName: 'chat_download',
+      data: job,
+      options: {
+        jobId,
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+      logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
+      successMessage: 'Chat download job enqueued',
+      extraContext: { tenantId: job.tenantId, vodId: job.vodId, platform: job.platform },
     });
-    return added.id ?? null;
+    return result.isNew ? result.jobId : null;
   } catch (error) {
-    const msg = extractErrorDetails(error).message;
-    const isDedup = msg.includes('deduplication');
-    if (!isDedup) {
-      log.error({ jobId, tenantId: job.tenantId, error: msg }, 'Failed to enqueue chat job');
-    }
+    log.error({ jobId, tenantId: job.tenantId, error: extractErrorDetails(error).message }, 'Failed to enqueue chat job');
     return null;
   }
 }
