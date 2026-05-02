@@ -8,7 +8,7 @@ import { TenantContext } from '../../types/context.js';
 import { withDbRetry } from '../../db/streamer-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getPlatformConfig, getDisplayName } from '../../config/types.js';
-import { ConfigNotConfiguredError, VodNotFoundError } from '../../utils/domain-errors.js';
+import { ConfigNotConfiguredError, PlatformNotMainSourceError, RestrictedGameError, VodNotFoundError } from '../../utils/domain-errors.js';
 import { buildYoutubeMetadata } from '../youtube/metadata-builder.js';
 
 const log = childLogger({ module: 'youtube-job' });
@@ -61,7 +61,7 @@ export async function createGameUploadJob(
 
   const platformCfg = getPlatformConfig(config, platform);
   if (platformCfg?.mainPlatform !== true) {
-    throw new Error(`Skipping upload because ${platform} mainPlatform is false`);
+    throw new PlatformNotMainSourceError(platform);
   }
 
   const vodRecord = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
@@ -74,7 +74,7 @@ export async function createGameUploadJob(
 
   // Check restricted games
   if (config.youtube?.restrictedGames != null && config.youtube.restrictedGames.includes(chapter.name)) {
-    throw new Error(`Game "${chapter.name}" is in restricted games list`);
+    throw new RestrictedGameError(chapter.name);
   }
 
   const channelName = getDisplayName(config);
@@ -147,7 +147,7 @@ export async function createGameUploadJobsForVod(
 
   const platformCfg = getPlatformConfig(config, platform);
   if (platformCfg?.mainPlatform !== true) {
-    throw new Error(`Skipping upload because ${platform} mainPlatform is false`);
+    throw new PlatformNotMainSourceError(platform);
   }
 
   // Fetch all chapters for this VOD

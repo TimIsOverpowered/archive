@@ -23,39 +23,26 @@ export async function finalizeVod(options: FinalizeVodOptions): Promise<void> {
   const { ctx, dbId, vodId, platform, durationSeconds } = options;
   const log = createAutoLogger(ctx.tenantId);
 
-  const parsed = VodUpdateSchema.safeParse({
-    duration: durationSeconds ?? undefined,
-  });
-  if (!parsed.success) {
-    log.warn({ error: parsed.error.format() }, 'Invalid VOD update data');
-    return;
+  const parsedDuration = VodUpdateSchema.safeParse({ duration: durationSeconds ?? undefined });
+  if (!parsedDuration.success) {
+    log.warn({ error: parsedDuration.error.format() }, 'Invalid VOD duration — is_live will still be cleared');
   }
 
+  const dur = parsedDuration.success ? (parsedDuration.data.duration ?? null) : null;
+
   await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-    const strategy = getStrategy(platform);
-    const dur = parsed.data.duration ?? null;
-    if (dur != null && strategy?.finalizeChapters != null) {
-      const finalize = strategy.finalizeChapters.bind(strategy);
-      await db.transaction().execute(async (trx) => {
-        await finalize({ tenantId: ctx.tenantId, config: ctx.config, platform, db: trx }, dbId, vodId, dur);
-        await trx
-          .updateTable('vods')
-          .set({
-            is_live: false,
-            ...(dur !== null && { duration: dur }),
-          })
-          .where('id', '=', dbId)
-          .execute();
-      });
+    if (dur != null) {
+      const strategy = getStrategy(platform);
+      if (strategy?.finalizeChapters != null) {
+        await db.transaction().execute(async (trx) => {
+          await strategy.finalizeChapters!({ ...ctx, platform, db: trx }, dbId, vodId, dur);
+          await trx.updateTable('vods').set({ is_live: false, duration: dur }).where('id', '=', dbId).execute();
+        });
+      } else {
+        await db.updateTable('vods').set({ is_live: false, duration: dur }).where('id', '=', dbId).execute();
+      }
     } else {
-      await db
-        .updateTable('vods')
-        .set({
-          is_live: false,
-          ...(dur !== null && { duration: dur }),
-        })
-        .where('id', '=', dbId)
-        .execute();
+      await db.updateTable('vods').set({ is_live: false }).where('id', '=', dbId).execute();
     }
 
     await publishVodDurationUpdate(ctx.tenantId, dbId, dur ?? 0, false);

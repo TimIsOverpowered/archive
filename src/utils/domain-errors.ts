@@ -71,3 +71,19 @@ export class GameNotFoundError extends DomainError {
     super(`Game not found: ${gameId}`);
   }
 }
+
+export class PlatformNotMainSourceError extends DomainError {
+  readonly code = 'PLATFORM_NOT_MAIN_SOURCE';
+
+  constructor(platform: string) {
+    super(`${platform} is not configured as the main upload source`);
+  }
+}
+
+export class RestrictedGameError extends DomainError {
+  readonly code = 'RESTRICTED_GAME';
+
+  constructor(gameName: string) {
+    super(`Game "${gameName}" is in restricted games list`);
+  }
+}
