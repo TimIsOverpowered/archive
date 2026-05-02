@@ -12,10 +12,6 @@ import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.js';
 import type { SWRKey } from '../utils/cache-keys.js';
 import { swrKeys } from '../utils/cache-keys.js';
 import { buildPagination } from '../db/queries/builders.js';
-import { findActiveLiveVod as _findActiveLiveVod } from '../db/queries/vods.js';
-
-export { _findActiveLiveVod as findActiveLiveVod };
-
 function applyVolatileData(
   vods: VodResponse[],
   volatileMap: Map<number, { duration: number | null; is_live: boolean }>

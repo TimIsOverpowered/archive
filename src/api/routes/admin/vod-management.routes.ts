@@ -10,7 +10,8 @@ import {
 } from '../../middleware/tenant-platform.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { HttpError } from '../../../utils/http-error.js';
-import { findVodByPlatformId, ensureVodRecord } from './utils/vod-helpers.js';
+import { findVodByPlatformId } from '../../../db/queries/vods.js';
+import { ensureVodRecord } from './utils/vod-helpers.js';
 import { getStrategy } from '../../../services/platforms/index.js';
 import { getApiConfig } from '../../../config/env.js';
 import { VodCreateSchema } from '../../../config/schemas.js';

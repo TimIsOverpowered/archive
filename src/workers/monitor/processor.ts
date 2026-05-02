@@ -5,7 +5,7 @@ import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { handleWorkerError } from '../utils/error-handler.js';
 import { PLATFORM_VALUES } from '../../types/platforms.js';
 import { getLiveDownloadQueue, LIVE_JOB_ID_PREFIX } from '../queues/queue.js';
-import { findActiveLiveVod } from '../../services/vods.service.js';
+import { findActiveLiveVod } from '../../db/queries/vods.js';
 import { requirePlatformConfig } from '../../config/types.js';
 
 const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async (job: Job<{ tenantId: string }>) => {

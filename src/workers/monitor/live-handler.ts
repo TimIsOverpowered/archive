@@ -329,7 +329,7 @@ export async function enqueueLiveHlsDownload(params: {
 }): Promise<void> {
   const log = createAutoLogger(params.tenantId);
 
-  if (params.skipValidation !== false) {
+  if (params.skipValidation !== true) {
     const validationResult = await validateVodPath(params.tenantId);
     if (!validationResult.valid) {
       log.error(

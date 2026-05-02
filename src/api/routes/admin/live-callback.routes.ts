@@ -14,7 +14,7 @@ import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { HttpError } from '../../../utils/http-error.js';
 import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
-import { findStreamRecord } from './utils/vod-helpers.js';
+import { findVodByStreamId } from '../../../db/queries/vods.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
 import { VodUpdateSchema } from '../../../config/schemas.js';
 import { publishVodDurationUpdate } from '../../../services/cache-invalidator.js';
@@ -86,7 +86,7 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
         throw new HttpError(400, `File at ${path} is invalid (not a regular file or empty)`, 'BAD_REQUEST');
       }
 
-      const vodRecord = await findStreamRecord(db, streamId, platform);
+      const vodRecord = await findVodByStreamId(db, streamId, platform);
       if (!vodRecord) throw new HttpError(404, `VOD ${streamId} not found`, 'NOT_FOUND');
 
       // Update duration if provided and different from current value

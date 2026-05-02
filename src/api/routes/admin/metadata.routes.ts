@@ -11,7 +11,7 @@ import { saveVodChapters } from '../../../services/twitch/index.js';
 import { HttpError } from '../../../utils/http-error.js';
 import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
-import { findVodByPlatformId } from './utils/vod-helpers.js';
+import { findVodByPlatformId } from '../../../db/queries/vods.js';
 import { fetchAndSaveEmotes } from '../../../services/emotes.js';
 import { triggerChatDownload } from '../../../workers/jobs/chat.job.js';
 import { getPlatformConfig, getDisplayName } from '../../../config/types.js';
