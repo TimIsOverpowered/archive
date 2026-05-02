@@ -7,7 +7,7 @@ import {
   asTenantPlatformContext,
   requireTenant,
 } from '../../middleware/tenant-platform.js';
-import { ensureVodDownload, ensureVodRecord, findVodRecord } from './utils/vod-helpers.js';
+import { ensureVodDownload, ensureVodRecord, findVodByPlatformId } from './utils/vod-helpers.js';
 import { buildVodJobResponse } from './utils/vod-job-response.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { HttpError } from '../../../utils/http-error.js';
@@ -172,7 +172,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
       const log = createAutoLogger(tenantId);
 
       // Ensure VOD record exists
-      const vodRecord = await findVodRecord(db, vodId, platform);
+      const vodRecord = await findVodByPlatformId(db, vodId, platform);
 
       if (!vodRecord) {
         throw new HttpError(404, `VOD ${vodId} not found on ${platform}`, 'NOT_FOUND');

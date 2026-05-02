@@ -10,7 +10,7 @@ import {
 } from '../../middleware/tenant-platform.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { HttpError } from '../../../utils/http-error.js';
-import { findVodRecord, ensureVodRecord } from './utils/vod-helpers.js';
+import { findVodByPlatformId, ensureVodRecord } from './utils/vod-helpers.js';
 import { getStrategy } from '../../../services/platforms/index.js';
 import { getApiConfig } from '../../../config/env.js';
 import { VodCreateSchema } from '../../../config/schemas.js';
@@ -92,7 +92,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
         throw new HttpError(400, 'vodId is required', 'BAD_REQUEST');
       }
 
-      const vodRecord = await findVodRecord(db, vodId, platform);
+      const vodRecord = await findVodByPlatformId(db, vodId, platform);
 
       if (vodRecord) {
         return ok({ message: `${vodId} already exists!`, vodId: vodId });
@@ -185,7 +185,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
       const { vodId } = request.body;
       const log = createAutoLogger(tenantId);
 
-      const vodRecord = await findVodRecord(db, vodId, platform);
+      const vodRecord = await findVodByPlatformId(db, vodId, platform);
 
       if (!vodRecord) throw new HttpError(404, `VOD ${vodId} not found`, 'NOT_FOUND');
 

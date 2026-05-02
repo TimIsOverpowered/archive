@@ -14,6 +14,7 @@ import { enqueueJobWithLogging } from '../jobs/enqueue.js';
 import type { LiveDownloadJob } from '../jobs/types.js';
 import { configService } from '../../config/tenant-config.js';
 import { publishVodUpdate } from '../../services/cache-invalidator.js';
+import { findVodByStreamId, findVodByPlatformId } from '../../db/queries/vods.js';
 
 type StreamerDbClient = Kysely<StreamerDB>;
 
@@ -126,12 +127,7 @@ async function handleOfflineStream(
 }
 
 async function handleLiveStream(ctx: LiveStreamContext): Promise<void> {
-  const existingVod = await ctx.db
-    .selectFrom('vods')
-    .selectAll()
-    .where('stream_id', '=', ctx.streamStatus.id)
-    .where('platform', '=', ctx.platform)
-    .executeTakeFirst();
+  const existingVod = await findVodByStreamId(ctx.db, ctx.streamStatus.id, ctx.platform);
 
   if (!existingVod) {
     await handleNewLiveStream(ctx);
@@ -161,12 +157,7 @@ async function handleNewLiveStream(ctx: LiveStreamContext): Promise<void> {
     return;
   }
 
-  const existingVod = await ctx.db
-    .selectFrom('vods')
-    .selectAll()
-    .where('vod_id', '=', vodMetadata.id)
-    .where('platform', '=', ctx.platform)
-    .executeTakeFirst();
+  const existingVod = await findVodByPlatformId(ctx.db, vodMetadata.id, ctx.platform);
 
   if (existingVod) {
     ctx.log.debug({ component: 'monitor', vodId: vodMetadata.id }, 'VOD was created by concurrent poll');

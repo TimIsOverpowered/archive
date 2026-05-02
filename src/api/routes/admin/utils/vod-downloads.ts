@@ -10,6 +10,7 @@ import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
 import { refreshVodRecord } from './vod-records.js';
 import { requirePlatformConfig } from '../../../../config/types.js';
 import { PlatformNotConfiguredError, VodNotFoundError } from '../../../../utils/domain-errors.js';
+import { findVodById } from '../../../../db/queries/vods.js';
 
 export interface EnsureVodDownloadOptions {
   ctx: TenantPlatformContext;
@@ -42,7 +43,7 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
   const filePath =
     type === SOURCE_TYPES.LIVE ? getLiveFilePath({ config, streamId: vodId }) : getVodFilePath({ config, vodId });
 
-  let vodRecord = (await db.selectFrom('vods').selectAll().where('id', '=', dbId).executeTakeFirst()) ?? null;
+  let vodRecord = await findVodById(db, dbId);
   if (vodRecord && vodRecord.duration === 0) {
     log.info({ dbId, vodId }, 'VOD duration is 0, refreshing metadata before download check');
     vodRecord = await refreshVodRecord(ctx, vodId, dbId, platformUserId, platformUsername, log);

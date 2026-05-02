@@ -1,15 +1,7 @@
-import type {
-  TwitchConfig as _TwitchConfig,
-  YouTubeConfig as _YouTubeConfig,
-  KickConfig as _KickConfig,
-  TenantSettings as _TenantSettings,
-} from './schemas.js';
+import type { TwitchConfig, YouTubeConfig, KickConfig, TenantSettings } from './schemas.js';
 import { Platform } from '../types/platforms.js';
 
-export type TwitchConfig = _TwitchConfig;
-export type YouTubeConfig = _YouTubeConfig;
-export type KickConfig = _KickConfig;
-export type TenantSettings = _TenantSettings;
+export type { TwitchConfig, YouTubeConfig, KickConfig, TenantSettings } from './schemas.js';
 
 export interface TenantBase {
   id: string;

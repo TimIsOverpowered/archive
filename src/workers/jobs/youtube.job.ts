@@ -15,6 +15,7 @@ import {
   VodNotFoundError,
 } from '../../utils/domain-errors.js';
 import { buildYoutubeMetadata } from '../youtube/metadata-builder.js';
+import { findVodById } from '../../db/queries/vods.js';
 
 const log = childLogger({ module: 'youtube-job' });
 
@@ -70,7 +71,7 @@ export async function createGameUploadJob(
   }
 
   const vodRecord = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-    return db.selectFrom('vods').where('id', '=', dbId).selectAll().executeTakeFirst();
+    return findVodById(db, dbId);
   });
 
   if (!vodRecord) {

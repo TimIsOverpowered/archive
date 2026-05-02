@@ -10,32 +10,15 @@ import { triggerChatDownload } from '../../../../workers/jobs/chat.job.js';
 
 import { getStrategy } from '../../../../services/platforms/index.js';
 import { getDisplayName, requirePlatformConfig } from '../../../../config/types.js';
-import { HttpError } from '../../../../utils/http-error.js';
-
-/**
- * Fetches VOD record or returns null if not found
- */
-export async function findVodRecord(
-  db: Kysely<StreamerDB>,
-  vodId: string,
-  platform: Platform
-): Promise<VodRecord | null> {
-  return (
-    (await db
-      .selectFrom('vods')
-      .selectAll()
-      .where('platform', '=', platform)
-      .where('vod_id', '=', vodId)
-      .executeTakeFirst()) ?? null
-  );
-}
+import { VodNotFoundError } from '../../../../utils/domain-errors.js';
+import { findVodByPlatformId, findVodByStreamId } from '../../../../db/queries/vods.js';
 
 /**
  * Fetches VOD record or throws 404 if not found
  */
 export async function requireVodRecord(db: Kysely<StreamerDB>, vodId: string, platform: Platform): Promise<VodRecord> {
-  const record = await findVodRecord(db, vodId, platform);
-  if (!record) throw new HttpError(404, `VOD ${vodId} not found`, 'NOT_FOUND');
+  const record = await findVodByPlatformId(db, vodId, platform);
+  if (!record) throw new VodNotFoundError(vodId);
   return record;
 }
 
@@ -47,14 +30,7 @@ export async function findStreamRecord(
   streamId: string,
   platform: Platform
 ): Promise<VodRecord | null> {
-  return (
-    (await db
-      .selectFrom('vods')
-      .selectAll()
-      .where('platform', '=', platform)
-      .where('stream_id', '=', streamId)
-      .executeTakeFirst()) ?? null
-  );
+  return findVodByStreamId(db, streamId, platform);
 }
 
 /**
@@ -74,7 +50,7 @@ export async function ensureVodRecord(
   }
   const { platformUserId, platformUsername } = platformConfig;
 
-  const rawVodRecord = await findVodRecord(db, vodId, platform);
+  const rawVodRecord = await findVodByPlatformId(db, vodId, platform);
 
   if (rawVodRecord) {
     log.info(`Using existing VOD record for ${vodId}`);

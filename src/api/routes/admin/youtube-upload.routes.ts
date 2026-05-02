@@ -18,7 +18,7 @@ import {
   UPLOAD_MODE_VALUES,
   UPLOAD_MODES,
 } from '../../../types/platforms.js';
-import { ensureVodDownload, findVodRecord } from './utils/vod-helpers.js';
+import { ensureVodDownload, findVodByPlatformId } from './utils/vod-helpers.js';
 import { buildVodJobResponse } from './utils/vod-job-response.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
@@ -88,7 +88,7 @@ export default function youtubeUploadRoutes(fastify: FastifyInstance, _options: 
       const log = createAutoLogger(tenantId);
 
       // Ensure VOD record exists or create it from platform API metadata
-      const vodRecord = await findVodRecord(db, vodId, platform);
+      const vodRecord = await findVodByPlatformId(db, vodId, platform);
 
       if (!vodRecord) {
         throw new HttpError(404, `VOD ${vodId} not found on ${platform}`, 'NOT_FOUND');

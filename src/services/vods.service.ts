@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { jsonArrayFrom } from 'kysely/helpers/postgres';
 import { sql } from 'kysely';
-import type { Expression, ExpressionBuilder, Kysely, Selectable, SqlBool } from 'kysely';
+import type { Expression, ExpressionBuilder, Kysely, SqlBool } from 'kysely';
 import type { StreamerDB, DBClient } from '../db/streamer-types.js';
 import { withStaleWhileRevalidate } from '../utils/cache.js';
 import { Cache, CacheSwr } from '../constants.js';
@@ -12,6 +12,9 @@ import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.js';
 import type { SWRKey } from '../utils/cache-keys.js';
 import { swrKeys } from '../utils/cache-keys.js';
 import { buildPagination } from '../db/queries/builders.js';
+import { findActiveLiveVod as _findActiveLiveVod } from '../db/queries/vods.js';
+
+export { _findActiveLiveVod as findActiveLiveVod };
 
 function applyVolatileData(
   vods: VodResponse[],
@@ -245,20 +248,4 @@ export async function getVodByPlatformId(
   }
 
   return staticData;
-}
-
-/**
- * Find the currently active live VOD for a given platform.
- * Returns null if no live VOD exists or if the platform has no active stream.
- */
-export async function findActiveLiveVod(
-  db: Kysely<StreamerDB>,
-  platform: Platform
-): Promise<Selectable<StreamerDB['vods']> | undefined> {
-  return db
-    .selectFrom('vods')
-    .selectAll('vods')
-    .where('platform', '=', platform)
-    .where('is_live', '=', true)
-    .executeTakeFirst();
 }

@@ -8,7 +8,7 @@ import redisPlugin from './plugins/redis.plugin.js';
 import configPlugin from './plugins/config.plugin.js';
 import createTenantLoggerMiddleware, { exitTenantContext } from './middleware/tenant-logger.js';
 import { getApiConfig } from '../config/env.js';
-import { extractErrorDetails, createErrorContext } from '../utils/error.js';
+import { extractErrorDetails, createErrorContext, hasStatusCode } from '../utils/error.js';
 import { HttpError } from '../utils/http-error.js';
 import { DomainError } from '../utils/domain-errors.js';
 import { errorResponse } from './response.js';
@@ -29,10 +29,6 @@ interface FormattedError {
   message: string;
   code: string;
   isClientError: boolean;
-}
-
-function hasStatusCode(e: unknown): e is { statusCode: number } {
-  return typeof e === 'object' && e !== null && 'statusCode' in e && typeof e.statusCode === 'number';
 }
 
 function formatErrorResponse(error: unknown): FormattedError {

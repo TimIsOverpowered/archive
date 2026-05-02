@@ -11,7 +11,7 @@ import { saveVodChapters } from '../../../services/twitch/index.js';
 import { HttpError } from '../../../utils/http-error.js';
 import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
-import { findVodRecord } from './utils/vod-helpers.js';
+import { findVodByPlatformId } from './utils/vod-helpers.js';
 import { fetchAndSaveEmotes } from '../../../services/emotes.js';
 import { triggerChatDownload } from '../../../workers/jobs/chat.job.js';
 import { getPlatformConfig, getDisplayName } from '../../../config/types.js';
@@ -70,7 +70,7 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
       const { db, platform } = tenantCtx;
       const { vodId } = request.body;
 
-      const vodRecord = await findVodRecord(db, vodId, platform);
+      const vodRecord = await findVodByPlatformId(db, vodId, platform);
 
       if (!vodRecord) throw new HttpError(404, `VOD ${vodId} not found`, 'NOT_FOUND');
 
@@ -120,7 +120,7 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
       const { db, platform, config } = tenantCtx;
       const { vodId } = request.body;
 
-      const vodRecord = await findVodRecord(db, vodId, platform);
+      const vodRecord = await findVodByPlatformId(db, vodId, platform);
 
       if (!vodRecord) throw new HttpError(404, `VOD ${vodId} not found`, 'NOT_FOUND');
 
@@ -167,7 +167,7 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
       const { db, platform, config, tenantId } = tenantCtx;
       const { vodId, forceRerun = false } = request.body;
 
-      const vodRecord = await findVodRecord(db, vodId, platform);
+      const vodRecord = await findVodByPlatformId(db, vodId, platform);
 
       if (!vodRecord) throw new HttpError(404, `VOD ${vodId} not found`, 'NOT_FOUND');
 

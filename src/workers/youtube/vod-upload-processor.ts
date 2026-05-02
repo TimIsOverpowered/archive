@@ -17,6 +17,7 @@ import { deleteFileIfExists } from '../../utils/path.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { safeUpdateAlert } from '../utils/alert-factories.js';
 import { VodNotFoundError } from '../../utils/domain-errors.js';
+import { findVodById } from '../../db/queries/vods.js';
 
 export interface VodUploadContext {
   tenantId: string;
@@ -43,7 +44,7 @@ export async function processVodUpload(ctx: VodUploadContext): Promise<VodUpload
     throw new Error('File path is required for VOD upload');
   }
 
-  const vodRecord = await db.selectFrom('vods').where('id', '=', dbId).selectAll().executeTakeFirst();
+  const vodRecord = await findVodById(db, dbId);
 
   if (!vodRecord) {
     throw new VodNotFoundError(dbId, 'vod upload processor');

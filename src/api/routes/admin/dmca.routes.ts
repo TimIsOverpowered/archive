@@ -17,7 +17,7 @@ import {
   DOWNLOAD_METHODS_VALUES,
   DOWNLOAD_METHODS,
 } from '../../../types/platforms.js';
-import { findVodRecord, ensureVodDownload } from './utils/vod-helpers.js';
+import { findVodByPlatformId, ensureVodDownload } from './utils/vod-helpers.js';
 import { parseDmcaClaims } from './utils/dmca.js';
 import { buildVodJobResponse } from './utils/vod-job-response.js';
 import { queueDmcaProcessing } from '../../../workers/jobs/dmca.job.js';
@@ -92,7 +92,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
       const log = createAutoLogger(tenantId);
 
       // Step 1: Ensure VOD record exists
-      const vodRecord = await findVodRecord(db, vodId, platform);
+      const vodRecord = await findVodByPlatformId(db, vodId, platform);
       if (!vodRecord) throw new HttpError(404, 'VOD not found', 'NOT_FOUND');
 
       // Step 2: Ensure VOD download (like /upload does)

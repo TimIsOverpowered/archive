@@ -5,6 +5,7 @@ import { GameNotFoundError } from '../../../../utils/domain-errors.js';
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../../../../db/streamer-types.js';
 import type { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
+import { findVodById } from '../../../../db/queries/vods.js';
 
 /** Resolved game with its associated VOD and platform context. */
 export interface ResolvedGameContext {
@@ -39,7 +40,7 @@ export async function resolveGameWithContext(
     throw new GameNotFoundError(gameId);
   }
 
-  const vodRecord = await db.selectFrom('vods').selectAll().where('id', '=', game.vod_id).executeTakeFirst();
+  const vodRecord = await findVodById(db, game.vod_id);
 
   if (!vodRecord) {
     throw new HttpError(404, `VOD ${game.vod_id} not found for game ${gameId}`, 'NOT_FOUND');
