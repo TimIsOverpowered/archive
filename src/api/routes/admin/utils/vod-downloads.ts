@@ -105,5 +105,3 @@ async function checkIfDownloadNeeded(
 
   return false;
 }
-
-

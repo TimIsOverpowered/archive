@@ -79,7 +79,9 @@ function createTenantConfigSubscriber(): Redis {
  *
  * Hooks into fastify's onClose for cleanup.
  */
-export function registerTenantConfigSubscriber(fastify: { addHook: (hook: string, fn: () => Promise<void>) => void }): void {
+export function registerTenantConfigSubscriber(fastify: {
+  addHook: (hook: string, fn: () => Promise<void>) => void;
+}): void {
   const subClient = createTenantConfigSubscriber();
   const log = getLogger().child({ module: 'tenant-config-subscriber' });
 

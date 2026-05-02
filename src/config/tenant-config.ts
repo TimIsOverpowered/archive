@@ -181,10 +181,7 @@ export class ConfigService {
 
     void client.publish(CONFIG_CHANNEL, JSON.stringify(event)).catch((err) => {
       const details = extractErrorDetails(err);
-      getLogger().warn(
-        { err: details, tenantId },
-        'Failed to publish tenant config change event'
-      );
+      getLogger().warn({ err: details, tenantId }, 'Failed to publish tenant config change event');
     });
   }
 }

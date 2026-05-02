@@ -25,7 +25,10 @@ async function enqueue(job: ChatDownloadJob): Promise<string | null> {
     });
     return result.isNew ? result.jobId : null;
   } catch (error) {
-    log.error({ jobId, tenantId: job.tenantId, error: extractErrorDetails(error).message }, 'Failed to enqueue chat job');
+    log.error(
+      { jobId, tenantId: job.tenantId, error: extractErrorDetails(error).message },
+      'Failed to enqueue chat job'
+    );
     return null;
   }
 }
