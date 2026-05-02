@@ -46,17 +46,7 @@ export async function buildLiveProcessorContext(
 ): Promise<LiveProcessorContext> {
   const { dbId, vodId, platform, tenantId, platformUserId, platformUsername, startedAt, sourceUrl } = job.data;
 
-  return buildWorkerContext<
-    LiveProcessorContext,
-    {
-      platformUserId: string;
-      platformUsername: string | undefined;
-      startedAt: string | undefined;
-      sourceUrl: string | undefined;
-      job: Job<LiveDownloadJob, unknown, string>;
-      streamerName: string;
-    }
-  >(
+  return buildWorkerContext(
     job,
     tenantId,
     dbId,

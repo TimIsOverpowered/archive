@@ -40,18 +40,7 @@ export async function buildVodProcessorContext(
     sourceUrl,
   } = job.data;
 
-  return buildWorkerContext<
-    VodProcessorContext,
-    {
-      platformUserId: string;
-      platformUsername: string | undefined;
-      sourceUrl: string | undefined;
-      downloadMethod: DownloadMethod;
-      job: Job<StandardVodJob, unknown, string>;
-      streamerName: string;
-      finalPath: string;
-    }
-  >(
+  return buildWorkerContext(
     job,
     tenantId,
     dbId,

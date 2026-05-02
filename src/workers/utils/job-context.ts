@@ -38,18 +38,15 @@ export type ContextBuilder<TExtra> = (
   db: Kysely<StreamerDB>
 ) => Promise<{ extra: TExtra; alertInitArgs: unknown[] }> | { extra: TExtra; alertInitArgs: unknown[] };
 
-export async function buildWorkerContext<
-  T extends BaseWorkerContext,
-  TExtra extends Record<string, unknown> = Record<string, unknown>,
->(
+export async function buildWorkerContext<TExtra extends Record<string, unknown>, TAlerts>(
   job: Job,
   tenantId: string,
   dbId: number,
   vodId: string,
   platform: Platform,
   configBuilder: ContextBuilder<TExtra>,
-  alertFactory: () => unknown
-): Promise<T> {
+  alertFactory: () => TAlerts
+): Promise<BaseWorkerContext & TExtra & { alerts: TAlerts; messageId: string }> {
   const log = createAutoLogger(String(tenantId));
 
   log.info({ component: 'worker', jobId: job.id, dbId, vodId, platform, tenantId }, 'Starting job');
@@ -78,5 +75,5 @@ export async function buildWorkerContext<
     ...extra,
     alerts,
     messageId,
-  } as unknown as T;
+  };
 }

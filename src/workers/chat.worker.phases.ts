@@ -42,17 +42,7 @@ export interface ChatProcessorContext {
 export async function buildChatProcessorContext(job: Job<ChatDownloadJob>): Promise<ChatProcessorContext> {
   const { tenantId, dbId, vodId, platform, duration, startOffset, forceRerun } = job.data;
 
-  return buildWorkerContext<
-    ChatProcessorContext,
-    {
-      job: Job<ChatDownloadJob>;
-      duration: number;
-      forceRerun: boolean;
-      displayName: string;
-      effectiveOffset: number;
-      hasExistingData: boolean;
-    }
-  >(
+  return buildWorkerContext(
     job,
     tenantId,
     dbId,
