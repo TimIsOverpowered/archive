@@ -9,7 +9,7 @@ import { extractErrorDetails } from '../utils/error.js';
 import { badRequest } from '../utils/http-error.js';
 import { LOGS_PAGE_SIZE, LOGS_DEFAULT_BUCKET_SIZE, LOGS_TARGET_COMMENTS_PER_BUCKET } from '../constants.js';
 import { simpleKeys } from '../utils/cache-keys.js';
-import { withSimpleCache } from '../utils/cache.js';
+import { withCache } from '../utils/cache.js';
 import { VodNotFoundError } from '../utils/domain-errors.js';
 
 const BOUNDARIES = [30, 60, 90, 120, 180, 300, 600, 900, 1800, 3600];
@@ -28,26 +28,20 @@ function computeBucketSize(commentsPer100s: number): number {
 async function getVodBucketSize(db: Kysely<StreamerDB>, tenantId: string, vodId: number): Promise<number> {
   const key = simpleKeys.bucketSize(tenantId, vodId);
 
-  return withSimpleCache(
-    key,
-    getApiConfig().CHAT_BUCKET_SIZE_TTL,
-    (v) => v.toString(),
-    (s) => parseInt(s, 10),
-    async () => {
-      const result = await db
-        .selectFrom('chat_messages')
-        .select(
-          sql<number>`
-          COUNT(*) / NULLIF(MAX(content_offset_seconds) - MIN(content_offset_seconds), 0) * 100
-        `.as('comments_per_100s')
-        )
-        .where('vod_id', '=', vodId)
-        .executeTakeFirst();
+  return withCache(key, getApiConfig().CHAT_BUCKET_SIZE_TTL, async () => {
+    const result = await db
+      .selectFrom('chat_messages')
+      .select(
+        sql<number>`
+        COUNT(*) / NULLIF(MAX(content_offset_seconds) - MIN(content_offset_seconds), 0) * 100
+      `.as('comments_per_100s')
+      )
+      .where('vod_id', '=', vodId)
+      .executeTakeFirst();
 
-      const commentsPer100sValue = parseFloat(String(result?.comments_per_100s ?? ''));
-      return isFinite(commentsPer100sValue) ? computeBucketSize(commentsPer100sValue) : LOGS_DEFAULT_BUCKET_SIZE;
-    }
-  );
+    const commentsPer100sValue = parseFloat(String(result?.comments_per_100s ?? ''));
+    return isFinite(commentsPer100sValue) ? computeBucketSize(commentsPer100sValue) : LOGS_DEFAULT_BUCKET_SIZE;
+  });
 }
 
 /**
