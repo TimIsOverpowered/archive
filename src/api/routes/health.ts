@@ -11,6 +11,7 @@ import { getCacheMetrics } from '../../utils/cache.js';
 import { QUEUE_NAMES } from '../../workers/queues/queue.js';
 import type { QueueJob } from '../../workers/queues/types.js';
 import { getRedisInstance } from '../../workers/redis.js';
+import { ok } from '../response.js';
 
 /** Options for registering the health routes plugin. */
 interface HealthRouteOptions {
@@ -94,29 +95,27 @@ export default function healthRoutes(fastify: FastifyInstance, _options: HealthR
 
       const workerQueues = await getQueueMetrics();
 
-      const response = {
-        data: {
-          status: redisStatus === 'error' ? 'degraded' : 'ok',
-          uptime: process.uptime(),
-          redis: {
-            status: redisStatus,
-            connection: redisStatusInfo.status,
-            connected: redisStatusInfo.connected,
-          },
-          rateLimiters,
-          streamers,
-          dbStatuses,
-          cloudflareIpCache: cloudflareCache,
-          ...(kickConfig && {
-            kick: {
-              flaresolverr: flaresolverrHealth.status,
-              version: flaresolverrHealth.stats.version,
-            },
-          }),
-          cache: getCacheMetrics(),
-          workerQueues,
+      const response = ok({
+        status: redisStatus === 'error' ? 'degraded' : 'ok',
+        uptime: process.uptime(),
+        redis: {
+          status: redisStatus,
+          connection: redisStatusInfo.status,
+          connected: redisStatusInfo.connected,
         },
-      };
+        rateLimiters,
+        streamers,
+        dbStatuses,
+        cloudflareIpCache: cloudflareCache,
+        ...(kickConfig && {
+          kick: {
+            flaresolverr: flaresolverrHealth.status,
+            version: flaresolverrHealth.stats.version,
+          },
+        }),
+        cache: getCacheMetrics(),
+        workerQueues,
+      });
 
       return response;
     }

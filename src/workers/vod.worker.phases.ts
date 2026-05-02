@@ -12,7 +12,7 @@ import { DOWNLOAD_METHODS, PLATFORMS, type DownloadMethod } from '../types/platf
 import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { getDisplayName } from '../config/types.js';
 import { PlatformNotConfiguredError } from '../utils/domain-errors.js';
-import { getVod } from '../services/kick/vod.js';
+import { getStrategy } from '../services/platforms/strategy.js';
 import type { VodWorkerAlerts } from './utils/alert-factories.js';
 import type { BaseWorkerContext } from './types.js';
 
@@ -93,8 +93,19 @@ export async function runVodDownload(ctx: VodProcessorContext): Promise<void> {
         throw new Error('Kick source URL not available for VOD: platformUsername is missing');
       }
       try {
-        const vodData = await getVod(username, ctx.vodId);
-        ctx.sourceUrl = vodData.source ?? undefined;
+        const strategy = getStrategy(ctx.platform);
+        if (!strategy) {
+          throw new Error(`No strategy registered for platform ${ctx.platform}`);
+        }
+        const vodMetadata = await strategy.fetchVodMetadata(ctx.vodId, {
+          config: ctx.config,
+          platform: ctx.platform,
+          tenantId: ctx.tenantId,
+        });
+        if (!vodMetadata) {
+          throw new Error(`VOD ${ctx.vodId} not found on ${ctx.platform}`);
+        }
+        ctx.sourceUrl = vodMetadata.sourceUrl ?? undefined;
       } catch (err) {
         ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Failed to fetch Kick VOD source URL');
       }

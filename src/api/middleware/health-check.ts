@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { getHealthToken } from '../../config/env.js';
+import { errorResponse } from '../response.js';
 
 /** Constant-time string comparison to prevent timing attacks. */
 function timingSafeEqual(a: string, b: string): boolean {
@@ -21,10 +22,8 @@ export default async function healthCheckMiddleware(request: FastifyRequest, rep
   const expectedToken = getHealthToken();
 
   if (token == null || expectedToken == null || !timingSafeEqual(token, expectedToken)) {
-    return reply.status(401).send({
-      statusCode: 401,
-      message: 'Invalid health check token',
-      code: 'UNAUTHORIZED',
-    });
+    return reply.status(401).send(
+      errorResponse(401, 'Invalid health check token', 'UNAUTHORIZED')
+    );
   }
 }

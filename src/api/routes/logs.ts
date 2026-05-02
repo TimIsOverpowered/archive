@@ -5,6 +5,7 @@ import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { RedisService } from '../../utils/redis-service.js';
 import { HttpError, badRequest } from '../../utils/http-error.js';
 import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
+import { ok } from '../response.js';
 
 const LogsQuerySchema = z.object({
   content_offset_seconds: z.number().nonnegative().optional(),
@@ -88,7 +89,7 @@ export default function logsRoutes(fastify: FastifyInstance, _options: LogsRoute
         throw new HttpError(400, 'Invalid content_offset_seconds value', 'BAD_REQUEST');
       }
 
-      return { data: result };
+      return ok(result);
     }
   );
 }

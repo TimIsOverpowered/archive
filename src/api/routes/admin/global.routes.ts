@@ -3,6 +3,7 @@ import { getAllTenants } from '../../../services/tenants.service.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import { RedisService } from '../../../utils/redis-service.js';
+import { ok } from '../../response.js';
 
 /**
  * Register global admin routes: list all tenants.
@@ -25,7 +26,7 @@ export default function globalAdminRoutes(fastify: FastifyInstance, _options: Re
     },
     (_request) => {
       const tenants = getAllTenants();
-      return { data: tenants };
+      return ok(tenants);
     }
   );
 

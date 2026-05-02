@@ -19,6 +19,7 @@ import { findStreamRecord } from './utils/vod-helpers.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
 import { VodUpdateSchema } from '../../../config/schemas.js';
 import { publishVodDurationUpdate } from '../../../services/cache-invalidator.js';
+import { ok } from '../../response.js';
 
 /** Body of the live callback from external recorder. */
 interface LiveCallbackBody {
@@ -104,14 +105,12 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
       if (config?.youtube?.upload !== true) {
         log.warn(`YouTube upload not enabled, skipping queue for ${streamId}`);
 
-        return {
-          data: {
-            message: 'YouTube upload is disabled for this tenant. Recording processed but no upload queued.',
-            vodId: vodRecord.id,
-            streamId,
-            path: path,
-          },
-        };
+        return ok({
+          message: 'YouTube upload is disabled for this tenant. Recording processed but no upload queued.',
+          vodId: vodRecord.id,
+          streamId,
+          path: path,
+        });
       }
 
       const { gameJobIds, vodJobId } = await queueYoutubeUploads({
@@ -123,16 +122,14 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
         type: SOURCE_TYPES.LIVE,
       });
 
-      return {
-        data: {
-          message: 'YouTube upload queued successfully',
-          vodId: vodRecord.id,
-          streamId,
-          gameJobIds,
-          vodJobId,
-          path: path,
-        },
-      };
+      return ok({
+        message: 'YouTube upload queued successfully',
+        vodId: vodRecord.id,
+        streamId,
+        gameJobIds,
+        vodJobId,
+        path: path,
+      });
     },
   });
 

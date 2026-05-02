@@ -8,8 +8,10 @@ import redisPlugin from './plugins/redis.plugin.js';
 import configPlugin from './plugins/config.plugin.js';
 import createTenantLoggerMiddleware, { exitTenantContext } from './middleware/tenant-logger.js';
 import { getApiConfig } from '../config/env.js';
-import { extractErrorDetails } from '../utils/error.js';
+import { extractErrorDetails, createErrorContext } from '../utils/error.js';
 import { HttpError } from '../utils/http-error.js';
+import { DomainError } from '../utils/domain-errors.js';
+import { errorResponse } from './response.js';
 import { getLogger, createLogger, setGlobalLogger } from '../utils/logger.js';
 import type { FastifyBaseLogger } from 'fastify';
 import healthRoutes from './routes/health.js';
@@ -35,6 +37,11 @@ function hasStatusCode(e: unknown): e is { statusCode: number } {
 
 function formatErrorResponse(error: unknown): FormattedError {
   if (error instanceof HttpError) {
+    const { statusCode, message, code } = error;
+    return { statusCode, message, code, isClientError: statusCode >= 400 && statusCode < 500 };
+  }
+
+  if (error instanceof DomainError) {
     const { statusCode, message, code } = error;
     return { statusCode, message, code, isClientError: statusCode >= 400 && statusCode < 500 };
   }
@@ -68,23 +75,19 @@ export async function buildServer() {
     const { statusCode, message, code, isClientError } = formatErrorResponse(error);
 
     if (statusCode >= 500) {
-      getLogger().error({ err: error }, 'Request error');
+      getLogger().error(createErrorContext(error), 'Request error');
     }
 
-    return reply.status(statusCode).send({
-      statusCode,
-      message: isClientError ? message : 'Internal server error',
-      code,
-    });
+    return reply.status(statusCode).send(
+      errorResponse(statusCode, isClientError ? message : 'Internal server error', code)
+    );
   });
 
   // Set 404 handler immediately after error handler
   fastify.setNotFoundHandler((_request, reply) => {
-    return reply.status(404).send({
-      statusCode: 404,
-      message: 'Route not found',
-      code: 'NOT_FOUND',
-    });
+    return reply.status(404).send(
+      errorResponse(404, 'Route not found', 'NOT_FOUND')
+    );
   });
 
   // Add tenant display name to logger for routes with streamer ID

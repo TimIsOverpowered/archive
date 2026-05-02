@@ -1,3 +1,5 @@
+import { ok } from '../../../response.js';
+
 /** Options for building a conditional VOD job response. */
 export interface BuildVodJobResponseOptions {
   /** Whether a download job was queued (true = needs download, false = file already exists) */
@@ -20,28 +22,24 @@ export interface BuildVodJobResponseOptions {
  * When download is needed: returns message indicating downstream job will run after download completes.
  * When file already exists: returns message indicating downstream job is queued.
  */
-export function buildVodJobResponse(opts: BuildVodJobResponseOptions): { data: Record<string, unknown> } {
+export function buildVodJobResponse(opts: BuildVodJobResponseOptions): ReturnType<typeof ok<Record<string, unknown>>> {
   const { hasDownload, filePath, downstreamJobId, downstreamLabel, base = {}, extra = {} } = opts;
 
   if (hasDownload) {
-    return {
-      data: {
-        message: `VOD download queued, ${downstreamLabel} will be triggered after completion`,
-        downloadJobId: null,
-        downstreamJobId,
-        ...base,
-        ...extra,
-      },
-    };
-  }
-
-  return {
-    data: {
-      message: `${downstreamLabel} queued!`,
-      filePath,
+    return ok({
+      message: `VOD download queued, ${downstreamLabel} will be triggered after completion`,
+      downloadJobId: null,
       downstreamJobId,
       ...base,
       ...extra,
-    },
-  };
+    });
+  }
+
+  return ok({
+    message: `${downstreamLabel} queued!`,
+    filePath,
+    downstreamJobId,
+    ...base,
+    ...extra,
+  });
 }

@@ -36,6 +36,12 @@ export class RedisService {
   private limiters: Map<string, RateLimiterInstance> = new Map();
   private isProduction: boolean;
   private _options: RedisServiceOptions | null = null;
+  private _connectPromise: { resolve: () => void; reject: (e: unknown) => void } | null = null;
+  private static _readyPromise: Promise<void> | null = null;
+
+  static get ready(): Promise<void> | null {
+    return this._readyPromise;
+  }
 
   private constructor() {
     this.isProduction = getBaseConfig().NODE_ENV === 'production';
@@ -94,6 +100,10 @@ export class RedisService {
     };
   }
 
+  static isReady(): boolean {
+    return this._instance?.client?.status === 'ready';
+  }
+
   static isLimiterFallback(key: string): boolean {
     if (!this._instance) return false;
     return this._instance.isLimiterFallback(key);
@@ -103,6 +113,7 @@ export class RedisService {
     if (!this._instance) return Promise.resolve();
     const instance = this._instance;
     this._instance = null;
+    RedisService._readyPromise = null;
     return instance.close();
   }
 
@@ -110,6 +121,10 @@ export class RedisService {
     if (!this._options) {
       throw new Error('RedisService options not provided. Call RedisService.init() first.');
     }
+
+    RedisService._readyPromise = new Promise((resolve, reject) => {
+      this._connectPromise = { resolve, reject };
+    });
 
     const { url, rateLimiters, maxRetriesPerRequest } = this._options;
     const maskedUrl = url.replace(/:\/\/.*@/, '://***@');
@@ -139,6 +154,8 @@ export class RedisService {
         getLogger().info('Redis connection ready, clearing cached failure flags');
         clearAllConnectionFailures();
       });
+
+      this._connectPromise?.resolve();
     } catch (error) {
       if (this.isProduction) {
         const details = extractErrorDetails(error);
@@ -146,6 +163,7 @@ export class RedisService {
           { error: details.message },
           'Failed to connect to Redis - server cannot start in production without Redis'
         );
+        this._connectPromise?.reject(error);
         throw error;
       }
 
@@ -156,6 +174,7 @@ export class RedisService {
       );
 
       this.client = null;
+      this._connectPromise?.resolve();
 
       // Initialize in-memory fallback rate limiters
       if (rateLimiters && rateLimiters.length > 0) {

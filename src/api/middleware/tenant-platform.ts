@@ -4,6 +4,7 @@ import { ensureClient } from '../../db/streamer-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import type { TenantContext } from '../../types/context.js';
 import { isValidPlatform, type Platform } from '../../types/platforms.js';
+import { errorResponse } from '../response.js';
 
 export interface TenantPlatformContext extends TenantContext {
   platform: Platform;
@@ -45,21 +46,13 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
   const tenantId = (request.params as { tenantId?: string }).tenantId;
 
   if (tenantId == null) {
-    return reply.status(404).send({
-      statusCode: 404,
-      message: 'Tenant ID not provided',
-      code: 'NOT_FOUND',
-    });
+    return reply.status(404).send(errorResponse(404, 'Tenant ID not provided', 'NOT_FOUND'));
   }
 
   const config = configService.get(tenantId);
 
   if (!config) {
-    return reply.status(404).send({
-      statusCode: 404,
-      message: 'Tenant not found',
-      code: 'NOT_FOUND',
-    });
+    return reply.status(404).send(errorResponse(404, 'Tenant not found', 'NOT_FOUND'));
   }
 
   let client;
@@ -70,11 +63,9 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
       { tenantId, error: extractErrorDetails(err) },
       'Failed to initialize database client during request'
     );
-    return reply.status(503).send({
-      statusCode: 503,
-      message: 'Database not available',
-      code: 'SERVICE_UNAVAILABLE',
-    });
+    return reply.status(503).send(
+      errorResponse(503, 'Database not available', 'SERVICE_UNAVAILABLE')
+    );
   }
 
   request.tenant = {
@@ -92,39 +83,29 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
 export async function platformValidationMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const rawPlatform = (request.body as { platform?: string }).platform;
   if (rawPlatform == null || rawPlatform === '') {
-    return reply.status(400).send({
-      statusCode: 400,
-      message: 'Platform is required',
-      code: 'BAD_REQUEST',
-    });
+    return reply.status(400).send(errorResponse(400, 'Platform is required', 'BAD_REQUEST'));
   }
 
   const requestPlatform = rawPlatform.toLowerCase();
   if (!isValidPlatform(requestPlatform)) {
-    return reply.status(400).send({
-      statusCode: 400,
-      message: `Invalid platform: ${requestPlatform}`,
-      code: 'BAD_REQUEST',
-    });
+    return reply.status(400).send(
+      errorResponse(400, `Invalid platform: ${requestPlatform}`, 'BAD_REQUEST')
+    );
   }
 
   const tenant = request.tenant;
   if (tenant == null) {
-    return reply.status(500).send({
-      statusCode: 500,
-      message: 'Tenant context not found',
-      code: 'INTERNAL_SERVER_ERROR',
-    });
+    return reply.status(500).send(
+      errorResponse(500, 'Tenant context not found', 'INTERNAL_SERVER_ERROR')
+    );
   }
 
   const config = tenant.config;
 
   if (config[requestPlatform]?.enabled !== true) {
-    return reply.status(400).send({
-      statusCode: 400,
-      message: `${requestPlatform} is not enabled for this tenant`,
-      code: 'BAD_REQUEST',
-    });
+    return reply.status(400).send(
+      errorResponse(400, `${requestPlatform} is not enabled for this tenant`, 'BAD_REQUEST')
+    );
   }
 
   (request.tenant as TenantPlatformContext).platform = requestPlatform;

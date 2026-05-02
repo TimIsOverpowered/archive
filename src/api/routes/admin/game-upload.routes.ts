@@ -13,6 +13,7 @@ import { resolveGameWithContext } from './utils/game-context.js';
 import { queueYoutubeGameUploadByGame } from '../../../workers/jobs/youtube.job.js';
 import { queueDmcaProcessing } from '../../../workers/jobs/dmca.job.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
+import { ok } from '../../response.js';
 
 interface ReUploadGameParams {
   tenantId: string;
@@ -108,13 +109,11 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
       );
 
       if (gameJobId == null) {
-        return {
-          data: {
-            message: 'Game upload skipped (restricted game)',
-            gameId,
-            vodId,
-          },
-        };
+        return ok({
+          message: 'Game upload skipped (restricted game)',
+          gameId,
+          vodId,
+        });
       }
 
       return buildVodJobResponse({

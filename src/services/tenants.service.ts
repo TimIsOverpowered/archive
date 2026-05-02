@@ -72,10 +72,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
       vodStats,
       uploadStats,
       chapterRow,
-      thisMonthRow,
       uniqueGamesCount,
-      totalUploadsRow,
-      lastUploadRow,
     ] = await Promise.all([
       sql`SELECT 1`
         .execute(db)
@@ -88,42 +85,37 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
           eb.fn.count('id').as('cnt'),
           eb.fn.sum('duration').as('dur'),
           eb.fn.max('created_at').as('last'),
+          eb.fn
+            .count('id')
+            .filterWhere('created_at', '>=', thisMonthStart)
+            .as('this_month_cnt'),
         ])
         .groupBy('platform')
         .execute(),
       db
         .selectFrom('vod_uploads')
-        .select((eb) => [eb.fn.count('upload_id').as('cnt')])
-        .where('status', '=', 'FAILED')
+        .select((eb) => [
+          eb.fn.count('upload_id').filterWhere('status', '=', 'FAILED').as('failed_cnt'),
+          eb.fn
+            .count('upload_id')
+            .filterWhere('status', 'in', ['COMPLETED', 'FAILED'])
+            .as('total_cnt'),
+          eb.fn.max('created_at').filterWhere('status', '=', 'COMPLETED').as('last_upload'),
+        ])
         .executeTakeFirst(),
       db
         .selectFrom('chapters')
         .select((eb) => [eb.fn.count('id').as('cnt')])
-        .executeTakeFirst(),
-      db
-        .selectFrom('vods')
-        .select((eb) => [eb.fn.count('id').as('cnt')])
-        .where('created_at', '>=', thisMonthStart)
         .executeTakeFirst(),
       db
         .selectFrom('chapters')
         .select(sql<string>`COUNT(DISTINCT game_id)`.as('cnt'))
         .where('game_id', 'is not', null)
         .executeTakeFirst(),
-      db
-        .selectFrom('vod_uploads')
-        .select((eb) => [eb.fn.count('upload_id').as('cnt')])
-        .where('status', 'in', ['COMPLETED', 'FAILED'])
-        .executeTakeFirst(),
-      db
-        .selectFrom('vod_uploads')
-        .select((eb) => [eb.fn.max('created_at').as('maxCreatedAt')])
-        .where('status', '=', 'COMPLETED')
-        .executeTakeFirst(),
     ]);
 
     const chapterCount = Number(chapterRow?.cnt ?? 0);
-    const thisMonthCount = Number(thisMonthRow?.cnt ?? 0);
+    const thisMonthCount = vodStats.reduce((sum, s) => sum + Number(s.this_month_cnt ?? 0), 0);
 
     const byPlatform: Record<string, number> = {};
     let totalDurationSeconds = 0;
@@ -137,10 +129,10 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
       }
     }
 
-    const failedUploads = Number(uploadStats?.cnt ?? 0);
-    const totalUploadsCnt = Number(totalUploadsRow?.cnt ?? 0);
+    const failedUploads = Number(uploadStats?.failed_cnt ?? 0);
+    const totalUploadsCnt = Number(uploadStats?.total_cnt ?? 0);
     const completedUploads = totalUploadsCnt - failedUploads;
-    const lastUploadDate = lastUploadRow?.maxCreatedAt ?? null;
+    const lastUploadDate = uploadStats?.last_upload ?? null;
 
     const uploadSuccessRate = totalUploadsCnt > 0 ? toPercentage(completedUploads / totalUploadsCnt) : 0;
 

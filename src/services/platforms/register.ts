@@ -1,3 +1,5 @@
+import { extractErrorDetails } from '../../utils/error.js';
+import { getLogger } from '../../utils/logger.js';
 import { registerStrategy } from './strategy.js';
 import type { PlatformStrategy } from './strategy.js';
 import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
@@ -15,6 +17,11 @@ const strategyMap = {
  */
 export function registerPlatformStrategies(): void {
   for (const platform of PLATFORM_VALUES) {
-    registerStrategy(platform, strategyMap[platform]);
+    try {
+      registerStrategy(platform, strategyMap[platform]);
+    } catch (err) {
+      getLogger().fatal({ platform, error: extractErrorDetails(err) }, `Failed to register strategy for ${platform}`);
+      throw err;
+    }
   }
 }

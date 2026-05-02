@@ -3,6 +3,7 @@ import { RateLimiterRedis, RateLimiterMemory, RateLimiterRes } from 'rate-limite
 import { validateCloudflareRequest } from '../../utils/cloudflare-ip-validator.js';
 import { getClientIp } from './ip.js';
 import { RedisService } from '../../utils/redis-service.js';
+import { errorResponse } from '../response.js';
 
 type RateLimiter = RateLimiterRedis | RateLimiterMemory;
 
@@ -24,11 +25,7 @@ export default function createRateLimitMiddleware(options: RateLimitOptions) {
 
     const isValidCfRequest = await validateCloudflareRequest(request);
     if (!isValidCfRequest) {
-      return reply.status(403).send({
-        statusCode: 403,
-        message: 'Forbidden',
-        code: 'FORBIDDEN',
-      });
+      return reply.status(403).send(errorResponse(403, 'Forbidden', 'FORBIDDEN'));
     }
 
     const ip = getClientIp(request);
@@ -44,19 +41,14 @@ export default function createRateLimitMiddleware(options: RateLimitOptions) {
 
         reply.header('Retry-After', String(retryAfter));
 
-        return reply.status(429).send({
-          statusCode: 429,
-          message: 'Too Many Requests',
-          code: 'RATE_LIMITED',
-          retryAfter,
-        });
+        return reply.status(429).send(
+          errorResponse(429, 'Too Many Requests', 'RATE_LIMITED', retryAfter)
+        );
       }
 
-      return reply.status(500).send({
-        statusCode: 500,
-        message: 'Internal server error',
-        code: 'INTERNAL_ERROR',
-      });
+       return reply.status(500).send(
+          errorResponse(500, 'Internal server error', 'INTERNAL_SERVER_ERROR')
+        );
     }
   };
 }

@@ -6,6 +6,7 @@ import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { HttpError } from '../../utils/http-error.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getChannelBadges, getGlobalBadges } from '../../services/twitch/index.js';
+import { ok } from '../response.js';
 
 /** Options for registering the badges routes plugin. */
 interface BadgesRoutesOptions {
@@ -55,7 +56,7 @@ export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesR
           if (cachedBadges != null) {
             log.info('Returning cached Twitch badges');
 
-            return { data: JSON.parse(cachedBadges) as Record<string, unknown> };
+            return ok(JSON.parse(cachedBadges) as Record<string, unknown>);
           }
         } catch (err) {
           const details = extractErrorDetails(err);
@@ -84,12 +85,12 @@ export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesR
 
         log.info('Fetched and cached Twitch badges');
 
-        return { data: badgesData };
+        return ok(badgesData);
       } catch (err) {
         const details = extractErrorDetails(err);
         log.error({ err: details }, 'Failed to fetch Twitch badges');
 
-        return { data: { channel: null, global: null } };
+        return ok({ channel: null, global: null });
       }
     }
   );

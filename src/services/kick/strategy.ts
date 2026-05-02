@@ -6,9 +6,10 @@ import type {
   VodCreateData,
   VodUpdateData,
 } from '../platforms/strategy.js';
+import { createErrorContext } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
 import { requirePlatformConfig } from '../../config/types.js';
-export const strategy: PlatformStrategy = {
+export const strategy: PlatformStrategy<VodCreateData, VodUpdateData> = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
     const { config, platform } = ctx;
 
@@ -97,7 +98,7 @@ export const strategy: PlatformStrategy = {
     try {
       await finalizeKickChapters({ tenantId: ctx.tenantId, config: ctx.config }, dbId, vodId, finalDurationSeconds);
     } catch (error) {
-      getLogger().error({ vodId, error }, 'Failed to finalize Kick chapters');
+      getLogger().error(createErrorContext(error, { vodId }), 'Failed to finalize Kick chapters');
     }
   },
 };

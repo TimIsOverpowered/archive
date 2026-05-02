@@ -18,6 +18,7 @@ import { VodCreateSchema } from '../../../config/schemas.js';
 import { PLATFORM_VALUES } from '../../../types/platforms.js';
 import { invalidateVodStaticCache } from '../../../services/vod-cache.js';
 import { invalidateVodVolatileCache } from '../../../services/cache-tags.js';
+import { ok } from '../../response.js';
 import type { StatsParams, CreateVodParams, DeleteVodParams, CreateVodBody, DeleteVodBody } from './types.js';
 import type { InsertableVods, SelectableVods } from '../../../db/streamer-types.js';
 
@@ -51,7 +52,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
       const { tenantId, db } = tenantCtx;
 
       const stats = await getTenantStats(db, tenantId, getApiConfig().STATS_CACHE_TTL);
-      return { data: stats };
+      return ok(stats);
     }
   );
 
@@ -97,21 +98,21 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
       const vodRecord = await findVodRecord(db, vodId, platform);
 
       if (vodRecord) {
-        return { data: { message: `${vodId} already exists!`, vodId: vodId } };
+        return ok({ message: `${vodId} already exists!`, vodId: vodId });
       }
 
       if (source === 'api') {
-        const vodRecord = await ensureVodRecord(tenantCtx, vodId, log);
+        const fetchedVod = await ensureVodRecord(tenantCtx, vodId, log);
 
-        if (!vodRecord) {
+        if (!fetchedVod) {
           throw new HttpError(404, `VOD ${vodId} not found on ${platform}`, 'NOT_FOUND');
         }
 
-        await invalidateVodStaticCache(tenantId, vodRecord.id);
-        await invalidateVodVolatileCache(tenantId, vodRecord.id);
+        await invalidateVodStaticCache(tenantId, fetchedVod.id);
+        await invalidateVodVolatileCache(tenantId, fetchedVod.id);
 
-        log.info(`Created/fetched VOD ${vodId} via API`);
-        return { data: { message: `${vodRecord.id} created!`, vodId: vodRecord.id } };
+    log.info(`Created/fetched VOD ${vodId} via API`);
+         return ok({ message: `${fetchedVod.id} created!`, vodId: fetchedVod.id });
       }
 
       const { title, createdAt, duration } = request.body;
@@ -152,7 +153,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
 
       log.info(`Created VOD ${vodId}`);
 
-      return { data: { message: `${newVod.id} created!`, vodId: newVod.id } };
+      return ok({ message: `${newVod.id} created!`, vodId: newVod.id });
     }
   );
 
@@ -198,7 +199,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
 
       log.info(`Deleted VOD ${vodId} (${platform}) and all related data (cascade)`);
 
-      return { data: { message: `Deleted VOD ${vodId} and all related data`, vodId } };
+      return ok({ message: `Deleted VOD ${vodId} and all related data`, vodId });
     }
   );
 

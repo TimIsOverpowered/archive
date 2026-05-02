@@ -8,6 +8,7 @@ import { HttpError } from '../../utils/http-error.js';
 import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
 import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
 import { Db } from '../../constants.js';
+import { ok, okPaginated } from '../response.js';
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../../db/streamer-types.js';
 
@@ -75,14 +76,11 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
       const query = VodQuerySchema.parse(request.query);
       const { vods, total } = await getVods(db, tenantId, query);
 
-      return {
-        data: vods,
-        meta: {
-          page: query.page,
-          limit: query.limit,
-          total,
-        },
-      };
+      return okPaginated(vods, {
+        page: query.page,
+        limit: query.limit,
+        total,
+      });
     }
   );
 
@@ -112,7 +110,7 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
         throw new HttpError(404, 'VOD not found', 'NOT_FOUND');
       }
       const vod = await fetchVodByIdSafe(vodIdParsed.data, db, tenantId);
-      return { data: vod };
+      return ok(vod);
     }
   );
 
@@ -145,7 +143,7 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
         throw new HttpError(404, 'VOD not found', 'NOT_FOUND');
       }
 
-      return { data: vod };
+      return ok(vod);
     }
   );
 
@@ -181,7 +179,7 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
         throw new HttpError(404, 'Emotes not found for this VOD', 'NOT_FOUND');
       }
 
-      return { data: emotes };
+      return ok(emotes);
     }
   );
 }

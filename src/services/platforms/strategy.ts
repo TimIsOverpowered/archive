@@ -55,11 +55,11 @@ export interface PlatformStrategyContext extends Omit<TenantPlatformContext, 'db
  * Contract for platform-specific VOD operations.
  * Each platform (Twitch, Kick, YouTube) implements this interface.
  */
-export interface PlatformStrategy {
+export interface PlatformStrategy<VodCreate = VodCreateData, VodUpdate = VodUpdateData> {
   checkStreamStatus(ctx: PlatformStrategyContext): Promise<PlatformStreamStatus | null>;
   fetchVodMetadata(vodId: string, ctx: PlatformStrategyContext): Promise<PlatformVodMetadata | null>;
-  createVodData(meta: PlatformVodMetadata): VodCreateData;
-  updateVodData(meta: PlatformVodMetadata): VodUpdateData;
+  createVodData(meta: PlatformVodMetadata): VodCreate;
+  updateVodData(meta: PlatformVodMetadata): VodUpdate;
   finalizeChapters?(
     ctx: PlatformStrategyContext,
     dbId: number,

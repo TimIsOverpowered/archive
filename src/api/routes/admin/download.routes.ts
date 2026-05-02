@@ -23,6 +23,7 @@ import {
   SOURCE_TYPES_VALUES,
 } from '../../../types/platforms.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
+import { ok } from '../../response.js';
 
 /** Route params for download job endpoints. */
 interface Params {
@@ -193,14 +194,12 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
       });
 
       if (jobId != null) {
-        return {
-          data: {
-            message: 'VOD download queued!',
-            dbId,
-            vodId,
-            jobId,
-          },
-        };
+        return ok({
+          message: 'VOD download queued!',
+          dbId,
+          vodId,
+          jobId,
+        });
       } else {
         throw new HttpError(400, `File already exists at ${filePath}`, 'BAD_REQUEST');
       }

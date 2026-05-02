@@ -16,6 +16,7 @@ import { findVodRecord } from './utils/vod-helpers.js';
 import { fetchAndSaveEmotes } from '../../../services/emotes.js';
 import { triggerChatDownload } from '../../../workers/jobs/chat.job.js';
 import { getPlatformConfig, getDisplayName } from '../../../config/types.js';
+import { ok } from '../../response.js';
 
 /** Route params shared by metadata endpoints. */
 type RouteParams = { tenantId: string };
@@ -77,7 +78,7 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
       if (!vodRecord) throw new HttpError(404, `VOD ${vodId} not found`, 'NOT_FOUND');
 
       if (platform !== PLATFORMS.TWITCH) {
-        return { data: { message: `Chapter fetching only supported for Twitch VODs`, vodId, platform } };
+        return ok({ message: `Chapter fetching only supported for Twitch VODs`, vodId, platform });
       }
 
       const durationSeconds =
@@ -85,10 +86,10 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
       const savedCount = await saveVodChapters(tenantCtx, vodRecord.id, vodId, durationSeconds);
 
       if (savedCount === 0) {
-        return { data: { message: `No chapters found for ${vodId}`, vodId, count: 0 } };
+        return ok({ message: `No chapters found for ${vodId}`, vodId, count: 0 });
       }
 
-      return { data: { message: `Saved chapters for ${vodId}`, vodId, count: savedCount } };
+      return ok({ message: `Saved chapters for ${vodId}`, vodId, count: savedCount });
     }
   );
 
@@ -134,7 +135,7 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
 
       await fetchAndSaveEmotes(tenantCtx, vodRecord.id, platform, platformId);
 
-      return { data: { message: `Emote saving completed for ${vodId}`, vodId, platform } };
+      return ok({ message: `Emote saving completed for ${vodId}`, vodId, platform });
     }
   );
 
@@ -192,7 +193,7 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
         forceRerun,
       });
 
-      return { data: { message: `Queueing chat job ${vodId}`, vodId, platform, jobId } };
+      return ok({ message: `Queueing chat job ${vodId}`, vodId, platform, jobId });
     }
   );
 
