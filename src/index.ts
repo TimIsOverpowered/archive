@@ -33,7 +33,7 @@ async function start() {
   try {
     getLogger().info({ port: PORT, host: HOST, env: config.NODE_ENV }, 'Starting Archive API server');
 
-    server = await buildServer();
+    server = await buildServer(config);
 
     await server.listen({ port: Number(PORT), host: HOST });
 

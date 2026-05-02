@@ -7,7 +7,7 @@ import swaggerUI from '@fastify/swagger-ui';
 import redisPlugin from './plugins/redis.plugin.js';
 import configPlugin from './plugins/config.plugin.js';
 import createTenantLoggerMiddleware, { exitTenantContext } from './middleware/tenant-logger.js';
-import { getApiConfig } from '../config/env.js';
+import type { ApiConfig } from '../config/env.js';
 import { extractErrorDetails, createErrorContext, hasStatusCode } from '../utils/error.js';
 import { HttpError } from '../utils/http-error.js';
 import { DomainError } from '../utils/domain-errors.js';
@@ -52,9 +52,7 @@ function formatErrorResponse(error: unknown): FormattedError {
   };
 }
 
-export async function buildServer() {
-  const config = getApiConfig();
-
+export async function buildServer(config: ApiConfig) {
   const logger = createLogger({ level: config.LOG_LEVEL, isProduction: config.NODE_ENV === 'production' });
   setGlobalLogger(logger);
 
@@ -116,7 +114,7 @@ export async function buildServer() {
 
   // Redis connection + rate limiters
   await fastify.register(redisPlugin, {
-    url: getApiConfig().REDIS_URL,
+    url: config.REDIS_URL,
   });
 
   // Pub/Sub subscriber for cache invalidation events from workers
