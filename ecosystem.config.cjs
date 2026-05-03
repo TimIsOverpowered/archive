@@ -41,6 +41,8 @@
  *   pm2 set pm2-logrotate:max_size 100M
  */
 
+const path = require('path');
+
 module.exports = {
   apps: [
     // === PREREQUISITE: PgBouncer (Required — Connection Pooler) ===
@@ -54,6 +56,8 @@ module.exports = {
     // === APP #1: HTTP API Server (Fastify/Feathers REST endpoints) ===
     {
       name: 'api', // PM2 app identifier
+
+      cwd: __dirname,
 
       script: './dist/src/index.js', // Compiled output from tsc build
 
@@ -76,13 +80,15 @@ module.exports = {
 
       merge_logs: true, // Combine stdout + stderr into single log file
 
-      out_file: './logs/api-out.log',
-      error_file: './logs/api-error.log',
+      out_file: path.join(__dirname, 'logs', 'api-out.log'),
+      error_file: path.join(__dirname, 'logs', 'api-error.log'),
     },
 
     // === APP #2: Background Workers + Stream Monitoring (BullMQ queues + FlareSolverr for Kick API access) ===
     {
       name: 'worker', // Separate PM2 app identifier
+
+      cwd: __dirname,
 
       script: './dist/src/workers/index.js', // Worker entry point - BullMQ job processors
 
@@ -104,8 +110,8 @@ module.exports = {
 
       merge_logs: true, // Combine streams for cleaner log viewing
 
-      out_file: './logs/worker-out.log',
-      error_file: './logs/worker-error.log',
+      out_file: path.join(__dirname, 'logs', 'worker-out.log'),
+      error_file: path.join(__dirname, 'logs', 'worker-error.log'),
     },
   ],
 };
