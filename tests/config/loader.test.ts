@@ -112,12 +112,6 @@ describe('API Config Loader', () => {
       assert.strictEqual(typeof config.PORT, 'number');
     });
 
-    it('should parse DISABLE_REDIS_CACHE as boolean', () => {
-      process.env.DISABLE_REDIS_CACHE = 'true';
-      const config = loadApiConfig();
-      assert.strictEqual(config.DISABLE_REDIS_CACHE, true);
-    });
-
     it('should keep string fields as strings', () => {
       const config = loadApiConfig();
       assert.strictEqual(typeof config.NODE_ENV, 'string');

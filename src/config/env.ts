@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { Cache } from '../constants.js';
 
 function envBoolWithDefault(defaultsTo: boolean) {
   return z.preprocess(
@@ -31,11 +30,10 @@ export const BaseConfigSchema = z.object({
   }, 'ENCRYPTION_MASTER_KEY must be a valid 32-byte hex string'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
   DISCORD_ALERT_WEBHOOK_URL: z.string().url().optional(),
-  REDIS_CHAT_COMPRESSION: z.enum(['brotli', 'gzip', 'none']).default('brotli'),
+  REDIS_COMPRESSION: z.enum(['brotli', 'gzip', 'none']).default('brotli'),
   REDIS_COMPRESSION_LEVEL: z.coerce.number().int().min(0).max(11).default(6),
-  DISABLE_REDIS_CACHE: envBoolWithDefault(false).default(false),
   FLARESOLVERR_CONCURRENCY: z.coerce.number().int().positive().default(3),
-  CONFIG_CACHE_TTL: z.coerce.number().int().positive().default(3600),
+
   PGBOUNCER_URL: z.string().min(1, 'PGBOUNCER_URL is required'),
   DISCORD_ALERTS_ENABLED: envBoolWithDefault(true).default(true),
   FLARESOLVERR_BASE_URL: z.string().url().default('http://localhost:8191'),
@@ -53,9 +51,7 @@ export const ApiConfigSchema = BaseConfigSchema.extend({
   RATE_LIMIT_ADMIN_GET: z.coerce.number().int().positive().default(60),
   RATE_LIMIT_ADMIN_AUTH: z.coerce.number().int().positive().default(20),
   RATE_LIMIT_BLOCK_DURATION: z.coerce.number().int().positive().default(60),
-  CHAT_CURSOR_TTL: z.coerce.number().int().positive().default(Cache.CHAT_CURSOR_TTL),
-  CHAT_OFFSET_TTL: z.coerce.number().int().positive().default(Cache.CHAT_OFFSET_TTL),
-  CHAT_BUCKET_SIZE_TTL: z.coerce.number().int().positive().default(Cache.CHAT_BUCKET_SIZE_TTL),
+
   HEALTH_TOKEN: z.string().optional(),
 });
 
@@ -147,8 +143,8 @@ export function getFlareSolverrConcurrency(): number {
   return getBaseConfig().FLARESOLVERR_CONCURRENCY;
 }
 
-export function getRedisChatCompression(): 'brotli' | 'gzip' | 'none' {
-  return getBaseConfig().REDIS_CHAT_COMPRESSION;
+export function getRedisCompression(): 'brotli' | 'gzip' | 'none' {
+  return getBaseConfig().REDIS_COMPRESSION;
 }
 
 export function getRedisCompressionLevel(): number {

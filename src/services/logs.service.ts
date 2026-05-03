@@ -2,12 +2,11 @@ import { sql } from 'kysely';
 import type { Kysely } from 'kysely';
 import type { StreamerDB, SelectableChatMessages } from '../db/streamer-types.js';
 import { RedisService } from '../utils/redis-service.js';
-import { getApiConfig } from '../config/env.js';
+import { Cache, Logs  } from '../constants.js';
 import { compressChatData, decompressChatData } from '../utils/compression.js';
 import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { badRequest } from '../utils/http-error.js';
-import { Logs } from '../constants.js';
 import { simpleKeys } from '../utils/cache-keys.js';
 import { withCache } from '../utils/cache.js';
 import { VodNotFoundError } from '../utils/domain-errors.js';
@@ -28,7 +27,7 @@ function computeBucketSize(commentsPer100s: number): number {
 async function getVodBucketSize(db: Kysely<StreamerDB>, tenantId: string, vodId: number): Promise<number> {
   const key = simpleKeys.bucketSize(tenantId, vodId);
 
-  return withCache(key, getApiConfig().CHAT_BUCKET_SIZE_TTL, async () => {
+  return withCache(key, Cache.CHAT_BUCKET_SIZE_TTL, async () => {
     const result = await db
       .selectFrom('chat_messages')
       .select(
@@ -131,7 +130,7 @@ export async function getLogsByOffset(
   if (redis) {
     try {
       const compressed = await compressChatData(response);
-      await redis.set(cacheKey, compressed, 'EX', getApiConfig().CHAT_OFFSET_TTL);
+      await redis.set(cacheKey, compressed, 'EX', Cache.CHAT_TTL);
       getLogger().debug({ vodId, bucket }, '[CACHE SET] bucket');
     } catch {
       // Ignore cache errors
@@ -253,7 +252,7 @@ export async function getLogsByCursor(
   if (redis) {
     try {
       const compressed = await compressChatData(response);
-      await redis.set(cacheKey, compressed, 'EX', getApiConfig().CHAT_CURSOR_TTL);
+      await redis.set(cacheKey, compressed, 'EX', Cache.CHAT_TTL);
       getLogger().debug({ vodId }, '[CACHE SET] cursor');
     } catch {
       // Ignore cache errors

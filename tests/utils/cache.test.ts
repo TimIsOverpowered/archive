@@ -24,7 +24,6 @@ describe('withCache', () => {
   beforeEach(() => {
     originalEnv = { ...process.env };
     setupBaseEnv();
-    process.env.DISABLE_REDIS_CACHE = 'true';
     resetEnvConfig();
     ctx = new CacheContext();
   });
@@ -34,7 +33,7 @@ describe('withCache', () => {
     resetEnvConfig();
   });
 
-  describe('when Redis is disabled', () => {
+  describe('when Redis is unavailable', () => {
     it('should call fetcher and return result without caching', async () => {
       let fetcherCalled = 0;
       const fetcher = async () => {
@@ -153,7 +152,6 @@ describe('withStaleWhileRevalidate', () => {
   beforeEach(() => {
     originalEnv = { ...process.env };
     setupBaseEnv();
-    process.env.DISABLE_REDIS_CACHE = 'true';
     resetEnvConfig();
     ctx = new CacheContext();
   });
@@ -163,7 +161,7 @@ describe('withStaleWhileRevalidate', () => {
     resetEnvConfig();
   });
 
-  describe('when Redis is disabled', () => {
+  describe('when Redis is unavailable', () => {
     it('should call fetcher and return result without caching', async () => {
       let fetcherCalled = 0;
       const fetcher = async () => {

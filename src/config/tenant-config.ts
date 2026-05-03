@@ -14,7 +14,7 @@ import {
   type YoutubeAuthObject,
 } from './schemas.js';
 import { TenantConfig } from './types.js';
-import { getBaseConfig } from './env.js';
+import { ConfigCache } from '../constants.js';
 import type { TenantResult } from '../db/meta-types.js';
 import { asJsonObject } from '../utils/object.js';
 import type { ZodType } from 'zod';
@@ -202,4 +202,4 @@ export class ConfigService {
   }
 }
 
-export const configService = new ConfigService(getBaseConfig().CONFIG_CACHE_TTL);
+export const configService = new ConfigService(ConfigCache.TTL);

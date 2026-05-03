@@ -47,10 +47,8 @@ export const Cache = {
   VOD_VOLATILE_TTL: 15,
   /** 1 day for emotes */
   EMOTE_TTL: 86_400,
-  /** 3 days for chat cursor positions */
-  CHAT_CURSOR_TTL: 3 * 24 * 3600,
-  /** 3 days for chat offset positions — separate from cursor TTL so offset-based pagination cache can be tuned independently if needed */
-  CHAT_OFFSET_TTL: 3 * 24 * 3600,
+  /** 3 days for chat cache */
+  CHAT_TTL: 3 * 24 * 3600,
   /** 30 days for chat bucket size cache */
   CHAT_BUCKET_SIZE_TTL: 30 * 24 * 3600,
   /** Cap paginated list cache to prevent tag explosion */
@@ -73,6 +71,12 @@ export const CacheInflight = {
   TIMEOUT_MS: 30_000,
   /** Max concurrent in-flight requests per process */
   CACHE_MAX: 1000,
+} as const;
+
+// ── Config Cache ─────────────────────────────────────────────────────────────
+export const ConfigCache = {
+  /** 1 hour */
+  TTL: 3600,
 } as const;
 
 // ── Cache Tag TTL Buffer ────────────────────────────────────────────────────

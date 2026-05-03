@@ -69,7 +69,6 @@ export class RedisService {
   }
 
   static getActiveClient(): Redis | null {
-    if (getBaseConfig().DISABLE_REDIS_CACHE) return null;
     return this._instance?.client ?? null;
   }
 
