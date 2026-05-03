@@ -16,8 +16,8 @@ export const Vod = {
 
 // ── Chat Download ────────────────────────────────────────────────────────────
 export const Chat = {
-  BATCH_SIZE: 1250,
-  RATE_LIMIT_MS: 150,
+  BATCH_SIZE: 2500,
+  RATE_LIMIT_MS: 100,
   MAX_RETRIES: 2,
   RETRY_DELAY_MS: 1_000,
 } as const;

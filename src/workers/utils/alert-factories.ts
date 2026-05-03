@@ -64,9 +64,12 @@ export function createVodWorkerAlerts(): VodWorkerAlerts {
 
     converting: (vodId, percent) => ({
       title: `[VOD] ${vodId} Converting`,
-      description: `Converting ${vodId} (${percent}%)`,
+      description: `Converting ${vodId}`,
       status: 'warning',
-      fields: [{ name: 'VOD ID', value: vodId, inline: false }],
+      fields: [
+        { name: 'VOD ID', value: vodId, inline: true },
+        { name: 'Progress', value: createProgressBar(percent), inline: false },
+      ],
       timestamp: new Date().toISOString(),
     }),
 

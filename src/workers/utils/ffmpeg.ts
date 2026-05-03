@@ -68,17 +68,11 @@ function runFfmpeg(
 ): Promise<void> {
   const cmdStr = `ffmpeg ${args.join(' ')}`;
 
-  return new Promise<void>((_resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     const proc = spawn('ffmpeg', args);
-    trackProgress(proc, cmdStr, knownDuration, onProgress, onStart);
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        logger.info(`FFmpeg complete: ${cmdStr}`);
-      } else {
-        logger.error({ code }, `FFmpeg failed: ${cmdStr}`);
-      }
-    });
+    trackProgress(proc, cmdStr, knownDuration, onProgress, onStart)
+      .then(resolve)
+      .catch(reject);
 
     proc.on('error', (err: Error) => {
       reject(err);
@@ -97,50 +91,54 @@ function trackProgress(
   knownDuration: number | null,
   onProgress?: (percent: number) => void,
   onStart?: (cmd: string) => void
-): void {
-  proc.on('close', (code) => {
-    if (code === 0) {
-      logger.info(`FFmpeg complete: ${cmd}`);
-    } else {
-      logger.error({ code }, `FFmpeg failed: ${cmd}`);
-    }
-  });
-
-  if (!onProgress && !onStart) return;
-  if (!proc.stderr) return;
-
-  logger.info(`FFmpeg start: ${cmd}`);
-  onStart?.(cmd);
-
-  let totalDuration = knownDuration;
-  let lastBucket = -1;
-
-  const durationRegex = /Duration:\s*(\d{1,2}:\d{2}:\d{2}\.\d+)/;
-  const timeRegex = /time=(\d{1,2}:\d{2}:\d{2}\.\d+)/;
-
-  proc.stderr.on('data', (data: Buffer) => {
-    const chunk = data.toString();
-
-    if (totalDuration === null) {
-      const durMatch = chunk.match(durationRegex);
-      if (durMatch?.[1] != null) {
-        totalDuration = parseTimecode(durMatch[1]);
-        logger.debug({ totalDuration, rawTimecode: durMatch[1] }, 'trackProgress: Duration found');
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    proc.on('close', (code) => {
+      if (code === 0) {
+        logger.info(`FFmpeg complete: ${cmd}`);
+        resolve();
+      } else {
+        logger.error({ code }, `FFmpeg failed: ${cmd}`);
+        reject(new Error(`FFmpeg exited with code ${code}`));
       }
-    }
+    });
 
-    if (onProgress && totalDuration != null && totalDuration > 0) {
-      const timeMatch = chunk.match(timeRegex);
-      if (timeMatch?.[1] != null) {
-        const elapsed = parseTimecode(timeMatch[1]);
-        const percent = Math.min(Math.round((elapsed / totalDuration) * 100), 100);
-        const bucket = Math.floor(percent / 25) * 25;
-        if (bucket > lastBucket) {
-          lastBucket = bucket;
-          onProgress(bucket);
+    if (!onProgress && !onStart) return;
+    if (!proc.stderr) return;
+
+    logger.info(`FFmpeg start: ${cmd}`);
+    onStart?.(cmd);
+
+    let totalDuration = knownDuration;
+    let lastBucket = -1;
+
+    const durationRegex = /Duration:\s*(\d{1,2}:\d{2}:\d{2}\.\d+)/;
+    const timeRegex = /time=(\d{1,2}:\d{2}:\d{2}\.\d+)/;
+
+    proc.stderr.on('data', (data: Buffer) => {
+      const chunk = data.toString();
+
+      if (totalDuration === null) {
+        const durMatch = chunk.match(durationRegex);
+        if (durMatch?.[1] != null) {
+          totalDuration = parseTimecode(durMatch[1]);
+          logger.debug({ totalDuration, rawTimecode: durMatch[1] }, 'trackProgress: Duration found');
         }
       }
-    }
+
+      if (onProgress && totalDuration != null && totalDuration > 0) {
+        const timeMatch = chunk.match(timeRegex);
+        if (timeMatch?.[1] != null) {
+          const elapsed = parseTimecode(timeMatch[1]);
+          const percent = Math.min(Math.round((elapsed / totalDuration) * 100), 100);
+          const bucket = Math.floor(percent / 25) * 25;
+          if (bucket > lastBucket) {
+            lastBucket = bucket;
+            onProgress(bucket);
+          }
+        }
+      }
+    });
   });
 }
 
@@ -181,7 +179,7 @@ export async function splitVideo(
 
       const cmdStr = `ffmpeg ${args.join(' ')}`;
       const proc = spawn('ffmpeg', args);
-      trackProgress(proc, cmdStr, splitDuration, undefined, onStart);
+      trackProgress(proc, cmdStr, splitDuration, undefined, onStart).catch(() => {});
 
       proc.on('close', (code) => {
         if (code === 0) {
