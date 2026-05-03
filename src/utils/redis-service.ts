@@ -106,7 +106,8 @@ export class RedisService {
 
   static isLimiterFallback(key: string): boolean {
     if (!this._instance) return false;
-    return this._instance.isLimiterFallback(key);
+    const entry = this._instance.limiters.get(key);
+    return entry?.isFallback ?? false;
   }
 
   static close(): Promise<void> {
@@ -216,15 +217,6 @@ export class RedisService {
         });
       }
     }
-  }
-
-  getClient(): Redis | null {
-    return this.client;
-  }
-
-  isLimiterFallback(key: string): boolean {
-    const entry = this.limiters.get(key);
-    return entry?.isFallback ?? false;
   }
 
   async close(): Promise<void> {
