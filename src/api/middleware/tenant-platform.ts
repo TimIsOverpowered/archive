@@ -78,6 +78,7 @@ export async function tenantMiddleware(request: FastifyRequest) {
  * Must be used after tenantMiddleware (expects request.tenant to exist)
  * Register in preValidation hook
  */
+// eslint-disable-next-line @typescript-eslint/require-await -- Fastify preValidation hooks must match the async nature of onRequest hooks (tenantMiddleware is async), otherwise hook chain sequencing breaks and routes fail.
 export async function platformValidationMiddleware(request: FastifyRequest) {
   const rawPlatform = (request.body as { platform?: string }).platform;
   if (rawPlatform == null || rawPlatform === '') {
