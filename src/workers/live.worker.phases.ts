@@ -26,7 +26,7 @@ export interface LiveCompletionData {
   finalPath: string;
 }
 
-export interface LiveDownloadResult {
+export interface LivePhaseResult {
   segmentCount: number;
   finalMp4Path: string;
 }
@@ -70,7 +70,7 @@ export async function prepareVodDirectory(ctx: LiveProcessorContext): Promise<vo
   }
 }
 
-export async function runDownload(ctx: LiveProcessorContext): Promise<LiveDownloadResult> {
+export async function runDownload(ctx: LiveProcessorContext): Promise<LivePhaseResult> {
   const downloadResult = await downloadHlsStream({
     ctx,
     dbId: ctx.dbId,
@@ -99,7 +99,7 @@ export async function runDownload(ctx: LiveProcessorContext): Promise<LiveDownlo
 
 export async function runFinalization(
   ctx: LiveProcessorContext,
-  downloadResult: LiveDownloadResult
+  downloadResult: LivePhaseResult
 ): Promise<number | null> {
   const actualDuration = (await getMetadata(downloadResult.finalMp4Path))?.duration ?? null;
   await finalizeVod({
@@ -114,7 +114,7 @@ export async function runFinalization(
 
 export async function runPostProcessing(
   ctx: LiveProcessorContext,
-  downloadResult: LiveDownloadResult,
+  downloadResult: LivePhaseResult,
   actualDuration: number | null
 ): Promise<LiveCompletionData> {
   let emotesSaved = false;

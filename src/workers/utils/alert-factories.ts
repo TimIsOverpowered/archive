@@ -439,7 +439,7 @@ function formatClaimList(
 
     const timeRange = `${claim.startTimestamp} - ${claim.endTimestamp}`;
     const typeLabel = claimTypeLabel[claim.claimType] ?? claim.claimType;
-    const policyLabel = claim.policyType ? claim.policyType.replace('POLICY_TYPE_', '') : '';
+    const policyLabel = claim.policyType !== '' && claim.policyType !== undefined ? claim.policyType.replace('POLICY_TYPE_', '') : '';
     const labels = [typeLabel, policyLabel].filter(Boolean).join(' | ');
     lines.push(`${prefix} ${claim.identifier} \`${timeRange}\` ${labels}${suffix}`);
   }

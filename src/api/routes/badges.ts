@@ -3,7 +3,7 @@ import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { RedisService } from '../../utils/redis-service.js';
 import { configService } from '../../config/tenant-config.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { HttpError } from '../../utils/http-error.js';
+import { notFound } from '../../utils/http-error.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getChannelBadges, getGlobalBadges } from '../../services/twitch/index.js';
 import { ok, errorResponse } from '../response.js';
@@ -43,7 +43,7 @@ export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesR
 
       const config = configService.get(tenantId);
 
-      if (config?.twitch?.id == null) throw new HttpError(404, 'Twitch not configured for this tenant', 'NOT_FOUND');
+      if (config?.twitch?.id == null) notFound('Twitch not configured for this tenant');
 
       const redis = RedisService.getActiveClient();
       // Check Redis cache first (60-minute TTL)

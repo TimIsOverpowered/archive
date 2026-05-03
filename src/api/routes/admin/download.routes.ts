@@ -12,7 +12,7 @@ import { ensureVodRecord } from './utils/vod-records.js';
 import { ensureVodDownload } from './utils/vod-downloads.js';
 import { buildVodJobResponse } from './utils/vod-job-response.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { HttpError } from '../../../utils/http-error.js';
+import { notFound, badRequest } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
 import {
   SOURCE_TYPES,
@@ -92,7 +92,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
       const vodRecord = await ensureVodRecord(tenantCtx, vodId, log);
 
       if (!vodRecord) {
-        throw new HttpError(404, `VOD ${vodId} not found on ${platform}`, 'NOT_FOUND');
+        notFound(`VOD ${vodId} not found on ${platform}`);
       }
 
       const dbId = vodRecord.id;
@@ -172,7 +172,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
       const vodRecord = await findVodByPlatformId(db, vodId, platform);
 
       if (!vodRecord) {
-        throw new HttpError(404, `VOD ${vodId} not found on ${platform}`, 'NOT_FOUND');
+        notFound(`VOD ${vodId} not found on ${platform}`);
       }
 
       const dbId = vodRecord.id;
@@ -195,7 +195,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
           jobId,
         });
       } else {
-        throw new HttpError(400, `File already exists at ${filePath}`, 'BAD_REQUEST');
+        badRequest(`File already exists at ${filePath}`);
       }
     }
   );

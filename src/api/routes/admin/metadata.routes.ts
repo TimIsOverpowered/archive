@@ -8,7 +8,7 @@ import {
   requireTenant,
 } from '../../middleware/tenant-platform.js';
 import { saveVodChapters } from '../../../services/twitch/index.js';
-import { HttpError } from '../../../utils/http-error.js';
+import { notFound, badRequest } from '../../../utils/http-error.js';
 import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
 import { findVodByPlatformId } from '../../../db/queries/vods.js';
@@ -72,7 +72,7 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
 
       const vodRecord = await findVodByPlatformId(db, vodId, platform);
 
-      if (!vodRecord) throw new HttpError(404, `VOD ${vodId} not found`, 'NOT_FOUND');
+      if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
       if (platform !== PLATFORMS.TWITCH) {
         return ok({ message: `Chapter fetching only supported for Twitch VODs`, vodId, platform });
@@ -122,13 +122,12 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
 
       const vodRecord = await findVodByPlatformId(db, vodId, platform);
 
-      if (!vodRecord) throw new HttpError(404, `VOD ${vodId} not found`, 'NOT_FOUND');
+      if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
       // Queue emote save job (fire-and-forget within request context)
       const platformId = getPlatformConfig(config, platform)?.id;
 
-      if (platformId == null)
-        throw new HttpError(400, `No platform ID available for ${platform} ${vodId}`, 'BAD_REQUEST');
+      if (platformId == null) badRequest(`No platform ID available for ${platform} ${vodId}`);
 
       await fetchAndSaveEmotes(tenantCtx, vodRecord.id, platform, platformId);
 
@@ -169,14 +168,13 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
 
       const vodRecord = await findVodByPlatformId(db, vodId, platform);
 
-      if (!vodRecord) throw new HttpError(404, `VOD ${vodId} not found`, 'NOT_FOUND');
+      if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
       // Queue emote save job (fire-and-forget within request context)
       const platformCfg = getPlatformConfig(config, platform);
       const platformId = platformCfg?.id;
 
-      if (platformId == null)
-        throw new HttpError(400, `No platform ID available for ${platform} ${vodId}`, 'BAD_REQUEST');
+      if (platformId == null) badRequest(`No platform ID available for ${platform} ${vodId}`);
 
       const jobId = await triggerChatDownload({
         tenantId,

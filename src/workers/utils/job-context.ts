@@ -46,7 +46,7 @@ export async function buildWorkerContext<TExtra extends Record<string, unknown>,
   platform: Platform,
   configBuilder: ContextBuilder<TExtra>,
   alertFactory: () => TAlerts
-): Promise<BaseWorkerContext & TExtra & { alerts: TAlerts; messageId: string }> {
+): Promise<BaseWorkerContext & TExtra & { alerts: TAlerts; messageId: string | null }> {
   const log = createAutoLogger(String(tenantId));
 
   log.info({ component: 'worker', jobId: job.id, dbId, vodId, platform, tenantId }, 'Starting job');
@@ -58,11 +58,7 @@ export async function buildWorkerContext<TExtra extends Record<string, unknown>,
   const alerts = alertFactory();
   const messageId = await initRichAlert(
     (alerts as { init: (...args: unknown[]) => RichEmbedData }).init(...alertInitArgs)
-  );
-
-  if (messageId == null) {
-    throw new Error('Failed to initialize alert');
-  }
+  ).catch(() => null);
 
   return {
     config,

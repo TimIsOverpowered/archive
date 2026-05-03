@@ -35,6 +35,11 @@ export async function enqueueJobWithLogging(opts: EnqueueJobWithLoggingOpts): Pr
     }
   }
 
+  if (await queue.isPaused()) {
+    logger.debug({ jobId, ...extraContext }, 'Queue is paused, skipping job enqueue');
+    return { jobId: String(jobId), isNew: false };
+  }
+
   const job = await queue.add(jobName, data, options);
   logger.info({ jobId: String(job.id), ...extraContext }, successMessage);
   return { jobId: String(job.id), isNew: true };

@@ -11,7 +11,7 @@ import {
 } from '../../middleware/tenant-platform.js';
 import { fileExists } from '../../../utils/path.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { HttpError } from '../../../utils/http-error.js';
+import { badRequest, notFound } from '../../../utils/http-error.js';
 import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
 import { findVodByStreamId } from '../../../db/queries/vods.js';
@@ -73,21 +73,21 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
       // Validate file path exists and is accessible
       const exists = await fileExists(path);
       if (!exists) {
-        throw new HttpError(400, `File at ${path} does not exist`, 'BAD_REQUEST');
+        badRequest(`File at ${path} does not exist`);
       }
 
       let stats: FsStats;
       try {
         stats = await fs.stat(path);
       } catch {
-        throw new HttpError(404, 'Recording file not found or inaccessible', 'NOT_FOUND');
+        notFound('Recording file not found or inaccessible');
       }
       if (!stats.isFile() || stats.size === 0) {
-        throw new HttpError(400, `File at ${path} is invalid (not a regular file or empty)`, 'BAD_REQUEST');
+        badRequest(`File at ${path} is invalid (not a regular file or empty)`);
       }
 
       const vodRecord = await findVodByStreamId(db, streamId, platform);
-      if (!vodRecord) throw new HttpError(404, `VOD ${streamId} not found`, 'NOT_FOUND');
+      if (!vodRecord) notFound(`VOD ${streamId} not found`);
 
       // Update duration if provided and different from current value
       if (durationSecs !== undefined && vodRecord.duration !== durationSecs) {

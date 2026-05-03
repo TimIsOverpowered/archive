@@ -8,7 +8,7 @@ import {
   requireTenant,
 } from '../../middleware/tenant-platform.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { HttpError, internalServerError } from '../../../utils/http-error.js';
+import { notFound, internalServerError } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod } from '../../../types/platforms.js';
 import {
   PLATFORM_VALUES,
@@ -94,7 +94,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
 
       // Step 1: Ensure VOD record exists
       const vodRecord = await findVodByPlatformId(db, vodId, platform);
-      if (!vodRecord) throw new HttpError(404, 'VOD not found', 'NOT_FOUND');
+      if (!vodRecord) notFound('VOD not found');
 
       // Step 2: Ensure VOD download (like /upload does)
       const { jobId: downloadJobId, filePath } = await ensureVodDownload({

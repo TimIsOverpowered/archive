@@ -2,7 +2,7 @@ import { FastifyInstance, FastifySchema } from 'fastify';
 import { z } from 'zod';
 import { getLogsByOffset, getLogsByCursor } from '../../services/logs.service.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
-import { HttpError, badRequest } from '../../utils/http-error.js';
+import { badRequest } from '../../utils/http-error.js';
 import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
 import { ok } from '../response.js';
 
@@ -67,13 +67,13 @@ export default function logsRoutes(fastify: FastifyInstance, _options: LogsRoute
 
       const parsed = LogsQuerySchema.safeParse(request.query);
       if (!parsed.success) {
-        throw new HttpError(400, 'Invalid query parameters', 'BAD_REQUEST');
+        badRequest('Invalid query parameters');
       }
 
       const { content_offset_seconds, cursor } = parsed.data;
 
       if (content_offset_seconds === undefined && cursor == null) {
-        throw new HttpError(400, 'Missing required query parameter: content_offset_seconds or cursor', 'BAD_REQUEST');
+        badRequest('Missing required query parameter: content_offset_seconds or cursor');
       }
 
       let result;
@@ -83,7 +83,7 @@ export default function logsRoutes(fastify: FastifyInstance, _options: LogsRoute
       } else if (content_offset_seconds !== undefined && !isNaN(content_offset_seconds)) {
         result = await getLogsByOffset(db, tenantId, vodIdNum, content_offset_seconds);
       } else {
-        throw new HttpError(400, 'Invalid content_offset_seconds value', 'BAD_REQUEST');
+        badRequest('Invalid content_offset_seconds value');
       }
 
       return ok(result);

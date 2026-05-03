@@ -1,4 +1,4 @@
-import { HttpError } from '../../../../utils/http-error.js';
+import { notFound, badRequest } from '../../../../utils/http-error.js';
 import type { Platform } from '../../../../types/platforms.js';
 import type { TenantContext } from '../../../../types/context.js';
 import { GameNotFoundError } from '../../../../utils/domain-errors.js';
@@ -43,13 +43,13 @@ export async function resolveGameWithContext(
   const vodRecord = await findVodById(db, game.vod_id);
 
   if (!vodRecord) {
-    throw new HttpError(404, `VOD ${game.vod_id} not found for game ${gameId}`, 'NOT_FOUND');
+    notFound(`VOD ${game.vod_id} not found for game ${gameId}`);
   }
 
   const platform = vodRecord.platform as Platform;
 
   if (config[platform]?.enabled !== true) {
-    throw new HttpError(400, `${platform} is not enabled for this tenant`, 'BAD_REQUEST');
+    badRequest(`${platform} is not enabled for this tenant`);
   }
 
   const tenantPlatformCtx: TenantPlatformContext = {

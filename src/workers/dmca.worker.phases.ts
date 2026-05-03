@@ -49,7 +49,7 @@ export interface DmcaProcessorContext {
   part: number | undefined;
   log: AppLogger;
   alerts: DmcaWorkerAlerts;
-  messageId: string;
+ messageId: string | null;
   workDir: string;
   tempFiles: string[];
   completedClaimIds: string[];
@@ -123,10 +123,7 @@ export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Pr
   const claimInfos: DmcaClaimInfo[] = blockingClaims.map(buildClaimInfo);
   const alerts = createDmcaWorkerAlerts();
   const displayName = config.displayName ?? config.id;
-  const messageId = await initRichAlert(alerts.processing(vodId, claimInfos, platform, displayName, part));
-  if (messageId == null) {
-    throw new Error('Failed to initialize DMCA alert');
-  }
+  const messageId = await initRichAlert(alerts.processing(vodId, claimInfos, platform, displayName, part)).catch(() => null);
 
   log.info(
     {

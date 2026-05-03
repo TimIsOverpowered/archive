@@ -9,7 +9,7 @@ import {
   requireTenant,
 } from '../../middleware/tenant-platform.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { HttpError } from '../../../utils/http-error.js';
+import { notFound, badRequest } from '../../../utils/http-error.js';
 import { findVodByPlatformId } from '../../../db/queries/vods.js';
 import { ensureVodRecord } from './utils/vod-records.js';
 import { getStrategy } from '../../../services/platforms/index.js';
@@ -90,7 +90,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
       const log = createAutoLogger(tenantId);
 
       if (vodId === '') {
-        throw new HttpError(400, 'vodId is required', 'BAD_REQUEST');
+        badRequest('vodId is required');
       }
 
       const vodRecord = await findVodByPlatformId(db, vodId, platform);
@@ -103,7 +103,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
         const fetchedVod = await ensureVodRecord(tenantCtx, vodId, log);
 
         if (!fetchedVod) {
-          throw new HttpError(404, `VOD ${vodId} not found on ${platform}`, 'NOT_FOUND');
+          notFound(`VOD ${vodId} not found on ${platform}`);
         }
 
         await invalidateVodStaticCache(tenantId, fetchedVod.id);
@@ -188,7 +188,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
 
       const vodRecord = await findVodByPlatformId(db, vodId, platform);
 
-      if (!vodRecord) throw new HttpError(404, `VOD ${vodId} not found`, 'NOT_FOUND');
+      if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
       await db.deleteFrom('vods').where('platform', '=', platform).where('vod_id', '=', vodId).execute();
 

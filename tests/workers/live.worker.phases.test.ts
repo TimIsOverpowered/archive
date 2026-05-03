@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, mock } from 'node:test';
 import { prepareVodDirectory, runPostProcessing, sendCompletionAlert } from '../../src/workers/live.worker.phases.js';
-import type { LiveDownloadResult, LiveProcessorContext } from '../../src/workers/live.worker.phases.js';
+import type { LivePhaseResult, LiveProcessorContext } from '../../src/workers/live.worker.phases.js';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
@@ -128,7 +128,7 @@ describe('Live Worker Phases', () => {
   describe('runPostProcessing', () => {
     it('produces correct result when all sub-steps complete normally', async () => {
       const ctx = createMockCtx();
-      const downloadResult: LiveDownloadResult = {
+      const downloadResult: LivePhaseResult = {
         segmentCount: 42,
         finalMp4Path: '/tmp/test-vods/test-tenant/live-vod-123.mp4',
       };
@@ -149,7 +149,7 @@ describe('Live Worker Phases', () => {
       // even if emotes fail internally, the function completes and
       // runPostProcessing still produces a valid result.
       const ctx = createMockCtx();
-      const downloadResult: LiveDownloadResult = {
+      const downloadResult: LivePhaseResult = {
         segmentCount: 42,
         finalMp4Path: '/tmp/test-vods/test-tenant/live-vod-123.mp4',
       };
@@ -172,7 +172,7 @@ describe('Live Worker Phases', () => {
       // triggerChatDownload has internal try/catch and returns null on failure.
       // runPostProcessing's catch block is a safety net.
       const ctx = createMockCtx();
-      const downloadResult: LiveDownloadResult = {
+      const downloadResult: LivePhaseResult = {
         segmentCount: 10,
         finalMp4Path: '/tmp/test-vods/test-tenant/live-vod-123.mp4',
       };
@@ -188,7 +188,7 @@ describe('Live Worker Phases', () => {
     it('YouTube queue failure is non-fatal — result has null/empty YouTube job IDs', async () => {
       // queueYoutubeUploads has internal try/catch and returns null/empty on failure.
       const ctx = createMockCtx();
-      const downloadResult: LiveDownloadResult = {
+      const downloadResult: LivePhaseResult = {
         segmentCount: 5,
         finalMp4Path: '/tmp/test-vods/test-tenant/live-vod-123.mp4',
       };
@@ -203,7 +203,7 @@ describe('Live Worker Phases', () => {
 
     it('null duration is handled correctly in completion data', async () => {
       const ctx = createMockCtx();
-      const downloadResult: LiveDownloadResult = {
+      const downloadResult: LivePhaseResult = {
         segmentCount: 3,
         finalMp4Path: '/tmp/test-vods/test-tenant/live-vod-123.mp4',
       };

@@ -7,7 +7,7 @@ import {
   asTenantPlatformContext,
   requireTenant,
 } from '../../middleware/tenant-platform.js';
-import { HttpError } from '../../../utils/http-error.js';
+import { notFound } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
 import {
   SOURCE_TYPES,
@@ -92,7 +92,7 @@ export default function youtubeUploadRoutes(fastify: FastifyInstance, _options: 
       const vodRecord = await findVodByPlatformId(db, vodId, platform);
 
       if (!vodRecord) {
-        throw new HttpError(404, `VOD ${vodId} not found on ${platform}`, 'NOT_FOUND');
+        notFound(`VOD ${vodId} not found on ${platform}`);
       }
 
       const dbId = vodRecord.id;
