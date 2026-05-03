@@ -1,5 +1,4 @@
 import 'dotenv/config';
-import { pathToFileURL } from 'node:url';
 import { Queue } from 'bullmq';
 import { loadWorkersConfig } from '../config/env.js';
 import { registerTenantConfigSubscriberWorker } from '../config/tenant-config-subscriber.js';
@@ -176,7 +175,4 @@ function registerShutdownHandlers(ctx: AppContext) {
   ]);
 }
 
-const scriptPath = process.argv[1];
-if (scriptPath != null && import.meta.url === pathToFileURL(scriptPath).href) {
-  void bootstrap();
-}
+void bootstrap();
