@@ -16,7 +16,7 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
 
   const { config, db } = await getJobContext(tenantId);
 
-  if (config == null || config.settings.vodDownload !== true) {
+  if (config.settings.vodDownload !== true) {
     log.debug({ component: 'monitor', tenantId }, 'VOD download disabled, skipping');
     return { success: true };
   }

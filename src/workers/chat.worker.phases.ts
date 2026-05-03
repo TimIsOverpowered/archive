@@ -32,7 +32,7 @@ export interface ChatProcessorContext {
   displayName: string;
   log: AppLogger;
   alerts: ChatWorkerAlerts;
- messageId: string | null;
+  messageId: string | null;
   /** Pagination cursor — mutated during download to track last processed offset */
   effectiveOffset: number;
   hasExistingData: boolean;

@@ -29,8 +29,10 @@ export function enterTenantContext(context: TenantContextData): void {
   tenantContextStore.enterWith(context);
 }
 
+/**
+ * Clear the tenant context for the current async chain by entering with an empty store.
+ * Used after request completion to prevent context leakage into subsequent async work.
+ */
 export function exitTenantContext(): void {
-  tenantContextStore.exit(() => {
-    /* no-op — exit requires a callback */
-  });
+  tenantContextStore.enterWith({});
 }

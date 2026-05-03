@@ -20,23 +20,14 @@ export const QUEUE_NAMES = {
 
 export const LIVE_JOB_ID_PREFIX = 'live_hls_';
 
-export const defaultJobOptions = {
+type JobOpts = NonNullable<QueueOptions['defaultJobOptions']>;
+
+export const defaultJobOptions: JobOpts = {
   attempts: 3,
   backoff: { type: 'exponential' as const, delay: 5000 },
 };
 
-export const queueRetryOptions: Record<string, QueueOptions['defaultJobOptions']> = {
-  [QUEUE_NAMES.CHAT_DOWNLOAD]: { attempts: 5, backoff: { type: 'exponential' as const, delay: 3000 } },
-  [QUEUE_NAMES.YOUTUBE_UPLOAD]: { attempts: 3, backoff: { type: 'exponential' as const, delay: 10000 } },
-  [QUEUE_NAMES.DMCA_PROCESSING]: { attempts: 3, backoff: { type: 'exponential' as const, delay: 10000 } },
-};
-
 const queueCache = new Map<string, Queue<unknown, unknown, string>>();
-
-/** Simple cache key for the queue options. Options are fixed literals, so no recursive sorting needed. */
-function cacheKeyForOptions(options: QueueOptions['defaultJobOptions'] | undefined): string {
-  return options ? JSON.stringify(options) : '';
-}
 
 let _flowProducer: FlowProducer | null = null;
 
@@ -49,46 +40,47 @@ export function getFlowProducer(): FlowProducer {
 
 function getQueue<TData = unknown, TFinishedData = unknown>(
   name: string,
-  jobOptions?: QueueOptions['defaultJobOptions']
+  jobOptions: JobOpts
 ): Queue<TData, TFinishedData, string> {
-  const cacheKey = `${name}:${cacheKeyForOptions(jobOptions)}`;
-
-  const cached = queueCache.get(cacheKey);
+  const cached = queueCache.get(name);
   if (cached) {
     return cached as Queue<TData, TFinishedData, string>;
   }
 
   const queue = new Queue<TData, TFinishedData, string>(name, {
     connection: getRedisInstance(),
-    defaultJobOptions: jobOptions ?? defaultJobOptions,
+    defaultJobOptions: jobOptions,
   });
 
-  queueCache.set(cacheKey, queue);
+  queueCache.set(name, queue);
   return queue;
 }
 
 export function getLiveDownloadQueue(): Queue<LiveDownloadJob, LiveDownloadJob, string> {
-  return getQueue(QUEUE_NAMES.VOD_LIVE);
+  return getQueue(QUEUE_NAMES.VOD_LIVE, defaultJobOptions);
 }
 
 export function getStandardVodQueue(): Queue<StandardVodJob, StandardVodJob, string> {
-  return getQueue(QUEUE_NAMES.VOD_STANDARD);
+  return getQueue(QUEUE_NAMES.VOD_STANDARD, defaultJobOptions);
 }
 
 export function getChatDownloadQueue(): Queue<ChatDownloadJob, ChatDownloadJob, string> {
-  return getQueue(QUEUE_NAMES.CHAT_DOWNLOAD, queueRetryOptions[QUEUE_NAMES.CHAT_DOWNLOAD]);
+  return getQueue(QUEUE_NAMES.CHAT_DOWNLOAD, { attempts: 5, backoff: { type: 'exponential' as const, delay: 3000 } });
 }
 
 export function getYoutubeUploadQueue(): Queue<YoutubeUploadJob, YoutubeUploadJob, string> {
-  return getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD, queueRetryOptions[QUEUE_NAMES.YOUTUBE_UPLOAD]);
+  return getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD, { attempts: 3, backoff: { type: 'exponential' as const, delay: 10000 } });
 }
 
 export function getDmcaProcessingQueue(): Queue<DmcaProcessingJob, DmcaProcessingJob, string> {
-  return getQueue(QUEUE_NAMES.DMCA_PROCESSING, queueRetryOptions[QUEUE_NAMES.DMCA_PROCESSING]);
+  return getQueue(QUEUE_NAMES.DMCA_PROCESSING, {
+    attempts: 3,
+    backoff: { type: 'exponential' as const, delay: 10000 },
+  });
 }
 
 export function getMonitorQueue(): Queue<MonitorJob, MonitorJob, string> {
-  return getQueue(QUEUE_NAMES.MONITOR);
+  return getQueue(QUEUE_NAMES.MONITOR, defaultJobOptions);
 }
 
 export async function closeQueues(): Promise<void> {
