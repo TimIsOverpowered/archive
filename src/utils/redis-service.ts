@@ -215,7 +215,6 @@ export class RedisService {
           isFallback: false,
         });
       }
-      getLogger().info({ count: rateLimiters.length }, 'Rate limiters initialized');
     }
   }
 
