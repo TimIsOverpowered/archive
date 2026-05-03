@@ -29,7 +29,13 @@ export interface VodWorkerAlerts {
   init: (vodId: string, platform: Platform, streamerName: string) => RichEmbedData;
   progress: (vodId: string, segmentsDownloaded: number, totalSegments: number) => RichEmbedData;
   converting: (vodId: string, percent: number) => RichEmbedData;
-  complete: (vodId: string, platform: Platform, finalPath: string, duration?: number, segmentCount?: number) => RichEmbedData;
+  complete: (
+    vodId: string,
+    platform: Platform,
+    finalPath: string,
+    duration?: number,
+    segmentCount?: number
+  ) => RichEmbedData;
   error: (vodId: string, platform: Platform, errorMsg: string) => RichEmbedData;
 }
 

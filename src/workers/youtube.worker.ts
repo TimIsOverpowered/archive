@@ -46,16 +46,19 @@ const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeP
 
   if (actualFilePath == null || actualFilePath === '') {
     const childResults = await job.getChildrenValues();
-    const downloadResult = Object.values(childResults)[0] as { finalPath?: string };
+    const firstResult = Object.values(childResults)[0] as { finalPath?: string; filePath?: string };
 
-    if (downloadResult?.finalPath == null || downloadResult?.finalPath === '') {
+    if (firstResult?.filePath != null && firstResult.filePath !== '') {
+      actualFilePath = firstResult.filePath;
+      log.debug({ vodId, filePath: actualFilePath }, 'Retrieved filePath from game upload child result');
+    } else if (firstResult?.finalPath != null && firstResult.finalPath !== '') {
+      actualFilePath = firstResult.finalPath;
+      log.debug({ vodId, filePath: actualFilePath }, 'Retrieved filePath from download job result');
+    } else {
       throw new Error(
-        `File path not available for vodId=${vodId}, jobId=${job.id}: download job may have failed or not completed`
+        `File path not available for vodId=${vodId}, jobId=${job.id}: child jobs may have failed or not completed`
       );
     }
-
-    actualFilePath = downloadResult.finalPath;
-    log.debug({ vodId, filePath: actualFilePath }, 'Retrieved filePath from download job result');
   }
 
   const { config, db } = await getJobContext(tenantId);

@@ -52,7 +52,16 @@ export async function buildVodProcessorContext(
       const streamerName = getDisplayName(config);
       const finalPath = getVodFilePath({ config, vodId });
       return {
-        extra: { platformUserId, platformUsername, sourceUrl, downloadMethod, job, streamerName, finalPath, segmentCount: undefined as number | undefined },
+        extra: {
+          platformUserId,
+          platformUsername,
+          sourceUrl,
+          downloadMethod,
+          job,
+          streamerName,
+          finalPath,
+          segmentCount: undefined as number | undefined,
+        },
         alertInitArgs: [vodId, platform, streamerName],
       };
     },
@@ -133,7 +142,10 @@ export async function sendVodCompletion(ctx: VodProcessorContext): Promise<void>
   await ctx.job.updateProgress(100);
   const metadata = await getMetadata(ctx.finalPath);
   const duration = metadata?.duration != null ? Math.round(metadata.duration) : undefined;
-  await updateAlert(ctx.messageId, ctx.alerts.complete(ctx.vodId, ctx.platform, ctx.finalPath, duration, ctx.segmentCount));
+  await updateAlert(
+    ctx.messageId,
+    ctx.alerts.complete(ctx.vodId, ctx.platform, ctx.finalPath, duration, ctx.segmentCount)
+  );
 
   ctx.log.info(
     {

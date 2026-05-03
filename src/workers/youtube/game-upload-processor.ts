@@ -49,9 +49,13 @@ export interface GameUploadAndUpsertParams {
 }
 
 export type GameUploadResult =
-  | { success: true; videoId: string; gameId: string }
-  | { success: true; videos: Array<{ id: string; part: number; startTime: number; endTime: number; gameId: string }> }
-  | { success: true; videoId: ''; gameId: '' };
+  | { success: true; videoId: string; gameId: string; filePath: string }
+  | {
+      success: true;
+      videos: Array<{ id: string; part: number; startTime: number; endTime: number; gameId: string }>;
+      filePath: string;
+    }
+  | { success: true; videoId: ''; gameId: ''; filePath: string };
 
 export async function uploadAndUpsertGame(
   params: GameUploadAndUpsertParams
@@ -73,7 +77,7 @@ export async function uploadAndUpsertGame(
     config,
   } = params;
   const channelName = getDisplayName(config);
-  const duration = chapterEnd - chapterStart;
+  const duration = chapterEnd;
   const currentPartNum = part ?? 1;
   const partTitle = part != null && part > 1 ? `${title} PART ${part}` : title;
 
@@ -207,7 +211,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     log,
   });
 
-  return { success: true, ...result };
+  return { success: true, ...result, filePath: ctx.filePath };
 }
 
 async function processSplitGameUpload(
@@ -282,7 +286,7 @@ async function processSplitGameUpload(
       vodId,
       filePath: splitPath,
       chapterStart: startTime + chapterStart,
-      chapterEnd: endTime + chapterStart,
+      chapterEnd: endTime - startTime,
       chapterName,
       chapterGameId,
       title,
@@ -320,5 +324,5 @@ async function processSplitGameUpload(
     vodId
   );
 
-  return { success: true, videos: uploadedGameVideos };
+  return { success: true, videos: uploadedGameVideos, filePath: ctx.filePath };
 }
