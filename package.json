@@ -41,7 +41,7 @@
     "stop:pm2": "pm2 stop all && pm2 delete all",
     "restart:pm2": "pm2 restart all",
     "logs:pm2": "pm2 logs --lines 100 --raw",
-    "deps:circular": "madge --ts-config tsconfig.json --circular src/index.ts src/workers/index.ts"
+    "deps:circular": "npx madge --ts-config tsconfig.json --circular src/index.ts src/workers/index.ts"
   },
   "standard": {
     "env": [],
@@ -84,7 +84,6 @@
     "eslint": "^10.3.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import-x": "^4.16.2",
-    "madge": "^8.0.0",
     "open": "^11.0.0",
     "pm2": "^7.0.1",
     "prettier": "^3.8.3",
