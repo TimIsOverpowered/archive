@@ -70,9 +70,7 @@ function runFfmpeg(
 
   return new Promise<void>((resolve, reject) => {
     const proc = spawn('ffmpeg', args);
-    trackProgress(proc, cmdStr, knownDuration, onProgress, onStart)
-      .then(resolve)
-      .catch(reject);
+    trackProgress(proc, cmdStr, knownDuration, onProgress, onStart).then(resolve).catch(reject);
 
     proc.on('error', (err: Error) => {
       reject(err);
@@ -165,14 +163,20 @@ export async function splitVideo(
       const args = [
         '-v',
         'info',
-        '-ss',
-        start.toString(),
         '-i',
         filePath,
+        '-ss',
+        start.toString(),
         '-t',
         splitDuration.toString(),
         '-c',
         'copy',
+        '-copyts',
+        '-start_at_zero',
+        '-avoid_negative_ts',
+        'make_zero',
+        '-map_metadata',
+        '0',
         '-y',
         partFile,
       ];
@@ -213,14 +217,20 @@ export async function trimVideo(
   const args = [
     '-v',
     'info',
-    '-ss',
-    start.toString(),
     '-i',
     filePath,
+    '-ss',
+    start.toString(),
     '-t',
     duration.toString(),
     '-c',
     'copy',
+    '-copyts',
+    '-start_at_zero',
+    '-avoid_negative_ts',
+    'make_zero',
+    '-map_metadata',
+    '0',
     '-y',
     outputFile,
   ];
@@ -440,14 +450,20 @@ export async function extractSegment(
   const args = [
     '-v',
     'info',
-    '-ss',
-    start.toString(),
     '-i',
     source,
+    '-ss',
+    start.toString(),
     '-t',
     duration.toString(),
     '-c',
     'copy',
+    '-copyts',
+    '-start_at_zero',
+    '-avoid_negative_ts',
+    'make_zero',
+    '-map_metadata',
+    '0',
     '-y',
     outputPath,
   ];
