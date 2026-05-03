@@ -5,32 +5,8 @@ import {
   platformValidationMiddleware,
   asTenantPlatformContext,
 } from '../../../src/api/middleware/tenant-platform.js';
+import { HttpError } from '../../../src/utils/http-error.js';
 import { PLATFORMS } from '../../../src/types/platforms.js';
-
-function createMockReply(statusCode = 200, _body: any = null): any {
-  const headers: Record<string, string> = {};
-  let sentBody: any = null;
-  let sentStatus = statusCode;
-
-  return {
-    header: function (key: string, value: string) {
-      headers[key] = value;
-      return this;
-    },
-    status: function (code: number) {
-      sentStatus = code;
-      return {
-        send: function (b: any) {
-          sentBody = b;
-          return this;
-        },
-      };
-    },
-    getSentBody: () => sentBody,
-    getSentStatus: () => sentStatus,
-    getHeaders: () => headers,
-  };
-}
 
 function makeMockTenantConfig(overrides: Record<string, any> = {}): any {
   return {
@@ -46,66 +22,66 @@ function makeMockTenantConfig(overrides: Record<string, any> = {}): any {
 }
 
 describe('tenantMiddleware', () => {
-  it('should return 404 when tenantId is not provided', async () => {
+  it('should throw 404 when tenantId is not provided', async () => {
     const request = { params: {} };
-    const reply = createMockReply();
 
-    await tenantMiddleware(request as any, reply);
-
-    assert.strictEqual(reply.getSentStatus(), 404);
-    const body = reply.getSentBody();
-    assert.strictEqual(body.code, 'NOT_FOUND');
-    assert.strictEqual(body.message, 'Tenant ID not provided');
+    try {
+      await tenantMiddleware(request as any);
+      assert.fail('Should have thrown');
+    } catch (error) {
+      assert.ok(error instanceof HttpError);
+      assert.strictEqual(error.statusCode, 404);
+      assert.strictEqual(error.code, 'NOT_FOUND');
+      assert.strictEqual(error.message, 'Tenant ID not provided');
+    }
   });
 
-  it('should return 404 when tenant is not found in config', async () => {
+  it('should throw 404 when tenant is not found in config', async () => {
     const request = { params: { tenantId: 'non-existent' } };
-    const reply = createMockReply();
 
-    await tenantMiddleware(request as any, reply);
-
-    assert.strictEqual(reply.getSentStatus(), 404);
-    const body = reply.getSentBody();
-    assert.strictEqual(body.code, 'NOT_FOUND');
-    assert.strictEqual(body.message, 'Tenant not found');
-  });
-
-  it('should return 503 when database client fails to initialize', async () => {
-    // Register a tenant config first
-    const { configService: _configService } = await import('../../../src/config/tenant-config.js');
-
-    // This test will skip since we can't easily mock the DB without a real config
-    // The 404 case above covers the main path for unregistered tenants
+    try {
+      await tenantMiddleware(request as any);
+      assert.fail('Should have thrown');
+    } catch (error) {
+      assert.ok(error instanceof HttpError);
+      assert.strictEqual(error.statusCode, 404);
+      assert.strictEqual(error.code, 'NOT_FOUND');
+      assert.strictEqual(error.message, 'Tenant not found');
+    }
   });
 });
 
 describe('platformValidationMiddleware', () => {
-  it('should return 400 when platform is not provided', async () => {
+  it('should throw 400 when platform is not provided', async () => {
     const request = { body: {}, tenant: null };
-    const reply = createMockReply();
 
-    await platformValidationMiddleware(request as any, reply);
-
-    assert.strictEqual(reply.getSentStatus(), 400);
-    const body = reply.getSentBody();
-    assert.strictEqual(body.code, 'BAD_REQUEST');
-    assert.strictEqual(body.message, 'Platform is required');
+    try {
+      await platformValidationMiddleware(request as any);
+      assert.fail('Should have thrown');
+    } catch (error) {
+      assert.ok(error instanceof HttpError);
+      assert.strictEqual(error.statusCode, 400);
+      assert.strictEqual(error.code, 'BAD_REQUEST');
+      assert.strictEqual(error.message, 'Platform is required');
+    }
   });
 
-  it('should return 400 when platform is not enabled for tenant', async () => {
+  it('should throw 400 when platform is not enabled for tenant', async () => {
     const tenantConfig = makeMockTenantConfig({ twitch: { enabled: false } });
     const request = {
       body: { platform: 'twitch' },
       tenant: { config: tenantConfig },
     };
-    const reply = createMockReply();
 
-    await platformValidationMiddleware(request as any, reply);
-
-    assert.strictEqual(reply.getSentStatus(), 400);
-    const body = reply.getSentBody();
-    assert.strictEqual(body.code, 'BAD_REQUEST');
-    assert.ok(body.message.includes('not enabled'));
+    try {
+      await platformValidationMiddleware(request as any);
+      assert.fail('Should have thrown');
+    } catch (error) {
+      assert.ok(error instanceof HttpError);
+      assert.strictEqual(error.statusCode, 400);
+      assert.strictEqual(error.code, 'BAD_REQUEST');
+      assert.ok(error.message.includes('not enabled'));
+    }
   });
 
   it('should set platform on tenant context when valid', async () => {
@@ -114,11 +90,9 @@ describe('platformValidationMiddleware', () => {
       body: { platform: 'twitch' },
       tenant: { config: tenantConfig },
     };
-    const reply = createMockReply();
 
-    await platformValidationMiddleware(request as any, reply);
+    await platformValidationMiddleware(request as any);
 
-    assert.strictEqual(reply.getSentStatus(), 200);
     assert.strictEqual((request.tenant as any).platform, PLATFORMS.TWITCH);
   });
 
@@ -128,27 +102,27 @@ describe('platformValidationMiddleware', () => {
       body: { platform: 'TWITCH' },
       tenant: { config: tenantConfig },
     };
-    const reply = createMockReply();
 
-    await platformValidationMiddleware(request as any, reply);
+    await platformValidationMiddleware(request as any);
 
-    assert.strictEqual(reply.getSentStatus(), 200);
     assert.strictEqual((request.tenant as any).platform, PLATFORMS.TWITCH);
   });
 
-  it('should return 500 when tenant context is missing', async () => {
+  it('should throw 500 when tenant context is missing', async () => {
     const request = {
       body: { platform: 'twitch' },
       tenant: null,
     };
-    const reply = createMockReply();
 
-    await platformValidationMiddleware(request as any, reply);
-
-    assert.strictEqual(reply.getSentStatus(), 500);
-    const body = reply.getSentBody();
-    assert.strictEqual(body.code, 'INTERNAL_SERVER_ERROR');
-    assert.strictEqual(body.message, 'Tenant context not found');
+    try {
+      await platformValidationMiddleware(request as any);
+      assert.fail('Should have thrown');
+    } catch (error) {
+      assert.ok(error instanceof HttpError);
+      assert.strictEqual(error.statusCode, 500);
+      assert.strictEqual(error.code, 'INTERNAL_SERVER_ERROR');
+      assert.strictEqual(error.message, 'Tenant context not found');
+    }
   });
 
   it('should validate kick platform when enabled', async () => {
@@ -157,11 +131,9 @@ describe('platformValidationMiddleware', () => {
       body: { platform: 'kick' },
       tenant: { config: tenantConfig },
     };
-    const reply = createMockReply();
 
-    await platformValidationMiddleware(request as any, reply);
+    await platformValidationMiddleware(request as any);
 
-    assert.strictEqual(reply.getSentStatus(), 200);
     assert.strictEqual((request.tenant as any).platform, PLATFORMS.KICK);
   });
 });

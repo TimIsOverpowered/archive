@@ -1,6 +1,6 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyRequest } from 'fastify';
 import { getHealthToken } from '../../config/env.js';
-import { errorResponse } from '../response.js';
+import { unauthorized } from '../../utils/http-error.js';
 
 /** Constant-time string comparison to prevent timing attacks. */
 function timingSafeEqual(a: string, b: string): boolean {
@@ -16,12 +16,12 @@ function timingSafeEqual(a: string, b: string): boolean {
  * Health check token validation middleware.
  * Requires `x-health-token` header matching the configured token (timing-safe comparison).
  */
-export default async function healthCheckMiddleware(request: FastifyRequest, reply: FastifyReply) {
+export default function healthCheckMiddleware(request: FastifyRequest) {
   const rawToken = request.headers['x-health-token'];
   const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
   const expectedToken = getHealthToken();
 
   if (token == null || expectedToken == null || !timingSafeEqual(token, expectedToken)) {
-    return reply.status(401).send(errorResponse(401, 'Invalid health check token', 'UNAUTHORIZED'));
+    unauthorized('Invalid health check token');
   }
 }

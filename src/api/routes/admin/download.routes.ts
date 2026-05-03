@@ -8,7 +8,8 @@ import {
   requireTenant,
 } from '../../middleware/tenant-platform.js';
 import { findVodByPlatformId } from '../../../db/queries/vods.js';
-import { ensureVodDownload, ensureVodRecord } from './utils/vod-helpers.js';
+import { ensureVodRecord } from './utils/vod-records.js';
+import { ensureVodDownload } from './utils/vod-downloads.js';
 import { buildVodJobResponse } from './utils/vod-job-response.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { HttpError } from '../../../utils/http-error.js';

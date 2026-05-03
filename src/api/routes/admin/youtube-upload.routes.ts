@@ -19,7 +19,7 @@ import {
   UPLOAD_MODES,
 } from '../../../types/platforms.js';
 import { findVodByPlatformId } from '../../../db/queries/vods.js';
-import { ensureVodDownload } from './utils/vod-helpers.js';
+import { ensureVodDownload } from './utils/vod-downloads.js';
 import { buildVodJobResponse } from './utils/vod-job-response.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';

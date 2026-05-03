@@ -1,10 +1,10 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyRequest } from 'fastify';
 import { configService } from '../../config/tenant-config.js';
 import { ensureClient } from '../../db/streamer-client.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import type { TenantContext } from '../../types/context.js';
 import { isValidPlatform, type Platform } from '../../types/platforms.js';
-import { errorResponse } from '../response.js';
+import { notFound, badRequest, serviceUnavailable, internalServerError } from '../../utils/http-error.js';
 
 export interface TenantPlatformContext extends TenantContext {
   platform: Platform;
@@ -42,17 +42,17 @@ export function asTenantPlatformContext(ctx: TenantContext): TenantPlatformConte
  * Use this for all routes that need tenant validation.
  * Register in onRequest hook.
  */
-export async function tenantMiddleware(request: FastifyRequest, reply: FastifyReply) {
+export async function tenantMiddleware(request: FastifyRequest) {
   const tenantId = (request.params as { tenantId?: string }).tenantId;
 
   if (tenantId == null) {
-    return reply.status(404).send(errorResponse(404, 'Tenant ID not provided', 'NOT_FOUND'));
+    notFound('Tenant ID not provided');
   }
 
   const config = configService.get(tenantId);
 
   if (!config) {
-    return reply.status(404).send(errorResponse(404, 'Tenant not found', 'NOT_FOUND'));
+    notFound('Tenant not found');
   }
 
   let client;
@@ -63,7 +63,7 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
       { tenantId, error: extractErrorDetails(err) },
       'Failed to initialize database client during request'
     );
-    return reply.status(503).send(errorResponse(503, 'Database not available', 'SERVICE_UNAVAILABLE'));
+    serviceUnavailable('Database not available');
   }
 
   request.tenant = {
@@ -78,28 +78,26 @@ export async function tenantMiddleware(request: FastifyRequest, reply: FastifyRe
  * Must be used after tenantMiddleware (expects request.tenant to exist)
  * Register in preValidation hook
  */
-export async function platformValidationMiddleware(request: FastifyRequest, reply: FastifyReply) {
+export function platformValidationMiddleware(request: FastifyRequest) {
   const rawPlatform = (request.body as { platform?: string }).platform;
   if (rawPlatform == null || rawPlatform === '') {
-    return reply.status(400).send(errorResponse(400, 'Platform is required', 'BAD_REQUEST'));
+    badRequest('Platform is required');
   }
 
   const requestPlatform = rawPlatform.toLowerCase();
   if (!isValidPlatform(requestPlatform)) {
-    return reply.status(400).send(errorResponse(400, `Invalid platform: ${requestPlatform}`, 'BAD_REQUEST'));
+    badRequest(`Invalid platform: ${requestPlatform}`);
   }
 
   const tenant = request.tenant;
   if (tenant == null) {
-    return reply.status(500).send(errorResponse(500, 'Tenant context not found', 'INTERNAL_SERVER_ERROR'));
+    internalServerError('Tenant context not found');
   }
 
   const config = tenant.config;
 
   if (config[requestPlatform]?.enabled !== true) {
-    return reply
-      .status(400)
-      .send(errorResponse(400, `${requestPlatform} is not enabled for this tenant`, 'BAD_REQUEST'));
+    badRequest(`${requestPlatform} is not enabled for this tenant`);
   }
 
   (request.tenant as TenantPlatformContext).platform = requestPlatform;

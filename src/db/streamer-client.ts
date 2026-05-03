@@ -20,10 +20,10 @@ interface PgPoolEntry {
 
 class PoolManager {
   private pools = new Map<string, PgPoolEntry>();
-
-  constructor(private readonly PoolCtor: typeof Pool = Pool) {}
   private cleanupIntervalId: NodeJS.Timeout | null = null;
   private creationLocks = new Map<string, Promise<Kysely<StreamerDB>>>();
+
+  constructor(private readonly PoolCtor: typeof Pool = Pool) {}
 
   getClient(tenantId: string): Kysely<StreamerDB> | undefined {
     const entry = this.pools.get(tenantId);

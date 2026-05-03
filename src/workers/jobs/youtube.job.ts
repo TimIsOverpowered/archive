@@ -535,7 +535,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
           name: 'youtube_upload',
           queueName: queue.name,
           data: { ...job, filePath: undefined },
-          opts: { jobId: gameJobIds[idx]!, removeOnComplete: true, removeOnFail: true },
+          opts: { jobId: gameJobIds[idx] ?? '', removeOnComplete: true, removeOnFail: true },
           children: [
             {
               name: 'standard_vod_download',
@@ -575,7 +575,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
           name: 'youtube_upload',
           queueName: queue.name,
           data: job,
-          opts: { jobId: gameJobIds[idx]!, removeOnComplete: true, removeOnFail: true },
+          opts: { jobId: gameJobIds[idx] ?? '', removeOnComplete: true, removeOnFail: true },
         }));
 
         const flow = await getFlowProducer().add({

@@ -18,7 +18,7 @@ import {
   DOWNLOAD_METHODS,
 } from '../../../types/platforms.js';
 import { findVodByPlatformId } from '../../../db/queries/vods.js';
-import { ensureVodDownload } from './utils/vod-helpers.js';
+import { ensureVodDownload } from './utils/vod-downloads.js';
 import { parseDmcaClaims } from './utils/dmca.js';
 import { buildVodJobResponse } from './utils/vod-job-response.js';
 import { queueDmcaProcessing } from '../../../workers/jobs/dmca.job.js';

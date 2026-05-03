@@ -75,7 +75,7 @@ export function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
   ] as const;
 
   for (const { key, raw, schema, label } of platformConfigs) {
-    const parsed = parsePlatformConfig(tenant.id, raw, schema as ZodType<any>, label);
+    const parsed = parsePlatformConfig(tenant.id, raw, schema as ZodType<unknown>, label);
     if (parsed != null) {
       (tenantConfig as unknown as Record<string, unknown>)[key] = parsed;
     }

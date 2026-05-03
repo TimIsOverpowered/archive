@@ -1,5 +1,4 @@
 import { RedisService } from '../utils/redis-service.js';
-import { getLogger } from '../utils/logger.js';
 
 let initPromise: Promise<void> | null = null;
 
@@ -14,9 +13,6 @@ export async function initWorkersRedis(): Promise<void> {
   initPromise = (async () => {
     const { getWorkersConfig } = await import('../config/env.js');
     const url = getWorkersConfig().REDIS_URL;
-    const maskedUrl = url.replace(/:\/\/.*@/, '://***@');
-    getLogger().info({ component: 'redis', url: maskedUrl }, 'Connecting to Redis');
-
     await RedisService.init({ url, maxRetriesPerRequest: null }).connect();
   })();
 

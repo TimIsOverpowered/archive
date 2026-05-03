@@ -87,7 +87,6 @@ async function initInfrastructure() {
   getLogger().info({ component: 'db' }, 'DB client cleanup started');
 
   await initCycleTLS();
-  getLogger().info({ component: 'cycletls' }, 'CycleTLS initialized');
 }
 
 async function initApplicationState() {

@@ -29,6 +29,8 @@ export function enterTenantContext(context: TenantContextData): void {
   tenantContextStore.enterWith(context);
 }
 
-export const exitTenantContext = (): void => {
-  tenantContextStore.exit(() => {});
-};
+export function exitTenantContext(): void {
+  tenantContextStore.exit(() => {
+    /* no-op — exit requires a callback */
+  });
+}

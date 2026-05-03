@@ -5,7 +5,7 @@ import { tenantMiddleware, requireTenant } from '../../middleware/tenant-platfor
 import { internalServerError } from '../../../utils/http-error.js';
 import type { SourceType, DownloadMethod } from '../../../types/platforms.js';
 import { DOWNLOAD_METHODS, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
-import { ensureVodDownload } from './utils/vod-helpers.js';
+import { ensureVodDownload } from './utils/vod-downloads.js';
 import { parseDmcaClaims } from './utils/dmca.js';
 import { buildVodJobResponse } from './utils/vod-job-response.js';
 import { resolveGameWithContext } from './utils/game-context.js';
