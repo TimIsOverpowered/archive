@@ -1,4 +1,4 @@
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import { RateLimiterRedis, RateLimiterMemory } from 'rate-limiter-flexible';
 import { getBaseConfig } from '../config/env.js';
 import { clearAllConnectionFailures } from './cache-state.js';

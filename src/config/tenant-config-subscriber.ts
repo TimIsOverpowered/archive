@@ -1,4 +1,4 @@
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import { createRedisSubscriber } from '../utils/redis-subscriber.js';
 import { configService } from './tenant-config.js';
 

@@ -1,11 +1,11 @@
 import { FastifyInstance } from 'fastify';
-import dmcaProcessingRoutes from './dmca.routes';
-import downloadJobsRoutes from './download.routes';
-import gameUploadRoutes from './game-upload.routes';
-import liveCallbackRoutes from './live-callback.routes';
-import metadataFetchingRoutes from './metadata.routes';
-import vodManagementRoutes from './vod-management.routes';
-import youtubeUploadRoutes from './youtube-upload.routes';
+import dmcaProcessingRoutes from './dmca.routes.js';
+import downloadJobsRoutes from './download.routes.js';
+import gameUploadRoutes from './game-upload.routes.js';
+import liveCallbackRoutes from './live-callback.routes.js';
+import metadataFetchingRoutes from './metadata.routes.js';
+import vodManagementRoutes from './vod-management.routes.js';
+import youtubeUploadRoutes from './youtube-upload.routes.js';
 
 /** Options for registering the admin routes plugin. */
 interface AdminRoutesOptions {
@@ -31,4 +31,4 @@ export default async function adminRoutes(fastify: FastifyInstance, _options: Ad
   await fastify.register(liveCallbackRoutes, { prefix: '' });
 }
 
-export { default as globalAdminRoutes } from './global.routes';
+export { default as globalAdminRoutes } from './global.routes.js';

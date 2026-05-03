@@ -1,7 +1,12 @@
 import fs from 'node:fs';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import cycletls from 'cycletls';
+import cycletlsMod from 'cycletls';
+import type { CycleTLSClient as CycleTLSClientType } from 'cycletls';
+const cycletls = cycletlsMod as unknown as (opts?: {
+  debug?: boolean;
+  timeout?: number;
+}) => Promise<CycleTLSClientType>;
 import { getBaseConfig } from '../config/env.js';
 import { Http } from '../constants.js';
 import { getLogger } from './logger.js';

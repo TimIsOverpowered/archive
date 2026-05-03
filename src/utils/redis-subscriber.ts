@@ -1,4 +1,4 @@
-import type Redis from 'ioredis';
+import type { Redis } from 'ioredis';
 import { extractErrorDetails } from './error.js';
 import { getLogger } from './logger.js';
 import { RedisService } from './redis-service.js';
