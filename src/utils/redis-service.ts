@@ -223,11 +223,6 @@ export class RedisService {
     return this.client;
   }
 
-  getLimiter(key: string): RateLimiterRedis | RateLimiterMemory | null {
-    const entry = this.limiters.get(key);
-    return entry?.limiter ?? null;
-  }
-
   isLimiterFallback(key: string): boolean {
     const entry = this.limiters.get(key);
     return entry?.isFallback ?? false;

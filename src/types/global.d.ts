@@ -11,9 +11,9 @@ type RateLimiter = RateLimiterRedis | RateLimiterMemory;
 declare module 'fastify' {
   interface FastifyInstance {
     redis: Redis;
-    publicRateLimiter: RateLimiter;
-    chatRateLimiter: RateLimiter;
-    adminRateLimiter: RateLimiter;
+    publicRateLimiter: RateLimiter | null;
+    chatRateLimiter: RateLimiter | null;
+    adminRateLimiter: RateLimiter | null;
   }
 
   interface FastifyRequest {

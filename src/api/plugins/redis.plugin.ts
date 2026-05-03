@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
+import fp from 'fastify-plugin';
 import { RedisService, type RateLimiterConfig } from '../../utils/redis-service.js';
 import { getLogger } from '../../utils/logger.js';
 import { getApiConfig } from '../../config/env.js';
@@ -26,21 +27,15 @@ const redisPlugin: FastifyPluginAsync<RedisPluginOptions> = async (fastify, opti
 
   await RedisService.init({ url, rateLimiters }).connect();
 
-  // Register on Fastify instance for backward compatibility
   fastify.decorate('redis', RedisService.getClient());
-  const vodsLimiter = RedisService.getLimiter('rate:vods');
-  const chatLimiter = RedisService.getLimiter('rate:chat');
-  const adminLimiter = RedisService.getLimiter('rate:admin');
-  if (vodsLimiter && chatLimiter && adminLimiter) {
-    fastify.decorate('publicRateLimiter', vodsLimiter);
-    fastify.decorate('chatRateLimiter', chatLimiter);
-    fastify.decorate('adminRateLimiter', adminLimiter);
-  }
+  fastify.decorate('publicRateLimiter', RedisService.getLimiter('rate:vods'));
+  fastify.decorate('chatRateLimiter', RedisService.getLimiter('rate:chat'));
+  fastify.decorate('adminRateLimiter', RedisService.getLimiter('rate:admin'));
 
   getLogger().info({ vodLimit, chatLimit, adminGetLimit }, 'Rate limiters initialized');
 };
 
-export default redisPlugin;
+export default fp(redisPlugin);
 
 export { RedisService };
 
