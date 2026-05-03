@@ -29,7 +29,7 @@ export interface VodWorkerAlerts {
   init: (vodId: string, platform: Platform, streamerName: string) => RichEmbedData;
   progress: (vodId: string, segmentsDownloaded: number, totalSegments: number) => RichEmbedData;
   converting: (vodId: string, percent: number) => RichEmbedData;
-  complete: (vodId: string, platform: Platform, finalPath: string) => RichEmbedData;
+  complete: (vodId: string, platform: Platform, finalPath: string, duration?: number, segmentCount?: number) => RichEmbedData;
   error: (vodId: string, platform: Platform, errorMsg: string) => RichEmbedData;
 }
 
@@ -70,16 +70,26 @@ export function createVodWorkerAlerts(): VodWorkerAlerts {
       timestamp: new Date().toISOString(),
     }),
 
-    complete: (vodId, platform, finalPath) => ({
-      title: `[VOD] ${vodId} Complete`,
-      description: 'Successfully downloaded',
-      status: 'success',
-      fields: [
+    complete: (vodId, platform, finalPath, duration, segmentCount) => {
+      const fields: Array<{ name: string; value: string; inline: boolean }> = [
         { name: 'Platform', value: capitalizePlatform(platform), inline: true },
-        { name: 'Path', value: finalPath, inline: false },
-      ],
-      timestamp: new Date().toISOString(),
-    }),
+        { name: 'Duration', value: duration != null ? toHHMMSS(duration) : 'Unknown', inline: true },
+      ];
+
+      if (segmentCount != null) {
+        fields.push({ name: 'Segments', value: String(segmentCount), inline: true });
+      }
+
+      fields.push({ name: 'Path', value: finalPath, inline: false });
+
+      return {
+        title: `[VOD] ${vodId} Complete`,
+        description: 'Successfully downloaded',
+        status: 'success',
+        fields,
+        timestamp: new Date().toISOString(),
+      };
+    },
 
     error: (vodId, platform, errorMsg) => ({
       title: `[VOD] ${vodId} FAILED`,

@@ -4,6 +4,7 @@ import { getVodFilePath, getVodDirPath, fileExists } from '../utils/path.js';
 import { updateAlert } from '../utils/discord-alerts.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { createVodWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
+import { getMetadata } from './utils/ffmpeg.js';
 import type { StandardVodJob } from './jobs/types.js';
 import { downloadVodWithFfmpeg } from './vod/vod-download-strategies.js';
 import { DOWNLOAD_METHODS, PLATFORMS, type DownloadMethod } from '../types/platforms.js';
@@ -24,6 +25,7 @@ export interface VodProcessorContext extends BaseWorkerContext {
   streamerName: string;
   downloadMethod: DownloadMethod;
   finalPath: string;
+  segmentCount: number | undefined;
 }
 
 export async function buildVodProcessorContext(
@@ -50,7 +52,7 @@ export async function buildVodProcessorContext(
       const streamerName = getDisplayName(config);
       const finalPath = getVodFilePath({ config, vodId });
       return {
-        extra: { platformUserId, platformUsername, sourceUrl, downloadMethod, job, streamerName, finalPath },
+        extra: { platformUserId, platformUsername, sourceUrl, downloadMethod, job, streamerName, finalPath, segmentCount: undefined as number | undefined },
         alertInitArgs: [vodId, platform, streamerName],
       };
     },
@@ -99,7 +101,7 @@ export async function runVodDownload(ctx: VodProcessorContext): Promise<void> {
       ctx.log.info({ vodId: ctx.vodId }, 'Fetched Kick source URL from API');
     }
 
-    await downloadHlsStream({
+    const downloadResult = await downloadHlsStream({
       ctx,
       dbId: ctx.dbId,
       vodId: ctx.vodId,
@@ -122,13 +124,16 @@ export async function runVodDownload(ctx: VodProcessorContext): Promise<void> {
       },
     });
 
+    ctx.segmentCount = downloadResult.segmentCount;
     ctx.log.info({ vodId: ctx.vodId, platform: ctx.platform }, `Downloaded ${ctx.vodId}.mp4`);
   }
 }
 
 export async function sendVodCompletion(ctx: VodProcessorContext): Promise<void> {
   await ctx.job.updateProgress(100);
-  await updateAlert(ctx.messageId, ctx.alerts.complete(ctx.vodId, ctx.platform, ctx.finalPath));
+  const metadata = await getMetadata(ctx.finalPath);
+  const duration = metadata?.duration != null ? Math.round(metadata.duration) : undefined;
+  await updateAlert(ctx.messageId, ctx.alerts.complete(ctx.vodId, ctx.platform, ctx.finalPath, duration, ctx.segmentCount));
 
   ctx.log.info(
     {
