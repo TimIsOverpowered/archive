@@ -1,10 +1,10 @@
-import { Pool } from 'pg';
 import { Kysely, PostgresDialect } from 'kysely';
-import type { MetaDB } from './meta-types.js';
-import { getLogger } from '../utils/logger.js';
+import { Pool } from 'pg';
 import { getBaseConfig } from '../config/env.js';
-import { extractDatabaseName } from '../utils/formatting.js';
 import { Db } from '../constants.js';
+import { extractDatabaseName } from '../utils/formatting.js';
+import { getLogger } from '../utils/logger.js';
+import type { MetaDB } from './meta-types.js';
 import { buildPgBouncerUrl } from './utils/pg-bouncer.js';
 
 // Double-cast pattern: globalThis is `object`-typed, so we cast through `unknown` first

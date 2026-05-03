@@ -1,11 +1,12 @@
-import { request } from '../../http-client.js';
-import { toHHMMSS } from '../../formatting.js';
-import { extractErrorDetails } from '../../error.js';
-import { getLogger } from '../../logger.js';
-import { capitalizePlatform, type Platform } from '../../../types/platforms.js';
 import { getDiscordAlertWebhookUrl } from '../../../config/env.js';
+import { capitalizePlatform, type Platform } from '../../../types/platforms.js';
+import { extractErrorDetails } from '../../error.js';
+import { toHHMMSS } from '../../formatting.js';
+import { request } from '../../http-client.js';
+import { getLogger } from '../../logger.js';
 import { isAlertsEnabled } from '../context.js';
 import { constructEmbed } from '../embed.js';
+import type { AlertStatus } from '../embed.js';
 
 export interface StreamAlertData {
   platform: Platform;
@@ -38,7 +39,7 @@ export async function sendStreamAlert(data: StreamAlertData): Promise<string | n
     success: 'Upload Completed Successfully',
   };
 
-  const embedStatus: import('../embed.js').AlertStatus =
+  const embedStatus: AlertStatus =
     data.alertType === 'success' ? 'success' : data.alertType === 'failure' ? 'error' : 'warning';
 
   const fields: Array<{ name: string; value: string; inline?: boolean }> = [

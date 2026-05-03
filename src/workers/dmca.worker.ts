@@ -1,10 +1,10 @@
 import type { Job } from 'bullmq';
+import { updateAlert } from '../utils/discord-alerts.js';
+import { cleanupTempFiles } from './dmca/dmca.js';
 import { buildDmcaProcessorContext, trimDmcaVideo, processDmcaClaims, queueDmcaUpload } from './dmca.worker.phases.js';
 import type { DmcaProcessorContext } from './dmca.worker.phases.js';
-import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
 import type { DmcaProcessingJob, DmcaProcessingResult } from './jobs/types.js';
-import { cleanupTempFiles } from './dmca/dmca.js';
-import { updateAlert } from '../utils/discord-alerts.js';
+import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
 
 const errorMeta = (ctx: DmcaProcessorContext, _job: Job<unknown>) => ({
   vodId: ctx.vodId,

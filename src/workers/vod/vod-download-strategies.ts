@@ -1,17 +1,17 @@
-import { getVodTokenSig } from '../../services/twitch/index.js';
-import { getVod as getKickVod, getKickParsedM3u8ForFfmpeg } from '../../services/kick/index.js';
-import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
-import { createVodWorkerAlerts } from '../utils/alert-factories.js';
-import { initRichAlert, updateAlert } from '../../utils/discord-alerts.js';
-import type { AppLogger } from '../../utils/logger.js';
-import { getLogger } from '../../utils/logger.js';
 import type { TenantConfig } from '../../config/types.js';
 import { getDisplayName } from '../../config/types.js';
-import { PLATFORMS, type Platform } from '../../types/platforms.js';
-import { request } from '../../utils/http-client.js';
-import { extractErrorDetails } from '../../utils/error.js';
 import { Twitch } from '../../constants.js';
+import { getVod as getKickVod, getKickParsedM3u8ForFfmpeg } from '../../services/kick/index.js';
+import { getVodTokenSig } from '../../services/twitch/index.js';
+import { PLATFORMS, type Platform } from '../../types/platforms.js';
+import { initRichAlert, updateAlert } from '../../utils/discord-alerts.js';
 import { ConfigNotConfiguredError } from '../../utils/domain-errors.js';
+import { extractErrorDetails } from '../../utils/error.js';
+import { request } from '../../utils/http-client.js';
+import { getLogger } from '../../utils/logger.js';
+import type { AppLogger } from '../../utils/logger.js';
+import { createVodWorkerAlerts } from '../utils/alert-factories.js';
+import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
 
 export interface VodDownloadResult {
   finalPath: string;

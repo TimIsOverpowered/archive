@@ -1,9 +1,9 @@
-import path from 'path';
-import fsPromises from 'fs/promises';
-import { extractErrorDetails } from './error.js';
-import { childLogger } from './logger.js';
+import fsPromises from 'node:fs/promises';
+import path from 'node:path';
 import { TenantConfig } from '../config/types.js';
 import { ConfigNotConfiguredError } from './domain-errors.js';
+import { extractErrorDetails } from './error.js';
+import { childLogger } from './logger.js';
 
 const log = childLogger({ module: 'path' });
 

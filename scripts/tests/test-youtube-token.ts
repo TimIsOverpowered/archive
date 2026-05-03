@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 import 'dotenv/config';
 import { program } from 'commander';
-import { initMetaClient, closeMetaClient } from '../../src/db/meta-client.js';
-import { extractErrorDetails } from '../../src/utils/error.js';
-import { decryptScalar, decryptObject } from '../../src/utils/encryption.js';
 import { configService } from '../../src/config/tenant-config.js';
-import { createYoutubeClient } from '../../src/services/youtube/client.js';
-import { humanizeDuration } from '../../src/utils/formatting.js';
+import { initMetaClient, closeMetaClient } from '../../src/db/meta-client.js';
 import { getAllTenants, getTenantById } from '../../src/services/meta-tenants.service.js';
+import { createYoutubeClient } from '../../src/services/youtube/client.js';
+import { decryptScalar, decryptObject } from '../../src/utils/encryption.js';
+import { extractErrorDetails } from '../../src/utils/error.js';
+import { humanizeDuration } from '../../src/utils/formatting.js';
 
 interface YoutubeAuth {
   access_token?: string;

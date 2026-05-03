@@ -1,8 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
-import { RedisService, type RateLimiterConfig } from '../../utils/redis-service.js';
-import { getLogger } from '../../utils/logger.js';
 import { getApiConfig } from '../../config/env.js';
+import { getLogger } from '../../utils/logger.js';
+import { RedisService, type RateLimiterConfig } from '../../utils/redis-service.js';
 
 interface RedisPluginOptions {
   url: string;

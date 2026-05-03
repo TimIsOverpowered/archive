@@ -1,10 +1,10 @@
-import { EventEmitter } from 'node:events';
 import { strict as assert } from 'node:assert';
+import { EventEmitter } from 'node:events';
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
-import { resetEnvConfig } from '../../src/config/env.js';
-import { stopClientCleanup, createPoolManager } from '../../src/db/streamer-client.js';
 import type { Pool } from 'pg';
+import { resetEnvConfig } from '../../src/config/env.js';
 import { TenantConfig } from '../../src/config/types.js';
+import { stopClientCleanup, createPoolManager } from '../../src/db/streamer-client.js';
 import { createMockTenantConfig } from '../helpers/worker-test-setup.js';
 
 process.env.REDIS_URL = 'redis://localhost:6379';

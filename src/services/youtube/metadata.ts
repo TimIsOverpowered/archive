@@ -1,8 +1,8 @@
 import type { Kysely } from 'kysely';
 import type { StreamerDB, SelectableChapters } from '../../db/streamer-types.js';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import dayjs from '../../utils/dayjs.js';
 import { createYoutubeClient } from './client.js';
-import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 
 export async function saveChaptersAndLinkParts(
   tenantId: string,

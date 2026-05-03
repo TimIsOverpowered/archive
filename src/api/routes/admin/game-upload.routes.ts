@@ -1,18 +1,18 @@
 import { FastifyInstance } from 'fastify';
-import createRateLimitMiddleware from '../../middleware/rate-limit.js';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import { tenantMiddleware, requireTenant } from '../../middleware/tenant-platform.js';
-import { internalServerError } from '../../../utils/http-error.js';
 import type { SourceType, DownloadMethod } from '../../../types/platforms.js';
 import { DOWNLOAD_METHODS, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
-import { ensureVodDownload } from './utils/vod-downloads.js';
-import { parseDmcaClaims } from './utils/dmca.js';
-import { buildVodJobResponse } from './utils/vod-job-response.js';
-import { resolveGameWithContext } from './utils/game-context.js';
-import { queueYoutubeGameUploadByGame } from '../../../workers/jobs/youtube.job.js';
-import { queueDmcaProcessing } from '../../../workers/jobs/dmca.job.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
+import { internalServerError } from '../../../utils/http-error.js';
+import { queueDmcaProcessing } from '../../../workers/jobs/dmca.job.js';
+import { queueYoutubeGameUploadByGame } from '../../../workers/jobs/youtube.job.js';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
+import createRateLimitMiddleware from '../../middleware/rate-limit.js';
+import { tenantMiddleware, requireTenant } from '../../middleware/tenant-platform.js';
 import { ok } from '../../response.js';
+import { parseDmcaClaims } from './utils/dmca.js';
+import { resolveGameWithContext } from './utils/game-context.js';
+import { ensureVodDownload } from './utils/vod-downloads.js';
+import { buildVodJobResponse } from './utils/vod-job-response.js';
 
 interface ReUploadGameParams {
   tenantId: string;

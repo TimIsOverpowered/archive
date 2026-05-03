@@ -1,16 +1,16 @@
-import { getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
-import { getMetadata } from '../../../../workers/utils/ffmpeg.js';
-import { type AppLogger } from '../../../../utils/logger.js';
-import type { VodRecord } from '../../../../types/db.js';
+import { requirePlatformConfig } from '../../../../config/types.js';
+import { Vod } from '../../../../constants.js';
+import { findVodById } from '../../../../db/queries/vods.js';
+import type { SelectableVods } from '../../../../db/streamer-types.js';
 import type { SourceType, DownloadMethod } from '../../../../types/platforms.js';
 import { DOWNLOAD_METHODS, SOURCE_TYPES } from '../../../../types/platforms.js';
-import { Vod } from '../../../../constants.js';
-import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
-import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
-import { refreshVodRecord } from './vod-records.js';
-import { requirePlatformConfig } from '../../../../config/types.js';
 import { PlatformNotConfiguredError, VodNotFoundError } from '../../../../utils/domain-errors.js';
-import { findVodById } from '../../../../db/queries/vods.js';
+import { type AppLogger } from '../../../../utils/logger.js';
+import { getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
+import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
+import { getMetadata } from '../../../../workers/utils/ffmpeg.js';
+import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
+import { refreshVodRecord } from './vod-records.js';
 
 export interface EnsureVodDownloadOptions {
   ctx: TenantPlatformContext;
@@ -80,7 +80,7 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
 async function checkIfDownloadNeeded(
   filePath: string,
   dbId: number,
-  vodRecord: VodRecord,
+  vodRecord: SelectableVods,
   log: AppLogger
 ): Promise<boolean> {
   const exists = await fileExists(filePath);

@@ -3,8 +3,8 @@
 import 'dotenv/config';
 import bcrypt from 'bcrypt';
 import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
-import { extractErrorDetails } from '../src/utils/error.js';
 import { findAdminByUsername, createAdmin, generateApiKey } from '../src/services/admin.service.js';
+import { extractErrorDetails } from '../src/utils/error.js';
 
 const BCRYPT_COST = 10;
 

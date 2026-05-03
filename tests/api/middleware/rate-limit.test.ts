@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import createRateLimitMiddleware from '../../../src/api/middleware/rate-limit.js';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
+import createRateLimitMiddleware from '../../../src/api/middleware/rate-limit.js';
 
 function createMockRequest(headers: Record<string, string | string[] | undefined>, method = 'GET'): any {
   return {

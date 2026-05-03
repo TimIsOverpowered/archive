@@ -1,8 +1,8 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach } from 'node:test';
-import { withCache, withStaleWhileRevalidate, CacheContext } from '../../src/utils/cache.js';
 import { resetEnvConfig } from '../../src/config/env.js';
 import { simpleKeys, swrKeys } from '../../src/utils/cache-keys.js';
+import { withCache, withStaleWhileRevalidate, CacheContext } from '../../src/utils/cache.js';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 

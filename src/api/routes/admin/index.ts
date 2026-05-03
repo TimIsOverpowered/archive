@@ -1,11 +1,11 @@
 import { FastifyInstance } from 'fastify';
-import downloadJobsRoutes from './download.routes';
-import youtubeUploadRoutes from './youtube-upload.routes';
-import gameUploadRoutes from './game-upload.routes';
 import dmcaProcessingRoutes from './dmca.routes';
-import metadataFetchingRoutes from './metadata.routes';
+import downloadJobsRoutes from './download.routes';
+import gameUploadRoutes from './game-upload.routes';
 import liveCallbackRoutes from './live-callback.routes';
+import metadataFetchingRoutes from './metadata.routes';
 import vodManagementRoutes from './vod-management.routes';
+import youtubeUploadRoutes from './youtube-upload.routes';
 
 /** Options for registering the admin routes plugin. */
 interface AdminRoutesOptions {

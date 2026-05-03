@@ -1,6 +1,15 @@
 import { Job } from 'bullmq';
-import type { DmcaProcessingJob } from './jobs/types.js';
-import { queueYoutubeVodUpload, queueYoutubeGameUploadByGame } from './jobs/youtube.job.js';
+import type { Kysely } from 'kysely';
+import type { TenantConfig } from '../config/types.js';
+import type { StreamerDB } from '../db/streamer-types.js';
+import type { Platform, SourceType } from '../types/platforms.js';
+import { createAutoLogger } from '../utils/auto-tenant-logger.js';
+import { initRichAlert } from '../utils/discord-alerts.js';
+import { ConfigNotConfiguredError, FileNotFound } from '../utils/domain-errors.js';
+import { extractErrorDetails } from '../utils/error.js';
+import { toHHMMSS } from '../utils/formatting.js';
+import type { AppLogger } from '../utils/logger.js';
+import { fileExists, getVodDirPath } from '../utils/path.js';
 import {
   isBlockingPolicy,
   buildMuteFilters,
@@ -10,23 +19,13 @@ import {
   CLAIM_TYPES,
   getClaimIdentifier,
 } from './dmca/dmca.js';
-import { toHHMMSS } from '../utils/formatting.js';
-import { trimVideo } from './utils/ffmpeg.js';
-import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { getJobContext } from './utils/job-context.js';
-import { fileExists, getVodDirPath } from '../utils/path.js';
-import { extractErrorDetails } from '../utils/error.js';
-import { initRichAlert } from '../utils/discord-alerts.js';
-import { createDmcaWorkerAlerts, DmcaClaimInfo, safeUpdateAlert } from './utils/alert-factories.js';
-import { ConfigNotConfiguredError, FileNotFound } from '../utils/domain-errors.js';
-
-import type { TenantConfig } from '../config/types.js';
-import type { Kysely } from 'kysely';
-import type { StreamerDB } from '../db/streamer-types.js';
-import type { AppLogger } from '../utils/logger.js';
-import type { Platform, SourceType } from '../types/platforms.js';
-import type { DmcaWorkerAlerts } from './utils/alert-factories.js';
 import type { DMCAClaim } from './dmca/dmca.js';
+import type { DmcaProcessingJob } from './jobs/types.js';
+import { queueYoutubeVodUpload, queueYoutubeGameUploadByGame } from './jobs/youtube.job.js';
+import { createDmcaWorkerAlerts, DmcaClaimInfo, safeUpdateAlert } from './utils/alert-factories.js';
+import type { DmcaWorkerAlerts } from './utils/alert-factories.js';
+import { trimVideo } from './utils/ffmpeg.js';
+import { getJobContext } from './utils/job-context.js';
 
 export interface DmcaProcessorContext {
   job: Job<DmcaProcessingJob>;

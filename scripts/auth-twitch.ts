@@ -1,11 +1,11 @@
 import 'dotenv/config';
 import * as readline from 'readline';
 import { z } from 'zod';
+import { TwitchAuthSchema, TwitchAuthObject, TwitchSchema } from '../src/config/schemas.js';
 import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
+import { getTenantById, updateTenant } from '../src/services/meta-tenants.service.js';
 import { encryptObject, validateEncryptionKey } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
-import { TwitchAuthSchema, TwitchAuthObject, TwitchSchema } from '../src/config/schemas.js';
-import { getTenantById, updateTenant } from '../src/services/meta-tenants.service.js';
 // Validate encryption key at startup
 if (!process.env.ENCRYPTION_MASTER_KEY || !validateEncryptionKey(process.env.ENCRYPTION_MASTER_KEY)) {
   console.error('❌ ENCRYPTION_MASTER_KEY must be a valid 32-byte hex string (64 hex characters)');

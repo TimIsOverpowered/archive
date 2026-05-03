@@ -1,5 +1,5 @@
-import { readFileSync, readdirSync } from 'fs';
-import { resolve, join } from 'path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { resolve, join } from 'node:path';
 import { sql, type Kysely } from 'kysely';
 import { getLogger } from '../../utils/logger.js';
 import type { MetaDB } from '../meta-types.js';

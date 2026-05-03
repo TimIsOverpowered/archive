@@ -1,15 +1,15 @@
-import { getTwitchCredentials } from '../../utils/credentials.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { configService } from '../../config/tenant-config.js';
-import { encryptObject } from '../../utils/encryption.js';
+import { LRUCache } from 'lru-cache';
 import type { TwitchAuthObject } from '../../config/schemas.js';
+import { configService } from '../../config/tenant-config.js';
+import { Twitch } from '../../constants.js';
 import { getMetaClient } from '../../db/meta-client.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
+import { getTwitchCredentials } from '../../utils/credentials.js';
+import { ConfigNotConfiguredError } from '../../utils/domain-errors.js';
+import { encryptObject } from '../../utils/encryption.js';
+import { extractErrorDetails } from '../../utils/error.js';
 import { request } from '../../utils/http-client.js';
 import { createTwitchClient, type TwitchClient } from './client.js';
-import { LRUCache } from 'lru-cache';
-import { Twitch } from '../../constants.js';
-import { ConfigNotConfiguredError } from '../../utils/domain-errors.js';
 
 const log = createAutoLogger('twitch-auth');
 

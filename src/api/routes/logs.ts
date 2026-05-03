@@ -1,8 +1,8 @@
 import { FastifyInstance, FastifySchema } from 'fastify';
 import { z } from 'zod';
 import { getLogsByOffset, getLogsByCursor } from '../../services/logs.service.js';
-import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { badRequest } from '../../utils/http-error.js';
+import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
 import { ok } from '../response.js';
 

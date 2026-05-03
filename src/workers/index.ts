@@ -1,24 +1,24 @@
 import 'dotenv/config';
 import { pathToFileURL } from 'node:url';
-import { extractErrorDetails } from '../utils/error.js';
-import { registerProcessErrorHandlers } from '../utils/process-handlers.js';
-import { configService } from '../config/tenant-config.js';
-import { registerTenantConfigSubscriberWorker } from '../config/tenant-config-subscriber.js';
-import { QUEUE_NAMES, closeQueues } from './queues/queue.js';
 import { Queue } from 'bullmq';
-import { getRedisInstance, initWorkersRedis, closeWorkersRedis, waitForRedisReady } from './redis.js';
-import { startTokenHealthCron } from '../cron/token-health.js';
-import { startMonitorService, stopMonitorService } from './monitor/index.js';
-import { getLogger, setLoggerConfig } from '../utils/logger.js';
-import { registerShutdownHandlers as registerShutdown } from '../utils/shutdown.js';
-import { registerWorkers } from './worker-definitions.js';
-import { waitForWorkersReady, workerRegistry } from './create-worker.js';
 import { loadWorkersConfig } from '../config/env.js';
+import { registerTenantConfigSubscriberWorker } from '../config/tenant-config-subscriber.js';
+import { configService } from '../config/tenant-config.js';
 import { Vod } from '../constants.js';
+import { startTokenHealthCron } from '../cron/token-health.js';
+import { closeMetaClient } from '../db/meta-client.js';
 import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/streamer-client.js';
 import { registerPlatformStrategies } from '../services/platforms/index.js';
-import { closeMetaClient } from '../db/meta-client.js';
 import { initCycleTLS, closeCycleTLS } from '../utils/cycletls.js';
+import { extractErrorDetails } from '../utils/error.js';
+import { getLogger, setLoggerConfig } from '../utils/logger.js';
+import { registerProcessErrorHandlers } from '../utils/process-handlers.js';
+import { registerShutdownHandlers as registerShutdown } from '../utils/shutdown.js';
+import { waitForWorkersReady, workerRegistry } from './create-worker.js';
+import { startMonitorService, stopMonitorService } from './monitor/index.js';
+import { QUEUE_NAMES, closeQueues } from './queues/queue.js';
+import { getRedisInstance, initWorkersRedis, closeWorkersRedis, waitForRedisReady } from './redis.js';
+import { registerWorkers } from './worker-definitions.js';
 
 interface AppContext {
   workerConfig: ReturnType<typeof loadWorkersConfig>;

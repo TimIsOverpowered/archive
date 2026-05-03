@@ -16,13 +16,13 @@
  * Both use `JSON.parse`/`JSON.stringify` internally — primitives like numbers round-trip correctly.
  * The `withSimpleCache` function has been removed; use `withCache` for all use cases.
  */
-import { RedisService } from '../utils/redis-service.js';
-import { extractErrorDetails } from './error.js';
-import { getLogger } from '../utils/logger.js';
 import { LRUCache } from 'lru-cache';
-import { retryWithBackoff } from './retry.js';
 import { CacheSwr, CacheInflight } from '../constants.js';
+import { getLogger } from '../utils/logger.js';
+import { RedisService } from '../utils/redis-service.js';
 import type { SWRKey, SimpleKey } from './cache-keys.js';
+import { extractErrorDetails } from './error.js';
+import { retryWithBackoff } from './retry.js';
 
 /** Metrics for Redis cache hit/miss/error tracking. */
 export interface CacheMetrics {

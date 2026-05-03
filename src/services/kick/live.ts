@@ -1,7 +1,7 @@
-import { fetchUrl } from '../../utils/flaresolverr-client.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { getLogger } from '../../utils/logger.js';
 import { Kick } from '../../constants.js';
+import { extractErrorDetails } from '../../utils/error.js';
+import { fetchUrl } from '../../utils/flaresolverr-client.js';
+import { getLogger } from '../../utils/logger.js';
 import { KickVod } from './vod.js';
 
 interface KickApiResponse {

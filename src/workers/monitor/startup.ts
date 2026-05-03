@@ -1,8 +1,8 @@
 import { configService } from '../../config/tenant-config.js';
 import type { TenantConfig } from '../../config/types.js';
-import { getMonitorQueue } from '../queues/queue.js';
-import { getLogger } from '../../utils/logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
+import { getLogger } from '../../utils/logger.js';
+import { getMonitorQueue } from '../queues/queue.js';
 
 export async function registerMonitorRepeatJob(config: TenantConfig): Promise<void> {
   const queue = getMonitorQueue();

@@ -1,18 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import createRateLimitMiddleware from '../../middleware/rate-limit.js';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import {
-  tenantMiddleware,
-  platformValidationMiddleware,
-  asTenantPlatformContext,
-  requireTenant,
-} from '../../middleware/tenant-platform.js';
 import { findVodByPlatformId } from '../../../db/queries/vods.js';
-import { ensureVodRecord } from './utils/vod-records.js';
-import { ensureVodDownload } from './utils/vod-downloads.js';
-import { buildVodJobResponse } from './utils/vod-job-response.js';
-import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { notFound, badRequest } from '../../../utils/http-error.js';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
 import {
   SOURCE_TYPES,
@@ -23,8 +10,21 @@ import {
   DOWNLOAD_METHODS_VALUES,
   SOURCE_TYPES_VALUES,
 } from '../../../types/platforms.js';
+import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
+import { notFound, badRequest } from '../../../utils/http-error.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
+import createRateLimitMiddleware from '../../middleware/rate-limit.js';
+import {
+  tenantMiddleware,
+  platformValidationMiddleware,
+  asTenantPlatformContext,
+  requireTenant,
+} from '../../middleware/tenant-platform.js';
 import { ok } from '../../response.js';
+import { ensureVodDownload } from './utils/vod-downloads.js';
+import { buildVodJobResponse } from './utils/vod-job-response.js';
+import { findOrCreateVodRecord } from './utils/vod-records.js';
 
 /** Route params for download job endpoints. */
 interface Params {
@@ -89,7 +89,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
       const { vodId, type, downloadMethod, uploadMode } = request.body;
       const log = createAutoLogger(tenantId);
 
-      const vodRecord = await ensureVodRecord(tenantCtx, vodId, log);
+      const vodRecord = await findOrCreateVodRecord(tenantCtx, vodId, log);
 
       if (!vodRecord) {
         notFound(`VOD ${vodId} not found on ${platform}`);

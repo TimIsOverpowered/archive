@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import { getEncryptionKeyBuffer } from '../config/env.js';
 import { Encryption } from '../constants.js';
 

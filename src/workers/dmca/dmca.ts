@@ -1,8 +1,8 @@
+import path from 'node:path';
 import { extractErrorDetails } from '../../utils/error.js';
-import { deleteFileIfExists } from '../../utils/path.js';
-import { childLogger } from '../../utils/logger.js';
-import path from 'path';
 import { toHHMMSS } from '../../utils/formatting.js';
+import { childLogger } from '../../utils/logger.js';
+import { deleteFileIfExists } from '../../utils/path.js';
 import {
   concatSegments,
   extractSegment,

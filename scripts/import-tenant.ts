@@ -3,10 +3,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
+import type { InsertableTenants } from '../src/db/meta-types.js';
+import { getTenantById, createTenant } from '../src/services/meta-tenants.service.js';
 import { encryptObject, encryptScalar } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
-import { getTenantById, createTenant } from '../src/services/meta-tenants.service.js';
-import type { InsertableTenants } from '../src/db/meta-types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

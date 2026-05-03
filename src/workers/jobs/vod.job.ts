@@ -1,9 +1,9 @@
-import type { StandardVodJob } from './types.js';
-import { getStandardVodQueue } from '../queues/queue.js';
-import { childLogger } from '../../utils/logger.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { enqueueJobWithLogging } from './enqueue.js';
 import type { Platform, DownloadMethod } from '../../types/platforms.js';
+import { extractErrorDetails } from '../../utils/error.js';
+import { childLogger } from '../../utils/logger.js';
+import { getStandardVodQueue } from '../queues/queue.js';
+import { enqueueJobWithLogging } from './enqueue.js';
+import type { StandardVodJob } from './types.js';
 
 const log = childLogger({ module: 'vod-job' });
 

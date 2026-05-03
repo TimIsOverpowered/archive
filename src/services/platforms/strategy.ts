@@ -1,7 +1,7 @@
-import type { Platform } from '../../types/platforms.js';
 import type { Kysely } from 'kysely';
-import type { StreamerDB } from '../../db/streamer-types.js';
 import type { TenantPlatformContext } from '../../api/middleware/tenant-platform.js';
+import type { StreamerDB } from '../../db/streamer-types.js';
+import type { Platform } from '../../types/platforms.js';
 
 /** Data shape for creating a VOD record from platform metadata. */
 export interface VodCreateData {

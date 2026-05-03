@@ -1,20 +1,20 @@
 import { Job } from 'bullmq';
-import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
-import { getVodFilePath, getVodDirPath, fileExists } from '../utils/path.js';
-import { updateAlert } from '../utils/discord-alerts.js';
-import { extractErrorDetails } from '../utils/error.js';
-import { createVodWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
-import { getMetadata } from './utils/ffmpeg.js';
-import type { StandardVodJob } from './jobs/types.js';
-import { downloadVodWithFfmpeg } from './vod/vod-download-strategies.js';
-import { DOWNLOAD_METHODS, PLATFORMS, type DownloadMethod } from '../types/platforms.js';
-import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { getDisplayName } from '../config/types.js';
-import { PlatformNotConfiguredError } from '../utils/domain-errors.js';
 import { getStrategy } from '../services/platforms/strategy.js';
-import type { VodWorkerAlerts } from './utils/alert-factories.js';
+import { DOWNLOAD_METHODS, PLATFORMS, type DownloadMethod } from '../types/platforms.js';
+import { updateAlert } from '../utils/discord-alerts.js';
+import { PlatformNotConfiguredError } from '../utils/domain-errors.js';
+import { extractErrorDetails } from '../utils/error.js';
+import { getVodFilePath, getVodDirPath, fileExists } from '../utils/path.js';
+import type { StandardVodJob } from './jobs/types.js';
 import type { BaseWorkerContext } from './types.js';
+import { createVodWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
+import type { VodWorkerAlerts } from './utils/alert-factories.js';
+import { getMetadata } from './utils/ffmpeg.js';
 import { buildWorkerContext } from './utils/job-context.js';
+import { downloadHlsStream } from './vod/hls-orchestrator.js';
+import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
+import { downloadVodWithFfmpeg } from './vod/vod-download-strategies.js';
 
 export interface VodProcessorContext extends BaseWorkerContext {
   job: Job<StandardVodJob, unknown, string>;

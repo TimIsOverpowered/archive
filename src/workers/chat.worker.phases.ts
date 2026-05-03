@@ -1,19 +1,19 @@
 import { Job } from 'bullmq';
-import { sleep, jitter } from '../utils/delay.js';
-import { fetchComments, fetchNextComments, type TwitchVideoCommentResponse } from '../services/twitch/index.js';
-import { resetFailures } from '../utils/discord-alerts.js';
-import type { ChatDownloadJob, ChatDownloadResult } from './jobs/types.js';
+import type { Kysely } from 'kysely';
+import { getDisplayName, type TenantConfig } from '../config/types.js';
 import { Chat } from '../constants.js';
+import type { StreamerDB } from '../db/streamer-types.js';
+import { fetchComments, fetchNextComments, type TwitchVideoCommentResponse } from '../services/twitch/index.js';
+import { type Platform } from '../types/platforms.js';
+import { sleep, jitter } from '../utils/delay.js';
+import { resetFailures } from '../utils/discord-alerts.js';
+import type { AppLogger } from '../utils/logger.js';
+import { flushChatBatch } from './chat/chat-batch-processor.js';
 import { extractEdges, calculateResumeOffset, extractMessageData } from './chat/chat-helpers.js';
 import type { ChatMessageCreateInput } from './chat/chat-types.js';
-import { type Platform } from '../types/platforms.js';
-import { flushChatBatch } from './chat/chat-batch-processor.js';
+import type { ChatDownloadJob, ChatDownloadResult } from './jobs/types.js';
 import { createChatWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
-import { getDisplayName, type TenantConfig } from '../config/types.js';
-import type { Kysely } from 'kysely';
-import type { StreamerDB } from '../db/streamer-types.js';
 import type { ChatWorkerAlerts } from './utils/alert-factories.js';
-import type { AppLogger } from '../utils/logger.js';
 import { buildWorkerContext } from './utils/job-context.js';
 
 /**

@@ -1,8 +1,8 @@
 import * as cheerio from 'cheerio';
-import { extractErrorDetails } from './error.js';
-import { childLogger } from './logger.js';
 import { getBaseConfig } from '../config/env.js';
 import { Flaresolverr } from '../constants.js';
+import { extractErrorDetails } from './error.js';
+import { childLogger } from './logger.js';
 import { retryWithBackoff } from './retry.js';
 
 const log = childLogger({ module: 'flaresolverr-client' });

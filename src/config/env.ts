@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+/**
+ * Parses a boolean env var.
+ * When defaultsTo=true, only the string "false" disables it.
+ * When defaultsTo=false, only the string "true" enables it.
+ */
 function envBoolWithDefault(defaultsTo: boolean) {
   return z.preprocess(
     (val) => (defaultsTo ? String(val).toLowerCase() !== 'false' : String(val).toLowerCase() === 'true'),

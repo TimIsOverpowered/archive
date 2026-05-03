@@ -1,11 +1,11 @@
+import { VodUpdateSchema } from '../../config/schemas.js';
 import { withDbRetry } from '../../db/streamer-client.js';
+import { publishVodDurationUpdate } from '../../services/cache-invalidator.js';
+import type { TenantContext } from '../../types/context.js';
+import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
-import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { getMetadata } from '../utils/ffmpeg.js';
-import type { TenantContext } from '../../types/context.js';
-import { VodUpdateSchema } from '../../config/schemas.js';
-import { publishVodDurationUpdate } from '../../services/cache-invalidator.js';
 
 const log = childLogger({ module: 'duration-updater' });
 

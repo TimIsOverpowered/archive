@@ -1,11 +1,11 @@
 import type { FastifyInstance } from 'fastify';
-import createRateLimitMiddleware from '../middleware/rate-limit.js';
-import { RedisService } from '../../utils/redis-service.js';
 import { configService } from '../../config/tenant-config.js';
-import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { notFound } from '../../utils/http-error.js';
-import { extractErrorDetails } from '../../utils/error.js';
 import { getChannelBadges, getGlobalBadges } from '../../services/twitch/index.js';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
+import { extractErrorDetails } from '../../utils/error.js';
+import { notFound } from '../../utils/http-error.js';
+import { RedisService } from '../../utils/redis-service.js';
+import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { ok, errorResponse } from '../response.js';
 
 /** Options for registering the badges routes plugin. */

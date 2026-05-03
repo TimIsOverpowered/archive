@@ -1,29 +1,28 @@
-import { mkdir, readdir, readFile, writeFile } from 'fs/promises';
-import { join } from 'path';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import HLS from 'hls-parser';
-import { extractErrorDetails } from '../../utils/error.js';
-import { DownloadAbortedError } from '../../utils/domain-errors.js';
-import { getVodDirPath, getVodFilePath } from '../../utils/path.js';
-import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import type { AppLogger } from '../../utils/logger.js';
-import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
+import type { TenantConfig } from '../../config/types.js';
+import { Hls } from '../../constants.js';
 import { updateChapterDuringDownload } from '../../services/kick/index.js';
+import { TenantContext } from '../../types/context.js';
+import { PLATFORMS, type Platform } from '../../types/platforms.js';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
+import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
+import { sleep, getRetryDelay } from '../../utils/delay.js';
+import { DownloadAbortedError } from '../../utils/domain-errors.js';
+import { extractErrorDetails } from '../../utils/error.js';
+import type { AppLogger } from '../../utils/logger.js';
+import { getVodDirPath, getVodFilePath } from '../../utils/path.js';
+import { createVodWorkerAlerts, safeUpdateAlert } from '../utils/alert-factories.js';
+import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
+import { updateVodDurationDuringDownload } from './duration-updater.js';
+import { cleanupHlsFiles } from './hls-cleanup.js';
 import {
   downloadSegmentsParallel,
   fetchTwitchPlaylist,
   fetchKickPlaylist,
   resolveDownloadStrategy,
 } from './hls-utils.js';
-import { sleep, getRetryDelay } from '../../utils/delay.js';
-
-import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
-import { createVodWorkerAlerts, safeUpdateAlert } from '../utils/alert-factories.js';
-import { cleanupHlsFiles } from './hls-cleanup.js';
-import { Hls } from '../../constants.js';
-import { PLATFORMS, type Platform } from '../../types/platforms.js';
-import { TenantContext } from '../../types/context.js';
-import type { TenantConfig } from '../../config/types.js';
-import { updateVodDurationDuringDownload } from './duration-updater.js';
 
 export interface HlsDownloadOptions {
   ctx: TenantContext;

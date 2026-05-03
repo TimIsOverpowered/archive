@@ -1,11 +1,11 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach } from 'node:test';
-import { registerVodTags } from '../../src/services/cache-tags.js';
-import { RedisService } from '../../src/utils/redis-service.js';
 import { resetEnvConfig } from '../../src/config/env.js';
+import { Cache } from '../../src/constants.js';
+import { registerVodTags } from '../../src/services/cache-tags.js';
 import { markConnectionFailed, markConnectionRestored } from '../../src/utils/cache-state.js';
 import { defaultCircuitBreaker } from '../../src/utils/circuit-breaker.js';
-import { Cache } from '../../src/constants.js';
+import { RedisService } from '../../src/utils/redis-service.js';
 
 describe('CacheTags: registerVodTags', () => {
   let mockClient: any;

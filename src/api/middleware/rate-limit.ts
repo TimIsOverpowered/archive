@@ -1,11 +1,11 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { RateLimiterRedis, RateLimiterMemory, RateLimiterRes } from 'rate-limiter-flexible';
 import { validateCloudflareRequest } from '../../utils/cloudflare-ip-validator.js';
-import { getClientIp } from './ip.js';
-import { RedisService } from '../../utils/redis-service.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
+import { RedisService } from '../../utils/redis-service.js';
 import { errorResponse } from '../response.js';
+import { getClientIp } from './ip.js';
 
 type RateLimiter = RateLimiterRedis | RateLimiterMemory;
 
@@ -40,13 +40,17 @@ export default function createRateLimitMiddleware(options: RateLimitOptions) {
     try {
       const consumeResult = await activeLimiter.consume(ip);
 
+      const resetTimestamp = Math.ceil((Date.now() + activeLimiter.duration * 1000) / 1000);
       reply.header('X-RateLimit-Limit', activeLimiter.points);
       reply.header('X-RateLimit-Remaining', String(consumeResult.remainingPoints));
+      reply.header('X-RateLimit-Reset', String(resetTimestamp));
     } catch (rateLimitError) {
       if (rateLimitError instanceof RateLimiterRes) {
         const retryAfter = Math.ceil(rateLimitError.msBeforeNext / 1000);
+        const resetAt = Math.ceil((Date.now() + rateLimitError.msBeforeNext) / 1000);
 
         reply.header('Retry-After', String(retryAfter));
+        reply.header('X-RateLimit-Reset', String(resetAt));
 
         return reply.status(429).send(errorResponse(429, 'Too Many Requests', 'RATE_LIMITED', retryAfter));
       }

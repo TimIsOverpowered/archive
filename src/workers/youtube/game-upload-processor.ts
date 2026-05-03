@@ -1,18 +1,18 @@
 import type { Kysely } from 'kysely';
+import { GameUpsertSchema } from '../../config/schemas.js';
+import type { TenantConfig } from '../../config/types.js';
+import { getDisplayName } from '../../config/types.js';
+import { YouTube } from '../../constants.js';
 import type { StreamerDB } from '../../db/streamer-types.js';
-import type { AppLogger } from '../../utils/logger.js';
-import { trimVideo, splitVideo, getMetadata } from '../utils/ffmpeg.js';
+import { publishVodUpdate } from '../../services/cache-invalidator.js';
 import { uploadVideo } from '../../services/youtube/index.js';
 import { initRichAlert, createProgressBar } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
-import { createYoutubeUploadProgressHandler } from './youtube-upload-progress.js';
-import { YouTube } from '../../constants.js';
-import type { TenantConfig } from '../../config/types.js';
-import { getDisplayName } from '../../config/types.js';
+import type { AppLogger } from '../../utils/logger.js';
 import { deleteFileIfExists } from '../../utils/path.js';
-import { GameUpsertSchema } from '../../config/schemas.js';
-import { publishVodUpdate } from '../../services/cache-invalidator.js';
 import { safeUpdateAlert } from '../utils/alert-factories.js';
+import { trimVideo, splitVideo, getMetadata } from '../utils/ffmpeg.js';
+import { createYoutubeUploadProgressHandler } from './youtube-upload-progress.js';
 
 export interface GameUploadContext {
   tenantId: string;

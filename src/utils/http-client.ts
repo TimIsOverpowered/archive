@@ -1,10 +1,10 @@
-import { retryWithBackoff } from './retry.js';
-import { extractErrorDetails } from './error.js';
-import { getLogger } from './logger.js';
-import { Http } from '../constants.js';
-import { HttpError } from './http-error.js';
-import { DownloadAbortedError } from './domain-errors.js';
 import { Agent, request as undiciRequest, type BodyInit as UndiciBodyInit, type Dispatcher } from 'undici';
+import { Http } from '../constants.js';
+import { DownloadAbortedError } from './domain-errors.js';
+import { extractErrorDetails } from './error.js';
+import { HttpError } from './http-error.js';
+import { getLogger } from './logger.js';
+import { retryWithBackoff } from './retry.js';
 
 /** Supported HTTP response types for request/safeRequest functions. */
 export type ResponseType = 'json' | 'text' | 'blob' | 'arrayBuffer' | 'response';

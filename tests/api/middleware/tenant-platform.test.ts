@@ -5,8 +5,8 @@ import {
   platformValidationMiddleware,
   asTenantPlatformContext,
 } from '../../../src/api/middleware/tenant-platform.js';
-import { HttpError } from '../../../src/utils/http-error.js';
 import { PLATFORMS } from '../../../src/types/platforms.js';
+import { HttpError } from '../../../src/utils/http-error.js';
 
 function makeMockTenantConfig(overrides: Record<string, any> = {}): any {
   return {

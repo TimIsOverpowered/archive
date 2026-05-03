@@ -1,8 +1,8 @@
-import { request } from '../../utils/http-client.js';
-import { getTwitchCredentials } from '../../utils/credentials.js';
-import { getLogger } from '../../utils/logger.js';
 import { Twitch } from '../../constants.js';
+import { getTwitchCredentials } from '../../utils/credentials.js';
 import { ConfigNotConfiguredError } from '../../utils/domain-errors.js';
+import { request } from '../../utils/http-client.js';
+import { getLogger } from '../../utils/logger.js';
 
 export interface TwitchClient {
   helix: {

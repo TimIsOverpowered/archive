@@ -1,7 +1,7 @@
+import { getDiscordAlertWebhookUrl } from '../../config/env.js';
 import { extractErrorDetails } from '../error.js';
 import { request } from '../http-client.js';
 import { getLogger } from '../logger.js';
-import { getDiscordAlertWebhookUrl } from '../../config/env.js';
 import { isAlertsEnabled } from './context.js';
 import { constructEmbed, RichEmbedData } from './embed.js';
 

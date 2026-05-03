@@ -1,11 +1,11 @@
-import { spawn } from 'child_process';
-import { writeFileSync } from 'fs';
+import { spawn } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import path from 'node:path';
+import HLS from 'hls-parser';
 import { extractErrorDetails } from '../../utils/error.js';
-import path from 'path';
+import { parseTimecode } from '../../utils/formatting.js';
 import { childLogger } from '../../utils/logger.js';
 import { deleteFileIfExists } from '../../utils/path.js';
-import HLS from 'hls-parser';
-import { parseTimecode } from '../../utils/formatting.js';
 
 const logger = childLogger({ module: 'ffmpeg' });
 

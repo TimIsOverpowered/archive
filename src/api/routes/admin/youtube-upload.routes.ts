@@ -1,13 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import createRateLimitMiddleware from '../../middleware/rate-limit.js';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import {
-  tenantMiddleware,
-  platformValidationMiddleware,
-  asTenantPlatformContext,
-  requireTenant,
-} from '../../middleware/tenant-platform.js';
-import { notFound } from '../../../utils/http-error.js';
+import { findVodByPlatformId } from '../../../db/queries/vods.js';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
 import {
   SOURCE_TYPES,
@@ -18,11 +10,20 @@ import {
   UPLOAD_MODE_VALUES,
   UPLOAD_MODES,
 } from '../../../types/platforms.js';
-import { findVodByPlatformId } from '../../../db/queries/vods.js';
+import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
+import { notFound } from '../../../utils/http-error.js';
+import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
+import createRateLimitMiddleware from '../../middleware/rate-limit.js';
+import {
+  tenantMiddleware,
+  platformValidationMiddleware,
+  asTenantPlatformContext,
+  requireTenant,
+} from '../../middleware/tenant-platform.js';
 import { ensureVodDownload } from './utils/vod-downloads.js';
 import { buildVodJobResponse } from './utils/vod-job-response.js';
-import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
-import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
+
 /** Route params for YouTube re-upload endpoint. */
 interface ReUploadYoutubeParams {
   tenantId: string;

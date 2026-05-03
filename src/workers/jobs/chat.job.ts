@@ -1,9 +1,9 @@
-import type { ChatDownloadJob } from './types.js';
-import { getChatDownloadQueue } from '../queues/queue.js';
-import { childLogger } from '../../utils/logger.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { enqueueJobWithLogging } from './enqueue.js';
 import { Platform, PLATFORMS } from '../../types/platforms.js';
+import { extractErrorDetails } from '../../utils/error.js';
+import { childLogger } from '../../utils/logger.js';
+import { getChatDownloadQueue } from '../queues/queue.js';
+import { enqueueJobWithLogging } from './enqueue.js';
+import type { ChatDownloadJob } from './types.js';
 
 const log = childLogger({ module: 'chat-job' });
 

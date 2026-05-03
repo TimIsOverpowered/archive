@@ -1,4 +1,7 @@
-import { getKickStreamStatus, getLatestKickVodObject, getVod, finalizeKickChapters } from './index.js';
+import { requirePlatformConfig } from '../../config/types.js';
+import { PLATFORMS } from '../../types/platforms.js';
+import { createErrorContext } from '../../utils/error.js';
+import { getLogger } from '../../utils/logger.js';
 import type {
   PlatformStrategy,
   PlatformStreamStatus,
@@ -6,10 +9,7 @@ import type {
   VodCreateData,
   VodUpdateData,
 } from '../platforms/strategy.js';
-import { createErrorContext } from '../../utils/error.js';
-import { getLogger } from '../../utils/logger.js';
-import { requirePlatformConfig } from '../../config/types.js';
-import { PLATFORMS } from '../../types/platforms.js';
+import { getKickStreamStatus, getLatestKickVodObject, getVod, finalizeKickChapters } from './index.js';
 export const strategy: PlatformStrategy<VodCreateData, VodUpdateData> = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
     const { config, platform } = ctx;

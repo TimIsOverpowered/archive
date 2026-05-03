@@ -1,8 +1,8 @@
-import { getTwitchClient } from './auth.js';
-import { createTwitchGqlClient } from './client.js';
-import { request } from '../../utils/http-client.js';
 import { Twitch } from '../../constants.js';
 import { VodNotFoundError } from '../../utils/domain-errors.js';
+import { request } from '../../utils/http-client.js';
+import { getTwitchClient } from './auth.js';
+import { createTwitchGqlClient } from './client.js';
 
 export interface VodData {
   id: string;

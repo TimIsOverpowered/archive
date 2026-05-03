@@ -1,8 +1,8 @@
-import { fetchUrl } from '../../utils/flaresolverr-client.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { childLogger } from '../../utils/logger.js';
-import { Kick } from '../../constants.js';
 import { LRUCache } from 'lru-cache';
+import { Kick } from '../../constants.js';
+import { extractErrorDetails } from '../../utils/error.js';
+import { fetchUrl } from '../../utils/flaresolverr-client.js';
+import { childLogger } from '../../utils/logger.js';
 
 const log = childLogger({ module: 'kick-category' });
 

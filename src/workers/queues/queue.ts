@@ -18,6 +18,8 @@ export const QUEUE_NAMES = {
   MONITOR: 'monitor',
 } as const;
 
+export type WorkerName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
+
 export const LIVE_JOB_ID_PREFIX = 'live_hls_';
 
 type JobOpts = NonNullable<QueueOptions['defaultJobOptions']>;

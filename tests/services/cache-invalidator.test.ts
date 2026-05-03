@@ -1,8 +1,8 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach } from 'node:test';
+import { resetEnvConfig } from '../../src/config/env.js';
 import { publishVodUpdate, publishVodDurationUpdate } from '../../src/services/cache-invalidator.js';
 import { RedisService } from '../../src/utils/redis-service.js';
-import { resetEnvConfig } from '../../src/config/env.js';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 

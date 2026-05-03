@@ -1,10 +1,10 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import HLS from 'hls-parser';
-import { PLATFORMS } from '../../../src/types/platforms.js';
-import { DownloadAbortedError } from '../../../src/utils/domain-errors.js';
 import { Hls } from '../../../src/constants.js';
+import { PLATFORMS } from '../../../src/types/platforms.js';
 import type { CycleTLSSession } from '../../../src/utils/cycletls.js';
+import { DownloadAbortedError } from '../../../src/utils/domain-errors.js';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 

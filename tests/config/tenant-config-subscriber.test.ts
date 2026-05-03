@@ -1,9 +1,9 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
-import { createMockRedis, type MockRedisClient } from '../helpers/mock-redis.js';
-import { RedisService } from '../../src/utils/redis-service.js';
-import { configService } from '../../src/config/tenant-config.js';
 import { registerTenantConfigSubscriberWorker } from '../../src/config/tenant-config-subscriber.js';
+import { configService } from '../../src/config/tenant-config.js';
+import { RedisService } from '../../src/utils/redis-service.js';
+import { createMockRedis, type MockRedisClient } from '../helpers/mock-redis.js';
 
 const CONFIG_CHANNEL = 'cache:tenant';
 

@@ -1,20 +1,20 @@
-import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
-import type { YoutubeUploadJob, YoutubeUploadResult } from './jobs/types.js';
-import { getJobContext } from './utils/job-context.js';
-import { processVodUpload, linkVodPartsAfterDelay } from './youtube/vod-upload-processor.js';
-import { getEffectiveSplitDuration } from './youtube/validation.js';
-import { processGameUpload } from './youtube/game-upload-processor.js';
-import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import type { AppLogger } from '../utils/logger.js';
-import { resetFailures } from '../utils/discord-alerts.js';
-import { TenantConfig } from '../config/types.js';
-import type { SourceType, UploadType } from '../types/platforms.js';
+import type { Job } from 'bullmq';
 import type { Kysely } from 'kysely';
+import { TenantConfig } from '../config/types.js';
 import type { StreamerDB } from '../db/streamer-types.js';
 import { publishVodUpdate } from '../services/cache-invalidator.js';
-import { ConfigNotConfiguredError } from '../utils/domain-errors.js';
 import { saveUploadResult, markUploadFailed } from '../services/youtube/upload.js';
-import type { Job } from 'bullmq';
+import type { SourceType, UploadType } from '../types/platforms.js';
+import { createAutoLogger } from '../utils/auto-tenant-logger.js';
+import { resetFailures } from '../utils/discord-alerts.js';
+import { ConfigNotConfiguredError } from '../utils/domain-errors.js';
+import type { AppLogger } from '../utils/logger.js';
+import type { YoutubeUploadJob, YoutubeUploadResult } from './jobs/types.js';
+import { getJobContext } from './utils/job-context.js';
+import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
+import { processGameUpload } from './youtube/game-upload-processor.js';
+import { getEffectiveSplitDuration } from './youtube/validation.js';
+import { processVodUpload, linkVodPartsAfterDelay } from './youtube/vod-upload-processor.js';
 
 interface YoutubeProcessorContext {
   log: AppLogger;

@@ -1,5 +1,5 @@
-import { createTwitchGqlClient } from './client.js';
 import { Twitch } from '../../constants.js';
+import { createTwitchGqlClient } from './client.js';
 
 function getTwitchGqlClient(tenantId?: string) {
   return createTwitchGqlClient(tenantId);

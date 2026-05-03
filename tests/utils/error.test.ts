@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { extractErrorDetails, createErrorContext, throwOnHttpError } from '../../src/utils/error.js';
 import { ZodError } from 'zod';
+import { extractErrorDetails, createErrorContext, throwOnHttpError } from '../../src/utils/error.js';
 
 describe('extractErrorDetails', () => {
   it('should extract message and stack from Error instance', () => {

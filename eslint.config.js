@@ -37,6 +37,14 @@ export default tseslint.config(
       '@typescript-eslint/no-empty-function': 'off',
       'import-x/no-duplicates': 'error',
       'import-x/extensions': ['error', 'ignorePackages', { ts: 'always', js: 'always', checkTypeImports: true }],
+      'import-x/order': [
+        'error',
+        {
+          groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
+          'newlines-between': 'never',
+          alphabetize: { order: 'asc', caseInsensitive: true },
+        },
+      ],
       '@typescript-eslint/no-non-null-assertion': 'warn',
       '@typescript-eslint/prefer-nullish-coalescing': 'warn',
       '@typescript-eslint/strict-boolean-expressions': [

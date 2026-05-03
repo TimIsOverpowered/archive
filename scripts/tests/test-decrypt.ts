@@ -10,8 +10,8 @@
 import 'dotenv/config';
 import { program } from 'commander';
 import { initMetaClient, closeMetaClient } from '../../src/db/meta-client.js';
-import { decryptScalar, decryptObject } from '../../src/utils/encryption.js';
 import { getTenantById, getAllTenants } from '../../src/services/meta-tenants.service.js';
+import { decryptScalar, decryptObject } from '../../src/utils/encryption.js';
 
 interface DecryptionResult {
   raw: string | null;

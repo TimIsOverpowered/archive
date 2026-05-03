@@ -1,3 +1,4 @@
+import { getWorkersConfig } from '../config/env.js';
 import { RedisService } from '../utils/redis-service.js';
 
 let initPromise: Promise<void> | null = null;
@@ -11,7 +12,6 @@ export async function initWorkersRedis(): Promise<void> {
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
-    const { getWorkersConfig } = await import('../config/env.js');
     const url = getWorkersConfig().REDIS_URL;
     await RedisService.init({ url, maxRetriesPerRequest: null }).connect();
   })();

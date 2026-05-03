@@ -1,6 +1,4 @@
 import { mock } from 'node:test';
-import { RedisService } from '../../src/utils/redis-service.js';
-import { poolManager, resetClientManager } from '../../src/db/streamer-client.js';
 import { resetEnvConfig } from '../../src/config/env.js';
 import type {
   TenantConfig,
@@ -10,6 +8,8 @@ import type {
   TenantSettings,
   DatabaseConfig,
 } from '../../src/config/types.js';
+import { poolManager, resetClientManager } from '../../src/db/streamer-client.js';
+import { RedisService } from '../../src/utils/redis-service.js';
 
 export interface MockTenantConfigOverrides {
   id?: string;

@@ -1,9 +1,9 @@
 import { FastifyRequest } from 'fastify';
 import { configService } from '../../config/tenant-config.js';
 import { ensureClient } from '../../db/streamer-client.js';
-import { extractErrorDetails } from '../../utils/error.js';
 import type { TenantContext } from '../../types/context.js';
 import { isValidPlatform, type Platform } from '../../types/platforms.js';
+import { extractErrorDetails } from '../../utils/error.js';
 import { notFound, badRequest, serviceUnavailable, internalServerError } from '../../utils/http-error.js';
 
 export interface TenantPlatformContext extends TenantContext {

@@ -1,21 +1,21 @@
-import { getFlowProducer, getStandardVodQueue, getYoutubeUploadQueue } from '../queues/queue.js';
-import { enqueueJobWithLogging } from './enqueue.js';
-import type { YoutubeVodUploadJob, YoutubeGameUploadJob } from './types.js';
-import { childLogger } from '../../utils/logger.js';
+import { getPlatformConfig, getDisplayName } from '../../config/types.js';
+import { findVodById } from '../../db/queries/vods.js';
+import { withDbRetry } from '../../db/streamer-client.js';
+import { TenantContext } from '../../types/context.js';
 import type { Platform, SourceType, UploadMode } from '../../types/platforms.js';
 import { UPLOAD_MODES } from '../../types/platforms.js';
-import { TenantContext } from '../../types/context.js';
-import { withDbRetry } from '../../db/streamer-client.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { getPlatformConfig, getDisplayName } from '../../config/types.js';
 import {
   ConfigNotConfiguredError,
   PlatformNotMainSourceError,
   RestrictedGameError,
   VodNotFoundError,
 } from '../../utils/domain-errors.js';
+import { extractErrorDetails } from '../../utils/error.js';
+import { childLogger } from '../../utils/logger.js';
+import { getFlowProducer, getStandardVodQueue, getYoutubeUploadQueue } from '../queues/queue.js';
 import { buildYoutubeMetadata } from '../youtube/metadata-builder.js';
-import { findVodById } from '../../db/queries/vods.js';
+import { enqueueJobWithLogging } from './enqueue.js';
+import type { YoutubeVodUploadJob, YoutubeGameUploadJob } from './types.js';
 
 const log = childLogger({ module: 'youtube-job' });
 

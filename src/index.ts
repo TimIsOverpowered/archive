@@ -1,17 +1,17 @@
 import 'dotenv/config';
-import { loadApiConfig } from './config/env.js';
-import { buildServer } from './api/server.js';
-import { closeAllClients, startClientCleanup, stopClientCleanup } from './db/streamer-client.js';
-import { getLogger, setLoggerConfig } from './utils/logger.js';
 import { closeRedisClient } from './api/plugins/redis.plugin.js';
+import { buildServer } from './api/server.js';
+import { loadApiConfig } from './config/env.js';
+import { CacheRefresh } from './constants.js';
+import { startCloudflareIpRangesCron } from './cron/cloudflare-ip-ranges.js';
+import { closeMetaClient } from './db/meta-client.js';
+import { closeAllClients, startClientCleanup, stopClientCleanup } from './db/streamer-client.js';
+import { registerPlatformStrategies } from './services/platforms/index.js';
+import { getCachedRangeInfo, getCloudflareIpRanges } from './utils/cloudflare-ip-validator.js';
 import { extractErrorDetails } from './utils/error.js';
+import { getLogger, setLoggerConfig } from './utils/logger.js';
 import { registerProcessErrorHandlers } from './utils/process-handlers.js';
 import { registerShutdownHandlers } from './utils/shutdown.js';
-import { startCloudflareIpRangesCron } from './cron/cloudflare-ip-ranges.js';
-import { getCachedRangeInfo, getCloudflareIpRanges } from './utils/cloudflare-ip-validator.js';
-import { registerPlatformStrategies } from './services/platforms/index.js';
-import { closeMetaClient } from './db/meta-client.js';
-import { CacheRefresh } from './constants.js';
 
 registerProcessErrorHandlers();
 

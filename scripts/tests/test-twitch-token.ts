@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 import 'dotenv/config';
 import { program } from 'commander';
-import { initMetaClient, closeMetaClient } from '../../src/db/meta-client.js';
-import { extractErrorDetails } from '../../src/utils/error.js';
+import type { TwitchAuthObject } from '../../src/config/schemas.js';
 import { configService, buildTenantConfig } from '../../src/config/tenant-config.js';
+import { initMetaClient, closeMetaClient } from '../../src/db/meta-client.js';
+import { getAllTenants, getTenantById } from '../../src/services/meta-tenants.service.js';
 import { getAppAccessToken } from '../../src/services/twitch/index.js';
 import { getTwitchCredentials } from '../../src/utils/credentials.js';
+import { extractErrorDetails } from '../../src/utils/error.js';
 import { humanizeDuration } from '../../src/utils/formatting.js';
-import { getAllTenants, getTenantById } from '../../src/services/meta-tenants.service.js';
-import type { TwitchAuthObject } from '../../src/config/schemas.js';
 
 program
   .name('test-twitch-token')

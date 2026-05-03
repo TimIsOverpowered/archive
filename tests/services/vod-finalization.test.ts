@@ -1,10 +1,10 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
-import { finalizeVod } from '../../src/services/vod-finalization.js';
-import { registerStrategy } from '../../src/services/platforms/strategy.js';
-import { RedisService } from '../../src/utils/redis-service.js';
-import { poolManager, resetClientManager } from '../../src/db/streamer-client.js';
 import { resetEnvConfig } from '../../src/config/env.js';
+import { poolManager, resetClientManager } from '../../src/db/streamer-client.js';
+import { registerStrategy } from '../../src/services/platforms/strategy.js';
+import { finalizeVod } from '../../src/services/vod-finalization.js';
+import { RedisService } from '../../src/utils/redis-service.js';
 import { createMockTenantConfig } from '../helpers/worker-test-setup.js';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';

@@ -1,8 +1,8 @@
 import { Processor, Worker, BaseJobOptions } from 'bullmq';
-import { getLogger } from '../utils/logger.js';
-import { extractErrorDetails } from '../utils/error.js';
-import { WorkerName } from './worker-definitions.js';
 import type { Redis } from 'ioredis';
+import { extractErrorDetails } from '../utils/error.js';
+import { getLogger } from '../utils/logger.js';
+import { WorkerName } from './queues/queue.js';
 
 export interface WorkerConfig<TData> {
   name: WorkerName;

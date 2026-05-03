@@ -1,5 +1,5 @@
-import { getLogger } from '../../utils/logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
+import { getLogger } from '../../utils/logger.js';
 import { registerAllMonitorRepeatJobs, removeMonitorRepeatJob } from './startup.js';
 
 export async function startMonitorService(): Promise<void> {

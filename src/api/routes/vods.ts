@@ -1,15 +1,15 @@
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod';
-import { getVods, getVodById, getVodByPlatformId, VodQuerySchema } from '../../services/vods.service.js';
-import { getEmotesByVodId } from '../../services/emotes.js';
-import createRateLimitMiddleware from '../middleware/rate-limit.js';
-import { notFound } from '../../utils/http-error.js';
-import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
-import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
-import { Db } from '../../constants.js';
-import { ok, okPaginated } from '../response.js';
 import type { Kysely } from 'kysely';
+import { z } from 'zod';
+import { Db } from '../../constants.js';
 import type { StreamerDB } from '../../db/streamer-types.js';
+import { getEmotesByVodId } from '../../services/emotes.js';
+import { getVods, getVodById, getVodByPlatformId, VodQuerySchema } from '../../services/vods.service.js';
+import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
+import { notFound } from '../../utils/http-error.js';
+import createRateLimitMiddleware from '../middleware/rate-limit.js';
+import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
+import { ok, okPaginated } from '../response.js';
 
 const VodIdParamSchema = z.coerce.number().int().min(0).max(Db.INT32_MAX);
 

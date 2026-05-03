@@ -1,15 +1,15 @@
-import { extractErrorDetails } from '../../utils/error.js';
-import fs from 'fs';
-import pathMod from 'path';
+import fs from 'node:fs';
+import pathMod from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import HLS from 'hls-parser';
-import { pipeline } from 'stream/promises';
-import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
 import pLimit from 'p-limit';
+import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch/index.js';
+import { PLATFORMS } from '../../types/platforms.js';
+import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
+import { extractErrorDetails } from '../../utils/error.js';
+import { request, segmentDownloadAgent } from '../../utils/http-client.js';
 import type { AppLogger } from '../../utils/logger.js';
 import { fileExists } from '../../utils/path.js';
-import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch/index.js';
-import { request, segmentDownloadAgent } from '../../utils/http-client.js';
-import { PLATFORMS } from '../../types/platforms.js';
 import type { RetryOptions } from '../../utils/retry.js';
 
 export type DownloadStrategy =

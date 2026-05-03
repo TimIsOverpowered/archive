@@ -1,16 +1,16 @@
+import type { Job, Processor } from 'bullmq';
+import { isTwitchPlatform } from '../types/platforms.js';
+import { createAutoLogger } from '../utils/auto-tenant-logger.js';
+import { updateAlert } from '../utils/discord-alerts.js';
 import {
   buildChatProcessorContext,
   checkChatCompletion,
   downloadChatMessages,
   sendChatCompletionAlert,
 } from './chat.worker.phases.js';
-import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
-import type { ChatDownloadJob, ChatDownloadResult } from './jobs/types.js';
-import { isTwitchPlatform } from '../types/platforms.js';
-import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import type { ChatProcessorContext } from './chat.worker.phases.js';
-import { updateAlert } from '../utils/discord-alerts.js';
-import type { Job } from 'bullmq';
+import type { ChatDownloadJob, ChatDownloadResult } from './jobs/types.js';
+import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
 
 const errorMeta = (ctx: ChatProcessorContext) => ({
   vodId: ctx.vodId,
@@ -40,7 +40,7 @@ const wrappedChatProcessor = wrapWorkerProcessor<ChatDownloadJob, ChatProcessorC
   { errorMeta, errorAlert }
 );
 
-const chatProcessor: import('bullmq').Processor<ChatDownloadJob, ChatDownloadResult> = async (job) => {
+const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job) => {
   const { platform } = job.data;
 
   if (!isTwitchPlatform(platform)) {

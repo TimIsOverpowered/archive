@@ -1,10 +1,10 @@
+import type { Platform, SourceType } from '../../types/platforms.js';
+import { extractErrorDetails } from '../../utils/error.js';
+import { childLogger } from '../../utils/logger.js';
+import type { DMCAClaim } from '../dmca/dmca.js';
 import { defaultJobOptions, getDmcaProcessingQueue, getFlowProducer, getStandardVodQueue } from '../queues/queue.js';
 import { enqueueJobWithLogging } from './enqueue.js';
-import type { DMCAClaim } from '../dmca/dmca.js';
 import type { DmcaProcessingJob } from './types.js';
-import { childLogger } from '../../utils/logger.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import type { Platform, SourceType } from '../../types/platforms.js';
 
 const log = childLogger({ module: 'dmca-job' });
 

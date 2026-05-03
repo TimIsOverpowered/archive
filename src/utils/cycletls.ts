@@ -1,12 +1,12 @@
-import cycletls from 'cycletls';
-import fs from 'fs';
-import { pipeline } from 'node:stream/promises';
-import { getLogger } from './logger.js';
+import fs from 'node:fs';
 import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import cycletls from 'cycletls';
 import { getBaseConfig } from '../config/env.js';
+import { Http } from '../constants.js';
+import { getLogger } from './logger.js';
 import type { RetryOptions } from './retry.js';
 import { retryWithBackoff } from './retry.js';
-import { Http } from '../constants.js';
 
 type CycleTLSClient = Awaited<ReturnType<typeof cycletls>>;
 

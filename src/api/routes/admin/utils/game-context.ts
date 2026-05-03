@@ -1,11 +1,11 @@
-import { notFound, badRequest } from '../../../../utils/http-error.js';
-import type { Platform } from '../../../../types/platforms.js';
-import type { TenantContext } from '../../../../types/context.js';
-import { GameNotFoundError } from '../../../../utils/domain-errors.js';
 import type { Kysely } from 'kysely';
-import type { StreamerDB } from '../../../../db/streamer-types.js';
-import type { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { findVodById } from '../../../../db/queries/vods.js';
+import type { StreamerDB } from '../../../../db/streamer-types.js';
+import type { TenantContext } from '../../../../types/context.js';
+import type { Platform } from '../../../../types/platforms.js';
+import { GameNotFoundError } from '../../../../utils/domain-errors.js';
+import { notFound, badRequest } from '../../../../utils/http-error.js';
+import type { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 
 /** Resolved game with its associated VOD and platform context. */
 export interface ResolvedGameContext {

@@ -1,30 +1,21 @@
 import { Job } from 'bullmq';
-import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
-import { getMetadata } from './utils/ffmpeg.js';
-import { fileExists, getVodDirPath } from '../utils/path.js';
+import { getDisplayName } from '../config/types.js';
+import { fetchAndSaveEmotes } from '../services/emotes.js';
+import { finalizeVod } from '../services/vod-finalization.js';
+import { SOURCE_TYPES } from '../types/platforms.js';
 import { updateAlert } from '../utils/discord-alerts.js';
 import { extractErrorDetails } from '../utils/error.js';
-import { finalizeVod } from '../services/vod-finalization.js';
-import { queueYoutubeUploads, type YoutubeUploadJobResult } from './jobs/youtube.job.js';
-import { downloadHlsStream } from './vod/hls-orchestrator.js';
-import { createLiveWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
-import type { LiveDownloadJob } from './jobs/types.js';
+import { fileExists, getVodDirPath } from '../utils/path.js';
 import { triggerChatDownload } from './jobs/chat.job.js';
-import { fetchAndSaveEmotes } from '../services/emotes.js';
-import { SOURCE_TYPES } from '../types/platforms.js';
-import { getDisplayName } from '../config/types.js';
+import type { LiveDownloadJob } from './jobs/types.js';
+import { queueYoutubeUploads, type YoutubeUploadJobResult } from './jobs/youtube.job.js';
+import type { BaseWorkerContext, LiveCompletionData } from './types.js';
+import { createLiveWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
 import type { LiveWorkerAlerts } from './utils/alert-factories.js';
-import type { BaseWorkerContext } from './types.js';
+import { getMetadata } from './utils/ffmpeg.js';
 import { buildWorkerContext } from './utils/job-context.js';
-
-export interface LiveCompletionData {
-  emotesSaved: boolean;
-  chatJobId: string | null;
-  youtubeVodJobId: string | null;
-  youtubeGameJobIds: string[];
-  segmentCount: number;
-  finalPath: string;
-}
+import { downloadHlsStream } from './vod/hls-orchestrator.js';
+import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
 
 export interface LivePhaseResult {
   segmentCount: number;

@@ -1,37 +1,39 @@
-import { saveVodChapters } from '../../../../services/twitch/index.js';
-import { type AppLogger } from '../../../../utils/logger.js';
-import type { VodRecord } from '../../../../types/db.js';
-import type { Platform } from '../../../../types/platforms.js';
 import type { Kysely } from 'kysely';
-import type { StreamerDB, InsertableVods, UpdateableVods } from '../../../../db/streamer-types.js';
-import { fetchAndSaveEmotes } from '../../../../services/emotes.js';
-import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
-import { triggerChatDownload } from '../../../../workers/jobs/chat.job.js';
-
-import { getStrategy } from '../../../../services/platforms/index.js';
-import { PLATFORMS } from '../../../../types/platforms.js';
 import { getDisplayName, requirePlatformConfig } from '../../../../config/types.js';
-import { VodNotFoundError } from '../../../../utils/domain-errors.js';
 import { findVodByPlatformId } from '../../../../db/queries/vods.js';
+import type { StreamerDB, InsertableVods, SelectableVods, UpdateableVods } from '../../../../db/streamer-types.js';
+import { fetchAndSaveEmotes } from '../../../../services/emotes.js';
+import { getStrategy } from '../../../../services/platforms/index.js';
+import { saveVodChapters } from '../../../../services/twitch/index.js';
+import type { Platform } from '../../../../types/platforms.js';
+import { PLATFORMS } from '../../../../types/platforms.js';
+import { VodNotFoundError } from '../../../../utils/domain-errors.js';
+import { type AppLogger } from '../../../../utils/logger.js';
+import { triggerChatDownload } from '../../../../workers/jobs/chat.job.js';
+import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 
 /**
  * Fetches VOD record or throws 404 if not found
  */
-export async function requireVodRecord(db: Kysely<StreamerDB>, vodId: string, platform: Platform): Promise<VodRecord> {
+export async function requireVodRecord(
+  db: Kysely<StreamerDB>,
+  vodId: string,
+  platform: Platform
+): Promise<SelectableVods> {
   const record = await findVodByPlatformId(db, vodId, platform);
   if (!record) throw new VodNotFoundError(vodId);
   return record;
 }
 
 /**
- * Ensures a VOD record exists in the database, creating it from platform API if needed
- * Returns null if VOD cannot be found or created
+ * Finds an existing VOD record or creates one from platform API metadata.
+ * Returns null if the VOD cannot be found or created.
  */
-export async function ensureVodRecord(
+export async function findOrCreateVodRecord(
   ctx: TenantPlatformContext,
   vodId: string,
   log: AppLogger
-): Promise<VodRecord | null> {
+): Promise<SelectableVods | null> {
   const { db, tenantId, platform } = ctx;
 
   const platformConfig = requirePlatformConfig(ctx.config, platform);
@@ -65,7 +67,7 @@ export async function ensureVodRecord(
     .insertInto('vods')
     .values(strategy.createVodData(vodMetadata) as InsertableVods)
     .returning(['id', 'vod_id', 'platform', 'title', 'duration', 'stream_id', 'created_at'])
-    .executeTakeFirst()) as VodRecord;
+    .executeTakeFirst()) as SelectableVods;
 
   if (platform === PLATFORMS.TWITCH) {
     await saveVodChapters(ctx, vodRecord.id, vodRecord.vod_id, vodRecord.duration);
@@ -98,8 +100,19 @@ export async function refreshVodRecord(
   platformUserId: string,
   platformUsername: string,
   log: AppLogger
-): Promise<VodRecord | null> {
-  const { db, tenantId, platform } = ctx;
+): Promise<SelectableVods | null> {
+  const { db, platform } = ctx;
+
+  const platformConfig = requirePlatformConfig(ctx.config, platform);
+  if (!platformConfig) {
+    return null;
+  }
+
+  const existingVod = await findVodByPlatformId(db, vodId, platform);
+  if (!existingVod) {
+    log.warn({ vodId, platform }, 'VOD record not found for refresh');
+    return null;
+  }
 
   const strategy = getStrategy(platform);
   if (!strategy) {
@@ -120,7 +133,7 @@ export async function refreshVodRecord(
     .set(strategy.updateVodData(vodMetadata) as UpdateableVods)
     .where('id', '=', dbId)
     .returning(['id', 'vod_id', 'platform', 'title', 'duration', 'stream_id', 'created_at'])
-    .executeTakeFirst()) as VodRecord;
+    .executeTakeFirst()) as SelectableVods;
 
   log.info({ vodId, platform, duration: updatedRecord.duration }, 'VOD metadata refreshed');
 
@@ -128,7 +141,7 @@ export async function refreshVodRecord(
     await saveVodChapters(ctx, updatedRecord.id, updatedRecord.vod_id, updatedRecord.duration);
     await fetchAndSaveEmotes(ctx, updatedRecord.id, platform, platformUserId);
     void triggerChatDownload({
-      tenantId,
+      tenantId: ctx.tenantId,
       displayName: getDisplayName(ctx.config),
       platformUserId,
       dbId: updatedRecord.id,

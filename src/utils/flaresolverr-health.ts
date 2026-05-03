@@ -1,8 +1,8 @@
-import { extractErrorDetails } from './error.js';
-import { getLogger } from './logger.js';
+import { LRUCache } from 'lru-cache';
 import { getBaseConfig } from '../config/env.js';
 import { Flaresolverr } from '../constants.js';
-import { LRUCache } from 'lru-cache';
+import { extractErrorDetails } from './error.js';
+import { getLogger } from './logger.js';
 
 export interface FlareSolverrHealthStats {
   version: string;

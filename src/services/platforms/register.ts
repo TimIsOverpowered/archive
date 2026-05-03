@@ -1,10 +1,10 @@
+import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
+import { strategy as kickStrategy } from '../kick/strategy.js';
+import { strategy as twitchStrategy } from '../twitch/strategy.js';
 import { registerStrategy } from './strategy.js';
 import type { PlatformStrategy } from './strategy.js';
-import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
-import { strategy as twitchStrategy } from '../twitch/strategy.js';
-import { strategy as kickStrategy } from '../kick/strategy.js';
 
 const strategyMap = {
   twitch: twitchStrategy,

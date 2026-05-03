@@ -1,11 +1,11 @@
-import { getAppAccessToken } from '../services/twitch/index.js';
-import type { TenantConfig as ConfigType } from '../config/types.js';
-import { sendDiscordAlert, trackFailure, resetFailures } from '../utils/discord-alerts.js';
-import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { getLogger } from '../utils/logger.js';
-import { extractErrorDetails } from '../utils/error.js';
 import { configService } from '../config/tenant-config.js';
+import type { TenantConfig as ConfigType } from '../config/types.js';
 import { Token } from '../constants.js';
+import { getAppAccessToken } from '../services/twitch/index.js';
+import { createAutoLogger } from '../utils/auto-tenant-logger.js';
+import { sendDiscordAlert, trackFailure, resetFailures } from '../utils/discord-alerts.js';
+import { extractErrorDetails } from '../utils/error.js';
+import { getLogger } from '../utils/logger.js';
 
 export async function checkTokenHealth(): Promise<void> {
   const streamerConfigs: ConfigType[] = configService.getAll();

@@ -3,13 +3,13 @@
  * Each factory provides init, progress, complete, and error alert builders.
  */
 
-import { toHHMMSS } from '../../utils/formatting.js';
-import type { RichEmbedData } from '../../utils/discord-alerts.js';
-import { createProgressBar, updateAlert } from '../../utils/discord-alerts.js';
 import { capitalizePlatform, Platform } from '../../types/platforms.js';
-import type { LiveCompletionData } from '../live.worker.phases.js';
+import { createProgressBar, updateAlert } from '../../utils/discord-alerts.js';
+import type { RichEmbedData } from '../../utils/discord-alerts.js';
 import { extractErrorDetails } from '../../utils/error.js';
+import { toHHMMSS } from '../../utils/formatting.js';
 import type { AppLogger } from '../../utils/logger.js';
+import type { LiveCompletionData } from '../types.js';
 
 /**
  * Safely updates a Discord alert, logging any errors without throwing.

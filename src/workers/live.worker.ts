@@ -1,3 +1,6 @@
+import type { Job } from 'bullmq';
+import { updateAlert } from '../utils/discord-alerts.js';
+import type { LiveDownloadJob, LiveDownloadResult } from './jobs/types.js';
 import {
   buildLiveProcessorContext,
   prepareVodDirectory,
@@ -6,11 +9,8 @@ import {
   runPostProcessing,
   sendCompletionAlert,
 } from './live.worker.phases.js';
-import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
-import type { LiveDownloadJob, LiveDownloadResult } from './jobs/types.js';
 import type { LiveProcessorContext } from './live.worker.phases.js';
-import { updateAlert } from '../utils/discord-alerts.js';
-import type { Job } from 'bullmq';
+import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
 
 const errorMeta = (ctx: LiveProcessorContext) => ({
   vodId: ctx.vodId,

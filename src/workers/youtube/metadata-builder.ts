@@ -1,7 +1,7 @@
-import dayjs from '../../utils/dayjs.js';
+import type { SelectableVods } from '../../db/streamer-types.js';
 import type { Platform, SourceType } from '../../types/platforms.js';
 import { capitalizePlatform, SOURCE_TYPES } from '../../types/platforms.js';
-import type { VodRecord } from '../../types/db.js';
+import dayjs from '../../utils/dayjs.js';
 
 export interface YoutubeMetadataOptions {
   channelName: string;
@@ -13,7 +13,7 @@ export interface YoutubeMetadataOptions {
   type?: SourceType;
   gameName?: string | undefined;
   epNumber?: number | undefined;
-  vodRecord: VodRecord;
+  vodRecord: SelectableVods;
   replayPath?: string | undefined;
 }
 

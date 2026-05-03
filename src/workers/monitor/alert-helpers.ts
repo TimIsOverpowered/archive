@@ -1,7 +1,7 @@
-import { sendRichAlert } from '../../utils/discord-alerts.js';
-import { toHHMMSS } from '../../utils/formatting.js';
 import { capitalizePlatform, type Platform } from '../../types/platforms.js';
+import { sendRichAlert } from '../../utils/discord-alerts.js';
 import { createErrorContext } from '../../utils/error.js';
+import { toHHMMSS } from '../../utils/formatting.js';
 import { getLogger } from '../../utils/logger.js';
 
 export async function sendStreamLiveAlert(

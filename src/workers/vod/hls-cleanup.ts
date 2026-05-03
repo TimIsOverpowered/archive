@@ -1,5 +1,5 @@
-import fs from 'fs/promises';
-import pathMod from 'path';
+import fs from 'node:fs/promises';
+import pathMod from 'node:path';
 import { extractErrorDetails } from '../../utils/error.js';
 import type { AppLogger } from '../../utils/logger.js';
 

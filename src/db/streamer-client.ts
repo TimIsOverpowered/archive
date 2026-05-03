@@ -1,15 +1,15 @@
-import { Pool } from 'pg';
 import { Kysely, PostgresDialect } from 'kysely';
-import { TenantConfig } from '../config/types.js';
+import { Pool } from 'pg';
 import { getBaseConfig } from '../config/env.js';
-import { getLogger } from '../utils/logger.js';
-import { extractErrorDetails } from '../utils/error.js';
-import { extractDatabaseName } from '../utils/formatting.js';
+import { TenantConfig } from '../config/types.js';
 import { Db } from '../constants.js';
 import { sleep } from '../utils/delay.js';
+import { extractErrorDetails } from '../utils/error.js';
+import { extractDatabaseName } from '../utils/formatting.js';
+import { getLogger } from '../utils/logger.js';
 import type { StreamerDB } from './streamer-types.js';
-import { buildPgBouncerUrl } from './utils/pg-bouncer.js';
 import { isConnectionError } from './utils/errors.js';
+import { buildPgBouncerUrl } from './utils/pg-bouncer.js';
 
 interface PgPoolEntry {
   pool: InstanceType<typeof Pool>;

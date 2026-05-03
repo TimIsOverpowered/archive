@@ -1,5 +1,5 @@
-import type { DMCAClaim } from '../dmca/dmca.js';
 import type { Platform, SourceType, UploadType, DownloadMethod } from '../../types/platforms.js';
+import type { DMCAClaim } from '../dmca/dmca.js';
 
 export interface LiveDownloadJob {
   dbId: number;

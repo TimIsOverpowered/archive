@@ -1,8 +1,8 @@
 import type { UploadProgressCallbackData } from '../../services/youtube/index.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { updateDiscordEmbed, isAlertsEnabled, createProgressBar } from '../../utils/discord-alerts.js';
 import type { UploadType } from '../../types/platforms.js';
 import { UPLOAD_TYPES } from '../../types/platforms.js';
+import { updateDiscordEmbed, isAlertsEnabled, createProgressBar } from '../../utils/discord-alerts.js';
+import { extractErrorDetails } from '../../utils/error.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 
 interface UploadProgressOptions {

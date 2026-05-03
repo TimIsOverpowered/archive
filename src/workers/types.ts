@@ -1,8 +1,8 @@
-import type { TenantConfig } from '../config/types.js';
 import type { Kysely } from 'kysely';
+import type { TenantConfig } from '../config/types.js';
 import type { StreamerDB } from '../db/streamer-types.js';
-import type { AppLogger } from '../utils/logger.js';
 import type { Platform } from '../types/platforms.js';
+import type { AppLogger } from '../utils/logger.js';
 
 export interface BaseWorkerContext {
   config: TenantConfig;
@@ -13,4 +13,13 @@ export interface BaseWorkerContext {
   dbId: number;
   vodId: string;
   platform: Platform;
+}
+
+export interface LiveCompletionData {
+  emotesSaved: boolean;
+  chatJobId: string | null;
+  youtubeVodJobId: string | null;
+  youtubeGameJobIds: string[];
+  segmentCount: number;
+  finalPath: string;
 }

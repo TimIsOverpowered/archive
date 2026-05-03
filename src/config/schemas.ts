@@ -1,5 +1,5 @@
+import path from 'node:path';
 import { z } from 'zod';
-import path from 'path';
 import { YouTube } from '../constants.js';
 import { decryptObject, decryptScalar } from '../utils/encryption.js';
 

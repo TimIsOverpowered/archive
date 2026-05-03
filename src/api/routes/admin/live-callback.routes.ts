@@ -1,23 +1,23 @@
+import type { Stats as FsStats } from 'node:fs';
+import fs from 'node:fs/promises';
 import type { FastifyInstance } from 'fastify';
-import fs from 'fs/promises';
-import type { Stats as FsStats } from 'fs';
-import createRateLimitMiddleware from '../../middleware/rate-limit.js';
+import { VodUpdateSchema } from '../../../config/schemas.js';
+import { findVodByStreamId } from '../../../db/queries/vods.js';
+import { publishVodDurationUpdate } from '../../../services/cache-invalidator.js';
+import type { Platform } from '../../../types/platforms.js';
+import { PLATFORM_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
+import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
+import { badRequest, notFound } from '../../../utils/http-error.js';
+import { fileExists } from '../../../utils/path.js';
+import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
+import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import {
   tenantMiddleware,
   platformValidationMiddleware,
   asTenantPlatformContext,
   requireTenant,
 } from '../../middleware/tenant-platform.js';
-import { fileExists } from '../../../utils/path.js';
-import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { badRequest, notFound } from '../../../utils/http-error.js';
-import type { Platform } from '../../../types/platforms.js';
-import { PLATFORM_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
-import { findVodByStreamId } from '../../../db/queries/vods.js';
-import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
-import { VodUpdateSchema } from '../../../config/schemas.js';
-import { publishVodDurationUpdate } from '../../../services/cache-invalidator.js';
 import { ok } from '../../response.js';
 
 /** Body of the live callback from external recorder. */

@@ -1,23 +1,22 @@
 import type { Kysely } from 'kysely';
-import type { StreamerDB } from '../../db/streamer-types.js';
-import type { AppLogger } from '../../utils/logger.js';
-import { splitVideo, getMetadata } from '../utils/ffmpeg.js';
-import { uploadVideo, saveChaptersAndLinkParts } from '../../services/youtube/index.js';
-import { initRichAlert, createProgressBar } from '../../utils/discord-alerts.js';
-import { toHHMMSS } from '../../utils/formatting.js';
-import { getEffectiveSplitDuration } from './validation.js';
-import { buildYoutubeMetadata } from './metadata-builder.js';
-import { createYoutubeUploadProgressHandler } from './youtube-upload-progress.js';
 import type { TenantConfig } from '../../config/types.js';
 import { getDisplayName } from '../../config/types.js';
+import { findVodById } from '../../db/queries/vods.js';
+import type { StreamerDB, SelectableVods } from '../../db/streamer-types.js';
+import { uploadVideo, saveChaptersAndLinkParts } from '../../services/youtube/index.js';
 import type { SourceType, Platform } from '../../types/platforms.js';
 import { UPLOAD_TYPES } from '../../types/platforms.js';
-import type { VodRecord } from '../../types/db.js';
-import { deleteFileIfExists } from '../../utils/path.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { safeUpdateAlert } from '../utils/alert-factories.js';
+import { initRichAlert, createProgressBar } from '../../utils/discord-alerts.js';
 import { VodNotFoundError } from '../../utils/domain-errors.js';
-import { findVodById } from '../../db/queries/vods.js';
+import { extractErrorDetails } from '../../utils/error.js';
+import { toHHMMSS } from '../../utils/formatting.js';
+import type { AppLogger } from '../../utils/logger.js';
+import { deleteFileIfExists } from '../../utils/path.js';
+import { safeUpdateAlert } from '../utils/alert-factories.js';
+import { splitVideo, getMetadata } from '../utils/ffmpeg.js';
+import { buildYoutubeMetadata } from './metadata-builder.js';
+import { getEffectiveSplitDuration } from './validation.js';
+import { createYoutubeUploadProgressHandler } from './youtube-upload-progress.js';
 
 export interface VodUploadContext {
   tenantId: string;
@@ -94,7 +93,7 @@ interface SplitVodUploadContext extends VodUploadContext {
   domainName: string;
   privacyStatus: string;
   platformName: Platform;
-  vodRecord: VodRecord;
+  vodRecord: SelectableVods;
 }
 
 async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUploadResult> {
@@ -255,7 +254,7 @@ interface SingleVodUploadContext extends VodUploadContext {
   domainName: string;
   privacyStatus: string;
   platformName: Platform;
-  vodRecord: VodRecord;
+  vodRecord: SelectableVods;
 }
 
 async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodUploadResult> {

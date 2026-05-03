@@ -1,9 +1,9 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, before, after } from 'node:test';
-import { buildTestServer } from '../helpers/build-test-server.js';
 import type { FastifyInstance } from 'fastify';
-import { HttpError, badRequest, internalServerError } from '../../src/utils/http-error.js';
 import { TenantNotFoundError, VodNotFoundError } from '../../src/utils/domain-errors.js';
+import { HttpError, badRequest, internalServerError } from '../../src/utils/http-error.js';
+import { buildTestServer } from '../helpers/build-test-server.js';
 
 describe('Integration: Error Response Formatting', () => {
   let server: FastifyInstance;

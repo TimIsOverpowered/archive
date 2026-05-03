@@ -1,14 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import createRateLimitMiddleware from '../../middleware/rate-limit.js';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import {
-  tenantMiddleware,
-  platformValidationMiddleware,
-  asTenantPlatformContext,
-  requireTenant,
-} from '../../middleware/tenant-platform.js';
-import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { notFound, internalServerError } from '../../../utils/http-error.js';
+import { findVodByPlatformId } from '../../../db/queries/vods.js';
 import type { Platform, SourceType, DownloadMethod } from '../../../types/platforms.js';
 import {
   PLATFORM_VALUES,
@@ -17,11 +8,20 @@ import {
   DOWNLOAD_METHODS_VALUES,
   DOWNLOAD_METHODS,
 } from '../../../types/platforms.js';
-import { findVodByPlatformId } from '../../../db/queries/vods.js';
-import { ensureVodDownload } from './utils/vod-downloads.js';
-import { parseDmcaClaims } from './utils/dmca.js';
-import { buildVodJobResponse } from './utils/vod-job-response.js';
+import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
+import { notFound, internalServerError } from '../../../utils/http-error.js';
 import { queueDmcaProcessing } from '../../../workers/jobs/dmca.job.js';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
+import createRateLimitMiddleware from '../../middleware/rate-limit.js';
+import {
+  tenantMiddleware,
+  platformValidationMiddleware,
+  asTenantPlatformContext,
+  requireTenant,
+} from '../../middleware/tenant-platform.js';
+import { parseDmcaClaims } from './utils/dmca.js';
+import { ensureVodDownload } from './utils/vod-downloads.js';
+import { buildVodJobResponse } from './utils/vod-job-response.js';
 
 /** DMCA claim entry with optional typed fields. */
 interface DmcaClaim {

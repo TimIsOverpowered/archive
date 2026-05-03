@@ -1,15 +1,15 @@
 import 'dotenv/config';
 import crypto from 'crypto';
 import http from 'http';
-import open from 'open';
 import readline from 'readline';
 import { program } from 'commander';
+import open from 'open';
 import { z } from 'zod';
-import { initMetaClient } from '../src/db/meta-client.js';
-import { extractErrorDetails } from '../src/utils/error.js';
 import { YoutubeAuthSchema, YoutubeAuthObject, YoutubeSchema } from '../src/config/schemas.js';
+import { initMetaClient } from '../src/db/meta-client.js';
 import { getTenantById, updateTenant } from '../src/services/meta-tenants.service.js';
 import { encryptObject, decryptObject } from '../src/utils/encryption.js';
+import { extractErrorDetails } from '../src/utils/error.js';
 
 const clientId = process.env.YOUTUBE_CLIENT_ID;
 const clientSecret = process.env.YOUTUBE_CLIENT_SECRET;

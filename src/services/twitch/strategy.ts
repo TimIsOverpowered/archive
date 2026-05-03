@@ -1,6 +1,8 @@
-import { getTwitchStreamStatus, getLatestTwitchVodObject } from './live.js';
-import { getVodData } from './vod.js';
-import { saveVodChapters } from './chapters.js';
+import { requirePlatformConfig } from '../../config/types.js';
+import { PLATFORMS } from '../../types/platforms.js';
+import { createErrorContext } from '../../utils/error.js';
+import { parseTwitchDuration } from '../../utils/formatting.js';
+import { getLogger } from '../../utils/logger.js';
 import type {
   PlatformStrategy,
   PlatformStreamStatus,
@@ -8,11 +10,9 @@ import type {
   VodCreateData,
   VodUpdateData,
 } from '../platforms/strategy.js';
-import { parseTwitchDuration } from '../../utils/formatting.js';
-import { createErrorContext } from '../../utils/error.js';
-import { getLogger } from '../../utils/logger.js';
-import { requirePlatformConfig } from '../../config/types.js';
-import { PLATFORMS } from '../../types/platforms.js';
+import { saveVodChapters } from './chapters.js';
+import { getTwitchStreamStatus, getLatestTwitchVodObject } from './live.js';
+import { getVodData } from './vod.js';
 
 export const strategy: PlatformStrategy = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {

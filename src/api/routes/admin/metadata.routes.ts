@@ -1,20 +1,20 @@
 import type { FastifyInstance } from 'fastify';
-import createRateLimitMiddleware from '../../middleware/rate-limit.js';
+import { getPlatformConfig, getDisplayName } from '../../../config/types.js';
+import { findVodByPlatformId } from '../../../db/queries/vods.js';
+import { fetchAndSaveEmotes } from '../../../services/emotes.js';
+import { saveVodChapters } from '../../../services/twitch/index.js';
+import type { Platform } from '../../../types/platforms.js';
+import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
+import { notFound, badRequest } from '../../../utils/http-error.js';
+import { triggerChatDownload } from '../../../workers/jobs/chat.job.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
+import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import {
   tenantMiddleware,
   platformValidationMiddleware,
   asTenantPlatformContext,
   requireTenant,
 } from '../../middleware/tenant-platform.js';
-import { saveVodChapters } from '../../../services/twitch/index.js';
-import { notFound, badRequest } from '../../../utils/http-error.js';
-import type { Platform } from '../../../types/platforms.js';
-import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
-import { findVodByPlatformId } from '../../../db/queries/vods.js';
-import { fetchAndSaveEmotes } from '../../../services/emotes.js';
-import { triggerChatDownload } from '../../../workers/jobs/chat.job.js';
-import { getPlatformConfig, getDisplayName } from '../../../config/types.js';
 import { ok } from '../../response.js';
 
 /** Route params shared by metadata endpoints. */

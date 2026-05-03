@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import 'dotenv/config';
-import { initMetaClient, getMetaClient, closeMetaClient } from '../src/db/meta-client.js';
 import readline from 'readline';
-import { extractErrorDetails } from '../src/utils/error.js';
-import { decryptScalar } from '../src/utils/encryption.js';
 import pg, { type Pool, type PoolClient } from 'pg';
+import { initMetaClient, getMetaClient, closeMetaClient } from '../src/db/meta-client.js';
+import { decryptScalar } from '../src/utils/encryption.js';
+import { extractErrorDetails } from '../src/utils/error.js';
 
 const META_DB_URL = process.env.META_DATABASE_URL;
 if (!META_DB_URL) {

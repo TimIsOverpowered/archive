@@ -1,16 +1,16 @@
-import { FastifyInstance } from 'fastify';
 import { Queue } from 'bullmq';
+import { FastifyInstance } from 'fastify';
 import { sql } from 'kysely';
 import { configService } from '../../config/tenant-config.js';
 import { getClient } from '../../db/streamer-client.js';
-import { checkFlareSolverrHealth } from '../../utils/flaresolverr-health.js';
-import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator.js';
-import healthCheckMiddleware from '../middleware/health-check.js';
-import { RedisService } from '../../utils/redis-service.js';
 import { defaultCacheContext } from '../../utils/cache.js';
+import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator.js';
+import { checkFlareSolverrHealth } from '../../utils/flaresolverr-health.js';
+import { RedisService } from '../../utils/redis-service.js';
 import { QUEUE_NAMES } from '../../workers/queues/queue.js';
-import type { AllJobData } from '../../workers/worker-definitions.js';
 import { getRedisInstance } from '../../workers/redis.js';
+import type { AllJobData } from '../../workers/worker-definitions.js';
+import healthCheckMiddleware from '../middleware/health-check.js';
 import { ok } from '../response.js';
 
 /** Options for registering the health routes plugin. */

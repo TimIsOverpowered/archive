@@ -1,10 +1,14 @@
 import { LRUCache } from 'lru-cache';
+import type { ZodType } from 'zod';
+import { ConfigCache } from '../constants.js';
 import { initMetaClient } from '../db/meta-client.js';
+import type { TenantResult } from '../db/meta-types.js';
 import { getAllTenants, getTenantById } from '../services/meta-tenants.service.js';
 import { decryptScalar } from '../utils/encryption.js';
-import { RedisService } from '../utils/redis-service.js';
-import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
+import { getLogger } from '../utils/logger.js';
+import { asJsonObject } from '../utils/object.js';
+import { RedisService } from '../utils/redis-service.js';
 import {
   SettingsSchema,
   YoutubeSchema,
@@ -14,10 +18,6 @@ import {
   type YoutubeAuthObject,
 } from './schemas.js';
 import { TenantConfig } from './types.js';
-import { ConfigCache } from '../constants.js';
-import type { TenantResult } from '../db/meta-types.js';
-import { asJsonObject } from '../utils/object.js';
-import type { ZodType } from 'zod';
 
 function parsePlatformConfig<T>(
   tenantId: string,

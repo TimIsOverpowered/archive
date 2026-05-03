@@ -1,9 +1,9 @@
 import Redis from 'ioredis';
 import { RateLimiterRedis, RateLimiterMemory } from 'rate-limiter-flexible';
-import { getLogger } from './logger.js';
-import { extractErrorDetails } from './error.js';
 import { getBaseConfig } from '../config/env.js';
 import { clearAllConnectionFailures } from './cache-state.js';
+import { extractErrorDetails } from './error.js';
+import { getLogger } from './logger.js';
 
 /** Configuration for a rate limiter instance. */
 export interface RateLimiterConfig {

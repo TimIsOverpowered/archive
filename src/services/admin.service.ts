@@ -1,5 +1,5 @@
-import bcrypt from 'bcrypt';
 import { randomBytes } from 'node:crypto';
+import bcrypt from 'bcrypt';
 import { getMetaClient } from '../db/meta-client.js';
 import type { SelectableAdmins, InsertableAdmins, UpdateableAdmins } from '../db/meta-types.js';
 

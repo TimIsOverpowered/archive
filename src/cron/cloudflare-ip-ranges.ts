@@ -1,6 +1,6 @@
 import { refreshCloudflareRanges } from '../utils/cloudflare-ip-validator.js';
-import { getLogger } from '../utils/logger.js';
 import { extractErrorDetails } from '../utils/error.js';
+import { getLogger } from '../utils/logger.js';
 
 /**
  * Daily cron job to refresh Cloudflare IP ranges

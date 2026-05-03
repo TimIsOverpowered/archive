@@ -1,10 +1,10 @@
-import { getTwitchClient } from './auth.js';
-import { getTwitchCredentials } from '../../utils/credentials.js';
+import { LRUCache } from 'lru-cache';
 import { configService } from '../../config/tenant-config.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
+import { getTwitchCredentials } from '../../utils/credentials.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { HttpError } from '../../utils/http-error.js';
-import { LRUCache } from 'lru-cache';
+import { getTwitchClient } from './auth.js';
 
 const log = createAutoLogger('twitch-badges');
 

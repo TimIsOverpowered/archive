@@ -1,11 +1,10 @@
 import { Processor } from 'bullmq';
-import liveProcessor from './live.worker.js';
-import standardVodProcessor from './vod.worker.js';
+import type { Redis } from 'ioredis';
+import { getWorkersConfig } from '../config/env.js';
+import type { TenantConfig } from '../config/types.js';
 import chatProcessor from './chat.worker.js';
-import youtubeProcessor from './youtube.worker.js';
+import { createWorker } from './create-worker.js';
 import dmcaProcessor from './dmca.worker.js';
-import monitorProcessor from './monitor/processor.js';
-import { QUEUE_NAMES } from './queues/queue.js';
 import type {
   LiveDownloadJob,
   StandardVodJob,
@@ -19,12 +18,12 @@ import type {
   YoutubeUploadResult,
   DmcaProcessingResult,
 } from './jobs/types.js';
-import type { Redis } from 'ioredis';
-import type { TenantConfig } from '../config/types.js';
-import { getWorkersConfig } from '../config/env.js';
-import { createWorker } from './create-worker.js';
+import liveProcessor from './live.worker.js';
+import monitorProcessor from './monitor/processor.js';
+import { QUEUE_NAMES, WorkerName } from './queues/queue.js';
+import standardVodProcessor from './vod.worker.js';
+import youtubeProcessor from './youtube.worker.js';
 
-export type WorkerName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 export type AllJobData =
   | LiveDownloadJob
   | StandardVodJob
