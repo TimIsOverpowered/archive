@@ -56,62 +56,41 @@ module.exports = {
     // === APP #1: HTTP API Server (Fastify/Feathers REST endpoints) ===
     {
       name: 'api', // PM2 app identifier
-
       cwd: __dirname,
-
       script: './dist/src/index.js', // Compiled output from tsc build
-
       interpreter: 'node',
-
       env: {
         // Production environment (default)
         NODE_ENV: 'production',
       },
-
       max_memory_restart: '512M', // Restart if memory exceeds this limit (lightweight API server)
-
       autorestart: true, // Auto-recover on crashes or OOM events
       watch: false, // Disable file watching in production
-
+      ignore_watch: ['logs', 'node_modules', '*.log', '.tmp'],
       instances: 1, // Single instance per app
       exec_mode: 'fork', // Standard process mode
-
       kill_timeout: 10000, // Allow graceful shutdown before PM2 force-kills
-
       merge_logs: true, // Combine stdout + stderr into single log file
-
-      out_file: path.join(__dirname, 'logs', 'api-out.log'),
-      error_file: path.join(__dirname, 'logs', 'api-error.log'),
     },
 
     // === APP #2: Background Workers + Stream Monitoring (BullMQ queues + FlareSolverr for Kick API access) ===
     {
       name: 'worker', // Separate PM2 app identifier
-
       cwd: __dirname,
-
       script: './dist/src/workers/index.js', // Worker entry point - BullMQ job processors
-
       interpreter: 'node',
-
       env: {
         // Production worker settings
         NODE_ENV: 'production',
       },
-
       max_memory_restart: '2G', // Higher limit needed - CycleTLS (~200MB) + 50 live workers + VOD downloads with concurrent HLS segment buffering
-
       autorestart: true, // Auto-recover on crashes
       watch: false, // Disable file watching in production
+      ignore_watch: ['logs', 'node_modules', '*.log', '.tmp'],
       instances: 1,
       exec_mode: 'fork',
-
       kill_timeout: 10000, // Allow graceful shutdown before PM2 force-kills
-
       merge_logs: true, // Combine streams for cleaner log viewing
-
-      out_file: path.join(__dirname, 'logs', 'worker-out.log'),
-      error_file: path.join(__dirname, 'logs', 'worker-error.log'),
     },
   ],
 };

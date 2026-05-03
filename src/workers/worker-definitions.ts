@@ -44,37 +44,31 @@ const workerDefs = {
   [QUEUE_NAMES.VOD_LIVE]: {
     name: QUEUE_NAMES.VOD_LIVE,
     processor: liveProcessor,
-    useWorkerThreads: true,
   } satisfies WorkerDef<LiveDownloadJob, LiveDownloadResult>,
 
   [QUEUE_NAMES.VOD_STANDARD]: {
     name: QUEUE_NAMES.VOD_STANDARD,
     processor: standardVodProcessor,
-    useWorkerThreads: true,
   } satisfies WorkerDef<StandardVodJob, StandardVodResult>,
 
   [QUEUE_NAMES.CHAT_DOWNLOAD]: {
     name: QUEUE_NAMES.CHAT_DOWNLOAD,
     processor: chatProcessor,
-    useWorkerThreads: true,
   } satisfies WorkerDef<ChatDownloadJob, ChatDownloadResult>,
 
   [QUEUE_NAMES.YOUTUBE_UPLOAD]: {
     name: QUEUE_NAMES.YOUTUBE_UPLOAD,
     processor: youtubeProcessor,
-    useWorkerThreads: true,
   } satisfies WorkerDef<YoutubeUploadJob, YoutubeUploadResult>,
 
   [QUEUE_NAMES.DMCA_PROCESSING]: {
     name: QUEUE_NAMES.DMCA_PROCESSING,
     processor: dmcaProcessor,
-    useWorkerThreads: true,
   } satisfies WorkerDef<DmcaProcessingJob, DmcaProcessingResult>,
 
   [QUEUE_NAMES.MONITOR]: {
     name: QUEUE_NAMES.MONITOR,
     processor: monitorProcessor,
-    useWorkerThreads: true,
   } satisfies WorkerDef<MonitorJob>,
 };
 
