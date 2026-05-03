@@ -530,7 +530,7 @@ describe('downloadHlsStream', () => {
         baseURL: 'https://example.com/segments',
       };
 
-      (mockFetchTwitchPlaylist as any).mock.mockImplementation(async () => emptyPlaylist);
+      mockFetchTwitchPlaylist.mock.mockImplementation(async () => emptyPlaylist);
 
       await assert.rejects(
         downloadHlsStream(buildOptions({ platform: PLATFORMS.TWITCH, isLive: false })),
@@ -539,7 +539,7 @@ describe('downloadHlsStream', () => {
     });
 
     it('should close CycleTLS session in finally block on error', async () => {
-      (mockDownloadSegmentsParallel as any).mock.mockImplementation(async () => {
+      mockDownloadSegmentsParallel.mock.mockImplementation(async () => {
         throw new Error('Download failed');
       });
 
@@ -568,7 +568,7 @@ describe('downloadHlsStream', () => {
     it('should poll until stream end detected (5 consecutive no-change polls)', async () => {
       let pollCount = 0;
 
-      (mockFetchTwitchPlaylist as any).mock.mockImplementation(async () => {
+      mockFetchTwitchPlaylist.mock.mockImplementation(async () => {
         pollCount++;
         const segments = pollCount <= 2 ? ['seg001.ts', 'seg002.ts'] : ['seg001.ts', 'seg002.ts', 'seg003.ts'];
         const playlistLines = ['#EXTM3U', '#EXT-X-VERSION:3', '#EXT-X-TARGETDURATION:10'];
@@ -593,7 +593,7 @@ describe('downloadHlsStream', () => {
     it('should call onProgress callback during live polling', async () => {
       let progressCalls = 0;
 
-      (mockFetchTwitchPlaylist as any).mock.mockImplementation(async () => {
+      mockFetchTwitchPlaylist.mock.mockImplementation(async () => {
         return {
           // Use seg999.ts so it's not in the mockFsReaddir response and gets treated as "new"
           variantM3u8String: `#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXTINF:10.0,\nseg999.ts\n#EXT-X-ENDLIST`,
@@ -601,7 +601,7 @@ describe('downloadHlsStream', () => {
         };
       });
 
-      (mockDownloadSegmentsParallel as any).mock.mockImplementation(
+      mockDownloadSegmentsParallel.mock.mockImplementation(
         async (
           _segments: any,
           _vodDir: string,
@@ -630,7 +630,7 @@ describe('downloadHlsStream', () => {
     });
 
     it('should close CycleTLS session in finally block on live polling error', async () => {
-      (mockFetchKickPlaylist as any).mock.mockImplementation(async () => {
+      mockFetchKickPlaylist.mock.mockImplementation(async () => {
         throw new Error('Playlist fetch failed');
       });
 
@@ -643,7 +643,7 @@ describe('downloadHlsStream', () => {
     });
 
     it('should call Kick-specific functions during live polling', async () => {
-      (mockFetchKickPlaylist as any).mock.mockImplementation(async () => {
+      mockFetchKickPlaylist.mock.mockImplementation(async () => {
         return {
           variantM3u8String: `#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXTINF:10.0,\nseg001.ts\n#EXT-X-ENDLIST`,
           baseURL: 'https://example.com/segments',
@@ -672,7 +672,7 @@ describe('downloadHlsStream', () => {
     });
 
     it('should not call Kick-specific functions for Twitch platform', async () => {
-      (mockFetchTwitchPlaylist as any).mock.mockImplementation(async () => {
+      mockFetchTwitchPlaylist.mock.mockImplementation(async () => {
         return {
           variantM3u8String: `#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXTINF:10.0,\nseg001.ts\n#EXT-X-ENDLIST`,
           baseURL: 'https://example.com/segments',
@@ -685,7 +685,7 @@ describe('downloadHlsStream', () => {
     });
 
     it('should use fetch strategy for Twitch and cycleTLS strategy for Kick', async () => {
-      (mockFetchTwitchPlaylist as any).mock.mockImplementation(async () => {
+      mockFetchTwitchPlaylist.mock.mockImplementation(async () => {
         return {
           variantM3u8String: `#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXTINF:10.0,\nseg001.ts\n#EXT-X-ENDLIST`,
           baseURL: 'https://example.com/segments',
@@ -702,7 +702,7 @@ describe('downloadHlsStream', () => {
 
   describe('error handling', () => {
     it('should re-throw DownloadAbortedError without wrapping', async () => {
-      (mockFetchTwitchPlaylist as any).mock.mockImplementation(async () => {
+      mockFetchTwitchPlaylist.mock.mockImplementation(async () => {
         throw new DownloadAbortedError();
       });
 
@@ -718,7 +718,7 @@ describe('downloadHlsStream', () => {
     it('should throw after too many consecutive poll errors in live mode', async () => {
       let callCount = 0;
 
-      (mockFetchTwitchPlaylist as any).mock.mockImplementation(async () => {
+      mockFetchTwitchPlaylist.mock.mockImplementation(async () => {
         callCount++;
         if (callCount <= 13) {
           throw new Error('Transient error');
@@ -735,7 +735,7 @@ describe('downloadHlsStream', () => {
     it('should log error and continue polling after transient error in live mode', async () => {
       let callCount = 0;
 
-      (mockFetchTwitchPlaylist as any).mock.mockImplementation(async () => {
+      mockFetchTwitchPlaylist.mock.mockImplementation(async () => {
         callCount++;
         if (callCount === 1) {
           throw new Error('Transient error');

@@ -80,14 +80,14 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
-      assert.strictEqual(result!.settings.domainName, 'example.com');
-      assert.strictEqual(result!.settings.timezone, 'America/New_York');
-      assert.strictEqual(result!.settings.saveMP4, true);
-      assert.strictEqual(result!.settings.saveHLS, true);
-      assert.strictEqual(result!.settings.vodDownload, false);
-      assert.strictEqual(result!.settings.chatDownload, false);
-      assert.strictEqual(result!.settings.vodPath, path.resolve('/data/vods'));
-      assert.strictEqual(result!.settings.livePath, path.resolve('/data/live'));
+      assert.strictEqual(result.settings.domainName, 'example.com');
+      assert.strictEqual(result.settings.timezone, 'America/New_York');
+      assert.strictEqual(result.settings.saveMP4, true);
+      assert.strictEqual(result.settings.saveHLS, true);
+      assert.strictEqual(result.settings.vodDownload, false);
+      assert.strictEqual(result.settings.chatDownload, false);
+      assert.strictEqual(result.settings.vodPath, path.resolve('/data/vods'));
+      assert.strictEqual(result.settings.livePath, path.resolve('/data/live'));
     });
 
     it('should apply default values for optional settings fields', () => {
@@ -97,17 +97,17 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
-      assert.strictEqual(result!.settings.saveMP4, false);
-      assert.strictEqual(result!.settings.saveHLS, false);
-      assert.strictEqual(result!.settings.vodDownload, true);
-      assert.strictEqual(result!.settings.chatDownload, true);
-      assert.strictEqual(result!.settings.vodPath, undefined);
-      assert.strictEqual(result!.settings.livePath, undefined);
+      assert.strictEqual(result.settings.saveMP4, false);
+      assert.strictEqual(result.settings.saveHLS, false);
+      assert.strictEqual(result.settings.vodDownload, true);
+      assert.strictEqual(result.settings.chatDownload, true);
+      assert.strictEqual(result.settings.vodPath, undefined);
+      assert.strictEqual(result.settings.livePath, undefined);
     });
 
     it('should throw when domainName is missing from settings', () => {
       const tenant = makeTenant({
-        settings: { timezone: 'UTC' } as any,
+        settings: { timezone: 'UTC' },
       });
 
       assert.throws(() => buildTenantConfig(tenant), /domainName/);
@@ -115,7 +115,7 @@ describe('buildTenantConfig parsing logic', () => {
 
     it('should throw when timezone is missing from settings', () => {
       const tenant = makeTenant({
-        settings: { domainName: 'example.com' } as any,
+        settings: { domainName: 'example.com' },
       });
 
       assert.throws(() => buildTenantConfig(tenant), /timezone/);
@@ -146,8 +146,8 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
-      assert.ok(result!.settings.vodPath);
-      assert.ok(path.isAbsolute(result!.settings.vodPath!));
+      assert.ok(result.settings.vodPath);
+      assert.ok(path.isAbsolute(result.settings.vodPath));
     });
 
     it('should normalize livePath to absolute path', () => {
@@ -157,8 +157,8 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
-      assert.ok(result!.settings.livePath);
-      assert.ok(path.isAbsolute(result!.settings.livePath!));
+      assert.ok(result.settings.livePath);
+      assert.ok(path.isAbsolute(result.settings.livePath));
     });
 
     it('should set vodPath to undefined when empty string', () => {
@@ -168,7 +168,7 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
-      assert.strictEqual(result!.settings.vodPath, undefined);
+      assert.strictEqual(result.settings.vodPath, undefined);
     });
 
     it('should set livePath to undefined when empty string', () => {
@@ -178,7 +178,7 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
-      assert.strictEqual(result!.settings.livePath, undefined);
+      assert.strictEqual(result.settings.livePath, undefined);
     });
   });
 
@@ -195,10 +195,10 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result?.twitch);
-      assert.strictEqual(result!.twitch!.enabled, true);
-      assert.strictEqual(result!.twitch!.mainPlatform, true);
-      assert.strictEqual(result!.twitch!.username, 'streamer');
-      assert.strictEqual(result!.twitch!.id, '12345');
+      assert.strictEqual(result.twitch.enabled, true);
+      assert.strictEqual(result.twitch.mainPlatform, true);
+      assert.strictEqual(result.twitch.username, 'streamer');
+      assert.strictEqual(result.twitch.id, '12345');
     });
 
     it('should apply Twitch defaults (enabled=false, mainPlatform=false)', () => {
@@ -206,10 +206,10 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result?.twitch);
-      assert.strictEqual(result!.twitch!.enabled, false);
-      assert.strictEqual(result!.twitch!.mainPlatform, false);
-      assert.strictEqual(result!.twitch!.username, undefined);
-      assert.strictEqual(result!.twitch!.id, undefined);
+      assert.strictEqual(result.twitch.enabled, false);
+      assert.strictEqual(result.twitch.mainPlatform, false);
+      assert.strictEqual(result.twitch.username, undefined);
+      assert.strictEqual(result.twitch.id, undefined);
     });
 
     it('should normalize null username to undefined', () => {
@@ -217,7 +217,7 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result?.twitch);
-      assert.strictEqual(result!.twitch!.username, undefined);
+      assert.strictEqual(result.twitch.username, undefined);
     });
 
     it('should normalize null id to undefined', () => {
@@ -225,7 +225,7 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result?.twitch);
-      assert.strictEqual(result!.twitch!.id, undefined);
+      assert.strictEqual(result.twitch.id, undefined);
     });
 
     it('should return undefined when twitch is null', () => {
@@ -261,15 +261,15 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result?.youtube);
-      assert.strictEqual(result!.youtube!.public, false);
-      assert.strictEqual(result!.youtube!.upload, false);
-      assert.strictEqual(result!.youtube!.vodUpload, false);
-      assert.strictEqual(result!.youtube!.liveUpload, true);
-      assert.strictEqual(result!.youtube!.multiTrack, true);
-      assert.strictEqual(result!.youtube!.splitDuration, 3600);
-      assert.strictEqual(result!.youtube!.perGameUpload, true);
-      assert.deepStrictEqual(result!.youtube!.restrictedGames, ['Game A', 'Game B']);
-      assert.strictEqual(result!.youtube!.description, 'My stream VODs');
+      assert.strictEqual(result.youtube.public, false);
+      assert.strictEqual(result.youtube.upload, false);
+      assert.strictEqual(result.youtube.vodUpload, false);
+      assert.strictEqual(result.youtube.liveUpload, true);
+      assert.strictEqual(result.youtube.multiTrack, true);
+      assert.strictEqual(result.youtube.splitDuration, 3600);
+      assert.strictEqual(result.youtube.perGameUpload, true);
+      assert.deepStrictEqual(result.youtube.restrictedGames, ['Game A', 'Game B']);
+      assert.strictEqual(result.youtube.description, 'My stream VODs');
     });
 
     it('should apply YouTube defaults', () => {
@@ -277,13 +277,13 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result?.youtube);
-      assert.strictEqual(result!.youtube!.public, true);
-      assert.strictEqual(result!.youtube!.upload, true);
-      assert.strictEqual(result!.youtube!.vodUpload, true);
-      assert.strictEqual(result!.youtube!.liveUpload, false);
-      assert.strictEqual(result!.youtube!.multiTrack, false);
-      assert.deepStrictEqual(result!.youtube!.restrictedGames, []);
-      assert.strictEqual(result!.youtube!.description, '');
+      assert.strictEqual(result.youtube.public, true);
+      assert.strictEqual(result.youtube.upload, true);
+      assert.strictEqual(result.youtube.vodUpload, true);
+      assert.strictEqual(result.youtube.liveUpload, false);
+      assert.strictEqual(result.youtube.multiTrack, false);
+      assert.deepStrictEqual(result.youtube.restrictedGames, []);
+      assert.strictEqual(result.youtube.description, '');
     });
 
     it('should return undefined when youtube is null', () => {
@@ -307,10 +307,10 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result?.kick);
-      assert.strictEqual(result!.kick!.enabled, true);
-      assert.strictEqual(result!.kick!.mainPlatform, true);
-      assert.strictEqual(result!.kick!.username, 'kickstreamer');
-      assert.strictEqual(result!.kick!.id, 'kick-999');
+      assert.strictEqual(result.kick.enabled, true);
+      assert.strictEqual(result.kick.mainPlatform, true);
+      assert.strictEqual(result.kick.username, 'kickstreamer');
+      assert.strictEqual(result.kick.id, 'kick-999');
     });
 
     it('should apply Kick defaults', () => {
@@ -318,10 +318,10 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result?.kick);
-      assert.strictEqual(result!.kick!.enabled, false);
-      assert.strictEqual(result!.kick!.mainPlatform, false);
-      assert.strictEqual(result!.kick!.username, undefined);
-      assert.strictEqual(result!.kick!.id, undefined);
+      assert.strictEqual(result.kick.enabled, false);
+      assert.strictEqual(result.kick.mainPlatform, false);
+      assert.strictEqual(result.kick.username, undefined);
+      assert.strictEqual(result.kick.id, undefined);
     });
 
     it('should return undefined when kick is null', () => {
@@ -362,7 +362,7 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result?.twitch);
-      assert.strictEqual(result!.twitch!.enabled, false);
+      assert.strictEqual(result.twitch.enabled, false);
     });
   });
 
@@ -422,7 +422,7 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
-      assert.strictEqual(result!.id, 'unique-tenant-id');
+      assert.strictEqual(result.id, 'unique-tenant-id');
     });
 
     it('should preserve displayName', () => {
@@ -430,7 +430,7 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
-      assert.strictEqual(result!.displayName, 'My Streamer');
+      assert.strictEqual(result.displayName, 'My Streamer');
     });
 
     it('should set displayName to undefined when null', () => {
@@ -438,7 +438,7 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
-      assert.strictEqual(result!.displayName, undefined);
+      assert.strictEqual(result.displayName, undefined);
     });
 
     it('should preserve createdAt as Date', () => {
@@ -447,7 +447,7 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
-      assert.strictEqual(result!.createdAt.getTime(), createdAt.getTime());
+      assert.strictEqual(result.createdAt.getTime(), createdAt.getTime());
     });
 
     it('should include database url in config', () => {
@@ -455,7 +455,7 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
-      assert.strictEqual(result!.database.url, 'postgresql://production-db');
+      assert.strictEqual(result.database.url, 'postgresql://production-db');
     });
 
     it('should include all settings in config', () => {
@@ -472,7 +472,7 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
-      assert.deepStrictEqual(result!.settings, {
+      assert.deepStrictEqual(result.settings, {
         domainName: 'example.com',
         timezone: 'UTC',
         saveMP4: true,
@@ -490,7 +490,7 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
-      assert.strictEqual(result!.database.url, 'postgresql://encrypted');
+      assert.strictEqual(result.database.url, 'postgresql://encrypted');
     });
 
     it('should return null when databaseUrl is null before decryption', () => {
@@ -547,8 +547,8 @@ describe('ConfigService seed method', () => {
 
     const result = configService.get('seeded-tenant');
     assert.ok(result);
-    assert.strictEqual(result!.displayName, 'Seeded');
-    assert.ok(result!.twitch);
+    assert.strictEqual(result.displayName, 'Seeded');
+    assert.ok(result.twitch);
   });
 
   it('should return all seeded configs', () => {
@@ -611,16 +611,16 @@ describe('ConfigService update methods', () => {
       } as any,
     ]);
 
-    configService.updateTwitchAuth('t1', { client_id: 'new-id', client_secret: 'new-secret' } as any);
+    configService.updateTwitchAuth('t1', { client_id: 'new-id', client_secret: 'new-secret' });
 
     const updated = configService.get('t1');
     assert.ok(updated);
-    assert.ok(updated!.twitch);
-    assert.strictEqual(updated!.twitch!.auth!.client_id, 'new-id');
+    assert.ok(updated.twitch);
+    assert.strictEqual(updated.twitch.auth!.client_id, 'new-id');
   });
 
   it('should not update when tenant not in cache', () => {
-    configService.updateTwitchAuth('nonexistent', { client_id: 'id', client_secret: 'secret' } as any);
+    configService.updateTwitchAuth('nonexistent', { client_id: 'id', client_secret: 'secret' });
 
     assert.strictEqual(configService.get('nonexistent'), undefined);
   });
@@ -636,7 +636,7 @@ describe('ConfigService update methods', () => {
       } as any,
     ]);
 
-    configService.updateTwitchAuth('t1', { client_id: 'id', client_secret: 'secret' } as any);
+    configService.updateTwitchAuth('t1', { client_id: 'id', client_secret: 'secret' });
 
     assert.strictEqual(configService.get('t1')?.twitch, undefined);
   });
@@ -653,12 +653,12 @@ describe('ConfigService update methods', () => {
       } as any,
     ]);
 
-    configService.updateYoutubeAuth('t1', { refresh_token: 'new-refresh', expiry_date: 9999999999 } as any);
+    configService.updateYoutubeAuth('t1', { refresh_token: 'new-refresh', expiry_date: 9999999999 });
 
     const updated = configService.get('t1');
     assert.ok(updated);
-    assert.ok(updated!.youtube);
-    assert.strictEqual(updated!.youtube!.auth!.refresh_token, 'new-refresh');
+    assert.ok(updated.youtube);
+    assert.strictEqual(updated.youtube.auth!.refresh_token, 'new-refresh');
   });
 });
 
