@@ -1,5 +1,6 @@
 import { defaultJobOptions, getDmcaProcessingQueue, getFlowProducer, getStandardVodQueue } from '../queues/queue.js';
 import { enqueueJobWithLogging } from './enqueue.js';
+import type { DMCAClaim } from '../dmca/dmca.js';
 import type { DmcaProcessingJob } from './types.js';
 import { childLogger } from '../../utils/logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
@@ -33,7 +34,7 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
     tenantId,
     dbId,
     vodId,
-    receivedClaims: claims as never[],
+    receivedClaims: claims as DMCAClaim[],
     type,
     platform,
     ...(part !== undefined && { part }),

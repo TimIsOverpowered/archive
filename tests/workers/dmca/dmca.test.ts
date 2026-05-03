@@ -8,7 +8,7 @@ describe('isBlockingPolicy', () => {
     const claim = {
       type: CLAIM_TYPES.AUDIO,
       claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_GLOBAL_BLOCK' } },
-      matchDetails: { longestMatchStartTimeSeconds: '10', longestMatchDurationSeconds: '30' },
+      matchDetails: { longestMatchStartTimeSeconds: 10, longestMatchDurationSeconds: 30 },
     };
     assert.strictEqual(isBlockingPolicy(claim), true);
   });
@@ -17,7 +17,7 @@ describe('isBlockingPolicy', () => {
     const claim = {
       type: CLAIM_TYPES.VISUAL,
       claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_MOSTLY_GLOBAL_BLOCK' } },
-      matchDetails: { longestMatchStartTimeSeconds: '0', longestMatchDurationSeconds: '60' },
+      matchDetails: { longestMatchStartTimeSeconds: 0, longestMatchDurationSeconds: 60 },
     };
     assert.strictEqual(isBlockingPolicy(claim), true);
   });
@@ -26,7 +26,7 @@ describe('isBlockingPolicy', () => {
     const claim = {
       type: CLAIM_TYPES.AUDIOVISUAL,
       claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_BLOCK' } },
-      matchDetails: { longestMatchStartTimeSeconds: '5', longestMatchDurationSeconds: '10' },
+      matchDetails: { longestMatchStartTimeSeconds: 5, longestMatchDurationSeconds: 10 },
     };
     assert.strictEqual(isBlockingPolicy(claim), false);
   });
@@ -35,7 +35,7 @@ describe('isBlockingPolicy', () => {
     const claim = {
       type: CLAIM_TYPES.AUDIO,
       claimPolicy: { primaryPolicy: { policyType: 'MONETIZE' } },
-      matchDetails: { longestMatchStartTimeSeconds: '0', longestMatchDurationSeconds: '30' },
+      matchDetails: { longestMatchStartTimeSeconds: 0, longestMatchDurationSeconds: 30 },
     };
     assert.strictEqual(isBlockingPolicy(claim), false);
   });
@@ -44,7 +44,7 @@ describe('isBlockingPolicy', () => {
     const claim = {
       type: CLAIM_TYPES.AUDIO,
       claimPolicy: { primaryPolicy: { policyType: 'TRACKING' } },
-      matchDetails: { longestMatchStartTimeSeconds: '0', longestMatchDurationSeconds: '15' },
+      matchDetails: { longestMatchStartTimeSeconds: 0, longestMatchDurationSeconds: 15 },
     };
     assert.strictEqual(isBlockingPolicy(claim), false);
   });
@@ -53,7 +53,7 @@ describe('isBlockingPolicy', () => {
     const claim = {
       type: CLAIM_TYPES.VISUAL,
       claimPolicy: { primaryPolicy: { policyType: 'BLOCK_DIFFERENT_COUNTRY' } },
-      matchDetails: { longestMatchStartTimeSeconds: '0', longestMatchDurationSeconds: '45' },
+      matchDetails: { longestMatchStartTimeSeconds: 0, longestMatchDurationSeconds: 45 },
     };
     assert.strictEqual(isBlockingPolicy(claim), false);
   });
@@ -65,7 +65,7 @@ describe('buildMuteFilters', () => {
       {
         type: CLAIM_TYPES.AUDIO,
         claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_GLOBAL_BLOCK' } },
-        matchDetails: { longestMatchStartTimeSeconds: '10', longestMatchDurationSeconds: '30' },
+        matchDetails: { longestMatchStartTimeSeconds: 10, longestMatchDurationSeconds: 30 },
       },
     ];
     const result = buildMuteFilters(claims);
@@ -77,12 +77,12 @@ describe('buildMuteFilters', () => {
       {
         type: CLAIM_TYPES.AUDIO,
         claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_GLOBAL_BLOCK' } },
-        matchDetails: { longestMatchStartTimeSeconds: '0', longestMatchDurationSeconds: '60' },
+        matchDetails: { longestMatchStartTimeSeconds: 0, longestMatchDurationSeconds: 60 },
       },
       {
         type: CLAIM_TYPES.AUDIOVISUAL,
         claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_MOSTLY_GLOBAL_BLOCK' } },
-        matchDetails: { longestMatchStartTimeSeconds: '120', longestMatchDurationSeconds: '45' },
+        matchDetails: { longestMatchStartTimeSeconds: 120, longestMatchDurationSeconds: 45 },
       },
     ];
     const result = buildMuteFilters(claims);
@@ -96,12 +96,12 @@ describe('buildMuteFilters', () => {
       {
         type: CLAIM_TYPES.AUDIO,
         claimPolicy: { primaryPolicy: { policyType: 'MONETIZE' } },
-        matchDetails: { longestMatchStartTimeSeconds: '0', longestMatchDurationSeconds: '30' },
+        matchDetails: { longestMatchStartTimeSeconds: 0, longestMatchDurationSeconds: 30 },
       },
       {
         type: CLAIM_TYPES.AUDIO,
         claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_GLOBAL_BLOCK' } },
-        matchDetails: { longestMatchStartTimeSeconds: '100', longestMatchDurationSeconds: '20' },
+        matchDetails: { longestMatchStartTimeSeconds: 100, longestMatchDurationSeconds: 20 },
       },
     ];
     const result = buildMuteFilters(claims);
@@ -114,7 +114,7 @@ describe('buildMuteFilters', () => {
       {
         type: CLAIM_TYPES.AUDIO,
         claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_GLOBAL_BLOCK' } },
-        matchDetails: { longestMatchStartTimeSeconds: '0', longestMatchDurationSeconds: '120' },
+        matchDetails: { longestMatchStartTimeSeconds: 0, longestMatchDurationSeconds: 120 },
       },
     ];
     const result = buildMuteFilters(claims);
@@ -131,7 +131,7 @@ describe('buildMuteFilters', () => {
       {
         type: CLAIM_TYPES.AUDIO,
         claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_GLOBAL_BLOCK' } },
-        matchDetails: { longestMatchStartTimeSeconds: '3600', longestMatchDurationSeconds: '7200' },
+        matchDetails: { longestMatchStartTimeSeconds: 3600, longestMatchDurationSeconds: 7200 },
       },
     ];
     const result = buildMuteFilters(claims);
@@ -143,7 +143,7 @@ describe('buildMuteFilters', () => {
       {
         type: CLAIM_TYPES.AUDIO,
         claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_GLOBAL_BLOCK' } },
-        matchDetails: { longestMatchStartTimeSeconds: '50', longestMatchDurationSeconds: '0' },
+        matchDetails: { longestMatchStartTimeSeconds: 50, longestMatchDurationSeconds: 0 },
       },
     ];
     const result = buildMuteFilters(claims);
@@ -155,22 +155,22 @@ describe('buildMuteFilters', () => {
       {
         type: CLAIM_TYPES.AUDIO,
         claimPolicy: { primaryPolicy: { policyType: 'MONETIZE' } },
-        matchDetails: { longestMatchStartTimeSeconds: '0', longestMatchDurationSeconds: '10' },
+        matchDetails: { longestMatchStartTimeSeconds: 0, longestMatchDurationSeconds: 10 },
       },
       {
         type: CLAIM_TYPES.AUDIO,
         claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_GLOBAL_BLOCK' } },
-        matchDetails: { longestMatchStartTimeSeconds: '20', longestMatchDurationSeconds: '30' },
+        matchDetails: { longestMatchStartTimeSeconds: 20, longestMatchDurationSeconds: 30 },
       },
       {
         type: CLAIM_TYPES.VISUAL,
         claimPolicy: { primaryPolicy: { policyType: 'TRACKING' } },
-        matchDetails: { longestMatchStartTimeSeconds: '50', longestMatchDurationSeconds: '10' },
+        matchDetails: { longestMatchStartTimeSeconds: 50, longestMatchDurationSeconds: 10 },
       },
       {
         type: CLAIM_TYPES.AUDIOVISUAL,
         claimPolicy: { primaryPolicy: { policyType: 'POLICY_TYPE_MOSTLY_GLOBAL_BLOCK' } },
-        matchDetails: { longestMatchStartTimeSeconds: '100', longestMatchDurationSeconds: '5' },
+        matchDetails: { longestMatchStartTimeSeconds: 100, longestMatchDurationSeconds: 5 },
       },
     ];
     const result = buildMuteFilters(claims);

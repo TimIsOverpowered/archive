@@ -108,8 +108,8 @@ export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Pr
   const blockingClaims = receivedClaims.filter(isBlockingPolicy);
 
   const buildClaimInfo = (claim: (typeof blockingClaims)[0]): DmcaClaimInfo => {
-    const startSec = parseInt(String(claim.matchDetails.longestMatchStartTimeSeconds)) ?? 0;
-    const durSec = parseInt(claim.matchDetails.longestMatchDurationSeconds) ?? 0;
+    const startSec = claim.matchDetails.longestMatchStartTimeSeconds ?? 0;
+    const durSec = claim.matchDetails.longestMatchDurationSeconds ?? 0;
     return {
       claimId: claim.claimId,
       identifier: getClaimIdentifier(claim),
@@ -249,8 +249,8 @@ export async function processDmcaClaims(ctx: DmcaProcessorContext): Promise<void
     const blackoutSections: BlackoutSection[] = [];
 
     for (const claim of blackoutClaims) {
-      const startSeconds = parseInt(String(claim.matchDetails.longestMatchStartTimeSeconds)) ?? 0;
-      const durationSeconds = parseInt(claim.matchDetails.longestMatchDurationSeconds) ?? 0;
+      const startSeconds = claim.matchDetails.longestMatchStartTimeSeconds ?? 0;
+      const durationSeconds = claim.matchDetails.longestMatchDurationSeconds ?? 0;
       const endSeconds = startSeconds + durationSeconds;
 
       ctx.log.info(

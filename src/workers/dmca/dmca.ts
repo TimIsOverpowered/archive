@@ -36,7 +36,7 @@ export interface DMCAClaim {
     };
   };
   claimPolicy: { primaryPolicy: { policyType: string } };
-  matchDetails: { longestMatchStartTimeSeconds: string; longestMatchDurationSeconds: string };
+  matchDetails: { longestMatchStartTimeSeconds: number; longestMatchDurationSeconds: number };
 }
 
 const BLOCKING_POLICY_TYPES = ['POLICY_TYPE_GLOBAL_BLOCK', 'POLICY_TYPE_MOSTLY_GLOBAL_BLOCK'];
@@ -81,8 +81,8 @@ export function buildMuteFilters(claims: DMCAClaim[]): string[] {
   for (const claim of claims) {
     if (!isBlockingPolicy(claim)) continue;
 
-    const startTime = parseInt(claim.matchDetails.longestMatchStartTimeSeconds);
-    const endTime = startTime + parseInt(claim.matchDetails.longestMatchDurationSeconds);
+    const startTime = claim.matchDetails.longestMatchStartTimeSeconds;
+    const endTime = startTime + claim.matchDetails.longestMatchDurationSeconds;
 
     muteSection.push(`volume=0:enable='between(t,${startTime},${endTime})'`);
   }
