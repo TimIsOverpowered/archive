@@ -7,7 +7,7 @@ import { checkFlareSolverrHealth } from '../../utils/flaresolverr-health.js';
 import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator.js';
 import healthCheckMiddleware from '../middleware/health-check.js';
 import { RedisService } from '../../utils/redis-service.js';
-import { getCacheMetrics } from '../../utils/cache.js';
+import { defaultCacheContext } from '../../utils/cache.js';
 import { QUEUE_NAMES } from '../../workers/queues/queue.js';
 import type { AllJobData } from '../../workers/worker-definitions.js';
 import { getRedisInstance } from '../../workers/redis.js';
@@ -113,7 +113,7 @@ export default function healthRoutes(fastify: FastifyInstance, _options: HealthR
             version: flaresolverrHealth.stats.version,
           },
         }),
-        cache: getCacheMetrics(),
+        cache: { ...defaultCacheContext.metrics },
         workerQueues,
       });
 

@@ -29,6 +29,16 @@ export function serviceUnavailable(message: string): never {
   throw new HttpError(503, message, 'SERVICE_UNAVAILABLE');
 }
 
+/** Throws a 401 Unauthorized HttpError. */
+export function unauthorized(message: string): never {
+  throw new HttpError(401, message, 'UNAUTHORIZED');
+}
+
+/** Throws a 403 Forbidden HttpError. */
+export function forbidden(message: string): never {
+  throw new HttpError(403, message, 'FORBIDDEN');
+}
+
 /** Throws a 500 Internal Server Error HttpError. */
 export function internalServerError(message: string): never {
   throw new HttpError(500, message, 'INTERNAL_SERVER_ERROR');
