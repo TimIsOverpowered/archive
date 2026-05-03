@@ -154,7 +154,7 @@ describe('cleanupOrphanedTmpFiles', () => {
     (fsPromises as any).unlink = async () => {};
 
     const mockLog = {
-      debug: (msg: string) => {
+      debug: (_ctx: unknown, msg: string) => {
         debugMessages.push(msg);
       },
       warn: () => {},
