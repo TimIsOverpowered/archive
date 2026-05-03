@@ -5,6 +5,7 @@ import { closeAllClients, startClientCleanup, stopClientCleanup } from './db/str
 import { getLogger, setLoggerConfig } from './utils/logger.js';
 import { closeRedisClient } from './api/plugins/redis.plugin.js';
 import { extractErrorDetails } from './utils/error.js';
+import { registerProcessErrorHandlers } from './utils/process-handlers.js';
 import { registerShutdownHandlers } from './utils/shutdown.js';
 import { startCloudflareIpRangesCron } from './cron/cloudflare-ip-ranges.js';
 import { getCachedRangeInfo, getCloudflareIpRanges } from './utils/cloudflare-ip-validator.js';
@@ -12,14 +13,7 @@ import { registerPlatformStrategies } from './services/platforms/index.js';
 import { closeMetaClient } from './db/meta-client.js';
 import { CacheRefresh } from './constants.js';
 
-process.on('unhandledRejection', (reason) => {
-  getLogger().error({ error: extractErrorDetails(reason) }, 'Unhandled promise rejection');
-});
-
-process.on('uncaughtException', (err) => {
-  getLogger().fatal({ error: extractErrorDetails(err) }, 'Uncaught exception');
-  process.exit(1);
-});
+registerProcessErrorHandlers();
 
 const config = loadApiConfig();
 setLoggerConfig({ level: config.LOG_LEVEL, isProduction: config.NODE_ENV === 'production' });

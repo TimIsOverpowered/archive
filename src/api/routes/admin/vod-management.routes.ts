@@ -109,7 +109,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
         await invalidateVodStaticCache(tenantId, fetchedVod.id);
         await invalidateVodVolatileCache(tenantId, fetchedVod.id);
 
-        log.info(`Created/fetched VOD ${vodId} via API`);
+        log.info({ vodId }, 'Created/fetched VOD via API');
         return ok({ message: `${fetchedVod.id} created!`, vodId: fetchedVod.id });
       }
 
@@ -149,7 +149,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
       await invalidateVodStaticCache(tenantId, newVod.id);
       await invalidateVodVolatileCache(tenantId, newVod.id);
 
-      log.info(`Created VOD ${vodId}`);
+      log.info({ vodId }, 'Created VOD');
 
       return ok({ message: `${newVod.id} created!`, vodId: newVod.id });
     }
@@ -195,7 +195,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
       await invalidateVodStaticCache(tenantId, vodRecord.id);
       await invalidateVodVolatileCache(tenantId, vodRecord.id);
 
-      log.info(`Deleted VOD ${vodId} (${platform}) and all related data (cascade)`);
+      log.info({ vodId, platform }, 'Deleted VOD and all related data (cascade)');
 
       return ok({ message: `Deleted VOD ${vodId} and all related data`, vodId });
     }

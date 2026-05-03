@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { pathToFileURL } from 'node:url';
 import { extractErrorDetails } from '../utils/error.js';
+import { registerProcessErrorHandlers } from '../utils/process-handlers.js';
 import { configService } from '../config/tenant-config.js';
 import { registerTenantConfigSubscriberWorker } from '../config/tenant-config-subscriber.js';
 import { QUEUE_NAMES, closeQueues } from './queues/queue.js';
@@ -25,14 +26,7 @@ interface AppContext {
   tenantConfigSubscriber: ReturnType<typeof registerTenantConfigSubscriberWorker>;
 }
 
-process.on('unhandledRejection', (reason) => {
-  getLogger().error({ error: extractErrorDetails(reason) }, 'Unhandled promise rejection');
-});
-
-process.on('uncaughtException', (err) => {
-  getLogger().fatal({ error: extractErrorDetails(err) }, 'Uncaught exception');
-  process.exit(1);
-});
+registerProcessErrorHandlers();
 
 async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkersConfig>) {
   if (!workerConfig.CLEAR_QUEUES_ON_STARTUP) return;
@@ -44,11 +38,13 @@ async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkers
 
   for (const name of Object.values(QUEUE_NAMES)) {
     const queue = new Queue(name, { connection: getRedisInstance() });
-    await queue.pause();
-    await queue.obliterate({ force: true });
-    await queue.resume();
-
-    getLogger().warn({ queue: name }, 'Queue obliterated and reset');
+    try {
+      await queue.pause();
+      await queue.obliterate({ force: true });
+      await queue.resume();
+    } finally {
+      await queue.close();
+    }
   }
 
   getLogger().warn({ component: 'queues' }, 'All queues cleared and reset');

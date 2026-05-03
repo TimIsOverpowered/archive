@@ -22,7 +22,7 @@ export async function checkTokenHealth(): Promise<void> {
         resetFailures(`${tenantId}:twitch`);
       } catch (err: unknown) {
         const { message } = extractErrorDetails(err);
-        log.error({ error: message, platform: 'Twitch' }, `Token health check failed for ${tenantId}`);
+        log.error({ error: message, platform: 'Twitch', tenantId }, 'Token health check failed');
 
         if (trackFailure(`${tenantId}:twitch`, Token.MAX_FAILURES)) {
           await sendDiscordAlert(

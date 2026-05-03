@@ -43,7 +43,7 @@ export async function ensureVodRecord(
   const rawVodRecord = await findVodByPlatformId(db, vodId, platform);
 
   if (rawVodRecord) {
-    log.info(`Using existing VOD record for ${vodId}`);
+    log.info({ vodId }, 'Using existing VOD record');
     return rawVodRecord;
   }
 
@@ -59,7 +59,7 @@ export async function ensureVodRecord(
     return null;
   }
 
-  log.info(`Creating new VOD ${vodId} for platform ${platform}`);
+  log.info({ vodId, platform }, 'Creating new VOD');
 
   const vodRecord = (await db
     .insertInto('vods')
@@ -107,7 +107,7 @@ export async function refreshVodRecord(
     return null;
   }
 
-  log.info(`Refreshing VOD ${vodId} metadata from platform ${platform}`);
+  log.info({ vodId, platform }, 'Refreshing VOD metadata from platform');
 
   const vodMetadata = await strategy.fetchVodMetadata(vodId, ctx);
   if (!vodMetadata) {

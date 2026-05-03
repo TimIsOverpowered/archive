@@ -276,7 +276,7 @@ async function processSplitGameUpload(
     const endTime = Math.min(startTime + YouTube.MAX_DURATION, trimmedDuration);
     const splitPath = splitPaths[i];
     if (splitPath == null) {
-      log.warn({ part: currentPartNum, totalParts }, `Missing split path for part ${currentPartNum}`);
+      log.warn({ part: currentPartNum, totalParts }, 'Missing split path for part');
       continue;
     }
 

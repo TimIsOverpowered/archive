@@ -96,11 +96,11 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
 
         await publishVodDurationUpdate(tenantId, vodRecord.id, durationSecs, vodRecord.is_live);
 
-        log.info(`Updated VOD ${vodRecord.id} duration to ${durationSecs}s`);
+        log.info({ vodId: vodRecord.id, durationSecs }, 'Updated VOD duration');
       }
 
       if (config?.youtube?.upload !== true) {
-        log.warn(`YouTube upload not enabled, skipping queue for ${streamId}`);
+        log.warn({ streamId }, 'YouTube upload not enabled, skipping queue');
 
         return ok({
           message: 'YouTube upload is disabled for this tenant. Recording processed but no upload queued.',

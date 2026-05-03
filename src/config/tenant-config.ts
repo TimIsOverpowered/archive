@@ -31,7 +31,10 @@ function parsePlatformConfig<T>(
   const result = schema.safeParse(obj);
   if (result.success) return result.data;
 
-  getLogger().warn({ tenantId, errors: result.error.issues }, `Invalid ${platformName} config, skipping platform`);
+  getLogger().warn(
+    { tenantId, platformName, errors: result.error.issues },
+    'Invalid platform config, skipping platform'
+  );
   return undefined;
 }
 
@@ -65,14 +68,18 @@ export function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
     settings,
   };
 
-  const twitch = parsePlatformConfig(tenant.id, tenant.twitch, TwitchSchema, 'Twitch');
-  if (twitch != null) tenantConfig.twitch = twitch;
+  const platformConfigs = [
+    { key: 'twitch', raw: tenant.twitch, schema: TwitchSchema, label: 'Twitch' },
+    { key: 'youtube', raw: tenant.youtube, schema: YoutubeSchema, label: 'YouTube' },
+    { key: 'kick', raw: tenant.kick, schema: KickSchema, label: 'Kick' },
+  ] as const;
 
-  const youtube = parsePlatformConfig(tenant.id, tenant.youtube, YoutubeSchema, 'YouTube');
-  if (youtube != null) tenantConfig.youtube = youtube;
-
-  const kick = parsePlatformConfig(tenant.id, tenant.kick, KickSchema, 'Kick');
-  if (kick != null) tenantConfig.kick = kick;
+  for (const { key, raw, schema, label } of platformConfigs) {
+    const parsed = parsePlatformConfig(tenant.id, raw, schema as ZodType<any>, label);
+    if (parsed != null) {
+      (tenantConfig as unknown as Record<string, unknown>)[key] = parsed;
+    }
+  }
 
   return tenantConfig;
 }

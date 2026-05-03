@@ -20,7 +20,7 @@ export function registerPlatformStrategies(): void {
     try {
       registerStrategy(platform, strategyMap[platform]);
     } catch (err) {
-      getLogger().fatal({ platform, error: extractErrorDetails(err) }, `Failed to register strategy for ${platform}`);
+      getLogger().fatal({ platform, error: extractErrorDetails(err) }, 'Failed to register strategy');
       throw err;
     }
   }

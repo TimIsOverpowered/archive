@@ -134,7 +134,7 @@ export async function runVodDownload(ctx: VodProcessorContext): Promise<void> {
     });
 
     ctx.segmentCount = downloadResult.segmentCount;
-    ctx.log.info({ vodId: ctx.vodId, platform: ctx.platform }, `Downloaded ${ctx.vodId}.mp4`);
+    ctx.log.info({ vodId: ctx.vodId, platform: ctx.platform }, 'Downloaded VOD');
   }
 }
 

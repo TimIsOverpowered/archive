@@ -168,14 +168,14 @@ export async function cleanupOrphanedTmpFiles(vodDir: string, log: AppLogger): P
 
         try {
           await fs.promises.unlink(filePath);
-          log.debug(`Cleaned up orphaned .tmp file: ${file}`);
+          log.debug({ file }, 'Cleaned up orphaned .tmp file');
         } catch (error) {
-          log.warn({ error: extractErrorDetails(error).message }, `Failed to clean up orphaned .tmp file: ${file}`);
+          log.warn({ error: extractErrorDetails(error).message, file }, 'Failed to clean up orphaned .tmp file');
         }
       }
     }
   } catch (error) {
-    log.warn({ error: extractErrorDetails(error).message }, `Failed to scan for orphaned files in directory`);
+    log.warn({ error: extractErrorDetails(error).message }, 'Failed to scan for orphaned files in directory');
   }
 }
 

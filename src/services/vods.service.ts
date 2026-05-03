@@ -85,14 +85,14 @@ export function buildVodQuery(query: VodQuery): {
   const where = (eb: ExpressionBuilder<StreamerDB, 'vods'>) => {
     const conditions: Expression<SqlBool>[] = [];
 
-    if (query.platform != null && query.platform !== '') {
+    if (query.platform != null) {
       conditions.push(eb('platform', '=', query.platform));
     }
 
-    if (query.from != null && query.from !== '') {
+    if (query.from != null) {
       conditions.push(eb('created_at', '>=', new Date(query.from)));
     }
-    if (query.to != null && query.to !== '') {
+    if (query.to != null) {
       conditions.push(eb('created_at', '<=', new Date(query.to)));
     }
 
@@ -100,7 +100,7 @@ export function buildVodQuery(query: VodQuery): {
       conditions.push(eb('id', 'in', eb.selectFrom('vod_uploads').select('vod_uploads.vod_id')));
     }
 
-    if (query.game != null && query.game !== '') {
+    if (query.game != null) {
       conditions.push(
         eb('id', 'in', eb.selectFrom('games').select('games.vod_id').where('game_name', 'ilike', `%${query.game}%`))
       );
@@ -110,8 +110,8 @@ export function buildVodQuery(query: VodQuery): {
   };
 
   const orderBy = {
-    col: query.sort ?? 'created_at',
-    dir: query.order ?? 'desc',
+    col: query.sort,
+    dir: query.order,
   };
 
   return { where, orderBy };

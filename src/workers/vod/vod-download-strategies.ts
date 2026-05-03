@@ -57,7 +57,7 @@ export async function downloadVodWithFfmpeg(
   config: TenantConfig,
   log: AppLogger
 ): Promise<VodDownloadResult> {
-  log.info({ vodId, platform, method: 'ffmpeg' }, `Starting ffmpeg download for ${vodId}`);
+  log.info({ vodId, platform, method: 'ffmpeg' }, 'Starting ffmpeg download');
 
   if (platform === PLATFORMS.KICK) {
     await downloadKickVodWithFfmpeg(vodId, finalPath, config, log);
@@ -67,7 +67,7 @@ export async function downloadVodWithFfmpeg(
     throw new Error(`Unsupported platform: ${String(platform)}`);
   }
 
-  log.info({ vodId, platform }, `ffmpeg download completed for ${vodId}`);
+  log.info({ vodId, platform }, 'ffmpeg download completed');
   return { finalPath };
 }
 
@@ -109,7 +109,7 @@ async function downloadKickVodWithFfmpeg(
       },
     });
 
-    log.info(`Downloaded ${vodId}.mp4`);
+    log.info({ vodId }, 'Downloaded VOD');
   });
 }
 
@@ -149,6 +149,6 @@ async function downloadTwitchVodWithFfmpeg(
       },
     });
 
-    log.info(`Downloaded ${vodId}.mp4`);
+    log.info({ vodId }, 'Downloaded VOD');
   });
 }

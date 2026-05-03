@@ -333,7 +333,7 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
     throw new Error('No segments found in HLS playlist');
   }
 
-  log.debug({ vodId, count: segments.length }, `Found ${segments.length} segments to download`);
+  log.debug({ vodId, count: segments.length }, 'Found segments to download');
 
   const strategy = resolveDownloadStrategy(platform, cycleTLS);
 
