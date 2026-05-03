@@ -36,6 +36,7 @@ export default async function adminApiKeyMiddleware(request: FastifyRequest, rep
 
   const limiter = RedisService.requireLimiter('rate:admin:auth');
   const ip = getClientIp(request);
+  const keyFingerprint = createHash('sha256').update(apiKey).digest('hex').substring(0, 12);
 
   try {
     await limiter.consume(ip);
@@ -48,7 +49,6 @@ export default async function adminApiKeyMiddleware(request: FastifyRequest, rep
   const admin = await findAdminByApiKey(apiKey);
 
   if (!admin) {
-    const keyFingerprint = createHash('sha256').update(apiKey).digest('hex').substring(0, 12);
     getLogger().warn({ ip, keyFingerprint }, 'Invalid admin API key used');
     return reply.status(401).send(errorResponse(401, 'Invalid API key', 'UNAUTHORIZED'));
   }

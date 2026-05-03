@@ -30,12 +30,12 @@ export default function createRateLimitMiddleware(options: RateLimitOptions) {
       return reply.status(503).send(errorResponse(503, 'Rate limiter unavailable', 'SERVICE_UNAVAILABLE'));
     }
 
+    const ip = getClientIp(request);
+
     const isValidCfRequest = await validateCloudflareRequest(request);
     if (!isValidCfRequest) {
       return reply.status(403).send(errorResponse(403, 'Forbidden', 'FORBIDDEN'));
     }
-
-    const ip = getClientIp(request);
 
     try {
       const consumeResult = await activeLimiter.consume(ip);

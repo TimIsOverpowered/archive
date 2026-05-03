@@ -78,7 +78,7 @@ export async function tenantMiddleware(request: FastifyRequest) {
  * Must be used after tenantMiddleware (expects request.tenant to exist)
  * Register in preValidation hook
  */
-export function platformValidationMiddleware(request: FastifyRequest) {
+export async function platformValidationMiddleware(request: FastifyRequest) {
   const rawPlatform = (request.body as { platform?: string }).platform;
   if (rawPlatform == null || rawPlatform === '') {
     badRequest('Platform is required');

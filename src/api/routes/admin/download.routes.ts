@@ -89,7 +89,6 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
       const { vodId, type, downloadMethod, uploadMode } = request.body;
       const log = createAutoLogger(tenantId);
 
-      // Ensure VOD record exists or create it from platform API metadata
       const vodRecord = await ensureVodRecord(tenantCtx, vodId, log);
 
       if (!vodRecord) {
@@ -98,7 +97,6 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
 
       const dbId = vodRecord.id;
 
-      // Ensure vod download
       const { jobId, filePath } = await ensureVodDownload({
         ctx: tenantCtx,
         dbId,
@@ -107,8 +105,6 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
         downloadMethod,
         log,
       });
-
-      // Queue Youtube upload
       await queueYoutubeUploads({
         ctx: tenantCtx,
         dbId,
@@ -119,7 +115,6 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
         downloadJobId: jobId ?? undefined,
         type,
       });
-
       return buildVodJobResponse({
         hasDownload: jobId != null,
         filePath,
