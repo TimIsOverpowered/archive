@@ -29,7 +29,7 @@ interface YoutubeConfig {
   perGameUpload?: boolean;
   restrictedGames?: (string | null)[];
   splitDuration?: number;
-  apiKey?: string;
+  api_key?: string;
   liveUpload?: boolean;
   multiTrack?: boolean;
   upload?: boolean;
@@ -65,7 +65,7 @@ interface RawConfig {
   kick?: KickConfig;
   youtube?: YoutubeConfig;
   channel?: string;
-  domainName: string;
+  domain_name: string;
   vodPath: string;
   livePath: string;
   timezone: string;
@@ -107,8 +107,8 @@ function processYoutube(config: YoutubeConfig | undefined) {
   if (config.multiTrack !== undefined) youtube.multiTrack = config.multiTrack;
   if (config.upload !== undefined) youtube.upload = config.upload;
 
-  if (config.apiKey) {
-    youtube.apiKey = encryptScalar(config.apiKey);
+  if (config.api_key) {
+    youtube.apiKey = encryptScalar(config.api_key);
   }
 
   if (config.auth && (config.auth.refresh_token || config.auth.access_token)) {
@@ -134,7 +134,7 @@ function processKick(config: KickConfig | undefined) {
 
 function processSettings(raw: RawConfig) {
   const settings: SettingsConfig = {
-    domainName: raw.domainName,
+    domainName: raw.domain_name,
     vodPath: raw.vodPath,
     livePath: raw.livePath,
     timezone: raw.timezone,
