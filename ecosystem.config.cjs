@@ -65,10 +65,9 @@ module.exports = {
     {
       name: 'archive-api', // PM2 app identifier
 
-      script: './src/index.ts', // Direct TypeScript via tsx interpreter
+      script: './dist/src/index.js', // Compiled output from tsc build
 
       interpreter: 'node',
-      interpreter_args: '--import tsx',
 
       env: {
         // Production environment (default)
@@ -104,10 +103,9 @@ module.exports = {
     {
       name: 'archive-worker', // Separate PM2 app identifier
 
-      script: './src/workers/index.ts', // Worker entry point - BullMQ job processors
+      script: './dist/src/workers/index.js', // Worker entry point - BullMQ job processors
 
       interpreter: 'node',
-      interpreter_args: '--import tsx',
 
       env: {
         // Production worker settings
@@ -121,7 +119,7 @@ module.exports = {
         LOG_LEVEL: 'debug', // Can match or differ from API server level
       },
 
-      max_memory_restart: '1G', // Higher limit needed - video processing is memory-intensive (2x API)
+      max_memory_restart: '2G', // Higher limit needed - CycleTLS (~200MB) + 50 live workers + VOD downloads with concurrent HLS segment buffering
 
       autorestart: true, // Auto-recover on crashes
       watch: false, // Disable file watching in production
