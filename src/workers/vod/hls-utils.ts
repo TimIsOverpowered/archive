@@ -6,6 +6,7 @@ import pLimit from 'p-limit';
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch/index.js';
 import { PLATFORMS } from '../../types/platforms.js';
 import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
+import { jitter, sleep } from '../../utils/delay.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { request, segmentDownloadAgent } from '../../utils/http-client.js';
 import type { AppLogger } from '../../utils/logger.js';
@@ -101,6 +102,8 @@ export async function downloadSegmentsParallel(
           if (isAborted() === true) {
             throw new Error('Aborted');
           }
+
+          await sleep(jitter(5));
 
           if (strategy.type === 'fetch') {
             const response = await request(`${baseURL}/${segment.uri}`, {
