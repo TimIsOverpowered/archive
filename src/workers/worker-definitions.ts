@@ -13,6 +13,8 @@ import type {
   YoutubeUploadJob,
   DmcaProcessingJob,
   MonitorJob,
+  LiveDownloadResult,
+  StandardVodResult,
   ChatDownloadResult,
   YoutubeUploadResult,
   DmcaProcessingResult,
@@ -44,13 +46,13 @@ const workerDefs = {
     name: QUEUE_NAMES.VOD_LIVE,
     processor: liveProcessor,
     useWorkerThreads: true,
-  } satisfies WorkerDef<LiveDownloadJob>,
+  } satisfies WorkerDef<LiveDownloadJob, LiveDownloadResult>,
 
   [QUEUE_NAMES.VOD_STANDARD]: {
     name: QUEUE_NAMES.VOD_STANDARD,
     processor: standardVodProcessor,
     useWorkerThreads: true,
-  } satisfies WorkerDef<StandardVodJob>,
+  } satisfies WorkerDef<StandardVodJob, StandardVodResult>,
 
   [QUEUE_NAMES.CHAT_DOWNLOAD]: {
     name: QUEUE_NAMES.CHAT_DOWNLOAD,

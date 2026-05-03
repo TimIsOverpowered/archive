@@ -92,6 +92,15 @@ export interface ChatDownloadResult {
   skipped?: boolean;
 }
 
+export interface LiveDownloadResult {
+  success: true;
+}
+
+export interface StandardVodResult {
+  success: true;
+  finalPath: string;
+}
+
 export interface YoutubeUploadVodResult {
   success: true;
   videos: Array<{ id: string; part: number }>;

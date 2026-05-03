@@ -1,9 +1,9 @@
 import { buildVodProcessorContext, runVodDownload, sendVodCompletion } from './vod.worker.phases.js';
 import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
-import type { StandardVodJob } from './jobs/types.js';
+import type { StandardVodJob, StandardVodResult } from './jobs/types.js';
 import type { VodProcessorContext } from './vod.worker.phases.js';
 import { updateAlert } from '../utils/discord-alerts.js';
-import type { Job, Processor } from 'bullmq';
+import type { Job } from 'bullmq';
 
 const errorMeta = (ctx: VodProcessorContext) => ({
   vodId: ctx.vodId,
@@ -17,7 +17,7 @@ const errorAlert = async (ctx: VodProcessorContext, job: Job, errorMsg: string) 
   await updateAlert(ctx.messageId, ctx.alerts.error(ctx.vodId, ctx.platform, errorMsg));
 };
 
-const vodProcessor = wrapWorkerProcessor(
+const vodProcessor = wrapWorkerProcessor<StandardVodJob, VodProcessorContext, StandardVodResult>(
   buildVodProcessorContext,
   async (ctx) => {
     await runVodDownload(ctx);
@@ -25,6 +25,6 @@ const vodProcessor = wrapWorkerProcessor(
     return { success: true, finalPath: ctx.finalPath };
   },
   { errorMeta, errorAlert }
-) as unknown as Processor<StandardVodJob, unknown, string>;
+);
 
 export default vodProcessor;

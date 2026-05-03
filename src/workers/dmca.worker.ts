@@ -1,4 +1,4 @@
-import { Processor, Job } from 'bullmq';
+import type { Job } from 'bullmq';
 import { buildDmcaProcessorContext, trimDmcaVideo, processDmcaClaims, queueDmcaUpload } from './dmca.worker.phases.js';
 import type { DmcaProcessorContext } from './dmca.worker.phases.js';
 import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
@@ -18,7 +18,7 @@ const errorAlert = async (ctx: DmcaProcessorContext, _job: Job, errorMsg: string
   await updateAlert(ctx.messageId, ctx.alerts.error(ctx.vodId, errorMsg));
 };
 
-const dmcaProcessor = wrapWorkerProcessor(
+const dmcaProcessor = wrapWorkerProcessor<DmcaProcessingJob, DmcaProcessorContext, DmcaProcessingResult>(
   buildDmcaProcessorContext,
   async (ctx) => {
     if (ctx.blockingClaims.length === 0) {
@@ -46,6 +46,6 @@ const dmcaProcessor = wrapWorkerProcessor(
       }
     },
   }
-) as unknown as Processor<DmcaProcessingJob, DmcaProcessingResult>;
+);
 
 export default dmcaProcessor;

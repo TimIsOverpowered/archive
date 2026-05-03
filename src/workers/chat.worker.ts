@@ -24,7 +24,7 @@ const errorAlert = async (ctx: ChatProcessorContext, job: Job, errorMsg: string)
   await updateAlert(ctx.messageId, ctx.alerts.error(ctx.displayName, ctx.vodId, ctx.platform, 0, errorMsg));
 };
 
-const wrappedChatProcessor = wrapWorkerProcessor(
+const wrappedChatProcessor = wrapWorkerProcessor<ChatDownloadJob, ChatProcessorContext, ChatDownloadResult>(
   buildChatProcessorContext,
   async (ctx) => {
     if (!ctx.forceRerun && ctx.hasExistingData) {
@@ -38,11 +38,9 @@ const wrappedChatProcessor = wrapWorkerProcessor(
     return { success: true, ...result };
   },
   { errorMeta, errorAlert }
-) as unknown as (job: Job<ChatDownloadJob>) => Promise<ChatDownloadResult>;
+);
 
-const chatProcessor: import('bullmq').Processor<ChatDownloadJob, ChatDownloadResult> = async (
-  job: import('bullmq').Job<ChatDownloadJob>
-) => {
+const chatProcessor: import('bullmq').Processor<ChatDownloadJob, ChatDownloadResult> = async (job) => {
   const { platform } = job.data;
 
   if (!isTwitchPlatform(platform)) {

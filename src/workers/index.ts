@@ -55,19 +55,20 @@ async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkers
 }
 
 export async function bootstrap() {
-  const ctx: AppContext = {
-    workerConfig: loadWorkersConfig(),
-    configs: {} as Awaited<ReturnType<typeof configService.loadAll>>,
-    tenantConfigSubscriber: {} as ReturnType<typeof registerTenantConfigSubscriberWorker>,
-  };
-
-  setLoggerConfig({ level: ctx.workerConfig.LOG_LEVEL, isProduction: ctx.workerConfig.NODE_ENV === 'production' });
-
-  getLogger().info({ nodeEnv: ctx.workerConfig.NODE_ENV }, 'Starting worker process');
+  const workerConfig = loadWorkersConfig();
+  setLoggerConfig({ level: workerConfig.LOG_LEVEL, isProduction: workerConfig.NODE_ENV === 'production' });
+  getLogger().info({ nodeEnv: workerConfig.NODE_ENV }, 'Starting worker process');
 
   try {
     await initInfrastructure();
-    await initApplicationState(ctx);
+    const { configs, tenantConfigSubscriber } = await initApplicationState();
+
+    const ctx: AppContext = {
+      workerConfig,
+      configs,
+      tenantConfigSubscriber,
+    };
+
     await initWorkers(ctx);
     await initBackgroundServices(ctx);
     registerShutdownHandlers(ctx);
@@ -93,15 +94,16 @@ async function initInfrastructure() {
   getLogger().info({ component: 'cycletls' }, 'CycleTLS initialized');
 }
 
-async function initApplicationState(ctx: AppContext) {
+async function initApplicationState() {
   getLogger().info({ component: 'application' }, 'Initializing application state');
 
   registerPlatformStrategies();
 
-  ctx.configs = await configService.loadAll();
-
-  ctx.tenantConfigSubscriber = registerTenantConfigSubscriberWorker();
+  const configs = await configService.loadAll();
+  const tenantConfigSubscriber = registerTenantConfigSubscriberWorker();
   getLogger().info({ component: 'tenant-config' }, 'Tenant config subscriber registered');
+
+  return { configs, tenantConfigSubscriber };
 }
 
 async function initWorkers(ctx: AppContext) {

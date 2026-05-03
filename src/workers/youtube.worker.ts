@@ -114,7 +114,7 @@ const errorAlert = async (ctx: YoutubeProcessorContext, _job: Job, _errorMsg: st
   await publishVodUpdate(ctx.tenantId, ctx.dbId);
 };
 
-const youtubeProcessor = wrapWorkerProcessor(
+const youtubeProcessor = wrapWorkerProcessor<YoutubeUploadJob, YoutubeProcessorContext, YoutubeUploadResult>(
   buildYoutubeContext,
   async (ctx) => {
     if (ctx.kind === 'vod') {
@@ -168,6 +168,6 @@ const youtubeProcessor = wrapWorkerProcessor(
     }
   },
   { errorMeta, errorAlert }
-) as unknown as import('bullmq').Processor<YoutubeUploadJob, YoutubeUploadResult>;
+);
 
 export default youtubeProcessor;

@@ -7,7 +7,7 @@ import {
   sendCompletionAlert,
 } from './live.worker.phases.js';
 import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
-import type { LiveDownloadJob } from './jobs/types.js';
+import type { LiveDownloadJob, LiveDownloadResult } from './jobs/types.js';
 import type { LiveProcessorContext } from './live.worker.phases.js';
 import { updateAlert } from '../utils/discord-alerts.js';
 import type { Job } from 'bullmq';
@@ -24,7 +24,7 @@ const errorAlert = async (ctx: LiveProcessorContext, job: Job, errorMsg: string)
   await updateAlert(ctx.messageId, ctx.alerts.error(ctx.vodId, errorMsg));
 };
 
-const liveProcessor = wrapWorkerProcessor(
+const liveProcessor = wrapWorkerProcessor<LiveDownloadJob, LiveProcessorContext, LiveDownloadResult>(
   buildLiveProcessorContext,
   async (ctx) => {
     await prepareVodDirectory(ctx);
@@ -35,6 +35,6 @@ const liveProcessor = wrapWorkerProcessor(
     return { success: true };
   },
   { errorMeta, errorAlert }
-) as unknown as import('bullmq').Processor<LiveDownloadJob, unknown, string>;
+);
 
 export default liveProcessor;
