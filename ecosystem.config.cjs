@@ -28,17 +28,7 @@
  * 2. archive-worker - Background job processors + stream detection monitoring (BullMQ + FlareSolverr via HTTP)
  *
  * Required environment variables (set in .env or PM2 runtime env):
- *   DATABASE_URL          - Primary PostgreSQL connection string (used by both processes)
- *   PGBOUNCER_URL         - PgBouncer connection string (used by both processes)
- *   REDIS_URL             - Redis connection string (used by both processes)
- *   TWITCH_CLIENT_ID      - Twitch OAuth client ID (used by both processes)
- *   TWITCH_CLIENT_SECRET  - Twitch OAuth client secret (used by both processes)
- *   KICK_AUTH_TOKEN       - Kick API auth token (used by both processes)
- *   YOUTUBE_API_KEY       - YouTube Data API v3 key (used by both processes)
- *   DISCORD_WEBHOOK_URL   - Discord alert webhook URL (used by both processes)
- *   FLARESOLVERR_BASE_URL - FlareSolverr URL for Kick anti-bot (worker only, default: http://localhost:8191)
  *   NODE_ENV              - "production" or "development"
- *   PORT                  - API server port (default: 3030, API only)
  *
  * Deployment on Linux:
  *   npm install && npm run start:pm2
@@ -63,7 +53,7 @@ module.exports = {
     //
     // === APP #1: HTTP API Server (Fastify/Feathers REST endpoints) ===
     {
-      name: 'archive-api', // PM2 app identifier
+      name: 'api', // PM2 app identifier
 
       script: './dist/src/index.js', // Compiled output from tsc build
 
@@ -72,15 +62,6 @@ module.exports = {
       env: {
         // Production environment (default)
         NODE_ENV: 'production',
-        LOG_LEVEL: 'info', // Lower verbosity - PM2 captures all logs
-        PORT: 3030,
-      },
-
-      env_development: {
-        // Development mode (--env development flag)
-        NODE_ENV: 'development',
-        LOG_LEVEL: 'debug', // Verbose logging for debugging
-        PORT: 3030,
       },
 
       max_memory_restart: '512M', // Restart if memory exceeds this limit (lightweight API server)
@@ -95,13 +76,13 @@ module.exports = {
 
       merge_logs: true, // Combine stdout + stderr into single log file
 
-      out_file: './logs/api-out.log', // Pretty-printed console output from pino-pretty transport
-      error_file: './logs/api-error.log', // Uncaught errors and exceptions
+      out_file: './logs/api-out.log',
+      error_file: './logs/api-error.log',
     },
 
     // === APP #2: Background Workers + Stream Monitoring (BullMQ queues + FlareSolverr for Kick API access) ===
     {
-      name: 'archive-worker', // Separate PM2 app identifier
+      name: 'worker', // Separate PM2 app identifier
 
       script: './dist/src/workers/index.js', // Worker entry point - BullMQ job processors
 
@@ -110,13 +91,6 @@ module.exports = {
       env: {
         // Production worker settings
         NODE_ENV: 'production',
-        LOG_LEVEL: 'info', // Same as API for consistency
-      },
-
-      env_development: {
-        // Development mode for workers
-        NODE_ENV: 'development',
-        LOG_LEVEL: 'debug', // Can match or differ from API server level
       },
 
       max_memory_restart: '2G', // Higher limit needed - CycleTLS (~200MB) + 50 live workers + VOD downloads with concurrent HLS segment buffering
@@ -130,8 +104,8 @@ module.exports = {
 
       merge_logs: true, // Combine streams for cleaner log viewing
 
-      out_file: './logs/worker-out.log', // Worker stdout with pretty pino logs (includes stream detection polling)
-      error_file: './logs/worker-error.log', // Uncaught errors and exceptions
+      out_file: './logs/worker-out.log',
+      error_file: './logs/worker-error.log',
     },
   ],
 };
