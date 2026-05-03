@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { sleep } from '../utils/delay.js';
+import { sleep, jitter } from '../utils/delay.js';
 import { fetchComments, fetchNextComments, type TwitchVideoCommentResponse } from '../services/twitch/index.js';
 import { resetFailures } from '../utils/discord-alerts.js';
 import type { ChatDownloadJob, ChatDownloadResult } from './jobs/types.js';
@@ -269,7 +269,7 @@ async function* paginateChatComments(
     const cursor = edges.at(-1)?.cursor ?? null;
     if (cursor == null || cursor === lastCursor) break;
     lastCursor = cursor;
-    await sleep(Chat.RATE_LIMIT_MS);
+    await sleep(jitter(Chat.RATE_LIMIT_MS));
     page = await fetchNextComments(vodId, cursor, tenantId);
   }
 }
