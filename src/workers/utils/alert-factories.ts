@@ -376,6 +376,7 @@ export interface DmcaClaimInfo {
   startTimestamp: string;
   endTimestamp: string;
   claimType: string;
+  policyType: string;
 }
 
 export interface DmcaWorkerAlerts {
@@ -393,7 +394,8 @@ export interface DmcaWorkerAlerts {
     currentStep: string,
     platform: string,
     displayName: string,
-    stepProgress?: number
+    stepProgress?: number,
+    currentCommand?: string
   ) => RichEmbedData;
   complete: (
     vodId: string,
@@ -414,6 +416,12 @@ function formatClaimList(
   const lines: string[] = [];
   const sorted = [...claims].sort((a, b) => a.startTimestamp.localeCompare(b.startTimestamp));
 
+  const claimTypeLabel: Record<string, string> = {
+    CLAIM_TYPE_AUDIO: '🔊 Audio',
+    CLAIM_TYPE_VISUAL: '👁️ Visual',
+    CLAIM_TYPE_AUDIOVISUAL: '🎬 AudioVisual',
+  };
+
   for (const claim of sorted) {
     const claimKey = claim.claimId ?? claim.identifier;
     const isCompleted = completedClaimIds.includes(claimKey);
@@ -430,7 +438,10 @@ function formatClaimList(
     }
 
     const timeRange = `${claim.startTimestamp} - ${claim.endTimestamp}`;
-    lines.push(`${prefix} ${claim.identifier} \`${timeRange}\`${suffix}`);
+    const typeLabel = claimTypeLabel[claim.claimType] ?? claim.claimType;
+    const policyLabel = claim.policyType ? claim.policyType.replace('POLICY_TYPE_', '') : '';
+    const labels = [typeLabel, policyLabel].filter(Boolean).join(' | ');
+    lines.push(`${prefix} ${claim.identifier} \`${timeRange}\` ${labels}${suffix}`);
   }
 
   return lines.join('\n');
@@ -454,20 +465,28 @@ export function createDmcaWorkerAlerts(): DmcaWorkerAlerts {
       };
     },
 
-    progress: (vodId, claims, completedClaimIds, currentStep, platform, displayName, stepProgress) => {
-      const claimList = formatClaimList(claims, completedClaimIds, undefined, stepProgress);
+    progress: (vodId, claims, completedClaimIds, currentStep, platform, displayName, stepProgress, currentCommand) => {
+      const claimList = formatClaimList(claims, completedClaimIds, currentStep, stepProgress);
       const completed = completedClaimIds.length;
       const total = claims.length;
+
+      const fields: Array<{ name: string; value: string; inline: boolean }> = [
+        { name: 'VOD ID', value: vodId, inline: true },
+        { name: 'Platform', value: platform, inline: true },
+        { name: 'Streamer', value: displayName, inline: true },
+      ];
+
+      if (stepProgress != null && currentCommand != null) {
+        const progressBar = createProgressBar(stepProgress);
+        fields.push({ name: 'Progress', value: progressBar, inline: false });
+        fields.push({ name: 'FFmpeg', value: `\`${currentCommand}\``, inline: false });
+      }
 
       return {
         title: `⚖️ DMCA Processing ${vodId}`,
         description: `${completed}/${total} claims processed — ${currentStep}\n\n${claimList}`,
         status: 'warning',
-        fields: [
-          { name: 'VOD ID', value: vodId, inline: true },
-          { name: 'Platform', value: platform, inline: true },
-          { name: 'Streamer', value: displayName, inline: true },
-        ],
+        fields,
         timestamp: new Date().toISOString(),
         updatedTimestamp: new Date().toISOString(),
       };

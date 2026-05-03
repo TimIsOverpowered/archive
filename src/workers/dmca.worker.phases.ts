@@ -116,6 +116,7 @@ export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Pr
       startTimestamp: toHHMMSS(startSec),
       endTimestamp: toHHMMSS(startSec + durSec),
       claimType: claim.type,
+      policyType: claim.claimPolicy.primaryPolicy.policyType,
     };
   };
 
@@ -220,6 +221,8 @@ export async function processDmcaClaims(ctx: DmcaProcessorContext): Promise<void
     }
   };
 
+  let currentCommand: string | undefined;
+
   const sendAlert = (step: string, progress?: number) => {
     const alertData =
       progress != null
@@ -230,7 +233,8 @@ export async function processDmcaClaims(ctx: DmcaProcessorContext): Promise<void
             step,
             ctx.platform,
             ctx.displayName,
-            progress
+            progress,
+            currentCommand
           )
         : ctx.alerts.progress(ctx.vodId, ctx.claimInfos, ctx.completedClaimIds, step, ctx.platform, ctx.displayName);
     safeUpdateAlert(ctx.messageId, alertData, ctx.log, ctx.vodId);
@@ -274,6 +278,9 @@ export async function processDmcaClaims(ctx: DmcaProcessorContext): Promise<void
       onStep: (step, current, total) => {
         sendAlert(`blackout-video [${current}/${total}]: ${step}`);
       },
+      onStart: (cmd) => {
+        currentCommand = cmd;
+      },
       audioFilters: muteFilters,
     });
 
@@ -300,9 +307,17 @@ export async function processDmcaClaims(ctx: DmcaProcessorContext): Promise<void
 
     const mutedPath = `${ctx.processedPath.replace('.mp4', '-muted.mp4')}`;
 
-    const mutedResult = await muteAudioSections(ctx.processedPath, muteFilters, mutedPath, (pct) => {
-      sendAlert('mute-audio', pct);
-    });
+    const mutedResult = await muteAudioSections(
+      ctx.processedPath,
+      muteFilters,
+      mutedPath,
+      (pct) => {
+        sendAlert('mute-audio', pct);
+      },
+      (cmd) => {
+        currentCommand = cmd;
+      }
+    );
 
     if (mutedResult == null) {
       throw new Error('Failed to process audio claims');
