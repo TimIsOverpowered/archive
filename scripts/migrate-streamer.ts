@@ -684,10 +684,10 @@ const main = async () => {
                 end = duration;
               }
 
-              let image = chapter.image || null;
-              if (!image && platform?.toLowerCase() === 'twitch' && chapter.name) {
+              let image;
+              if (platform?.toLowerCase() === 'twitch' && chapter.name) {
                 const encodedGame = encodeURIComponent(chapter.name);
-                image = `https://static-cdn.jtvnw.net/ttv-boxart/${encodedGame}-40x53.jpg`;
+                image = `https://static-cdn.jtvnw.net/ttv-boxart/${encodedGame}-{width}x{height}.jpg`;
               }
 
               await schemaClient.query(

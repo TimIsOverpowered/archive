@@ -119,10 +119,7 @@ export async function saveVodChapters(
             vod_id: validatedChapter.vod_id,
             game_id: validatedChapter.game_id,
             name: validatedChapter.title,
-            image:
-              gameData && typeof gameData.box_art_url === 'string'
-                ? gameData.box_art_url.replace('{width}x{height}', '40x53')
-                : null,
+            image: gameData && typeof gameData.box_art_url === 'string' ? gameData.box_art_url : null,
             start: validatedChapter.start,
             end: validatedChapter.end,
           })
