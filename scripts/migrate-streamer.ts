@@ -440,8 +440,11 @@ const createNormalizedSchema = async (client: PoolClient) => {
     CREATE INDEX "vod_uploads_vod_id_type_part_idx" ON "vod_uploads"("vod_id", "type", "part");
     CREATE INDEX "games_new_game_name_idx" ON "games_new"("game_name");
     CREATE INDEX "games_new_vod_id_start_time_idx" ON "games_new"("vod_id", "start_time");
+    CREATE INDEX "games_new_game_name_fts_idx" ON "games_new" USING GIN (to_tsvector('english', coalesce(game_name, '')));
+    CREATE INDEX "games_new_game_id_idx" ON "games_new"("game_id");
     CREATE INDEX "chapters_vod_id_start_idx" ON "chapters"("vod_id", "start");
     CREATE INDEX "chapters_name_fts_idx" ON "chapters" USING GIN (to_tsvector('english', coalesce(name, '')));
+    CREATE INDEX "chapters_game_id_idx" ON "chapters"("game_id");
     CREATE UNIQUE INDEX "vod_uploads_vod_id_type_part_key" ON "vod_uploads"("vod_id", "type", "part");
     CREATE UNIQUE INDEX "games_unique_chapter_key" ON "games_new"("vod_id", "start_time", "end_time");
 

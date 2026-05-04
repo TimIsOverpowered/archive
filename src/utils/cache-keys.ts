@@ -11,6 +11,45 @@ function buildVodQueryKey(
   return ['vods', `{${tenantId}}`, ...queryParts, `page:${page}`, `limit:${limit}`].join(':');
 }
 
+function buildGameQueryKey(
+  tenantId: string,
+  query: Record<string, string | number | undefined>,
+  page: number,
+  limit: number
+): string {
+  const sorted = Object.keys(query).sort();
+  const queryParts = sorted
+    .filter((k) => query[k] !== undefined && query[k] !== null && query[k] !== '')
+    .map((k) => `${k}:${encodeURIComponent(String(query[k]))}`);
+  return ['games', `{${tenantId}}`, ...queryParts, `page:${page}`, `limit:${limit}`].join(':');
+}
+
+function buildChapterLibraryKey(
+  tenantId: string,
+  query: Record<string, string | number | undefined>,
+  page: number,
+  limit: number
+): string {
+  const sorted = Object.keys(query).sort();
+  const queryParts = sorted
+    .filter((k) => query[k] !== undefined && query[k] !== null && query[k] !== '')
+    .map((k) => `${k}:${encodeURIComponent(String(query[k]))}`);
+  return ['chapters', `{${tenantId}}`, ...queryParts, `page:${page}`, `limit:${limit}`].join(':');
+}
+
+function buildGameLibraryKey(
+  tenantId: string,
+  query: Record<string, string | number | undefined>,
+  page: number,
+  limit: number
+): string {
+  const sorted = Object.keys(query).sort();
+  const queryParts = sorted
+    .filter((k) => query[k] !== undefined && query[k] !== null && query[k] !== '')
+    .map((k) => `${k}:${encodeURIComponent(String(query[k]))}`);
+  return ['games-library', `{${tenantId}}`, ...queryParts, `page:${page}`, `limit:${limit}`].join(':');
+}
+
 export type SWRKey = string & { readonly __swr: unique symbol };
 export type SimpleKey = string & { readonly __simple: unique symbol };
 
@@ -40,6 +79,24 @@ export const swrKeys = {
     page: number,
     limit: number
   ): SWRKey => swrKey(`swr:${buildVodQueryKey(tenantId, query, page, limit)}`),
+  gameQuery: (
+    tenantId: string,
+    query: Record<string, string | number | undefined>,
+    page: number,
+    limit: number
+  ): SWRKey => swrKey(`swr:${buildGameQueryKey(tenantId, query, page, limit)}`),
+  chapterLibrary: (
+    tenantId: string,
+    query: Record<string, string | number | undefined>,
+    page: number,
+    limit: number
+  ): SWRKey => swrKey(`swr:${buildChapterLibraryKey(tenantId, query, page, limit)}`),
+  gameLibrary: (
+    tenantId: string,
+    query: Record<string, string | number | undefined>,
+    page: number,
+    limit: number
+  ): SWRKey => swrKey(`swr:${buildGameLibraryKey(tenantId, query, page, limit)}`),
   stats: (tenantId: string): SWRKey => swrKey(`swr:stats:${tenantId}`),
 } as const;
 
@@ -61,6 +118,24 @@ export const simpleKeys = {
     page: number,
     limit: number
   ): SimpleKey => simpleKey(`simple:${buildVodQueryKey(tenantId, query, page, limit)}`),
+  gameQuery: (
+    tenantId: string,
+    query: Record<string, string | number | undefined>,
+    page: number,
+    limit: number
+  ): SimpleKey => simpleKey(`simple:${buildGameQueryKey(tenantId, query, page, limit)}`),
+  chapterLibrary: (
+    tenantId: string,
+    query: Record<string, string | number | undefined>,
+    page: number,
+    limit: number
+  ): SimpleKey => simpleKey(`simple:${buildChapterLibraryKey(tenantId, query, page, limit)}`),
+  gameLibrary: (
+    tenantId: string,
+    query: Record<string, string | number | undefined>,
+    page: number,
+    limit: number
+  ): SimpleKey => simpleKey(`simple:${buildGameLibraryKey(tenantId, query, page, limit)}`),
   stats: (tenantId: string): SimpleKey => simpleKey(`simple:stats:${tenantId}`),
 } as const;
 
@@ -75,4 +150,7 @@ export const CacheKeys = {
   vodPlatform: (tenantId: string, platform: string, platformVodId: string) =>
     `vod:platform:{${tenantId}}:${platform}:${platformVodId}`,
   vodQuery: buildVodQueryKey,
+  gameQuery: buildGameQueryKey,
+  chapterLibrary: buildChapterLibraryKey,
+  gameLibrary: buildGameLibraryKey,
 } as const;

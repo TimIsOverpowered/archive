@@ -20,6 +20,8 @@ import redisPlugin from './plugins/redis.plugin.js';
 import { errorResponse } from './response.js';
 import { globalAdminRoutes, default as adminRoutes } from './routes/admin/index.js';
 import badgesRoutes from './routes/badges.js';
+import chaptersRoutes from './routes/chapters.js';
+import gamesRoutes from './routes/games.js';
 import healthRoutes from './routes/health.js';
 import logsRoutes from './routes/logs.js';
 import vodsRoutes from './routes/vods.js';
@@ -160,10 +162,12 @@ export async function buildServer(config: ApiConfig) {
   await fastify.register(async (instance) => {
     await instance.register(healthRoutes, { prefix: '/api/v1' });
 
-    // Register VODs and logs under same prefix to avoid duplicate OPTIONS handlers
+    // Register VODs, games, and logs under same prefix to avoid duplicate OPTIONS handlers
     await instance.register(
       async (vodInstance) => {
         await vodInstance.register(vodsRoutes, { prefix: '' });
+        await vodInstance.register(gamesRoutes, { prefix: '' });
+        await vodInstance.register(chaptersRoutes, { prefix: '' });
         await vodInstance.register(logsRoutes, { prefix: '' });
       },
       { prefix: '/api/v1/' }

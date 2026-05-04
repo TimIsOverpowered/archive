@@ -77,6 +77,7 @@ export const VodQuerySchema = z.object({
   to: z.string().datetime().optional(),
   uploaded: z.literal('youtube').optional(),
   game: z.string().optional(),
+  game_id: z.string().optional(),
   title: z.string().optional(),
   chapter: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -120,6 +121,12 @@ export function buildVodQuery(query: VodQuery): {
     if (query.game != null) {
       conditions.push(
         eb('id', 'in', eb.selectFrom('games').select('games.vod_id').where('game_name', 'ilike', `%${query.game}%`))
+      );
+    }
+
+    if (query.game_id != null) {
+      conditions.push(
+        eb('id', 'in', eb.selectFrom('chapters').select('chapters.vod_id').where('game_id', '=', query.game_id))
       );
     }
 

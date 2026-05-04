@@ -57,6 +57,7 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
             to: { type: 'string', format: 'date-time', description: 'Filter VODs before date (ISO)' },
             uploaded: { type: 'string', enum: ['youtube'], description: 'Only VODs with YouTube uploads' },
             game: { type: 'string', description: 'Fuzzy search in games.game_name' },
+            game_id: { type: 'string', description: 'Exact match by game_id (via chapters)' },
             title: { type: 'string', description: 'Full-text search in VOD title' },
             chapter: { type: 'string', description: 'Full-text search in chapter names' },
             page: { type: 'integer', minimum: 1, default: 1, description: 'Page number' },

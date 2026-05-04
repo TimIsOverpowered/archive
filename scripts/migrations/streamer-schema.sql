@@ -96,6 +96,9 @@ CREATE INDEX "vods_title_fts_idx" ON "vods" USING GIN (to_tsvector('english', co
 CREATE INDEX "chapters_name_fts_idx" ON "chapters" USING GIN (to_tsvector('english', coalesce(name, '')));
 
 -- CreateIndex
+CREATE INDEX "chapters_game_id_idx" ON "chapters"("game_id");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "vods_platform_vod_id_key" ON "vods"("platform", "platform_vod_id");
 
 -- CreateIndex
@@ -120,7 +123,13 @@ CREATE UNIQUE INDEX "emotes_new_vod_id_key" ON "emotes"("vod_id");
 CREATE INDEX "games_new_game_name_idx" ON "games"("game_name");
 
 -- CreateIndex
+CREATE INDEX "games_new_game_id_idx" ON "games"("game_id");
+
+-- CreateIndex
 CREATE INDEX "games_new_vod_id_start_time_idx" ON "games"("vod_id", "start_time");
+
+-- CreateIndex
+CREATE INDEX "games_new_game_name_fts_idx" ON "games" USING GIN (to_tsvector('english', coalesce("game_name", '')));
 
 -- CreateIndex
 CREATE INDEX "chapters_vod_id_start_idx" ON "chapters"("vod_id", "start");
