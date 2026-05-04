@@ -287,3 +287,32 @@ export async function getVodByPlatformId(
 
   return staticData;
 }
+
+export type VodNeighbors = {
+  prev: Pick<VodResponse, 'id' | 'title' | 'platform'> | null;
+  next: Pick<VodResponse, 'id' | 'title' | 'platform'> | null;
+};
+
+export async function getVodNeighbors(db: DBClient, _tenantId: string, vodId: number): Promise<VodNeighbors> {
+  const [prev, next] = await Promise.all([
+    db
+      .selectFrom('vods')
+      .select(['id', 'title', 'platform'])
+      .where('id', '<', vodId)
+      .orderBy('id', 'desc')
+      .limit(1)
+      .executeTakeFirst(),
+    db
+      .selectFrom('vods')
+      .select(['id', 'title', 'platform'])
+      .where('id', '>', vodId)
+      .orderBy('id', 'asc')
+      .limit(1)
+      .executeTakeFirst(),
+  ]);
+
+  return {
+    prev: (prev ?? null) as VodNeighbors['prev'],
+    next: (next ?? null) as VodNeighbors['next'],
+  };
+}

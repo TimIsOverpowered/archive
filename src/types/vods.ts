@@ -37,4 +37,6 @@ export interface VodResponse {
     title: string | null;
     chapter_image: string | null;
   }>;
+  prev?: { id: number; title: string | null; platform: string } | null;
+  next?: { id: number; title: string | null; platform: string } | null;
 }
