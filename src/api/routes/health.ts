@@ -1,6 +1,7 @@
 import { Queue } from 'bullmq';
 import { FastifyInstance } from 'fastify';
 import { sql } from 'kysely';
+import { getBaseConfig } from '../../config/env.js';
 import { configService } from '../../config/tenant-config.js';
 import { getClient } from '../../db/streamer-client.js';
 import { defaultCacheContext } from '../../utils/cache.js';
@@ -79,12 +80,14 @@ export default function healthRoutes(fastify: FastifyInstance, _options: HealthR
       const kickConfig = streamerConfigs.find((c) => c.kick?.enabled === true);
       const flaresolverrHealth = await checkFlareSolverrHealth();
 
-      let cloudflareCache = { status: 'unknown' };
-      try {
-        const cfInfo = await getCachedRangeInfo();
-        cloudflareCache = cfInfo ?? { status: 'missing' };
-      } catch {
-        cloudflareCache = { status: 'error' };
+      let cloudflareCache: { status: string } = { status: 'disabled' };
+      if (getBaseConfig().REQUIRE_CLOUDFLARE_IP) {
+        try {
+          const cfInfo = await getCachedRangeInfo();
+          cloudflareCache = cfInfo ?? { status: 'missing' };
+        } catch {
+          cloudflareCache = { status: 'error' };
+        }
       }
 
       const rateLimiters = {

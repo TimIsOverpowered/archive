@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { closeRedisClient } from './api/plugins/redis.plugin.js';
 import { buildServer } from './api/server.js';
-import { loadApiConfig } from './config/env.js';
+import { getBaseConfig, loadApiConfig } from './config/env.js';
 import { CacheRefresh } from './constants.js';
 import { startCloudflareIpRangesCron } from './cron/cloudflare-ip-ranges.js';
 import { closeMetaClient } from './db/meta-client.js';
@@ -38,27 +38,31 @@ async function start() {
     startClientCleanup();
     getLogger().info('DB client cleanup started');
 
-    // Pre-fetch Cloudflare IP ranges (only if missing or expiring soon)
-    try {
-      const cacheInfo = await getCachedRangeInfo();
-      if (
-        !cacheInfo ||
-        cacheInfo.status === 'missing' ||
-        (cacheInfo.ttlRemaining ?? 0) < CacheRefresh.TTL_REMAINING_THRESHOLD
-      ) {
-        await getCloudflareIpRanges();
-        getLogger().info('Cloudflare IP ranges pre-fetched (cache was missing/expired)');
-      } else {
-        getLogger().debug({ ttlRemaining: cacheInfo.ttlRemaining }, 'Cloudflare IP ranges cache is fresh');
+    if (getBaseConfig().REQUIRE_CLOUDFLARE_IP) {
+      // Pre-fetch Cloudflare IP ranges (only if missing or expiring soon)
+      try {
+        const cacheInfo = await getCachedRangeInfo();
+        if (
+          !cacheInfo ||
+          cacheInfo.status === 'missing' ||
+          (cacheInfo.ttlRemaining ?? 0) < CacheRefresh.TTL_REMAINING_THRESHOLD
+        ) {
+          await getCloudflareIpRanges();
+          getLogger().info('Cloudflare IP ranges pre-fetched (cache was missing/expired)');
+        } else {
+          getLogger().debug({ ttlRemaining: cacheInfo.ttlRemaining }, 'Cloudflare IP ranges cache is fresh');
+        }
+      } catch (err) {
+        const details = extractErrorDetails(err);
+        getLogger().warn({ ...details }, 'Failed to check Cloudflare IP ranges cache');
       }
-    } catch (err) {
-      const details = extractErrorDetails(err);
-      getLogger().warn({ ...details }, 'Failed to check Cloudflare IP ranges cache');
-    }
 
-    // Start Cloudflare IP ranges refresh cron
-    startCloudflareIpRangesCron();
-    getLogger().info('Cloudflare IP ranges refresh cron started');
+      // Start Cloudflare IP ranges refresh cron
+      startCloudflareIpRangesCron();
+      getLogger().info('Cloudflare IP ranges refresh cron started');
+    } else {
+      getLogger().info('Cloudflare IP range validation disabled (REQUIRE_CLOUDFLARE_IP=false)');
+    }
   } catch (error) {
     const details = extractErrorDetails(error);
     getLogger().fatal({ ...details }, 'Failed to start server');

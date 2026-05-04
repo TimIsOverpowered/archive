@@ -1,3 +1,4 @@
+import { getBaseConfig } from '../config/env.js';
 import { refreshCloudflareRanges } from '../utils/cloudflare-ip-validator.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { getLogger } from '../utils/logger.js';
@@ -19,6 +20,10 @@ export async function refreshCloudflareIpRanges(): Promise<void> {
  * Returns interval ID for cleanup if needed
  */
 export function startCloudflareIpRangesCron(): NodeJS.Timeout {
+  if (!getBaseConfig().REQUIRE_CLOUDFLARE_IP) {
+    return setInterval(() => {}, 24 * 60 * 60 * 1000);
+  }
+
   // Run every 24 hours (no initial run - pre-fetch handles startup)
   return setInterval(
     () => {
