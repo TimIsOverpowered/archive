@@ -21,6 +21,7 @@ export interface GameUploadContext {
   filePath: string;
   chapterStart: number;
   chapterDuration: number;
+  chapterEnd: number;
   chapterName: string;
   chapterGameId?: string | undefined;
   title: string;

@@ -656,11 +656,10 @@ const main = async () => {
           vodIdMap.set(legacyVodId, newId);
 
           if (vod.youtube && Array.isArray(vod.youtube) && vod.youtube.length > 0) {
-            let nextPart = 1;
             for (const upload of vod.youtube) {
-              const uploadId = `${legacyVodId}-${upload.id}`;
+              const uploadId = `${upload.id}`;
               const uploadDuration = Math.round(Number(upload.duration) || 0);
-              const part = upload.part ? Number(upload.part) : nextPart++;
+              const part = upload.part ? Number(upload.part) : 1;
 
               await schemaClient.query(
                 `INSERT INTO "vod_uploads" (vod_id, upload_id, type, duration, part, status, thumbnail_url)
