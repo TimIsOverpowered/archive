@@ -90,6 +90,12 @@ CREATE TABLE "chat_messages" (
 CREATE INDEX "vods_new_platform_idx" ON "vods"("platform");
 
 -- CreateIndex
+CREATE INDEX "vods_title_fts_idx" ON "vods" USING GIN (to_tsvector('english', coalesce(title, '')));
+
+-- CreateIndex
+CREATE INDEX "chapters_name_fts_idx" ON "chapters" USING GIN (to_tsvector('english', coalesce(name, '')));
+
+-- CreateIndex
 CREATE UNIQUE INDEX "vods_platform_vod_id_key" ON "vods"("platform", "platform_vod_id");
 
 -- CreateIndex

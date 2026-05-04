@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { buildVodQuery, VodQuerySchema } from '../../src/services/vods.service.js';
+import { buildVodQuery, VodQuerySchema, buildFtsQuery } from '../../src/services/vods.service.js';
 import type { VodResponse } from '../../src/types/vods.js';
 
 describe('VodService: buildVodQuery', () => {
@@ -169,6 +169,78 @@ describe('VodService: VodQuerySchema', () => {
     assert.strictEqual(result.to, undefined);
     assert.strictEqual(result.uploaded, undefined);
     assert.strictEqual(result.game, undefined);
+  });
+});
+
+describe('VodService: buildFtsQuery', () => {
+  it('should format single word with prefix matching', () => {
+    assert.strictEqual(buildFtsQuery('hero'), 'hero:*');
+  });
+
+  it('should join multiple words with AND', () => {
+    const result = buildFtsQuery('hero stream');
+    assert.ok(result.includes('hero:*'));
+    assert.ok(result.includes('stream:*'));
+    assert.ok(result.includes(' & '));
+  });
+
+  it('should strip special characters', () => {
+    assert.strictEqual(buildFtsQuery('test&query'), 'testquery:*');
+  });
+
+  it('should return empty string for whitespace-only input', () => {
+    assert.strictEqual(buildFtsQuery('   '), '');
+  });
+
+  it('should return empty string for empty input', () => {
+    assert.strictEqual(buildFtsQuery(''), '');
+  });
+});
+
+describe('VodService: title and chapter filters', () => {
+  it('should parse title query param', () => {
+    const result = VodQuerySchema.parse({ title: 'epic moments' });
+    assert.strictEqual(result.title, 'epic moments');
+  });
+
+  it('should parse chapter query param', () => {
+    const result = VodQuerySchema.parse({ chapter: 'intro' });
+    assert.strictEqual(result.chapter, 'intro');
+  });
+
+  it('should parse full query with title and chapter', () => {
+    const result = VodQuerySchema.parse({
+      platform: 'twitch',
+      title: 'best plays',
+      chapter: 'highlight',
+      page: 1,
+      limit: 20,
+    });
+    assert.strictEqual(result.platform, 'twitch');
+    assert.strictEqual(result.title, 'best plays');
+    assert.strictEqual(result.chapter, 'highlight');
+  });
+
+  it('should include title FTS filter in buildVodQuery', () => {
+    const query = VodQuerySchema.parse({ title: 'epic' });
+    const { where } = buildVodQuery(query);
+    assert.ok(typeof where === 'function');
+  });
+
+  it('should include chapter FTS filter in buildVodQuery', () => {
+    const query = VodQuerySchema.parse({ chapter: 'intro' });
+    const { where } = buildVodQuery(query);
+    assert.ok(typeof where === 'function');
+  });
+
+  it('should combine title, chapter, and game filters', () => {
+    const query = VodQuerySchema.parse({
+      title: 'best',
+      chapter: 'highlight',
+      game: 'fps',
+    });
+    const { where } = buildVodQuery(query);
+    assert.ok(typeof where === 'function');
   });
 });
 

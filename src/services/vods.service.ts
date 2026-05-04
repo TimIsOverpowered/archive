@@ -13,6 +13,19 @@ import { withStaleWhileRevalidate } from '../utils/cache.js';
 import { registerVodTags, setVodListCache } from './cache-tags.js';
 import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.js';
 
+const FtsSpecialChars = /[&|()@:\\"]/g;
+
+function formatFtsTerm(term: string): string {
+  const escaped = term.replace(FtsSpecialChars, '');
+  return `${escaped}:*`;
+}
+
+export function buildFtsQuery(text: string): string {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '';
+  return words.map(formatFtsTerm).join(' & ');
+}
+
 function applyVolatileData(
   vods: VodResponse[],
   volatileMap: Map<number, { duration: number | null; is_live: boolean }>
@@ -64,6 +77,8 @@ export const VodQuerySchema = z.object({
   to: z.string().datetime().optional(),
   uploaded: z.literal('youtube').optional(),
   game: z.string().optional(),
+  title: z.string().optional(),
+  chapter: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   sort: z.enum(['created_at', 'duration']).default('created_at'),
@@ -77,7 +92,8 @@ type VodsOrderByCol = 'created_at' | 'duration';
 
 /**
  * Build Kysely where clause and order-by config from a VodQuery.
- * Handles platform, date range, YouTube upload filter, and game name search.
+ * Handles platform, date range, YouTube upload filter, game name search,
+ * and full-text search on title and chapter name.
  */
 export function buildVodQuery(query: VodQuery): {
   where: (eb: ExpressionBuilder<StreamerDB, 'vods'>) => Expression<SqlBool>;
@@ -105,6 +121,24 @@ export function buildVodQuery(query: VodQuery): {
       conditions.push(
         eb('id', 'in', eb.selectFrom('games').select('games.vod_id').where('game_name', 'ilike', `%${query.game}%`))
       );
+    }
+
+    if (query.title != null) {
+      const ftsQuery = buildFtsQuery(query.title);
+      if (ftsQuery) {
+        conditions.push(
+          sql`to_tsvector('english', coalesce("vods"."title", '')) @@ to_tsquery('english', ${ftsQuery})`
+        );
+      }
+    }
+
+    if (query.chapter != null) {
+      const ftsQuery = buildFtsQuery(query.chapter);
+      if (ftsQuery) {
+        conditions.push(
+          eb('id', 'in', eb.selectFrom('chapters').select('chapters.vod_id').where(sql`to_tsvector('english', coalesce("chapters"."name", '')) @@ to_tsquery('english', ${ftsQuery})` as Expression<SqlBool>))
+        );
+      }
     }
 
     return eb.and(conditions);

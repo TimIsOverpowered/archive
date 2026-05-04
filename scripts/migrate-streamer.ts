@@ -433,6 +433,7 @@ const createNormalizedSchema = async (client: PoolClient) => {
     SELECT add_compression_policy('chat_messages_new', INTERVAL '30 days');
 
     CREATE INDEX "vods_new_platform_idx" ON "vods_new"("platform");
+    CREATE INDEX "vods_new_title_fts_idx" ON "vods_new" USING GIN (to_tsvector('english', coalesce(title, '')));
     CREATE INDEX "vod_uploads_vod_id_idx" ON "vod_uploads"("vod_id");
     CREATE INDEX "vod_uploads_status_idx" ON "vod_uploads"("status");
     CREATE INDEX "vod_uploads_type_idx" ON "vod_uploads"("type");
@@ -440,6 +441,7 @@ const createNormalizedSchema = async (client: PoolClient) => {
     CREATE INDEX "games_new_game_name_idx" ON "games_new"("game_name");
     CREATE INDEX "games_new_vod_id_start_time_idx" ON "games_new"("vod_id", "start_time");
     CREATE INDEX "chapters_vod_id_start_idx" ON "chapters"("vod_id", "start");
+    CREATE INDEX "chapters_name_fts_idx" ON "chapters" USING GIN (to_tsvector('english', coalesce(name, '')));
     CREATE UNIQUE INDEX "vod_uploads_vod_id_type_part_key" ON "vod_uploads"("vod_id", "type", "part");
     CREATE UNIQUE INDEX "games_unique_chapter_key" ON "games_new"("vod_id", "start_time", "end_time");
 
