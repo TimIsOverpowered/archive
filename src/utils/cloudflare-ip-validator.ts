@@ -105,8 +105,13 @@ export async function validateCloudflareRequest(request: {
   headers: Record<string, string | string[] | undefined>;
   raw: { socket?: { remoteAddress?: string | undefined } };
   url?: string | undefined;
+  ips?: string[];
 }): Promise<boolean> {
   if (getBaseConfig().NODE_ENV !== 'production') {
+    return true;
+  }
+
+  if (getBaseConfig().REQUIRE_CLOUDFLARE_IP === false) {
     return true;
   }
 
@@ -115,23 +120,32 @@ export async function validateCloudflareRequest(request: {
     return true;
   }
 
-  const remoteAddress = request.raw.socket?.remoteAddress;
-  if (remoteAddress == null || remoteAddress === '') {
-    return true;
-  }
-
   const ranges = await getCloudflareIpRanges();
   if (!ranges) {
     return true;
   }
 
-  const isValid = isFromCloudflare(remoteAddress, ranges);
-
-  if (!isValid) {
-    getLogger().warn({ component: 'cloudflare-ip-validator', ip: cfIp }, 'Request not from Cloudflare IP range');
+  // 1. Check the proxy chain first (supports: Cloudflare -> Nginx -> App)
+  if (request.ips && request.ips.length > 0) {
+    for (const ip of request.ips) {
+      if (isFromCloudflare(ip, ranges)) {
+        return true;
+      }
+    }
   }
 
-  return isValid;
+  // 2. Check the raw socket (supports: Cloudflare -> App directly)
+  const remoteAddress = request.raw.socket?.remoteAddress;
+  if (remoteAddress != null && remoteAddress !== '' && isFromCloudflare(remoteAddress, ranges)) {
+    return true;
+  }
+
+  getLogger().warn(
+    { component: 'cloudflare-ip-validator', ip: cfIp, remoteAddress },
+    'Request not from Cloudflare IP range'
+  );
+
+  return false;
 }
 
 /** Get cache info for health endpoint */

@@ -41,6 +41,7 @@ export const BaseConfigSchema = z.object({
 
   PGBOUNCER_URL: z.string().min(1, 'PGBOUNCER_URL is required'),
   DISCORD_ALERTS_ENABLED: envBoolWithDefault(true).default(true),
+  REQUIRE_CLOUDFLARE_IP: envBoolWithDefault(true).default(true),
   FLARESOLVERR_BASE_URL: z.string().url().default('http://localhost:8191'),
   FLARESOLVERR_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
   FLARESOLVERR_SESSION_TTL: z.coerce.number().int().positive().default(3600),
