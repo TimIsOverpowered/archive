@@ -82,11 +82,12 @@ const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeP
   };
 
   if (kind === 'game') {
-    const { chapterStart, chapterDuration, chapterName, chapterGameId, title, description } = job.data;
+    const { chapterStart, chapterDuration, chapterName, chapterEnd, chapterGameId, title, description } = job.data;
     return {
       ...base,
       chapterStart,
       chapterDuration,
+      chapterEnd,
       chapterName,
       chapterGameId,
       title,
@@ -102,11 +103,11 @@ const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeP
   };
 };
 
-const errorMeta = (ctx: YoutubeProcessorContext, _job: Job) => ({
+const errorMeta = (ctx: YoutubeProcessorContext, job: Job) => ({
   vodId: ctx.vodId,
   tenantId: ctx.tenantId,
   dbId: ctx.dbId,
-  jobId: _job.id,
+  jobId: job.id,
   filePath: ctx.filePath,
 });
 
