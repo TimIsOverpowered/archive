@@ -11,15 +11,7 @@ import { handlePlatformLiveCheck } from './live-handler.js';
 const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async (job: Job<{ tenantId: string }>) => {
   const { tenantId } = job.data;
   const log = createAutoLogger(tenantId);
-
-  log.info({ component: 'monitor', jobId: job.id, tenantId }, 'Starting poll cycle');
-
   const { config, db } = await getJobContext(tenantId);
-
-  if (config.settings.vodDownload !== true) {
-    log.debug({ component: 'monitor', tenantId }, 'VOD download disabled, skipping');
-    return { success: true };
-  }
 
   const liveQueue = getLiveDownloadQueue();
 
