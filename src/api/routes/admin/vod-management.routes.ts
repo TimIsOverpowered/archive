@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { getApiConfig } from '../../../config/env.js';
 import { VodCreateSchema } from '../../../config/schemas.js';
 import { findVodByPlatformId } from '../../../db/queries/vods.js';
-import type { InsertableVods, SelectableVods } from '../../../db/streamer-types.js';
+import type { SelectableVods } from '../../../db/streamer-types.js';
 import { invalidateVodVolatileCache } from '../../../services/cache-tags.js';
 import { getStrategy } from '../../../services/platforms/index.js';
 import { getTenantStats } from '../../../services/tenants.service.js';
@@ -127,12 +127,12 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
         .insertInto('vods')
         .values(
           strategy
-            ? (strategy.createVodData({
+            ? strategy.createVodData({
                 id: validatedData.platformVodId ?? '',
                 title: validatedData.title ?? '',
                 createdAt: validatedData.created_at.toISOString(),
                 duration: validatedData.duration,
-              }) as InsertableVods)
+              })
             : {
                 platform_vod_id: validatedData.platformVodId ?? null,
                 title: validatedData.title,

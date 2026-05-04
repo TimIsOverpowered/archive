@@ -72,11 +72,11 @@ export const strategy: PlatformStrategy = {
 
   createVodData(meta: PlatformVodMetadata): VodCreateData {
     return {
-      platformVodId: meta.id,
+      platform_vod_id: meta.id,
       title: meta.title === '' ? null : (meta.title ?? ''),
-      created_at: new Date(meta.createdAt),
+      created_at: meta.createdAt,
       duration: meta.duration,
-      platformStreamId: meta.streamId ?? null,
+      platform_stream_id: meta.streamId ?? null,
       platform: PLATFORMS.TWITCH,
       is_live: false,
     };
@@ -84,11 +84,11 @@ export const strategy: PlatformStrategy = {
 
   updateVodData(meta: PlatformVodMetadata): VodUpdateData {
     return {
-      platformVodId: meta.id,
+      platform_vod_id: meta.id,
       title: meta.title === '' ? null : (meta.title ?? ''),
       created_at: new Date(meta.createdAt),
       duration: meta.duration,
-      platformStreamId: meta.streamId,
+      platform_stream_id: meta.streamId,
     };
   },
 
