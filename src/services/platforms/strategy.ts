@@ -5,22 +5,22 @@ import type { Platform } from '../../types/platforms.js';
 
 /** Data shape for creating a VOD record from platform metadata. */
 export interface VodCreateData {
-  vod_id: string;
+  platformVodId?: string;
   platform: Platform;
   title: string | null;
   created_at: Date;
   duration: number;
-  stream_id: string | null;
+  platformStreamId?: string | null;
   is_live: boolean;
 }
 
 /** Data shape for updating a VOD record. */
 export interface VodUpdateData {
-  vod_id?: string;
+  platformVodId?: string;
   title?: string | null;
   created_at?: Date;
   duration?: number;
-  stream_id?: string | null | undefined;
+  platformStreamId?: string | null | undefined;
 }
 
 /** Current live stream status from a platform. */

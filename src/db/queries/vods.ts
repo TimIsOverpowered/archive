@@ -15,7 +15,7 @@ export async function findVodByPlatformId(
     (await db
       .selectFrom('vods')
       .selectAll()
-      .where('vod_id', '=', vodId)
+      .where('platform_vod_id', '=', vodId)
       .where('platform', '=', platform)
       .executeTakeFirst()) ?? null
   );
@@ -30,7 +30,7 @@ export async function findVodByStreamId(
     (await db
       .selectFrom('vods')
       .selectAll()
-      .where('stream_id', '=', streamId)
+      .where('platform_stream_id', '=', streamId)
       .where('platform', '=', platform)
       .executeTakeFirst()) ?? null
   );

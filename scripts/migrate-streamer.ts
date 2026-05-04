@@ -345,17 +345,18 @@ const createNormalizedSchema = async (client: PoolClient) => {
 
     CREATE TABLE "vods_new" (
       "id" SERIAL NOT NULL,
-      "vod_id" TEXT NOT NULL,
+      "platform_vod_id" TEXT,
       "platform" TEXT NOT NULL,
       "title" TEXT,
       "duration" INTEGER DEFAULT 0 NOT NULL,
-      "stream_id" TEXT,
+      "platform_stream_id" TEXT,
       "created_at" TIMESTAMPTZ(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
       "is_live" BOOLEAN DEFAULT false NOT NULL,
       "started_at" TIMESTAMPTZ(3),
       "updated_at" TIMESTAMPTZ(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
       CONSTRAINT "vods_new_pkey" PRIMARY KEY ("id"),
-      CONSTRAINT "vods_new_platform_vod_id_key" UNIQUE ("platform", "vod_id")
+      CONSTRAINT "vods_new_platform_vod_id_key" UNIQUE ("platform", "platform_vod_id"),
+      CONSTRAINT "vods_new_platform_stream_id_key" UNIQUE ("platform", "platform_stream_id")
     );
 
     CREATE TABLE "vod_uploads" (
@@ -638,7 +639,7 @@ const main = async () => {
           const vodStartedAt = streamId ? streamsMap.get(streamId) || null : null;
 
           const insertResult = await schemaClient.query(
-            `INSERT INTO "vods_new" (vod_id, platform, title, duration, stream_id, started_at, created_at)
+            `INSERT INTO "vods_new" (platform_vod_id, platform, title, duration, platform_stream_id, started_at, created_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7)
              RETURNING id`,
             [legacyVodId, platform, title, duration, streamId, vodStartedAt, vod.createdAt || new Date()]
@@ -800,7 +801,7 @@ const main = async () => {
 
       const totalChatMessages = await oldPool.query(`
         SELECT COUNT(*) FROM logs cm
-        INNER JOIN "vods_new" vn ON cm.vod_id = vn.vod_id
+        INNER JOIN "vods_new" vn ON cm.vod_id = vn.platform_vod_id
       `);
       const totalChat = Number(totalChatMessages.rows[0].count);
 

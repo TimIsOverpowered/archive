@@ -49,7 +49,7 @@ export async function removeMonitorRepeatJob(tenantId: string): Promise<void> {
   const jobId = `monitor:${tenantId}`;
 
   try {
-    await queue.removeRepeatableByKey(jobId);
+    await queue.removeJobScheduler(jobId);
     getLogger().info({ component: 'monitor', tenantId }, 'Removed repeat job');
   } catch (error) {
     const details = extractErrorDetails(error);

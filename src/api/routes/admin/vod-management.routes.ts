@@ -117,7 +117,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
 
       const strategy = getStrategy(platform);
       const validatedData = VodCreateSchema.parse({
-        vod_id: vodId,
+        platformVodId: vodId,
         title: title ?? null,
         created_at: createdAt != null && createdAt !== '' ? new Date(createdAt) : new Date(),
         duration: Number(duration) ?? 0,
@@ -128,22 +128,22 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
         .values(
           strategy
             ? (strategy.createVodData({
-                id: validatedData.vod_id,
+                id: validatedData.platformVodId ?? '',
                 title: validatedData.title ?? '',
                 createdAt: validatedData.created_at.toISOString(),
                 duration: validatedData.duration,
               }) as InsertableVods)
             : {
-                vod_id: validatedData.vod_id,
+                platform_vod_id: validatedData.platformVodId ?? null,
                 title: validatedData.title,
                 created_at: validatedData.created_at.toISOString(),
                 duration: validatedData.duration,
                 platform: validatedData.platform,
-                stream_id: null,
+                platform_stream_id: null,
                 is_live: false,
               }
         )
-        .returning(['id', 'vod_id', 'platform', 'title', 'duration', 'stream_id', 'created_at'])
+        .returning(['id', 'platform_vod_id', 'platform_stream_id', 'platform', 'title', 'duration', 'created_at'])
         .executeTakeFirst()) as SelectableVods;
 
       await invalidateVodStaticCache(tenantId, newVod.id);
@@ -190,7 +190,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
-      await db.deleteFrom('vods').where('platform', '=', platform).where('vod_id', '=', vodId).execute();
+      await db.deleteFrom('vods').where('platform', '=', platform).where('platform_vod_id', '=', vodId).execute();
 
       await invalidateVodStaticCache(tenantId, vodRecord.id);
       await invalidateVodVolatileCache(tenantId, vodRecord.id);

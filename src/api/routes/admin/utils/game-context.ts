@@ -70,7 +70,7 @@ export async function resolveGameWithContext(
   return {
     game: gameRecord,
     dbId: vodRecord.id,
-    vodId: String(vodRecord.vod_id),
+    vodId: vodRecord.platform_vod_id ?? '',
     platform,
     tenantPlatformCtx,
   };

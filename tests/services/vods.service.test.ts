@@ -176,11 +176,11 @@ describe('VodService: VodResponse type', () => {
   it('should accept a valid VodResponse object', () => {
     const vod: VodResponse = {
       id: 1,
-      vod_id: 'abc123',
+      platformVodId: 'abc123',
       platform: 'twitch',
       title: 'Test Stream',
       duration: 3600,
-      stream_id: 'stream-1',
+      platformStreamId: 'stream-1',
       created_at: new Date(),
       updated_at: new Date(),
       is_live: false,
@@ -199,11 +199,11 @@ describe('VodService: VodResponse type', () => {
   it('should accept VodResponse with populated relations', () => {
     const vod: VodResponse = {
       id: 1,
-      vod_id: 'abc123',
+      platformVodId: 'abc123',
       platform: 'twitch',
       title: 'Test Stream',
       duration: 3600,
-      stream_id: 'stream-1',
+      platformStreamId: 'stream-1',
       created_at: new Date(),
       updated_at: new Date(),
       is_live: false,

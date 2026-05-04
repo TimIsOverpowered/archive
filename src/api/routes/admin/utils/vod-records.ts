@@ -63,14 +63,19 @@ export async function findOrCreateVodRecord(
 
   log.info({ vodId, platform }, 'Creating new VOD');
 
+  const createData = strategy.createVodData(vodMetadata) as InsertableVods;
+
   const vodRecord = (await db
     .insertInto('vods')
-    .values(strategy.createVodData(vodMetadata) as InsertableVods)
-    .returning(['id', 'vod_id', 'platform', 'title', 'duration', 'stream_id', 'created_at'])
+    .values(createData)
+    .onConflict((oc) =>
+      oc.columns(['platform', 'platform_stream_id']).doUpdateSet({ platform_vod_id: createData.platform_vod_id })
+    )
+    .returning(['id', 'platform_vod_id', 'platform_stream_id', 'platform', 'title', 'duration', 'created_at'])
     .executeTakeFirst()) as SelectableVods;
 
   if (platform === PLATFORMS.TWITCH) {
-    await saveVodChapters(ctx, vodRecord.id, vodRecord.vod_id, vodRecord.duration);
+    await saveVodChapters(ctx, vodRecord.id, vodRecord.platform_vod_id ?? '', vodRecord.duration);
     await fetchAndSaveEmotes(ctx, vodRecord.id, platform, platformUserId);
     void triggerChatDownload({
       tenantId,
@@ -132,13 +137,13 @@ export async function refreshVodRecord(
     .updateTable('vods')
     .set(strategy.updateVodData(vodMetadata) as UpdateableVods)
     .where('id', '=', dbId)
-    .returning(['id', 'vod_id', 'platform', 'title', 'duration', 'stream_id', 'created_at'])
+    .returning(['id', 'platform_vod_id', 'platform_stream_id', 'platform', 'title', 'duration', 'created_at'])
     .executeTakeFirst()) as SelectableVods;
 
   log.info({ vodId, platform, duration: updatedRecord.duration }, 'VOD metadata refreshed');
 
   if (platform === PLATFORMS.TWITCH) {
-    await saveVodChapters(ctx, updatedRecord.id, updatedRecord.vod_id, updatedRecord.duration);
+    await saveVodChapters(ctx, updatedRecord.id, updatedRecord.platform_vod_id ?? '', updatedRecord.duration);
     await fetchAndSaveEmotes(ctx, updatedRecord.id, platform, platformUserId);
     void triggerChatDownload({
       tenantId: ctx.tenantId,

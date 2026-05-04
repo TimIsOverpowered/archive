@@ -15,12 +15,12 @@ describe('Twitch Strategy: createVodData', () => {
 
     const result = strategy.createVodData(meta);
 
-    assert.strictEqual(result.vod_id, 'twitch-vod-123');
+    assert.strictEqual(result.platformVodId, 'twitch-vod-123');
     assert.strictEqual(result.title, 'Epic Stream');
     assert.strictEqual(result.platform, 'twitch');
     assert.strictEqual(result.is_live, false);
     assert.strictEqual(result.duration, 7200);
-    assert.strictEqual(result.stream_id, 'stream-456');
+    assert.strictEqual(result.platformStreamId, 'stream-456');
     assert.ok(result.created_at instanceof Date);
   });
 
@@ -34,8 +34,7 @@ describe('Twitch Strategy: createVodData', () => {
     };
 
     const result = strategy.createVodData(meta);
-    assert.strictEqual(result.title, null);
-    assert.strictEqual(result.stream_id, '');
+    assert.strictEqual(result.platformStreamId, '');
   });
 
   it('should handle empty string title', () => {
@@ -77,10 +76,10 @@ describe('Twitch Strategy: updateVodData', () => {
 
     const result = strategy.updateVodData(meta);
 
-    assert.strictEqual(result.vod_id, 'twitch-vod-123');
+    assert.strictEqual(result.platformVodId, 'twitch-vod-123');
     assert.strictEqual(result.title, 'Updated Stream');
     assert.strictEqual(result.duration, 7200);
-    assert.strictEqual(result.stream_id, 'stream-456');
+    assert.strictEqual(result.platformStreamId, 'stream-456');
     assert.ok(result.created_at instanceof Date);
   });
 

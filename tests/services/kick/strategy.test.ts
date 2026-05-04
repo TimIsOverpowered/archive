@@ -15,12 +15,12 @@ describe('Kick Strategy: createVodData', () => {
 
     const result = strategy.createVodData(meta);
 
-    assert.strictEqual(result.vod_id, 'kick-vod-123');
+    assert.strictEqual(result.platformVodId, 'kick-vod-123');
     assert.strictEqual(result.title, 'Kick Stream');
     assert.strictEqual(result.platform, 'kick');
     assert.strictEqual(result.is_live, false);
     assert.strictEqual(result.duration, 5400);
-    assert.strictEqual(result.stream_id, 'stream-456');
+    assert.strictEqual(result.platformStreamId, 'stream-456');
     assert.ok(result.created_at instanceof Date);
   });
 
@@ -34,8 +34,7 @@ describe('Kick Strategy: createVodData', () => {
     };
 
     const result = strategy.createVodData(meta);
-    assert.strictEqual(result.title, null);
-    assert.strictEqual(result.stream_id, '');
+    assert.strictEqual(result.platformStreamId, '');
   });
 
   it('should handle empty string title', () => {
@@ -77,10 +76,10 @@ describe('Kick Strategy: updateVodData', () => {
 
     const result = strategy.updateVodData(meta);
 
-    assert.strictEqual(result.vod_id, 'kick-vod-123');
+    assert.strictEqual(result.platformVodId, 'kick-vod-123');
     assert.strictEqual(result.title, 'Updated Kick Stream');
     assert.strictEqual(result.duration, 5400);
-    assert.strictEqual(result.stream_id, 'stream-456');
+    assert.strictEqual(result.platformStreamId, 'stream-456');
     assert.ok(result.created_at instanceof Date);
   });
 

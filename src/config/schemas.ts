@@ -174,7 +174,7 @@ export const KickSchema = z.object({
 /** Schema for creating a new VOD record. */
 export const VodCreateSchema = z.object({
   /** External platform VOD ID (string to preserve large IDs) */
-  vod_id: z.string(),
+  platformVodId: z.string().optional(),
   /** VOD title, nullable for live streams */
   title: z.string().nullable().default(null),
   /** VOD creation timestamp */
@@ -182,7 +182,7 @@ export const VodCreateSchema = z.object({
   /** Duration in seconds (default: 0 for live streams) */
   duration: z.number().default(0),
   /** Platform stream/session ID */
-  stream_id: z.string().nullable().default(null),
+  platformStreamId: z.string().nullable().default(null),
   /** Source platform */
   platform: z.enum(['twitch', 'kick']),
   /** Whether this VOD originated from a live stream (default: false) */
@@ -192,7 +192,7 @@ export const VodCreateSchema = z.object({
 /** Schema for updating an existing VOD record. */
 export const VodUpdateSchema = z.object({
   /** External platform VOD ID (optional) */
-  vod_id: z.string().optional(),
+  platformVodId: z.string().optional(),
   /** VOD title (nullable) */
   title: z.string().nullable().default(null),
   /** VOD creation timestamp (optional) */
@@ -200,7 +200,7 @@ export const VodUpdateSchema = z.object({
   /** Duration in seconds (optional) */
   duration: z.number().optional(),
   /** Platform stream ID (nullable) */
-  stream_id: z.string().nullable().default(null),
+  platformStreamId: z.string().nullable().default(null),
 });
 
 /** Schema for creating a chapter within a VOD. */

@@ -108,7 +108,7 @@ async function handleOfflineStream(
   log.debug({ component: 'monitor', username }, 'Streamer is OFFLINE');
 
   if (activeLiveVod) {
-    log.info({ component: 'monitor', vodId: activeLiveVod.vod_id }, 'Marking VOD as ended');
+    log.info({ component: 'monitor', vodId: activeLiveVod.platform_vod_id }, 'Marking VOD as ended');
 
     await db.updateTable('vods').set({ is_live: false }).where('id', '=', activeLiveVod.id).execute();
 
@@ -116,7 +116,7 @@ async function handleOfflineStream(
 
     await sendStreamOfflineAlert(
       platform,
-      activeLiveVod.vod_id,
+      activeLiveVod.platform_vod_id ?? '',
       activeLiveVod.started_at ?? undefined,
       username ?? undefined,
       displayName
@@ -151,6 +151,35 @@ async function handleNewLiveStream(ctx: LiveStreamContext): Promise<void> {
   }
 
   if (!vodMetadata) {
+    if (ctx.config.settings.vodDownload === false) {
+      ctx.log.info(
+        { component: 'monitor', streamId: ctx.streamStatus.id },
+        'VODs disabled - creating VOD record without platform VOD ID'
+      );
+
+      const [createdVod] = await ctx.db
+        .insertInto('vods')
+        .values({
+          platform: ctx.platform,
+          title: null,
+          created_at: new Date().toISOString(),
+          duration: 0,
+          platform_stream_id: ctx.streamStatus.id,
+          is_live: true,
+          started_at: new Date(ctx.streamStatus.startedAt),
+        } as InsertableVods)
+        .returning('id')
+        .execute();
+
+      if (!createdVod) {
+        ctx.log.error({ component: 'monitor' }, 'Failed to create VOD record');
+        return;
+      }
+
+      await publishVodUpdate(ctx.tenantId, createdVod.id);
+      return;
+    }
+
     ctx.log.debug({ component: 'monitor' }, 'No VOD object found yet');
     return;
   }
@@ -207,7 +236,10 @@ async function handleNewLiveStream(ctx: LiveStreamContext): Promise<void> {
 }
 
 async function handleExistingVodBecameLive(ctx: ExistingVodLiveContext): Promise<void> {
-  ctx.log.info({ component: 'monitor', vodId: ctx.existingVod.vod_id }, 'Existing VOD is now active');
+  ctx.log.info(
+    { component: 'monitor', vodId: ctx.existingVod.platform_vod_id, streamId: ctx.existingVod.platform_stream_id },
+    'Existing VOD is now active'
+  );
 
   await ctx.db
     .updateTable('vods')
@@ -220,8 +252,6 @@ async function handleExistingVodBecameLive(ctx: ExistingVodLiveContext): Promise
 
   await publishVodUpdate(ctx.tenantId, ctx.existingVod.id);
 
-  ctx.log.info({ vodId: ctx.existingVod.vod_id }, '[Monitor]: Queuing HLS download');
-
   const vodMetadata = ctx.strategy.fetchVodObjectForLiveStream
     ? await ctx.strategy.fetchVodObjectForLiveStream(ctx.streamStatus.id, {
         tenantId: ctx.tenantId,
@@ -230,20 +260,33 @@ async function handleExistingVodBecameLive(ctx: ExistingVodLiveContext): Promise
       })
     : null;
 
+  if (!vodMetadata) {
+    ctx.log.warn(
+      { component: 'monitor', dbId: ctx.existingVod.id },
+      'Failed to fetch VOD metadata - skipping HLS download'
+    );
+    return;
+  }
+
+  ctx.log.info({ vodId: vodMetadata.id }, '[Monitor]: Queuing HLS download');
+
   await enqueueLiveHlsDownload({
     dbId: ctx.existingVod.id,
-    vodId: ctx.existingVod.vod_id,
+    vodId: vodMetadata.id,
     platform: ctx.platform,
     tenantId: ctx.tenantId,
     platformUserId: ctx.platformUserId,
     platformUsername: ctx.platformUsername,
     startedAt: new Date(ctx.streamStatus.startedAt),
-    sourceUrl: vodMetadata?.sourceUrl ?? undefined,
+    sourceUrl: vodMetadata.sourceUrl ?? undefined,
   });
 }
 
 async function handleAlreadyLiveStream(ctx: AlreadyLiveContext): Promise<void> {
-  ctx.log.debug({ component: 'monitor', vodId: ctx.existingVod.vod_id }, 'VOD is live, ensuring download queued');
+  ctx.log.debug(
+    { component: 'monitor', vodId: ctx.existingVod.platform_vod_id },
+    'VOD is live, ensuring download queued'
+  );
 
   const vodMetadata = ctx.strategy.fetchVodObjectForLiveStream
     ? await ctx.strategy.fetchVodObjectForLiveStream(ctx.streamStatus.id, {
@@ -253,15 +296,23 @@ async function handleAlreadyLiveStream(ctx: AlreadyLiveContext): Promise<void> {
       })
     : null;
 
+  if (!vodMetadata) {
+    ctx.log.warn(
+      { component: 'monitor', dbId: ctx.existingVod.id },
+      'Failed to fetch VOD metadata - skipping HLS download'
+    );
+    return;
+  }
+
   await enqueueLiveHlsDownload({
     dbId: ctx.existingVod.id,
-    vodId: ctx.existingVod.vod_id,
+    vodId: vodMetadata.id,
     platform: ctx.platform,
     tenantId: ctx.tenantId,
     platformUserId: ctx.platformUserId,
     platformUsername: ctx.platformUsername,
     startedAt: ctx.existingVod.started_at ?? new Date(ctx.streamStatus.startedAt),
-    sourceUrl: vodMetadata?.sourceUrl ?? undefined,
+    sourceUrl: vodMetadata.sourceUrl ?? undefined,
     skipValidation: true,
   });
 }

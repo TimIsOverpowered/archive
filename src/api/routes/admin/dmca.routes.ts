@@ -113,7 +113,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
       const dmcaJobId = await queueDmcaProcessing({
         tenantId,
         dbId: vodRecord.id,
-        vodId: String(vodRecord.vod_id),
+        vodId: vodRecord.platform_vod_id ?? '',
         claims: claimsArray,
         type,
         platform,
@@ -139,7 +139,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         filePath,
         downstreamJobId: dmcaJobId,
         downstreamLabel: 'DMCA processing',
-        base: { dbId: vodRecord.id, vodId: vodRecord.vod_id },
+        base: { dbId: vodRecord.id, vodId: vodRecord.platform_vod_id },
         extra: part !== undefined ? { part } : {},
       });
     }

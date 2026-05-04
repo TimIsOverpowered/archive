@@ -22,15 +22,21 @@ const monitorProcessor: Processor<{ tenantId: string }, unknown, string> = async
 
     const activeLiveVod = await findActiveLiveVod(db, platform);
 
-    if (activeLiveVod) {
-      const jobId = `${LIVE_JOB_ID_PREFIX}${activeLiveVod.vod_id}`;
+    if (activeLiveVod && activeLiveVod.platform_vod_id != null && activeLiveVod.platform_vod_id !== '') {
+      const jobId = `${LIVE_JOB_ID_PREFIX}${activeLiveVod.platform_vod_id}`;
       const queuedJob = await liveQueue.getJob(jobId);
       const hasActiveJob = queuedJob !== undefined && (await queuedJob.isActive());
       if (hasActiveJob) {
-        log.debug({ component: 'monitor', platform, vodId: activeLiveVod.vod_id }, 'Skipping - live worker active');
+        log.debug(
+          { component: 'monitor', platform, vodId: activeLiveVod.platform_vod_id },
+          'Skipping - live worker active'
+        );
         continue;
       }
-      log.debug({ component: 'monitor', platform, vodId: activeLiveVod.vod_id }, 'No active job found, rechecking');
+      log.debug(
+        { component: 'monitor', platform, vodId: activeLiveVod.platform_vod_id },
+        'No active job found, rechecking'
+      );
     }
 
     try {

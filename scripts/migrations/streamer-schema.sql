@@ -4,11 +4,11 @@ CREATE TYPE "UploadStatus" AS ENUM ('PENDING', 'UPLOADING', 'COMPLETED', 'FAILED
 -- CreateTable
 CREATE TABLE "vods" (
     "id" SERIAL NOT NULL,
-    "vod_id" TEXT NOT NULL,
+    "platform_vod_id" TEXT,
     "platform" TEXT NOT NULL,
     "title" TEXT,
     "duration" INTEGER NOT NULL DEFAULT 0,
-    "stream_id" TEXT,
+    "platform_stream_id" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "is_live" BOOLEAN NOT NULL DEFAULT false,
@@ -90,7 +90,10 @@ CREATE TABLE "chat_messages" (
 CREATE INDEX "vods_new_platform_idx" ON "vods"("platform");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "vods_platform_vod_id_key" ON "vods"("platform", "vod_id");
+CREATE UNIQUE INDEX "vods_platform_vod_id_key" ON "vods"("platform", "platform_vod_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "vods_platform_stream_id_key" ON "vods"("platform", "platform_stream_id");
 
 -- CreateIndex
 CREATE INDEX "vod_uploads_vod_id_idx" ON "vod_uploads"("vod_id");

@@ -34,7 +34,7 @@ export interface VodRecordBase {
   title: string | null;
   created_at: Date;
   duration: number;
-  stream_id: string | null;
+  platformStreamId: string | null;
   platform: Platform;
 }
 

@@ -120,7 +120,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
         filePath,
         downstreamJobId: jobId ?? '',
         downstreamLabel: 'YouTube upload',
-        base: jobId != null ? { dbId: vodRecord.id, vodId: vodRecord.vod_id, jobId } : {},
+        base: jobId != null ? { dbId: vodRecord.id, vodId: vodRecord.platform_vod_id, jobId } : {},
       });
     }
   );

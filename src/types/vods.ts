@@ -1,11 +1,11 @@
 /** Shape of a VOD record with all its relations (uploads, chapters, games). */
 export interface VodResponse {
   id: number;
-  vod_id: string;
+  platformVodId: string | null;
   platform: string;
   title: string | null;
   duration: number;
-  stream_id: string | null;
+  platformStreamId: string | null;
   created_at: Date;
   updated_at: Date;
   is_live: boolean;

@@ -20,11 +20,11 @@ export interface StreamerDB {
 
 export interface VodsTable {
   id: Generated<number>;
-  vod_id: string;
+  platform_vod_id: string | null;
   platform: string;
   title: string | null;
   duration: number;
-  stream_id: string | null;
+  platform_stream_id: string | null;
   created_at: ColumnType<Date, string | undefined, never>;
   updated_at: ColumnType<Date, never, never>;
   is_live: boolean;

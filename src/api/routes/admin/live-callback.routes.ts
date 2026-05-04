@@ -113,7 +113,7 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
       const { gameJobIds, vodJobId } = await queueYoutubeUploads({
         ctx: tenantCtx,
         dbId: vodRecord.id,
-        vodId: vodRecord.vod_id,
+        vodId: vodRecord.platform_vod_id ?? '',
         filePath: path,
         platform,
         type: SOURCE_TYPES.LIVE,

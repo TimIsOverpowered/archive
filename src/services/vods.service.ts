@@ -152,7 +152,7 @@ export async function getVods(
 
     const total = Number(totalRow?.cnt ?? 0);
     const hasMore = result.length > limit;
-    const resultVods = (hasMore ? result.slice(0, limit) : result) as VodResponse[];
+    const resultVods = (hasMore ? result.slice(0, limit) : result) as unknown as VodResponse[];
     const dbIds = resultVods.map((v) => v.id);
     const volatileMap = await getVodVolatileCacheBatch(tenantId, dbIds);
     const mergedVods = applyVolatileData(resultVods, volatileMap);
@@ -185,7 +185,7 @@ export async function getVodById(db: DBClient, tenantId: string, vodId: number):
       .executeTakeFirst();
 
     if (!vod) return null;
-    return vod as VodResponse;
+    return vod as unknown as VodResponse;
   };
 
   const staticData = await withStaleWhileRevalidate(
@@ -223,11 +223,11 @@ export async function getVodByPlatformId(
       .selectAll('vods')
       .select((eb) => selectVodRelations(eb))
       .where('platform', '=', platform)
-      .where('vod_id', '=', platformVodId)
+      .where('platform_vod_id', '=', platformVodId)
       .executeTakeFirst();
 
     if (!vod) return null;
-    return vod as VodResponse;
+    return vod as unknown as VodResponse;
   };
 
   const staticData = await withStaleWhileRevalidate(
