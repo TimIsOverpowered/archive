@@ -59,6 +59,7 @@ export interface YoutubeGameUploadJob {
   chapterId: number;
   chapterName: string;
   chapterStart: number;
+  chapterDuration: number;
   chapterEnd: number;
   chapterGameId?: string | undefined;
   title: string;
@@ -78,7 +79,7 @@ export interface DmcaProcessingJob {
   filePath?: string | undefined;
   gameId?: number | undefined;
   gameStart?: number | undefined;
-  gameEnd?: number | undefined;
+  gameDuration?: number | undefined;
 }
 
 export interface MonitorJob {

@@ -28,8 +28,6 @@ export interface ChapterLibraryEntry {
   count: number;
 }
 
-
-
 function buildQueryCacheKey(tenantId: string, query: ChapterLibraryQuery, page: number, limit: number): SWRKey {
   return swrKeys.chapterLibrary(tenantId, query, page, limit);
 }
@@ -62,19 +60,13 @@ export async function getChaptersLibrary(
         .where('chapters.game_id', 'is not', null)
         .where('chapters.game_id', '!=', '')
         .where((eb) =>
-          query.chapter_name != null
-            ? eb('chapters.name', 'ilike', `%${query.chapter_name}%`)
-            : sql`true`
+          query.chapter_name != null ? eb('chapters.name', 'ilike', `%${query.chapter_name}%`) : sql`true`
         )
         .groupBy('chapters.game_id')
         .groupBy('chapters.name')
         .groupBy('chapters.image')
         .orderBy(
-          query.sort === 'count'
-            ? sql`count`
-            : query.sort === 'chapter_name'
-              ? 'chapters.name'
-              : sql`last_played`,
+          query.sort === 'count' ? sql`count` : query.sort === 'chapter_name' ? 'chapters.name' : sql`last_played`,
           query.order
         )
         .limit(limit + 1)
@@ -87,9 +79,7 @@ export async function getChaptersLibrary(
         .where('chapters.game_id', 'is not', null)
         .where('chapters.game_id', '!=', '')
         .where((eb) =>
-          query.chapter_name != null
-            ? eb('chapters.name', 'ilike', `%${query.chapter_name}%`)
-            : sql`true`
+          query.chapter_name != null ? eb('chapters.name', 'ilike', `%${query.chapter_name}%`) : sql`true`
         )
         .executeTakeFirst(),
     ]);

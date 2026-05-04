@@ -209,7 +209,9 @@ export const ChapterCreateSchema = z.object({
   vod_id: z.number(),
   /** Chapter start time in seconds */
   start: z.number(),
-  /** Chapter end time in seconds (nullable for open-ended) */
+  /** Chapter duration in seconds */
+  duration: z.number().default(0),
+  /** Chapter end position in seconds (nullable for open-ended) */
   end: z.number().nullable().default(null),
   /** Chapter title (nullable) */
   title: z.string().nullable().default(null),
@@ -221,7 +223,9 @@ export const ChapterCreateSchema = z.object({
 export const ChapterUpdateSchema = z.object({
   /** Chapter start time in seconds (optional) */
   start: z.number().optional(),
-  /** Chapter end time in seconds (nullable) */
+  /** Chapter duration in seconds (optional) */
+  duration: z.number().optional(),
+  /** Chapter end position in seconds (nullable) */
   end: z.number().nullable().default(null),
   /** Chapter title (nullable) */
   title: z.string().nullable().default(null),

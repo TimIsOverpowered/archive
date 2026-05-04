@@ -95,7 +95,7 @@ function buildChapterTimestampsForPart(chapters: SelectableChapters[], partNum: 
   const partEnd = splitDuration * partNum;
 
   const chaptersInPart = chapters.filter((chapter) => {
-    const chapterDuration = chapter.end ?? 0;
+    const chapterDuration = chapter.duration ?? 0;
     return chapter.start <= partEnd && chapter.start + chapterDuration >= partStart;
   });
 

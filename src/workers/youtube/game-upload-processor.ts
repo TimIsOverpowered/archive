@@ -20,6 +20,7 @@ export interface GameUploadContext {
   vodId: string;
   filePath: string;
   chapterStart: number;
+  chapterDuration: number;
   chapterEnd: number;
   chapterName: string;
   chapterGameId?: string | undefined;
@@ -37,6 +38,7 @@ export interface GameUploadAndUpsertParams {
   filePath: string;
   chapterStart: number;
   chapterEnd: number;
+  chapterDuration: number;
   chapterName: string;
   chapterGameId?: string | undefined;
   title: string;
@@ -66,6 +68,7 @@ export async function uploadAndUpsertGame(
     vodId,
     filePath,
     chapterStart,
+    chapterDuration,
     chapterEnd,
     chapterName,
     chapterGameId,
@@ -77,7 +80,6 @@ export async function uploadAndUpsertGame(
     config,
   } = params;
   const channelName = getDisplayName(config);
-  const duration = chapterEnd;
   const currentPartNum = part ?? 1;
   const partTitle = part != null && part > 1 ? `${title} PART ${part}` : title;
 
@@ -113,7 +115,7 @@ export async function uploadAndUpsertGame(
     description,
     'public',
     onUploadProgress,
-    duration
+    chapterDuration
   );
 
   GameUpsertSchema.parse({
@@ -124,8 +126,9 @@ export async function uploadAndUpsertGame(
     .insertInto('games')
     .values({
       vod_id: dbId,
-      start_time: chapterStart,
-      end_time: chapterEnd,
+      start: chapterStart,
+      duration: chapterDuration,
+      end: chapterEnd,
       video_provider: 'youtube',
       video_id: result.videoId,
       thumbnail_url: result.thumbnailUrl ?? null,
@@ -134,7 +137,7 @@ export async function uploadAndUpsertGame(
       title: chapterName,
     })
     .onConflict((oc) =>
-      oc.columns(['vod_id', 'start_time', 'end_time']).doUpdateSet({
+      oc.columns(['vod_id', 'start', 'end']).doUpdateSet({
         video_id: result.videoId,
         thumbnail_url: result.thumbnailUrl ?? null,
       })
@@ -150,7 +153,7 @@ export async function uploadAndUpsertGame(
 }
 
 export async function processGameUpload(ctx: GameUploadContext): Promise<GameUploadResult> {
-  const { filePath, chapterStart, chapterEnd } = ctx;
+  const { filePath, chapterStart, chapterDuration } = ctx;
 
   if (filePath === '') {
     throw new Error('File path is required for game upload');
@@ -159,7 +162,7 @@ export async function processGameUpload(ctx: GameUploadContext): Promise<GameUpl
   const trimmedPath = await trimVideo(
     filePath,
     chapterStart,
-    chapterEnd,
+    chapterDuration,
     `${ctx.vodId}-game-${ctx.chapterGameId ?? 'unknown'}`,
     undefined,
     () => {}
@@ -186,6 +189,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     vodId,
     chapterStart,
     chapterEnd,
+    chapterDuration,
     chapterGameId,
     title,
     description,
@@ -202,6 +206,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     filePath: trimmedPath,
     chapterStart,
     chapterEnd,
+    chapterDuration,
     chapterName,
     chapterGameId,
     title,
@@ -219,7 +224,20 @@ async function processSplitGameUpload(
   trimmedPath: string,
   trimmedDuration: number
 ): Promise<GameUploadResult> {
-  const { tenantId, dbId, chapterStart, chapterGameId, chapterName, title, description, config, db, vodId, log } = ctx;
+  const {
+    tenantId,
+    dbId,
+    chapterStart,
+    chapterGameId,
+    chapterName,
+    chapterEnd,
+    title,
+    description,
+    config,
+    db,
+    vodId,
+    log,
+  } = ctx;
   const channelName = getDisplayName(config);
   const totalParts = Math.ceil(trimmedDuration / YouTube.MAX_DURATION);
 
@@ -286,8 +304,9 @@ async function processSplitGameUpload(
       vodId,
       filePath: splitPath,
       chapterStart: startTime + chapterStart,
-      chapterEnd: endTime - startTime,
+      chapterDuration: endTime - startTime,
       chapterName,
+      chapterEnd,
       chapterGameId,
       title,
       description,

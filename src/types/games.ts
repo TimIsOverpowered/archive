@@ -2,8 +2,9 @@
 export interface GameResponse {
   id: number;
   vod_id: number;
-  start_time: number;
-  end_time: number;
+  start: number;
+  duration: number;
+  end: number;
   video_provider: string | null;
   video_id: string | null;
   thumbnail_url: string | null;

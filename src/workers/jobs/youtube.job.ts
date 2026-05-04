@@ -1,6 +1,7 @@
 import { getPlatformConfig, getDisplayName } from '../../config/types.js';
 import { findVodById } from '../../db/queries/vods.js';
 import { withDbRetry } from '../../db/streamer-client.js';
+import { SelectableChapters, SelectableGames } from '../../db/streamer-types.js';
 import { TenantContext } from '../../types/context.js';
 import type { Platform, SourceType, UploadMode } from '../../types/platforms.js';
 import { UPLOAD_MODES } from '../../types/platforms.js';
@@ -57,7 +58,7 @@ export async function createGameUploadJob(
   vodId: string,
   filePath: string | undefined,
   platform: Platform,
-  chapter: { id: number; name: string; start: number; end: number; gameId?: string | undefined },
+  chapter: SelectableChapters,
   options?: { title?: string | undefined }
 ): Promise<YoutubeGameUploadJob> {
   const { config, tenantId } = ctx;
@@ -80,12 +81,12 @@ export async function createGameUploadJob(
 
   // Check restricted games
   if (config.youtube?.restrictedGames != null && config.youtube.restrictedGames.includes(chapter.name)) {
-    throw new RestrictedGameError(chapter.name);
+    throw new RestrictedGameError(chapter.name ?? '');
   }
 
   // Skip chapters shorter than 5 minutes
-  if ((chapter.end ?? 0) < 300) {
-    throw new Error(`Chapter "${chapter.name}" duration (${chapter.end}s) is less than 5 minutes`);
+  if ((chapter.duration ?? 0) < 300) {
+    throw new Error(`Chapter "${chapter.name}" duration (${chapter.duration}s) is less than 5 minutes`);
   }
 
   const channelName = getDisplayName(config);
@@ -106,7 +107,7 @@ export async function createGameUploadJob(
       return result?.cnt ?? 0;
     });
     epNumber = gameCount + 1;
-    gameName = chapter.name;
+    gameName = chapter.name ?? '';
   }
 
   const { title, description } = buildYoutubeMetadata({
@@ -129,10 +130,11 @@ export async function createGameUploadJob(
     type: 'game',
     platform,
     chapterId: chapter.id,
-    chapterName: chapter.name,
+    chapterName: chapter.name ?? '',
     chapterStart: chapter.start,
-    chapterEnd: chapter.end,
-    chapterGameId: chapter.gameId,
+    chapterDuration: chapter.duration,
+    chapterEnd: chapter.end ?? 0,
+    chapterGameId: chapter.game_id ?? '',
     title,
     description,
   };
@@ -170,13 +172,7 @@ export async function createGameUploadJobsForVod(
 
   for (const chapter of chapters) {
     try {
-      const job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, {
-        id: chapter.id,
-        name: chapter.name ?? '',
-        start: chapter.start ?? 0,
-        end: chapter.end ?? 0,
-        gameId: chapter.game_id ?? undefined,
-      });
+      const job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, chapter);
       jobs.push(job);
     } catch (error) {
       // Skip restricted games or other errors
@@ -363,13 +359,7 @@ export async function queueYoutubeGameUpload(
 
   let job: YoutubeGameUploadJob;
   try {
-    job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, {
-      id: chapter.id,
-      name: chapter.name ?? '',
-      start: chapter.start ?? 0,
-      end: chapter.end ?? 0,
-      gameId: chapter.game_id ?? undefined,
-    });
+    job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, chapter);
   } catch (error) {
     const details = extractErrorDetails(error);
     log.warn({ chapterId, tenantId: ctx.tenantId, ...details }, 'Skipping game upload job');
@@ -398,14 +388,7 @@ export async function queueYoutubeGameUploadByGame(
   vodId: string,
   filePath: string | undefined,
   platform: Platform,
-  game: {
-    id: number;
-    name: string;
-    start: number;
-    end: number;
-    gameId?: string | undefined;
-    title?: string | undefined;
-  },
+  game: SelectableGames,
   downloadJobId?: string
 ): Promise<string | null> {
   let job: YoutubeGameUploadJob;
@@ -418,13 +401,16 @@ export async function queueYoutubeGameUploadByGame(
       platform,
       {
         id: game.id,
-        name: game.name,
+        vod_id: game.vod_id,
+        game_id: game.game_id,
+        name: game.game_name,
+        image: game.chapter_image,
         start: game.start,
+        duration: game.duration,
         end: game.end,
-        gameId: game.gameId,
       },
       {
-        title: game.title,
+        title: game.title ?? undefined,
       }
     );
   } catch (error) {

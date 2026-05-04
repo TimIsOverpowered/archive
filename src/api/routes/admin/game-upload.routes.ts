@@ -94,14 +94,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
         vodId,
         filePath,
         platform,
-        {
-          id: game.id,
-          name: game.game_name ?? '',
-          start: game.start_time,
-          end: game.end_time,
-          gameId: game.game_id ?? undefined,
-          title: game.title ?? undefined,
-        },
+        game,
         jobId ?? undefined
       );
 
@@ -186,8 +179,8 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
         type,
         platform,
         gameId,
-        gameStart: game.start_time,
-        gameEnd: game.end_time,
+        gameStart: game.start,
+        gameDuration: game.end - game.start,
         downloadJobId: jobId ?? undefined,
         filePath,
       });

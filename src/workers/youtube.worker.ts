@@ -30,6 +30,7 @@ interface YoutubeProcessorContext {
   dmcaProcessed?: boolean | undefined;
   part?: number | undefined;
   chapterStart?: number | undefined;
+  chapterDuration?: number | undefined;
   chapterEnd?: number | undefined;
   chapterName?: string | undefined;
   chapterGameId?: string | undefined;
@@ -81,11 +82,11 @@ const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeP
   };
 
   if (kind === 'game') {
-    const { chapterStart, chapterEnd, chapterName, chapterGameId, title, description } = job.data;
+    const { chapterStart, chapterDuration, chapterName, chapterGameId, title, description } = job.data;
     return {
       ...base,
       chapterStart,
-      chapterEnd,
+      chapterDuration,
       chapterName,
       chapterGameId,
       title,
@@ -151,6 +152,7 @@ const youtubeProcessor = wrapWorkerProcessor<YoutubeUploadJob, YoutubeProcessorC
         vodId: ctx.vodId,
         filePath: ctx.filePath,
         chapterStart: ctx.chapterStart as number,
+        chapterDuration: ctx.chapterDuration as number,
         chapterEnd: ctx.chapterEnd as number,
         chapterName: ctx.chapterName as string,
         chapterGameId: ctx.chapterGameId,

@@ -46,8 +46,9 @@ CREATE TABLE "emotes" (
 CREATE TABLE "games" (
     "id" SERIAL NOT NULL,
     "vod_id" INTEGER NOT NULL,
-    "start_time" INTEGER NOT NULL,
-    "end_time" INTEGER NOT NULL,
+    "start" INTEGER NOT NULL,
+    "duration" INTEGER NOT NULL DEFAULT 0,
+    "end" INTEGER NOT NULL,
     "video_provider" TEXT,
     "video_id" TEXT,
     "thumbnail_url" TEXT,
@@ -67,6 +68,7 @@ CREATE TABLE "chapters" (
     "name" TEXT,
     "image" TEXT,
     "start" INTEGER NOT NULL DEFAULT 0,
+    "duration" INTEGER NOT NULL DEFAULT 0,
     "end" INTEGER,
 
     CONSTRAINT "chapters_pkey" PRIMARY KEY ("id")
@@ -126,7 +128,7 @@ CREATE INDEX "games_new_game_name_idx" ON "games"("game_name");
 CREATE INDEX "games_new_game_id_idx" ON "games"("game_id");
 
 -- CreateIndex
-CREATE INDEX "games_new_vod_id_start_time_idx" ON "games"("vod_id", "start_time");
+CREATE INDEX "games_new_vod_id_start_idx" ON "games"("vod_id", "start");
 
 -- CreateIndex
 CREATE INDEX "games_new_game_name_fts_idx" ON "games" USING GIN (to_tsvector('english', coalesce("game_name", '')));
@@ -156,7 +158,7 @@ ALTER TABLE "chapters" ADD CONSTRAINT "chapters_vod_id_fkey" FOREIGN KEY ("vod_i
 CREATE UNIQUE INDEX "vod_uploads_vod_id_type_part_key" ON "vod_uploads"("vod_id", "type", "part");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "games_unique_chapter_key" ON "games"("vod_id", "start_time", "end_time");
+CREATE UNIQUE INDEX "games_unique_chapter_key" ON "games"("vod_id", "start", "end");
 
 -- Create the trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()

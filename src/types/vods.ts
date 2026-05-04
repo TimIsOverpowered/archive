@@ -27,8 +27,9 @@ export interface VodResponse {
     end: number | null;
   }>;
   games: Array<{
-    start_time: number;
-    end_time: number;
+    start: number;
+    duration: number;
+    end: number;
     video_provider: string | null;
     video_id: string | null;
     thumbnail_url: string | null;

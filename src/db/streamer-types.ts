@@ -59,8 +59,9 @@ export interface EmotesTable {
 export interface GamesTable {
   id: Generated<number>;
   vod_id: number;
-  start_time: number;
-  end_time: number;
+  start: number;
+  duration: number;
+  end: number;
   video_provider: string | null;
   video_id: string | null;
   thumbnail_url: string | null;
@@ -77,6 +78,7 @@ export interface ChaptersTable {
   name: string | null;
   image: string | null;
   start: number;
+  duration: number;
   end: number | null;
 }
 

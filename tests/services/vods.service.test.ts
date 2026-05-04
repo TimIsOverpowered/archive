@@ -302,8 +302,9 @@ describe('VodService: VodResponse type', () => {
       ],
       games: [
         {
-          start_time: 120,
-          end_time: 300,
+          start: 120,
+          duration: 180,
+          end: 300,
           video_provider: null,
           video_id: null,
           thumbnail_url: null,

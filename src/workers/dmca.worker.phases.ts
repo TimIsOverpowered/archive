@@ -1,7 +1,7 @@
 import { Job } from 'bullmq';
 import type { Kysely } from 'kysely';
 import type { TenantConfig } from '../config/types.js';
-import type { StreamerDB } from '../db/streamer-types.js';
+import type { SelectableGames, StreamerDB } from '../db/streamer-types.js';
 import type { Platform, SourceType } from '../types/platforms.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { initRichAlert } from '../utils/discord-alerts.js';
@@ -44,7 +44,7 @@ export interface DmcaProcessorContext {
   isGameUpload: boolean;
   gameId: number | undefined;
   gameStart: number | undefined;
-  gameEnd: number | undefined;
+  gameDuration: number | undefined;
   part: number | undefined;
   log: AppLogger;
   alerts: DmcaWorkerAlerts;
@@ -65,10 +65,10 @@ export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Pr
     filePath: providedFilePath,
     gameId,
     gameStart,
-    gameEnd,
+    gameDuration,
     type,
   } = job.data;
-  const isGameUpload = gameId != null && gameStart != null && gameEnd != null;
+  const isGameUpload = gameId != null && gameStart != null && gameDuration != null;
   const log = createAutoLogger(String(tenantId));
 
   const { config, db } = await getJobContext(tenantId);
@@ -160,7 +160,7 @@ export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Pr
     isGameUpload,
     gameId,
     gameStart,
-    gameEnd,
+    gameDuration,
     part,
     log,
     alerts,
@@ -184,16 +184,16 @@ export async function trimDmcaVideo(ctx: DmcaProcessorContext): Promise<void> {
     ctx.processedPath = trimmed;
   }
 
-  if (ctx.isGameUpload && ctx.gameStart != null && ctx.gameEnd != null && ctx.gameId != null) {
+  if (ctx.isGameUpload && ctx.gameStart != null && ctx.gameDuration != null && ctx.gameId != null) {
     ctx.log.info(
-      { vodId: ctx.vodId, gameId: ctx.gameId, gameStart: ctx.gameStart, gameEnd: ctx.gameEnd },
+      { vodId: ctx.vodId, gameId: ctx.gameId, gameStart: ctx.gameStart, gameDuration: ctx.gameDuration },
       'Trimming VOD to game range'
     );
 
     const trimmedPath = await trimVideo(
       ctx.processedPath,
       ctx.gameStart,
-      ctx.gameEnd,
+      ctx.gameDuration,
       `${ctx.vodId}-game-${ctx.gameId}-trimmed`
     );
 
@@ -334,10 +334,12 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
     'Queuing YouTube upload'
   );
 
-  if (ctx.isGameUpload && ctx.gameStart != null && ctx.gameEnd != null && ctx.gameId != null) {
-    const game = await ctx.db.selectFrom('games').selectAll().where('id', '=', ctx.gameId).executeTakeFirst();
-    const gameName = game?.game_name ?? '';
-    const gameTitle = game?.title ?? '';
+  if (ctx.isGameUpload && ctx.gameStart != null && ctx.gameDuration != null && ctx.gameId != null) {
+    const game = (await ctx.db
+      .selectFrom('games')
+      .selectAll()
+      .where('id', '=', ctx.gameId)
+      .executeTakeFirst()) as SelectableGames;
 
     try {
       await queueYoutubeGameUploadByGame(
@@ -346,14 +348,7 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
         ctx.vodId,
         ctx.processedPath,
         ctx.platform,
-        {
-          id: ctx.gameId,
-          name: gameName,
-          start: ctx.gameStart,
-          end: ctx.gameEnd,
-          gameId: game?.game_id ?? undefined,
-          title: gameTitle,
-        }
+        game
       );
     } catch (err) {
       ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Game upload queue failed');

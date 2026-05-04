@@ -151,8 +151,6 @@ export interface GameLibraryEntry {
   count: number;
 }
 
-
-
 function buildGameLibraryCacheKey(tenantId: string, query: GameLibraryQuery, page: number, limit: number): SWRKey {
   return swrKeys.gameLibrary(tenantId, query, page, limit);
 }
@@ -184,25 +182,13 @@ export async function getGamesLibrary(
         ])
         .where('games.game_id', 'is not', null)
         .where('games.game_id', '!=', '')
-        .where((eb) =>
-          query.game_name != null
-            ? eb('games.game_name', 'ilike', `%${query.game_name}%`)
-            : sql`true`
-        )
-        .where((eb) =>
-          query.game_id != null
-            ? eb('games.game_id', '=', query.game_id)
-            : sql`true`
-        )
+        .where((eb) => (query.game_name != null ? eb('games.game_name', 'ilike', `%${query.game_name}%`) : sql`true`))
+        .where((eb) => (query.game_id != null ? eb('games.game_id', '=', query.game_id) : sql`true`))
         .groupBy('games.game_id')
         .groupBy('games.game_name')
         .groupBy('games.chapter_image')
         .orderBy(
-          query.sort === 'count'
-            ? sql`count`
-            : query.sort === 'game_name'
-              ? 'games.game_name'
-              : sql`last_played`,
+          query.sort === 'count' ? sql`count` : query.sort === 'game_name' ? 'games.game_name' : sql`last_played`,
           query.order
         )
         .limit(limit + 1)
@@ -214,16 +200,8 @@ export async function getGamesLibrary(
         .select((eb) => [eb.fn.count('games.game_id').distinct().as('cnt')])
         .where('games.game_id', 'is not', null)
         .where('games.game_id', '!=', '')
-        .where((eb) =>
-          query.game_name != null
-            ? eb('games.game_name', 'ilike', `%${query.game_name}%`)
-            : sql`true`
-        )
-        .where((eb) =>
-          query.game_id != null
-            ? eb('games.game_id', '=', query.game_id)
-            : sql`true`
-        )
+        .where((eb) => (query.game_name != null ? eb('games.game_name', 'ilike', `%${query.game_name}%`) : sql`true`))
+        .where((eb) => (query.game_id != null ? eb('games.game_id', '=', query.game_id) : sql`true`))
         .executeTakeFirst(),
     ]);
 

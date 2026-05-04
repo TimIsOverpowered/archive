@@ -384,8 +384,9 @@ const createNormalizedSchema = async (client: PoolClient) => {
     CREATE TABLE "games_new" (
       "id" SERIAL NOT NULL,
       "vod_id" INTEGER NOT NULL,
-      "start_time" INTEGER NOT NULL,
-      "end_time" INTEGER NOT NULL,
+      "start" INTEGER NOT NULL,
+      "duration" INTEGER DEFAULT 0 NOT NULL,
+      "end" INTEGER NOT NULL,
       "video_provider" TEXT,
       "video_id" TEXT,
       "thumbnail_url" TEXT,
@@ -403,6 +404,7 @@ const createNormalizedSchema = async (client: PoolClient) => {
       "name" TEXT,
       "image" TEXT,
       "start" INTEGER DEFAULT 0 NOT NULL,
+      "duration" INTEGER DEFAULT 0 NOT NULL,
       "end" INTEGER,
       CONSTRAINT "chapters_pkey" PRIMARY KEY ("id"),
       CONSTRAINT "chapters_vod_id_start_key" UNIQUE ("vod_id", "start")
@@ -439,14 +441,14 @@ const createNormalizedSchema = async (client: PoolClient) => {
     CREATE INDEX "vod_uploads_type_idx" ON "vod_uploads"("type");
     CREATE INDEX "vod_uploads_vod_id_type_part_idx" ON "vod_uploads"("vod_id", "type", "part");
     CREATE INDEX "games_new_game_name_idx" ON "games_new"("game_name");
-    CREATE INDEX "games_new_vod_id_start_time_idx" ON "games_new"("vod_id", "start_time");
+    CREATE INDEX "games_new_vod_id_start_idx" ON "games_new"("vod_id", "start");
     CREATE INDEX "games_new_game_name_fts_idx" ON "games_new" USING GIN (to_tsvector('english', coalesce(game_name, '')));
     CREATE INDEX "games_new_game_id_idx" ON "games_new"("game_id");
     CREATE INDEX "chapters_vod_id_start_idx" ON "chapters"("vod_id", "start");
     CREATE INDEX "chapters_name_fts_idx" ON "chapters" USING GIN (to_tsvector('english', coalesce(name, '')));
     CREATE INDEX "chapters_game_id_idx" ON "chapters"("game_id");
     CREATE UNIQUE INDEX "vod_uploads_vod_id_type_part_key" ON "vod_uploads"("vod_id", "type", "part");
-    CREATE UNIQUE INDEX "games_unique_chapter_key" ON "games_new"("vod_id", "start_time", "end_time");
+    CREATE UNIQUE INDEX "games_unique_chapter_key" ON "games_new"("vod_id", "start", "end");
 
     ALTER TABLE "vod_uploads" ADD CONSTRAINT "vod_uploads_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE ON UPDATE CASCADE;
     ALTER TABLE "emotes_new" ADD CONSTRAINT "emotes_new_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -679,26 +681,31 @@ const main = async () => {
             for (let i = 0; i < vod.chapters.length; i++) {
               const chapter = vod.chapters[i];
               const start = Math.round(Number(chapter.start) || 0);
-              let end = chapter.end ? Math.round(Number(chapter.end)) : null;
-              if (!end && i === vod.chapters.length - 1) {
-                end = duration;
+              let chapterDuration = chapter.end ? Math.round(Number(chapter.end)) : null;
+              if (!chapterDuration && i === vod.chapters.length - 1) {
+                chapterDuration = duration;
+              }
+              const end = chapterDuration !== null ? start + chapterDuration : null;
+
+              let image = chapter.image || null;
+              if (!image && platform?.toLowerCase() === 'twitch' && chapter.game_id) {
+                image = `https://static-cdn.jtvnw.net/ttv-boxart/${chapter.game_id}_IGDB-{width}x{height}.jpg`;
               }
 
-              let image;
-              if (platform?.toLowerCase() === 'twitch' && chapter.name) {
-                const encodedGame = encodeURIComponent(chapter.name);
-                image = `https://static-cdn.jtvnw.net/ttv-boxart/${encodedGame}-{width}x{height}.jpg`;
+              if (image && platform?.toLowerCase() === 'twitch') {
+                image = image.replace('40x53', '{width}x{height}');
               }
 
               await schemaClient.query(
-                `INSERT INTO "chapters" (vod_id, game_id, name, image, start, "end")
-                 VALUES ($1, $2, $3, $4, $5, $6)
+                `INSERT INTO "chapters" (vod_id, game_id, name, image, start, duration, "end")
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)
                  ON CONFLICT (vod_id, start) DO UPDATE
                  SET game_id = EXCLUDED.game_id,
                      name = EXCLUDED.name,
                      image = EXCLUDED.image,
+                     duration = EXCLUDED.duration,
                      "end" = EXCLUDED."end"`,
-                [newId, chapter.gameId || null, chapter.name || null, image, start, end]
+                [newId, chapter.gameId || null, chapter.name || null, image, start, chapterDuration, end]
               );
             }
           }
@@ -742,21 +749,23 @@ const main = async () => {
           if (!newVodId) {
             throw new Error(`Game references non-existent VOD ${game.vod_id} - FK integrity failed`);
           }
-          const startTime = game.start_time ? Math.round(Number(game.start_time)) : null;
-          const endTime = game.end_time ? Math.round(Number(game.end_time)) : null;
+          const start = game.start_time ? Math.round(Number(game.start_time)) : null;
+          const duration = game.end_time ? Math.round(Number(game.end_time)) : null;
 
-          if (startTime === null || endTime === null) {
+          if (start === null || duration === null) {
             console.warn(`⚠️  Skipping game ${game.id} (null start_time or end_time)`);
             continue;
           }
+          const end = start + duration;
 
           await schemaClient.query(
-            `INSERT INTO "games_new" (vod_id, start_time, end_time, video_provider, video_id, thumbnail_url, game_id, game_name, title, chapter_image)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            `INSERT INTO "games_new" (vod_id, start, duration, "end", video_provider, video_id, thumbnail_url, game_id, game_name, title, chapter_image)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
             [
               newVodId,
-              startTime,
-              endTime,
+              start,
+              duration,
+              end,
               game.video_provider,
               game.video_id,
               game.thumbnail_url,

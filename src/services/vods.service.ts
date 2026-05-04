@@ -49,14 +49,18 @@ function selectVodRelations(eb: ExpressionBuilder<StreamerDB, 'vods'>) {
         .whereRef('vod_uploads.vod_id', '=', 'vods.id')
     ).as('vod_uploads'),
     jsonArrayFrom(
-      eb.selectFrom('chapters').select(['name', 'image', 'start', 'end']).whereRef('chapters.vod_id', '=', 'vods.id')
+      eb
+        .selectFrom('chapters')
+        .select(['name', 'image', 'start', 'duration', 'end'])
+        .whereRef('chapters.vod_id', '=', 'vods.id')
     ).as('chapters'),
     jsonArrayFrom(
       eb
         .selectFrom('games')
         .select([
-          'start_time',
-          'end_time',
+          'start',
+          'duration',
+          'end',
           'video_provider',
           'video_id',
           'thumbnail_url',
@@ -132,7 +136,7 @@ export function buildVodQuery(query: VodQuery): {
 
     if (query.title != null) {
       const ftsQuery = buildFtsQuery(query.title);
-      if (ftsQuery) {
+      if (ftsQuery !== '') {
         conditions.push(
           sql`to_tsvector('english', coalesce("vods"."title", '')) @@ to_tsquery('english', ${ftsQuery})`
         );
@@ -141,9 +145,18 @@ export function buildVodQuery(query: VodQuery): {
 
     if (query.chapter != null) {
       const ftsQuery = buildFtsQuery(query.chapter);
-      if (ftsQuery) {
+      if (ftsQuery !== '') {
         conditions.push(
-          eb('id', 'in', eb.selectFrom('chapters').select('chapters.vod_id').where(sql`to_tsvector('english', coalesce("chapters"."name", '')) @@ to_tsquery('english', ${ftsQuery})` as Expression<SqlBool>))
+          eb(
+            'id',
+            'in',
+            eb
+              .selectFrom('chapters')
+              .select('chapters.vod_id')
+              .where(
+                sql`to_tsvector('english', coalesce("chapters"."name", '')) @@ to_tsquery('english', ${ftsQuery})` as Expression<SqlBool>
+              )
+          )
         );
       }
     }

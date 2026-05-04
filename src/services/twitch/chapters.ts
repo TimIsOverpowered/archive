@@ -109,6 +109,7 @@ export async function saveVodChapters(
         const validatedChapter = ChapterCreateSchema.parse({
           vod_id: dbId,
           start: 0,
+          duration: finalDurationSeconds,
           end: finalDurationSeconds,
           title: typeof game.displayName === 'string' ? game.displayName : null,
           game_id: gameId,
@@ -121,6 +122,7 @@ export async function saveVodChapters(
             name: validatedChapter.title,
             image: gameData && typeof gameData.box_art_url === 'string' ? gameData.box_art_url : null,
             start: validatedChapter.start,
+            duration: validatedChapter.duration,
             end: validatedChapter.end,
           })
           .execute();
@@ -157,12 +159,14 @@ export async function saveVodChapters(
             }
 
             const startSeconds = Math.floor(positionMs / 1000);
-            const endSeconds = durationMs === 0 ? finalDurationSeconds - startSeconds : Math.floor(durationMs / 1000);
+            const durationSeconds =
+              durationMs === 0 ? finalDurationSeconds - startSeconds : Math.floor(durationMs / 1000);
 
             const validatedChapter = ChapterCreateSchema.parse({
               vod_id: dbId,
               start: startSeconds,
-              end: endSeconds,
+              duration: durationSeconds,
+              end: startSeconds + durationSeconds,
               title: gameName,
               game_id: gameId,
             });
@@ -173,6 +177,7 @@ export async function saveVodChapters(
               name: validatedChapter.title,
               image: gameImage,
               start: validatedChapter.start,
+              duration: validatedChapter.duration,
               end: validatedChapter.end,
             });
           } catch (error) {

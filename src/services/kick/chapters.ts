@@ -37,8 +37,12 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
         .executeTakeFirst();
 
       if (lastChapter && lastChapter.game_id === String(category.id)) {
-        ChapterUpdateSchema.parse({ end: currentTimeSeconds });
-        await db.updateTable('chapters').set({ end: currentTimeSeconds }).where('id', '=', lastChapter.id).execute();
+        ChapterUpdateSchema.parse({ end: currentTimeSeconds, duration: currentTimeSeconds - lastChapter.start });
+        await db
+          .updateTable('chapters')
+          .set({ end: currentTimeSeconds, duration: currentTimeSeconds - lastChapter.start })
+          .where('id', '=', lastChapter.id)
+          .execute();
 
         await publishVodUpdate(ctx.tenantId, dbId);
 
@@ -47,8 +51,12 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
       }
 
       if (lastChapter) {
-        ChapterUpdateSchema.parse({ end: currentTimeSeconds });
-        await db.updateTable('chapters').set({ end: currentTimeSeconds }).where('id', '=', lastChapter.id).execute();
+        ChapterUpdateSchema.parse({ end: currentTimeSeconds, duration: currentTimeSeconds - lastChapter.start });
+        await db
+          .updateTable('chapters')
+          .set({ end: currentTimeSeconds, duration: currentTimeSeconds - lastChapter.start })
+          .where('id', '=', lastChapter.id)
+          .execute();
 
         await publishVodUpdate(ctx.tenantId, dbId);
 
@@ -75,10 +83,10 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
         .executeTakeFirst();
 
       if (existingChapter) {
-        ChapterUpdateSchema.parse({ end: currentTimeSeconds });
+        ChapterUpdateSchema.parse({ end: currentTimeSeconds, duration: 0 });
         await db
           .updateTable('chapters')
-          .set({ end: currentTimeSeconds })
+          .set({ end: currentTimeSeconds, duration: 0 })
           .where('id', '=', existingChapter.id)
           .execute();
 
@@ -94,6 +102,8 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
       const validatedChapter = ChapterCreateSchema.parse({
         vod_id: dbId,
         start: currentTimeSeconds,
+        duration: 0,
+        end: currentTimeSeconds,
         title: category.name,
         game_id: String(category.id),
       });
@@ -105,6 +115,8 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
           name: validatedChapter.title,
           image: bannerImage,
           start: validatedChapter.start,
+          duration: validatedChapter.duration,
+          end: validatedChapter.end,
         })
         .execute();
 
@@ -137,22 +149,24 @@ export async function finalizeKickChapters(
         .executeTakeFirst();
 
       if (incompleteChapter) {
-        const endDuration = finalDurationSeconds - incompleteChapter.start;
+        const duration = finalDurationSeconds - incompleteChapter.start;
 
         ChapterUpdateSchema.parse({
-          end: endDuration,
+          duration,
+          end: finalDurationSeconds,
         });
         await db
           .updateTable('chapters')
           .set({
-            end: endDuration,
+            duration,
+            end: finalDurationSeconds,
           })
           .where('id', '=', incompleteChapter.id)
           .execute();
 
         await publishVodUpdate(ctx.tenantId, dbId);
 
-        log.info({ vodId, chapterId: incompleteChapter.id, finalDuration: endDuration }, 'Finalized last chapter');
+        log.info({ vodId, chapterId: incompleteChapter.id, finalDuration: duration }, 'Finalized last chapter');
       } else {
         log.debug({ vodId }, 'No incomplete chapters to finalize');
       }

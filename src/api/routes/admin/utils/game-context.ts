@@ -1,6 +1,6 @@
 import type { Kysely } from 'kysely';
 import { findVodById } from '../../../../db/queries/vods.js';
-import type { StreamerDB } from '../../../../db/streamer-types.js';
+import type { SelectableGames, StreamerDB } from '../../../../db/streamer-types.js';
 import type { TenantContext } from '../../../../types/context.js';
 import type { Platform } from '../../../../types/platforms.js';
 import { GameNotFoundError } from '../../../../utils/domain-errors.js';
@@ -9,15 +9,7 @@ import type { TenantPlatformContext } from '../../../middleware/tenant-platform.
 
 /** Resolved game with its associated VOD and platform context. */
 export interface ResolvedGameContext {
-  game: {
-    id: number;
-    vod_id: number;
-    game_name?: string;
-    start_time: number;
-    end_time: number;
-    game_id?: string;
-    title?: string;
-  };
+  game: SelectableGames;
   dbId: number;
   vodId: string;
   platform: Platform;
@@ -57,18 +49,8 @@ export async function resolveGameWithContext(
     platform,
   };
 
-  const gameRecord: ResolvedGameContext['game'] = {
-    id: game.id,
-    vod_id: game.vod_id,
-    start_time: game.start_time,
-    end_time: game.end_time,
-    ...(game.game_name != null && { game_name: game.game_name }),
-    ...(game.game_id != null && { game_id: game.game_id }),
-    ...(game.title != null && { title: game.title }),
-  };
-
   return {
-    game: gameRecord,
+    game,
     dbId: vodRecord.id,
     vodId: vodRecord.platform_vod_id ?? '',
     platform,
