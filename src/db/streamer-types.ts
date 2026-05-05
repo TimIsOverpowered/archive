@@ -32,6 +32,7 @@ export interface VodsTable {
 }
 
 export interface VodUploadsTable {
+  id: Generated<number>;
   vod_id: number;
   upload_id: string;
   type: string | null;

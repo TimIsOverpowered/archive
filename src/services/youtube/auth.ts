@@ -32,7 +32,8 @@ async function updateYoutubeTokenInDb(
     };
 
     const encryptedAuth = encryptObject(updatedAuth);
-    const encryptedApiKey = config.youtube.apiKey != null && config.youtube.apiKey !== '' ? encryptScalar(config.youtube.apiKey) : undefined;
+    const encryptedApiKey =
+      config.youtube.apiKey != null && config.youtube.apiKey !== '' ? encryptScalar(config.youtube.apiKey) : undefined;
 
     await getMetaClient()
       .updateTable('tenants')

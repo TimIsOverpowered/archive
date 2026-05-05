@@ -19,6 +19,7 @@ CREATE TABLE "vods" (
 
 -- CreateTable
 CREATE TABLE "vod_uploads" (
+    "id" SERIAL NOT NULL,
     "vod_id" INTEGER NOT NULL,
     "upload_id" TEXT NOT NULL,
     "type" TEXT,
@@ -28,7 +29,7 @@ CREATE TABLE "vod_uploads" (
     "thumbnail_url" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "vod_uploads_pkey" PRIMARY KEY ("upload_id")
+    CONSTRAINT "vod_uploads_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable

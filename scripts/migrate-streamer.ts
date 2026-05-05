@@ -360,6 +360,7 @@ const createNormalizedSchema = async (client: PoolClient) => {
     );
 
     CREATE TABLE "vod_uploads" (
+      "id" SERIAL NOT NULL,
       "vod_id" INTEGER NOT NULL,
       "upload_id" TEXT NOT NULL,
       "type" TEXT,
@@ -368,7 +369,7 @@ const createNormalizedSchema = async (client: PoolClient) => {
       "status" "UploadStatus" DEFAULT 'PENDING' NOT NULL,
       "thumbnail_url" TEXT,
       "created_at" TIMESTAMPTZ(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      CONSTRAINT "vod_uploads_pkey" PRIMARY KEY ("upload_id")
+      CONSTRAINT "vod_uploads_pkey" PRIMARY KEY ("id")
     );
 
     CREATE TABLE "emotes_new" (
@@ -662,8 +663,8 @@ const main = async () => {
               const part = upload.part ? Number(upload.part) : 1;
 
               await schemaClient.query(
-                `INSERT INTO "vod_uploads" (vod_id, upload_id, type, duration, part, status, thumbnail_url)
-                 VALUES ($1, $2, $3, $4, $5, 'COMPLETED', $6)`,
+                `INSERT INTO "vod_uploads" (vod_id, upload_id, type, duration, part, status, thumbnail_url, created_at)
+                 VALUES ($1, $2, $3, $4, $5, 'COMPLETED', $6, $7)`,
                 [
                   newId,
                   uploadId,
@@ -671,6 +672,7 @@ const main = async () => {
                   uploadDuration,
                   part,
                   upload.thumbnail_url || thumbnailUrl || null,
+                  vod.createdAt || new Date(),
                 ]
               );
             }

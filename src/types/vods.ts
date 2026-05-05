@@ -11,6 +11,7 @@ export interface VodResponse {
   is_live: boolean;
   started_at: Date | null;
   vod_uploads: Array<{
+    id: number;
     upload_id: string;
     type: string | null;
     duration: number;

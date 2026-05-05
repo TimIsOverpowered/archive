@@ -282,6 +282,7 @@ describe('VodService: VodResponse type', () => {
       started_at: new Date(),
       vod_uploads: [
         {
+          id: 1,
           upload_id: 'yt-1',
           type: 'youtube',
           duration: 3600,
