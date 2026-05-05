@@ -6,6 +6,7 @@ import { findActiveLiveVod } from '../../db/queries/vods.js';
 import { getTwitchStreamStatusBatch, type TwitchStreamStatus } from '../../services/twitch/live.js';
 import { PLATFORMS, PLATFORM_VALUES } from '../../types/platforms.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
+import { getLogger } from '../../utils/logger.js';
 import type { MonitorJob } from '../jobs/types.js';
 import { getLiveDownloadQueue, LIVE_JOB_ID_PREFIX } from '../queues/queue.js';
 import { handleWorkerError } from '../utils/error-handler.js';
@@ -13,10 +14,14 @@ import { getJobContext } from '../utils/job-context.js';
 import { handlePlatformLiveCheck, handlePlatformLiveCheckWithStreamStatus } from './live-handler.js';
 
 const monitorProcessor: Processor<MonitorJob, unknown, string> = async (job: Job<MonitorJob>) => {
-  const { tenantId, batchType } = job.data;
+  const { tenantId, platform } = job.data;
 
-  if (batchType === 'twitch') {
+  if (platform === PLATFORMS.TWITCH) {
     return await processTwitchBatchJob(job);
+  }
+
+  if (tenantId == null || tenantId === '') {
+    throw new Error('Missing tenantId for per-tenant monitor job');
   }
 
   return await processPerTenantJob(job, tenantId);
@@ -27,7 +32,7 @@ const monitorProcessor: Processor<MonitorJob, unknown, string> = async (job: Job
  * then processes each tenant individually.
  */
 async function processTwitchBatchJob(job: Job<MonitorJob>): Promise<{ success: true }> {
-  const log = createAutoLogger('twitch-batch');
+  const log = getLogger();
   const liveQueue = getLiveDownloadQueue();
 
   const twitchTenants = configService
@@ -46,15 +51,16 @@ async function processTwitchBatchJob(job: Job<MonitorJob>): Promise<{ success: t
     })
     .filter((entry): entry is { cfg: TenantConfig; platformUserId: string } => entry != null);
 
+  const tenantIds = twitchEntries.map((e) => e.cfg.id);
   const userIds = twitchEntries.map((e) => e.platformUserId);
 
-  const streamMap = await getTwitchStreamStatusBatch(userIds, { tenantId: '__twitch_batch__' });
+  const streamMap = await getTwitchStreamStatusBatch(userIds);
 
   for (const { cfg, platformUserId } of twitchEntries) {
     await processTenantWithStreamStatus(cfg, streamMap.get(platformUserId) ?? null, liveQueue);
   }
 
-  log.debug({ component: 'monitor', jobId: job.id, tenantCount: twitchTenants.length }, 'Twitch batch poll completed');
+  log.debug({ component: 'monitor', jobId: job.id, tenantCount: twitchTenants.length, tenants: tenantIds.join(', ') }, 'Twitch batch poll completed');
   return { success: true };
 }
 

@@ -40,7 +40,7 @@ async function registerTwitchBatchMonitorJob(): Promise<void> {
   try {
     await queue.add(
       'check',
-      { tenantId: '__twitch_batch__', batchType: 'twitch' },
+      { platform: PLATFORMS.TWITCH },
       {
         jobId: Monitor.TWITCH_BATCH_JOB_ID,
         repeat: { every: 30_000, immediately: true },

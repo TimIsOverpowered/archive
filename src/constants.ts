@@ -134,6 +134,7 @@ export const Logs = {
 // ── Token Health ─────────────────────────────────────────────────────────────
 export const Token = {
   MAX_FAILURES: 3,
+  TWITCH_FAILURE_KEY: 'twitch',
 } as const;
 
 // ── Monitor ──────────────────────────────────────────────────────────────────

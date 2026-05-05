@@ -4,7 +4,6 @@ import { loadWorkersConfig } from '../config/env.js';
 import { registerTenantConfigSubscriberWorker } from '../config/tenant-config-subscriber.js';
 import { configService } from '../config/tenant-config.js';
 import { Vod } from '../constants.js';
-import { startTokenHealthCron } from '../cron/token-health.js';
 import { closeMetaClient } from '../db/meta-client.js';
 import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/streamer-client.js';
 import { registerPlatformStrategies } from '../services/platforms/index.js';
@@ -113,9 +112,6 @@ async function initWorkers(ctx: AppContext) {
 
 async function initBackgroundServices(_ctx: AppContext) {
   getLogger().info({ component: 'background' }, 'Initializing background services');
-
-  startTokenHealthCron();
-  getLogger().info({ component: 'cron' }, 'Token health cron started');
 
   await startMonitorService();
   getLogger().info({ component: 'monitor' }, 'Monitor service started');
