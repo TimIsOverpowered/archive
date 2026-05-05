@@ -116,7 +116,7 @@ export default function healthRoutes(fastify: FastifyInstance, _options: HealthR
             version: flaresolverrHealth.stats.version,
           },
         }),
-        cache: { ...defaultCacheContext.metrics },
+        cache: defaultCacheContext.getMetrics(),
         workerQueues,
       });
 

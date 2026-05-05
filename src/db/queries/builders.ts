@@ -1,4 +1,5 @@
 import { Cache } from '../../constants.js';
+import { NoResultError } from '../../utils/domain-errors.js';
 
 export interface PaginationOptions {
   page?: number;
@@ -17,7 +18,9 @@ export function buildPagination(opts: PaginationOptions): { page: number; offset
   return { page, offset, limit };
 }
 
-export function expectFirst<T>(items: readonly T[]): T {
-  if (items.length === 0) throw new Error('Expected at least one item, got 0');
+export function expectFirst<T>(items: readonly T[], queryDescription?: string): T {
+  if (items.length === 0) {
+    throw new NoResultError(queryDescription ?? 'query');
+  }
   return items[0] as T;
 }

@@ -29,6 +29,10 @@ export const defaultJobOptions: JobOpts = {
   backoff: { type: 'exponential' as const, delay: 5000 },
 };
 
+function exponentialBackoff(delay: number, attempts: number): JobOpts {
+  return { attempts, backoff: { type: 'exponential' as const, delay } };
+}
+
 const queueCache = new Map<string, Queue<unknown, unknown, string>>();
 
 let _flowProducer: FlowProducer | null = null;
@@ -67,18 +71,15 @@ export function getStandardVodQueue(): Queue<StandardVodJob, StandardVodJob, str
 }
 
 export function getChatDownloadQueue(): Queue<ChatDownloadJob, ChatDownloadJob, string> {
-  return getQueue(QUEUE_NAMES.CHAT_DOWNLOAD, { attempts: 5, backoff: { type: 'exponential' as const, delay: 3000 } });
+  return getQueue(QUEUE_NAMES.CHAT_DOWNLOAD, exponentialBackoff(3000, 5));
 }
 
 export function getYoutubeUploadQueue(): Queue<YoutubeUploadJob, YoutubeUploadJob, string> {
-  return getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD, { attempts: 3, backoff: { type: 'exponential' as const, delay: 10000 } });
+  return getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD, exponentialBackoff(10_000, 3));
 }
 
 export function getDmcaProcessingQueue(): Queue<DmcaProcessingJob, DmcaProcessingJob, string> {
-  return getQueue(QUEUE_NAMES.DMCA_PROCESSING, {
-    attempts: 3,
-    backoff: { type: 'exponential' as const, delay: 10000 },
-  });
+  return getQueue(QUEUE_NAMES.DMCA_PROCESSING, exponentialBackoff(10_000, 3));
 }
 
 export function getMonitorQueue(): Queue<MonitorJob, MonitorJob, string> {

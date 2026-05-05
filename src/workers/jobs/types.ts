@@ -1,61 +1,48 @@
 import type { Platform, SourceType, UploadType, DownloadMethod } from '../../types/platforms.js';
 import type { DMCAClaim } from '../dmca/dmca.js';
 
-export interface LiveDownloadJob {
+export interface BaseJobData {
+  tenantId: string;
   dbId: number;
   vodId: string;
   platform: Platform;
-  tenantId: string;
+}
+
+export interface LiveDownloadJob extends BaseJobData {
   platformUserId: string;
   platformUsername?: string | undefined;
   startedAt?: string | undefined;
   sourceUrl?: string | undefined;
 }
 
-export interface StandardVodJob {
-  tenantId: string;
-  dbId: number;
-  vodId: string;
-  platform: Platform;
+export interface StandardVodJob extends BaseJobData {
   platformUserId: string;
   platformUsername: string;
   sourceUrl?: string | undefined;
   downloadMethod?: DownloadMethod | undefined;
 }
 
-export interface ChatDownloadJob {
-  tenantId: string;
+export interface ChatDownloadJob extends BaseJobData {
   displayName?: string | undefined;
   platformUserId?: string | undefined;
   platformUsername?: string | undefined;
-  dbId: number;
-  vodId: string;
-  platform: Platform;
   duration: number;
   startOffset?: number | undefined;
   forceRerun?: boolean | undefined;
 }
 
-export interface YoutubeVodUploadJob {
+export interface YoutubeVodUploadJob extends BaseJobData {
   kind: 'vod';
-  tenantId: string;
-  dbId: number;
-  vodId: string;
   filePath?: string | undefined;
   type: SourceType;
-  platform: Platform;
   dmcaProcessed?: boolean | undefined;
   part?: number | undefined;
 }
 
-export interface YoutubeGameUploadJob {
+export interface YoutubeGameUploadJob extends BaseJobData {
   kind: 'game';
-  tenantId: string;
-  dbId: number;
-  vodId: string;
   filePath?: string | undefined;
   type: UploadType;
-  platform: Platform;
   chapterId: number;
   chapterName: string;
   chapterStart: number;
@@ -69,13 +56,9 @@ export interface YoutubeGameUploadJob {
 
 export type YoutubeUploadJob = YoutubeVodUploadJob | YoutubeGameUploadJob;
 
-export interface DmcaProcessingJob {
-  tenantId: string;
-  dbId: number;
-  vodId: string;
+export interface DmcaProcessingJob extends BaseJobData {
   receivedClaims: DMCAClaim[];
   type: SourceType;
-  platform: Platform;
   part?: number | undefined;
   filePath?: string | undefined;
   gameId?: number | undefined;

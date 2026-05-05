@@ -1,4 +1,4 @@
-import { Queue, JobsOptions } from 'bullmq';
+import { Queue, JobsOptions, type JobState } from 'bullmq';
 
 export interface JobLogger {
   info: (context: Record<string, unknown>, message: string) => void;
@@ -28,7 +28,8 @@ export async function enqueueJobWithLogging(opts: EnqueueJobWithLoggingOpts): Pr
     const existing = await queue.getJob(String(jobId));
     if (existing != null) {
       const state = await existing.getState();
-      if (state === 'active' || state === 'waiting' || state === 'delayed') {
+      const SKIPPABLE_STATES: JobState[] = ['active', 'waiting', 'delayed'];
+      if (typeof state === 'string' && SKIPPABLE_STATES.includes(state as JobState)) {
         logger.debug({ jobId, state, ...extraContext }, `Job already exists in state ${state}, skipping`);
         return { jobId: String(jobId), isNew: false };
       }

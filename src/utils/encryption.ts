@@ -10,12 +10,8 @@ export function validateEncryptionKey(key: string): boolean {
   return /^[0-9a-fA-F]+$/.test(key);
 }
 
-export function getKeyBuffer(): Buffer {
-  return getEncryptionKeyBuffer();
-}
-
 export function encrypt(plaintext: string): Buffer {
-  const key = getKeyBuffer();
+  const key = getEncryptionKeyBuffer();
   const iv = crypto.randomBytes(Encryption.IV_LENGTH);
 
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
@@ -30,7 +26,7 @@ export function encrypt(plaintext: string): Buffer {
 }
 
 export function decrypt(ciphertext: Uint8Array): string {
-  const key = getKeyBuffer();
+  const key = getEncryptionKeyBuffer();
 
   // Extract IV (first 12 bytes), auth tag (next 16 bytes), and actual ciphertext
   if (ciphertext.length < Encryption.IV_LENGTH + Encryption.AUTH_TAG_LENGTH) {

@@ -5,8 +5,9 @@ import { Chat } from '../constants.js';
 import type { StreamerDB } from '../db/streamer-types.js';
 import { fetchComments, fetchNextComments, type TwitchVideoCommentResponse } from '../services/twitch/index.js';
 import { type Platform } from '../types/platforms.js';
+import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { sleep, jitter } from '../utils/delay.js';
-import { resetFailures } from '../utils/discord-alerts.js';
+import { resetFailures, initRichAlert } from '../utils/discord-alerts.js';
 import type { AppLogger } from '../utils/logger.js';
 import { flushChatBatch } from './chat/chat-batch-processor.js';
 import { extractEdges, calculateResumeOffset, extractMessageData } from './chat/chat-helpers.js';
@@ -14,7 +15,7 @@ import type { ChatMessageCreateInput } from './chat/chat-types.js';
 import type { ChatDownloadJob, ChatDownloadResult } from './jobs/types.js';
 import { createChatWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
 import type { ChatWorkerAlerts } from './utils/alert-factories.js';
-import { buildWorkerContext } from './utils/job-context.js';
+import { getJobContext } from './utils/job-context.js';
 
 /**
  * Context for chat download processing.
@@ -42,28 +43,42 @@ export interface ChatProcessorContext {
 export async function buildChatProcessorContext(job: Job<ChatDownloadJob>): Promise<ChatProcessorContext> {
   const { tenantId, dbId, vodId, platform, duration, startOffset, forceRerun } = job.data;
 
-  return buildWorkerContext(
-    job,
+  const { config, db } = await getJobContext(tenantId);
+  const log = createAutoLogger(String(tenantId));
+
+  log.info({ component: 'worker', jobId: job.id, dbId, vodId, platform, tenantId }, 'Starting job');
+  await job.updateProgress(0);
+
+  const displayName = getDisplayName(config);
+  const { offset: effectiveOffset, hasExistingData } = await calculateResumeOffset(
+    db,
+    dbId,
+    startOffset,
+    forceRerun
+  );
+  const isResume = hasExistingData && startOffset == null;
+  const alerts = createChatWorkerAlerts();
+  const messageId = await initRichAlert(
+    alerts.init(displayName, vodId, platform, isResume, isResume ? effectiveOffset : undefined)
+  ).catch(() => null);
+
+  return {
+    config,
+    db,
     tenantId,
+    log,
     dbId,
     vodId,
     platform,
-    async (config, db) => {
-      const displayName = getDisplayName(config);
-      const { offset: effectiveOffset, hasExistingData } = await calculateResumeOffset(
-        db,
-        dbId,
-        startOffset,
-        forceRerun
-      );
-      const isResume = hasExistingData && startOffset == null;
-      return {
-        extra: { job, duration, forceRerun: forceRerun ?? false, displayName, effectiveOffset, hasExistingData },
-        alertInitArgs: [displayName, vodId, platform, isResume, isResume ? effectiveOffset : undefined],
-      };
-    },
-    createChatWorkerAlerts
-  );
+    duration,
+    displayName,
+    job,
+    effectiveOffset,
+    hasExistingData,
+    forceRerun: forceRerun ?? false,
+    alerts,
+    messageId,
+  };
 }
 
 export async function checkChatCompletion(ctx: ChatProcessorContext): Promise<ChatDownloadResult | null> {

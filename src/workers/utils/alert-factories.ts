@@ -28,7 +28,7 @@ export function safeUpdateAlert(messageId: string | null, alert: RichEmbedData, 
 export interface VodWorkerAlerts {
   init: (vodId: string, platform: Platform, streamerName: string) => RichEmbedData;
   progress: (vodId: string, segmentsDownloaded: number, totalSegments: number) => RichEmbedData;
-  converting: (vodId: string, percent: number) => RichEmbedData;
+  converting: (vodId: string, percent: number, ffmpegCmd?: string) => RichEmbedData;
   complete: (
     vodId: string,
     platform: Platform,
@@ -68,16 +68,24 @@ export function createVodWorkerAlerts(): VodWorkerAlerts {
       };
     },
 
-    converting: (vodId, percent) => ({
-      title: `[VOD] ${vodId} Converting`,
-      description: `Converting ${vodId}`,
-      status: 'warning',
-      fields: [
+    converting: (vodId, percent, ffmpegCmd) => {
+      const fields: Array<{ name: string; value: string; inline: boolean }> = [
         { name: 'VOD ID', value: vodId, inline: true },
         { name: 'Progress', value: createProgressBar(percent), inline: false },
-      ],
-      timestamp: new Date().toISOString(),
-    }),
+      ];
+
+      if (ffmpegCmd != null) {
+        fields.push({ name: 'FFmpeg', value: `\`${ffmpegCmd.substring(0, 500)}\``, inline: false });
+      }
+
+      return {
+        title: `[VOD] ${vodId} Converting`,
+        description: `Converting ${vodId}`,
+        status: 'warning',
+        fields,
+        timestamp: new Date().toISOString(),
+      };
+    },
 
     complete: (vodId, platform, finalPath, duration, segmentCount) => {
       const fields: Array<{ name: string; value: string; inline: boolean }> = [

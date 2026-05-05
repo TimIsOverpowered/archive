@@ -29,14 +29,7 @@ async function withVodAlerts<T>(
   try {
     const result = await fn(messageId, (pct, ffmpegCmd) => {
       if (messageId !== null) {
-        const alertData = alerts.converting(vodId, pct);
-        if (ffmpegCmd != null) {
-          alertData.fields = [
-            ...(alertData.fields ?? []),
-            { name: 'FFmpeg', value: `\`${ffmpegCmd.substring(0, 500)}\``, inline: false },
-          ];
-        }
-        updateAlert(messageId, alertData).catch((err) => {
+        updateAlert(messageId, alerts.converting(vodId, pct, ffmpegCmd)).catch((err) => {
           getLogger().debug({ err: extractErrorDetails(err) }, 'Progress alert update failed');
         });
       }

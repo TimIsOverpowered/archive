@@ -2,7 +2,8 @@ import { Job } from 'bullmq';
 import { getDisplayName } from '../config/types.js';
 import { getStrategy } from '../services/platforms/strategy.js';
 import { DOWNLOAD_METHODS, PLATFORMS, type DownloadMethod } from '../types/platforms.js';
-import { updateAlert } from '../utils/discord-alerts.js';
+import { createAutoLogger } from '../utils/auto-tenant-logger.js';
+import { updateAlert, initRichAlert } from '../utils/discord-alerts.js';
 import { PlatformNotConfiguredError } from '../utils/domain-errors.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { getVodFilePath, getVodDirPath, fileExists } from '../utils/path.js';
@@ -11,7 +12,7 @@ import type { BaseWorkerContext } from './types.js';
 import { createVodWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
 import type { VodWorkerAlerts } from './utils/alert-factories.js';
 import { getMetadata } from './utils/ffmpeg.js';
-import { buildWorkerContext } from './utils/job-context.js';
+import { getJobContext } from './utils/job-context.js';
 import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
 import { downloadVodWithFfmpeg } from './vod/vod-download-strategies.js';
@@ -42,31 +43,38 @@ export async function buildVodProcessorContext(
     sourceUrl,
   } = job.data;
 
-  return buildWorkerContext(
-    job,
+  const { config, db } = await getJobContext(tenantId);
+  const log = createAutoLogger(String(tenantId));
+
+  log.info({ component: 'worker', jobId: job.id, dbId, vodId, platform, tenantId }, 'Starting job');
+  await job.updateProgress(0);
+
+  const streamerName = getDisplayName(config);
+  const finalPath = getVodFilePath({ config, vodId });
+  const alerts = createVodWorkerAlerts();
+  const messageId = await initRichAlert(
+    alerts.init(vodId, platform, streamerName)
+  ).catch(() => null);
+
+  return {
+    config,
+    db,
     tenantId,
+    log,
     dbId,
     vodId,
     platform,
-    (config) => {
-      const streamerName = getDisplayName(config);
-      const finalPath = getVodFilePath({ config, vodId });
-      return {
-        extra: {
-          platformUserId,
-          platformUsername,
-          sourceUrl,
-          downloadMethod,
-          job,
-          streamerName,
-          finalPath,
-          segmentCount: undefined as number | undefined,
-        },
-        alertInitArgs: [vodId, platform, streamerName],
-      };
-    },
-    createVodWorkerAlerts
-  );
+    platformUserId,
+    platformUsername,
+    sourceUrl,
+    downloadMethod,
+    job,
+    streamerName,
+    finalPath,
+    segmentCount: undefined,
+    alerts,
+    messageId,
+  };
 }
 
 export async function runVodDownload(ctx: VodProcessorContext): Promise<void> {

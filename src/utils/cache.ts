@@ -49,39 +49,233 @@ const emptyMetrics = (): CacheMetrics => ({
   swrErrors: 0,
 });
 
-/**
- * Owns all mutable cache state: metrics, SWR failure tracking, and inflight deduplication.
- * Use the default export for production, or construct a fresh instance per test case.
- */
-export class CacheContext {
-  public readonly metrics: CacheMetrics = emptyMetrics();
-  public readonly swrFailures = new LRUCache<string, number>({
-    max: 5000,
-    ttl: CacheSwr.FAILURES_TTL_MS,
-    allowStale: false,
-  });
-  public readonly inflight = new LRUCache<string, Promise<unknown>>({
-    max: CacheInflight.CACHE_MAX,
-    ttl: CacheInflight.TIMEOUT_MS,
-    allowStale: false,
-  });
-
-  /** Resets metrics to zero and clears both caches. */
-  public reset(): void {
-    Object.assign(this.metrics, emptyMetrics());
-    this.swrFailures.clear();
-    this.inflight.clear();
-  }
-}
-
-/** Default singleton for production use. */
-export const defaultCacheContext = new CacheContext();
-
 function isCacheEntry(raw: unknown): raw is CacheEntry<unknown> {
   if (raw == null || typeof raw !== 'object') return false;
   const obj = raw as Record<string, unknown>;
   return typeof obj.timestamp === 'number' && obj.data !== undefined;
 }
+
+/**
+ * Owns all mutable cache state: metrics, SWR failure tracking, and inflight deduplication.
+ * Use the default export for production, or construct a fresh instance per test case.
+ */
+export class CacheContext {
+  private readonly metrics: CacheMetrics = emptyMetrics();
+  private readonly swrFailures = new LRUCache<string, number>({
+    max: 5000,
+    ttl: CacheSwr.FAILURES_TTL_MS,
+    allowStale: false,
+  });
+  private readonly inflight = new LRUCache<string, Promise<unknown>>({
+    max: CacheInflight.CACHE_MAX,
+    ttl: CacheInflight.TIMEOUT_MS,
+    allowStale: false,
+  });
+
+  getMetrics(): Readonly<CacheMetrics> {
+    return { ...this.metrics };
+  }
+
+  /** Resets metrics to zero and clears both caches. */
+  reset(): void {
+    Object.assign(this.metrics, emptyMetrics());
+    this.swrFailures.clear();
+    this.inflight.clear();
+  }
+
+  async withCache<T>(
+    key: SimpleKey,
+    ttl: number,
+    fetcher: () => Promise<T>,
+  ): Promise<T> {
+    const client = RedisService.getActiveClient();
+    if (!client) return fetcher();
+
+    try {
+      const cached = await client.get(key);
+      if (cached != null && cached !== '') {
+        const parsed: unknown = JSON.parse(cached);
+        if (isCacheEntry(parsed)) {
+          this.metrics.misses++;
+          getLogger().debug({ key }, 'Cache miss: unexpected SWR-format entry in simple cache');
+          return fetcher();
+        }
+        this.metrics.hits++;
+        return parsed as T;
+      }
+      this.metrics.misses++;
+    } catch (err) {
+      this.metrics.errors++;
+      const details = extractErrorDetails(err);
+      getLogger().warn({ err: details, key }, 'Cache read failed, falling back to DB');
+    }
+
+    const inflight = this.inflight.get(key) as Promise<T> | undefined;
+    if (inflight) return inflight;
+
+    const promise = fetcher()
+      .then(async (result) => {
+        try {
+          await client.set(key, JSON.stringify(result), 'EX', ttl);
+        } catch (err) {
+          const details = extractErrorDetails(err);
+          getLogger().warn({ err: details, key }, 'Cache write failed');
+        }
+        return result;
+      })
+      .finally(() => this.inflight.delete(key));
+
+    this.inflight.set(key, promise);
+    return promise;
+  }
+
+  async withStaleWhileRevalidate<T>(
+    key: SWRKey,
+    ttl: number,
+    staleAfter: number,
+    fetcher: () => Promise<T>,
+  ): Promise<T> {
+    const client = RedisService.getActiveClient();
+    if (!client) return fetcher();
+
+    const now = Date.now();
+
+    try {
+      const cached = await client.get(key);
+      if (cached != null && cached !== '') {
+        const parsed: unknown = JSON.parse(cached);
+        if (!isCacheEntry(parsed)) {
+          this.metrics.misses++;
+          getLogger().debug({ key }, 'Cache miss: unexpected simple-format entry in SWR cache');
+          return fetcher();
+        }
+        const entry = parsed as CacheEntry<T>;
+        const isStale = now - entry.timestamp > staleAfter * 1000;
+
+        if (!isStale) {
+          this.metrics.swrHits++;
+          return entry.data;
+        }
+
+        this.metrics.swrStale++;
+        // Stale — serve immediately, revalidate in background
+        if (!this.inflight.get(key)) {
+          const revalidatePromise = this.withTimeout(
+            this.revalidateWithRetry(client, key, ttl, fetcher).finally(() => this.inflight.delete(key)),
+            CacheInflight.TIMEOUT_MS
+          );
+
+          this.inflight.set(key, revalidatePromise);
+        }
+
+        return entry.data;
+      }
+      this.metrics.misses++;
+    } catch (err) {
+      this.metrics.swrErrors++;
+      const details = extractErrorDetails(err);
+      getLogger().warn({ err: details, key }, 'SWR cache read failed, falling back to DB');
+    }
+
+    const existing = this.inflight.get(key);
+    if (existing) return (await existing) as T;
+
+    const fetchPromise = this.withTimeout(
+      this.revalidateWithRetry(client, key, ttl, fetcher).finally(() => this.inflight.delete(key)),
+      CacheInflight.TIMEOUT_MS
+    );
+
+    this.inflight.set(key, fetchPromise);
+    return await fetchPromise;
+  }
+
+  private withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`In-flight fetch timed out after ${ms}ms`));
+        }, ms);
+      }),
+    ]);
+  }
+
+  private async revalidateWithRetry<T>(
+    client: ReturnType<typeof RedisService.getClient>,
+    key: string,
+    ttl: number,
+    fetcher: () => Promise<T>,
+  ): Promise<T> {
+    const log = getLogger().child({ key });
+    const failureKey = `swr:failures:${key}`;
+    const failures = await this.getSwrFailureCount(client, failureKey);
+
+    if (failures >= CacheSwr.MAX_FAILURES) {
+      this.swrFailures.delete(key);
+      log.warn('SWR revalidation failing repeatedly, skipping retry');
+      throw new Error('SWR revalidation limit exceeded');
+    }
+
+    try {
+      const data = await retryWithBackoff(fetcher, { attempts: 2, baseDelayMs: 2000 });
+      await this.clearSwrFailureCount(client, failureKey);
+      this.swrFailures.delete(key);
+      try {
+        await client.set(key, JSON.stringify({ data, timestamp: Date.now() }), 'EX', ttl);
+      } catch (writeErr) {
+        log.warn({ err: extractErrorDetails(writeErr) }, 'SWR cache write failed');
+      }
+      return data;
+    } catch (err) {
+      await this.incrementSwrFailureCount(client, failureKey);
+      this.swrFailures.set(key, failures + 1);
+      log.error({ err: extractErrorDetails(err) }, 'SWR revalidation exhausted retries');
+      throw err;
+    }
+  }
+
+  private async getSwrFailureCount(
+    client: ReturnType<typeof RedisService.getClient>,
+    failureKey: string,
+  ): Promise<number> {
+    try {
+      const val = await client.get(failureKey);
+      if (val != null && val !== '') return parseInt(val, 10);
+      return 0;
+    } catch {
+      return this.swrFailures.get(failureKey) ?? 0;
+    }
+  }
+
+  private async incrementSwrFailureCount(
+    client: ReturnType<typeof RedisService.getClient>,
+    failureKey: string,
+  ): Promise<void> {
+    try {
+      const pipeline = client.pipeline();
+      pipeline.incr(failureKey);
+      pipeline.expire(failureKey, CacheSwr.FAILURES_TTL_MS / 1_000);
+      await pipeline.exec();
+    } catch {
+      const current = this.swrFailures.get(failureKey) ?? 0;
+      this.swrFailures.set(failureKey, current + 1);
+    }
+  }
+
+  private async clearSwrFailureCount(
+    client: ReturnType<typeof RedisService.getClient>,
+    failureKey: string,
+  ): Promise<void> {
+    try {
+      await client.del(failureKey);
+    } catch {
+      this.swrFailures.delete(failureKey);
+    }
+  }
+}
+
+/** Default singleton for production use. */
+export const defaultCacheContext = new CacheContext();
 
 /**
  * Reads from Redis cache, falling back to the fetcher on miss or error.
@@ -96,45 +290,7 @@ export async function withCache<T>(
   fetcher: () => Promise<T>,
   ctx: CacheContext = defaultCacheContext
 ): Promise<T> {
-  const client = RedisService.getActiveClient();
-  if (!client) return fetcher();
-
-  try {
-    const cached = await client.get(key);
-    if (cached != null && cached !== '') {
-      const parsed: unknown = JSON.parse(cached);
-      if (isCacheEntry(parsed)) {
-        ctx.metrics.misses++;
-        getLogger().debug({ key }, 'Cache miss: unexpected SWR-format entry in simple cache');
-        return fetcher();
-      }
-      ctx.metrics.hits++;
-      return parsed as T;
-    }
-    ctx.metrics.misses++;
-  } catch (err) {
-    ctx.metrics.errors++;
-    const details = extractErrorDetails(err);
-    getLogger().warn({ err: details, key }, 'Cache read failed, falling back to DB');
-  }
-
-  const inflight = ctx.inflight.get(key) as Promise<T> | undefined;
-  if (inflight) return inflight;
-
-  const promise = fetcher()
-    .then(async (result) => {
-      try {
-        await client.set(key, JSON.stringify(result), 'EX', ttl);
-      } catch (err) {
-        const details = extractErrorDetails(err);
-        getLogger().warn({ err: details, key }, 'Cache write failed');
-      }
-      return result;
-    })
-    .finally(() => ctx.inflight.delete(key));
-
-  ctx.inflight.set(key, promise);
-  return promise;
+  return ctx.withCache(key, ttl, fetcher);
 }
 
 interface CacheEntry<T> {
@@ -157,144 +313,5 @@ export async function withStaleWhileRevalidate<T>(
   fetcher: () => Promise<T>,
   ctx: CacheContext = defaultCacheContext
 ): Promise<T> {
-  const client = RedisService.getActiveClient();
-  if (!client) return fetcher();
-
-  const now = Date.now();
-
-  try {
-    const cached = await client.get(key);
-    if (cached != null && cached !== '') {
-      const parsed: unknown = JSON.parse(cached);
-      if (!isCacheEntry(parsed)) {
-        ctx.metrics.misses++;
-        getLogger().debug({ key }, 'Cache miss: unexpected simple-format entry in SWR cache');
-        return fetcher();
-      }
-      const entry = parsed as CacheEntry<T>;
-      const isStale = now - entry.timestamp > staleAfter * 1000;
-
-      if (!isStale) {
-        ctx.metrics.swrHits++;
-        return entry.data;
-      }
-
-      ctx.metrics.swrStale++;
-      // Stale — serve immediately, revalidate in background
-      if (!ctx.inflight.get(key)) {
-        const revalidatePromise = withTimeout(
-          revalidateWithRetry(client, key, ttl, fetcher, ctx).finally(() => ctx.inflight.delete(key)),
-          CacheInflight.TIMEOUT_MS
-        );
-
-        ctx.inflight.set(key, revalidatePromise);
-      }
-
-      return entry.data;
-    }
-    ctx.metrics.misses++;
-  } catch (err) {
-    ctx.metrics.swrErrors++;
-    const details = extractErrorDetails(err);
-    getLogger().warn({ err: details, key }, 'SWR cache read failed, falling back to DB');
-  }
-
-  const existing = ctx.inflight.get(key);
-  if (existing) return (await existing) as T;
-
-  const fetchPromise = withTimeout(
-    revalidateWithRetry(client, key, ttl, fetcher, ctx).finally(() => ctx.inflight.delete(key)),
-    CacheInflight.TIMEOUT_MS
-  );
-
-  ctx.inflight.set(key, fetchPromise);
-  return await fetchPromise;
-}
-
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) => {
-      setTimeout(() => {
-        reject(new Error(`In-flight fetch timed out after ${ms}ms`));
-      }, ms);
-    }),
-  ]);
-}
-
-async function revalidateWithRetry<T>(
-  client: ReturnType<typeof RedisService.getClient>,
-  key: string,
-  ttl: number,
-  fetcher: () => Promise<T>,
-  ctx: CacheContext
-): Promise<T> {
-  const log = getLogger().child({ key });
-  const failureKey = `swr:failures:${key}`;
-  const failures = await getSwrFailureCount(client, failureKey, ctx);
-
-  if (failures >= CacheSwr.MAX_FAILURES) {
-    ctx.swrFailures.delete(key);
-    log.warn('SWR revalidation failing repeatedly, skipping retry');
-    throw new Error('SWR revalidation limit exceeded');
-  }
-
-  try {
-    const data = await retryWithBackoff(fetcher, { attempts: 2, baseDelayMs: 2000 });
-    await clearSwrFailureCount(client, failureKey, ctx);
-    ctx.swrFailures.delete(key);
-    try {
-      await client.set(key, JSON.stringify({ data, timestamp: Date.now() }), 'EX', ttl);
-    } catch (writeErr) {
-      log.warn({ err: extractErrorDetails(writeErr) }, 'SWR cache write failed');
-    }
-    return data;
-  } catch (err) {
-    await incrementSwrFailureCount(client, failureKey, ctx);
-    ctx.swrFailures.set(key, failures + 1);
-    log.error({ err: extractErrorDetails(err) }, 'SWR revalidation exhausted retries');
-    throw err;
-  }
-}
-
-async function getSwrFailureCount(
-  client: ReturnType<typeof RedisService.getClient>,
-  failureKey: string,
-  ctx: CacheContext
-): Promise<number> {
-  try {
-    const val = await client.get(failureKey);
-    if (val != null && val !== '') return parseInt(val, 10);
-    return 0;
-  } catch {
-    return ctx.swrFailures.get(failureKey) ?? 0;
-  }
-}
-
-async function incrementSwrFailureCount(
-  client: ReturnType<typeof RedisService.getClient>,
-  failureKey: string,
-  ctx: CacheContext
-): Promise<void> {
-  try {
-    const pipeline = client.pipeline();
-    pipeline.incr(failureKey);
-    pipeline.expire(failureKey, CacheSwr.FAILURES_TTL_MS / 1_000);
-    await pipeline.exec();
-  } catch {
-    const current = ctx.swrFailures.get(failureKey) ?? 0;
-    ctx.swrFailures.set(failureKey, current + 1);
-  }
-}
-
-async function clearSwrFailureCount(
-  client: ReturnType<typeof RedisService.getClient>,
-  failureKey: string,
-  ctx: CacheContext
-): Promise<void> {
-  try {
-    await client.del(failureKey);
-  } catch {
-    ctx.swrFailures.delete(failureKey);
-  }
+  return ctx.withStaleWhileRevalidate(key, ttl, staleAfter, fetcher);
 }
