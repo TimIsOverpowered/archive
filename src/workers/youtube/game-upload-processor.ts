@@ -12,6 +12,7 @@ import type { AppLogger } from '../../utils/logger.js';
 import { deleteFileIfExists } from '../../utils/path.js';
 import { safeUpdateAlert } from '../utils/alert-factories.js';
 import { trimVideo, splitVideo, getMetadata } from '../utils/ffmpeg.js';
+import { buildYoutubeMetadata } from './metadata-builder.js';
 import { createYoutubeUploadProgressHandler } from './youtube-upload-progress.js';
 
 export interface GameUploadContext {
@@ -24,8 +25,9 @@ export interface GameUploadContext {
   chapterEnd: number;
   chapterName: string;
   chapterGameId?: string | undefined;
-  title: string;
   description: string;
+  epNumber: number;
+  gameTitle?: string | undefined;
   db: Kysely<StreamerDB>;
   config: TenantConfig;
   log: AppLogger;
@@ -41,8 +43,9 @@ export interface GameUploadAndUpsertParams {
   chapterDuration: number;
   chapterName: string;
   chapterGameId?: string | undefined;
-  title: string;
   description: string;
+  epNumber: number;
+  gameTitle?: string | undefined;
   part?: number | undefined;
   totalParts?: number | undefined;
   db: Kysely<StreamerDB>;
@@ -72,8 +75,9 @@ export async function uploadAndUpsertGame(
     chapterEnd,
     chapterName,
     chapterGameId,
-    title,
     description,
+    epNumber,
+    gameTitle,
     part,
     totalParts,
     db,
@@ -81,7 +85,22 @@ export async function uploadAndUpsertGame(
   } = params;
   const channelName = getDisplayName(config);
   const currentPartNum = part ?? 1;
-  const partTitle = part != null && part > 1 ? `${title} PART ${part}` : title;
+
+  const dbTitle = gameTitle ?? `${chapterName} EP ${epNumber + (currentPartNum - 1)}`;
+
+  const vodRecord = await db.selectFrom('vods').selectAll().where('id', '=', dbId).executeTakeFirst();
+  if (!vodRecord) throw new Error(`VOD not found for dbId ${dbId}`);
+
+  const { title: ytTitle } = buildYoutubeMetadata({
+    channelName,
+    platform: 'twitch',
+    domainName: config.settings?.domainName ?? '',
+    timezone: config.settings?.timezone ?? 'UTC',
+    youtubeDescription: config.youtube?.description,
+    gameName: gameTitle ?? chapterName,
+    epNumber: gameTitle == null ? epNumber + (currentPartNum - 1) : undefined,
+    vodRecord,
+  });
 
   const uploadAlertMessageId = await initRichAlert({
     title: part != null ? `🎮 Game Upload (Part ${currentPartNum}/${totalParts})` : '🎮 Game Upload Started',
@@ -101,7 +120,7 @@ export async function uploadAndUpsertGame(
           type: 'game',
           channelName,
           gameName: chapterName,
-          videoTitle: partTitle,
+          videoTitle: ytTitle,
           privacyStatus: 'public',
           ...(part != null && totalParts != null && { part: currentPartNum, totalParts }),
         })
@@ -111,7 +130,7 @@ export async function uploadAndUpsertGame(
     tenantId,
     channelName,
     filePath,
-    partTitle,
+    ytTitle,
     description,
     'public',
     onUploadProgress,
@@ -134,12 +153,13 @@ export async function uploadAndUpsertGame(
       thumbnail_url: result.thumbnailUrl ?? null,
       game_id: chapterGameId,
       game_name: chapterName,
-      title: chapterName,
+      title: dbTitle,
     })
     .onConflict((oc) =>
       oc.columns(['vod_id', 'start', 'end']).doUpdateSet({
         video_id: result.videoId,
         thumbnail_url: result.thumbnailUrl ?? null,
+        title: dbTitle,
       })
     )
     .returning('id')
@@ -191,8 +211,9 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     chapterEnd,
     chapterDuration,
     chapterGameId,
-    title,
     description,
+    epNumber,
+    gameTitle,
     db,
     chapterName,
     config,
@@ -209,8 +230,9 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     chapterDuration,
     chapterName,
     chapterGameId,
-    title,
     description,
+    epNumber,
+    gameTitle,
     db,
     config,
     log,
@@ -231,8 +253,9 @@ async function processSplitGameUpload(
     chapterGameId,
     chapterName,
     chapterEnd,
-    title,
     description,
+    epNumber,
+    gameTitle,
     config,
     db,
     vodId,
@@ -308,8 +331,9 @@ async function processSplitGameUpload(
       chapterName,
       chapterEnd,
       chapterGameId,
-      title,
       description,
+      epNumber,
+      gameTitle,
       part: currentPartNum,
       totalParts,
       db,

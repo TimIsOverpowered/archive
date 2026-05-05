@@ -59,7 +59,7 @@ export async function createGameUploadJob(
   filePath: string | undefined,
   platform: Platform,
   chapter: SelectableChapters,
-  options?: { title?: string | undefined }
+  options?: { gameTitle?: string | undefined }
 ): Promise<YoutubeGameUploadJob> {
   const { config, tenantId } = ctx;
   if (config.youtube?.upload === false) {
@@ -90,27 +90,20 @@ export async function createGameUploadJob(
   }
 
   const channelName = getDisplayName(config);
+  const gameName = chapter.name ?? '';
 
-  let gameName: string;
-  let epNumber: number | undefined;
+  const gameCount = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+    const result = await db
+      .selectFrom('games')
+      .select((eb) => eb.fn.count<number>('id').as('cnt'))
+      .where('game_name', '=', chapter.name)
+      .where('vod_id', '!=', dbId)
+      .executeTakeFirst();
+    return result?.cnt ?? 0;
+  });
+  const epNumber = gameCount + 1;
 
-  if (options?.title != null) {
-    gameName = options.title;
-  } else {
-    const gameCount = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-      const result = await db
-        .selectFrom('games')
-        .select((eb) => eb.fn.count<number>('id').as('cnt'))
-        .where('game_name', '=', chapter.name)
-        .where('vod_id', '!=', dbId)
-        .executeTakeFirst();
-      return result?.cnt ?? 0;
-    });
-    epNumber = gameCount + 1;
-    gameName = chapter.name ?? '';
-  }
-
-  const { title, description } = buildYoutubeMetadata({
+  const { description } = buildYoutubeMetadata({
     channelName,
     platform,
     domainName: config.settings?.domainName ?? '',
@@ -135,8 +128,9 @@ export async function createGameUploadJob(
     chapterDuration: chapter.duration,
     chapterEnd: chapter.end ?? 0,
     chapterGameId: chapter.game_id ?? '',
-    title,
     description,
+    epNumber,
+    gameTitle: options?.gameTitle,
   };
 }
 
@@ -410,7 +404,7 @@ export async function queueYoutubeGameUploadByGame(
         end: game.end,
       },
       {
-        title: game.title ?? undefined,
+        gameTitle: game.title ?? undefined,
       }
     );
   } catch (error) {

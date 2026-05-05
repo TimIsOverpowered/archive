@@ -62,8 +62,9 @@ export interface YoutubeGameUploadJob {
   chapterDuration: number;
   chapterEnd: number;
   chapterGameId?: string | undefined;
-  title: string;
   description: string;
+  epNumber: number;
+  gameTitle?: string | undefined;
 }
 
 export type YoutubeUploadJob = YoutubeVodUploadJob | YoutubeGameUploadJob;

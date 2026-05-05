@@ -284,6 +284,7 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
     domainName,
     timezone: config.settings?.timezone ?? 'UTC',
     youtubeDescription: config.youtube?.description,
+    part: part != null ? parseInt(String(part)) : undefined,
     type,
   });
 
