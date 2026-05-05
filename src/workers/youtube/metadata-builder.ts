@@ -22,18 +22,8 @@ export interface YoutubeMetadata {
 }
 
 export function buildYoutubeMetadata(options: YoutubeMetadataOptions): YoutubeMetadata {
-  const {
-    channelName,
-    platform,
-    vodRecord,
-    domainName,
-    timezone,
-    youtubeDescription,
-    part,
-    type,
-    gameName,
-    epNumber,
-  } = options;
+  const { channelName, platform, vodRecord, domainName, timezone, youtubeDescription, part, type, gameName, epNumber } =
+    options;
 
   const dateFormatted = dayjs(vodRecord.created_at).tz(timezone).format('MMMM DD YYYY').toUpperCase();
   const isGameUpload = gameName != null && gameName !== '';
@@ -42,14 +32,10 @@ export function buildYoutubeMetadata(options: YoutubeMetadataOptions): YoutubeMe
   const replayPath = isGameUpload ? `/games/${vodRecord.id}` : `/youtube/${vodRecord.id}`;
 
   if (isGameUpload) {
-    if (epNumber != null) {
-      title = `${channelName} plays ${gameName} EP ${epNumber} - ${dateFormatted}`;
-    } else {
-      title = `${channelName} plays ${gameName} - ${dateFormatted}`;
-    }
+    title = `${channelName} plays ${gameName} ${epNumber != null ? `EP ${epNumber}` : ''} - ${dateFormatted}`;
   } else {
     const platformName = capitalizePlatform(platform);
-    const baseTitle = `${channelName} ${platformName}${type === SOURCE_TYPES.LIVE ? ' LIVE' : ''} VOD - ${dateFormatted}`;
+    const baseTitle = `${channelName} ${platformName} ${type === SOURCE_TYPES.LIVE ? 'LIVE' : ''} VOD - ${dateFormatted}`;
     title = part != null && part > 0 ? `${baseTitle} PART ${part}` : baseTitle;
   }
 
