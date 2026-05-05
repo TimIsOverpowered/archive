@@ -5,7 +5,7 @@ import { configService } from '../../config/tenant-config.js';
 import { getMetaClient } from '../../db/meta-client.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { ConfigNotConfiguredError } from '../../utils/domain-errors.js';
-import { encryptObject } from '../../utils/encryption.js';
+import { encryptObject, encryptScalar } from '../../utils/encryption.js';
 import { extractErrorDetails } from '../../utils/error.js';
 
 const REDIRECT_URI = 'https://developers.google.com/oauthplayground';
@@ -32,10 +32,11 @@ async function updateYoutubeTokenInDb(
     };
 
     const encryptedAuth = encryptObject(updatedAuth);
+    const encryptedApiKey = config.youtube.apiKey != null && config.youtube.apiKey !== '' ? encryptScalar(config.youtube.apiKey) : undefined;
 
     await getMetaClient()
       .updateTable('tenants')
-      .set({ youtube: JSON.stringify({ ...config.youtube, auth: encryptedAuth }) })
+      .set({ youtube: JSON.stringify({ ...config.youtube, auth: encryptedAuth, apiKey: encryptedApiKey }) })
       .where('id', '=', tenantId)
       .execute();
 
