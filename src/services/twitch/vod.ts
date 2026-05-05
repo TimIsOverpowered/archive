@@ -29,9 +29,9 @@ interface VodTokenSig {
   signature: string;
 }
 
-export async function getVodData(vodId: string, tenantId: string): Promise<VodData> {
-  const client = getTwitchClient(tenantId);
-  const data = await client.helix.get<{ data: VodData[] }>(`/videos?id=${vodId}`);
+export async function getVodData(vodId: string, logContext?: Record<string, unknown>): Promise<VodData> {
+  const client = getTwitchClient();
+  const data = await client.helix.get<{ data: VodData[] }>(`/videos?id=${vodId}`, logContext);
 
   if (data.data == null || data.data.length === 0) {
     throw new VodNotFoundError(vodId, 'twitch helix');

@@ -136,6 +136,11 @@ export const Token = {
   MAX_FAILURES: 3,
 } as const;
 
+// ── Monitor ──────────────────────────────────────────────────────────────────
+export const Monitor = {
+  TWITCH_BATCH_JOB_ID: 'monitor_twitch_batch',
+} as const;
+
 // ── Twitch API ───────────────────────────────────────────────────────────────
 export const Twitch = {
   HELIX_BASE_URL: 'https://api.twitch.tv/helix',
@@ -144,6 +149,8 @@ export const Twitch = {
   USHER_BASE_URL: 'https://usher.ttvnw.net/vod',
   GQL_CLIENT_ID: 'kimne78kx3ncx6brgo4mv6wki5h1ko',
   BACKUP_GQL_CLIENT_ID: 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
+  /** Max user_id query params per /streams request. */
+  STREAMS_BATCH_SIZE: 100,
 } as const;
 
 // ── Emote APIs ───────────────────────────────────────────────────────────────

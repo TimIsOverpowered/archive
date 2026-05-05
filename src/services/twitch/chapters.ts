@@ -56,14 +56,17 @@ export async function getChapter(vodId: string, tenantId?: string): Promise<Reco
   return data?.data?.video ?? null;
 }
 
-export async function getGameData(gameId: string, tenantId: string): Promise<Record<string, unknown> | null> {
+export async function getGameData(
+  gameId: string,
+  logContext?: Record<string, unknown>
+): Promise<Record<string, unknown> | null> {
   const cached = gameDataCache.get(gameId);
   if (cached !== undefined) {
     return cached;
   }
 
-  const client = getTwitchClient(tenantId);
-  const data = await client.helix.get<{ data: Record<string, unknown>[] }>(`/games?id=${gameId}`);
+  const client = getTwitchClient();
+  const data = await client.helix.get<{ data: Record<string, unknown>[] }>(`/games?id=${gameId}`, logContext);
 
   if (data.data == null || data.data.length === 0) {
     return null;
@@ -104,7 +107,7 @@ export async function saveVodChapters(
 
         const game = chapter.game as Record<string, unknown>;
         const gameId = typeof game.id === 'string' ? game.id : null;
-        const gameData = gameId != null ? await getGameData(gameId, tenantId) : null;
+        const gameData = gameId != null ? await getGameData(gameId, { tenantId }) : null;
 
         const validatedChapter = ChapterCreateSchema.parse({
           vod_id: dbId,
@@ -152,7 +155,7 @@ export async function saveVodChapters(
 
             let gameImage: string | null = null;
             if (gameId != null && gameId !== '') {
-              const gameData = await getGameData(gameId, tenantId);
+              const gameData = await getGameData(gameId, { tenantId });
               if (gameData != null && typeof gameData.box_art_url === 'string') {
                 gameImage = gameData.box_art_url.replace('{width}x{height}', '40x53');
               }

@@ -11,6 +11,10 @@ process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.META_DATABASE_URL = 'postgresql://localhost/test';
 process.env.ENCRYPTION_MASTER_KEY = '0000000000000000000000000000000000000000000000000000000000000000';
 process.env.PGBOUNCER_URL = 'postgresql://localhost/placeholder';
+process.env.TWITCH_CLIENT_ID = 'test-twitch-client-id';
+process.env.TWITCH_CLIENT_SECRET = 'test-twitch-client-secret';
+process.env.YOUTUBE_CLIENT_ID = 'test-youtube-client-id';
+process.env.YOUTUBE_CLIENT_SECRET = 'test-youtube-client-secret';
 
 const createMockConfig = (id: string): TenantConfig =>
   createMockTenantConfig({

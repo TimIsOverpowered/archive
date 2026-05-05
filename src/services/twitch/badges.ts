@@ -1,7 +1,6 @@
 import { LRUCache } from 'lru-cache';
 import { configService } from '../../config/tenant-config.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { getTwitchCredentials } from '../../utils/credentials.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { HttpError } from '../../utils/http-error.js';
 import { getTwitchClient } from './auth.js';
@@ -26,16 +25,15 @@ export async function getChannelBadges(tenantId: string): Promise<Record<string,
     return cached;
   }
 
-  const creds = getTwitchCredentials(tenantId);
   const config = configService.get(tenantId);
-  if (creds?.clientId == null || creds?.clientId === '' || config?.twitch?.id == null || config?.twitch?.id === '') {
-    log.warn({ tenantId }, 'Twitch credentials not configured for streamer');
+  if (config?.twitch?.id == null || config.twitch.id === '') {
+    log.warn({ tenantId }, 'Twitch user ID not configured for streamer');
     return null;
   }
 
   try {
-    const client = getTwitchClient(tenantId);
-    const data = await client.helix.get(`/chat/badges?broadcaster_id=${config.twitch.id}`);
+    const client = getTwitchClient();
+    const data = await client.helix.get(`/chat/badges?broadcaster_id=${config.twitch.id}`, { tenantId });
 
     const badgesData = ((data as { data?: unknown })?.data ?? null) as Record<string, unknown>[] | null;
     if (badgesData == null) {
@@ -69,12 +67,9 @@ export async function getGlobalBadges(tenantId: string): Promise<Record<string, 
     return cached;
   }
 
-  const creds = getTwitchCredentials(tenantId);
-  if (creds?.clientId == null || creds?.clientId === '') return null;
-
   try {
-    const client = getTwitchClient(tenantId);
-    const data = await client.helix.get('/chat/badges/global');
+    const client = getTwitchClient();
+    const data = await client.helix.get('/chat/badges/global', { tenantId });
     const badgesData = ((data as { data?: unknown })?.data ?? null) as Record<string, unknown>[] | null;
 
     if (badgesData != null) {

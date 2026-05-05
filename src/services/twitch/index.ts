@@ -1,5 +1,5 @@
 // Auth
-export { getTwitchClient, getAppAccessToken, updateTwitchTokenInDb } from './auth.js';
+export { getTwitchClient, getAppAccessToken } from './auth.js';
 
 // Client
 export { createTwitchClient, type TwitchClient } from './client.js';
@@ -29,4 +29,10 @@ export {
 export { getChannelBadges, getGlobalBadges } from './badges.js';
 
 // Live
-export { getTwitchStreamStatus, getLatestTwitchVodObject, type TwitchStreamStatus } from './live.js';
+export {
+  getTwitchStreamStatus,
+  getTwitchStreamStatusBatch,
+  getLatestTwitchVodObject,
+  getLatestTwitchVodObjectBatch,
+  type TwitchStreamStatus,
+} from './live.js';

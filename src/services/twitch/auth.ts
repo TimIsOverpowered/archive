@@ -1,48 +1,40 @@
-import { LRUCache } from 'lru-cache';
-import type { TwitchAuthObject } from '../../config/schemas.js';
-import { configService } from '../../config/tenant-config.js';
 import { Twitch } from '../../constants.js';
-import { getMetaClient } from '../../db/meta-client.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { getTwitchCredentials } from '../../utils/credentials.js';
-import { ConfigNotConfiguredError } from '../../utils/domain-errors.js';
-import { encryptObject } from '../../utils/encryption.js';
-import { extractErrorDetails } from '../../utils/error.js';
+import { getTwitchAppCredentials } from '../../utils/credentials.js';
 import { request } from '../../utils/http-client.js';
 import { createTwitchClient, type TwitchClient } from './client.js';
 
 const log = createAutoLogger('twitch-auth');
 
-const accessTokenCache = new LRUCache<string, { token: string; expiresAt: number }>({
-  max: 50,
-  ttl: 55 * 60 * 1000,
-  allowStale: false,
-  updateAgeOnGet: true,
-});
+let tokenState: { token: string; expiresAt: number } | null = null;
+let refreshing: Promise<string> | null = null;
 
-export async function getAppAccessToken(tenantId: string): Promise<string> {
-  const cached = accessTokenCache.get(tenantId);
-  if (cached != null && cached.expiresAt > Date.now()) {
-    return cached.token;
+export async function getAppAccessToken(): Promise<string> {
+  const now = Date.now();
+
+  if (tokenState != null && tokenState.expiresAt > now + 60 * 60 * 1000) {
+    return tokenState.token;
   }
 
-  const creds = getTwitchCredentials(tenantId);
-  if (!creds) {
-    throw new ConfigNotConfiguredError(`Twitch credentials for tenant ${tenantId}`);
+  if (refreshing != null) {
+    return refreshing;
   }
 
-  if (creds.accessToken != null && creds.expiryDate != null && creds.expiryDate > 0) {
-    const oneHourFromNow = Date.now() + 60 * 60 * 1000;
-
-    if (creds.expiryDate > oneHourFromNow) {
-      accessTokenCache.set(tenantId, { token: creds.accessToken, expiresAt: creds.expiryDate });
-      return creds.accessToken;
-    }
+  refreshing = refreshToken();
+  try {
+    const token = await refreshing;
+    return token;
+  } finally {
+    refreshing = null;
   }
+}
+
+async function refreshToken(): Promise<string> {
+  const { clientId, clientSecret } = getTwitchAppCredentials();
 
   const url = new URL(Twitch.TOKEN_URL);
-  url.searchParams.append('client_id', creds.clientId);
-  url.searchParams.append('client_secret', creds.clientSecret);
+  url.searchParams.append('client_id', clientId);
+  url.searchParams.append('client_secret', clientSecret);
   url.searchParams.append('grant_type', 'client_credentials');
 
   const data = await request<{ access_token: string; expires_in: number }>(url.toString(), {
@@ -50,56 +42,15 @@ export async function getAppAccessToken(tenantId: string): Promise<string> {
   });
 
   const { access_token, expires_in } = data;
-  const expiryDate = Date.now() + expires_in * 1000;
+  const expiresAt = Date.now() + expires_in * 1000;
 
-  accessTokenCache.set(tenantId, { token: access_token, expiresAt: expiryDate });
+  tokenState = { token: access_token, expiresAt };
 
-  log.info({ tenantId, expires_in, expiry_date: expiryDate }, 'Fetched new Twitch access token');
-
-  try {
-    await updateTwitchTokenInDb(tenantId, access_token, expiryDate);
-  } catch (err) {
-    const { message } = extractErrorDetails(err);
-    log.warn({ tenantId, error: message }, 'Failed to update Twitch token in database');
-  }
+  log.info({ expires_in, expires_at: expiresAt }, 'Fetched new Twitch access token');
 
   return access_token;
 }
 
-export async function updateTwitchTokenInDb(tenantId: string, newToken: string, expiryDate: number): Promise<void> {
-  const config = configService.get(tenantId);
-  if (config?.twitch?.auth == null) {
-    return;
-  }
-
-  try {
-    const auth = config.twitch.auth;
-
-    const updatedAuth: TwitchAuthObject = {
-      client_id: auth.client_id,
-      client_secret: auth.client_secret,
-      access_token: newToken,
-      expiry_date: expiryDate,
-    };
-
-    const encryptedAuth = encryptObject(updatedAuth);
-
-    await getMetaClient()
-      .updateTable('tenants')
-      .set({ twitch: JSON.stringify({ ...config.twitch, auth: encryptedAuth }) })
-      .where('id', '=', tenantId)
-      .execute();
-
-    configService.updateTwitchAuth(tenantId, updatedAuth);
-    configService.publishConfigChanged(tenantId);
-
-    log.info({ tenantId, expiry_date: expiryDate }, 'Updated Twitch token');
-  } catch (err) {
-    const { message } = extractErrorDetails(err);
-    log.warn({ tenantId, error: message }, 'Failed to update Twitch token in database');
-  }
-}
-
-export function getTwitchClient(tenantId: string): TwitchClient {
-  return createTwitchClient(tenantId, () => getAppAccessToken(tenantId));
+export function getTwitchClient(): TwitchClient {
+  return createTwitchClient(() => getAppAccessToken());
 }

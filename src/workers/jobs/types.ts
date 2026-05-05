@@ -85,6 +85,8 @@ export interface DmcaProcessingJob {
 
 export interface MonitorJob {
   tenantId: string;
+  /** When present, this is a batch job that polls multiple tenants at once. */
+  batchType?: 'twitch';
 }
 
 export interface ChatDownloadResult {

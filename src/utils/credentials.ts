@@ -1,38 +1,18 @@
-import { configService } from '../config/tenant-config.js';
-import { createAutoLogger } from './auto-tenant-logger.js';
-
-export interface TwitchCredentials {
-  clientId: string;
-  clientSecret: string;
-  accessToken?: string | undefined;
-  expiryDate?: number | undefined;
-}
+import { getBaseConfig } from '../config/env.js';
 
 /**
- * Get decrypted Twitch credentials for a tenant.
- * Returns null if not configured or decryption fails.
+ * Get the shared Twitch app credentials from environment variables.
+ * Throws if TWITCH_CLIENT_ID or TWITCH_CLIENT_SECRET is not configured.
  */
-export function getTwitchCredentials(tenantId: string): TwitchCredentials | null {
-  const log = createAutoLogger(tenantId);
-
-  const config = configService.get(tenantId);
-
-  if (config?.twitch?.auth == null) {
-    log.warn({ component: 'credentials', tenantId }, 'No auth configured for tenant');
-    return null;
+export function getTwitchAppCredentials(): { clientId: string; clientSecret: string } {
+  const cfg = getBaseConfig();
+  if (cfg.TWITCH_CLIENT_ID === '' || cfg.TWITCH_CLIENT_SECRET === '') {
+    throw new Error(
+      'Twitch app credentials not configured. Set TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET in your environment.'
+    );
   }
-
-  const auth = config.twitch.auth;
-
-  if (auth.client_id == null || auth.client_id === '' || auth.client_secret == null || auth.client_secret === '') {
-    log.error({ component: 'credentials' }, 'Missing client_id or client_secret in credentials');
-    return null;
-  }
-
   return {
-    clientId: auth.client_id,
-    clientSecret: auth.client_secret,
-    accessToken: auth.access_token,
-    expiryDate: auth.expiry_date,
+    clientId: cfg.TWITCH_CLIENT_ID,
+    clientSecret: cfg.TWITCH_CLIENT_SECRET,
   };
 }

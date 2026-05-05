@@ -1,6 +1,6 @@
 import { extractErrorDetails } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
-import { registerAllMonitorRepeatJobs, removeMonitorRepeatJob } from './startup.js';
+import { registerAllMonitorRepeatJobs, removeMonitorRepeatJob, removeTwitchBatchMonitorJob } from './startup.js';
 
 export async function startMonitorService(): Promise<void> {
   getLogger().info({ component: 'monitor' }, 'Starting Archive Monitor Service...');
@@ -21,4 +21,4 @@ export function stopMonitorService(): void {
   getLogger().info({ component: 'monitor' }, 'Monitor service stopped.');
 }
 
-export { removeMonitorRepeatJob };
+export { removeMonitorRepeatJob, removeTwitchBatchMonitorJob };

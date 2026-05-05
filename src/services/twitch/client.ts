@@ -1,46 +1,41 @@
 import { Twitch } from '../../constants.js';
-import { getTwitchCredentials } from '../../utils/credentials.js';
-import { ConfigNotConfiguredError } from '../../utils/domain-errors.js';
+import { getTwitchAppCredentials } from '../../utils/credentials.js';
 import { request } from '../../utils/http-client.js';
 import { getLogger } from '../../utils/logger.js';
 
 export interface TwitchClient {
   helix: {
-    get: <T = unknown>(endpoint: string) => Promise<T>;
-    post: <T = unknown>(endpoint: string, body?: object) => Promise<T>;
+    get: <T = unknown>(endpoint: string, logContext?: Record<string, unknown>) => Promise<T>;
+    post: <T = unknown>(endpoint: string, body?: object, logContext?: Record<string, unknown>) => Promise<T>;
   };
 }
 
-export function createTwitchClient(tenantId: string, getAccessToken: () => Promise<string>): TwitchClient {
-  const creds = getTwitchCredentials(tenantId);
-
-  if (!creds) {
-    throw new ConfigNotConfiguredError(`Twitch credentials for tenant ${tenantId}`);
-  }
+export function createTwitchClient(getAccessToken: () => Promise<string>): TwitchClient {
+  const { clientId } = getTwitchAppCredentials();
 
   return {
     helix: {
-      async get<T = unknown>(endpoint: string): Promise<T> {
+      async get<T = unknown>(endpoint: string, logContext?: Record<string, unknown>): Promise<T> {
         const accessToken = await getAccessToken();
         return request<T>(`${Twitch.HELIX_BASE_URL}${endpoint}`, {
           method: 'GET',
           headers: {
             Authorization: `Bearer ${accessToken}`,
-            'Client-Id': creds.clientId,
+            'Client-Id': clientId,
           },
-          logContext: { tenantId },
+          logContext,
         });
       },
-      async post<T = unknown>(endpoint: string, body?: object): Promise<T> {
+      async post<T = unknown>(endpoint: string, body?: object, logContext?: Record<string, unknown>): Promise<T> {
         const accessToken = await getAccessToken();
         return request<T>(`${Twitch.HELIX_BASE_URL}${endpoint}`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${accessToken}`,
-            'Client-Id': creds.clientId,
+            'Client-Id': clientId,
           },
           body,
-          logContext: { tenantId },
+          logContext,
         });
       },
     },

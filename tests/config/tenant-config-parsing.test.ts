@@ -35,6 +35,10 @@ function setupBaseEnv(): void {
   process.env.PGBOUNCER_URL = 'postgresql://bouncer';
   process.env.ENCRYPTION_MASTER_KEY = VALID_KEY;
   process.env.NODE_ENV = 'test';
+  process.env.TWITCH_CLIENT_ID = 'test-twitch-client-id';
+  process.env.TWITCH_CLIENT_SECRET = 'test-twitch-client-secret';
+  process.env.YOUTUBE_CLIENT_ID = 'test-youtube-client-id';
+  process.env.YOUTUBE_CLIENT_SECRET = 'test-youtube-client-secret';
 }
 
 setupBaseEnv();
@@ -597,48 +601,6 @@ describe('ConfigService update methods', () => {
   afterEach(() => {
     (RedisService as any)._instance = null;
     mock.restoreAll();
-  });
-
-  it('should update Twitch auth in cached config', () => {
-    configService.seed([
-      {
-        id: 't1',
-        displayName: 'T1',
-        createdAt: new Date(),
-        database: { url: 'pg://t1' },
-        settings: { domainName: 't1.com', timezone: 'UTC', saveHLS: false, saveMP4: true },
-        twitch: { enabled: true, auth: { old: 'token' } },
-      } as any,
-    ]);
-
-    configService.updateTwitchAuth('t1', { client_id: 'new-id', client_secret: 'new-secret' });
-
-    const updated = configService.get('t1');
-    assert.ok(updated);
-    assert.ok(updated.twitch);
-    assert.strictEqual(updated.twitch.auth!.client_id, 'new-id');
-  });
-
-  it('should not update when tenant not in cache', () => {
-    configService.updateTwitchAuth('nonexistent', { client_id: 'id', client_secret: 'secret' });
-
-    assert.strictEqual(configService.get('nonexistent'), undefined);
-  });
-
-  it('should not update when tenant has no twitch config', () => {
-    configService.seed([
-      {
-        id: 't1',
-        displayName: 'T1',
-        createdAt: new Date(),
-        database: { url: 'pg://t1' },
-        settings: { domainName: 't1.com', timezone: 'UTC', saveHLS: false, saveMP4: true },
-      } as any,
-    ]);
-
-    configService.updateTwitchAuth('t1', { client_id: 'id', client_secret: 'secret' });
-
-    assert.strictEqual(configService.get('t1')?.twitch, undefined);
   });
 
   it('should update YouTube auth in cached config', () => {

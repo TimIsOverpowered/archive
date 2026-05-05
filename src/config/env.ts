@@ -45,6 +45,8 @@ export const BaseConfigSchema = z.object({
   FLARESOLVERR_BASE_URL: z.string().url().default('http://localhost:8191'),
   FLARESOLVERR_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
   FLARESOLVERR_SESSION_TTL: z.coerce.number().int().positive().default(3600),
+  TWITCH_CLIENT_ID: z.string().default(''),
+  TWITCH_CLIENT_SECRET: z.string().default(''),
 });
 
 // API-specific schema (extends base + API-only fields)

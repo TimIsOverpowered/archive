@@ -9,14 +9,7 @@ import { extractErrorDetails } from '../utils/error.js';
 import { getLogger } from '../utils/logger.js';
 import { asJsonObject } from '../utils/object.js';
 import { RedisService } from '../utils/redis-service.js';
-import {
-  SettingsSchema,
-  YoutubeSchema,
-  TwitchSchema,
-  KickSchema,
-  type TwitchAuthObject,
-  type YoutubeAuthObject,
-} from './schemas.js';
+import { SettingsSchema, YoutubeSchema, TwitchSchema, KickSchema, type YoutubeAuthObject } from './schemas.js';
 import { TenantConfig } from './types.js';
 
 function parsePlatformConfig<T>(
@@ -140,19 +133,6 @@ export class ConfigService {
     for (const config of configs) {
       this.cache.set(config.id, config);
     }
-  }
-
-  /**
-   * Replaces the cached config with an immutable update containing the decrypted Twitch auth object.
-   * Creates a new config object so all callers get the updated version.
-   * Publishes a config change event via Redis Pub/Sub to notify other processes.
-   */
-  updateTwitchAuth(tenantId: string, auth: TwitchAuthObject): void {
-    const config = this.cache.get(tenantId);
-    if (!config || !config.twitch) return;
-    const updated = { ...config, twitch: { ...config.twitch, auth } };
-    this.cache.set(tenantId, updated);
-    this.publishConfigChanged(tenantId);
   }
 
   /**

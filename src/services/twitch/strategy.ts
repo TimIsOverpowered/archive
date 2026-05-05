@@ -20,7 +20,7 @@ export const strategy: PlatformStrategy = {
     const cfg = requirePlatformConfig(config, platform);
     if (!cfg) return null;
 
-    const streamStatus = await getTwitchStreamStatus(cfg.platformUserId, tenantId);
+    const streamStatus = await getTwitchStreamStatus(cfg.platformUserId, { tenantId });
 
     if (streamStatus == null || streamStatus.type !== 'live') {
       return null;
@@ -39,7 +39,7 @@ export const strategy: PlatformStrategy = {
   async fetchVodMetadata(vodId: string, ctx): Promise<PlatformVodMetadata | null> {
     const { tenantId } = ctx;
 
-    const vodData = await getVodData(vodId, tenantId);
+    const vodData = await getVodData(vodId, { tenantId });
 
     return {
       id: vodData.id,
@@ -55,7 +55,7 @@ export const strategy: PlatformStrategy = {
     const cfg = requirePlatformConfig(config, platform);
     if (!cfg) return null;
 
-    const vodObject = await getLatestTwitchVodObject(cfg.platformUserId, streamId, tenantId);
+    const vodObject = await getLatestTwitchVodObject(cfg.platformUserId, streamId, { tenantId });
 
     if (vodObject == null || vodObject.stream_id !== streamId) {
       return null;

@@ -105,39 +105,12 @@ export const YoutubeSchema = z.object({
   apiKey: encryptedString().optional(),
 });
 
-/** Twitch API OAuth credentials. */
-export const TwitchAuthSchema = z.object({
-  /** Twitch API client ID */
-  client_id: z.string(),
-  /** Twitch API client secret */
-  client_secret: z.string(),
-  /** OAuth access token (may be expired) */
-  access_token: z.string().optional(),
-  /** Unix timestamp when access_token expires */
-  expiry_date: z.number().optional(),
-});
-
-export type TwitchAuthObject = z.infer<typeof TwitchAuthSchema>;
-
-/**
- * Zod schema for an encrypted Twitch auth JSON object field.
- * Decrypts and parses non-empty values automatically at parse time.
- */
-function encryptedTwitchAuth() {
-  return z.any().transform((val) => {
-    if (typeof val !== 'string' || val === '') return undefined;
-    return decryptObject<TwitchAuthObject>(val);
-  });
-}
-
 /** Twitch platform configuration for a tenant. */
 export const TwitchSchema = z.object({
   /** Enable Twitch streaming (default: false) */
   enabled: z.boolean().default(false),
   /** Mark as the primary platform (default: false) */
   mainPlatform: z.boolean().default(false),
-  /** Decrypted Twitch API auth object (decrypted at parse time) */
-  auth: encryptedTwitchAuth().optional(),
   /** Twitch username / display name */
   username: z
     .string()

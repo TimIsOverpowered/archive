@@ -196,7 +196,6 @@ npx tsx scripts/import-tenant.ts moonmoon "postgresql://<user>:***@<host>:5432/<
 2. Checks for existing tenant (exits with error if found)
 3. Reads `config/config.json.<channel_name>`
 4. Encrypts sensitive fields:
-   - `twitch.auth` (client_secret, access_token)
    - `youtube.auth` (refresh_token, access_token)
    - `youtube.api_key`
    - `database_url`

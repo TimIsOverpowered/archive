@@ -30,7 +30,6 @@ export function createMockTenantConfig(overrides: MockTenantConfigOverrides = {}
     twitch: {
       enabled: false,
       mainPlatform: false,
-      auth: undefined,
       username: undefined,
       id: undefined,
       ...(overrides.twitch ?? {}),
@@ -81,6 +80,10 @@ export function setupBaseEnv(vodPath?: string): void {
   process.env.PGBOUNCER_URL = 'postgresql://bouncer';
   process.env.ENCRYPTION_MASTER_KEY = VALID_KEY;
   process.env.NODE_ENV = 'test';
+  process.env.TWITCH_CLIENT_ID = 'test-twitch-client-id';
+  process.env.TWITCH_CLIENT_SECRET = 'test-twitch-client-secret';
+  process.env.YOUTUBE_CLIENT_ID = 'test-youtube-client-id';
+  process.env.YOUTUBE_CLIENT_SECRET = 'test-youtube-client-secret';
   if (vodPath !== undefined) {
     process.env.VOD_PATH = vodPath;
   }

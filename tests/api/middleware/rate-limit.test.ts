@@ -3,6 +3,18 @@ import { describe, it } from 'node:test';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 import createRateLimitMiddleware from '../../../src/api/middleware/rate-limit.js';
 
+// Required for getBaseConfig() calls in cloudflare-ip-validator and rate-limit middleware
+const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+process.env.REDIS_URL = 'redis://localhost';
+process.env.META_DATABASE_URL = 'postgresql://meta';
+process.env.PGBOUNCER_URL = 'postgresql://bouncer';
+process.env.ENCRYPTION_MASTER_KEY = VALID_KEY;
+process.env.NODE_ENV = 'test';
+process.env.TWITCH_CLIENT_ID = 'test-twitch-client-id';
+process.env.TWITCH_CLIENT_SECRET = 'test-twitch-client-secret';
+process.env.YOUTUBE_CLIENT_ID = 'test-youtube-client-id';
+process.env.YOUTUBE_CLIENT_SECRET = 'test-youtube-client-secret';
+
 function createMockRequest(headers: Record<string, string | string[] | undefined>, method = 'GET'): any {
   return {
     headers,

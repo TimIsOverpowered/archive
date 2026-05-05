@@ -8,6 +8,7 @@ import { findVodByStreamId, findVodByPlatformId } from '../../db/queries/vods.js
 import type { StreamerDB, InsertableVods, SelectableVods } from '../../db/streamer-types.js';
 import { publishVodUpdate } from '../../services/cache-invalidator.js';
 import { getStrategy, type PlatformStreamStatus, type PlatformVodMetadata } from '../../services/platforms/index.js';
+import type { TwitchStreamStatus } from '../../services/twitch/live.js';
 import type { Platform } from '../../types/platforms.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
@@ -91,6 +92,68 @@ export async function handlePlatformLiveCheck(
     platformUsername,
     config,
     strategy: strategy,
+    tenantId,
+    log,
+  });
+}
+
+/**
+ * Handle a live check for a tenant using a pre-fetched Twitch stream status.
+ * Used by the batch monitor job to avoid redundant API calls.
+ */
+export async function handlePlatformLiveCheckWithStreamStatus(
+  db: Kysely<StreamerDB>,
+  tenantId: string,
+  config: TenantConfig,
+  twitchStatus: TwitchStreamStatus | null,
+  activeLiveVod: SelectableVods | null = null
+): Promise<void> {
+  const log = createAutoLogger(tenantId);
+  const platform = 'twitch' as Platform;
+
+  const strategy = getStrategy(platform);
+  if (!strategy) {
+    log.warn({ component: 'monitor', platform }, 'No strategy found for platform');
+    return;
+  }
+
+  const platformInfo = requirePlatformConfig(config, platform);
+  if (!platformInfo) {
+    log.debug({ component: 'monitor', platform }, 'Platform not fully configured');
+    return;
+  }
+  const { platformUserId, platformUsername } = platformInfo;
+
+  if (!twitchStatus || twitchStatus.type !== 'live') {
+    await handleOfflineStream(
+      db,
+      tenantId,
+      platform,
+      platformUsername ?? undefined,
+      config.displayName,
+      log,
+      activeLiveVod
+    );
+    return;
+  }
+
+  const streamStatus: PlatformStreamStatus = {
+    id: twitchStatus.id,
+    title: twitchStatus.title,
+    startedAt: twitchStatus.started_at,
+    streamId: twitchStatus.id,
+    platformUserId: twitchStatus.user_id,
+    platformUsername: twitchStatus.user_login,
+  };
+
+  await handleLiveStream({
+    db,
+    streamStatus,
+    platform,
+    platformUserId,
+    platformUsername,
+    config,
+    strategy,
     tenantId,
     log,
   });

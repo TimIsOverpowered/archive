@@ -4,7 +4,7 @@ Automated VOD upload from Twitch/Kick to YouTube after streaming.
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 24+
 - PostgreSQL 14+
 - Redis 6+
 - PgBouncer
@@ -242,6 +242,8 @@ See `.env.example` for all available configuration options. Key variables:
 - `ENCRYPTION_MASTER_KEY`: 64-character hex string for encrypting sensitive data
 - `JWT_SECRET`: Secret for admin dashboard authentication
 - `FLARESOLVERR_BASE_URL`: FlareSolverr API endpoint (default: `http://localhost:8191`)
+- `TWITCH_CLIENT_ID`: Twitch app client ID (shared across all tenants for Helix API)
+- `TWITCH_CLIENT_SECRET`: Twitch app client secret (shared across all tenants for Helix API)
 
 ## Troubleshooting
 

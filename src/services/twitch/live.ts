@@ -1,6 +1,6 @@
 import { Twitch } from '../../constants.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { getTwitchCredentials } from '../../utils/credentials.js';
+import { getTwitchAppCredentials } from '../../utils/credentials.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { request } from '../../utils/http-client.js';
 import { getAppAccessToken } from './auth.js';
@@ -24,15 +24,13 @@ export interface TwitchStreamStatus {
   thumbnail_url?: string | null | undefined;
 }
 
-export async function getTwitchStreamStatus(userId: string, tenantId: string): Promise<TwitchStreamStatus | null> {
+export async function getTwitchStreamStatus(
+  userId: string,
+  logContext?: Record<string, unknown>
+): Promise<TwitchStreamStatus | null> {
   try {
-    const accessToken = await getAppAccessToken(tenantId);
-    const creds = getTwitchCredentials(tenantId);
-
-    if (!creds) {
-      log.warn({ component: 'twitch-live', tenantId }, 'No credentials configured for tenant');
-      return null;
-    }
+    const accessToken = await getAppAccessToken();
+    const { clientId } = getTwitchAppCredentials();
 
     const url = new URL(`${Twitch.HELIX_BASE_URL}/streams`);
     url.searchParams.append('user_id', userId);
@@ -41,33 +39,16 @@ export async function getTwitchStreamStatus(userId: string, tenantId: string): P
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        'Client-Id': creds.clientId,
+        'Client-Id': clientId,
       },
-      logContext: { userId, tenantId },
+      logContext,
     });
 
     if (!data.data || data.data.length === 0) {
       return null;
     }
 
-    const streamData = data.data[0];
-    if (!streamData) return null;
-
-    return {
-      id: streamData.id,
-      user_id: streamData.user_id,
-      user_login: streamData.user_login,
-      user_name: streamData.user_name ?? '',
-      game_id: streamData.game_id ?? undefined,
-      game_name: streamData.game_name ?? undefined,
-      type: streamData.type ?? '',
-      title: streamData.title ?? '',
-      tags: streamData.tags ?? undefined,
-      viewer_count: streamData.viewer_count,
-      started_at: streamData.started_at,
-      language: streamData.language ?? 'other',
-      thumbnail_url: streamData.thumbnail_url ?? undefined,
-    };
+    return data.data[0] ?? null;
   } catch (error: unknown) {
     const { message } = extractErrorDetails(error);
     log.error({ component: 'twitch-live', userId, err: message }, 'Failed to get stream status for user');
@@ -75,19 +56,66 @@ export async function getTwitchStreamStatus(userId: string, tenantId: string): P
   }
 }
 
+/**
+ * Batch fetch stream status for multiple users. Automatically chunks
+ * at Twitch.STREAMS_BATCH_SIZE to stay within API limits.
+ * Returns a map of userId -> TwitchStreamStatus | null.
+ * Users not in the response are considered offline (null).
+ */
+export async function getTwitchStreamStatusBatch(
+  userIds: string[],
+  logContext?: Record<string, unknown>
+): Promise<Map<string, TwitchStreamStatus | null>> {
+  const result = new Map<string, TwitchStreamStatus | null>();
+
+  if (userIds.length === 0) {
+    return result;
+  }
+
+  const accessToken = await getAppAccessToken();
+  const { clientId } = getTwitchAppCredentials();
+
+  for (let i = 0; i < userIds.length; i += Twitch.STREAMS_BATCH_SIZE) {
+    const chunk = userIds.slice(i, i + Twitch.STREAMS_BATCH_SIZE);
+
+    try {
+      const url = new URL(`${Twitch.HELIX_BASE_URL}/streams`);
+      for (const userId of chunk) {
+        url.searchParams.append('user_id', userId);
+      }
+
+      const data = await request<{ data: TwitchStreamStatus[] | null }>(url.toString(), {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Client-Id': clientId,
+        },
+        logContext,
+      });
+
+      if (data?.data) {
+        for (const streamData of data.data) {
+          result.set(streamData.user_id, streamData);
+        }
+      }
+    } catch (error: unknown) {
+      const { message } = extractErrorDetails(error);
+      log.error({ component: 'twitch-live', userIds: chunk, err: message }, 'Failed to batch get stream status');
+      throw error;
+    }
+  }
+
+  return result;
+}
+
 export async function getLatestTwitchVodObject(
   userId: string,
   expectedStreamId: string,
-  tenantId: string
+  logContext?: Record<string, unknown>
 ): Promise<VodData | null> {
   try {
-    const accessToken = await getAppAccessToken(tenantId);
-    const creds = getTwitchCredentials(tenantId);
-
-    if (!creds) {
-      log.warn({ component: 'twitch-live', tenantId }, 'No credentials configured for tenant');
-      return null;
-    }
+    const accessToken = await getAppAccessToken();
+    const { clientId } = getTwitchAppCredentials();
 
     const url = new URL('https://api.twitch.tv/helix/videos');
     url.searchParams.append('user_id', userId);
@@ -97,9 +125,9 @@ export async function getLatestTwitchVodObject(
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        'Client-Id': creds.clientId,
+        'Client-Id': clientId,
       },
-      logContext: { userId, tenantId },
+      logContext,
     });
 
     if (!data.data || data.data.length === 0) {
@@ -124,4 +152,58 @@ export async function getLatestTwitchVodObject(
     log.error({ component: 'twitch-live', userId, err: message }, 'Failed to get VOD object for user');
     throw error;
   }
+}
+
+/**
+ * Batch fetch latest VOD objects for multiple users.
+ * Returns a map of userId -> VodData | null.
+ * Note: This makes one request per user as /videos doesn't support multi-user queries efficiently.
+ */
+export async function getLatestTwitchVodObjectBatch(
+  entries: { userId: string; expectedStreamId: string }[],
+  logContext?: Record<string, unknown>
+): Promise<Map<string, VodData | null>> {
+  const result = new Map<string, VodData | null>();
+
+  if (entries.length === 0) {
+    return result;
+  }
+
+  const accessToken = await getAppAccessToken();
+  const { clientId } = getTwitchAppCredentials();
+
+  for (const { userId, expectedStreamId } of entries) {
+    result.set(userId, null);
+
+    try {
+      const url = new URL('https://api.twitch.tv/helix/videos');
+      url.searchParams.append('user_id', userId);
+      url.searchParams.append('first', '1');
+
+      const data = await request<{ data: VodData[] | null }>(url.toString(), {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Client-Id': clientId,
+        },
+        logContext,
+      });
+
+      if (!data.data || data.data.length === 0) {
+        continue;
+      }
+
+      const latestVod = data.data[0];
+      if (!latestVod || latestVod.stream_id !== expectedStreamId || latestVod.id == null) {
+        continue;
+      }
+
+      result.set(userId, latestVod);
+    } catch (error: unknown) {
+      const { message } = extractErrorDetails(error);
+      log.warn({ component: 'twitch-live', userId, err: message }, 'Failed to get VOD object for user');
+    }
+  }
+
+  return result;
 }

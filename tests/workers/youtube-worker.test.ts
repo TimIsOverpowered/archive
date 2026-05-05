@@ -1,5 +1,16 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach } from 'node:test';
+// Must set env vars BEFORE any source imports (youtube auth calls getWorkersConfig at module load)
+const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+process.env.REDIS_URL = 'redis://localhost';
+process.env.META_DATABASE_URL = 'postgresql://meta';
+process.env.PGBOUNCER_URL = 'postgresql://bouncer';
+process.env.ENCRYPTION_MASTER_KEY = VALID_KEY;
+process.env.NODE_ENV = 'test';
+process.env.TWITCH_CLIENT_ID = 'test-twitch-client-id';
+process.env.TWITCH_CLIENT_SECRET = 'test-twitch-client-secret';
+process.env.YOUTUBE_CLIENT_ID = 'test-youtube-client-id';
+process.env.YOUTUBE_CLIENT_SECRET = 'test-youtube-client-secret';
 import youtubeProcessor from '../../src/workers/youtube.worker.js';
 import {
   buildMockDb,

@@ -15,6 +15,10 @@ function setupBaseEnv(): void {
   process.env.NODE_ENV = 'test';
   process.env.PORT = '3000';
   process.env.LOG_LEVEL = 'info';
+  process.env.TWITCH_CLIENT_ID = 'test-twitch-client-id';
+  process.env.TWITCH_CLIENT_SECRET = 'test-twitch-client-secret';
+  process.env.YOUTUBE_CLIENT_ID = 'test-youtube-client-id';
+  process.env.YOUTUBE_CLIENT_SECRET = 'test-youtube-client-secret';
 }
 
 describe('withCache', () => {

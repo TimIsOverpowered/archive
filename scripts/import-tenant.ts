@@ -13,11 +13,6 @@ const __dirname = path.dirname(__filename);
 
 interface TwitchConfig {
   enabled?: boolean;
-  auth?: {
-    client_id: string;
-    client_secret: string;
-    access_token: string;
-  };
   id: string;
   username: string;
 }
@@ -78,18 +73,12 @@ interface RawConfig {
 function processTwitch(config: TwitchConfig | undefined) {
   if (!config) return null;
 
-  const twitch: Record<string, unknown> = {
+  return {
     enabled: config.enabled ?? false,
     id: config.id,
     username: config.username,
     mainPlatform: false,
   };
-
-  if (config.auth && (config.auth.client_secret || config.auth.access_token)) {
-    twitch.auth = encryptObject(config.auth);
-  }
-
-  return twitch;
 }
 
 function processYoutube(config: YoutubeConfig | undefined) {

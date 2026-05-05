@@ -16,6 +16,10 @@ describe('API Config Loader', () => {
     process.env.META_DATABASE_URL = 'postgresql://meta';
     process.env.PGBOUNCER_URL = 'postgresql://bouncer';
     process.env.ENCRYPTION_MASTER_KEY = validKey;
+    process.env.TWITCH_CLIENT_ID = 'test-twitch-client-id';
+    process.env.TWITCH_CLIENT_SECRET = 'test-twitch-client-secret';
+    process.env.YOUTUBE_CLIENT_ID = 'test-youtube-client-id';
+    process.env.YOUTUBE_CLIENT_SECRET = 'test-youtube-client-secret';
     clearConfigCache();
   };
 
