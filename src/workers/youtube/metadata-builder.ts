@@ -14,7 +14,6 @@ export interface YoutubeMetadataOptions {
   gameName?: string | undefined;
   epNumber?: number | undefined;
   vodRecord: Pick<SelectableVods, 'id' | 'title' | 'created_at'>;
-  replayPath?: string | undefined;
 }
 
 export interface YoutubeMetadata {
@@ -34,14 +33,13 @@ export function buildYoutubeMetadata(options: YoutubeMetadataOptions): YoutubeMe
     type,
     gameName,
     epNumber,
-    replayPath,
   } = options;
 
   const dateFormatted = dayjs(vodRecord.created_at).tz(timezone).format('MMMM DD YYYY').toUpperCase();
   const isGameUpload = gameName != null && gameName !== '';
 
   let title: string;
-  const resolvedReplayPath = replayPath ?? (isGameUpload ? `/games/${vodRecord.id}` : `/youtube/${vodRecord.id}`);
+  const replayPath = isGameUpload ? `/games/${vodRecord.id}` : `/youtube/${vodRecord.id}`;
 
   if (isGameUpload) {
     if (epNumber != null) {
@@ -55,7 +53,7 @@ export function buildYoutubeMetadata(options: YoutubeMetadataOptions): YoutubeMe
     title = part != null && part > 0 ? `${baseTitle} PART ${part}` : baseTitle;
   }
 
-  const description = `Chat Replay: https://${domainName}${resolvedReplayPath}\nStream Title: ${vodRecord.title?.replace(/<[^>]*>/g, '') ?? ''}\n${youtubeDescription ?? ''}`;
+  const description = `Chat Replay: https://${domainName}${replayPath}\nStream Title: ${vodRecord.title?.replace(/<[^>]*>/g, '') ?? ''}\n${youtubeDescription ?? ''}`;
 
   return { title, description };
 }
