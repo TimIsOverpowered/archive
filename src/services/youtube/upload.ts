@@ -116,6 +116,7 @@ export async function uploadVideo(
 
     const response = await youtube.videos.insert({
       part: ['id', 'snippet', 'status'],
+      notifySubscribers: true,
       requestBody: {
         snippet: { title, description, categoryId: YouTube.CATEGORY_ID },
         status: { privacyStatus },
@@ -135,9 +136,7 @@ export async function uploadVideo(
       await onProgress({ milestone: 'processing_metadata', videoId });
     }
 
-    let thumbnailUrl = '';
-    const thumbs = response?.data?.snippet?.thumbnails;
-    thumbnailUrl = thumbs?.high?.url ?? thumbs?.medium?.url ?? '';
+    const thumbnailUrl = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
 
     if (onProgress) {
       await onProgress({ milestone: 'success', videoId, thumbnailUrl, videoDuration, privacyStatus });
