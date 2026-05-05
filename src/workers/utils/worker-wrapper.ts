@@ -1,5 +1,7 @@
 import type { Job, Processor } from 'bullmq';
+import { extractErrorDetails } from '../../utils/error.js';
 import type { AppLogger } from '../../utils/logger.js';
+import { getLogger } from '../../utils/logger.js';
 import { handleWorkerError } from './error-handler.js';
 import type { WorkerErrorContext } from './error-handler.js';
 
@@ -25,7 +27,9 @@ export function wrapWorkerProcessor<TJobData, TCtx extends { log: AppLogger }, T
       ctx = await buildCtx(job);
       return await processor(ctx);
     } catch (error) {
-      if (ctx) {
+      if (!ctx) {
+        getLogger().error({ jobId: job.id, error: extractErrorDetails(error) }, 'Worker context build failed');
+      } else {
         const errorMsg = handleWorkerError(error, ctx.log, options.errorMeta(ctx, job));
         await options.errorAlert(ctx, job, errorMsg);
       }

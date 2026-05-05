@@ -93,7 +93,7 @@ interface SplitVodUploadContext extends VodUploadContext {
   domainName: string;
   privacyStatus: string;
   platformName: Platform;
-  vodRecord: SelectableVods;
+  vodRecord: Pick<SelectableVods, 'platform' | 'id' | 'title' | 'created_at'>;
 }
 
 async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUploadResult> {
@@ -254,7 +254,7 @@ interface SingleVodUploadContext extends VodUploadContext {
   domainName: string;
   privacyStatus: string;
   platformName: Platform;
-  vodRecord: SelectableVods;
+  vodRecord: Pick<SelectableVods, 'platform' | 'id' | 'title' | 'created_at'>;
 }
 
 async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodUploadResult> {

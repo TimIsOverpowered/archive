@@ -42,6 +42,10 @@ interface ConfigChangeEvent {
  * Build a TenantConfig from a raw database tenant row.
  * Pure function — does not depend on any module-level state.
  */
+/**
+ * Build a TenantConfig from a raw database tenant row.
+ * Pure function — does not depend on any module-level state.
+ */
 export function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
   if (tenant.databaseUrl == null) return null;
 
@@ -61,17 +65,19 @@ export function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
     settings,
   };
 
-  const platformConfigs = [
-    { key: 'twitch', raw: tenant.twitch, schema: TwitchSchema, label: 'Twitch' },
-    { key: 'youtube', raw: tenant.youtube, schema: YoutubeSchema, label: 'YouTube' },
-    { key: 'kick', raw: tenant.kick, schema: KickSchema, label: 'Kick' },
-  ] as const;
+  const twitchConfig = parsePlatformConfig(tenant.id, tenant.twitch, TwitchSchema, 'Twitch');
+  if (twitchConfig != null) {
+    tenantConfig.twitch = twitchConfig;
+  }
 
-  for (const { key, raw, schema, label } of platformConfigs) {
-    const parsed = parsePlatformConfig(tenant.id, raw, schema as ZodType<unknown>, label);
-    if (parsed != null) {
-      (tenantConfig as unknown as Record<string, unknown>)[key] = parsed;
-    }
+  const youtubeConfig = parsePlatformConfig(tenant.id, tenant.youtube, YoutubeSchema, 'YouTube');
+  if (youtubeConfig != null) {
+    tenantConfig.youtube = youtubeConfig;
+  }
+
+  const kickConfig = parsePlatformConfig(tenant.id, tenant.kick, KickSchema, 'Kick');
+  if (kickConfig != null) {
+    tenantConfig.kick = kickConfig;
   }
 
   return tenantConfig;

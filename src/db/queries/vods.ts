@@ -2,8 +2,16 @@ import type { Kysely } from 'kysely';
 import type { Platform } from '../../types/platforms.js';
 import type { StreamerDB, SelectableVods } from '../streamer-types.js';
 
-export async function findVodById(db: Kysely<StreamerDB>, id: number): Promise<SelectableVods | null> {
-  return (await db.selectFrom('vods').selectAll().where('id', '=', id).executeTakeFirst()) ?? null;
+type VodByIdResult = Pick<SelectableVods, 'id' | 'platform_vod_id' | 'platform' | 'title' | 'duration' | 'created_at' | 'is_live'>;
+
+export async function findVodById(db: Kysely<StreamerDB>, id: number): Promise<VodByIdResult | null> {
+  return (
+    (await db
+      .selectFrom('vods')
+      .select(['id', 'platform_vod_id', 'platform', 'title', 'duration', 'created_at', 'is_live'])
+      .where('id', '=', id)
+      .executeTakeFirst()) ?? null
+  );
 }
 
 export async function findVodByPlatformId(
@@ -36,13 +44,15 @@ export async function findVodByStreamId(
   );
 }
 
+export type ActiveLiveVodResult = Pick<SelectableVods, 'id' | 'platform_vod_id' | 'platform_stream_id' | 'is_live' | 'started_at'>;
+
 export async function findActiveLiveVod(
   db: Kysely<StreamerDB>,
   platform: Platform
-): Promise<SelectableVods | undefined> {
+): Promise<ActiveLiveVodResult | undefined> {
   return db
     .selectFrom('vods')
-    .selectAll()
+    .select(['id', 'platform_vod_id', 'platform_stream_id', 'is_live', 'started_at'])
     .where('platform', '=', platform)
     .where('is_live', '=', true)
     .executeTakeFirst();

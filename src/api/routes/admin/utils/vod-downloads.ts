@@ -80,7 +80,7 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
 async function checkIfDownloadNeeded(
   filePath: string,
   dbId: number,
-  vodRecord: SelectableVods,
+  vodRecord: Pick<SelectableVods, 'duration'>,
   log: AppLogger
 ): Promise<boolean> {
   const exists = await fileExists(filePath);

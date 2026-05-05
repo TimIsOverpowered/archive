@@ -4,6 +4,7 @@ import type { Kysely } from 'kysely';
 import { configService } from '../../config/tenant-config.js';
 import type { TenantConfig } from '../../config/types.js';
 import { requirePlatformConfig } from '../../config/types.js';
+import type { ActiveLiveVodResult } from '../../db/queries/vods.js';
 import { findVodByStreamId, findVodByPlatformId } from '../../db/queries/vods.js';
 import type { StreamerDB, InsertableVods, SelectableVods } from '../../db/streamer-types.js';
 import { publishVodUpdate } from '../../services/cache-invalidator.js';
@@ -40,7 +41,7 @@ export async function handlePlatformLiveCheck(
   tenantId: string,
   platform: Platform,
   config: TenantConfig,
-  activeLiveVod: SelectableVods | null = null
+  activeLiveVod: ActiveLiveVodResult | null = null
 ): Promise<void> {
   const log = createAutoLogger(tenantId);
 
@@ -106,7 +107,7 @@ export async function handlePlatformLiveCheckWithStreamStatus(
   tenantId: string,
   config: TenantConfig,
   twitchStatus: TwitchStreamStatus | null,
-  activeLiveVod: SelectableVods | null = null
+  activeLiveVod: ActiveLiveVodResult | null = null
 ): Promise<void> {
   const log = createAutoLogger(tenantId);
   const platform = 'twitch' as Platform;
@@ -166,7 +167,7 @@ async function handleOfflineStream(
   username: string | undefined,
   displayName: string | undefined,
   log: ReturnType<typeof createAutoLogger>,
-  activeLiveVod: SelectableVods | null = null
+  activeLiveVod: ActiveLiveVodResult | null = null
 ): Promise<void> {
   log.debug({ component: 'monitor', username }, 'Streamer is OFFLINE');
 

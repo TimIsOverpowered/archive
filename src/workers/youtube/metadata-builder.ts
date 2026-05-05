@@ -13,7 +13,7 @@ export interface YoutubeMetadataOptions {
   type?: SourceType;
   gameName?: string | undefined;
   epNumber?: number | undefined;
-  vodRecord: SelectableVods;
+  vodRecord: Pick<SelectableVods, 'id' | 'title' | 'created_at'>;
   replayPath?: string | undefined;
 }
 
