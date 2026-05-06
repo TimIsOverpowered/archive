@@ -49,7 +49,7 @@ export async function tenantMiddleware(request: FastifyRequest) {
     notFound('Tenant ID not provided');
   }
 
-  const config = configService.get(tenantId);
+  const config = await configService.get(tenantId);
 
   if (!config) {
     notFound('Tenant not found');

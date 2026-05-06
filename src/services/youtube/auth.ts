@@ -19,7 +19,7 @@ async function updateYoutubeTokenInDb(
   refreshToken: string
 ): Promise<void> {
   const logger = createAutoLogger('youtube-auth');
-  const config = configService.get(tenantId);
+  const config = await configService.get(tenantId);
   if (config?.youtube?.auth == null) {
     return;
   }
@@ -118,7 +118,7 @@ export async function getYoutubeAuth(tenantId: string): Promise<{
   accessToken: string;
 }> {
   const logger = createAutoLogger('youtube-auth');
-  const config = configService.get(tenantId);
+  const config = await configService.get(tenantId);
 
   if (config?.youtube?.auth == null) {
     throw new ConfigNotConfiguredError(`YouTube auth for ${tenantId}`);

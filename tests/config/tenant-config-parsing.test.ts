@@ -549,7 +549,7 @@ describe('ConfigService seed method', () => {
 
     configService.seed([mockConfig as any]);
 
-    const result = configService.get('seeded-tenant');
+    const result = configService.getSync('seeded-tenant');
     assert.ok(result);
     assert.strictEqual(result.displayName, 'Seeded');
     assert.ok(result.twitch);
@@ -617,7 +617,7 @@ describe('ConfigService update methods', () => {
 
     configService.updateYoutubeAuth('t1', { refresh_token: 'new-refresh', expiry_date: 9999999999 });
 
-    const updated = configService.get('t1');
+    const updated = configService.getSync('t1');
     assert.ok(updated);
     assert.ok(updated.youtube);
     assert.strictEqual(updated.youtube.auth!.refresh_token, 'new-refresh');

@@ -8,7 +8,7 @@ export function createAutoLogger(tenantId?: string | null): AppLogger {
     return getLogger();
   }
 
-  const config = configService.get(tenantId);
+  const config = configService.getSync(tenantId);
   const displayName = config?.displayName ?? tenantId;
   const childLog = getLogger().child({ tenantId: displayName });
 

@@ -25,7 +25,7 @@ export async function getChannelBadges(tenantId: string): Promise<Record<string,
     return cached;
   }
 
-  const config = configService.get(tenantId);
+  const config = await configService.get(tenantId);
   if (config?.twitch?.id == null || config.twitch.id === '') {
     log.warn({ tenantId }, 'Twitch user ID not configured for streamer');
     return null;

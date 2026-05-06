@@ -115,7 +115,31 @@ export class ConfigService {
     return Array.from(this.cache.values());
   }
 
-  get(tenantId: string): TenantConfig | undefined {
+  /**
+   * Get tenant config, loading from database on cache miss.
+   * Returns undefined if the tenant doesn't exist or the DB is unavailable.
+   */
+  async get(tenantId: string): Promise<TenantConfig | undefined> {
+    const cached = this.cache.get(tenantId);
+    if (cached) return cached;
+
+    try {
+      await this.reloadTenant(tenantId);
+    } catch (err) {
+      getLogger().warn(
+        { tenantId, error: extractErrorDetails(err) },
+        'Failed to load tenant config from database on cache miss'
+      );
+    }
+
+    return this.cache.get(tenantId);
+  }
+
+  /**
+   * Synchronous cache-only lookup. Returns undefined on cache miss.
+   * Used by logging utilities where a DB round-trip is unnecessary.
+   */
+  getSync(tenantId: string): TenantConfig | undefined {
     return this.cache.get(tenantId);
   }
 

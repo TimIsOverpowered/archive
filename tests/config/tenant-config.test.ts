@@ -129,7 +129,7 @@ describe('ConfigService', () => {
       const result = await configService.loadAll();
 
       assert.strictEqual(result.length, 2);
-      assert.ok(configService.get('t1'));
+      assert.ok(await configService.get('t1'));
     });
   });
 
@@ -141,7 +141,7 @@ describe('ConfigService', () => {
       fakeById = async (id) => (id === 't1' ? makeTenant({ id: 't1', displayName: 'Updated' }) : undefined);
       await configService.reloadTenant('t1');
 
-      assert.strictEqual(configService.get('t1')?.displayName, 'Updated');
+      assert.strictEqual((await configService.get('t1'))?.displayName, 'Updated');
     });
 
     it('deletes cache entry when tenant no longer exists', async () => {
@@ -151,7 +151,7 @@ describe('ConfigService', () => {
       fakeById = async () => undefined;
       await configService.reloadTenant('t1');
 
-      assert.strictEqual(configService.get('t1'), undefined);
+      assert.strictEqual(configService.getSync('t1'), undefined);
     });
   });
 });

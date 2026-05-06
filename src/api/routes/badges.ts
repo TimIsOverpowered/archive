@@ -41,7 +41,7 @@ export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesR
       const tenantId = request.params.tenantId;
       const log = createAutoLogger(tenantId);
 
-      const config = configService.get(tenantId);
+      const config = await configService.get(tenantId);
 
       if (config?.twitch?.id == null) notFound('Twitch not configured for this tenant');
 

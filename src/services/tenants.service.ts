@@ -56,7 +56,7 @@ interface TenantStats {
  * Includes VOD counts by platform, upload success rate, chapter/game counts.
  */
 export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, cacheTtl = 60): Promise<TenantStats> {
-  const config = configService.get(tenantId);
+  const config = await configService.get(tenantId);
 
   if (!config) {
     throw new TenantNotFoundError(tenantId);

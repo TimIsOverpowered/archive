@@ -29,7 +29,7 @@ export default function createTenantLoggerMiddleware() {
       return;
     } // No tenant context available for this route (e.g., health check, root paths)
 
-    const config = configService.get(tenantId);
+    const config = configService.getSync(tenantId);
     const displayName = config?.displayName ?? tenantId;
     request.tenantDisplayName = displayName;
 

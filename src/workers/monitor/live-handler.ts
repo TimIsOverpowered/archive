@@ -388,7 +388,7 @@ export async function validateVodPath(tenantId: string): Promise<{ valid: boolea
   const log = createAutoLogger(tenantId);
 
   try {
-    const streamerConfig = configService.get(tenantId);
+    const streamerConfig = await configService.get(tenantId);
 
     if (streamerConfig?.settings.vodPath == null) {
       log.error({ component: 'monitor', tenantId }, 'VOD path not configured for tenant - cannot queue downloads');

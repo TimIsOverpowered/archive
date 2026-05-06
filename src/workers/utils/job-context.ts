@@ -11,7 +11,7 @@ export interface JobContext {
 }
 
 export async function getJobContext(tenantId: string): Promise<JobContext> {
-  const config = configService.get(tenantId);
+  const config = await configService.get(tenantId);
 
   if (!config) {
     throw new TenantNotFoundError(tenantId);
