@@ -58,6 +58,9 @@ export async function buildServer(config: ApiConfig) {
     exposeHeadRoutes: true,
     loggerInstance: logger as unknown as FastifyBaseLogger,
     trustProxy: true,
+    routerOptions: {
+      ignoreTrailingSlash: true,
+    },
   });
 
   // Set error handler immediately after creating instance (before any plugins/routes)
