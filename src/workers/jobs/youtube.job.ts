@@ -46,7 +46,7 @@ export function createVodUploadJob(
     type,
     platform,
     dmcaProcessed,
-    part: part ?? 1,
+    part,
   };
 }
 
@@ -537,7 +537,6 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
             type,
             platform,
             dmcaProcessed,
-            part: 1,
           },
           opts: {
             jobId: vodJobId,
@@ -570,7 +569,6 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
             type,
             platform,
             dmcaProcessed,
-            part: 1,
           },
           opts: {
             jobId: vodJobId,
