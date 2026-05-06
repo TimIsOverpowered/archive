@@ -52,9 +52,7 @@ export async function buildVodProcessorContext(
   const streamerName = getDisplayName(config);
   const finalPath = getVodFilePath({ config, vodId });
   const alerts = createVodWorkerAlerts();
-  const messageId = await initRichAlert(
-    alerts.init(vodId, platform, streamerName)
-  ).catch(() => null);
+  const messageId = await initRichAlert(alerts.init(vodId, platform, streamerName)).catch(() => null);
 
   return {
     config,

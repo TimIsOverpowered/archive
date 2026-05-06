@@ -60,7 +60,10 @@ async function processTwitchBatchJob(job: Job<MonitorJob>): Promise<{ success: t
     await processTenantWithStreamStatus(cfg, streamMap.get(platformUserId) ?? null, liveQueue);
   }
 
-  log.debug({ component: 'monitor', jobId: job.id, tenantCount: twitchTenants.length, tenants: tenantIds.join(', ') }, 'Twitch batch poll completed');
+  log.debug(
+    { component: 'monitor', jobId: job.id, tenantCount: twitchTenants.length, tenants: tenantIds.join(', ') },
+    'Twitch batch poll completed'
+  );
   return { success: true };
 }
 

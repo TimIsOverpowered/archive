@@ -50,12 +50,7 @@ export async function buildChatProcessorContext(job: Job<ChatDownloadJob>): Prom
   await job.updateProgress(0);
 
   const displayName = getDisplayName(config);
-  const { offset: effectiveOffset, hasExistingData } = await calculateResumeOffset(
-    db,
-    dbId,
-    startOffset,
-    forceRerun
-  );
+  const { offset: effectiveOffset, hasExistingData } = await calculateResumeOffset(db, dbId, startOffset, forceRerun);
   const isResume = hasExistingData && startOffset == null;
   const alerts = createChatWorkerAlerts();
   const messageId = await initRichAlert(

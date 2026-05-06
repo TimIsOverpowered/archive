@@ -83,11 +83,7 @@ export class CacheContext {
     this.inflight.clear();
   }
 
-  async withCache<T>(
-    key: SimpleKey,
-    ttl: number,
-    fetcher: () => Promise<T>,
-  ): Promise<T> {
+  async withCache<T>(key: SimpleKey, ttl: number, fetcher: () => Promise<T>): Promise<T> {
     const client = RedisService.getActiveClient();
     if (!client) return fetcher();
 
@@ -133,7 +129,7 @@ export class CacheContext {
     key: SWRKey,
     ttl: number,
     staleAfter: number,
-    fetcher: () => Promise<T>,
+    fetcher: () => Promise<T>
   ): Promise<T> {
     const client = RedisService.getActiveClient();
     if (!client) return fetcher();
@@ -204,7 +200,7 @@ export class CacheContext {
     client: ReturnType<typeof RedisService.getClient>,
     key: string,
     ttl: number,
-    fetcher: () => Promise<T>,
+    fetcher: () => Promise<T>
   ): Promise<T> {
     const log = getLogger().child({ key });
     const failureKey = `swr:failures:${key}`;
@@ -236,7 +232,7 @@ export class CacheContext {
 
   private async getSwrFailureCount(
     client: ReturnType<typeof RedisService.getClient>,
-    failureKey: string,
+    failureKey: string
   ): Promise<number> {
     try {
       const val = await client.get(failureKey);
@@ -249,7 +245,7 @@ export class CacheContext {
 
   private async incrementSwrFailureCount(
     client: ReturnType<typeof RedisService.getClient>,
-    failureKey: string,
+    failureKey: string
   ): Promise<void> {
     try {
       const pipeline = client.pipeline();
@@ -264,7 +260,7 @@ export class CacheContext {
 
   private async clearSwrFailureCount(
     client: ReturnType<typeof RedisService.getClient>,
-    failureKey: string,
+    failureKey: string
   ): Promise<void> {
     try {
       await client.del(failureKey);

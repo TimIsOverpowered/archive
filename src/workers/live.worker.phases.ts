@@ -46,9 +46,7 @@ export async function buildLiveProcessorContext(
 
   const streamerName = getDisplayName(config);
   const alerts = createLiveWorkerAlerts();
-  const messageId = await initRichAlert(
-    alerts.init(vodId, platform, streamerName, startedAt)
-  ).catch(() => null);
+  const messageId = await initRichAlert(alerts.init(vodId, platform, streamerName, startedAt)).catch(() => null);
 
   return {
     config,

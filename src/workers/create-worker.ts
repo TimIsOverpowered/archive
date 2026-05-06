@@ -117,7 +117,7 @@ export function createWorker<TData>(config: WorkerConfig<TData>): Worker<TData, 
  * All returned values will be `unknown | undefined` when the key is absent.
  */
 function extractJobMeta(data: unknown) {
- if (typeof data !== 'object' || data == null) {
+  if (typeof data !== 'object' || data == null) {
     return { vodId: undefined, platform: undefined, tenantId: undefined, type: undefined, reqId: undefined };
   }
   const obj = data as Record<string, unknown>;

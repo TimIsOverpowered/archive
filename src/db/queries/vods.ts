@@ -2,7 +2,10 @@ import type { Kysely } from 'kysely';
 import type { Platform } from '../../types/platforms.js';
 import type { StreamerDB, SelectableVods } from '../streamer-types.js';
 
-type VodByIdResult = Pick<SelectableVods, 'id' | 'platform_vod_id' | 'platform' | 'title' | 'duration' | 'created_at' | 'is_live'>;
+type VodByIdResult = Pick<
+  SelectableVods,
+  'id' | 'platform_vod_id' | 'platform' | 'title' | 'duration' | 'created_at' | 'is_live'
+>;
 
 export async function findVodById(db: Kysely<StreamerDB>, id: number): Promise<VodByIdResult | null> {
   return (
@@ -44,7 +47,10 @@ export async function findVodByStreamId(
   );
 }
 
-export type ActiveLiveVodResult = Pick<SelectableVods, 'id' | 'platform_vod_id' | 'platform_stream_id' | 'is_live' | 'started_at'>;
+export type ActiveLiveVodResult = Pick<
+  SelectableVods,
+  'id' | 'platform_vod_id' | 'platform_stream_id' | 'is_live' | 'started_at'
+>;
 
 export async function findActiveLiveVod(
   db: Kysely<StreamerDB>,
