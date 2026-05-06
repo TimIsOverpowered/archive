@@ -27,38 +27,38 @@ export interface VodEmotes {
   seventv_emotes: EmoteData[];
 }
 
-interface FFZResponse {
-  channels?: Record<
-    string,
-    {
-      emotes?: Array<{
-        id: number;
-        code: string;
-      }>;
-    }
-  >;
+interface FFZEmoticon {
+  id: number;
+  name: string;
 }
 
-interface BTTVGlobalResponse {
-  emotes?: Array<{
-    id: string;
-    code: string;
-  }>;
+interface FFZResponse {
+  room?: {
+    set: string;
+  };
+  sets?: Record<string, { emoticons?: FFZEmoticon[] }>;
+}
+
+interface BTTVEmote {
+  id: string;
+  code: string;
 }
 
 interface BTTVChannelResponse {
-  channelEmotes?: Array<{
-    id: string;
-    code: string;
-  }>;
+  channelEmotes?: BTTVEmote[];
+  sharedEmotes?: BTTVEmote[];
+}
+
+interface SevenTVEmote {
+  id: string;
+  name: string;
+  flags: number;
 }
 
 interface SevenTVResponse {
-  emotes?: Array<{
-    id: string;
-    name: string;
-    flags: number;
-  }>;
+  emote_set?: {
+    emotes?: SevenTVEmote[];
+  };
 }
 
 /**
@@ -76,49 +76,42 @@ export async function fetchAndSaveEmotes(
   let sevenTvEmotes: EmoteData[] = [];
 
   if (platform === PLATFORMS.TWITCH && platformId != null && platformId !== '') {
-    const [ffzRes, bttvGlobalRes, bttvChannelRes, sevenTvRes, sevenTvGlobalRes] = await Promise.all([
+    const [ffzRes, bttvChannelRes, sevenTvRes] = await Promise.all([
       safeRequest<FFZResponse>(`${Emote.FFZ_API_BASE}/${platformId}`, {}, { timeoutMs: 5000 }),
-      safeRequest<BTTVGlobalResponse>(`${Emote.BTTV_API_BASE}/emotes/global`, { emotes: [] }, { timeoutMs: 5000 }),
       safeRequest<BTTVChannelResponse>(
         `${Emote.BTTV_API_BASE}/users/twitch/${platformId}`,
-        { channelEmotes: [] },
+        { channelEmotes: [], sharedEmotes: [] },
         { timeoutMs: 5000 }
       ),
       safeRequest<SevenTVResponse>(
         `${Emote.SEVENTV_API_BASE}/users/twitch/${platformId}`,
-        { emotes: [] },
+        { emote_set: {} },
         { timeoutMs: 5000 }
       ),
-      safeRequest<SevenTVResponse>(`${Emote.SEVENTV_API_BASE}/emote-sets/global`, { emotes: [] }, { timeoutMs: 5000 }),
     ]);
 
-    ffzEmotes = (ffzRes.channels?.[platformId]?.emotes ?? []).map((e) => ({ id: String(e.id), code: e.code })) ?? [];
+    const ffzSetKey = ffzRes.room?.set ?? null;
+    ffzEmotes = (ffzSetKey != null ? (ffzRes.sets?.[ffzSetKey]?.emoticons ?? []) : []).map((e) => ({
+      id: String(e.id),
+      code: e.name,
+    }));
 
     bttvEmotes = [
-      ...(bttvGlobalRes.emotes ?? []).map(({ id, code }) => ({ id, code })),
-      ...((bttvChannelRes.channelEmotes ?? [])?.map(({ id, code }) => ({ id, code })) ?? []),
+      ...(bttvChannelRes.channelEmotes ?? []).map(({ id, code }) => ({ id, code })),
+      ...(bttvChannelRes.sharedEmotes ?? []).map(({ id, code }) => ({ id, code })),
     ];
 
-    sevenTvEmotes = [
-      ...(sevenTvGlobalRes?.emotes ?? []).map((e) => ({ id: e.id, code: e.name, flags: e.flags })),
-      ...(sevenTvRes?.emotes ?? []).map((e) => ({ id: e.id, code: e.name, flags: e.flags })),
-    ];
+    sevenTvEmotes = (sevenTvRes.emote_set?.emotes ?? []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
   } else if (platform === PLATFORMS.KICK && platformId != null && platformId !== '') {
-    const [sevenTvRes, sevenTvGlobalRes] = await Promise.all([
-      safeRequest<SevenTVResponse>(
-        `${Emote.SEVENTV_API_BASE}/users/twitch/${platformId}`,
-        { emotes: [] },
-        { timeoutMs: 5000 }
-      ),
-      safeRequest<SevenTVResponse>(`${Emote.SEVENTV_API_BASE}/emote-sets/global`, { emotes: [] }, { timeoutMs: 5000 }),
-    ]);
+    const sevenTvRes = await safeRequest<SevenTVResponse>(
+      `${Emote.SEVENTV_API_BASE}/users/kick/${platformId}`,
+      { emote_set: {} },
+      { timeoutMs: 5000 }
+    );
 
     ffzEmotes = [];
     bttvEmotes = [];
-    sevenTvEmotes = [
-      ...(sevenTvGlobalRes?.emotes ?? []).map((e) => ({ id: e.id, code: e.name, flags: e.flags })),
-      ...(sevenTvRes?.emotes ?? []).map((e) => ({ id: e.id, code: e.name, flags: e.flags })),
-    ];
+    sevenTvEmotes = (sevenTvRes.emote_set?.emotes ?? []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
   }
 
   if (ffzEmotes.length === 0 && bttvEmotes.length === 0 && sevenTvEmotes.length === 0) {
