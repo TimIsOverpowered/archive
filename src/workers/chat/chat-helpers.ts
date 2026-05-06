@@ -79,32 +79,24 @@ export async function calculateResumeOffset(
 }
 
 export function extractMessageData(node: TwitchChatMessageNode | null | undefined): {
-  message: Record<string, unknown>;
+  message: unknown[];
   userBadges?: Record<string, unknown> | undefined;
 } {
   if (!node || !node.message) {
-    return { message: { content: '', fragments: [] }, userBadges: undefined };
+    return { message: [], userBadges: undefined };
   }
 
   const rawFragments = node.message.fragments ?? [];
   const cleanFragments = stripTypename(rawFragments);
+
   const badgesRaw = node.message.userBadges ?? null;
 
   return {
-    message: {
-      content: (Array.isArray(cleanFragments) ? cleanFragments : [])
-        .map((f: unknown) => {
-          if (typeof f !== 'object' || f === null) return '';
-          const text = (f as Record<string, unknown>).text;
-          return typeof text === 'string' ? text : '';
-        })
-        .join(''),
-      fragments: Array.isArray(cleanFragments)
-        ? cleanFragments.map((frag) =>
-            typeof frag === 'object' && frag !== null ? { ...(frag as Record<string, unknown>) } : {}
-          )
-        : [],
-    },
+    message: Array.isArray(cleanFragments)
+      ? cleanFragments.map((frag) =>
+          typeof frag === 'object' && frag !== null ? { ...(frag as Record<string, unknown>) } : {}
+        )
+      : [],
     userBadges:
       badgesRaw && typeof stripTypename(badgesRaw) === 'object'
         ? (stripTypename(badgesRaw) as Record<string, unknown>)

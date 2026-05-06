@@ -138,7 +138,7 @@ describe('extractEdges', () => {
 });
 
 describe('extractMessageData', () => {
-  it('should extract message content from a valid node', () => {
+  it('should extract fragments from a valid node', () => {
     const node = {
       message: {
         fragments: [{ text: 'hello ' }, { text: 'world' }],
@@ -146,30 +146,26 @@ describe('extractMessageData', () => {
       },
     };
     const result = extractMessageData(node as any);
-    assert.strictEqual(result.message.content, 'hello world');
-    assert.deepStrictEqual(result.message.fragments, [{ text: 'hello ' }, { text: 'world' }]);
+    assert.deepStrictEqual(result.message, [{ text: 'hello ' }, { text: 'world' }]);
     assert.strictEqual(result.userBadges, undefined);
   });
 
   it('should handle node with null message', () => {
     const node = { message: null };
     const result = extractMessageData(node as any);
-    assert.strictEqual(result.message.content, '');
-    assert.deepStrictEqual(result.message.fragments, []);
+    assert.deepStrictEqual(result.message, []);
     assert.strictEqual(result.userBadges, undefined);
   });
 
   it('should handle undefined node', () => {
     const result = extractMessageData(undefined);
-    assert.strictEqual(result.message.content, '');
-    assert.deepStrictEqual(result.message.fragments, []);
+    assert.deepStrictEqual(result.message, []);
     assert.strictEqual(result.userBadges, undefined);
   });
 
   it('should handle null node', () => {
     const result = extractMessageData(null);
-    assert.strictEqual(result.message.content, '');
-    assert.deepStrictEqual(result.message.fragments, []);
+    assert.deepStrictEqual(result.message, []);
     assert.strictEqual(result.userBadges, undefined);
   });
 
@@ -181,8 +177,8 @@ describe('extractMessageData', () => {
       },
     };
     const result = extractMessageData(node as any);
-    assert.strictEqual(result.message.content, 'hello world');
-    assert.deepStrictEqual((result.message.fragments as any)[0], { text: 'hello' });
+    assert.deepStrictEqual(result.message[0], { text: 'hello' });
+    assert.deepStrictEqual(result.message[1], { text: ' world' });
   });
 
   it('should extract userBadges when present', () => {
@@ -214,7 +210,7 @@ describe('extractMessageData', () => {
       },
     };
     const result = extractMessageData(node as any);
-    assert.strictEqual(result.message.content, '');
+    assert.deepStrictEqual(result.message, []);
   });
 
   it('should handle fragments with null/undefined text', () => {
@@ -225,7 +221,7 @@ describe('extractMessageData', () => {
       },
     };
     const result = extractMessageData(node as any);
-    assert.strictEqual(result.message.content, 'valid');
+    assert.deepStrictEqual(result.message, [{ text: null }, { text: undefined }, { text: 'valid' }]);
   });
 
   it('should handle non-object fragments in array', () => {
@@ -236,10 +232,14 @@ describe('extractMessageData', () => {
       },
     };
     const result = extractMessageData(node as any);
-    assert.strictEqual(result.message.content, 'good');
+    assert.strictEqual(result.message.length, 4);
+    assert.deepStrictEqual(result.message[0], {});
+    assert.deepStrictEqual(result.message[1], {});
+    assert.deepStrictEqual(result.message[2], {});
+    assert.deepStrictEqual(result.message[3], { text: 'good' });
   });
 
-  it('should handle fragments as non-array (should return empty string)', () => {
+  it('should handle fragments as non-array (should return empty array)', () => {
     const node = {
       message: {
         fragments: 'not-an-array',
@@ -247,7 +247,7 @@ describe('extractMessageData', () => {
       },
     };
     const result = extractMessageData(node as any);
-    assert.strictEqual(result.message.content, '');
+    assert.deepStrictEqual(result.message, []);
   });
 
   it('should deep copy fragments array', () => {
@@ -258,8 +258,7 @@ describe('extractMessageData', () => {
       },
     };
     const result = extractMessageData(node as any);
-    (result.message.fragments as any)[0].text = 'modified';
-    // The original should not be affected since we create a new object
-    assert.deepStrictEqual((result.message.fragments as any)[0], { text: 'modified' });
+    (result.message as any)[0].text = 'modified';
+    assert.deepStrictEqual(result.message[0], { text: 'modified' });
   });
 });

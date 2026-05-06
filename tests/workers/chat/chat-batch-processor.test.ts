@@ -7,13 +7,31 @@ import type { ChatMessageCreateInput } from '../../../src/workers/chat/chat-type
 function createMockDb(): any {
   const insertCalls: any[] = [];
   let insertValue: any = { onConflict: () => ({ execute: async () => undefined }) };
+  let conflictHandler: string | null = null;
 
   return {
     insertInto: (table: string) => {
       insertCalls.push({ table });
       return {
         values: (values: any[]) => {
-          insertValue = { values, onConflict: () => ({ execute: async () => undefined }) };
+          insertValue = {
+            values,
+            onConflict: (cb: (oc: any) => any) => {
+              const oc = {
+                columns: () => ({
+                  doNothing: () => {
+                    conflictHandler = 'doNothing';
+                    return { execute: async () => undefined };
+                  },
+                  doUpdateSet: () => {
+                    conflictHandler = 'doUpdateSet';
+                    return { execute: async () => undefined };
+                  },
+                }),
+              };
+              return cb(oc);
+            },
+          };
           return insertValue;
         },
       };
@@ -36,6 +54,7 @@ function createMockDb(): any {
     }),
     getInsertCalls: () => insertCalls,
     getInsertValue: () => insertValue,
+    getConflictHandler: () => conflictHandler,
   };
 }
 
@@ -65,7 +84,7 @@ function createMockMessage(override: Partial<ChatMessageCreateInput> = {}): Chat
     display_name: 'TestUser',
     content_offset_seconds: 10,
     createdAt: new Date('2024-01-15T20:00:00Z'),
-    message: { content: 'hello', fragments: [] },
+    message: [],
     user_badges: undefined,
     user_color: '#FF0000',
     ...override,
@@ -226,7 +245,7 @@ describe('flushChatBatch', () => {
       id: 'msg-1',
       display_name: 'TestUser',
       user_color: '#FF0000',
-      message: { content: 'hello', fragments: [{ text: 'hello' }] },
+      message: [{ text: 'hello' }],
       user_badges: [{ setID: 'mod' }],
     });
     const options: FlushBatchOptions = {
@@ -250,7 +269,7 @@ describe('flushChatBatch', () => {
     assert.strictEqual(inserted.content_offset_seconds, 10);
     assert.strictEqual(inserted.user_color, '#FF0000');
     assert.ok(inserted.created_at);
-    assert.strictEqual(inserted.message, JSON.stringify({ content: 'hello', fragments: [{ text: 'hello' }] }));
+    assert.strictEqual(inserted.message, JSON.stringify([{ text: 'hello' }]));
   });
 
   it('should handle null message and user_badges fields', async () => {
@@ -324,5 +343,44 @@ describe('flushChatBatch', () => {
 
     await flushChatBatch(options);
     assert.strictEqual(onProgressCalled, false);
+  });
+
+  it('should use doNothing on conflict by default', async () => {
+    const db = createMockDb();
+    const log = createMockLog();
+
+    const options: FlushBatchOptions = {
+      db,
+      buffer: [createMockMessage()],
+      log,
+      vodId: 'vod-123',
+      onProgress: () => {},
+      lastOffset: 100,
+      totalMessages: 50,
+      batchCount: 5,
+    };
+
+    await flushChatBatch(options);
+    assert.strictEqual(db.getConflictHandler(), 'doNothing');
+  });
+
+  it('should use doUpdateSet on conflict when forceRerun is true', async () => {
+    const db = createMockDb();
+    const log = createMockLog();
+
+    const options: FlushBatchOptions = {
+      db,
+      buffer: [createMockMessage()],
+      log,
+      vodId: 'vod-123',
+      onProgress: () => {},
+      lastOffset: 100,
+      totalMessages: 50,
+      batchCount: 5,
+      forceRerun: true,
+    };
+
+    await flushChatBatch(options);
+    assert.strictEqual(db.getConflictHandler(), 'doUpdateSet');
   });
 });

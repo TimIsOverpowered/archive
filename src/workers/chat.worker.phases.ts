@@ -161,7 +161,7 @@ async function countChatMessages(db: Kysely<StreamerDB>, dbId: number): Promise<
 export async function downloadChatMessages(
   ctx: ChatProcessorContext
 ): Promise<{ totalMessages: number; batchCount: number }> {
-  const { displayName, dbId, vodId, platform, duration, log, alerts, messageId, db, tenantId } = ctx;
+  const { displayName, dbId, vodId, platform, duration, log, alerts, messageId, db, tenantId, forceRerun } = ctx;
   let totalMessages = 0;
   let batchCount = 0;
   const batchBuffer: ChatMessageCreateInput[] = [];
@@ -229,6 +229,7 @@ export async function downloadChatMessages(
         lastOffset,
         totalMessages,
         batchCount,
+        forceRerun,
       });
       totalMessages = result.totalMessages;
       batchCount = result.batchCount;
@@ -255,6 +256,7 @@ export async function downloadChatMessages(
       lastOffset: ctx.effectiveOffset,
       totalMessages,
       batchCount,
+      forceRerun,
     });
     totalMessages = result.totalMessages;
     batchCount = result.batchCount;
