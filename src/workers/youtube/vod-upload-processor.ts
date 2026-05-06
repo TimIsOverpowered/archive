@@ -32,7 +32,7 @@ export interface VodUploadContext {
 }
 
 export interface VodUploadResult {
-  uploadedVideos: Array<{ id: string; part: number; duration: number }>;
+  uploadedVideos: Array<{ id: string; part: number; duration: number; thumbnailUrl: string }>;
   needsPartLinking: boolean;
 }
 
@@ -167,7 +167,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
     }
   );
 
-  const uploadedVideos: Array<{ id: string; part: number; duration: number }> = [];
+  const uploadedVideos: Array<{ id: string; part: number; duration: number; thumbnailUrl: string }> = [];
 
   for (let i = 0; i < parts.length; i++) {
     const currentPartNum = i + 1;
@@ -223,7 +223,7 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
       partDuration
     );
 
-    uploadedVideos.push({ id: result.videoId, part: i + 1, duration: partDuration });
+    uploadedVideos.push({ id: result.videoId, part: i + 1, duration: partDuration, thumbnailUrl: result.thumbnailUrl });
 
     await deleteFileIfExists(partPath);
   }
@@ -328,7 +328,7 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
   );
 
   const uploadPart = part ?? 1;
-  const uploadedVideos = [{ id: result.videoId, part: uploadPart, duration }];
+  const uploadedVideos = [{ id: result.videoId, part: uploadPart, duration, thumbnailUrl: result.thumbnailUrl }];
 
   if (!config.settings.saveMP4 || dmcaProcessed === true) {
     await deleteFileIfExists(filePath);
@@ -340,7 +340,7 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
 export function linkVodPartsAfterDelay(
   tenantId: string,
   dbId: number,
-  uploadedVideos: Array<{ id: string; part: number; duration: number }>,
+  uploadedVideos: Array<{ id: string; part: number; duration: number; thumbnailUrl: string }>,
   splitDuration: number,
   db: Kysely<StreamerDB>,
   log: AppLogger

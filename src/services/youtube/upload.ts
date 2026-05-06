@@ -12,6 +12,7 @@ export interface UploadedVideo {
   id: string;
   part: number;
   duration: number;
+  thumbnailUrl: string;
 }
 
 export async function saveUploadResult(
@@ -30,11 +31,15 @@ export async function saveUploadResult(
         duration: video.duration,
         part: video.part,
         status: 'COMPLETED',
+        thumbnail_url: video.thumbnailUrl ?? null,
       })
       .onConflict((oc) =>
-        oc
-          .columns(['vod_id', 'type', 'part'])
-          .doUpdateSet({ upload_id: video.id, status: 'COMPLETED', duration: video.duration })
+        oc.columns(['vod_id', 'type', 'part']).doUpdateSet({
+          upload_id: video.id,
+          status: 'COMPLETED',
+          duration: video.duration,
+          thumbnail_url: video.thumbnailUrl ?? null,
+        })
       )
       .execute();
   }
@@ -136,7 +141,8 @@ export async function uploadVideo(
       await onProgress({ milestone: 'processing_metadata', videoId });
     }
 
-    const thumbnailUrl = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+    const thumbnailUrl =
+      response.data.snippet?.thumbnails?.medium?.url ?? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
 
     if (onProgress) {
       await onProgress({ milestone: 'success', videoId, thumbnailUrl, videoDuration, privacyStatus });
