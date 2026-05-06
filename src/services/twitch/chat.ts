@@ -48,9 +48,16 @@ export interface TwitchChatEdge {
   node: TwitchChatMessageNode | null;
 }
 
+export interface TwitchPageInfo {
+  __typename?: 'PageInfo';
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
 export interface TwitchCommentsConnection {
   __typename?: 'VideoCommentsConnection';
   edges: TwitchChatEdge[] | null;
+  pageInfo?: TwitchPageInfo | null;
 }
 
 export interface TwitchVideoCommentResponse {

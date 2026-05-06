@@ -19,7 +19,6 @@ export interface FlushBatchOptions {
   lastOffset: number;
   totalMessages: number;
   batchCount: number;
-  forceRerun?: boolean;
 }
 
 function toInsertableChatMessage(msg: ChatMessageCreateInput): InsertableChatMessages {
@@ -36,31 +35,24 @@ function toInsertableChatMessage(msg: ChatMessageCreateInput): InsertableChatMes
 }
 
 export async function flushChatBatch(options: FlushBatchOptions): Promise<FlushBatchResult> {
-  const { db, buffer, log, vodId, onProgress, lastOffset, totalMessages, batchCount, forceRerun } = options;
+  const { db, buffer, log, vodId, onProgress, lastOffset, totalMessages, batchCount } = options;
 
   if (buffer.length === 0) {
     return { totalMessages, batchCount };
   }
 
-  const insertQuery = db
-    .insertInto('chat_messages')
-    .values(buffer.map(toInsertableChatMessage))
-    .onConflict((oc) =>
-      forceRerun === true
-        ? oc.columns(['id', 'created_at']).doUpdateSet({
-            display_name: (eb) => eb.ref('excluded.display_name'),
-            content_offset_seconds: (eb) => eb.ref('excluded.content_offset_seconds'),
-            user_color: (eb) => eb.ref('excluded.user_color'),
-            message: (eb) => eb.ref('excluded.message'),
-            user_badges: (eb) => eb.ref('excluded.user_badges'),
-          })
-        : oc.columns(['id', 'created_at']).doNothing()
-    );
-
-  await retryWithBackoff(() => insertQuery.execute(), {
-    attempts: Chat.MAX_RETRIES,
-    baseDelayMs: Chat.RETRY_DELAY_MS,
-  });
+  await retryWithBackoff(
+    () =>
+      db
+        .insertInto('chat_messages')
+        .values(buffer.map(toInsertableChatMessage))
+        .onConflict((oc) => oc.columns(['id', 'created_at']).doNothing())
+        .execute(),
+    {
+      attempts: Chat.MAX_RETRIES,
+      baseDelayMs: Chat.RETRY_DELAY_MS,
+    }
+  );
 
   const newTotalMessages = totalMessages + buffer.length;
   const newBatchCount = batchCount + 1;

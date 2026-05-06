@@ -168,6 +168,11 @@ export async function downloadChatMessages(
 
   log.info({ vodId, effectiveOffset: ctx.effectiveOffset }, 'Starting chat download');
 
+  if (forceRerun === true) {
+    await db.deleteFrom('chat_messages').where('vod_id', '=', dbId).execute();
+    log.info({ vodId }, 'Cleared existing chat messages for force rerun');
+  }
+
   const reportProgress = (offset: number) => {
     if (duration > 0) {
       const pct = Math.min(Math.round((offset / duration) * 100), 100);
@@ -229,7 +234,6 @@ export async function downloadChatMessages(
         lastOffset,
         totalMessages,
         batchCount,
-        forceRerun,
       });
       totalMessages = result.totalMessages;
       batchCount = result.batchCount;
@@ -256,7 +260,6 @@ export async function downloadChatMessages(
       lastOffset: ctx.effectiveOffset,
       totalMessages,
       batchCount,
-      forceRerun,
     });
     totalMessages = result.totalMessages;
     batchCount = result.batchCount;
@@ -271,16 +274,15 @@ async function* paginateChatComments(
   tenantId: string
 ): AsyncGenerator<TwitchVideoCommentResponse> {
   let page = await fetchComments(vodId, offset, tenantId);
-  let lastCursor: string | null = null;
 
   while (page && typeof page === 'object') {
     yield page;
     const comments = page.comments;
-    if (!comments) break;
+    const hasNextPage = comments?.pageInfo?.hasNextPage ?? false;
+    if (!comments || hasNextPage === false) break;
     const edges = extractEdges(comments);
     const cursor = edges.at(-1)?.cursor ?? null;
-    if (cursor == null || cursor === lastCursor) break;
-    lastCursor = cursor;
+    if (cursor == null || cursor === '') break;
     await sleep(jitter(Chat.RATE_LIMIT_MS));
     page = await fetchNextComments(vodId, cursor, tenantId);
   }

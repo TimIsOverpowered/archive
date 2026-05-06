@@ -7,31 +7,13 @@ import type { ChatMessageCreateInput } from '../../../src/workers/chat/chat-type
 function createMockDb(): any {
   const insertCalls: any[] = [];
   let insertValue: any = { onConflict: () => ({ execute: async () => undefined }) };
-  let conflictHandler: string | null = null;
 
   return {
     insertInto: (table: string) => {
       insertCalls.push({ table });
       return {
         values: (values: any[]) => {
-          insertValue = {
-            values,
-            onConflict: (cb: (oc: any) => any) => {
-              const oc = {
-                columns: () => ({
-                  doNothing: () => {
-                    conflictHandler = 'doNothing';
-                    return { execute: async () => undefined };
-                  },
-                  doUpdateSet: () => {
-                    conflictHandler = 'doUpdateSet';
-                    return { execute: async () => undefined };
-                  },
-                }),
-              };
-              return cb(oc);
-            },
-          };
+          insertValue = { values, onConflict: () => ({ execute: async () => undefined }) };
           return insertValue;
         },
       };
@@ -54,7 +36,6 @@ function createMockDb(): any {
     }),
     getInsertCalls: () => insertCalls,
     getInsertValue: () => insertValue,
-    getConflictHandler: () => conflictHandler,
   };
 }
 
@@ -343,44 +324,5 @@ describe('flushChatBatch', () => {
 
     await flushChatBatch(options);
     assert.strictEqual(onProgressCalled, false);
-  });
-
-  it('should use doNothing on conflict by default', async () => {
-    const db = createMockDb();
-    const log = createMockLog();
-
-    const options: FlushBatchOptions = {
-      db,
-      buffer: [createMockMessage()],
-      log,
-      vodId: 'vod-123',
-      onProgress: () => {},
-      lastOffset: 100,
-      totalMessages: 50,
-      batchCount: 5,
-    };
-
-    await flushChatBatch(options);
-    assert.strictEqual(db.getConflictHandler(), 'doNothing');
-  });
-
-  it('should use doUpdateSet on conflict when forceRerun is true', async () => {
-    const db = createMockDb();
-    const log = createMockLog();
-
-    const options: FlushBatchOptions = {
-      db,
-      buffer: [createMockMessage()],
-      log,
-      vodId: 'vod-123',
-      onProgress: () => {},
-      lastOffset: 100,
-      totalMessages: 50,
-      batchCount: 5,
-      forceRerun: true,
-    };
-
-    await flushChatBatch(options);
-    assert.strictEqual(db.getConflictHandler(), 'doUpdateSet');
   });
 });
