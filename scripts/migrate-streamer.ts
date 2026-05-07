@@ -766,6 +766,11 @@ const main = async () => {
           }
           const end = start + duration;
 
+          let image = game.chapter_image || null;
+          if (image) {
+            image = image.replace('40x53', '{width}x{height}');
+          }
+
           await schemaClient.query(
             `INSERT INTO "games_new" (vod_id, start, duration, "end", video_provider, video_id, thumbnail_url, game_id, game_name, title, chapter_image, created_at, updated_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
@@ -780,7 +785,7 @@ const main = async () => {
               game.game_id,
               game.game_name,
               game.title,
-              game.chapter_image,
+              image,
               game.created_at || game.createdAt || new Date(),
               game.updated_at || game.updatedAt || new Date(),
             ]
