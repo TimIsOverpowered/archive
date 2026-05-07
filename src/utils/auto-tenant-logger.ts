@@ -22,9 +22,9 @@ export function createAutoLogger(tenantId?: string | null): AppLogger {
   };
 
   function wrapMethod(method: LogFn): WrappedLogFn {
-    const bound = method.bind(childLog);
+    const bound: (...args: unknown[]) => void = method.bind(childLog);
 
-    return (firstArg, ...rest): void => {
+    return (firstArg: string | Record<string, unknown>, ...rest: unknown[]): void => {
       if (typeof firstArg === 'string') {
         bound(prefix(firstArg), ...rest);
         return;
@@ -38,8 +38,9 @@ export function createAutoLogger(tenantId?: string | null): AppLogger {
           obj.message = prefix(obj.message);
         }
 
-        if (typeof rest[0] === 'string') {
-          bound(obj, prefix(rest[0]), ...rest.slice(1));
+        const secondArg = rest[0];
+        if (typeof secondArg === 'string') {
+          bound(obj, prefix(secondArg), ...rest.slice(1));
           return;
         }
 
@@ -53,7 +54,7 @@ export function createAutoLogger(tenantId?: string | null): AppLogger {
 
   const wrappedLog = Object.create(childLog) as AppLogger;
 
-  const logLevels: (keyof AppLogger)[] = ['info', 'error', 'warn', 'debug', 'trace', 'fatal'] as (keyof AppLogger)[];
+  const logLevels: (keyof AppLogger)[] = ['info', 'error', 'warn', 'debug', 'trace', 'fatal'];
 
   for (const level of logLevels) {
     const original = childLog[level];

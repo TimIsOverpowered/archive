@@ -1,14 +1,11 @@
 import { Job } from 'bullmq';
-import type { Kysely } from 'kysely';
-import type { TenantConfig } from '../config/types.js';
-import type { SelectableGames, StreamerDB } from '../db/streamer-types.js';
-import type { Platform, SourceType } from '../types/platforms.js';
+import type { SelectableGames } from '../db/streamer-types.js';
+import type { SourceType } from '../types/platforms.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { initRichAlert } from '../utils/discord-alerts.js';
 import { ConfigNotConfiguredError, FileNotFound } from '../utils/domain-errors.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { toHHMMSS } from '../utils/formatting.js';
-import type { AppLogger } from '../utils/logger.js';
 import { fileExists, getVodDirPath } from '../utils/path.js';
 import {
   isBlockingPolicy,
@@ -22,19 +19,14 @@ import {
 import type { DMCAClaim } from './dmca/dmca.js';
 import type { DmcaProcessingJob } from './jobs/types.js';
 import { queueYoutubeVodUpload, queueYoutubeGameUploadByGame } from './jobs/youtube.job.js';
+import type { BaseWorkerContext } from './types.js';
 import { createDmcaWorkerAlerts, DmcaClaimInfo, safeUpdateAlert } from './utils/alert-factories.js';
 import type { DmcaWorkerAlerts } from './utils/alert-factories.js';
 import { trimVideo } from './utils/ffmpeg.js';
 import { getJobContext } from './utils/job-context.js';
 
-export interface DmcaProcessorContext {
+export interface DmcaProcessorContext extends BaseWorkerContext {
   job: Job<DmcaProcessingJob>;
-  config: TenantConfig;
-  db: Kysely<StreamerDB>;
-  tenantId: string;
-  dbId: number;
-  vodId: string;
-  platform: Platform;
   type: SourceType;
   displayName: string;
   filePath: string;
@@ -46,9 +38,7 @@ export interface DmcaProcessorContext {
   gameStart: number | undefined;
   gameDuration: number | undefined;
   part: number | undefined;
-  log: AppLogger;
   alerts: DmcaWorkerAlerts;
-  messageId: string | null;
   workDir: string;
   tempFiles: string[];
   completedClaimIds: string[];
