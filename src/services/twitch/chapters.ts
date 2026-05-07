@@ -157,7 +157,7 @@ export async function saveVodChapters(
             if (gameId != null && gameId !== '') {
               const gameData = await getGameData(gameId, { tenantId });
               if (gameData != null && typeof gameData.box_art_url === 'string') {
-                gameImage = gameData.box_art_url.replace('{width}x{height}', '40x53');
+                gameImage = gameData.box_art_url;
               }
             }
 
