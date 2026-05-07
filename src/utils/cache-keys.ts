@@ -63,6 +63,7 @@ function simpleKey(s: string): SimpleKey {
 
 export const swrKeys = {
   vodStatic: (tenantId: string, dbId: number): SWRKey => swrKey(`swr:vod:{${tenantId}}:${dbId}`),
+  vodMeta: (tenantId: string, dbId: number): SWRKey => swrKey(`swr:vod:meta:{${tenantId}}:${dbId}`),
   vodVolatile: (tenantId: string, dbId: number): SWRKey => swrKey(`swr:vod:volatile:{${tenantId}}:${dbId}`),
   vodTags: (tenantId: string, dbId: number): SWRKey => swrKey(`swr:vods:tags:{${tenantId}}:${dbId}`),
   bucketSize: (tenantId: string, vodId: number): SWRKey => swrKey(`swr:{${tenantId}}:${vodId}:bucketSize`),
@@ -102,6 +103,7 @@ export const swrKeys = {
 
 export const simpleKeys = {
   vodStatic: (tenantId: string, dbId: number): SimpleKey => simpleKey(`simple:vod:{${tenantId}}:${dbId}`),
+  vodMeta: (tenantId: string, dbId: number): SimpleKey => simpleKey(`simple:vod:meta:{${tenantId}}:${dbId}`),
   vodVolatile: (tenantId: string, dbId: number): SimpleKey => simpleKey(`simple:vod:volatile:{${tenantId}}:${dbId}`),
   vodTags: (tenantId: string, dbId: number): SimpleKey => simpleKey(`simple:vods:tags:{${tenantId}}:${dbId}`),
   bucketSize: (tenantId: string, vodId: number): SimpleKey => simpleKey(`simple:{${tenantId}}:${vodId}:bucketSize`),
@@ -141,6 +143,7 @@ export const simpleKeys = {
 
 export const CacheKeys = {
   vodStatic: (tenantId: string, dbId: number) => `vod:{${tenantId}}:${dbId}`,
+  vodMeta: (tenantId: string, dbId: number) => `vod:meta:{${tenantId}}:${dbId}`,
   vodVolatile: (tenantId: string, dbId: number) => `vod:volatile:{${tenantId}}:${dbId}`,
   vodTags: (tenantId: string, dbId: number) => `vods:tags:{${tenantId}}:${dbId}`,
   bucketSize: (tenantId: string, vodId: number) => `{${tenantId}}:${vodId}:bucketSize`,

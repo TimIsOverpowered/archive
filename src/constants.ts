@@ -128,6 +128,12 @@ export const Cloudflare = {
 export const Logs = {
   BUCKET_SIZE: 60,
   BUCKET_LIMIT: 10000,
+  /** Minimum historical messages to pre-fill UI on scrub */
+  TARGET_PAST: 20,
+  /** Minimum future messages to prevent client API spam */
+  TARGET_FUTURE: 30,
+  /** Maximum buckets to scan in either direction (4 minutes) */
+  MAX_EXPANSION: 4,
 } as const;
 
 // ── Token Health ─────────────────────────────────────────────────────────────
