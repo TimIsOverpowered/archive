@@ -126,9 +126,8 @@ export const Cloudflare = {
 
 // ── Logs / Comments ──────────────────────────────────────────────────────────
 export const Logs = {
-  PAGE_SIZE: 200,
-  DEFAULT_BUCKET_SIZE: 120,
-  TARGET_COMMENTS_PER_BUCKET: 300,
+  BUCKET_SIZE: 60,
+  BUCKET_LIMIT: 10000,
 } as const;
 
 // ── Token Health ─────────────────────────────────────────────────────────────

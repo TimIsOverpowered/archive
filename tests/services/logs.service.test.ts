@@ -27,36 +27,51 @@ describe('LogsService: getLogsByOffset', () => {
   let mockClient: any;
   let originalEnv: NodeJS.ProcessEnv;
 
-  function chainableBuilder(executeResult: any, executeTakeFirstResult: any): any {
-    return {
-      where: () => chainableBuilder(executeResult, executeTakeFirstResult),
-      orderBy: () => ({
-        orderBy: () => ({
-          limit: () => ({
-            execute: async () => executeResult,
-            executeTakeFirst: async () => executeTakeFirstResult,
-          }),
-          execute: async () => executeResult,
-          executeTakeFirst: async () => executeTakeFirstResult,
-        }),
-        execute: async () => executeResult,
-        executeTakeFirst: async () => executeTakeFirstResult,
-      }),
-      execute: async () => executeResult,
-      executeTakeFirst: async () => executeTakeFirstResult,
-    };
-  }
-
   function createMockDb(
     chatMessagesResult: any = [],
+    peekResult: any = null,
     vodResult: any = {
       created_at: new Date('2024-01-01T00:00:00Z'),
       duration: 3600,
     }
   ): any {
+    let takeFirstCall = 0;
+
+    function chainable(): any {
+      return {
+        where: () => chainable(),
+        orderBy: () => ({
+          orderBy: () => ({
+            limit: () => ({
+              execute: async () => chatMessagesResult,
+              executeTakeFirst: async () => {
+                takeFirstCall++;
+                return takeFirstCall === 1 ? vodResult : peekResult;
+              },
+            }),
+            execute: async () => chatMessagesResult,
+            executeTakeFirst: async () => {
+              takeFirstCall++;
+              return takeFirstCall === 1 ? vodResult : peekResult;
+            },
+          }),
+          execute: async () => chatMessagesResult,
+          executeTakeFirst: async () => {
+            takeFirstCall++;
+            return takeFirstCall === 1 ? vodResult : peekResult;
+          },
+        }),
+        execute: async () => chatMessagesResult,
+        executeTakeFirst: async () => {
+          takeFirstCall++;
+          return takeFirstCall === 1 ? vodResult : peekResult;
+        },
+      };
+    }
+
     return {
       selectFrom: () => ({
-        select: () => chainableBuilder(chatMessagesResult, vodResult),
+        select: () => chainable(),
       }),
     };
   }
@@ -107,7 +122,7 @@ describe('LogsService: getLogsByOffset', () => {
   });
 
   it('should return empty comments when no chat messages found', async () => {
-    mockDb = createMockDb([], {
+    mockDb = createMockDb([], null, {
       created_at: new Date('2024-01-01T00:00:00Z'),
       duration: 3600,
     });
@@ -116,7 +131,7 @@ describe('LogsService: getLogsByOffset', () => {
     assert.deepStrictEqual(result, { comments: [], cursor: undefined });
   });
 
-  it('should return comments without cursor when fewer than page size + 1', async () => {
+  it('should return full bucket without filtering by offset', async () => {
     const messages = [
       {
         id: 'msg-1',
@@ -140,50 +155,71 @@ describe('LogsService: getLogsByOffset', () => {
       },
     ];
 
-    mockDb = createMockDb(messages, {
+    mockDb = createMockDb(messages, null, {
       created_at: new Date('2024-01-01T00:00:00Z'),
       duration: 3600,
     });
 
     const result = await getLogsByOffset(mockDb, 'tenant-1', 1, 0);
     assert.strictEqual(result.comments.length, 2);
-    assert.strictEqual(result.cursor, undefined);
     assert.strictEqual(result.comments[0]?.id, 'msg-1');
     assert.strictEqual(result.comments[1]?.id, 'msg-2');
   });
 
-  it('should return cursor when there are more messages (page size + 1)', async () => {
-    const { Logs } = await import('../../src/constants.js');
-    const messages: any[] = [];
-    for (let i = 0; i <= Logs.PAGE_SIZE; i++) {
-      const totalSeconds = i * 10;
-      const mins = Math.floor(totalSeconds / 60);
-      const secs = totalSeconds % 60;
-      messages.push({
-        id: `msg-${i}`,
+  it('should return cursor when peek finds next bucket message', async () => {
+    const messages = [
+      {
+        id: 'msg-1',
         vod_id: 1,
-        display_name: `user${i}`,
-        content_offset_seconds: totalSeconds,
-        user_color: '#FFFFFF',
-        created_at: new Date(`2024-01-01T00:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}Z`),
-        message: `Message ${i}`,
+        display_name: 'user1',
+        content_offset_seconds: 10,
+        user_color: '#FF0000',
+        created_at: new Date('2024-01-01T00:00:10Z'),
+        message: 'Hello!',
         user_badges: [],
-      });
-    }
+      },
+    ];
 
-    mockDb = createMockDb(messages, {
+    const peekMsg = {
+      id: 'msg-next',
+      content_offset_seconds: 65,
+      created_at: new Date('2024-01-01T00:01:05Z'),
+    };
+
+    mockDb = createMockDb(messages, peekMsg, {
       created_at: new Date('2024-01-01T00:00:00Z'),
       duration: 3600,
     });
 
     const result = await getLogsByOffset(mockDb, 'tenant-1', 1, 0);
-    assert.strictEqual(result.comments.length, Logs.PAGE_SIZE);
+    assert.strictEqual(result.comments.length, 1);
     assert.ok(result.cursor);
-    assert.ok(typeof result.cursor === 'string');
     const decoded = JSON.parse(Buffer.from(result.cursor, 'base64').toString());
-    assert.ok(decoded.offset !== undefined);
-    assert.ok(decoded.createdAt !== undefined);
-    assert.ok(decoded.id !== undefined);
+    assert.strictEqual(decoded.offset, 65);
+  });
+
+  it('should return no cursor when peek finds no next message', async () => {
+    const messages = [
+      {
+        id: 'msg-1',
+        vod_id: 1,
+        display_name: 'user1',
+        content_offset_seconds: 10,
+        user_color: '#FF0000',
+        created_at: new Date('2024-01-01T00:00:10Z'),
+        message: 'Hello!',
+        user_badges: [],
+      },
+    ];
+
+    mockDb = createMockDb(messages, null, {
+      created_at: new Date('2024-01-01T00:00:00Z'),
+      duration: 3600,
+    });
+
+    const result = await getLogsByOffset(mockDb, 'tenant-1', 1, 0);
+    assert.strictEqual(result.comments.length, 1);
+    assert.strictEqual(result.cursor, undefined);
   });
 
   it('should return cached result when Redis has bucket data', async () => {
@@ -220,7 +256,7 @@ describe('LogsService: getLogsByOffset', () => {
       throw new Error('ECONNREFUSED');
     };
 
-    mockDb = createMockDb([], {
+    mockDb = createMockDb([], null, {
       created_at: new Date('2024-01-01T00:00:00Z'),
       duration: 3600,
     });
@@ -231,47 +267,59 @@ describe('LogsService: getLogsByOffset', () => {
 
   it('should use correct bucket calculation based on offset', async () => {
     let capturedBucket: number | null = null;
-    let whereCallIndex = 0;
+    let takeFirstCall = 0;
 
-    function countingBuilder(executeResult: any, executeTakeFirstResult: any): any {
+    function countingBuilder(): any {
       return {
-        where: function (this: any, ...args: any[]) {
-          whereCallIndex++;
-          if (whereCallIndex === 4 && typeof args[0] === 'string' && args[0] === 'content_offset_seconds') {
+        where: function (...args: any[]) {
+          if (
+            typeof args[0] === 'string' &&
+            args[0] === 'content_offset_seconds' &&
+            args[1] === '>=' &&
+            capturedBucket === null
+          ) {
             capturedBucket = args[2];
           }
-          return countingBuilder(executeResult, executeTakeFirstResult);
+          return countingBuilder();
         },
         orderBy: () => ({
           orderBy: () => ({
             limit: () => ({
-              execute: async () => executeResult,
-              executeTakeFirst: async () => executeTakeFirstResult,
+              execute: async () => [],
+              executeTakeFirst: async () => {
+                takeFirstCall++;
+                return takeFirstCall === 1 ? { created_at: new Date('2024-01-01T00:00:00Z'), duration: 3600 } : null;
+              },
             }),
-            execute: async () => executeResult,
-            executeTakeFirst: async () => executeTakeFirstResult,
+            execute: async () => [],
+            executeTakeFirst: async () => {
+              takeFirstCall++;
+              return takeFirstCall === 1 ? { created_at: new Date('2024-01-01T00:00:00Z'), duration: 3600 } : null;
+            },
           }),
-          execute: async () => executeResult,
-          executeTakeFirst: async () => executeTakeFirstResult,
+          execute: async () => [],
+          executeTakeFirst: async () => {
+            takeFirstCall++;
+            return takeFirstCall === 1 ? { created_at: new Date('2024-01-01T00:00:00Z'), duration: 3600 } : null;
+          },
         }),
-        execute: async () => executeResult,
-        executeTakeFirst: async () => executeTakeFirstResult,
+        execute: async () => [],
+        executeTakeFirst: async () => {
+          takeFirstCall++;
+          return takeFirstCall === 1 ? { created_at: new Date('2024-01-01T00:00:00Z'), duration: 3600 } : null;
+        },
       };
     }
 
     mockDb = {
       selectFrom: () => ({
-        select: () =>
-          countingBuilder([], {
-            created_at: new Date('2024-01-01T00:00:00Z'),
-            duration: 3600,
-          }),
+        select: () => countingBuilder(),
       }),
     };
 
     await getLogsByOffset(mockDb, 'tenant-1', 1, 150);
     assert.ok(capturedBucket !== null);
-    assert.ok(capturedBucket >= 0);
+    assert.strictEqual(capturedBucket, 120);
   });
 });
 
@@ -280,36 +328,51 @@ describe('LogsService: getLogsByCursor', () => {
   let mockClient: any;
   let originalEnv: NodeJS.ProcessEnv;
 
-  function chainableBuilder(executeResult: any, executeTakeFirstResult: any): any {
-    return {
-      where: () => chainableBuilder(executeResult, executeTakeFirstResult),
-      orderBy: () => ({
-        orderBy: () => ({
-          limit: () => ({
-            execute: async () => executeResult,
-            executeTakeFirst: async () => executeTakeFirstResult,
-          }),
-          execute: async () => executeResult,
-          executeTakeFirst: async () => executeTakeFirstResult,
-        }),
-        execute: async () => executeResult,
-        executeTakeFirst: async () => executeTakeFirstResult,
-      }),
-      execute: async () => executeResult,
-      executeTakeFirst: async () => executeTakeFirstResult,
-    };
-  }
-
   function createMockDb(
     chatMessagesResult: any = [],
+    peekResult: any = null,
     vodResult: any = {
       created_at: new Date('2024-01-01T00:00:00Z'),
       duration: 3600,
     }
   ): any {
+    let takeFirstCall = 0;
+
+    function chainable(): any {
+      return {
+        where: () => chainable(),
+        orderBy: () => ({
+          orderBy: () => ({
+            limit: () => ({
+              execute: async () => chatMessagesResult,
+              executeTakeFirst: async () => {
+                takeFirstCall++;
+                return takeFirstCall === 1 ? vodResult : peekResult;
+              },
+            }),
+            execute: async () => chatMessagesResult,
+            executeTakeFirst: async () => {
+              takeFirstCall++;
+              return takeFirstCall === 1 ? vodResult : peekResult;
+            },
+          }),
+          execute: async () => chatMessagesResult,
+          executeTakeFirst: async () => {
+            takeFirstCall++;
+            return takeFirstCall === 1 ? vodResult : peekResult;
+          },
+        }),
+        execute: async () => chatMessagesResult,
+        executeTakeFirst: async () => {
+          takeFirstCall++;
+          return takeFirstCall === 1 ? vodResult : peekResult;
+        },
+      };
+    }
+
     return {
       selectFrom: () => ({
-        select: () => chainableBuilder(chatMessagesResult, vodResult),
+        select: () => chainable(),
       }),
     };
   }
@@ -349,10 +412,10 @@ describe('LogsService: getLogsByCursor', () => {
     }
   });
 
-  it('should throw bad request for cursor missing required fields', async () => {
+  it('should throw bad request for cursor missing offset', async () => {
     mockDb = createMockDb();
 
-    const cursor = Buffer.from(JSON.stringify({ offset: 100 })).toString('base64');
+    const cursor = Buffer.from(JSON.stringify({ foo: 'bar' })).toString('base64');
     try {
       await getLogsByCursor(mockDb, 'tenant-1', 1, cursor);
       assert.fail('Should have thrown');
@@ -361,30 +424,42 @@ describe('LogsService: getLogsByCursor', () => {
     }
   });
 
-  it('should throw bad request for cursor with invalid date', async () => {
-    mockDb = createMockDb();
-
+  it('should accept old cursor format with extra fields', async () => {
     const cursor = Buffer.from(
       JSON.stringify({
         offset: 100,
-        createdAt: 'not-a-date',
+        createdAt: new Date().toISOString(),
         id: 'msg-1',
       })
     ).toString('base64');
-    try {
-      await getLogsByCursor(mockDb, 'tenant-1', 1, cursor);
-      assert.fail('Should have thrown');
-    } catch (error) {
-      assert.ok(error instanceof Error);
-    }
+
+    const messages = [
+      {
+        id: 'msg-2',
+        vod_id: 1,
+        display_name: 'user2',
+        content_offset_seconds: 110,
+        user_color: '#FFF',
+        created_at: new Date('2024-01-01T00:01:50Z'),
+        message: 'After cursor',
+        user_badges: [],
+      },
+    ];
+
+    mockDb = createMockDb(messages, null, {
+      created_at: new Date('2024-01-01T00:00:00Z'),
+      duration: 3600,
+    });
+
+    const result = await getLogsByCursor(mockDb, 'tenant-1', 1, cursor);
+    assert.strictEqual(result.comments.length, 1);
+    assert.strictEqual(result.comments[0]?.id, 'msg-2');
   });
 
   it('should throw when VOD not found', async () => {
     const cursor = Buffer.from(
       JSON.stringify({
         offset: 100,
-        createdAt: new Date().toISOString(),
-        id: 'msg-1',
       })
     ).toString('base64');
 
@@ -408,16 +483,14 @@ describe('LogsService: getLogsByCursor', () => {
     }
   });
 
-  it('should return empty comments when no messages after cursor', async () => {
+  it('should return empty comments when no messages in bucket', async () => {
     const cursor = Buffer.from(
       JSON.stringify({
         offset: 100,
-        createdAt: new Date().toISOString(),
-        id: 'msg-1',
       })
     ).toString('base64');
 
-    mockDb = createMockDb([], {
+    mockDb = createMockDb([], null, {
       created_at: new Date('2024-01-01T00:00:00Z'),
       duration: 3600,
     });
@@ -426,48 +499,7 @@ describe('LogsService: getLogsByCursor', () => {
     assert.deepStrictEqual(result, { comments: [], cursor: undefined });
   });
 
-  it('should return comments with next cursor when paginated', async () => {
-    const { Logs } = await import('../../src/constants.js');
-    const messages: any[] = [];
-    for (let i = 0; i <= Logs.PAGE_SIZE; i++) {
-      const totalSeconds = 60 + 10 + i * 10;
-      const mins = Math.floor(totalSeconds / 60);
-      const secs = totalSeconds % 60;
-      messages.push({
-        id: `msg-${i}`,
-        vod_id: 1,
-        display_name: `user${i}`,
-        content_offset_seconds: 110 + i * 10,
-        user_color: '#FFFFFF',
-        created_at: new Date(`2024-01-01T00:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}Z`),
-        message: `Message ${i}`,
-        user_badges: [],
-      });
-    }
-
-    mockDb = createMockDb(messages, {
-      created_at: new Date('2024-01-01T00:00:00Z'),
-      duration: 3600,
-    });
-
-    const cursor = Buffer.from(
-      JSON.stringify({
-        offset: 100,
-        createdAt: new Date('2024-01-01T00:01:40Z').toISOString(),
-        id: 'msg-9',
-      })
-    ).toString('base64');
-
-    const result = await getLogsByCursor(mockDb, 'tenant-1', 1, cursor);
-    assert.strictEqual(result.comments.length, Logs.PAGE_SIZE);
-    assert.ok(result.cursor);
-    const decoded = JSON.parse(Buffer.from(result.cursor, 'base64').toString());
-    assert.ok(decoded.offset !== undefined);
-    assert.ok(decoded.createdAt !== undefined);
-    assert.ok(decoded.id !== undefined);
-  });
-
-  it('should return cached result when Redis has cursor data', async () => {
+  it('should share same bucket cache key as offset-based lookup', async () => {
     const cachedData = {
       comments: [
         {
@@ -477,7 +509,7 @@ describe('LogsService: getLogsByCursor', () => {
           content_offset_seconds: 110,
           user_color: '#FFF',
           created_at: new Date(),
-          message: 'Cached from cursor',
+          message: 'Cached from bucket',
           user_badges: [],
         },
       ],
@@ -493,8 +525,6 @@ describe('LogsService: getLogsByCursor', () => {
     const cursor = Buffer.from(
       JSON.stringify({
         offset: 100,
-        createdAt: new Date().toISOString(),
-        id: 'msg-1',
       })
     ).toString('base64');
 
@@ -509,7 +539,7 @@ describe('LogsService: getLogsByCursor', () => {
       throw new Error('ECONNREFUSED');
     };
 
-    mockDb = createMockDb([], {
+    mockDb = createMockDb([], null, {
       created_at: new Date('2024-01-01T00:00:00Z'),
       duration: 3600,
     });
@@ -517,8 +547,6 @@ describe('LogsService: getLogsByCursor', () => {
     const cursor = Buffer.from(
       JSON.stringify({
         offset: 100,
-        createdAt: new Date().toISOString(),
-        id: 'msg-1',
       })
     ).toString('base64');
 
