@@ -42,10 +42,6 @@ interface ConfigChangeEvent {
  * Build a TenantConfig from a raw database tenant row.
  * Pure function — does not depend on any module-level state.
  */
-/**
- * Build a TenantConfig from a raw database tenant row.
- * Pure function — does not depend on any module-level state.
- */
 export function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
   if (tenant.databaseUrl == null) return null;
 

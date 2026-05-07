@@ -1,54 +1,44 @@
-function buildVodQueryKey(
+function buildPaginatedQueryKey(
+  namespace: string,
   tenantId: string,
   query: Record<string, string | number | undefined>,
   page: number,
   limit: number
 ): string {
   const sorted = Object.keys(query).sort();
-  const queryParts = sorted
-    .filter((k) => query[k] !== undefined && query[k] !== null && query[k] !== '')
+  const parts = sorted
+    .filter((k) => query[k] != null && query[k] !== '')
     .map((k) => `${k}:${encodeURIComponent(String(query[k]))}`);
-  return ['vods', `{${tenantId}}`, ...queryParts, `page:${page}`, `limit:${limit}`].join(':');
+  return [namespace, `{${tenantId}}`, ...parts, `page:${page}`, `limit:${limit}`].join(':');
 }
 
-function buildGameQueryKey(
+const buildVodQueryKey = (
   tenantId: string,
   query: Record<string, string | number | undefined>,
   page: number,
   limit: number
-): string {
-  const sorted = Object.keys(query).sort();
-  const queryParts = sorted
-    .filter((k) => query[k] !== undefined && query[k] !== null && query[k] !== '')
-    .map((k) => `${k}:${encodeURIComponent(String(query[k]))}`);
-  return ['games', `{${tenantId}}`, ...queryParts, `page:${page}`, `limit:${limit}`].join(':');
-}
+) => buildPaginatedQueryKey('vods', tenantId, query, page, limit);
 
-function buildChapterLibraryKey(
+const buildGameQueryKey = (
   tenantId: string,
   query: Record<string, string | number | undefined>,
   page: number,
   limit: number
-): string {
-  const sorted = Object.keys(query).sort();
-  const queryParts = sorted
-    .filter((k) => query[k] !== undefined && query[k] !== null && query[k] !== '')
-    .map((k) => `${k}:${encodeURIComponent(String(query[k]))}`);
-  return ['chapters', `{${tenantId}}`, ...queryParts, `page:${page}`, `limit:${limit}`].join(':');
-}
+) => buildPaginatedQueryKey('games', tenantId, query, page, limit);
 
-function buildGameLibraryKey(
+const buildChapterLibraryKey = (
   tenantId: string,
   query: Record<string, string | number | undefined>,
   page: number,
   limit: number
-): string {
-  const sorted = Object.keys(query).sort();
-  const queryParts = sorted
-    .filter((k) => query[k] !== undefined && query[k] !== null && query[k] !== '')
-    .map((k) => `${k}:${encodeURIComponent(String(query[k]))}`);
-  return ['games-library', `{${tenantId}}`, ...queryParts, `page:${page}`, `limit:${limit}`].join(':');
-}
+) => buildPaginatedQueryKey('chapters', tenantId, query, page, limit);
+
+const buildGameLibraryKey = (
+  tenantId: string,
+  query: Record<string, string | number | undefined>,
+  page: number,
+  limit: number
+) => buildPaginatedQueryKey('games-library', tenantId, query, page, limit);
 
 export type SWRKey = string & { readonly __swr: unique symbol };
 export type SimpleKey = string & { readonly __simple: unique symbol };

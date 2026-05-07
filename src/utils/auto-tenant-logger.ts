@@ -3,6 +3,8 @@ import { configService } from '../config/tenant-config.js';
 import { type AppLogger, getLogger } from './logger.js';
 import { asJsonObject } from './object.js';
 
+type WrappedLogFn = (msg: string | Record<string, unknown>, ...args: unknown[]) => void;
+
 export function createAutoLogger(tenantId?: string | null): AppLogger {
   if (tenantId == null || tenantId === '') {
     return getLogger();
@@ -19,14 +21,12 @@ export function createAutoLogger(tenantId?: string | null): AppLogger {
     return `[${displayName}] ${msg}`;
   };
 
-  function wrapMethod(method: LogFn): LogFn {
-    return (firstArg: unknown, ...rest: unknown[]): void => {
-      // Cast the method to satisfy type requirements for call signature.
-      const log = method as unknown as { call: (thisArg: unknown, ...args: unknown[]) => void };
+  function wrapMethod(method: LogFn): WrappedLogFn {
+    const bound = method.bind(childLog);
 
+    return (firstArg, ...rest): void => {
       if (typeof firstArg === 'string') {
-        const msg = prefix(firstArg);
-        log.call(childLog, msg, ...rest);
+        bound(prefix(firstArg), ...rest);
         return;
       }
 
@@ -38,18 +38,16 @@ export function createAutoLogger(tenantId?: string | null): AppLogger {
           obj.message = prefix(obj.message);
         }
 
-        const secondArg = rest[0];
-        if (typeof secondArg === 'string') {
-          const msg = prefix(secondArg);
-          log.call(childLog, obj, msg, ...rest.slice(1));
+        if (typeof rest[0] === 'string') {
+          bound(obj, prefix(rest[0]), ...rest.slice(1));
           return;
         }
 
-        log.call(childLog, obj, ...rest);
+        bound(obj, ...rest);
         return;
       }
 
-      log.call(childLog, firstArg, ...rest);
+      bound(firstArg, ...rest);
     };
   }
 

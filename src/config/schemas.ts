@@ -8,7 +8,7 @@ import { decryptObject, decryptScalar } from '../utils/encryption.js';
  * Decrypts non-empty values automatically at parse time.
  * Empty or undefined values pass through unchanged.
  */
-function encryptedString() {
+function encryptedStringSchema() {
   return z
     .string()
     .optional()
@@ -102,7 +102,7 @@ export const YoutubeSchema = z.object({
   /** Decrypted YouTube API auth object (decrypted at parse time) */
   auth: encryptedYoutubeAuth().optional(),
   /** Encrypted YouTube API key (decrypted at parse time) */
-  apiKey: encryptedString().optional(),
+  apiKey: encryptedStringSchema().optional(),
 });
 
 /** Twitch platform configuration for a tenant. */
