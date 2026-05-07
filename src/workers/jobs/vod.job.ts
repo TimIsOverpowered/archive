@@ -1,3 +1,4 @@
+import { Jobs } from '../../constants.js';
 import type { Platform, DownloadMethod } from '../../types/platforms.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
@@ -19,7 +20,7 @@ export interface TriggerVodOptions {
 
 export async function triggerVodDownload(opts: TriggerVodOptions): Promise<string | null> {
   const { tenantId, dbId, vodId, platform, platformUserId, platformUsername, downloadMethod } = opts;
-  const jobId = `vod_${vodId}`;
+  const jobId = `${Jobs.VOD_JOB_PREFIX}${vodId}`;
   const job: StandardVodJob = {
     tenantId,
     dbId,

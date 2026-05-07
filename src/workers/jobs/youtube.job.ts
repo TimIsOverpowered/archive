@@ -1,4 +1,5 @@
 import { getPlatformConfig, getDisplayName } from '../../config/types.js';
+import { Jobs } from '../../constants.js';
 import { findVodById } from '../../db/queries/vods.js';
 import { withDbRetry } from '../../db/streamer-client.js';
 import { SelectableChapters, SelectableGames } from '../../db/streamer-types.js';
@@ -188,7 +189,7 @@ export async function createGameUploadJobsForVod(
  */
 export async function enqueueVodUpload(job: YoutubeVodUploadJob, downloadJobId?: string): Promise<string | null> {
   const queue = getYoutubeUploadQueue();
-  const jobId = `youtube_${job.vodId}_vod_${job.part ?? 1}`;
+  const jobId = `${Jobs.YOUTUBE_JOB_PREFIX}${job.vodId}_vod_${job.part ?? 1}`;
 
   try {
     if (downloadJobId != null) {
@@ -246,7 +247,7 @@ export async function enqueueVodUpload(job: YoutubeVodUploadJob, downloadJobId?:
  */
 export async function enqueueGameUpload(job: YoutubeGameUploadJob, downloadJobId?: string): Promise<string | null> {
   const queue = getYoutubeUploadQueue();
-  const jobId = `youtube_${job.vodId}_game_${job.chapterId}_${job.chapterStart}`;
+  const jobId = `${Jobs.YOUTUBE_JOB_PREFIX}${job.vodId}_game_${job.chapterId}_${job.chapterStart}`;
 
   try {
     if (downloadJobId != null) {

@@ -1,3 +1,4 @@
+import { Jobs } from '../../constants.js';
 import { Platform, PLATFORMS } from '../../types/platforms.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
@@ -8,7 +9,7 @@ import type { ChatDownloadJob } from './types.js';
 const log = childLogger({ module: 'chat-job' });
 
 async function enqueue(job: ChatDownloadJob): Promise<string | null> {
-  const jobId = `chat_${job.vodId}`;
+  const jobId = `${Jobs.CHAT_JOB_PREFIX}${job.vodId}`;
   try {
     const result = await enqueueJobWithLogging({
       queue: getChatDownloadQueue(),

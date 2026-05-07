@@ -204,3 +204,12 @@ export const CacheRefresh = {
   /** Pre-fetch threshold — refresh if TTL remaining is under 1 hour */
   TTL_REMAINING_THRESHOLD: 3_600,
 } as const;
+
+// ── Job IDs ────────────────────────────────────────────────────────────────────
+export const Jobs = {
+  LIVE_HLS_JOB_PREFIX: 'live_hls_',
+  YOUTUBE_JOB_PREFIX: 'youtube_',
+  VOD_JOB_PREFIX: 'vod_',
+  CHAT_JOB_PREFIX: 'chat_',
+  DMCA_JOB_PREFIX: 'dmca_',
+} as const;

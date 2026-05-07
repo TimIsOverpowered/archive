@@ -4,6 +4,7 @@ import type { Kysely } from 'kysely';
 import { configService } from '../../config/tenant-config.js';
 import type { TenantConfig } from '../../config/types.js';
 import { requirePlatformConfig } from '../../config/types.js';
+import { Jobs } from '../../constants.js';
 import type { ActiveLiveVodResult } from '../../db/queries/vods.js';
 import { findVodByStreamId, findVodByPlatformId } from '../../db/queries/vods.js';
 import type { StreamerDB, InsertableVods, SelectableVods } from '../../db/streamer-types.js';
@@ -15,7 +16,7 @@ import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { enqueueJobWithLogging } from '../jobs/enqueue.js';
 import type { LiveDownloadJob } from '../jobs/types.js';
-import { getLiveDownloadQueue, LIVE_JOB_ID_PREFIX } from '../queues/queue.js';
+import { getLiveDownloadQueue } from '../queues/queue.js';
 import { sendStreamOfflineAlert, sendStreamLiveAlert } from './alert-helpers.js';
 
 interface LiveStreamContext {
@@ -465,7 +466,7 @@ export async function enqueueLiveHlsDownload(params: {
 
     const { jobId, isNew } = await enqueueJobWithLogging({
       queue,
-      jobName: `${LIVE_JOB_ID_PREFIX}download`,
+      jobName: `${Jobs.LIVE_HLS_JOB_PREFIX}download`,
       data: {
         dbId: params.dbId,
         vodId: params.vodId,
@@ -477,10 +478,10 @@ export async function enqueueLiveHlsDownload(params: {
         sourceUrl: params.sourceUrl,
       } satisfies LiveDownloadJob,
       options: {
-        jobId: `${LIVE_JOB_ID_PREFIX}${params.vodId}`,
+        jobId: `${Jobs.LIVE_HLS_JOB_PREFIX}${params.vodId}`,
         attempts: 10,
         backoff: { type: 'exponential' as const, delay: 5000 },
-        deduplication: { id: `${LIVE_JOB_ID_PREFIX}${params.vodId}` },
+        deduplication: { id: `${Jobs.LIVE_HLS_JOB_PREFIX}${params.vodId}` },
         removeOnComplete: true,
         removeOnFail: true,
       },

@@ -1,3 +1,4 @@
+import { Jobs } from '../../constants.js';
 import type { Platform, SourceType } from '../../types/platforms.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
@@ -40,7 +41,11 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
   } = options;
 
   const isGameUpload = gameId != null;
-  const jobId = isGameUpload ? `dmca_game_${gameId}` : part !== undefined ? `dmca_${vodId}_p${part}` : `dmca_${vodId}`;
+  const jobId = isGameUpload
+    ? `${Jobs.DMCA_JOB_PREFIX}game_${gameId}`
+    : part !== undefined
+      ? `${Jobs.DMCA_JOB_PREFIX}${vodId}_p${part}`
+      : `${Jobs.DMCA_JOB_PREFIX}${vodId}`;
 
   const job: DmcaProcessingJob = {
     tenantId,
