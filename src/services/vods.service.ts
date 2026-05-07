@@ -10,7 +10,7 @@ import type { VodResponse } from '../types/vods.js';
 import type { SWRKey } from '../utils/cache-keys.js';
 import { swrKeys } from '../utils/cache-keys.js';
 import { withStaleWhileRevalidate } from '../utils/cache.js';
-import { registerVodTags, setVodListCache } from './cache-tags.js';
+import { registerVodTags } from './cache-tags.js';
 import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.js';
 
 const FtsSpecialChars = /[&|()@:\\"]/g;
@@ -213,9 +213,7 @@ export async function getVods(
 
     const hasLiveVod = mergedVods.some((vod) => vod.is_live);
     const ttl = hasLiveVod ? Cache.VOD_VOLATILE_TTL : Cache.VOD_LIST_TTL;
-    const serialized = JSON.stringify({ vods: mergedVods, total });
-    await setVodListCache(cacheKey, serialized, ttl);
-    await registerVodTags(tenantId, mergedVods, cacheKey, serialized, ttl, page);
+    await registerVodTags(tenantId, mergedVods, cacheKey, ttl, page);
 
     return { vods: mergedVods, total };
   };

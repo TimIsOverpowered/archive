@@ -1,7 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { configService } from '../../config/tenant-config.js';
+import { Cache } from '../../constants.js';
 import { getChannelBadges, getGlobalBadges } from '../../services/twitch/index.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
+import { compressData, decompressData } from '../../utils/compression.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { notFound } from '../../utils/http-error.js';
 import { RedisService } from '../../utils/redis-service.js';
@@ -46,15 +48,15 @@ export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesR
       if (config?.twitch?.id == null) notFound('Twitch not configured for this tenant');
 
       const redis = RedisService.getActiveClient();
-      // Check Redis cache first (60-minute TTL)
+      // Check Redis cache first
       if (redis) {
         try {
-          const cachedBadges = await redis.get(`twitch_badges:${tenantId}`);
+          const cachedBadges = await redis.getBuffer(`twitch_badges:${tenantId}`);
 
-          if (cachedBadges != null) {
+          if (cachedBadges != null && cachedBadges.length > 0) {
             log.info('Returning cached Twitch badges');
 
-            return ok(JSON.parse(cachedBadges) as Record<string, unknown>);
+            return ok((await decompressData(cachedBadges)) as Record<string, unknown>);
           }
         } catch (err) {
           const details = extractErrorDetails(err);
@@ -71,17 +73,17 @@ export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesR
 
         const badgesData = { channel: channelBadges ?? null, global: globalBadges ?? null };
 
-        // Cache in Redis with 60-minute TTL (3600 seconds) if fetch succeeded
+        // Cache in Redis if fetch succeeded
         if (redis) {
           try {
-            await redis.set(`twitch_badges:${tenantId}`, JSON.stringify(badgesData), 'EX', 3600);
+            const compressed = await compressData(badgesData);
+            await redis.set(`twitch_badges:${tenantId}`, compressed, 'EX', Cache.BADGES_TTL);
           } catch {
-            // Cache write failure - still return the fetched data even if caching fails
             log.warn('Failed to cache Twitch badges in Redis, returning uncached result');
           }
         }
 
-        log.info('Fetched and cached Twitch badges');
+        log.info({ tenantId }, 'Fetched and cached Twitch badges');
 
         return ok(badgesData);
       } catch (err) {

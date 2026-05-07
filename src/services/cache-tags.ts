@@ -6,27 +6,10 @@ import { extractErrorDetails } from '../utils/error.js';
 import { getLogger } from '../utils/logger.js';
 import { RedisService } from '../utils/redis-service.js';
 
-/**
- * Cache a VOD list query result and register tag-based associations for all VODs in the list.
- * Enables batch invalidation by VOD ID later.
- */
-export async function setVodListCache(cacheKey: string, data: string, ttl: number): Promise<void> {
-  const client = RedisService.getActiveClient();
-  if (!client) return;
-
-  try {
-    await client.set(cacheKey, data, 'EX', ttl);
-  } catch (err) {
-    const details = extractErrorDetails(err);
-    getLogger().warn({ err: details, cacheKey }, 'Failed to set VOD list cache');
-  }
-}
-
 export async function registerVodTags(
   tenantId: string,
   vods: { id: number }[],
   cacheKey: string,
-  data: string,
   ttl: number,
   page: number
 ): Promise<void> {
@@ -46,9 +29,6 @@ export async function registerVodTags(
   try {
     for (let i = 0; i < vods.length; i += RedisBatch.CHUNK_SIZE) {
       const chunk = client.pipeline();
-      if (i === 0) {
-        chunk.set(cacheKey, data, 'EX', ttl);
-      }
 
       for (const vod of vods.slice(i, i + RedisBatch.CHUNK_SIZE)) {
         const tagKey = CacheKeys.vodTags(tenantId, vod.id);

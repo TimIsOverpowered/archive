@@ -5,7 +5,7 @@ import type { DBClient } from '../db/streamer-types.js';
 import { TenantContext } from '../types/context.js';
 import { Platform, PLATFORMS } from '../types/platforms.js';
 import { simpleKeys } from '../utils/cache-keys.js';
-import { compressChatData, decompressChatData } from '../utils/compression.js';
+import { compressData, decompressData } from '../utils/compression.js';
 import { safeRequest } from '../utils/http-client.js';
 import { getLogger } from '../utils/logger.js';
 import { RedisService } from '../utils/redis-service.js';
@@ -168,9 +168,9 @@ export async function getEmotesByVodId(db: DBClient, tenantId: string, vodId: nu
   const redis = RedisService.getActiveClient();
   if (redis) {
     try {
-      const cached = await redis.get(cacheKey);
-      if (cached != null && cached !== '') {
-        return (await decompressChatData(cached as unknown as Buffer)) as VodEmotes;
+      const cached = await redis.getBuffer(cacheKey);
+      if (cached != null && cached.length > 0) {
+        return (await decompressData(cached)) as VodEmotes;
       }
     } catch (err) {
       getLogger().warn({ err, cacheKey }, 'Emote cache read failed, falling back to DB');
@@ -196,14 +196,14 @@ export async function getEmotesByVodId(db: DBClient, tenantId: string, vodId: nu
 
   const result: VodEmotes = {
     vodId: emote.vod_id,
-    ffz_emotes: emote.ffz_emotes as unknown as EmoteData[],
-    bttv_emotes: emote.bttv_emotes as unknown as EmoteData[],
-    seventv_emotes: emote.seventv_emotes as unknown as EmoteData[],
+    ffz_emotes: emote.ffz_emotes ?? [],
+    bttv_emotes: emote.bttv_emotes ?? [],
+    seventv_emotes: emote.seventv_emotes ?? [],
   };
 
   if (redis) {
     try {
-      const compressed = await compressChatData(result);
+      const compressed = await compressData(result);
       await redis.set(cacheKey, compressed, 'EX', Cache.EMOTE_TTL);
     } catch (err) {
       getLogger().warn({ err, cacheKey }, 'Emote cache write failed');

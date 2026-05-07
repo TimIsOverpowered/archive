@@ -238,8 +238,8 @@ describe('LogsService: getLogsByOffset', () => {
       ],
       cursor: 'cached-cursor',
     };
-    const { compressChatData } = await import('../../src/utils/compression.js');
-    const compressed = await compressChatData(cachedData);
+    const { compressData } = await import('../../src/utils/compression.js');
+    const compressed = await compressData(cachedData);
 
     mockClient.getBuffer = async () => Buffer.from(compressed);
 
@@ -515,8 +515,8 @@ describe('LogsService: getLogsByCursor', () => {
       ],
       cursor: 'next-cursor',
     };
-    const { compressChatData } = await import('../../src/utils/compression.js');
-    const compressed = await compressChatData(cachedData);
+    const { compressData } = await import('../../src/utils/compression.js');
+    const compressed = await compressData(cachedData);
 
     mockClient.getBuffer = async () => Buffer.from(compressed);
 

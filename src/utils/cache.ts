@@ -3,7 +3,7 @@
  *
  * Two cache strategies are available — choose based on your latency requirements:
  *
- * **`withCache`** — Simple read-through cache with JSON serialization.
+ * **`withCache`** — Simple read-through cache with compressed storage.
  * Use for data that must always be fresh on cache miss. Supports primitives, objects, and arrays.
  * Includes inflight deduplication and cache metrics tracking.
  * Key type: `SimpleKey` (via `simpleKeys.*` helpers).
@@ -13,7 +13,7 @@
  * Includes failure circuit breaker, retry-with-backoff, and inflight deduplication.
  * Key type: `SWRKey` (via `swrKeys.*` helpers).
  *
- * Both use `JSON.parse`/`JSON.stringify` internally — primitives like numbers round-trip correctly.
+ * Both use Brotli compression internally — primitives like numbers round-trip correctly.
  * The `withSimpleCache` function has been removed; use `withCache` for all use cases.
  */
 import { LRUCache } from 'lru-cache';
@@ -21,6 +21,7 @@ import { CacheSwr, CacheInflight } from '../constants.js';
 import { getLogger } from '../utils/logger.js';
 import { RedisService } from '../utils/redis-service.js';
 import type { SWRKey, SimpleKey } from './cache-keys.js';
+import { compressData, decompressData } from './compression.js';
 import { extractErrorDetails } from './error.js';
 import { retryWithBackoff } from './retry.js';
 
@@ -88,9 +89,9 @@ export class CacheContext {
     if (!client) return fetcher();
 
     try {
-      const cached = await client.get(key);
-      if (cached != null && cached !== '') {
-        const parsed: unknown = JSON.parse(cached);
+      const cached = await client.getBuffer(key);
+      if (cached != null && cached.length > 0) {
+        const parsed: unknown = await decompressData(cached);
         if (isCacheEntry(parsed)) {
           this.metrics.misses++;
           getLogger().debug({ key }, 'Cache miss: unexpected SWR-format entry in simple cache');
@@ -112,7 +113,8 @@ export class CacheContext {
     const promise = fetcher()
       .then(async (result) => {
         try {
-          await client.set(key, JSON.stringify(result), 'EX', ttl);
+          const compressed = await compressData(result);
+          await client.set(key, compressed, 'EX', ttl);
         } catch (err) {
           const details = extractErrorDetails(err);
           getLogger().warn({ err: details, key }, 'Cache write failed');
@@ -137,9 +139,9 @@ export class CacheContext {
     const now = Date.now();
 
     try {
-      const cached = await client.get(key);
-      if (cached != null && cached !== '') {
-        const parsed: unknown = JSON.parse(cached);
+      const cached = await client.getBuffer(key);
+      if (cached != null && cached.length > 0) {
+        const parsed: unknown = await decompressData(cached);
         if (!isCacheEntry(parsed)) {
           this.metrics.misses++;
           getLogger().debug({ key }, 'Cache miss: unexpected simple-format entry in SWR cache');
@@ -217,7 +219,8 @@ export class CacheContext {
       await this.clearSwrFailureCount(client, failureKey);
       this.swrFailures.delete(key);
       try {
-        await client.set(key, JSON.stringify({ data, timestamp: Date.now() }), 'EX', ttl);
+        const compressed = await compressData({ data, timestamp: Date.now() });
+        await client.set(key, compressed, 'EX', ttl);
       } catch (writeErr) {
         log.warn({ err: extractErrorDetails(writeErr) }, 'SWR cache write failed');
       }

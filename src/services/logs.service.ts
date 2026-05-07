@@ -2,7 +2,7 @@ import type { Kysely } from 'kysely';
 import { Cache, Logs } from '../constants.js';
 import type { StreamerDB, SelectableChatMessages } from '../db/streamer-types.js';
 import { simpleKeys } from '../utils/cache-keys.js';
-import { compressChatData, decompressChatData } from '../utils/compression.js';
+import { compressData, decompressData } from '../utils/compression.js';
 import { VodNotFoundError } from '../utils/domain-errors.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { badRequest } from '../utils/http-error.js';
@@ -33,7 +33,7 @@ async function fetchBucket(
       const cached = await redis.getBuffer(cacheKey);
       if (cached != null && cached.length > 0) {
         getLogger().debug({ vodId, bucketStart }, '[CACHE HIT] bucket');
-        const data = (await decompressChatData(cached)) as {
+        const data = (await decompressData(cached)) as {
           comments: SelectableChatMessages[];
           cursor?: string | undefined;
         };
@@ -95,7 +95,7 @@ async function fetchBucket(
 
   if (redis) {
     try {
-      const compressed = await compressChatData(response);
+      const compressed = await compressData(response);
       await redis.set(cacheKey, compressed, 'EX', Cache.CHAT_TTL);
       getLogger().debug({ vodId, bucketStart }, '[CACHE SET] bucket');
     } catch {

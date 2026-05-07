@@ -119,11 +119,6 @@ export async function getGames(
     const total = Number(totalRow?.cnt ?? 0);
     const hasMore = result.length > limit;
     const resultGames = hasMore ? result.slice(0, limit) : result;
-    const serialized = JSON.stringify({ games: resultGames, total });
-    const ttl = Cache.VOD_LIST_TTL;
-
-    await setGameListCache(cacheKey, serialized, ttl);
-
     return { games: resultGames as GameResponse[], total };
   };
 
@@ -208,35 +203,8 @@ export async function getGamesLibrary(
     const total = Number(totalRow?.cnt ?? 0);
     const hasMore = result.length > limit;
     const resultGames = hasMore ? result.slice(0, limit) : result;
-    const serialized = JSON.stringify({ games: resultGames, total });
-    const ttl = Cache.VOD_LIST_TTL;
-
-    await setGameLibraryCache(cacheKey, serialized, ttl);
-
     return { games: resultGames as GameLibraryEntry[], total };
   };
 
   return withStaleWhileRevalidate(cacheKey, Cache.VOD_LIST_TTL, Cache.VOD_LIST_TTL * CacheSwr.STALE_RATIO, fetcher);
-}
-
-async function setGameListCache(key: SWRKey, value: string, ttl: number): Promise<void> {
-  const { RedisService } = await import('../utils/redis-service.js');
-  const client = RedisService.getActiveClient();
-  if (!client) return;
-  try {
-    await client.set(key, value, 'EX', ttl);
-  } catch {
-    // Cache write failure is non-fatal
-  }
-}
-
-async function setGameLibraryCache(key: SWRKey, value: string, ttl: number): Promise<void> {
-  const { RedisService } = await import('../utils/redis-service.js');
-  const client = RedisService.getActiveClient();
-  if (!client) return;
-  try {
-    await client.set(key, value, 'EX', ttl);
-  } catch {
-    // Cache write failure is non-fatal
-  }
 }

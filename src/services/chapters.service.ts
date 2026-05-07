@@ -87,24 +87,8 @@ export async function getChaptersLibrary(
     const total = Number(totalRow?.cnt ?? 0);
     const hasMore = result.length > limit;
     const resultChapters = hasMore ? result.slice(0, limit) : result;
-    const serialized = JSON.stringify({ chapters: resultChapters, total });
-    const ttl = Cache.VOD_LIST_TTL;
-
-    await setChaptersLibraryCache(cacheKey, serialized, ttl);
-
     return { chapters: resultChapters as ChapterLibraryEntry[], total };
   };
 
   return withStaleWhileRevalidate(cacheKey, Cache.VOD_LIST_TTL, Cache.VOD_LIST_TTL * CacheSwr.STALE_RATIO, fetcher);
-}
-
-async function setChaptersLibraryCache(key: SWRKey, value: string, ttl: number): Promise<void> {
-  const { RedisService } = await import('../utils/redis-service.js');
-  const client = RedisService.getActiveClient();
-  if (!client) return;
-  try {
-    await client.set(key, value, 'EX', ttl);
-  } catch {
-    // Cache write failure is non-fatal
-  }
 }
