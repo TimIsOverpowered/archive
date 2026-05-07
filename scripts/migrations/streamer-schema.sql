@@ -57,6 +57,8 @@ CREATE TABLE "games" (
      "game_name" TEXT,
     "title" TEXT,
     "chapter_image" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "games_new_pkey" PRIMARY KEY ("id")
 );

@@ -395,6 +395,8 @@ const createNormalizedSchema = async (client: PoolClient) => {
         "game_name" TEXT,
       "title" TEXT,
       "chapter_image" TEXT,
+      "created_at" TIMESTAMPTZ(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      "updated_at" TIMESTAMPTZ(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
       CONSTRAINT "games_new_pkey" PRIMARY KEY ("id")
     );
 
@@ -471,6 +473,11 @@ const applySchemaMigrations = async (client: PoolClient) => {
     DROP TRIGGER IF EXISTS update_vods_updated_at ON "vods_new";
     CREATE TRIGGER update_vods_updated_at
     BEFORE UPDATE ON "vods_new"
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+    DROP TRIGGER IF EXISTS update_games_updated_at ON "games_new";
+    CREATE TRIGGER update_games_updated_at
+    BEFORE UPDATE ON "games_new"
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
     CREATE INDEX IF NOT EXISTS "vods_updated_at_idx" ON "vods_new"("updated_at");
@@ -760,8 +767,8 @@ const main = async () => {
           const end = start + duration;
 
           await schemaClient.query(
-            `INSERT INTO "games_new" (vod_id, start, duration, "end", video_provider, video_id, thumbnail_url, game_id, game_name, title, chapter_image)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+            `INSERT INTO "games_new" (vod_id, start, duration, "end", video_provider, video_id, thumbnail_url, game_id, game_name, title, chapter_image, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
             [
               newVodId,
               start,
@@ -774,6 +781,8 @@ const main = async () => {
               game.game_name,
               game.title,
               game.chapter_image,
+              game.created_at || game.createdAt || new Date(),
+              game.updated_at || game.updatedAt || new Date(),
             ]
           );
           migratedGames++;
