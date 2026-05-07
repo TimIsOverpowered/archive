@@ -1,16 +1,13 @@
 import Fastify, { FastifyInstance } from 'fastify';
-import { hasStatusCode, extractErrorDetails } from '../../src/utils/error.js';
-
-export interface TestServerOptions {
-  disableRedis?: boolean;
-}
+import { errorResponse } from '../../src/api/response.js';
+import { formatErrorResponse } from '../../src/utils/error.js';
 
 export interface TestServer {
   server: FastifyInstance;
   close: () => Promise<void>;
 }
 
-export async function buildTestServer(_options: TestServerOptions = {}): Promise<TestServer> {
+export async function buildTestServer(): Promise<TestServer> {
   const server = Fastify({
     bodyLimit: 25 * 1024 * 1024,
     exposeHeadRoutes: true,
@@ -21,14 +18,11 @@ export async function buildTestServer(_options: TestServerOptions = {}): Promise
     },
   });
 
-  server.setErrorHandler((error: unknown, _request, reply) => {
-    const statusCode = hasStatusCode(error) ? error.statusCode : 500;
-    const { message } = extractErrorDetails(error);
-    return reply.status(statusCode).send({
-      statusCode,
-      message: statusCode >= 500 ? 'Internal server error' : message,
-      code: 'INTERNAL_SERVER_ERROR',
-    });
+  server.setErrorHandler((error, _request, reply) => {
+    const { statusCode, message, code, isClientError } = formatErrorResponse(error);
+    return reply
+      .status(statusCode)
+      .send(errorResponse(statusCode, isClientError ? message : 'Internal server error', code));
   });
 
   return {
@@ -39,11 +33,8 @@ export async function buildTestServer(_options: TestServerOptions = {}): Promise
   };
 }
 
-export async function withTestServer<T>(
-  options: TestServerOptions,
-  callback: (server: FastifyInstance) => Promise<T>
-): Promise<T> {
-  const { server } = await buildTestServer(options);
+export async function withTestServer<T>(callback: (server: FastifyInstance) => Promise<T>): Promise<T> {
+  const { server } = await buildTestServer();
   try {
     return await callback(server);
   } finally {

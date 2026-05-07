@@ -10,9 +10,7 @@ import type { ApiConfig } from '../config/env.js';
 import { registerTenantConfigSubscriber } from '../config/tenant-config-subscriber.js';
 import { Server } from '../constants.js';
 import { registerCacheSubscriber } from '../services/cache-invalidator.js';
-import { DomainError } from '../utils/domain-errors.js';
-import { extractErrorDetails, createErrorContext, hasStatusCode } from '../utils/error.js';
-import { HttpError } from '../utils/http-error.js';
+import { createErrorContext, formatErrorResponse } from '../utils/error.js';
 import { getLogger, createLogger, setGlobalLogger } from '../utils/logger.js';
 import createTenantLoggerMiddleware, { exitTenantContext } from './middleware/tenant-logger.js';
 import configPlugin from './plugins/config.plugin.js';
@@ -25,29 +23,6 @@ import gamesRoutes from './routes/games.js';
 import healthRoutes from './routes/health.js';
 import logsRoutes from './routes/logs.js';
 import vodsRoutes from './routes/vods.js';
-
-interface FormattedError {
-  statusCode: number;
-  message: string;
-  code: string;
-  isClientError: boolean;
-}
-
-function formatErrorResponse(error: unknown): FormattedError {
-  if (error instanceof HttpError || error instanceof DomainError) {
-    const { statusCode, message, code } = error;
-    return { statusCode, message, code, isClientError: statusCode >= 400 && statusCode < 500 };
-  }
-
-  const details = extractErrorDetails(error);
-  const statusCode = hasStatusCode(error) ? error.statusCode : 500;
-  return {
-    statusCode,
-    message: details.message,
-    code: 'INTERNAL_SERVER_ERROR',
-    isClientError: statusCode >= 400 && statusCode < 500,
-  };
-}
 
 export async function buildServer(config: ApiConfig) {
   const logger = createLogger({ level: config.LOG_LEVEL, isProduction: config.NODE_ENV === 'production' });

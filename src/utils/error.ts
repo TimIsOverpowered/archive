@@ -3,10 +3,19 @@
  */
 
 import { ZodError } from 'zod';
+import { DomainError } from './domain-errors.js';
+import { HttpError } from './http-error.js';
 
 export interface ErrorDetails {
   message: string;
   stack?: string | undefined;
+}
+
+export interface FormattedError {
+  statusCode: number;
+  message: string;
+  code: string;
+  isClientError: boolean;
 }
 
 export function hasStatusCode(e: unknown): e is { statusCode: number } {
@@ -71,4 +80,24 @@ export function throwOnHttpError(response: Response, context: string = 'HTTP req
   if (!response.ok) {
     throw new Error(`${context} failed with status ${response.status} ${response.statusText}`);
   }
+}
+
+/**
+ * Format an error into a consistent API error response shape.
+ * Used by both production error handler and test server.
+ */
+export function formatErrorResponse(error: unknown): FormattedError {
+  if (error instanceof HttpError || error instanceof DomainError) {
+    const { statusCode, message, code } = error;
+    return { statusCode, message, code, isClientError: statusCode >= 400 && statusCode < 500 };
+  }
+
+  const details = extractErrorDetails(error);
+  const statusCode = hasStatusCode(error) ? error.statusCode : 500;
+  return {
+    statusCode,
+    message: details.message,
+    code: 'INTERNAL_SERVER_ERROR',
+    isClientError: statusCode >= 400 && statusCode < 500,
+  };
 }
