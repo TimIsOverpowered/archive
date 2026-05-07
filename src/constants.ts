@@ -151,6 +151,12 @@ export const Twitch = {
   BACKUP_GQL_CLIENT_ID: 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
   /** Max user_id query params per /streams request. */
   STREAMS_BATCH_SIZE: 100,
+  /** Redis key for shared app access token */
+  REDIS_TOKEN_KEY: 'twitch:app_token',
+  /** Redis lock key for distributed token refresh */
+  REDIS_LOCK_KEY: 'twitch:token:refreshing',
+  /** Lock TTL in seconds */
+  LOCK_TTL: 30,
 } as const;
 
 // ── Emote APIs ───────────────────────────────────────────────────────────────
