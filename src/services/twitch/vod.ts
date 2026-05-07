@@ -74,7 +74,12 @@ export async function getM3u8(
   vodId: string,
   token: string,
   sig: string,
-  retryOptions?: { attempts?: number; baseDelayMs?: number; maxDelayMs?: number }
+  retryOptions?: {
+    attempts?: number;
+    baseDelayMs?: number;
+    maxDelayMs?: number;
+    shouldRetry?: (error: unknown) => boolean;
+  }
 ): Promise<string> {
   const codecs = encodeURIComponent('av1,h265,h264');
   const url = `${Twitch.USHER_BASE_URL}/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=${codecs}&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`;

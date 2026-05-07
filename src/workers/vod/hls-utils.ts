@@ -186,7 +186,12 @@ export async function fetchTwitchPlaylist(
   vodId: string,
   log: AppLogger,
   tenantId?: string,
-  retryOptions?: { attempts?: number; baseDelayMs?: number; maxDelayMs?: number }
+  retryOptions?: {
+    attempts?: number;
+    baseDelayMs?: number;
+    maxDelayMs?: number;
+    shouldRetry?: (error: unknown) => boolean;
+  }
 ): Promise<FetchPlaylistResult> {
   const tokenSig = await getVodTokenSig(vodId, tenantId);
 

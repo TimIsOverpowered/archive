@@ -9,8 +9,8 @@ import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
 import { sleep, getRetryDelay } from '../../utils/delay.js';
-import { DownloadAbortedError } from '../../utils/domain-errors.js';
 import { extractErrorDetails } from '../../utils/error.js';
+import { HttpError } from '../../utils/http-error.js';
 import type { AppLogger } from '../../utils/logger.js';
 import { getVodDirPath, getVodFilePath } from '../../utils/path.js';
 import { createVodWorkerAlerts, safeUpdateAlert } from '../utils/alert-factories.js';
@@ -238,7 +238,11 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
   let streamEnded = false;
   while (!streamEnded) {
     try {
-      const playlist = await fetchPlaylist(ctx, { attempts: 3, baseDelayMs: 2000 });
+      const playlist = await fetchPlaylist(ctx, {
+        attempts: 3,
+        baseDelayMs: 2000,
+        shouldRetry: (err) => err instanceof HttpError && (err.statusCode === 403 || err.statusCode >= 500),
+      });
 
       const { variantM3u8String, baseURL } = playlist;
       const parsed = HLS.parse(variantM3u8String) as HLS.types.MediaPlaylist;
@@ -290,8 +294,6 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
       await sleep(Hls.POLL_INTERVAL_MS);
     } catch (error) {
       const details = extractErrorDetails(error);
-
-      if (error instanceof DownloadAbortedError) throw error;
 
       log.error({ ...details, vodId }, 'Poll cycle error');
       consecutiveErrors++;
@@ -350,7 +352,12 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
 
 export async function fetchPlaylist(
   ctx: LivePollingContext | ArchivedVodContext,
-  retryOptions?: { attempts?: number; baseDelayMs?: number; maxDelayMs?: number }
+  retryOptions?: {
+    attempts?: number;
+    baseDelayMs?: number;
+    maxDelayMs?: number;
+    shouldRetry?: (error: unknown) => boolean;
+  }
 ) {
   const tenantId = ctx.ctx.tenantId;
 

@@ -705,17 +705,14 @@ describe('downloadHlsStream', () => {
   });
 
   describe('error handling', () => {
-    it('should re-throw DownloadAbortedError without wrapping', async () => {
+    it('should treat DownloadAbortedError as retryable and fail after max consecutive errors', async () => {
       mockFetchTwitchPlaylist.mock.mockImplementation(async () => {
         throw new DownloadAbortedError();
       });
 
       await assert.rejects(
         downloadHlsStream(buildOptions({ platform: PLATFORMS.TWITCH, isLive: true })),
-        (err: unknown) => {
-          assert.ok(err instanceof DownloadAbortedError);
-          return true;
-        }
+        /consecutive errors/
       );
     });
 
