@@ -122,3 +122,7 @@ export interface DmcaProcessingSuccessResult {
 }
 
 export type DmcaProcessingResult = DmcaProcessingSuccessResult;
+
+export interface MonitorJobResult {
+  success: true;
+}

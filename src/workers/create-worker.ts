@@ -4,9 +4,9 @@ import { extractErrorDetails } from '../utils/error.js';
 import { getLogger } from '../utils/logger.js';
 import { WorkerName } from './queues/queue.js';
 
-export interface WorkerConfig<TData> {
+export interface WorkerConfig<TData, TResult = unknown> {
   name: WorkerName;
-  processor: Processor<TData, unknown, string>;
+  processor: Processor<TData, TResult, string>;
   concurrency?: number;
   useWorkerThreads?: boolean;
   connection: Redis;
@@ -57,10 +57,10 @@ export async function waitForWorkersReady(workerInstances: Worker[], timeoutMs =
   await Promise.all(readyPromises);
 }
 
-export function createWorker<TData>(config: WorkerConfig<TData>): Worker<TData, unknown> {
+export function createWorker<TData, TResult = unknown>(config: WorkerConfig<TData, TResult>): Worker<TData, TResult> {
   const { name, processor, connection, concurrency = 1, useWorkerThreads = false } = config;
 
-  const worker = new Worker<TData, unknown>(name, processor, {
+  const worker = new Worker<TData, TResult>(name, processor, {
     connection,
     concurrency,
     useWorkerThreads,

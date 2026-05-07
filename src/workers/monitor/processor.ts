@@ -2,18 +2,19 @@ import { Processor, Job } from 'bullmq';
 import { configService } from '../../config/tenant-config.js';
 import { requirePlatformConfig } from '../../config/types.js';
 import type { TenantConfig } from '../../config/types.js';
+import { Jobs } from '../../constants.js';
 import { findActiveLiveVod } from '../../db/queries/vods.js';
 import { getTwitchStreamStatusBatch, type TwitchStreamStatus } from '../../services/twitch/live.js';
 import { PLATFORMS, PLATFORM_VALUES } from '../../types/platforms.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { getLogger } from '../../utils/logger.js';
-import type { MonitorJob } from '../jobs/types.js';
-import { getLiveDownloadQueue, LIVE_JOB_ID_PREFIX } from '../queues/queue.js';
+import type { MonitorJob, MonitorJobResult } from '../jobs/types.js';
+import { getLiveDownloadQueue } from '../queues/queue.js';
 import { handleWorkerError } from '../utils/error-handler.js';
 import { getJobContext } from '../utils/job-context.js';
 import { handlePlatformLiveCheck, handlePlatformLiveCheckWithStreamStatus } from './live-handler.js';
 
-const monitorProcessor: Processor<MonitorJob, unknown, string> = async (job: Job<MonitorJob>) => {
+const monitorProcessor: Processor<MonitorJob, MonitorJobResult, string> = async (job: Job<MonitorJob>) => {
   const { tenantId, platform } = job.data;
 
   if (platform === PLATFORMS.TWITCH) {
@@ -83,7 +84,7 @@ async function processPerTenantJob(job: Job<MonitorJob>, tenantId: string): Prom
     const activeLiveVod = await findActiveLiveVod(db, platform);
 
     if (activeLiveVod && activeLiveVod.platform_vod_id != null && activeLiveVod.platform_vod_id !== '') {
-      const jobId = `${LIVE_JOB_ID_PREFIX}${activeLiveVod.platform_vod_id}`;
+      const jobId = `${Jobs.LIVE_HLS_JOB_PREFIX}${activeLiveVod.platform_vod_id}`;
       const queuedJob = await liveQueue.getJob(jobId);
       const hasActiveJob = queuedJob !== undefined && (await queuedJob.isActive());
       if (hasActiveJob) {
@@ -129,7 +130,7 @@ async function processTenantWithStreamStatus(
   const activeLiveVod = await findActiveLiveVod(db, platform);
 
   if (activeLiveVod && activeLiveVod.platform_vod_id != null && activeLiveVod.platform_vod_id !== '') {
-    const jobId = `${LIVE_JOB_ID_PREFIX}${activeLiveVod.platform_vod_id}`;
+    const jobId = `${Jobs.LIVE_HLS_JOB_PREFIX}${activeLiveVod.platform_vod_id}`;
     const queuedJob = await liveQueue.getJob(jobId);
     const hasActiveJob = queuedJob !== undefined && (await queuedJob.isActive());
     if (hasActiveJob) {

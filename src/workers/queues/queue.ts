@@ -1,11 +1,17 @@
 import { Queue, QueueOptions, FlowProducer } from 'bullmq';
 import type {
   LiveDownloadJob,
+  LiveDownloadResult,
   StandardVodJob,
+  StandardVodResult,
   ChatDownloadJob,
+  ChatDownloadResult,
   YoutubeUploadJob,
+  YoutubeUploadResult,
   DmcaProcessingJob,
+  DmcaProcessingResult,
   MonitorJob,
+  MonitorJobResult,
 } from '../jobs/types.js';
 import { getRedisInstance } from '../redis.js';
 
@@ -19,8 +25,6 @@ export const QUEUE_NAMES = {
 } as const;
 
 export type WorkerName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
-
-export const LIVE_JOB_ID_PREFIX = 'live_hls_';
 
 type JobOpts = NonNullable<QueueOptions['defaultJobOptions']>;
 
@@ -62,27 +66,27 @@ function getQueue<TData = unknown, TFinishedData = unknown>(
   return queue;
 }
 
-export function getLiveDownloadQueue(): Queue<LiveDownloadJob, LiveDownloadJob, string> {
+export function getLiveDownloadQueue(): Queue<LiveDownloadJob, LiveDownloadResult, string> {
   return getQueue(QUEUE_NAMES.VOD_LIVE, defaultJobOptions);
 }
 
-export function getStandardVodQueue(): Queue<StandardVodJob, StandardVodJob, string> {
+export function getStandardVodQueue(): Queue<StandardVodJob, StandardVodResult, string> {
   return getQueue(QUEUE_NAMES.VOD_STANDARD, defaultJobOptions);
 }
 
-export function getChatDownloadQueue(): Queue<ChatDownloadJob, ChatDownloadJob, string> {
+export function getChatDownloadQueue(): Queue<ChatDownloadJob, ChatDownloadResult, string> {
   return getQueue(QUEUE_NAMES.CHAT_DOWNLOAD, exponentialBackoff(3000, 5));
 }
 
-export function getYoutubeUploadQueue(): Queue<YoutubeUploadJob, YoutubeUploadJob, string> {
+export function getYoutubeUploadQueue(): Queue<YoutubeUploadJob, YoutubeUploadResult, string> {
   return getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD, exponentialBackoff(10_000, 3));
 }
 
-export function getDmcaProcessingQueue(): Queue<DmcaProcessingJob, DmcaProcessingJob, string> {
+export function getDmcaProcessingQueue(): Queue<DmcaProcessingJob, DmcaProcessingResult, string> {
   return getQueue(QUEUE_NAMES.DMCA_PROCESSING, exponentialBackoff(10_000, 3));
 }
 
-export function getMonitorQueue(): Queue<MonitorJob, MonitorJob, string> {
+export function getMonitorQueue(): Queue<MonitorJob, MonitorJobResult, string> {
   return getQueue(QUEUE_NAMES.MONITOR, defaultJobOptions);
 }
 

@@ -17,6 +17,7 @@ import type {
   ChatDownloadResult,
   YoutubeUploadResult,
   DmcaProcessingResult,
+  MonitorJobResult,
 } from './jobs/types.js';
 import liveProcessor from './live.worker.js';
 import monitorProcessor from './monitor/processor.js';
@@ -69,7 +70,7 @@ const workerDefs = {
   [QUEUE_NAMES.MONITOR]: {
     name: QUEUE_NAMES.MONITOR,
     processor: monitorProcessor,
-  } satisfies WorkerDef<MonitorJob>,
+  } satisfies WorkerDef<MonitorJob, MonitorJobResult>,
 };
 
 export function registerWorkers(
