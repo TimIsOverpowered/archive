@@ -40,7 +40,7 @@ export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesR
       onRequest: [rateLimitMiddleware],
     },
     async (request, reply) => {
-      const tenantId = request.params.tenantId;
+      const tenantId = request.params.tenantId.toLowerCase();
       const log = createAutoLogger(tenantId);
 
       const config = await configService.get(tenantId);

@@ -43,7 +43,8 @@ export function asTenantPlatformContext(ctx: TenantContext): TenantPlatformConte
  * Register in onRequest hook.
  */
 export async function tenantMiddleware(request: FastifyRequest) {
-  const tenantId = (request.params as { tenantId?: string }).tenantId;
+  const rawTenantId = (request.params as { tenantId?: string }).tenantId;
+  const tenantId = rawTenantId?.toLowerCase();
 
   if (tenantId == null) {
     notFound('Tenant ID not provided');

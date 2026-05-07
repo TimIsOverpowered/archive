@@ -21,7 +21,7 @@ export default function createTenantLoggerMiddleware() {
 
     if ('tenantId' in params) {
       // Routes use 'tenantId' parameter
-      tenantId = String(params.tenantId);
+      tenantId = String(params.tenantId).toLowerCase();
     }
 
     if (tenantId == null) {
