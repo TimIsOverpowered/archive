@@ -24,6 +24,25 @@ const HOST = config.HOST;
 
 let server: Awaited<ReturnType<typeof buildServer>> | null = null;
 
+async function preloadCloudflareIpRanges(): Promise<void> {
+  try {
+    const cacheInfo = await getCachedRangeInfo();
+    if (
+      !cacheInfo ||
+      cacheInfo.status === 'missing' ||
+      (cacheInfo.ttlRemaining ?? 0) < CacheRefresh.TTL_REMAINING_THRESHOLD
+    ) {
+      await getCloudflareIpRanges();
+      getLogger().info('Cloudflare IP ranges pre-fetched (cache was missing/expired)');
+    } else {
+      getLogger().debug({ ttlRemaining: cacheInfo.ttlRemaining }, 'Cloudflare IP ranges cache is fresh');
+    }
+  } catch (err) {
+    const details = extractErrorDetails(err);
+    getLogger().warn({ ...details }, 'Failed to check Cloudflare IP ranges cache');
+  }
+}
+
 async function start() {
   try {
     getLogger().info({ port: PORT, host: HOST, env: config.NODE_ENV }, 'Starting Archive API server');
@@ -39,25 +58,7 @@ async function start() {
     getLogger().info('DB client cleanup started');
 
     if (getBaseConfig().REQUIRE_CLOUDFLARE_IP) {
-      // Pre-fetch Cloudflare IP ranges (only if missing or expiring soon)
-      try {
-        const cacheInfo = await getCachedRangeInfo();
-        if (
-          !cacheInfo ||
-          cacheInfo.status === 'missing' ||
-          (cacheInfo.ttlRemaining ?? 0) < CacheRefresh.TTL_REMAINING_THRESHOLD
-        ) {
-          await getCloudflareIpRanges();
-          getLogger().info('Cloudflare IP ranges pre-fetched (cache was missing/expired)');
-        } else {
-          getLogger().debug({ ttlRemaining: cacheInfo.ttlRemaining }, 'Cloudflare IP ranges cache is fresh');
-        }
-      } catch (err) {
-        const details = extractErrorDetails(err);
-        getLogger().warn({ ...details }, 'Failed to check Cloudflare IP ranges cache');
-      }
-
-      // Start Cloudflare IP ranges refresh cron
+      await preloadCloudflareIpRanges();
       startCloudflareIpRangesCron();
       getLogger().info('Cloudflare IP ranges refresh cron started');
     } else {

@@ -32,7 +32,7 @@ export const Hls = {
 } as const;
 
 // ── Redis ────────────────────────────────────────────────────────────────────
-export const Redis = {
+export const RedisConfig = {
   RETRY_TIMEOUT_MS: 30_000,
   MAX_RETRIES: 10,
 } as const;

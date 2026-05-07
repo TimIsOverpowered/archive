@@ -45,12 +45,14 @@ class PoolManager {
       await this.evictOldestIdleClient();
     }
 
-    const creationPromise = this.createConnection(config).finally(() => this.creationLocks.delete(config.id));
+    const creationPromise = Promise.resolve(this.createConnection(config)).finally(() =>
+      this.creationLocks.delete(config.id)
+    );
     this.creationLocks.set(config.id, creationPromise);
     return creationPromise;
   }
 
-  private createConnection(config: TenantConfig): Promise<Kysely<StreamerDB>> {
+  private buildConnection(config: TenantConfig): PgPoolEntry {
     const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
     const connectionLimit = config.database.connectionLimit ?? 2;
     const tenantDbName = extractDatabaseName(config.database.url);
@@ -64,14 +66,17 @@ class PoolManager {
     });
     const db = new Kysely<StreamerDB>({ dialect: new PostgresDialect({ pool }) });
 
-    this.pools.set(config.id, {
-      pool,
-      db,
-      lastAccessedAt: Date.now(),
-      createdAt: Date.now(),
-    });
+    return { pool, db, lastAccessedAt: Date.now(), createdAt: Date.now() };
+  }
 
-    return Promise.resolve(db);
+  private registerConnection(tenantId: string, entry: PgPoolEntry): void {
+    this.pools.set(tenantId, entry);
+  }
+
+  private createConnection(config: TenantConfig): Kysely<StreamerDB> {
+    const entry = this.buildConnection(config);
+    this.registerConnection(config.id, entry);
+    return entry.db;
   }
 
   async closeClient(tenantId: string): Promise<void> {
