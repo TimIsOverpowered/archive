@@ -54,8 +54,6 @@ export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesR
           const cachedBadges = await redis.getBuffer(`twitch_badges:${tenantId}`);
 
           if (cachedBadges != null && cachedBadges.length > 0) {
-            log.info('Returning cached Twitch badges');
-
             return ok((await decompressData(cachedBadges)) as Record<string, unknown>);
           }
         } catch (err) {
@@ -82,8 +80,6 @@ export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesR
             log.warn('Failed to cache Twitch badges in Redis, returning uncached result');
           }
         }
-
-        log.info({ tenantId }, 'Fetched and cached Twitch badges');
 
         return ok(badgesData);
       } catch (err) {
