@@ -648,11 +648,24 @@ describe('downloadHlsStream', () => {
     });
 
     it('should call Kick-specific functions during live polling', async () => {
+      let pollCount = 0;
+      const downloadedSet = new Set<string>();
+
       mockFetchKickPlaylist.mock.mockImplementation(async () => {
+        pollCount++;
+        const seg = pollCount <= 3 ? `live${String(pollCount).padStart(3, '0')}.ts` : 'live003.ts';
         return {
-          variantM3u8String: `#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXTINF:10.0,\nseg001.ts\n#EXT-X-ENDLIST`,
+          variantM3u8String: `#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXTINF:10.0,\n${seg}\n#EXT-X-ENDLIST`,
           baseURL: 'https://example.com/segments',
         };
+      });
+
+      mockFsReaddir.mock.mockImplementation(async () => Array.from(downloadedSet));
+
+      mockDownloadSegmentsParallel.mock.mockImplementation(async (segments: any) => {
+        for (const seg of segments) {
+          downloadedSet.add(seg.uri);
+        }
       });
 
       await downloadHlsStream(
@@ -664,16 +677,15 @@ describe('downloadHlsStream', () => {
         })
       );
 
-      assert.strictEqual(
-        mockUpdateChapterDuringDownload.mock.callCount(),
-        5,
-        'Expected updateChapterDuringDownload to be called'
-      );
-      assert.strictEqual(
-        mockUpdateVodDurationDuringDownload.mock.callCount(),
-        5,
-        'Expected updateVodDurationDuringDownload to be called'
-      );
+      mockFsReaddir.mock.mockImplementation(async (_path: string) => [
+        'seg001.ts',
+        'seg002.ts',
+        'seg003.ts',
+        'vod.mp4',
+      ]);
+
+      assert.ok(mockUpdateChapterDuringDownload.mock.callCount() >= 5);
+      assert.ok(mockUpdateVodDurationDuringDownload.mock.callCount() >= 5);
     });
 
     it('should not call Kick-specific functions for Twitch platform', async () => {

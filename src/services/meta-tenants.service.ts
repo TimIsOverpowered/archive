@@ -7,7 +7,7 @@ const tenantSelect = [
   'twitch',
   'youtube',
   'kick',
-  'database_url as databaseUrl',
+  'database_name as databaseName',
   'settings',
   'created_at as createdAt',
   'updated_at as updatedAt',

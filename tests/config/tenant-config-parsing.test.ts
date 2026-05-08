@@ -49,6 +49,7 @@ function makeTenant(overrides: Partial<TenantResult> = {}): TenantResult {
     twitch: null,
     youtube: null,
     kick: null,
+    databaseName: 'test',
     databaseUrl: encryptScalar('postgresql://test'),
     settings: { domainName: 'example.com', timezone: 'UTC' },
     createdAt: new Date(),
@@ -405,12 +406,12 @@ describe('buildTenantConfig parsing logic', () => {
       assert.strictEqual(result.createdAt.getTime(), createdAt.getTime());
     });
 
-    it('should include database url in config', () => {
-      const tenant = makeTenant({ databaseUrl: encryptScalar('postgresql://production-db') });
+    it('should include database name in config', () => {
+      const tenant = makeTenant({ databaseName: 'production' });
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
-      assert.strictEqual(result.database.url, 'postgresql://production-db');
+      assert.strictEqual(result.database.name, 'production');
     });
 
     it('should include all settings in config', () => {
@@ -438,18 +439,17 @@ describe('buildTenantConfig parsing logic', () => {
     });
   });
 
-  describe('decryptScalar usage', () => {
-    it('should decrypt databaseUrl', () => {
-      const encryptedUrl = encryptScalar('postgresql://encrypted');
-      const tenant = makeTenant({ databaseUrl: encryptedUrl });
+  describe('database name handling', () => {
+    it('should include database name in config', () => {
+      const tenant = makeTenant({ databaseName: 'encrypted' });
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
-      assert.strictEqual(result.database.url, 'postgresql://encrypted');
+      assert.strictEqual(result.database.name, 'encrypted');
     });
 
-    it('should return null when databaseUrl is null before decryption', () => {
-      const tenant = makeTenant({ databaseUrl: null });
+    it('should return null when databaseName is null', () => {
+      const tenant = makeTenant({ databaseName: null });
 
       const result = buildTenantConfig(tenant);
       assert.strictEqual(result, null);

@@ -24,7 +24,7 @@ CREATE TABLE "tenants" (
     "twitch" JSONB,
     "youtube" JSONB,
     "kick" JSONB,
-    "database_url" TEXT,
+    "database_name" TEXT,
     "settings" JSONB NOT NULL DEFAULT '{}'::jsonb,
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP

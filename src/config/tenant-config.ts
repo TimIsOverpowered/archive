@@ -4,7 +4,6 @@ import { ConfigCache } from '../constants.js';
 import { initMetaClient } from '../db/meta-client.js';
 import type { TenantResult } from '../db/meta-types.js';
 import { getAllTenants, getTenantById } from '../services/meta-tenants.service.js';
-import { decryptScalar } from '../utils/encryption.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { getLogger } from '../utils/logger.js';
 import { asJsonObject } from '../utils/object.js';
@@ -43,9 +42,7 @@ interface ConfigChangeEvent {
  * Pure function — does not depend on any module-level state.
  */
 export function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
-  if (tenant.databaseUrl == null) return null;
-
-  const dbUrl = decryptScalar(tenant.databaseUrl);
+  if (tenant.databaseName == null) return null;
 
   const settingsObj: Record<string, unknown> =
     typeof tenant.settings === 'object' && tenant.settings !== null && !Array.isArray(tenant.settings)
@@ -57,7 +54,7 @@ export function buildTenantConfig(tenant: TenantResult): TenantConfig | null {
     id: tenant.id,
     displayName: tenant.displayName ?? undefined,
     createdAt: tenant.createdAt,
-    database: { url: dbUrl },
+    database: { name: tenant.databaseName },
     settings,
   };
 

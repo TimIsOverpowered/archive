@@ -27,7 +27,7 @@ export interface TenantsTable {
   twitch: JSONColumnType<Record<string, unknown>> | null;
   youtube: JSONColumnType<Record<string, unknown>> | null;
   kick: JSONColumnType<Record<string, unknown>> | null;
-  database_url: string | null;
+  database_name: string | null;
   settings: JSONColumnType<Record<string, unknown>>;
   created_at: ColumnType<Date, string | undefined, never>;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
@@ -58,7 +58,7 @@ export interface TenantResult {
   twitch: Record<string, unknown> | null;
   youtube: Record<string, unknown> | null;
   kick: Record<string, unknown> | null;
-  databaseUrl: string | null;
+  databaseName: string | null;
   settings: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;

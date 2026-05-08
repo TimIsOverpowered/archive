@@ -89,10 +89,11 @@ export const CacheTag = {
 export const Db = {
   /** PostgreSQL integer column limit */
   INT32_MAX: 2_147_483_647,
-  POOL_IDLE_TIMEOUT_MS: 30 * 60 * 1_000,
-  POOL_MAX_CLIENTS: 10,
+  POOL_IDLE_TIMEOUT_MS: 15 * 60 * 1_000,
+  POOL_MAX_PER_TENANT: 10,
+  POOL_GLOBAL_MAX_CONNECTIONS: 800,
   POOL_CLEANUP_INTERVAL_MS: 5 * 60 * 1_000,
-  STATEMENT_TIMEOUT_MS: 30_000,
+  QUERY_TIMEOUT_MS: 10_000,
 } as const;
 
 // ── Kick API ─────────────────────────────────────────────────────────────────

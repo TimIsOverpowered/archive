@@ -15,13 +15,15 @@ process.env.TWITCH_CLIENT_ID = 'test-twitch-client-id';
 process.env.TWITCH_CLIENT_SECRET = 'test-twitch-client-secret';
 process.env.YOUTUBE_CLIENT_ID = 'test-youtube-client-id';
 process.env.YOUTUBE_CLIENT_SECRET = 'test-youtube-client-secret';
+process.env.TMP_PATH = '/tmp/archive';
+process.env.VOD_PATH = '/tmp/archive/vods';
 
 const createMockConfig = (id: string): TenantConfig =>
   createMockTenantConfig({
     id,
     displayName: id,
     database: {
-      url: `postgresql://test:test@localhost:5432/${id}`,
+      name: id,
     },
     settings: {
       domainName: `${id}.example.com`,
@@ -168,9 +170,9 @@ describe('DB Client Manager', () => {
   });
 
   describe('LRU eviction at MAX_CLIENTS', () => {
-    it('should evict oldest idle client when MAX_CLIENTS is reached', async () => {
+    it('should evict oldest idle client when global pool limit is reached', async () => {
       const configs: TenantConfig[] = [];
-      for (let i = 0; i < 11; i++) {
+      for (let i = 0; i < 81; i++) {
         configs.push(createMockConfig(`tenant-lru-${i}`));
       }
 
@@ -178,11 +180,11 @@ describe('DB Client Manager', () => {
         await pm.createClient(config);
       }
 
-      assert.strictEqual(pm.getCount(), 10);
+      assert.strictEqual(pm.getCount(), 80);
 
       assert.strictEqual(pm.getClient('tenant-lru-0'), undefined);
 
-      for (let i = 1; i <= 10; i++) {
+      for (let i = 1; i <= 80; i++) {
         assert.ok(pm.getClient(`tenant-lru-${i}`), `tenant-lru-${i} should exist`);
       }
     });

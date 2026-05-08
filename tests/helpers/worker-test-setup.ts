@@ -55,7 +55,7 @@ export function createMockTenantConfig(overrides: MockTenantConfigOverrides = {}
       ...(overrides.kick ?? {}),
     },
     database: {
-      url: 'postgresql://test:test@localhost:5432/test',
+      name: 'test',
       ...(overrides.database ?? {}),
     },
     settings: {

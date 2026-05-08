@@ -10,8 +10,7 @@ export interface TenantBase {
 }
 
 export interface DatabaseConfig {
-  url: string;
-  connectionLimit?: number;
+  name: string;
 }
 
 export interface TenantConfig extends TenantBase {

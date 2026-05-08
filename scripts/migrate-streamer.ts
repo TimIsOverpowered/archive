@@ -3,7 +3,6 @@ import 'dotenv/config';
 import readline from 'readline';
 import pg, { type Pool, type PoolClient } from 'pg';
 import { initMetaClient, getMetaClient, closeMetaClient } from '../src/db/meta-client.js';
-import { decryptScalar } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
 
 const META_DB_URL = process.env.META_DATABASE_URL;
@@ -510,24 +509,24 @@ const main = async () => {
     }
   }
 
-  let dbUrl: string | null;
+  let dbUrl: string;
   try {
     const tenant = await metaClient
       .selectFrom('tenants')
-      .select('database_url')
+      .select('database_name')
       .where('id', '=', streamerName)
       .executeTakeFirst();
 
-    if (!tenant?.database_url) {
+    if (!tenant?.database_name) {
       console.error(`❌ Tenant "${streamerName}" not found in meta database`);
       process.exit(1);
     }
 
-    try {
-      dbUrl = decryptScalar(tenant.database_url);
-    } catch (decryptError) {
-      const details = extractErrorDetails(decryptError);
-      console.error('❌ Failed to decrypt database URL:', details.message);
+    dbUrl = await prompt(
+      `Database connection string for tenant "${streamerName}" (postgresql://user:pass@host:port/${tenant.database_name}): `
+    );
+    if (!dbUrl) {
+      console.error('❌ Database connection string is required');
       await closeMetaClient();
       process.exit(1);
     }
@@ -558,6 +557,14 @@ const main = async () => {
     const oldPool = new pg.Pool({
       connectionString: dbUrl,
       max: actualWorkerCount + 4,
+      query_timeout: 0,
+      statement_timeout: 0,
+    });
+
+    oldPool.on('connect', (client) => {
+      client.query('SET statement_timeout = 0').catch((err) => {
+        console.error('⚠️ Failed to set statement_timeout to 0 on new connection', err);
+      });
     });
 
     let isAlreadyMigrated = false;

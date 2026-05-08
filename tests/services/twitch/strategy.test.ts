@@ -114,7 +114,7 @@ describe('Twitch Strategy: finalizeChapters', () => {
   it('should not throw when chapters finalize fails (error is caught)', async () => {
     const ctx = {
       tenantId: 'tenant-1',
-      config: { id: 'tenant-1', twitch: { enabled: true }, database: { url: 'postgresql://test' }, settings: {} },
+      config: { id: 'tenant-1', twitch: { enabled: true }, database: { name: 'test' }, settings: {} },
       db: null,
     };
 

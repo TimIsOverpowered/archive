@@ -15,7 +15,7 @@ function makeMockTenantConfig(overrides: Record<string, any> = {}): any {
     createdAt: new Date(),
     twitch: { enabled: true, auth: 'token', username: 'testuser' },
     kick: { enabled: false, username: 'testkick' },
-    database: { url: 'postgresql://test' },
+    database: { name: 'test' },
     settings: { domainName: 'example.com', timezone: 'UTC', saveMP4: true, saveHLS: false },
     ...overrides,
   };

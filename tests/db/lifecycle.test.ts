@@ -9,6 +9,17 @@ import {
   ensureClient,
 } from '../../src/db/streamer-client.js';
 import { isConnectionError } from '../../src/db/utils/errors.js';
+process.env.REDIS_URL = 'redis://localhost:6379';
+process.env.META_DATABASE_URL = 'postgresql://localhost/test';
+process.env.ENCRYPTION_MASTER_KEY = '0000000000000000000000000000000000000000000000000000000000000000';
+process.env.PGBOUNCER_URL = 'postgresql://localhost/placeholder';
+process.env.TWITCH_CLIENT_ID = 'test-twitch-client-id';
+process.env.TWITCH_CLIENT_SECRET = 'test-twitch-client-secret';
+process.env.YOUTUBE_CLIENT_ID = 'test-youtube-client-id';
+process.env.YOUTUBE_CLIENT_SECRET = 'test-youtube-client-secret';
+process.env.TMP_PATH = '/tmp/archive';
+process.env.VOD_PATH = '/tmp/archive/vods';
+
 import { createMockTenantConfig } from '../helpers/worker-test-setup.js';
 
 const createMockConfig = (id: string): TenantConfig =>
@@ -16,7 +27,7 @@ const createMockConfig = (id: string): TenantConfig =>
     id,
     displayName: id,
     database: {
-      url: `postgresql://test:test@localhost:5432/${id}`,
+      name: id,
     },
     settings: {
       domainName: `${id}.example.com`,

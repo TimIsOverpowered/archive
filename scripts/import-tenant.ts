@@ -170,14 +170,14 @@ async function importConfig(channelName: string, dbUrl: string): Promise<void> {
     if (kick) kick.mainPlatform = true;
   }
 
-  const encryptedDbUrl = encryptScalar(dbUrl);
+  const dbName = dbUrl.split('/').pop() || channelName;
 
   const displayName = rawConfig.channel || channelName;
 
   const createData: any = {
     id: channelName,
     display_name: displayName,
-    database_url: encryptedDbUrl,
+    database_name: dbName,
     settings,
   };
 

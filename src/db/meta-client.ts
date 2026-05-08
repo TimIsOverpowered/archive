@@ -40,7 +40,7 @@ export function initMetaClient(): Kysely<MetaDB> {
 
   const url = buildPgBouncerUrl(pgbouncerUrl, metaDbName);
 
-  const pool = new Pool({ connectionString: url, statement_timeout: Db.STATEMENT_TIMEOUT_MS });
+  const pool = new Pool({ connectionString: url, query_timeout: Db.QUERY_TIMEOUT_MS });
   const dialect = new PostgresDialect({ pool });
   const db = new Kysely<MetaDB>({ dialect });
 

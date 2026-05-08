@@ -111,7 +111,7 @@ describe('finalizeVod', () => {
       config: createMockTenantConfig({
         id: 'tenant-1',
         twitch: { enabled: true },
-        database: { url: 'postgresql://test' },
+        database: { name: 'test' },
         settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false },
       }),
       db: mockDb,
@@ -130,7 +130,7 @@ describe('finalizeVod', () => {
       config: createMockTenantConfig({
         id: 'tenant-1',
         twitch: { enabled: true },
-        database: { url: 'postgresql://test' },
+        database: { name: 'test' },
         settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false },
       }),
       db: mockDb,
@@ -150,7 +150,7 @@ describe('finalizeVod', () => {
       config: createMockTenantConfig({
         id: 'tenant-1',
         twitch: { enabled: true },
-        database: { url: 'postgresql://test' },
+        database: { name: 'test' },
         settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false },
       }),
       db: mockDb,
@@ -170,7 +170,7 @@ describe('finalizeVod', () => {
       config: createMockTenantConfig({
         id: 'tenant-1',
         twitch: { enabled: true },
-        database: { url: 'postgresql://test' },
+        database: { name: 'test' },
         settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false },
       }),
       db: mockDb,
@@ -187,7 +187,7 @@ describe('finalizeVod', () => {
       config: createMockTenantConfig({
         id: 'tenant-1',
         twitch: { enabled: true },
-        database: { url: 'postgresql://test' },
+        database: { name: 'test' },
         settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false },
       }),
       db: mockDb,
@@ -206,7 +206,7 @@ describe('finalizeVod', () => {
       config: createMockTenantConfig({
         id: 'tenant-1',
         twitch: { enabled: true },
-        database: { url: 'postgresql://test' },
+        database: { name: 'test' },
         settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false },
       }),
       db: mockDb,
@@ -233,7 +233,7 @@ describe('finalizeVod', () => {
       config: createMockTenantConfig({
         id: 'tenant-1',
         twitch: { enabled: true },
-        database: { url: 'postgresql://test' },
+        database: { name: 'test' },
         settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false },
       }),
       db: mockDb,
@@ -299,7 +299,7 @@ describe('finalizeVod', () => {
         config: createMockTenantConfig({
           id: 'tenant-1',
           twitch: { enabled: true },
-          database: { url: 'postgresql://test' },
+          database: { name: 'test' },
           settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false },
         }),
         db: mockDbWithTxnTracking,
@@ -364,7 +364,7 @@ describe('finalizeVod', () => {
         config: createMockTenantConfig({
           id: 'tenant-1',
           twitch: { enabled: true },
-          database: { url: 'postgresql://test' },
+          database: { name: 'test' },
           settings: { domainName: 'test.com', timezone: 'UTC', saveMP4: true, saveHLS: false },
         }),
         db: mockDbWithTracking,

@@ -30,6 +30,7 @@ function makeTenant(overrides: Partial<TenantResult> = {}): TenantResult {
     twitch: null,
     youtube: null,
     kick: null,
+    databaseName: 'test',
     // Provide REAL encrypted data so decryptScalar doesn't throw
     databaseUrl: encryptScalar('postgresql://test'),
     settings: { domainName: 'example.com', timezone: 'UTC' },
@@ -40,8 +41,8 @@ function makeTenant(overrides: Partial<TenantResult> = {}): TenantResult {
 }
 
 describe('buildTenantConfig', () => {
-  it('returns null when databaseUrl is null', () => {
-    const tenant = makeTenant({ databaseUrl: null });
+  it('returns null when databaseName is null', () => {
+    const tenant = makeTenant({ databaseName: null });
     const result = buildTenantConfig(tenant);
     assert.strictEqual(result, null);
   });
@@ -53,7 +54,7 @@ describe('buildTenantConfig', () => {
     assert.ok(result);
     assert.strictEqual(result?.id, 'tenant-1');
     assert.strictEqual(result?.displayName, 'Test Tenant');
-    assert.strictEqual(result?.database.url, 'postgresql://test');
+    assert.strictEqual(result?.database.name, 'test');
     assert.strictEqual(result?.settings.domainName, 'example.com');
   });
 

@@ -9,7 +9,7 @@ import { Pool } from 'pg';
 import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
 import type { InsertableTenants } from '../src/db/meta-types.js';
 import { getTenantById, createTenant, deleteTenant } from '../src/services/meta-tenants.service.js';
-import { encryptScalar, validateEncryptionKey } from '../src/utils/encryption.js';
+import { validateEncryptionKey } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -483,7 +483,7 @@ async function main(): Promise<void> {
     const tenantData: any = {
       id: channelName,
       display_name: displayName,
-      database_url: encryptScalar(dbUrl),
+      database_name: dbName,
       settings: {
         domainName,
         timezone,

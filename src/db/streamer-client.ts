@@ -5,7 +5,6 @@ import { TenantConfig } from '../config/types.js';
 import { Db } from '../constants.js';
 import { sleep } from '../utils/delay.js';
 import { extractErrorDetails } from '../utils/error.js';
-import { extractDatabaseName } from '../utils/formatting.js';
 import { getLogger } from '../utils/logger.js';
 import type { StreamerDB } from './streamer-types.js';
 import { isConnectionError } from './utils/errors.js';
@@ -41,8 +40,12 @@ class PoolManager {
     const inflight = this.creationLocks.get(config.id);
     if (inflight) return inflight;
 
-    if (this.pools.size >= Db.POOL_MAX_CLIENTS) {
-      await this.evictOldestIdleClient();
+    const totalConns = this.pools.size * Db.POOL_MAX_PER_TENANT;
+    if (totalConns >= Db.POOL_GLOBAL_MAX_CONNECTIONS) {
+      const evicted = await this.evictOldestIdleClient();
+      if (!evicted) {
+        throw new Error('Global connection limit reached. System under heavy load.');
+      }
     }
 
     const creationPromise = Promise.resolve(this.createConnection(config)).finally(() =>
@@ -54,15 +57,12 @@ class PoolManager {
 
   private buildConnection(config: TenantConfig): PgPoolEntry {
     const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
-    const connectionLimit = config.database.connectionLimit ?? 2;
-    const tenantDbName = extractDatabaseName(config.database.url);
-
-    const url = buildPgBouncerUrl(pgbouncerUrl, tenantDbName);
+    const url = buildPgBouncerUrl(pgbouncerUrl, config.database.name);
 
     const pool = new this.PoolCtor({
       connectionString: url,
-      max: connectionLimit,
-      statement_timeout: Db.STATEMENT_TIMEOUT_MS,
+      max: Db.POOL_MAX_PER_TENANT,
+      query_timeout: Db.QUERY_TIMEOUT_MS,
     });
     const db = new Kysely<StreamerDB>({ dialect: new PostgresDialect({ pool }) });
 
@@ -83,7 +83,7 @@ class PoolManager {
     const entry = this.pools.get(tenantId);
     if (entry) {
       try {
-        await entry.pool.end();
+        await entry.db.destroy();
       } catch (error) {
         getLogger().warn({ tenantId, error: extractErrorDetails(error) }, 'Failed to disconnect DB pool');
       }
@@ -91,16 +91,17 @@ class PoolManager {
     }
   }
 
-  async evictOldestIdleClient(): Promise<void> {
+  async evictOldestIdleClient(): Promise<boolean> {
     const entries = Array.from(this.pools.entries()).sort((a, b) => a[1].lastAccessedAt - b[1].lastAccessedAt);
 
     for (const [tenantId, entry] of entries) {
       if (entry.pool.idleCount === entry.pool.totalCount) {
         await this.closeClient(tenantId);
         getLogger().info({ tenantId }, 'Evicted oldest idle client due to MAX_CLIENTS limit');
-        return;
+        return true;
       }
     }
+    return false;
   }
 
   async evictIdleClients(): Promise<void> {
@@ -113,7 +114,7 @@ class PoolManager {
         const idleDuration = now - entry.lastAccessedAt;
 
         try {
-          await entry.pool.end();
+          await entry.db.destroy();
         } catch (error) {
           getLogger().warn({ tenantId, error: extractErrorDetails(error) }, 'Failed to disconnect during eviction');
         }
@@ -174,21 +175,15 @@ class PoolManager {
   async closeAll(): Promise<void> {
     this.stopCleanup();
 
-    for (const [tenantId, entry] of this.pools.entries()) {
-      const isFullyIdle = entry.pool.idleCount === entry.pool.totalCount;
-      if (!isFullyIdle) {
-        getLogger().info(
-          { tenantId, active: entry.pool.totalCount - entry.pool.idleCount },
-          'Skipping pool shutdown (active connections)'
-        );
-        continue;
-      }
+    const shutdownPromises = Array.from(this.pools.entries()).map(async ([tenantId, entry]) => {
       try {
-        await entry.pool.end();
+        await entry.db.destroy();
       } catch (error) {
         getLogger().warn({ tenantId, error: extractErrorDetails(error) }, 'Failed to disconnect during shutdown');
       }
-    }
+    });
+
+    await Promise.all(shutdownPromises);
 
     this.pools.clear();
     this.creationLocks.clear();
