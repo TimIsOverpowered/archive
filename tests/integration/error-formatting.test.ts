@@ -49,7 +49,7 @@ describe('Integration: Error Response Formatting', () => {
     const body = JSON.parse(res.body);
     assert.strictEqual(body.statusCode, 400);
     assert.strictEqual(body.message, 'invalid input');
-    assert.strictEqual(body.code, 'INTERNAL_SERVER_ERROR');
+    assert.strictEqual(body.code, 'BAD_REQUEST');
   });
 
   it('should format HttpError 500 as internal server error', async () => {
@@ -67,7 +67,7 @@ describe('Integration: Error Response Formatting', () => {
     const body = JSON.parse(res.body);
     assert.strictEqual(body.statusCode, 404);
     assert.ok(body.message.includes('Tenant not found'));
-    assert.strictEqual(body.code, 'INTERNAL_SERVER_ERROR');
+    assert.strictEqual(body.code, 'TENANT_NOT_FOUND');
   });
 
   it('should format VodNotFoundError with context', async () => {
@@ -76,7 +76,7 @@ describe('Integration: Error Response Formatting', () => {
     const body = JSON.parse(res.body);
     assert.strictEqual(body.statusCode, 404);
     assert.ok(body.message.includes('VOD not found'));
-    assert.strictEqual(body.code, 'INTERNAL_SERVER_ERROR');
+    assert.strictEqual(body.code, 'VOD_NOT_FOUND');
   });
 
   it('should format generic Error with message for 500', async () => {
@@ -94,6 +94,6 @@ describe('Integration: Error Response Formatting', () => {
     const body = JSON.parse(res.body);
     assert.strictEqual(body.statusCode, 422);
     assert.strictEqual(body.message, 'validation failed');
-    assert.strictEqual(body.code, 'INTERNAL_SERVER_ERROR');
+    assert.strictEqual(body.code, 'VALIDATION_ERROR');
   });
 });
