@@ -111,10 +111,6 @@ data/
 # Build output (never commit compiled code)
 dist/
 
-# Prisma generated clients - platform-specific binaries regenerated on each deploy
-generated/
-prisma/generated/meta/
-
 config/*
 !config/example.config.json
 
@@ -127,4 +123,3 @@ logs/
 pm2-debug.log
 
 *.opencode*
-AGENTS.md
