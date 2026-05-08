@@ -5,10 +5,13 @@ import type { SelectableVods } from '../../../../db/streamer-types.js';
 import type { SourceType, DownloadMethod } from '../../../../types/platforms.js';
 import { DOWNLOAD_METHODS, SOURCE_TYPES } from '../../../../types/platforms.js';
 import { PlatformNotConfiguredError, VodNotFoundError } from '../../../../utils/domain-errors.js';
+import { extractErrorDetails } from '../../../../utils/error.js';
 import { type AppLogger } from '../../../../utils/logger.js';
-import { getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
+import { getTmpPath } from '../../../../config/env.js';
+import { getTmpFilePath, getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
 import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
 import { getMetadata } from '../../../../workers/utils/ffmpeg.js';
+import { finalizeToStorage } from '../../../../workers/utils/file-finalization.js';
 import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { refreshVodRecord } from './vod-records.js';
 
@@ -24,6 +27,7 @@ export interface EnsureVodDownloadOptions {
 export interface EnsureVodDownloadResponse {
   filePath?: string;
   jobId: string | null;
+  workDir?: string | undefined;
 }
 
 /**
@@ -34,14 +38,13 @@ export interface EnsureVodDownloadResponse {
  */
 export async function ensureVodDownload(options: EnsureVodDownloadOptions): Promise<EnsureVodDownloadResponse> {
   const { ctx, dbId, vodId, type, downloadMethod = DOWNLOAD_METHODS.HLS, log } = options;
-  const { tenantId, platform, config, db } = ctx;
+  const { tenantId, platform, db } = ctx;
 
   const platformConfig = requirePlatformConfig(ctx.config, platform);
   if (!platformConfig) throw new PlatformNotConfiguredError(platform, `tenant ${tenantId}`);
   const { platformUserId, platformUsername } = platformConfig;
 
-  const filePath =
-    type === SOURCE_TYPES.LIVE ? getLiveFilePath({ config, streamId: vodId }) : getVodFilePath({ config, vodId });
+  const filePath = type === SOURCE_TYPES.LIVE ? getLiveFilePath({ streamId: vodId }) : getVodFilePath({ vodId });
 
   let vodRecord = await findVodById(db, dbId);
   if (vodRecord && vodRecord.duration === 0) {
@@ -55,6 +58,20 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
 
   if (!needsDownload) {
     log.debug({ vodId, filePath, type }, 'VOD file already exists and is valid');
+
+    // If tmpPath is configured, copy to tmpPath for local processing
+    const tmpPath = getTmpPath();
+    if (tmpPath != null) {
+      const tmpFilePath = getTmpFilePath({ vodId });
+      try {
+        await finalizeToStorage(filePath, tmpFilePath, log);
+        log.info({ filePath, tmpFilePath }, 'Copied existing VOD from storage to tmpPath');
+        return { filePath: tmpFilePath, jobId: null, workDir: tmpPath };
+      } catch (err) {
+        log.warn({ error: extractErrorDetails(err).message }, 'Failed to copy VOD to tmpPath');
+      }
+    }
+
     return { filePath, jobId: null };
   }
 
@@ -71,7 +88,8 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
   });
 
   log.info({ jobId, vodId, filePath, type }, 'VOD download queued');
-  return { filePath, jobId };
+  const tmpPath = getTmpPath();
+  return { filePath, jobId, workDir: tmpPath ?? undefined };
 }
 
 /**

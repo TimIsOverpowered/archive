@@ -46,8 +46,6 @@ interface KickConfig {
 interface SettingsConfig {
   channel?: string;
   domainName: string;
-  vodPath: string;
-  livePath: string;
   timezone: string;
   chatDownload: boolean;
   vodDownload: boolean;
@@ -61,8 +59,6 @@ interface RawConfig {
   youtube?: YoutubeConfig;
   channel?: string;
   domain_name: string;
-  vodPath: string;
-  livePath: string;
   timezone: string;
   chatDownload: boolean;
   vodDownload: boolean;
@@ -124,8 +120,6 @@ function processKick(config: KickConfig | undefined) {
 function processSettings(raw: RawConfig) {
   const settings: SettingsConfig = {
     domainName: raw.domain_name,
-    vodPath: raw.vodPath,
-    livePath: raw.livePath,
     timezone: raw.timezone,
     chatDownload: raw.chatDownload,
     vodDownload: raw.vodDownload,

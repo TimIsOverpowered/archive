@@ -1,5 +1,4 @@
 import { strict as assert } from 'node:assert';
-import path from 'node:path';
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import { SettingsSchema, TwitchSchema, YoutubeSchema, KickSchema } from '../../src/config/schemas.js';
 import type { TenantResult } from '../../src/db/meta-types.js';
@@ -77,8 +76,6 @@ describe('buildTenantConfig parsing logic', () => {
           saveHLS: true,
           vodDownload: false,
           chatDownload: false,
-          vodPath: '/data/vods',
-          livePath: '/data/live',
         },
       });
 
@@ -90,8 +87,6 @@ describe('buildTenantConfig parsing logic', () => {
       assert.strictEqual(result.settings.saveHLS, true);
       assert.strictEqual(result.settings.vodDownload, false);
       assert.strictEqual(result.settings.chatDownload, false);
-      assert.strictEqual(result.settings.vodPath, path.resolve('/data/vods'));
-      assert.strictEqual(result.settings.livePath, path.resolve('/data/live'));
     });
 
     it('should apply default values for optional settings fields', () => {
@@ -105,8 +100,6 @@ describe('buildTenantConfig parsing logic', () => {
       assert.strictEqual(result.settings.saveHLS, false);
       assert.strictEqual(result.settings.vodDownload, true);
       assert.strictEqual(result.settings.chatDownload, true);
-      assert.strictEqual(result.settings.vodPath, undefined);
-      assert.strictEqual(result.settings.livePath, undefined);
     });
 
     it('should throw when domainName is missing from settings', () => {
@@ -141,48 +134,6 @@ describe('buildTenantConfig parsing logic', () => {
       const tenant = makeTenant({ settings: ['not-an-object'] as any });
 
       assert.throws(() => buildTenantConfig(tenant), /domainName/);
-    });
-
-    it('should normalize vodPath to absolute path', () => {
-      const tenant = makeTenant({
-        settings: { domainName: 'example.com', timezone: 'UTC', vodPath: 'relative/path' },
-      });
-
-      const result = buildTenantConfig(tenant);
-      assert.ok(result);
-      assert.ok(result.settings.vodPath);
-      assert.ok(path.isAbsolute(result.settings.vodPath));
-    });
-
-    it('should normalize livePath to absolute path', () => {
-      const tenant = makeTenant({
-        settings: { domainName: 'example.com', timezone: 'UTC', livePath: 'relative/live' },
-      });
-
-      const result = buildTenantConfig(tenant);
-      assert.ok(result);
-      assert.ok(result.settings.livePath);
-      assert.ok(path.isAbsolute(result.settings.livePath));
-    });
-
-    it('should set vodPath to undefined when empty string', () => {
-      const tenant = makeTenant({
-        settings: { domainName: 'example.com', timezone: 'UTC', vodPath: '' },
-      });
-
-      const result = buildTenantConfig(tenant);
-      assert.ok(result);
-      assert.strictEqual(result.settings.vodPath, undefined);
-    });
-
-    it('should set livePath to undefined when empty string', () => {
-      const tenant = makeTenant({
-        settings: { domainName: 'example.com', timezone: 'UTC', livePath: '' },
-      });
-
-      const result = buildTenantConfig(tenant);
-      assert.ok(result);
-      assert.strictEqual(result.settings.livePath, undefined);
     });
   });
 

@@ -22,6 +22,8 @@ export interface QueueDmcaProcessingOptions {
   gameId?: number | undefined;
   gameStart?: number | undefined;
   gameDuration?: number | undefined;
+  workDir?: string | undefined;
+  skipFinalize?: boolean | undefined;
 }
 
 export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): Promise<string | null> {
@@ -38,6 +40,8 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
     gameId,
     gameStart,
     gameDuration,
+    workDir,
+    skipFinalize,
   } = options;
 
   const isGameUpload = gameId != null;
@@ -59,6 +63,8 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
     ...(gameId != null && { gameId }),
     ...(gameStart != null && { gameStart }),
     ...(gameDuration != null && { gameDuration }),
+    ...(workDir != null && { workDir }),
+    ...(skipFinalize !== undefined && { skipFinalize }),
   };
 
   try {

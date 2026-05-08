@@ -13,6 +13,8 @@ function setupBaseEnv(): void {
   process.env.ENCRYPTION_MASTER_KEY = VALID_KEY;
   process.env.NODE_ENV = 'test';
   process.env.VOD_PATH = '/tmp/test-vods';
+  process.env.LIVE_PATH = '/tmp/test-live';
+  process.env.TMP_PATH = '/tmp/test-tmp';
   process.env.TWITCH_CLIENT_ID = 'test-twitch-client-id';
   process.env.TWITCH_CLIENT_SECRET = 'test-twitch-client-secret';
   process.env.YOUTUBE_CLIENT_ID = 'test-youtube-client-id';
@@ -49,7 +51,7 @@ function createMockCtx(overrides: Partial<LiveProcessorContext> = {}): LiveProce
     } as any,
     config: {
       id: 'test-tenant',
-      settings: { vodPath: '/tmp/test-vods' },
+      settings: {},
     } as any,
     db: {} as any,
     tenantId: 'test-tenant',

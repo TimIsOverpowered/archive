@@ -176,6 +176,7 @@ export async function uploadAndUpsertGame(
     .executeTakeFirst();
 
   await publishVodUpdate(tenantId, dbId);
+
   await deleteFileIfExists(filePath);
 
   if (gameRecord == null) throw new Error('Failed to insert game record');

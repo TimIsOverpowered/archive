@@ -78,7 +78,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
       const type: SourceType = SOURCE_TYPES.VOD;
 
       // Ensure VOD file is downloaded and valid
-      const { jobId, filePath } = await ensureVodDownload({
+      const { jobId, filePath, workDir } = await ensureVodDownload({
         ctx: tenantPlatformCtx,
         dbId,
         vodId,
@@ -95,7 +95,8 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
         filePath,
         platform,
         game,
-        jobId ?? undefined
+        jobId ?? undefined,
+        workDir
       );
 
       if (gameJobId == null) {

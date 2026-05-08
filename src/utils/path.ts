@@ -1,6 +1,6 @@
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
-import { TenantConfig } from '../config/types.js';
+import { getTmpPath, getVodPath, getLivePath } from '../config/env.js';
 import { ConfigNotConfiguredError } from './domain-errors.js';
 import { extractErrorDetails } from './error.js';
 import { childLogger } from './logger.js';
@@ -44,67 +44,73 @@ export async function deleteFileIfExists(filePath: string): Promise<void> {
 }
 
 export interface VodPathOptions {
-  config: TenantConfig;
   vodId: string;
 }
 
 export interface LivePathOptions {
-  config: TenantConfig;
   streamId: string;
 }
 
 /**
+ * Gets the tmp directory path for a VOD.
+ * Path: {TMP_PATH}/{vodId}
+ */
+export function getTmpDirPath(options: VodPathOptions): string {
+  const tmpPath = getTmpPath();
+  if (tmpPath == null) {
+    throw new ConfigNotConfiguredError('TMP_PATH is not configured');
+  }
+  return path.join(tmpPath, options.vodId);
+}
+
+/**
+ * Gets the tmp file path for a VOD.
+ * Path: {TMP_PATH}/{vodId}/{vodId}.mp4
+ */
+export function getTmpFilePath(options: VodPathOptions): string {
+  const tmpPath = getTmpPath();
+  if (tmpPath == null) {
+    throw new ConfigNotConfiguredError('TMP_PATH is not configured');
+  }
+  return path.join(tmpPath, options.vodId, `${options.vodId}.mp4`);
+}
+
+/**
  * Gets the file path for an archived VOD.
- * Path: {vodPath}/{tenantId}/{vodId}.mp4
+ * Path: {VOD_PATH}/{vodId}/{vodId}.mp4
  */
 export function getVodFilePath(options: VodPathOptions): string {
-  const { config, vodId } = options;
-
-  if (config.settings.vodPath == null || config.settings.vodPath === '') {
-    throw new ConfigNotConfiguredError(`VOD path for tenant ${config.id}`);
-  }
-
-  return path.join(config.settings.vodPath, config.id, vodId, `${vodId}.mp4`);
+  const vodPath = getVodPath();
+  if (vodPath == null) throw new Error('VOD_PATH is not configured');
+  return path.join(vodPath, options.vodId, `${options.vodId}.mp4`);
 }
 
 /**
  * Gets the directory path for an archived VOD.
- * Path: {vodPath}/{tenantId}/{vodId}
+ * Path: {VOD_PATH}/{vodId}
  */
 export function getVodDirPath(options: VodPathOptions): string {
-  const { config, vodId } = options;
-
-  if (config.settings.vodPath == null || config.settings.vodPath === '') {
-    throw new ConfigNotConfiguredError(`VOD path for tenant ${config.id}`);
-  }
-
-  return path.join(config.settings.vodPath, config.id, vodId);
+  const vodPath = getVodPath();
+  if (vodPath == null) throw new Error('VOD_PATH is not configured');
+  return path.join(vodPath, options.vodId);
 }
 
 /**
  * Gets the file path for a live VOD.
- * Path: {livePath}/{tenantId}/{streamId}/{streamId}.mp4
+ * Path: {LIVE_PATH}/{streamId}/{streamId}.mp4
  */
 export function getLiveFilePath(options: LivePathOptions): string {
-  const { config, streamId } = options;
-
-  if (config.settings.livePath == null || config.settings.livePath === '') {
-    throw new ConfigNotConfiguredError(`Live path for tenant ${config.id}`);
-  }
-
-  return path.join(config.settings.livePath, config.id, streamId, `${streamId}.mp4`);
+  const livePath = getLivePath();
+  if (livePath == null) throw new Error('LIVE_PATH is not configured');
+  return path.join(livePath, options.streamId, `${options.streamId}.mp4`);
 }
 
 /**
  * Gets the directory path for a live VOD.
- * Path: {livePath}/{tenantId}/{streamId}
+ * Path: {LIVE_PATH}/{streamId}
  */
 export function getLiveDirPath(options: LivePathOptions): string {
-  const { config, streamId } = options;
-
-  if (config.settings.livePath == null || config.settings.livePath === '') {
-    throw new ConfigNotConfiguredError(`Live path for tenant ${config.id}`);
-  }
-
-  return path.join(config.settings.livePath, config.id, streamId);
+  const livePath = getLivePath();
+  if (livePath == null) throw new Error('LIVE_PATH is not configured');
+  return path.join(livePath, options.streamId);
 }

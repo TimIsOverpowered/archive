@@ -16,10 +16,11 @@ export interface TriggerVodOptions {
   platformUserId: string;
   platformUsername: string;
   downloadMethod?: DownloadMethod | undefined;
+  skipFinalize?: boolean;
 }
 
 export async function triggerVodDownload(opts: TriggerVodOptions): Promise<string | null> {
-  const { tenantId, dbId, vodId, platform, platformUserId, platformUsername, downloadMethod } = opts;
+  const { tenantId, dbId, vodId, platform, platformUserId, platformUsername, downloadMethod, skipFinalize } = opts;
   const jobId = `${Jobs.VOD_JOB_PREFIX}${vodId}`;
   const job: StandardVodJob = {
     tenantId,
@@ -29,6 +30,7 @@ export async function triggerVodDownload(opts: TriggerVodOptions): Promise<strin
     platformUserId,
     platformUsername,
     downloadMethod,
+    ...(skipFinalize !== undefined && { skipFinalize }),
   };
 
   try {

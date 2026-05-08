@@ -6,7 +6,8 @@ import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { updateAlert, initRichAlert } from '../utils/discord-alerts.js';
 import { PlatformNotConfiguredError } from '../utils/domain-errors.js';
 import { extractErrorDetails } from '../utils/error.js';
-import { getVodFilePath, getVodDirPath, fileExists } from '../utils/path.js';
+import { getTmpFilePath, getTmpDirPath, getVodFilePath, fileExists } from '../utils/path.js';
+import { finalizeToStorage } from './utils/file-finalization.js';
 import type { StandardVodJob } from './jobs/types.js';
 import type { BaseWorkerContext } from './types.js';
 import { createVodWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
@@ -50,7 +51,7 @@ export async function buildVodProcessorContext(
   await job.updateProgress(0);
 
   const streamerName = getDisplayName(config);
-  const finalPath = getVodFilePath({ config, vodId });
+  const finalPath = getTmpFilePath({ vodId });
   const alerts = createVodWorkerAlerts();
   const messageId = await initRichAlert(alerts.init(vodId, platform, streamerName)).catch(() => null);
 
@@ -79,7 +80,7 @@ export async function runVodDownload(ctx: VodProcessorContext): Promise<void> {
   if (ctx.downloadMethod === DOWNLOAD_METHODS.FFMPEG) {
     await downloadVodWithFfmpeg(ctx.platform, ctx.vodId, ctx.finalPath, ctx.config, ctx.log);
   } else {
-    const vodDirPath = getVodDirPath({ config: ctx.config, vodId: ctx.vodId });
+    const vodDirPath = getTmpDirPath({ vodId: ctx.vodId });
     if (await fileExists(vodDirPath)) {
       await cleanupOrphanedTmpFiles(vodDirPath, ctx.log);
     }
@@ -148,6 +149,12 @@ export async function sendVodCompletion(ctx: VodProcessorContext): Promise<void>
   await ctx.job.updateProgress(100);
   const metadata = await getMetadata(ctx.finalPath);
   const duration = metadata?.duration != null ? Math.round(metadata.duration) : undefined;
+
+  // Standalone download (no downstream consumer): copy to final path if saveMP4
+  if (ctx.config.settings.saveMP4 && !ctx.job.data.skipFinalize) {
+    await finalizeToStorage(ctx.finalPath, getVodFilePath({ vodId: ctx.vodId }), ctx.log);
+  }
+
   await updateAlert(
     ctx.messageId,
     ctx.alerts.complete(ctx.vodId, ctx.platform, ctx.finalPath, duration, ctx.segmentCount)

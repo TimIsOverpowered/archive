@@ -1,16 +1,20 @@
 import type { Job } from 'bullmq';
 import { updateAlert } from '../utils/discord-alerts.js';
+import { extractErrorDetails } from '../utils/error.js';
 import { cleanupTempFiles } from './dmca/dmca.js';
 import { buildDmcaProcessorContext, trimDmcaVideo, processDmcaClaims, queueDmcaUpload } from './dmca.worker.phases.js';
 import type { DmcaProcessorContext } from './dmca.worker.phases.js';
 import type { DmcaProcessingJob, DmcaProcessingResult } from './jobs/types.js';
 import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
+import { finalizeVodFile } from './utils/file-finalization.js';
+import { getLiveFilePath, getVodFilePath } from '../utils/path.js';
+import { SOURCE_TYPES } from '../types/platforms.js';
 
-const errorMeta = (ctx: DmcaProcessorContext, _job: Job<unknown>) => ({
+const errorMeta = (ctx: DmcaProcessorContext, job: Job<unknown>) => ({
   vodId: ctx.vodId,
   dbId: ctx.dbId,
   tenantId: ctx.tenantId,
-  jobId: _job.id,
+  jobId: job.id,
   platform: ctx.platform,
 });
 
@@ -31,10 +35,6 @@ const dmcaProcessor = wrapWorkerProcessor<DmcaProcessingJob, DmcaProcessorContex
     await processDmcaClaims(ctx);
     await queueDmcaUpload(ctx);
 
-    if (!ctx.config.settings.saveMP4) {
-      ctx.tempFiles.push(ctx.filePath);
-    }
-
     return { success: true, vodId: ctx.vodId };
   },
   {
@@ -43,6 +43,21 @@ const dmcaProcessor = wrapWorkerProcessor<DmcaProcessingJob, DmcaProcessorContex
     finally: async (ctx) => {
       if (ctx.tempFiles.length > 0) {
         await cleanupTempFiles(ctx.tempFiles);
+      }
+      // Finalize: move original full VOD to storage or delete from tmpPath
+      try {
+        await finalizeVodFile({
+          filePath: ctx.filePath,
+          destPath:
+            ctx.type === SOURCE_TYPES.LIVE
+              ? getLiveFilePath({ streamId: ctx.vodId })
+              : getVodFilePath({ vodId: ctx.vodId }),
+          tmpDir: ctx.workDir,
+          saveMP4: ctx.config.settings.saveMP4 ?? false,
+          log: ctx.log,
+        });
+      } catch (err) {
+        ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Failed to finalize DMCA processed VOD');
       }
     },
   }

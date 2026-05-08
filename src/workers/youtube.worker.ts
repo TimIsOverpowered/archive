@@ -39,6 +39,8 @@ interface YoutubeProcessorContext {
   platform?: Platform | undefined;
   epNumber?: number | undefined;
   gameTitle?: string | undefined;
+  workDir?: string | undefined;
+  skipFinalize?: boolean | undefined;
 }
 
 const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeProcessorContext> => {
@@ -98,6 +100,7 @@ const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeP
       platform,
       epNumber,
       gameTitle,
+      workDir,
     } = job.data;
     return {
       ...base,
@@ -110,14 +113,17 @@ const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeP
       platform,
       epNumber,
       gameTitle,
+      workDir,
     };
   }
 
-  const { dmcaProcessed, part } = job.data;
+  const { dmcaProcessed, part, workDir, skipFinalize } = job.data;
   return {
     ...base,
     dmcaProcessed,
     part,
+    workDir,
+    skipFinalize,
   };
 };
 
@@ -149,6 +155,8 @@ const youtubeProcessor = wrapWorkerProcessor<YoutubeUploadJob, YoutubeProcessorC
         log: ctx.log,
         type: ctx.type as SourceType,
         part: ctx.part,
+        workDir: ctx.workDir,
+        skipFinalize: ctx.skipFinalize,
       });
 
       await saveUploadResult(ctx.db, ctx.dbId, ctx.type, vodResult.uploadedVideos);

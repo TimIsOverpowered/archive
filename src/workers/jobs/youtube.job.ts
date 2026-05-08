@@ -30,7 +30,8 @@ export function createVodUploadJob(
   platform: Platform,
   type: SourceType,
   dmcaProcessed?: boolean,
-  part?: number
+  part?: number,
+  options?: { workDir?: string; skipFinalize?: boolean }
 ): YoutubeVodUploadJob {
   const { config, tenantId } = ctx;
   if (config.youtube?.upload === false) {
@@ -47,6 +48,8 @@ export function createVodUploadJob(
     platform,
     dmcaProcessed,
     part,
+    workDir: options?.workDir,
+    skipFinalize: options?.skipFinalize,
   };
 }
 
@@ -127,7 +130,8 @@ export async function createGameUploadJobsForVod(
   dbId: number,
   vodId: string,
   filePath: string | undefined,
-  platform: Platform
+  platform: Platform,
+  workDir?: string
 ): Promise<YoutubeGameUploadJob[]> {
   const { config, tenantId } = ctx;
   if (config.youtube?.perGameUpload !== true) {
@@ -153,7 +157,7 @@ export async function createGameUploadJobsForVod(
   for (const chapter of chapters) {
     try {
       const job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, chapter);
-      jobs.push(job);
+      jobs.push({ ...job, workDir });
     } catch (error) {
       // Skip restricted games or other errors
       const details = extractErrorDetails(error);
@@ -305,9 +309,10 @@ export async function queueYoutubeVodUpload(
   type: SourceType,
   dmcaProcessed?: boolean,
   downloadJobId?: string,
-  part?: number
+  part?: number,
+  options?: { workDir?: string; skipFinalize?: boolean }
 ): Promise<string | null> {
-  const job = createVodUploadJob(ctx, dbId, vodId, filePath, platform, type, dmcaProcessed, part);
+  const job = createVodUploadJob(ctx, dbId, vodId, filePath, platform, type, dmcaProcessed, part, options);
   return enqueueVodUpload(job, downloadJobId);
 }
 
@@ -369,7 +374,8 @@ export async function queueYoutubeGameUploadByGame(
   filePath: string | undefined,
   platform: Platform,
   game: SelectableGames,
-  downloadJobId?: string
+  downloadJobId?: string,
+  workDir?: string
 ): Promise<string | null> {
   let job: YoutubeGameUploadJob;
   try {
@@ -399,7 +405,7 @@ export async function queueYoutubeGameUploadByGame(
     return null;
   }
 
-  return enqueueGameUpload(job, downloadJobId);
+  return enqueueGameUpload({ ...job, workDir }, downloadJobId);
 }
 
 /**
@@ -447,6 +453,8 @@ export interface QueueYoutubeUploadsOptions {
    */
   downloadJobId?: string | undefined;
   type: SourceType;
+  workDir?: string | undefined;
+  skipFinalize?: boolean | undefined;
 }
 
 export interface YoutubeUploadJobResult {
@@ -470,6 +478,8 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
     downloadJobId,
     type,
     dmcaProcessed,
+    workDir,
+    skipFinalize,
   } = options;
   const { config } = ctx;
 
@@ -485,7 +495,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
   // ALL mode with both game and VOD uploads: chain games -> VOD so VOD waits for games
   if (uploadMode === UPLOAD_MODES.ALL && gameUploadEnabled && vodUploadEnabled) {
     try {
-      const gameJobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform);
+      const gameJobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform, workDir);
       const gameJobIds: string[] = [];
 
       for (const job of gameJobs) {
@@ -523,6 +533,8 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
             type,
             platform,
             dmcaProcessed,
+            workDir,
+            skipFinalize,
           },
           opts: {
             jobId: vodJobId,
@@ -539,7 +551,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
         const flowChildren = gameJobs.map((job, idx) => ({
           name: 'youtube_upload',
           queueName: queue.name,
-          data: job,
+          data: { ...job, workDir, skipFinalize },
           opts: { jobId: gameJobIds[idx] ?? '', removeOnComplete: true, removeOnFail: true },
         }));
 
@@ -555,6 +567,8 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
             type,
             platform,
             dmcaProcessed,
+            workDir,
+            skipFinalize,
           },
           opts: {
             jobId: vodJobId,
@@ -581,7 +595,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
     // Game Uploads (ALL mode, no VOD or VOD not enabled)
     if (uploadMode === UPLOAD_MODES.ALL && gameUploadEnabled) {
       try {
-        const jobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform);
+        const jobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform, workDir);
 
         for (const job of jobs) {
           const gameJobId = await enqueueGameUpload(job, downloadJobId);

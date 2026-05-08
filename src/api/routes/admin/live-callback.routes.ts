@@ -1,5 +1,6 @@
 import type { Stats as FsStats } from 'node:fs';
 import fs from 'node:fs/promises';
+import * as pathModule from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { VodUpdateSchema } from '../../../config/schemas.js';
 import { findVodByStreamId } from '../../../db/queries/vods.js';
@@ -117,6 +118,7 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
         filePath: path,
         platform,
         type: SOURCE_TYPES.LIVE,
+        workDir: pathModule.dirname(path),
       });
 
       return ok({

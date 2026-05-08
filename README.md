@@ -245,6 +245,9 @@ See `.env.example` for all available configuration options. Key variables:
 - `FLARESOLVERR_BASE_URL`: FlareSolverr API endpoint (default: `http://localhost:8191`)
 - `TWITCH_CLIENT_ID`: Twitch app client ID (shared across all tenants for Helix API)
 - `TWITCH_CLIENT_SECRET`: Twitch app client secret (shared across all tenants for Helix API)
+- `TMP_PATH`: Local SSD/NVMe path for intermediate file operations (optional, enables storage optimization)
+- `VOD_PATH`: Final VOD storage path
+- `LIVE_PATH`: Final Live storage path for twitch-recorder-go
 
 ## Troubleshooting
 

@@ -12,7 +12,7 @@ import { sleep, getRetryDelay } from '../../utils/delay.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { HttpError } from '../../utils/http-error.js';
 import type { AppLogger } from '../../utils/logger.js';
-import { getVodDirPath, getVodFilePath } from '../../utils/path.js';
+import { getTmpDirPath, getTmpFilePath } from '../../utils/path.js';
 import { createVodWorkerAlerts, safeUpdateAlert } from '../utils/alert-factories.js';
 import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
 import { updateVodDurationDuringDownload } from './duration-updater.js';
@@ -68,8 +68,8 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
   const { config, tenantId } = ctx;
   const log = createAutoLogger(tenantId);
 
-  const vodDir = getVodDirPath({ config, vodId });
-  const finalMp4Path = getVodFilePath({ config, vodId });
+  const vodDir = getTmpDirPath({ vodId });
+  const finalMp4Path = getTmpFilePath({ vodId });
   await mkdir(vodDir, { recursive: true });
 
   const m3u8Path = join(vodDir, `${vodId}.m3u8`);

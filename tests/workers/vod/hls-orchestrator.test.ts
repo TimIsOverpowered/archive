@@ -446,8 +446,6 @@ function buildContext(overrides: Record<string, unknown> = {}) {
         saveMP4: true,
         vodDownload: true,
         chatDownload: true,
-        vodPath: undefined,
-        livePath: undefined,
       },
       ...overrides,
     },
@@ -786,8 +784,6 @@ describe('downloadHlsStream', () => {
               saveMP4: true,
               vodDownload: true,
               chatDownload: true,
-              vodPath: undefined,
-              livePath: undefined,
             },
           }),
         })
@@ -812,8 +808,6 @@ describe('downloadHlsStream', () => {
               saveMP4: true,
               vodDownload: true,
               chatDownload: true,
-              vodPath: undefined,
-              livePath: undefined,
             },
           }),
         })

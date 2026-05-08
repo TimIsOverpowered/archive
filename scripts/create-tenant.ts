@@ -11,7 +11,6 @@ import type { InsertableTenants } from '../src/db/meta-types.js';
 import { getTenantById, createTenant, deleteTenant } from '../src/services/meta-tenants.service.js';
 import { encryptScalar, validateEncryptionKey } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
-import { normalizePath as pathNormalize } from '../src/utils/path.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -427,13 +426,7 @@ async function main(): Promise<void> {
     console.log('='.repeat(50));
 
     const domainName = await prompt('Domain name (e.g., moon2.tv): ');
-    const vodPathInput = await prompt('VOD storage path: ');
-    const livePathInput = await prompt('Live stream path: ');
     const timezone = (await prompt('Timezone (e.g., America/Chicago): ')) || 'UTC';
-
-    // Normalize paths for cross-platform compatibility
-    const vodPath = pathNormalize(vodPathInput);
-    const livePath = pathNormalize(livePathInput);
 
     const chatDownload = await confirm('Download chat logs?');
     const vodDownload = await confirm('Download VODs?');
@@ -479,8 +472,6 @@ async function main(): Promise<void> {
 
     console.log('\nSettings:');
     console.log(`  Domain: ${domainName}`);
-    console.log(`  VOD Path: ${vodPath}`);
-    console.log(`  Live Path: ${livePath}`);
     console.log(`  Timezone: ${timezone}`);
     console.log(`  Chat Download: ${chatDownload ? 'yes' : 'no'}`);
     console.log(`  VOD Download: ${vodDownload ? 'yes' : 'no'}`);
@@ -495,8 +486,6 @@ async function main(): Promise<void> {
       database_url: encryptScalar(dbUrl),
       settings: {
         domainName,
-        vodPath,
-        livePath,
         timezone,
         chatDownload,
         vodDownload,

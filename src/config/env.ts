@@ -1,4 +1,11 @@
+import path from 'node:path';
 import { z } from 'zod';
+
+function normalizePathForSchema(basePath?: string): string | undefined {
+  if (basePath == null || basePath === '') return undefined;
+  const normalized = path.normalize(basePath);
+  return normalized.startsWith('/') || /^[A-Za-z]:/.test(normalized) ? normalized : path.resolve(normalized);
+}
 
 /**
  * Parses a boolean env var.
@@ -47,6 +54,18 @@ export const BaseConfigSchema = z.object({
   FLARESOLVERR_SESSION_TTL: z.coerce.number().int().positive().default(3600),
   TWITCH_CLIENT_ID: z.string().default(''),
   TWITCH_CLIENT_SECRET: z.string().default(''),
+
+  /** Base path for temporary processing files (local SSD), normalized to absolute */
+  TMP_PATH: z.string().min(1, 'TMP_PATH is required').transform(normalizePathForSchema),
+
+  /** Base path for storing VOD files, normalized to absolute */
+  VOD_PATH: z.string().min(1, 'VOD_PATH is required').transform(normalizePathForSchema),
+
+  /** Base path for storing live stream files, normalized to absolute */
+  LIVE_PATH: z
+    .string()
+    .optional()
+    .transform((p): string | undefined => (p != null && p !== '' ? normalizePathForSchema(p) : undefined)),
 });
 
 // API-specific schema (extends base + API-only fields)
@@ -168,4 +187,18 @@ export function resetEnvConfig(): void {
   apiConfigCache = null;
   workersConfigCache = null;
   baseConfigCache = null;
+}
+
+// --- Storage path accessors ---
+
+export function getTmpPath(): string | undefined {
+  return getBaseConfig().TMP_PATH;
+}
+
+export function getVodPath(): string | undefined {
+  return getBaseConfig().VOD_PATH;
+}
+
+export function getLivePath(): string | undefined {
+  return getBaseConfig().LIVE_PATH;
 }

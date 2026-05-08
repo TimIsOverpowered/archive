@@ -20,6 +20,7 @@ export interface StandardVodJob extends BaseJobData {
   platformUsername: string;
   sourceUrl?: string | undefined;
   downloadMethod?: DownloadMethod | undefined;
+  skipFinalize?: boolean; // If true, finalization is handled by downstream consumer
 }
 
 export interface ChatDownloadJob extends BaseJobData {
@@ -37,6 +38,8 @@ export interface YoutubeVodUploadJob extends BaseJobData {
   type: SourceType;
   dmcaProcessed?: boolean | undefined;
   part?: number | undefined;
+  workDir?: string | undefined;
+  skipFinalize?: boolean | undefined;
 }
 
 export interface YoutubeGameUploadJob extends BaseJobData {
@@ -53,6 +56,8 @@ export interface YoutubeGameUploadJob extends BaseJobData {
   platform: Platform;
   epNumber: number;
   gameTitle?: string | undefined;
+  workDir?: string | undefined;
+  sourceType?: SourceType | undefined;
 }
 
 export type YoutubeUploadJob = YoutubeVodUploadJob | YoutubeGameUploadJob;
@@ -65,6 +70,8 @@ export interface DmcaProcessingJob extends BaseJobData {
   gameId?: number | undefined;
   gameStart?: number | undefined;
   gameDuration?: number | undefined;
+  workDir?: string | undefined;
+  skipFinalize?: boolean | undefined;
 }
 
 export interface MonitorJob {

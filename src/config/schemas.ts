@@ -1,4 +1,3 @@
-import path from 'node:path';
 import { z } from 'zod';
 import { YouTube } from '../constants.js';
 import { decryptObject, decryptScalar } from '../utils/encryption.js';
@@ -18,12 +17,6 @@ function encryptedStringSchema() {
     });
 }
 
-function normalizePathForSchema(basePath?: string): string | undefined {
-  if (basePath == null || basePath === '') return undefined;
-  const normalized = path.normalize(basePath);
-  return normalized.startsWith('/') || /^[A-Za-z]:/.test(normalized) ? normalized : path.resolve(normalized);
-}
-
 /**
  * Tenant-level settings controlling which features are enabled and storage paths.
  */
@@ -40,16 +33,6 @@ export const SettingsSchema = z.object({
   vodDownload: z.boolean().default(true),
   /** Whether to download chat messages (default: true) */
   chatDownload: z.boolean().default(true),
-  /** Base path for storing VOD files, normalized to absolute */
-  vodPath: z
-    .string()
-    .optional()
-    .transform((p): string | undefined => (p != null && p !== '' ? normalizePathForSchema(p) : undefined)),
-  /** Base path for storing live stream files, normalized to absolute */
-  livePath: z
-    .string()
-    .optional()
-    .transform((p): string | undefined => (p != null && p !== '' ? normalizePathForSchema(p) : undefined)),
 });
 
 /** YouTube OAuth token credentials. */

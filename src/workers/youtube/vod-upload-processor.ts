@@ -5,15 +5,16 @@ import { findVodById } from '../../db/queries/vods.js';
 import type { StreamerDB, SelectableVods } from '../../db/streamer-types.js';
 import { uploadVideo, saveChaptersAndLinkParts } from '../../services/youtube/index.js';
 import type { SourceType, Platform } from '../../types/platforms.js';
-import { UPLOAD_TYPES } from '../../types/platforms.js';
+import { SOURCE_TYPES, UPLOAD_TYPES } from '../../types/platforms.js';
 import { initRichAlert, createProgressBar } from '../../utils/discord-alerts.js';
 import { VodNotFoundError } from '../../utils/domain-errors.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 import type { AppLogger } from '../../utils/logger.js';
-import { deleteFileIfExists } from '../../utils/path.js';
+import { deleteFileIfExists, getLiveFilePath, getVodFilePath } from '../../utils/path.js';
 import { safeUpdateAlert } from '../utils/alert-factories.js';
 import { splitVideo, getMetadata } from '../utils/ffmpeg.js';
+import { finalizeVodFile } from '../utils/file-finalization.js';
 import { buildYoutubeMetadata } from './metadata-builder.js';
 import { getEffectiveSplitDuration } from './validation.js';
 import { createYoutubeUploadProgressHandler } from './youtube-upload-progress.js';
@@ -29,6 +30,8 @@ export interface VodUploadContext {
   log: AppLogger;
   type: SourceType;
   part?: number | undefined;
+  workDir?: string | undefined;
+  skipFinalize?: boolean | undefined;
 }
 
 export interface VodUploadResult {
@@ -111,6 +114,8 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
     log,
     vodRecord,
     type,
+    workDir,
+    skipFinalize,
   } = ctx;
 
   if (filePath == null) {
@@ -225,6 +230,23 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
 
     uploadedVideos.push({ id: result.videoId, part: i + 1, duration: partDuration, thumbnailUrl: result.thumbnailUrl });
 
+    if (config.settings.saveMP4 && skipFinalize !== true) {
+      try {
+        await finalizeVodFile({
+          filePath: partPath,
+          destPath: ctx.type === SOURCE_TYPES.LIVE ? getLiveFilePath({ streamId: vodId }) : getVodFilePath({ vodId }),
+          saveMP4: true,
+          log,
+          ...(workDir != null && { tmpDir: workDir }),
+        });
+      } catch (err) {
+        log.warn(
+          { err: extractErrorDetails(err), vodId, part: currentPartNum },
+          'Failed to finalize VOD part after YouTube upload (non-fatal)'
+        );
+      }
+    }
+
     await deleteFileIfExists(partPath);
   }
 
@@ -267,10 +289,13 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
     privacyStatus,
     platformName,
     config,
+    log,
     type,
     dmcaProcessed,
     vodRecord,
     part,
+    workDir,
+    skipFinalize,
   } = ctx;
 
   if (filePath == null) {
@@ -329,6 +354,20 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
 
   const uploadPart = part ?? 1;
   const uploadedVideos = [{ id: result.videoId, part: uploadPart, duration, thumbnailUrl: result.thumbnailUrl }];
+
+  if (config.settings.saveMP4 && dmcaProcessed !== true && skipFinalize !== true) {
+    try {
+      await finalizeVodFile({
+        filePath,
+        destPath: ctx.type === SOURCE_TYPES.LIVE ? getLiveFilePath({ streamId: vodId }) : getVodFilePath({ vodId }),
+        saveMP4: true,
+        log,
+        ...(workDir != null && { tmpDir: workDir }),
+      });
+    } catch (err) {
+      log.warn({ err: extractErrorDetails(err), vodId }, 'Failed to finalize VOD after YouTube upload (non-fatal)');
+    }
+  }
 
   if (!config.settings.saveMP4 || dmcaProcessed === true) {
     await deleteFileIfExists(filePath);

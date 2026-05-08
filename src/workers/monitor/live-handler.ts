@@ -1,7 +1,5 @@
 import fs from 'node:fs/promises';
-import path from 'node:path';
 import type { Kysely } from 'kysely';
-import { configService } from '../../config/tenant-config.js';
 import type { TenantConfig } from '../../config/types.js';
 import { requirePlatformConfig } from '../../config/types.js';
 import { Jobs } from '../../constants.js';
@@ -14,6 +12,7 @@ import type { TwitchStreamStatus } from '../../services/twitch/live.js';
 import type { Platform } from '../../types/platforms.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
+import { getTmpPath } from '../../config/env.js';
 import { enqueueJobWithLogging } from '../jobs/enqueue.js';
 import type { LiveDownloadJob } from '../jobs/types.js';
 import { getLiveDownloadQueue } from '../queues/queue.js';
@@ -385,46 +384,17 @@ async function handleAlreadyLiveStream(ctx: AlreadyLiveContext): Promise<void> {
 /**
  * Validate that the VOD path exists and is writable before queuing a download job
  */
-export async function validateVodPath(tenantId: string): Promise<{ valid: boolean }> {
-  const log = createAutoLogger(tenantId);
+export async function validateVodPath(_tenantId: string): Promise<{ valid: boolean }> {
+  const tmpPath = getTmpPath();
+
+  if (tmpPath == null) {
+    return { valid: true };
+  }
 
   try {
-    const streamerConfig = await configService.get(tenantId);
-
-    if (streamerConfig?.settings.vodPath == null) {
-      log.error({ component: 'monitor', tenantId }, 'VOD path not configured for tenant - cannot queue downloads');
-      return { valid: false };
-    }
-
-    const vodDirBase = streamerConfig.settings.vodPath;
-
-    try {
-      await fs.access(vodDirBase, fs.constants.R_OK | fs.constants.W_OK);
-
-      const testSubdir = path.join(vodDirBase, tenantId);
-      try {
-        await fs.mkdir(testSubdir, { recursive: true });
-        log.trace({ component: 'monitor', vodPath: vodDirBase }, 'VOD path validated successfully');
-        return { valid: true };
-      } catch (mkdirError) {
-        const details = extractErrorDetails(mkdirError);
-        log.error(
-          { component: 'monitor', tenantId, vodPath: testSubdir, error: details.message },
-          'Cannot write to VOD path - directory creation failed'
-        );
-        return { valid: false };
-      }
-    } catch (accessError) {
-      const details = extractErrorDetails(accessError);
-      log.error(
-        { component: 'monitor', tenantId, vodPath: vodDirBase, error: details.message },
-        'VOD path not accessible - check permissions'
-      );
-      return { valid: false };
-    }
-  } catch (error) {
-    const details = extractErrorDetails(error);
-    log.error({ component: 'monitor', tenantId, error: details.message }, 'Unexpected error validating VOD path');
+    await fs.access(tmpPath, fs.constants.R_OK | fs.constants.W_OK);
+    return { valid: true };
+  } catch {
     return { valid: false };
   }
 }

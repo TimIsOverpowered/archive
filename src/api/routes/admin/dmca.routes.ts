@@ -120,6 +120,8 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         part,
         downloadJobId: downloadJobId ?? undefined,
         filePath,
+        workDir: filePath ?? undefined,
+        skipFinalize: true, // DMCA worker will handle finalization
       });
 
       if (dmcaJobId == null) {

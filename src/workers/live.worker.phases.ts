@@ -6,7 +6,8 @@ import { SOURCE_TYPES } from '../types/platforms.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { updateAlert, initRichAlert } from '../utils/discord-alerts.js';
 import { extractErrorDetails } from '../utils/error.js';
-import { fileExists, getVodDirPath } from '../utils/path.js';
+import { fileExists, getTmpDirPath, getVodFilePath } from '../utils/path.js';
+import { finalizeVodFile } from './utils/file-finalization.js';
 import { triggerChatDownload } from './jobs/chat.job.js';
 import type { LiveDownloadJob } from './jobs/types.js';
 import { queueYoutubeUploads, type YoutubeUploadJobResult } from './jobs/youtube.job.js';
@@ -68,7 +69,7 @@ export async function buildLiveProcessorContext(
 }
 
 export async function prepareVodDirectory(ctx: LiveProcessorContext): Promise<void> {
-  const vodDirPath = getVodDirPath({ config: ctx.config, vodId: ctx.vodId });
+  const vodDirPath = getTmpDirPath({ vodId: ctx.vodId });
   if (await fileExists(vodDirPath)) {
     await cleanupOrphanedTmpFiles(vodDirPath, ctx.log);
   }
@@ -169,12 +170,29 @@ export async function runPostProcessing(
       filePath: downloadResult.finalMp4Path,
       platform: ctx.platform,
       type: SOURCE_TYPES.VOD,
+      workDir: getTmpDirPath({ vodId: ctx.vodId }),
+      skipFinalize: true,
     });
     if (youtubeResult.vodJobId != null || youtubeResult.gameJobIds.length > 0) {
       await updateAlert(ctx.messageId, ctx.alerts.uploadQueued(ctx.vodId, ctx.streamerName));
     }
   } catch (error) {
     ctx.log.warn({ ...extractErrorDetails(error), vodId: ctx.vodId }, 'Failed to queue upload (non-fatal)');
+  }
+
+  // YouTube disabled -- finalize path ourselves
+  if (!ctx.config.youtube?.upload || !ctx.config.youtube.vodUpload) {
+    try {
+      await finalizeVodFile({
+        filePath: downloadResult.finalMp4Path,
+        destPath: getVodFilePath({ vodId: ctx.vodId }),
+        tmpDir: getTmpDirPath({ vodId: ctx.vodId }),
+        saveMP4: ctx.config.settings.saveMP4 ?? false,
+        log: ctx.log,
+      });
+    } catch (err) {
+      ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Failed to finalize live VOD to storage');
+    }
   }
 
   return {

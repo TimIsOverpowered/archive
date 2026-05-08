@@ -65,8 +65,6 @@ export function createMockTenantConfig(overrides: MockTenantConfigOverrides = {}
       saveHLS: overrides.settings?.saveHLS ?? false,
       vodDownload: overrides.settings?.vodDownload ?? true,
       chatDownload: overrides.settings?.chatDownload ?? true,
-      vodPath: overrides.settings?.vodPath ?? undefined,
-      livePath: overrides.settings?.livePath ?? undefined,
     },
   };
 }

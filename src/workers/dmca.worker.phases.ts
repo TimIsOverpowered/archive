@@ -6,7 +6,7 @@ import { initRichAlert, createProgressBar } from '../utils/discord-alerts.js';
 import { ConfigNotConfiguredError, FileNotFound } from '../utils/domain-errors.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { toHHMMSS } from '../utils/formatting.js';
-import { fileExists, getVodDirPath } from '../utils/path.js';
+import { fileExists, getTmpDirPath } from '../utils/path.js';
 import {
   isBlockingPolicy,
   buildMuteFilters,
@@ -155,7 +155,7 @@ export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Pr
     log,
     alerts,
     messageId,
-    workDir: getVodDirPath({ config, vodId }),
+    workDir: getTmpDirPath({ vodId }),
     tempFiles: [],
     completedClaimIds: [],
   };
@@ -415,7 +415,9 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
         ctx.vodId,
         ctx.processedPath,
         ctx.platform,
-        game
+        game,
+        undefined,
+        ctx.workDir
       );
     } catch (err) {
       ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Game upload queue failed');
@@ -431,7 +433,8 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
         'vod',
         true,
         undefined,
-        ctx.part
+        ctx.part,
+        { workDir: ctx.workDir, skipFinalize: true }
       );
     } catch (err) {
       ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'YouTube upload queue failed');
