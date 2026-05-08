@@ -9,6 +9,8 @@ import {
   ensureClient,
 } from '../../src/db/streamer-client.js';
 import { isConnectionError } from '../../src/db/utils/errors.js';
+import { createMockTenantConfig } from '../helpers/worker-test-setup.js';
+
 process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.META_DATABASE_URL = 'postgresql://localhost/test';
 process.env.ENCRYPTION_MASTER_KEY = '0000000000000000000000000000000000000000000000000000000000000000';
@@ -19,8 +21,6 @@ process.env.YOUTUBE_CLIENT_ID = 'test-youtube-client-id';
 process.env.YOUTUBE_CLIENT_SECRET = 'test-youtube-client-secret';
 process.env.TMP_PATH = '/tmp/archive';
 process.env.VOD_PATH = '/tmp/archive/vods';
-
-import { createMockTenantConfig } from '../helpers/worker-test-setup.js';
 
 const createMockConfig = (id: string): TenantConfig =>
   createMockTenantConfig({

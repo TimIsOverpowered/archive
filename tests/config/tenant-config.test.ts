@@ -1,7 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import type { TenantResult } from '../../src/db/meta-types.js';
-import { encryptScalar } from '../../src/utils/encryption.js';
 
 // 1. Setup Hoisted Mocks
 const mockGetAllTenants = mock.fn<() => Promise<TenantResult[]>>(async () => []);
@@ -31,8 +30,6 @@ function makeTenant(overrides: Partial<TenantResult> = {}): TenantResult {
     youtube: null,
     kick: null,
     databaseName: 'test',
-    // Provide REAL encrypted data so decryptScalar doesn't throw
-    databaseUrl: encryptScalar('postgresql://test'),
     settings: { domainName: 'example.com', timezone: 'UTC' },
     createdAt: new Date(),
     updatedAt: new Date(),

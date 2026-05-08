@@ -2,7 +2,6 @@ import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import { SettingsSchema, TwitchSchema, YoutubeSchema, KickSchema } from '../../src/config/schemas.js';
 import type { TenantResult } from '../../src/db/meta-types.js';
-import { encryptScalar } from '../../src/utils/encryption.js';
 import { RedisService } from '../../src/utils/redis-service.js';
 
 // Hoist mock functions so we can alter their implementations in specific tests
@@ -50,7 +49,6 @@ function makeTenant(overrides: Partial<TenantResult> = {}): TenantResult {
     youtube: null,
     kick: null,
     databaseName: 'test',
-    databaseUrl: encryptScalar('postgresql://test'),
     settings: { domainName: 'example.com', timezone: 'UTC' },
     createdAt: new Date(),
     updatedAt: new Date(),

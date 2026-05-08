@@ -441,7 +441,7 @@ function buildContext(overrides: Record<string, unknown> = {}) {
       id: 'test-tenant',
       displayName: 'Test Tenant',
       createdAt: new Date(),
-      database: { url: 'postgresql://test' },
+      database: { name: 'test' },
       settings: {
         domainName: 'test.com',
         timezone: 'UTC',
