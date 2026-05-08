@@ -1,4 +1,4 @@
-import { getPlatformConfig, getDisplayName } from '../../config/types.js';
+import { getPlatformConfig } from '../../config/types.js';
 import { Jobs } from '../../constants.js';
 import { findVodById } from '../../db/queries/vods.js';
 import { withDbRetry } from '../../db/streamer-client.js';
@@ -15,7 +15,6 @@ import {
 import { extractErrorDetails } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
 import { getFlowProducer, getStandardVodQueue, getYoutubeUploadQueue } from '../queues/queue.js';
-import { buildYoutubeMetadata } from '../youtube/metadata-builder.js';
 import { enqueueJobWithLogging } from './enqueue.js';
 import type { YoutubeVodUploadJob, YoutubeGameUploadJob } from './types.js';
 
@@ -90,9 +89,6 @@ export async function createGameUploadJob(
     throw new Error(`Chapter "${chapter.name}" duration (${chapter.duration}s) is less than 5 minutes`);
   }
 
-  const channelName = getDisplayName(config);
-  const gameName = chapter.name ?? '';
-
   const gameCount = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
     const result = await db
       .selectFrom('games')
@@ -100,20 +96,9 @@ export async function createGameUploadJob(
       .where('game_name', '=', chapter.name)
       .where('vod_id', '!=', dbId)
       .executeTakeFirst();
-    return result?.cnt ?? 0;
+    return Number(result?.cnt ?? 0);
   });
   const epNumber = gameCount + 1;
-
-  const { description } = buildYoutubeMetadata({
-    channelName,
-    platform,
-    domainName: config.settings?.domainName ?? '',
-    timezone: config.settings?.timezone ?? 'UTC',
-    youtubeDescription: config.youtube?.description,
-    gameName,
-    epNumber,
-    vodRecord,
-  });
 
   return {
     kind: 'game',
@@ -130,7 +115,6 @@ export async function createGameUploadJob(
     chapterEnd: chapter.end ?? 0,
     chapterGameId: chapter.game_id ?? '',
     chapterImage: chapter.image ?? null,
-    description,
     epNumber,
     gameTitle: options?.gameTitle,
   };

@@ -6,6 +6,7 @@ import { YouTube } from '../../constants.js';
 import type { StreamerDB } from '../../db/streamer-types.js';
 import { publishVodUpdate } from '../../services/cache-invalidator.js';
 import { uploadVideo } from '../../services/youtube/index.js';
+import type { Platform } from '../../types/platforms.js';
 import { initRichAlert, createProgressBar } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 import type { AppLogger } from '../../utils/logger.js';
@@ -26,7 +27,7 @@ export interface GameUploadContext {
   chapterName: string;
   chapterGameId?: string | undefined;
   chapterImage?: string | null | undefined;
-  description: string;
+  platform: Platform;
   epNumber: number;
   gameTitle?: string | undefined;
   displayName: string;
@@ -46,7 +47,7 @@ export interface GameUploadAndUpsertParams {
   chapterName: string;
   chapterGameId?: string | undefined;
   chapterImage?: string | null | undefined;
-  description: string;
+  platform: Platform;
   epNumber: number;
   gameTitle?: string | undefined;
   displayName: string;
@@ -80,7 +81,7 @@ export async function uploadAndUpsertGame(
     chapterName,
     chapterGameId,
     chapterImage,
-    description,
+    platform,
     epNumber,
     gameTitle,
     displayName,
@@ -97,9 +98,9 @@ export async function uploadAndUpsertGame(
   const vodRecord = await db.selectFrom('vods').selectAll().where('id', '=', dbId).executeTakeFirst();
   if (!vodRecord) throw new Error(`VOD not found for dbId ${dbId}`);
 
-  const { title: ytTitle } = buildYoutubeMetadata({
+  const { title: ytTitle, description: youtubeDescription } = buildYoutubeMetadata({
     channelName,
-    platform: 'twitch',
+    platform,
     domainName: config.settings?.domainName ?? '',
     timezone: config.settings?.timezone ?? 'UTC',
     youtubeDescription: config.youtube?.description,
@@ -138,7 +139,7 @@ export async function uploadAndUpsertGame(
     channelName,
     filePath,
     ytTitle,
-    description,
+    youtubeDescription,
     'public',
     onUploadProgress,
     chapterDuration
@@ -289,7 +290,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     chapterDuration,
     chapterGameId,
     chapterImage,
-    description,
+    platform,
     epNumber,
     gameTitle,
     displayName,
@@ -310,7 +311,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     chapterName: gameName,
     chapterGameId,
     chapterImage,
-    description,
+    platform,
     epNumber,
     gameTitle,
     displayName,
@@ -333,9 +334,9 @@ async function processSplitGameUpload(
     chapterStart,
     chapterGameId,
     chapterImage,
+    platform,
     chapterName,
     chapterEnd,
-    description,
     epNumber,
     gameTitle,
     displayName,
@@ -415,7 +416,7 @@ async function processSplitGameUpload(
       chapterEnd,
       chapterGameId,
       chapterImage,
-      description,
+      platform,
       epNumber,
       gameTitle,
       displayName,

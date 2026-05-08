@@ -4,7 +4,7 @@ import { getDisplayName, TenantConfig } from '../config/types.js';
 import type { StreamerDB } from '../db/streamer-types.js';
 import { publishVodUpdate } from '../services/cache-invalidator.js';
 import { saveUploadResult, markUploadFailed } from '../services/youtube/upload.js';
-import type { SourceType, UploadType } from '../types/platforms.js';
+import type { Platform, SourceType, UploadType } from '../types/platforms.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { resetFailures } from '../utils/discord-alerts.js';
 import { ConfigNotConfiguredError } from '../utils/domain-errors.js';
@@ -36,7 +36,7 @@ interface YoutubeProcessorContext {
   chapterName?: string | undefined;
   chapterGameId?: string | undefined;
   chapterImage?: string | null | undefined;
-  description?: string | undefined;
+  platform?: Platform | undefined;
   epNumber?: number | undefined;
   gameTitle?: string | undefined;
 }
@@ -95,7 +95,7 @@ const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeP
       chapterEnd,
       chapterGameId,
       chapterImage,
-      description,
+      platform,
       epNumber,
       gameTitle,
     } = job.data;
@@ -107,7 +107,7 @@ const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeP
       chapterName,
       chapterGameId,
       chapterImage,
-      description,
+      platform,
       epNumber,
       gameTitle,
     };
@@ -176,7 +176,7 @@ const youtubeProcessor = wrapWorkerProcessor<YoutubeUploadJob, YoutubeProcessorC
         chapterName: ctx.chapterName as string,
         chapterGameId: ctx.chapterGameId,
         chapterImage: ctx.chapterImage,
-        description: ctx.description as string,
+        platform: ctx.platform as Platform,
         epNumber: ctx.epNumber as number,
         gameTitle: ctx.gameTitle,
         db: ctx.db,
