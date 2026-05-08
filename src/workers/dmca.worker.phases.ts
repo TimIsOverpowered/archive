@@ -42,6 +42,7 @@ export interface DmcaProcessorContext extends BaseWorkerContext {
   workDir: string;
   tempFiles: string[];
   completedClaimIds: string[];
+  streamId?: string | undefined;
 }
 
 export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Promise<DmcaProcessorContext> {
@@ -57,6 +58,7 @@ export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Pr
     gameStart,
     gameDuration,
     type,
+    streamId,
   } = job.data;
   const isGameUpload = gameId != null && gameStart != null && gameDuration != null;
   const log = createAutoLogger(String(tenantId));
@@ -155,9 +157,10 @@ export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Pr
     log,
     alerts,
     messageId,
-    workDir: getTmpDirPath({ vodId }),
+    workDir: getTmpDirPath({ tenantId, vodId }),
     tempFiles: [],
     completedClaimIds: [],
+    streamId,
   };
 }
 

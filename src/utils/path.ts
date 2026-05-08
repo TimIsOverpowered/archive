@@ -44,73 +44,81 @@ export async function deleteFileIfExists(filePath: string): Promise<void> {
 }
 
 export interface VodPathOptions {
+  tenantId: string;
   vodId: string;
 }
 
 export interface LivePathOptions {
-  streamId: string;
+  tenantId: string;
+  streamId: string | null;
 }
 
 /**
  * Gets the tmp directory path for a VOD.
- * Path: {TMP_PATH}/{vodId}
+ * Path: {TMP_PATH}/{tenantId}/{vodId}
  */
 export function getTmpDirPath(options: VodPathOptions): string {
   const tmpPath = getTmpPath();
   if (tmpPath == null) {
     throw new ConfigNotConfiguredError('TMP_PATH is not configured');
   }
-  return path.join(tmpPath, options.vodId);
+  return path.join(tmpPath, options.tenantId, options.vodId);
 }
 
 /**
  * Gets the tmp file path for a VOD.
- * Path: {TMP_PATH}/{vodId}/{vodId}.mp4
+ * Path: {TMP_PATH}/{tenantId}/{vodId}/{vodId}.mp4
  */
 export function getTmpFilePath(options: VodPathOptions): string {
   const tmpPath = getTmpPath();
   if (tmpPath == null) {
     throw new ConfigNotConfiguredError('TMP_PATH is not configured');
   }
-  return path.join(tmpPath, options.vodId, `${options.vodId}.mp4`);
+  return path.join(tmpPath, options.tenantId, options.vodId, `${options.vodId}.mp4`);
 }
 
 /**
  * Gets the file path for an archived VOD.
- * Path: {VOD_PATH}/{vodId}/{vodId}.mp4
+ * Path: {VOD_PATH}/{tenantId}/{vodId}/{vodId}.mp4
  */
 export function getVodFilePath(options: VodPathOptions): string {
   const vodPath = getVodPath();
   if (vodPath == null) throw new Error('VOD_PATH is not configured');
-  return path.join(vodPath, options.vodId, `${options.vodId}.mp4`);
+  return path.join(vodPath, options.tenantId, options.vodId, `${options.vodId}.mp4`);
 }
 
 /**
  * Gets the directory path for an archived VOD.
- * Path: {VOD_PATH}/{vodId}
+ * Path: {VOD_PATH}/{tenantId}/{vodId}
  */
 export function getVodDirPath(options: VodPathOptions): string {
   const vodPath = getVodPath();
   if (vodPath == null) throw new Error('VOD_PATH is not configured');
-  return path.join(vodPath, options.vodId);
+  return path.join(vodPath, options.tenantId, options.vodId);
 }
 
 /**
  * Gets the file path for a live VOD.
- * Path: {LIVE_PATH}/{streamId}/{streamId}.mp4
+ * Path: {LIVE_PATH}/{tenantId}/{streamId}/{streamId}.mp4
  */
 export function getLiveFilePath(options: LivePathOptions): string {
   const livePath = getLivePath();
   if (livePath == null) throw new Error('LIVE_PATH is not configured');
-  return path.join(livePath, options.streamId, `${options.streamId}.mp4`);
+  if (options.streamId == null || options.streamId === '') {
+    throw new Error('streamId is required for live file paths');
+  }
+  return path.join(livePath, options.tenantId, options.streamId, `${options.streamId}.mp4`);
 }
 
 /**
  * Gets the directory path for a live VOD.
- * Path: {LIVE_PATH}/{streamId}
+ * Path: {LIVE_PATH}/{tenantId}/{streamId}
  */
 export function getLiveDirPath(options: LivePathOptions): string {
   const livePath = getLivePath();
   if (livePath == null) throw new Error('LIVE_PATH is not configured');
-  return path.join(livePath, options.streamId);
+  if (options.streamId == null || options.streamId === '') {
+    throw new Error('streamId is required for live file paths');
+  }
+  return path.join(livePath, options.tenantId, options.streamId);
 }

@@ -4,14 +4,14 @@ import type { StreamerDB, SelectableVods } from '../streamer-types.js';
 
 type VodByIdResult = Pick<
   SelectableVods,
-  'id' | 'platform_vod_id' | 'platform' | 'title' | 'duration' | 'created_at' | 'is_live'
+  'id' | 'platform_vod_id' | 'platform' | 'title' | 'duration' | 'created_at' | 'is_live' | 'platform_stream_id'
 >;
 
 export async function findVodById(db: Kysely<StreamerDB>, id: number): Promise<VodByIdResult | null> {
   return (
     (await db
       .selectFrom('vods')
-      .select(['id', 'platform_vod_id', 'platform', 'title', 'duration', 'created_at', 'is_live'])
+      .select(['id', 'platform_vod_id', 'platform', 'title', 'duration', 'created_at', 'is_live', 'platform_stream_id'])
       .where('id', '=', id)
       .executeTakeFirst()) ?? null
   );

@@ -5,11 +5,15 @@ import type { StreamerDB } from '../db/streamer-types.js';
 import { publishVodUpdate } from '../services/cache-invalidator.js';
 import { saveUploadResult, markUploadFailed } from '../services/youtube/upload.js';
 import type { Platform, SourceType, UploadType } from '../types/platforms.js';
+import { SOURCE_TYPES } from '../types/platforms.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { resetFailures } from '../utils/discord-alerts.js';
 import { ConfigNotConfiguredError } from '../utils/domain-errors.js';
+import { extractErrorDetails } from '../utils/error.js';
 import type { AppLogger } from '../utils/logger.js';
+import { getLiveFilePath, getVodFilePath } from '../utils/path.js';
 import type { YoutubeUploadJob, YoutubeUploadResult } from './jobs/types.js';
+import { finalizeFile } from './utils/file-finalization.js';
 import { getJobContext } from './utils/job-context.js';
 import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
 import { processGameUpload } from './youtube/game-upload-processor.js';
@@ -41,6 +45,7 @@ interface YoutubeProcessorContext {
   gameTitle?: string | undefined;
   workDir?: string | undefined;
   skipFinalize?: boolean | undefined;
+  streamId?: string | undefined;
 }
 
 const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeProcessorContext> => {
@@ -117,13 +122,14 @@ const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeP
     };
   }
 
-  const { dmcaProcessed, part, workDir, skipFinalize } = job.data;
+  const { dmcaProcessed, part, workDir, skipFinalize, streamId } = job.data;
   return {
     ...base,
     dmcaProcessed,
     part,
     workDir,
     skipFinalize,
+    streamId,
   };
 };
 
@@ -162,6 +168,26 @@ const youtubeProcessor = wrapWorkerProcessor<YoutubeUploadJob, YoutubeProcessorC
       await saveUploadResult(ctx.db, ctx.dbId, ctx.type, vodResult.uploadedVideos);
       await publishVodUpdate(ctx.tenantId, ctx.dbId);
 
+      if (ctx.config.settings.saveMP4 && ctx.skipFinalize !== true) {
+        try {
+          await finalizeFile({
+            filePath: ctx.filePath,
+            destPath:
+              ctx.type === SOURCE_TYPES.LIVE
+                ? getLiveFilePath({ tenantId: ctx.tenantId, streamId: ctx.streamId ?? '' })
+                : getVodFilePath({ tenantId: ctx.tenantId, vodId: ctx.vodId }),
+            log: ctx.log,
+            ...(ctx.workDir != null && { tmpDir: ctx.workDir }),
+          });
+        } catch (err) {
+          const details = extractErrorDetails(err);
+          ctx.log.warn(
+            { err: details.message, vodId: ctx.vodId },
+            'Failed to finalize original VOD after YouTube upload (non-fatal)'
+          );
+        }
+      }
+
       const splitDuration = getEffectiveSplitDuration(ctx.config.youtube?.splitDuration);
       linkVodPartsAfterDelay(ctx.tenantId, ctx.dbId, vodResult.uploadedVideos, splitDuration, ctx.db, ctx.log);
 
@@ -192,6 +218,23 @@ const youtubeProcessor = wrapWorkerProcessor<YoutubeUploadJob, YoutubeProcessorC
         log: ctx.log,
         displayName: ctx.displayName,
       });
+
+      if (ctx.config.settings.saveMP4 && ctx.config.youtube?.vodUpload !== true) {
+        try {
+          await finalizeFile({
+            filePath: ctx.filePath,
+            destPath: getVodFilePath({ tenantId: ctx.tenantId, vodId: ctx.vodId }),
+            log: ctx.log,
+            ...(ctx.workDir != null && { tmpDir: ctx.workDir }),
+          });
+        } catch (err) {
+          const details = extractErrorDetails(err);
+          ctx.log.warn(
+            { err: details.message, vodId: ctx.vodId },
+            'Failed to finalize original VOD after game upload (non-fatal)'
+          );
+        }
+      }
 
       resetFailures(ctx.tenantId);
       const duration = Date.now() - ctx.startTime;

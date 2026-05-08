@@ -84,8 +84,8 @@ mock.module('../../../src/utils/path.js', {
       mockGetVodFilePath();
       return '/tmp/test-vods/test-tenant/vod-123/vod-123.mp4';
     },
-    getTmpDirPath: () => '/tmp/test-tmp/vod-123',
-    getTmpFilePath: () => '/tmp/test-tmp/vod-123/temp.ts',
+    getTmpDirPath: () => '/tmp/test-tmp/test-tenant/vod-123',
+    getTmpFilePath: () => '/tmp/test-tmp/test-tenant/vod-123/vod-123.mp4',
   },
 });
 

@@ -31,7 +31,7 @@ export function createVodUploadJob(
   type: SourceType,
   dmcaProcessed?: boolean,
   part?: number,
-  options?: { workDir?: string; skipFinalize?: boolean }
+  options?: { workDir?: string; skipFinalize?: boolean; streamId?: string }
 ): YoutubeVodUploadJob {
   const { config, tenantId } = ctx;
   if (config.youtube?.upload === false) {
@@ -50,6 +50,7 @@ export function createVodUploadJob(
     part,
     workDir: options?.workDir,
     skipFinalize: options?.skipFinalize,
+    streamId: options?.streamId,
   };
 }
 
@@ -310,7 +311,7 @@ export async function queueYoutubeVodUpload(
   dmcaProcessed?: boolean,
   downloadJobId?: string,
   part?: number,
-  options?: { workDir?: string; skipFinalize?: boolean }
+  options?: { workDir?: string; skipFinalize?: boolean; streamId?: string }
 ): Promise<string | null> {
   const job = createVodUploadJob(ctx, dbId, vodId, filePath, platform, type, dmcaProcessed, part, options);
   return enqueueVodUpload(job, downloadJobId);
@@ -455,6 +456,7 @@ export interface QueueYoutubeUploadsOptions {
   type: SourceType;
   workDir?: string | undefined;
   skipFinalize?: boolean | undefined;
+  streamId?: string | undefined;
 }
 
 export interface YoutubeUploadJobResult {
@@ -480,6 +482,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
     dmcaProcessed,
     workDir,
     skipFinalize,
+    streamId,
   } = options;
   const { config } = ctx;
 
@@ -535,6 +538,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
             dmcaProcessed,
             workDir,
             skipFinalize,
+            streamId,
           },
           opts: {
             jobId: vodJobId,
@@ -569,6 +573,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
             dmcaProcessed,
             workDir,
             skipFinalize,
+            streamId,
           },
           opts: {
             jobId: vodJobId,
@@ -628,7 +633,9 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
           platform,
           type,
           dmcaProcessed,
-          downloadJobId
+          downloadJobId,
+          undefined,
+          streamId != null ? { streamId } : {}
         );
         result.vodJobId = vodJobId;
         log.info({ vodId, chained: downloadJobId != null, vodJobId }, 'Queued YouTube VOD upload');

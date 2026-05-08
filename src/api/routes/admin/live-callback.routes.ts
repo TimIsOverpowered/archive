@@ -119,6 +119,7 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
         platform,
         type: SOURCE_TYPES.LIVE,
         workDir: pathModule.dirname(path),
+        streamId: vodRecord.platform_stream_id ?? undefined,
       });
 
       return ok({

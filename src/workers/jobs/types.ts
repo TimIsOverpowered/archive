@@ -40,6 +40,7 @@ export interface YoutubeVodUploadJob extends BaseJobData {
   part?: number | undefined;
   workDir?: string | undefined;
   skipFinalize?: boolean | undefined;
+  streamId?: string | undefined;
 }
 
 export interface YoutubeGameUploadJob extends BaseJobData {
@@ -72,6 +73,7 @@ export interface DmcaProcessingJob extends BaseJobData {
   gameDuration?: number | undefined;
   workDir?: string | undefined;
   skipFinalize?: boolean | undefined;
+  streamId?: string | undefined;
 }
 
 export interface MonitorJob {

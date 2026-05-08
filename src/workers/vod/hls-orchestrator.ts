@@ -68,8 +68,8 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
   const { config, tenantId } = ctx;
   const log = createAutoLogger(tenantId);
 
-  const vodDir = getTmpDirPath({ vodId });
-  const finalMp4Path = getTmpFilePath({ vodId });
+  const vodDir = getTmpDirPath({ tenantId, vodId });
+  const finalMp4Path = getTmpFilePath({ tenantId, vodId });
   await mkdir(vodDir, { recursive: true });
 
   const m3u8Path = join(vodDir, `${vodId}.m3u8`);

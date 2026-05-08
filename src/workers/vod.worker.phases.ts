@@ -12,7 +12,7 @@ import type { BaseWorkerContext } from './types.js';
 import { createVodWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
 import type { VodWorkerAlerts } from './utils/alert-factories.js';
 import { getMetadata } from './utils/ffmpeg.js';
-import { finalizeToStorage } from './utils/file-finalization.js';
+import { finalizeFile } from './utils/file-finalization.js';
 import { getJobContext } from './utils/job-context.js';
 import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
@@ -51,7 +51,7 @@ export async function buildVodProcessorContext(
   await job.updateProgress(0);
 
   const streamerName = getDisplayName(config);
-  const finalPath = getTmpFilePath({ vodId });
+  const finalPath = getTmpFilePath({ tenantId, vodId });
   const alerts = createVodWorkerAlerts();
   const messageId = await initRichAlert(alerts.init(vodId, platform, streamerName)).catch(() => null);
 
@@ -80,7 +80,7 @@ export async function runVodDownload(ctx: VodProcessorContext): Promise<void> {
   if (ctx.downloadMethod === DOWNLOAD_METHODS.FFMPEG) {
     await downloadVodWithFfmpeg(ctx.platform, ctx.vodId, ctx.finalPath, ctx.config, ctx.log);
   } else {
-    const vodDirPath = getTmpDirPath({ vodId: ctx.vodId });
+    const vodDirPath = getTmpDirPath({ tenantId: ctx.tenantId, vodId: ctx.vodId });
     if (await fileExists(vodDirPath)) {
       await cleanupOrphanedTmpFiles(vodDirPath, ctx.log);
     }
@@ -154,7 +154,11 @@ export async function sendVodCompletion(ctx: VodProcessorContext): Promise<void>
   const saveMp4 = ctx.config.settings.saveMP4 === true;
   const skipFinalization = ctx.job.data.skipFinalize === true;
   if (saveMp4 && !skipFinalization) {
-    await finalizeToStorage(ctx.finalPath, getVodFilePath({ vodId: ctx.vodId }), ctx.log);
+    await finalizeFile({
+      filePath: ctx.finalPath,
+      destPath: getVodFilePath({ tenantId: ctx.tenantId, vodId: ctx.vodId }),
+      log: ctx.log,
+    });
   }
 
   await updateAlert(

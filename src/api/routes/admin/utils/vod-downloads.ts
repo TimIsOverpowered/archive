@@ -11,7 +11,7 @@ import { type AppLogger } from '../../../../utils/logger.js';
 import { getTmpFilePath, getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
 import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
 import { getMetadata } from '../../../../workers/utils/ffmpeg.js';
-import { finalizeToStorage } from '../../../../workers/utils/file-finalization.js';
+import { finalizeFile } from '../../../../workers/utils/file-finalization.js';
 import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { refreshVodRecord } from './vod-records.js';
 
@@ -44,17 +44,24 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
   if (!platformConfig) throw new PlatformNotConfiguredError(platform, `tenant ${tenantId}`);
   const { platformUserId, platformUsername } = platformConfig;
 
-  const filePath = type === SOURCE_TYPES.LIVE ? getLiveFilePath({ streamId: vodId }) : getVodFilePath({ vodId });
-
-  let vodRecord = await findVodById(db, dbId);
-  if (vodRecord && vodRecord.duration === 0) {
-    log.info({ dbId, vodId }, 'VOD duration is 0, refreshing metadata before download check');
-    vodRecord = await refreshVodRecord(ctx, vodId, dbId, platformUserId, platformUsername, log);
-  }
-
+  const vodRecord = await findVodById(db, dbId);
   if (!vodRecord) throw new VodNotFoundError(dbId, 'vod downloads');
 
-  const needsDownload = await checkIfDownloadNeeded(filePath, dbId, vodRecord, log);
+  const filePath =
+    type === SOURCE_TYPES.LIVE
+      ? getLiveFilePath({ tenantId, streamId: vodRecord.platform_stream_id ?? '' })
+      : getVodFilePath({ tenantId, vodId });
+
+  let durationCheckRecord: Pick<SelectableVods, 'duration'> | null = vodRecord;
+  if (vodRecord.duration === 0) {
+    log.info({ dbId, vodId }, 'VOD duration is 0, refreshing metadata before download check');
+    const refreshed = await refreshVodRecord(ctx, vodId, dbId, platformUserId, platformUsername, log);
+    if (refreshed) {
+      durationCheckRecord = refreshed;
+    }
+  }
+
+  const needsDownload = await checkIfDownloadNeeded(filePath, dbId, durationCheckRecord ?? { duration: 0 }, log);
 
   if (!needsDownload) {
     log.debug({ vodId, filePath, type }, 'VOD file already exists and is valid');
@@ -62,9 +69,9 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
     // If tmpPath is configured, copy to tmpPath for local processing
     const tmpPath = getTmpPath();
     if (tmpPath != null) {
-      const tmpFilePath = getTmpFilePath({ vodId });
+      const tmpFilePath = getTmpFilePath({ tenantId, vodId });
       try {
-        await finalizeToStorage(filePath, tmpFilePath, log);
+        await finalizeFile({ filePath, destPath: tmpFilePath, log });
         log.info({ filePath, tmpFilePath }, 'Copied existing VOD from storage to tmpPath');
         return { filePath: tmpFilePath, jobId: null, workDir: tmpPath };
       } catch (err) {

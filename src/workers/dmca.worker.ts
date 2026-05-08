@@ -7,7 +7,7 @@ import { cleanupTempFiles } from './dmca/dmca.js';
 import { buildDmcaProcessorContext, trimDmcaVideo, processDmcaClaims, queueDmcaUpload } from './dmca.worker.phases.js';
 import type { DmcaProcessorContext } from './dmca.worker.phases.js';
 import type { DmcaProcessingJob, DmcaProcessingResult } from './jobs/types.js';
-import { finalizeVodFile } from './utils/file-finalization.js';
+import { finalizeFile } from './utils/file-finalization.js';
 import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
 
 const errorMeta = (ctx: DmcaProcessorContext, job: Job<unknown>) => ({
@@ -46,12 +46,12 @@ const dmcaProcessor = wrapWorkerProcessor<DmcaProcessingJob, DmcaProcessorContex
       }
       // Finalize: move original full VOD to storage or delete from tmpPath
       try {
-        await finalizeVodFile({
+        await finalizeFile({
           filePath: ctx.filePath,
           destPath:
             ctx.type === SOURCE_TYPES.LIVE
-              ? getLiveFilePath({ streamId: ctx.vodId })
-              : getVodFilePath({ vodId: ctx.vodId }),
+              ? getLiveFilePath({ tenantId: ctx.tenantId, streamId: ctx.streamId ?? '' })
+              : getVodFilePath({ tenantId: ctx.tenantId, vodId: ctx.vodId }),
           tmpDir: ctx.workDir,
           saveMP4: ctx.config.settings.saveMP4 ?? false,
           log: ctx.log,

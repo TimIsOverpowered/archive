@@ -14,7 +14,7 @@ import type { BaseWorkerContext, LiveCompletionData } from './types.js';
 import { createLiveWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
 import type { LiveWorkerAlerts } from './utils/alert-factories.js';
 import { getMetadata } from './utils/ffmpeg.js';
-import { finalizeVodFile } from './utils/file-finalization.js';
+import { finalizeFile } from './utils/file-finalization.js';
 import { getJobContext } from './utils/job-context.js';
 import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
@@ -69,7 +69,7 @@ export async function buildLiveProcessorContext(
 }
 
 export async function prepareVodDirectory(ctx: LiveProcessorContext): Promise<void> {
-  const vodDirPath = getTmpDirPath({ vodId: ctx.vodId });
+  const vodDirPath = getTmpDirPath({ tenantId: ctx.tenantId, vodId: ctx.vodId });
   if (await fileExists(vodDirPath)) {
     await cleanupOrphanedTmpFiles(vodDirPath, ctx.log);
   }
@@ -170,7 +170,7 @@ export async function runPostProcessing(
       filePath: downloadResult.finalMp4Path,
       platform: ctx.platform,
       type: SOURCE_TYPES.VOD,
-      workDir: getTmpDirPath({ vodId: ctx.vodId }),
+      workDir: getTmpDirPath({ tenantId: ctx.tenantId, vodId: ctx.vodId }),
       skipFinalize: true,
     });
     if (youtubeResult.vodJobId != null || youtubeResult.gameJobIds.length > 0) {
@@ -185,10 +185,10 @@ export async function runPostProcessing(
   const vodUploadEnabled = ctx.config.youtube?.vodUpload === true;
   if (!uploadEnabled || !vodUploadEnabled) {
     try {
-      await finalizeVodFile({
+      await finalizeFile({
         filePath: downloadResult.finalMp4Path,
-        destPath: getVodFilePath({ vodId: ctx.vodId }),
-        tmpDir: getTmpDirPath({ vodId: ctx.vodId }),
+        destPath: getVodFilePath({ tenantId: ctx.tenantId, vodId: ctx.vodId }),
+        tmpDir: getTmpDirPath({ tenantId: ctx.tenantId, vodId: ctx.vodId }),
         saveMP4: ctx.config.settings.saveMP4 ?? false,
         log: ctx.log,
       });

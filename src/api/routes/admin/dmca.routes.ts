@@ -122,6 +122,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         filePath,
         workDir: filePath ?? undefined,
         skipFinalize: true, // DMCA worker will handle finalization
+        streamId: vodRecord.platform_stream_id ?? undefined,
       });
 
       if (dmcaJobId == null) {
