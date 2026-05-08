@@ -129,6 +129,7 @@ export async function createGameUploadJob(
     chapterDuration: chapter.duration,
     chapterEnd: chapter.end ?? 0,
     chapterGameId: chapter.game_id ?? '',
+    chapterImage: chapter.image ?? null,
     description,
     epNumber,
     gameTitle: options?.gameTitle,

@@ -35,6 +35,7 @@ interface YoutubeProcessorContext {
   chapterEnd?: number | undefined;
   chapterName?: string | undefined;
   chapterGameId?: string | undefined;
+  chapterImage?: string | null | undefined;
   description?: string | undefined;
   epNumber?: number | undefined;
   gameTitle?: string | undefined;
@@ -87,8 +88,17 @@ const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeP
   };
 
   if (kind === 'game') {
-    const { chapterStart, chapterDuration, chapterName, chapterEnd, chapterGameId, description, epNumber, gameTitle } =
-      job.data;
+    const {
+      chapterStart,
+      chapterDuration,
+      chapterName,
+      chapterEnd,
+      chapterGameId,
+      chapterImage,
+      description,
+      epNumber,
+      gameTitle,
+    } = job.data;
     return {
       ...base,
       chapterStart,
@@ -96,6 +106,7 @@ const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeP
       chapterEnd,
       chapterName,
       chapterGameId,
+      chapterImage,
       description,
       epNumber,
       gameTitle,
@@ -164,6 +175,7 @@ const youtubeProcessor = wrapWorkerProcessor<YoutubeUploadJob, YoutubeProcessorC
         chapterEnd: ctx.chapterEnd as number,
         chapterName: ctx.chapterName as string,
         chapterGameId: ctx.chapterGameId,
+        chapterImage: ctx.chapterImage,
         description: ctx.description as string,
         epNumber: ctx.epNumber as number,
         gameTitle: ctx.gameTitle,

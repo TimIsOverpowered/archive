@@ -25,6 +25,7 @@ export interface GameUploadContext {
   chapterEnd: number;
   chapterName: string;
   chapterGameId?: string | undefined;
+  chapterImage?: string | null | undefined;
   description: string;
   epNumber: number;
   gameTitle?: string | undefined;
@@ -44,6 +45,7 @@ export interface GameUploadAndUpsertParams {
   chapterDuration: number;
   chapterName: string;
   chapterGameId?: string | undefined;
+  chapterImage?: string | null | undefined;
   description: string;
   epNumber: number;
   gameTitle?: string | undefined;
@@ -77,6 +79,7 @@ export async function uploadAndUpsertGame(
     chapterEnd,
     chapterName,
     chapterGameId,
+    chapterImage,
     description,
     epNumber,
     gameTitle,
@@ -158,12 +161,14 @@ export async function uploadAndUpsertGame(
       game_id: chapterGameId,
       game_name: chapterName,
       title: dbTitle,
+      chapter_image: chapterImage,
     })
     .onConflict((oc) =>
       oc.columns(['vod_id', 'start', 'end']).doUpdateSet({
         video_id: result.videoId,
         thumbnail_url: result.thumbnailUrl ?? null,
         title: dbTitle,
+        chapter_image: chapterImage,
       })
     )
     .returning('id')
@@ -283,6 +288,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     chapterEnd,
     chapterDuration,
     chapterGameId,
+    chapterImage,
     description,
     epNumber,
     gameTitle,
@@ -303,6 +309,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     chapterDuration,
     chapterName: gameName,
     chapterGameId,
+    chapterImage,
     description,
     epNumber,
     gameTitle,
@@ -325,6 +332,7 @@ async function processSplitGameUpload(
     dbId,
     chapterStart,
     chapterGameId,
+    chapterImage,
     chapterName,
     chapterEnd,
     description,
@@ -406,6 +414,7 @@ async function processSplitGameUpload(
       chapterName,
       chapterEnd,
       chapterGameId,
+      chapterImage,
       description,
       epNumber,
       gameTitle,

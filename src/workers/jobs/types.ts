@@ -49,6 +49,7 @@ export interface YoutubeGameUploadJob extends BaseJobData {
   chapterDuration: number;
   chapterEnd: number;
   chapterGameId?: string | undefined;
+  chapterImage?: string | null | undefined;
   description: string;
   epNumber: number;
   gameTitle?: string | undefined;
