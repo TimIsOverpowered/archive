@@ -180,11 +180,11 @@ The `chat_messages` table uses a composite primary key on `(id, created_at)`. Th
 Check that the hypertable is set up correctly:
 
 ```sql
-SELECT hypertable_name, chunk_time_interval, create_time FROM timescaledb_information.hypertables;
+SELECT hypertable_name, num_chunks, compression_enabled FROM timescaledb_information.hypertables;
 
 SELECT * FROM timescaledb_information.compression_settings WHERE hypertable_name = 'chat_messages';
 
-SELECT policy_name, schedule_interval, target::regclass, initial_start, timezone FROM timescaledb_information.policies;
+SELECT job_id, application_name, schedule_interval, max_runtime, scheduled FROM timescaledb_information.jobs;
 ```
 
 ### Maintenance
@@ -192,37 +192,38 @@ SELECT policy_name, schedule_interval, target::regclass, initial_start, timezone
 **Monitor chunk status:**
 
 ```sql
-SELECT chunk_name, created_at, upper_boundary, compressed FROM timescaledb_information.chunks
-WHERE hypertable_name = 'chat_messages' ORDER BY created_at DESC;
+SELECT chunk_name, range_start, range_end, is_compressed FROM timescaledb_information.chunks
+WHERE hypertable_name = 'chat_messages' ORDER BY range_start DESC;
 ```
 
 **Manually compress a chunk:**
 
 ```sql
-SELECT compress_chunk(chunk_id, if_not_compressed => true)
+SELECT compress_chunk(chunk_name::regclass, if_not_compressed => true)
 FROM timescaledb_information.chunks
-WHERE hypertable_name = 'chat_messages' AND NOT compressed;
+WHERE hypertable_name = 'chat_messages' AND NOT is_compressed;
 ```
 
 **Decompress a chunk (rarely needed):**
 
 ```sql
-SELECT decompress_chunk(chunk_id)
+SELECT decompress_chunk(chunk_name::regclass)
 FROM timescaledb_information.chunks
-WHERE hypertable_name = 'chat_messages' AND compressed;
+WHERE hypertable_name = 'chat_messages' AND is_compressed;
 ```
 
 **Monitor compression ratio:**
 
 ```sql
 SELECT
-  pg_size_pretty(sum(pg_total_relation_size(c.oid))) AS total_size,
-  pg_size_pretty(sum(pg_relation_size(c.oid))) AS uncompressed_size,
-  pg_size_pretty(sum(case when c.relkind = 'c' then pg_total_relation_size(c.oid) else 0 end)) AS compressed_size
-FROM pg_class c
-JOIN pg_namespace n ON n.oid = c.relnamespace
-WHERE n.nspname = 'timescaledb_internal'
-  AND c.relname LIKE 'chunk%';
+  ch.chunk_name,
+  ch.is_compressed,
+  pg_size_pretty(pg_total_relation_size(pc.oid)) AS total_size
+FROM timescaledb_information.chunks ch
+JOIN pg_class pc ON pc.relname = ch.chunk_name
+JOIN pg_namespace ns ON ns.oid = pc.relnamespace
+WHERE ch.hypertable_name = 'chat_messages'
+ORDER BY ch.range_start DESC;
 ```
 
 ### Important Notes
