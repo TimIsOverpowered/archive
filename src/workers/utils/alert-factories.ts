@@ -153,25 +153,18 @@ export function createLiveWorkerAlerts(): LiveWorkerAlerts {
       timestamp: new Date().toISOString(),
     }),
 
-    progress: (vodId, platform, streamerName, segmentsDownloaded, duration) => {
-      const percent =
-        duration > 0 ? Math.min(Math.round((segmentsDownloaded * 2) / Math.max(duration / 2, 1)), 100) : 0;
-      const progressBar = createProgressBar(Math.min(percent, 100));
-
-      return {
-        title: `[Live] Downloading ${streamerName} - ${vodId}`,
-        description: `Downloading segments from ${capitalizePlatform(platform)}...`,
-        status: 'warning',
-        fields: [
-          { name: 'Streamer', value: streamerName, inline: true },
-          { name: 'Platform', value: capitalizePlatform(platform), inline: true },
-          { name: 'Segments', value: `${segmentsDownloaded}`, inline: true },
-          { name: 'Duration', value: toHHMMSS(duration), inline: true },
-          { name: 'Progress', value: progressBar, inline: false },
-        ],
-        timestamp: new Date().toISOString(),
-      };
-    },
+    progress: (vodId, platform, streamerName, segmentsDownloaded, duration) => ({
+      title: `[Live] Downloading ${streamerName} - ${vodId}`,
+      description: `Downloading segments from ${capitalizePlatform(platform)}...`,
+      status: 'warning',
+      fields: [
+        { name: 'Streamer', value: streamerName, inline: true },
+        { name: 'Platform', value: capitalizePlatform(platform), inline: true },
+        { name: 'Segments', value: `${segmentsDownloaded}`, inline: true },
+        { name: 'Duration', value: toHHMMSS(duration), inline: true },
+      ],
+      timestamp: new Date().toISOString(),
+    }),
 
     converting: (vodId, segmentCount) => ({
       title: `[Live] Converting ${vodId}`,
@@ -211,10 +204,10 @@ export function createLiveWorkerAlerts(): LiveWorkerAlerts {
       if (completionData) {
         const streamerName = completionData.streamerName;
         const platform = completionData.platform;
-        if (streamerName) {
+        if (streamerName != null) {
           fields.push({ name: 'Streamer', value: streamerName, inline: true });
         }
-        if (platform) {
+        if (platform != null) {
           fields.push({ name: 'Platform', value: capitalizePlatform(platform), inline: true });
         }
       }
