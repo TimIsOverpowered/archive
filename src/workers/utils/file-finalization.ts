@@ -31,8 +31,12 @@ export async function finalizeFile(options: FinalizeFileOptions): Promise<void> 
     for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
       try {
         await fsPromises.copyFile(filePath, destPath);
-        await fsPromises.unlink(filePath);
-        log.info({ filePath, destPath, attempt: attempt + 1 }, 'Finalized file to storage');
+        if (tmpDir != null) {
+          await fsPromises.rm(tmpDir, { recursive: true, force: true });
+          log.info({ filePath, destPath, tmpDir }, 'Finalized file to storage');
+        } else {
+          log.info({ filePath, destPath, attempt: attempt + 1 }, 'Finalized file to storage');
+        }
         return;
       } catch (err) {
         lastError = err;
