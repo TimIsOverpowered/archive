@@ -87,7 +87,7 @@ export async function saveVodChapters(
   const { tenantId } = ctx;
   const logger = createAutoLogger('twitch-chapters');
   try {
-    await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+    return await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
       await db.deleteFrom('chapters').where('vod_id', '=', dbId).execute();
 
       await publishVodUpdate(tenantId, dbId);
@@ -95,14 +95,14 @@ export async function saveVodChapters(
       const chapters = await getChapters(vodId, tenantId);
       if (!chapters) {
         logger.warn({ vodId }, 'No chapters data available from Twitch API');
-        return;
+        return 0;
       }
 
       if (chapters.length === 0) {
         const chapter = await getChapter(vodId, tenantId);
         if (chapter == null || chapter.game == null) {
           logger.warn({ vodId }, 'No game info available');
-          return;
+          return 0;
         }
 
         const game = chapter.game as Record<string, unknown>;
@@ -136,7 +136,7 @@ export async function saveVodChapters(
           { dbId, vodId, game: typeof game.displayName === 'string' ? game.displayName : 'unknown' },
           'Created single chapter from game info'
         );
-        return;
+        return 1;
       } else if (chapters.length > 0) {
         const chaptersToCreate = [];
 
@@ -196,10 +196,12 @@ export async function saveVodChapters(
           await publishVodUpdate(tenantId, dbId);
 
           logger.info({ dbId, vodId, chapterCount: chaptersToCreate.length }, 'Saved all chapters');
+          return chaptersToCreate.length;
         }
+        return 0;
       }
+      return 0;
     });
-    return 0;
   } catch (error) {
     logger.error({ error: extractErrorDetails(error).message, dbId, vodId }, 'Failed to save chapters');
     return 0;

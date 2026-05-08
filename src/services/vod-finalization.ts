@@ -1,3 +1,4 @@
+import { treeifyError } from 'zod';
 import { VodUpdateSchema } from '../config/schemas.js';
 import { withDbRetry } from '../db/streamer-client.js';
 import { TenantContext } from '../types/context.js';
@@ -25,7 +26,7 @@ export async function finalizeVod(options: FinalizeVodOptions): Promise<void> {
 
   const parsedDuration = VodUpdateSchema.safeParse({ duration: durationSeconds ?? undefined });
   if (!parsedDuration.success) {
-    log.warn({ error: parsedDuration.error.format() }, 'Invalid VOD duration — is_live will still be cleared');
+    log.warn({ error: treeifyError(parsedDuration.error) }, 'Invalid VOD duration — is_live will still be cleared');
   }
 
   const dur = parsedDuration.success ? (parsedDuration.data.duration ?? null) : null;
