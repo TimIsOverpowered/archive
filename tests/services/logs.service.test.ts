@@ -18,6 +18,8 @@ function setupBaseEnv(): void {
   process.env.TWITCH_CLIENT_SECRET = 'test-twitch-client-secret';
   process.env.YOUTUBE_CLIENT_ID = 'test-youtube-client-id';
   process.env.YOUTUBE_CLIENT_SECRET = 'test-youtube-client-secret';
+  process.env.TMP_PATH = '/tmp/test-tmp';
+  process.env.VOD_PATH = '/tmp/test-vods';
 }
 
 setupBaseEnv();

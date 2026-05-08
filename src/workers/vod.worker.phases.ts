@@ -7,12 +7,12 @@ import { updateAlert, initRichAlert } from '../utils/discord-alerts.js';
 import { PlatformNotConfiguredError } from '../utils/domain-errors.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { getTmpFilePath, getTmpDirPath, getVodFilePath, fileExists } from '../utils/path.js';
-import { finalizeToStorage } from './utils/file-finalization.js';
 import type { StandardVodJob } from './jobs/types.js';
 import type { BaseWorkerContext } from './types.js';
 import { createVodWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
 import type { VodWorkerAlerts } from './utils/alert-factories.js';
 import { getMetadata } from './utils/ffmpeg.js';
+import { finalizeToStorage } from './utils/file-finalization.js';
 import { getJobContext } from './utils/job-context.js';
 import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
@@ -151,7 +151,9 @@ export async function sendVodCompletion(ctx: VodProcessorContext): Promise<void>
   const duration = metadata?.duration != null ? Math.round(metadata.duration) : undefined;
 
   // Standalone download (no downstream consumer): copy to final path if saveMP4
-  if (ctx.config.settings.saveMP4 && !ctx.job.data.skipFinalize) {
+  const saveMp4 = ctx.config.settings.saveMP4 === true;
+  const skipFinalization = ctx.job.data.skipFinalize === true;
+  if (saveMp4 && !skipFinalization) {
     await finalizeToStorage(ctx.finalPath, getVodFilePath({ vodId: ctx.vodId }), ctx.log);
   }
 

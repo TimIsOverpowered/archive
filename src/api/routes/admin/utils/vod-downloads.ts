@@ -1,3 +1,4 @@
+import { getTmpPath } from '../../../../config/env.js';
 import { requirePlatformConfig } from '../../../../config/types.js';
 import { Vod } from '../../../../constants.js';
 import { findVodById } from '../../../../db/queries/vods.js';
@@ -7,7 +8,6 @@ import { DOWNLOAD_METHODS, SOURCE_TYPES } from '../../../../types/platforms.js';
 import { PlatformNotConfiguredError, VodNotFoundError } from '../../../../utils/domain-errors.js';
 import { extractErrorDetails } from '../../../../utils/error.js';
 import { type AppLogger } from '../../../../utils/logger.js';
-import { getTmpPath } from '../../../../config/env.js';
 import { getTmpFilePath, getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
 import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
 import { getMetadata } from '../../../../workers/utils/ffmpeg.js';

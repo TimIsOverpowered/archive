@@ -15,6 +15,7 @@ function setupBaseEnv(): void {
   process.env.PGBOUNCER_URL = 'postgresql://bouncer';
   process.env.ENCRYPTION_MASTER_KEY = VALID_KEY;
   process.env.NODE_ENV = 'test';
+  process.env.TMP_PATH = '/tmp/test-tmp';
   process.env.VOD_PATH = '/tmp/test-vods';
   process.env.TWITCH_CLIENT_ID = 'test-twitch-client-id';
   process.env.TWITCH_CLIENT_SECRET = 'test-twitch-client-secret';
@@ -83,6 +84,8 @@ mock.module('../../../src/utils/path.js', {
       mockGetVodFilePath();
       return '/tmp/test-vods/test-tenant/vod-123/vod-123.mp4';
     },
+    getTmpDirPath: () => '/tmp/test-tmp/vod-123',
+    getTmpFilePath: () => '/tmp/test-tmp/vod-123/temp.ts',
   },
 });
 

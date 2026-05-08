@@ -1,14 +1,14 @@
 import type { Job } from 'bullmq';
+import { SOURCE_TYPES } from '../types/platforms.js';
 import { updateAlert } from '../utils/discord-alerts.js';
 import { extractErrorDetails } from '../utils/error.js';
+import { getLiveFilePath, getVodFilePath } from '../utils/path.js';
 import { cleanupTempFiles } from './dmca/dmca.js';
 import { buildDmcaProcessorContext, trimDmcaVideo, processDmcaClaims, queueDmcaUpload } from './dmca.worker.phases.js';
 import type { DmcaProcessorContext } from './dmca.worker.phases.js';
 import type { DmcaProcessingJob, DmcaProcessingResult } from './jobs/types.js';
-import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
 import { finalizeVodFile } from './utils/file-finalization.js';
-import { getLiveFilePath, getVodFilePath } from '../utils/path.js';
-import { SOURCE_TYPES } from '../types/platforms.js';
+import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
 
 const errorMeta = (ctx: DmcaProcessorContext, job: Job<unknown>) => ({
   vodId: ctx.vodId,

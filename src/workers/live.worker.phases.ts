@@ -7,7 +7,6 @@ import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { updateAlert, initRichAlert } from '../utils/discord-alerts.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { fileExists, getTmpDirPath, getVodFilePath } from '../utils/path.js';
-import { finalizeVodFile } from './utils/file-finalization.js';
 import { triggerChatDownload } from './jobs/chat.job.js';
 import type { LiveDownloadJob } from './jobs/types.js';
 import { queueYoutubeUploads, type YoutubeUploadJobResult } from './jobs/youtube.job.js';
@@ -15,6 +14,7 @@ import type { BaseWorkerContext, LiveCompletionData } from './types.js';
 import { createLiveWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
 import type { LiveWorkerAlerts } from './utils/alert-factories.js';
 import { getMetadata } from './utils/ffmpeg.js';
+import { finalizeVodFile } from './utils/file-finalization.js';
 import { getJobContext } from './utils/job-context.js';
 import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
@@ -181,7 +181,9 @@ export async function runPostProcessing(
   }
 
   // YouTube disabled -- finalize path ourselves
-  if (!ctx.config.youtube?.upload || !ctx.config.youtube.vodUpload) {
+  const uploadEnabled = ctx.config.youtube?.upload === true;
+  const vodUploadEnabled = ctx.config.youtube?.vodUpload === true;
+  if (!uploadEnabled || !vodUploadEnabled) {
     try {
       await finalizeVodFile({
         filePath: downloadResult.finalMp4Path,

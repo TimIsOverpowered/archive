@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import type { Kysely } from 'kysely';
+import { getTmpPath } from '../../config/env.js';
 import type { TenantConfig } from '../../config/types.js';
 import { requirePlatformConfig } from '../../config/types.js';
 import { Jobs } from '../../constants.js';
@@ -12,7 +13,6 @@ import type { TwitchStreamStatus } from '../../services/twitch/live.js';
 import type { Platform } from '../../types/platforms.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
-import { getTmpPath } from '../../config/env.js';
 import { enqueueJobWithLogging } from '../jobs/enqueue.js';
 import type { LiveDownloadJob } from '../jobs/types.js';
 import { getLiveDownloadQueue } from '../queues/queue.js';
