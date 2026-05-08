@@ -28,6 +28,7 @@ export interface GameUploadContext {
   description: string;
   epNumber: number;
   gameTitle?: string | undefined;
+  displayName: string;
   db: Kysely<StreamerDB>;
   config: TenantConfig;
   log: AppLogger;
@@ -46,6 +47,7 @@ export interface GameUploadAndUpsertParams {
   description: string;
   epNumber: number;
   gameTitle?: string | undefined;
+  displayName: string;
   part?: number | undefined;
   totalParts?: number | undefined;
   db: Kysely<StreamerDB>;
@@ -78,6 +80,7 @@ export async function uploadAndUpsertGame(
     description,
     epNumber,
     gameTitle,
+    displayName,
     part,
     totalParts,
     db,
@@ -104,10 +107,11 @@ export async function uploadAndUpsertGame(
 
   const uploadAlertMessageId = await initRichAlert({
     title: part != null ? `🎮 Game Upload (Part ${currentPartNum}/${totalParts})` : '🎮 Game Upload Started',
-    description: `${channelName} - Uploading game clip to YouTube...`,
+    description: `${displayName} - Uploading "${chapterName}" to YouTube`,
     status: 'warning',
     fields: [
-      { name: 'Game Name', value: chapterName, inline: true },
+      { name: 'Streamer', value: displayName, inline: true },
+      { name: 'Game', value: chapterName, inline: true },
       { name: 'VOD ID', value: vodId, inline: false },
     ],
     timestamp: new Date().toISOString(),
@@ -173,20 +177,88 @@ export async function uploadAndUpsertGame(
 }
 
 export async function processGameUpload(ctx: GameUploadContext): Promise<GameUploadResult> {
-  const { filePath, chapterStart, chapterDuration } = ctx;
+  const { filePath, chapterStart, chapterDuration, vodId, log, displayName, chapterName } = ctx;
 
   if (filePath === '') {
     throw new Error('File path is required for game upload');
   }
+
+  const channelName = displayName;
+
+  const trimAlertMessageId = await initRichAlert({
+    title: `✂️ Trimming Game Clip`,
+    description: `${channelName} - Extracting "${chapterName}" from VOD ${vodId}`,
+    status: 'warning',
+    fields: [
+      { name: 'Game', value: chapterName, inline: true },
+      { name: 'VOD ID', value: vodId, inline: true },
+      { name: 'Start Time', value: toHHMMSS(chapterStart), inline: true },
+      { name: 'Duration', value: toHHMMSS(chapterDuration), inline: true },
+    ],
+    timestamp: new Date().toISOString(),
+  });
+
+  let trimFfmpegCmd: string | undefined;
+  const startTime = Date.now();
 
   const trimmedPath = await trimVideo(
     filePath,
     chapterStart,
     chapterDuration,
     `${ctx.vodId}-game-${ctx.chapterGameId ?? 'unknown'}`,
-    undefined,
-    () => {}
+    (percent: number) => {
+      if (trimAlertMessageId == null) return;
+
+      const elapsed = (Date.now() - startTime) / 1000;
+      const eta = percent > 0 ? Math.round((elapsed / percent) * (100 - percent)) : 0;
+
+      const alertFields: Array<{ name: string; value: string; inline: boolean }> = [
+        { name: 'Game', value: chapterName, inline: true },
+        { name: 'Progress', value: createProgressBar(percent), inline: false },
+      ];
+
+      if (trimFfmpegCmd != null) {
+        alertFields.push({ name: 'FFmpeg', value: `\`${trimFfmpegCmd.substring(0, 500)}\``, inline: false });
+      }
+
+      alertFields.push({ name: 'ETA', value: toHHMMSS(Math.max(0, eta)), inline: true });
+
+      safeUpdateAlert(
+        trimAlertMessageId,
+        {
+          title: `✂️ Trimming Game Clip`,
+          description: `${channelName} - Extracting "${chapterName}" from VOD ${vodId}`,
+          status: 'warning',
+          fields: alertFields,
+          timestamp: new Date().toISOString(),
+          updatedTimestamp: new Date().toISOString(),
+        },
+        log,
+        vodId
+      );
+    },
+    (cmd) => {
+      trimFfmpegCmd = cmd;
+    }
   );
+
+  safeUpdateAlert(
+    trimAlertMessageId,
+    {
+      title: `✅ Game Clip Trimmed`,
+      description: `${channelName} - Successfully trimmed "${chapterName}"`,
+      status: 'success',
+      fields: [
+        { name: 'Game', value: chapterName, inline: true },
+        { name: 'VOD ID', value: vodId, inline: true },
+      ],
+      timestamp: new Date().toISOString(),
+      updatedTimestamp: new Date().toISOString(),
+    },
+    log,
+    vodId
+  );
+
   const metadata = await getMetadata(trimmedPath);
   if (!metadata) {
     throw new Error(`Trimmed file has invalid duration or no video stream: ${trimmedPath}`);
@@ -196,9 +268,9 @@ export async function processGameUpload(ctx: GameUploadContext): Promise<GameUpl
   const gameExceedsYoutubeMax = trimmedDuration > YouTube.MAX_DURATION;
 
   if (gameExceedsYoutubeMax === true) {
-    return await processSplitGameUpload(ctx, trimmedPath, trimmedDuration);
+    return await processSplitGameUpload({ ...ctx, displayName: channelName }, trimmedPath, trimmedDuration);
   } else {
-    return await processSingleGameUpload(ctx, trimmedPath);
+    return await processSingleGameUpload({ ...ctx, displayName: channelName }, trimmedPath);
   }
 }
 
@@ -214,8 +286,9 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     description,
     epNumber,
     gameTitle,
+    displayName,
     db,
-    chapterName,
+    chapterName: gameName,
     config,
     log,
   } = ctx;
@@ -228,11 +301,12 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     chapterStart,
     chapterEnd,
     chapterDuration,
-    chapterName,
+    chapterName: gameName,
     chapterGameId,
     description,
     epNumber,
     gameTitle,
+    displayName,
     db,
     config,
     log,
@@ -256,12 +330,13 @@ async function processSplitGameUpload(
     description,
     epNumber,
     gameTitle,
+    displayName,
     config,
     db,
     vodId,
     log,
   } = ctx;
-  const channelName = getDisplayName(config);
+  const channelName = displayName;
   const totalParts = Math.ceil(trimmedDuration / YouTube.MAX_DURATION);
 
   const splitAlertMessageId = await initRichAlert({
@@ -334,6 +409,7 @@ async function processSplitGameUpload(
       description,
       epNumber,
       gameTitle,
+      displayName,
       part: currentPartNum,
       totalParts,
       db,

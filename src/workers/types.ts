@@ -22,4 +22,6 @@ export interface LiveCompletionData {
   youtubeGameJobIds: string[];
   segmentCount: number;
   finalPath: string;
+  streamerName?: string;
+  platform?: Platform;
 }

@@ -88,7 +88,12 @@ export async function runDownload(ctx: LiveProcessorContext): Promise<LivePhaseR
     discordMessageId: ctx.messageId ?? undefined,
     streamerName: ctx.streamerName,
     onProgress: (segmentsDownloaded, duration) => {
-      safeUpdateAlert(ctx.messageId, ctx.alerts.progress(ctx.vodId, segmentsDownloaded, duration), ctx.log, ctx.vodId);
+      safeUpdateAlert(
+        ctx.messageId,
+        ctx.alerts.progress(ctx.vodId, ctx.platform, ctx.streamerName, segmentsDownloaded, duration),
+        ctx.log,
+        ctx.vodId
+      );
     },
   });
 
@@ -129,7 +134,7 @@ export async function runPostProcessing(
   try {
     await fetchAndSaveEmotes(ctx, ctx.dbId, ctx.platform, ctx.platformUserId);
     emotesSaved = true;
-    await updateAlert(ctx.messageId, ctx.alerts.emotesSaved(ctx.vodId));
+    await updateAlert(ctx.messageId, ctx.alerts.emotesSaved(ctx.vodId, ctx.streamerName));
     ctx.log.info({ vodId: ctx.vodId }, 'Queued emote save');
   } catch (error) {
     ctx.log.warn({ ...extractErrorDetails(error), vodId: ctx.vodId }, 'Failed to save emotes (non-fatal)');
@@ -148,7 +153,7 @@ export async function runPostProcessing(
       platformUsername: ctx.platformUsername,
     });
     if (chatJobId != null) {
-      await updateAlert(ctx.messageId, ctx.alerts.chatQueued(ctx.vodId));
+      await updateAlert(ctx.messageId, ctx.alerts.chatQueued(ctx.vodId, ctx.streamerName));
     }
     ctx.log.info({ vodId: ctx.vodId, chatJobId }, 'Queued chat download job');
   } catch (error) {
@@ -166,7 +171,7 @@ export async function runPostProcessing(
       type: SOURCE_TYPES.VOD,
     });
     if (youtubeResult.vodJobId != null || youtubeResult.gameJobIds.length > 0) {
-      await updateAlert(ctx.messageId, ctx.alerts.uploadQueued(ctx.vodId));
+      await updateAlert(ctx.messageId, ctx.alerts.uploadQueued(ctx.vodId, ctx.streamerName));
     }
   } catch (error) {
     ctx.log.warn({ ...extractErrorDetails(error), vodId: ctx.vodId }, 'Failed to queue upload (non-fatal)');
@@ -179,6 +184,8 @@ export async function runPostProcessing(
     youtubeGameJobIds: youtubeResult.gameJobIds,
     segmentCount: downloadResult.segmentCount,
     finalPath: downloadResult.finalMp4Path,
+    streamerName: ctx.streamerName,
+    platform: ctx.platform,
   };
 }
 

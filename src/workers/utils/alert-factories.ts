@@ -124,11 +124,17 @@ export function createVodWorkerAlerts(): VodWorkerAlerts {
 
 export interface LiveWorkerAlerts {
   init: (vodId: string, platform: Platform, streamerName: string, startedAt?: string) => RichEmbedData;
-  progress: (vodId: string, segmentsDownloaded: number, duration: number) => RichEmbedData;
+  progress: (
+    vodId: string,
+    platform: Platform,
+    streamerName: string,
+    segmentsDownloaded: number,
+    duration: number
+  ) => RichEmbedData;
   converting: (vodId: string, segmentCount: number) => RichEmbedData;
-  emotesSaved: (vodId: string) => RichEmbedData;
-  chatQueued: (vodId: string) => RichEmbedData;
-  uploadQueued: (vodId: string) => RichEmbedData;
+  emotesSaved: (vodId: string, streamerName: string) => RichEmbedData;
+  chatQueued: (vodId: string, streamerName: string) => RichEmbedData;
+  uploadQueued: (vodId: string, streamerName: string) => RichEmbedData;
   complete: (vodId: string, duration?: number, completionData?: LiveCompletionData) => RichEmbedData;
   error: (vodId: string, errorMsg: string) => RichEmbedData;
 }
@@ -136,59 +142,82 @@ export interface LiveWorkerAlerts {
 export function createLiveWorkerAlerts(): LiveWorkerAlerts {
   return {
     init: (vodId, platform, streamerName, startedAt) => ({
-      title: `[Live] ${vodId} Started`,
-      description: `${capitalizePlatform(platform)} live stream download started`,
+      title: `[Live] ${streamerName} - ${vodId}`,
+      description: `Downloading live stream from ${capitalizePlatform(platform)}`,
       status: 'warning',
       fields: [
-        { name: 'Platform', value: capitalizePlatform(platform), inline: true },
         { name: 'Streamer', value: streamerName, inline: true },
+        { name: 'Platform', value: capitalizePlatform(platform), inline: true },
         ...(startedAt != null ? [{ name: 'Started At', value: startedAt, inline: false }] : []),
       ],
       timestamp: new Date().toISOString(),
     }),
 
-    progress: (vodId, segmentsDownloaded, duration) => ({
-      title: `[Live] Downloading ${vodId}`,
-      description: `${segmentsDownloaded} segments downloaded (${toHHMMSS(duration)})`,
-      status: 'warning',
-      fields: [],
-      timestamp: new Date().toISOString(),
-    }),
+    progress: (vodId, platform, streamerName, segmentsDownloaded, duration) => {
+      const percent =
+        duration > 0 ? Math.min(Math.round((segmentsDownloaded * 2) / Math.max(duration / 2, 1)), 100) : 0;
+      const progressBar = createProgressBar(Math.min(percent, 100));
+
+      return {
+        title: `[Live] Downloading ${streamerName} - ${vodId}`,
+        description: `Downloading segments from ${capitalizePlatform(platform)}...`,
+        status: 'warning',
+        fields: [
+          { name: 'Streamer', value: streamerName, inline: true },
+          { name: 'Platform', value: capitalizePlatform(platform), inline: true },
+          { name: 'Segments', value: `${segmentsDownloaded}`, inline: true },
+          { name: 'Duration', value: toHHMMSS(duration), inline: true },
+          { name: 'Progress', value: progressBar, inline: false },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    },
 
     converting: (vodId, segmentCount) => ({
       title: `[Live] Converting ${vodId}`,
-      description: 'Download complete. Converting...',
+      description: `Download complete. Converting ${segmentCount} segments to MP4...`,
       status: 'warning',
       fields: [{ name: 'Segments', value: String(segmentCount), inline: true }],
       timestamp: new Date().toISOString(),
     }),
 
-    emotesSaved: (vodId) => ({
-      title: `[Live] ${vodId} Emotes Saved`,
-      description: 'Emote data successfully saved',
+    emotesSaved: (vodId, streamerName) => ({
+      title: `[Live] ${streamerName} - Emotes Saved`,
+      description: `Emote data successfully saved for ${vodId}`,
       status: 'success',
-      fields: [],
+      fields: [{ name: 'VOD ID', value: vodId, inline: true }],
       timestamp: new Date().toISOString(),
     }),
 
-    chatQueued: (vodId) => ({
-      title: `[Live] ${vodId} Chat Download Queued`,
-      description: 'Chat download job has been queued',
+    chatQueued: (vodId, streamerName) => ({
+      title: `[Live] ${streamerName} - Chat Download Queued`,
+      description: `Chat download job has been queued for ${vodId}`,
       status: 'warning',
-      fields: [],
+      fields: [{ name: 'VOD ID', value: vodId, inline: true }],
       timestamp: new Date().toISOString(),
     }),
 
-    uploadQueued: (vodId) => ({
-      title: `[Live] ${vodId} Upload Queued`,
-      description: 'YouTube upload has been queued',
+    uploadQueued: (vodId, streamerName) => ({
+      title: `[Live] ${streamerName} - Upload Queued`,
+      description: `YouTube upload has been queued for ${vodId}`,
       status: 'warning',
-      fields: [],
+      fields: [{ name: 'VOD ID', value: vodId, inline: true }],
       timestamp: new Date().toISOString(),
     }),
 
     complete: (vodId, duration, completionData) => {
       const fields: Array<{ name: string; value: string; inline: boolean }> = [];
+
+      if (completionData) {
+        const streamerName = completionData.streamerName;
+        const platform = completionData.platform;
+        if (streamerName) {
+          fields.push({ name: 'Streamer', value: streamerName, inline: true });
+        }
+        if (platform) {
+          fields.push({ name: 'Platform', value: capitalizePlatform(platform), inline: true });
+        }
+      }
 
       fields.push({ name: 'Duration', value: duration != null ? toHHMMSS(duration) : 'Unknown', inline: true });
 

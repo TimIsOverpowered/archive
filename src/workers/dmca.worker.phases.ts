@@ -2,7 +2,7 @@ import { Job } from 'bullmq';
 import type { SelectableGames } from '../db/streamer-types.js';
 import type { SourceType } from '../types/platforms.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { initRichAlert } from '../utils/discord-alerts.js';
+import { initRichAlert, createProgressBar } from '../utils/discord-alerts.js';
 import { ConfigNotConfiguredError, FileNotFound } from '../utils/domain-errors.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { toHHMMSS } from '../utils/formatting.js';
@@ -168,7 +168,48 @@ export async function trimDmcaVideo(ctx: DmcaProcessorContext): Promise<void> {
 
     ctx.log.info({ vodId: ctx.vodId, part: ctx.part }, 'Extracting part from VOD');
 
-    const trimmed = await trimVideo(ctx.filePath, startOffset, splitDuration, `${ctx.vodId}-part-${ctx.part}`);
+    let dmcaTrimFfmpegCmd: string | undefined;
+    const trimStartTime = Date.now();
+
+    const trimmed = await trimVideo(
+      ctx.filePath,
+      startOffset,
+      splitDuration,
+      `${ctx.vodId}-part-${ctx.part}`,
+      (percent: number) => {
+        const elapsed = (Date.now() - trimStartTime) / 1000;
+        const eta = percent > 0 ? Math.round((elapsed / percent) * (100 - percent)) : 0;
+
+        const alertFields: Array<{ name: string; value: string; inline: boolean }> = [
+          { name: 'VOD ID', value: ctx.vodId, inline: true },
+          { name: 'Part', value: `${ctx.part}`, inline: true },
+          { name: 'Progress', value: createProgressBar(percent), inline: false },
+        ];
+
+        if (dmcaTrimFfmpegCmd != null) {
+          alertFields.push({ name: 'FFmpeg', value: `\`${dmcaTrimFfmpegCmd.substring(0, 500)}\``, inline: false });
+        }
+
+        alertFields.push({ name: 'ETA', value: toHHMMSS(Math.max(0, eta)), inline: true });
+
+        safeUpdateAlert(
+          ctx.messageId,
+          {
+            title: `✂️ DMCA Processing - Trimming Part ${ctx.part}`,
+            description: `${ctx.displayName} - Extracting part ${ctx.part}/${ctx.blockingClaims.length}`,
+            status: 'warning',
+            fields: alertFields,
+            timestamp: new Date().toISOString(),
+            updatedTimestamp: new Date().toISOString(),
+          },
+          ctx.log,
+          ctx.vodId
+        );
+      },
+      (cmd) => {
+        dmcaTrimFfmpegCmd = cmd;
+      }
+    );
 
     if (ctx.processedPath !== ctx.filePath) ctx.tempFiles.push(ctx.processedPath);
     ctx.processedPath = trimmed;
@@ -180,11 +221,47 @@ export async function trimDmcaVideo(ctx: DmcaProcessorContext): Promise<void> {
       'Trimming VOD to game range'
     );
 
+    let dmcaGameTrimFfmpegCmd: string | undefined;
+    const gameTrimStartTime = Date.now();
+
     const trimmedPath = await trimVideo(
       ctx.processedPath,
       ctx.gameStart,
       ctx.gameDuration,
-      `${ctx.vodId}-game-${ctx.gameId}-trimmed`
+      `${ctx.vodId}-game-${ctx.gameId}-trimmed`,
+      (percent: number) => {
+        const elapsed = (Date.now() - gameTrimStartTime) / 1000;
+        const eta = percent > 0 ? Math.round((elapsed / percent) * (100 - percent)) : 0;
+
+        const alertFields: Array<{ name: string; value: string; inline: boolean }> = [
+          { name: 'VOD ID', value: ctx.vodId, inline: true },
+          { name: 'Game ID', value: String(ctx.gameId), inline: true },
+          { name: 'Progress', value: createProgressBar(percent), inline: false },
+        ];
+
+        if (dmcaGameTrimFfmpegCmd != null) {
+          alertFields.push({ name: 'FFmpeg', value: `\`${dmcaGameTrimFfmpegCmd.substring(0, 500)}\``, inline: false });
+        }
+
+        alertFields.push({ name: 'ETA', value: toHHMMSS(Math.max(0, eta)), inline: true });
+
+        safeUpdateAlert(
+          ctx.messageId,
+          {
+            title: `✂️ DMCA Processing - Trimming Game Clip`,
+            description: `${ctx.displayName} - Extracting game clip from VOD ${ctx.vodId}`,
+            status: 'warning',
+            fields: alertFields,
+            timestamp: new Date().toISOString(),
+            updatedTimestamp: new Date().toISOString(),
+          },
+          ctx.log,
+          ctx.vodId
+        );
+      },
+      (cmd) => {
+        dmcaGameTrimFfmpegCmd = cmd;
+      }
     );
 
     if (ctx.processedPath !== ctx.filePath) ctx.tempFiles.push(ctx.processedPath);

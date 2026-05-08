@@ -1,6 +1,6 @@
 import type { Job } from 'bullmq';
 import type { Kysely } from 'kysely';
-import { TenantConfig } from '../config/types.js';
+import { getDisplayName, TenantConfig } from '../config/types.js';
 import type { StreamerDB } from '../db/streamer-types.js';
 import { publishVodUpdate } from '../services/cache-invalidator.js';
 import { saveUploadResult, markUploadFailed } from '../services/youtube/upload.js';
@@ -27,6 +27,7 @@ interface YoutubeProcessorContext {
   db: Kysely<StreamerDB>;
   startTime: number;
   kind: 'vod' | 'game';
+  displayName: string;
   dmcaProcessed?: boolean | undefined;
   part?: number | undefined;
   chapterStart?: number | undefined;
@@ -69,6 +70,8 @@ const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeP
     throw new ConfigNotConfiguredError(`YouTube for tenant ${tenantId}`);
   }
 
+  const displayName = getDisplayName(config);
+
   const base = {
     log,
     tenantId,
@@ -80,6 +83,7 @@ const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeP
     db,
     startTime,
     kind,
+    displayName,
   };
 
   if (kind === 'game') {
@@ -166,6 +170,7 @@ const youtubeProcessor = wrapWorkerProcessor<YoutubeUploadJob, YoutubeProcessorC
         db: ctx.db,
         config: ctx.config,
         log: ctx.log,
+        displayName: ctx.displayName,
       });
 
       resetFailures(ctx.tenantId);
