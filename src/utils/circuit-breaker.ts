@@ -23,39 +23,46 @@ const DEFAULT_OPTIONS: CircuitBreakerOptions = {
   recoveryTimeout: 30_000,
 };
 
-export const breakerCache = new LRUCache<string, CircuitBreakerState>({
-  max: 5000,
-  ttl: 120_000,
-  allowStale: false,
-});
-
-function getOrCreateBreaker(key: string, opts?: Partial<CircuitBreakerOptions>): CircuitBreakerState {
-  let state = breakerCache.get(key);
-
-  if (!state) {
-    state = {
-      state: 'closed',
-      failureCount: 0,
-      failureThreshold: opts?.failureThreshold ?? DEFAULT_OPTIONS.failureThreshold,
-      recoveryTimeout: opts?.recoveryTimeout ?? DEFAULT_OPTIONS.recoveryTimeout,
-      lastFailureTime: null,
-      lastSuccessTime: null,
-    };
-    breakerCache.set(key, state);
-  }
-
-  return state;
-}
+const DEFAULT_CACHE_MAX = 5000;
+const DEFAULT_CACHE_TTL_MS = 120_000;
 
 export class CircuitBreaker {
+  private readonly cache: LRUCache<string, CircuitBreakerState>;
+
+  constructor(options?: { max?: number; ttl?: number }) {
+    this.cache = new LRUCache({
+      max: options?.max ?? DEFAULT_CACHE_MAX,
+      ttl: options?.ttl ?? DEFAULT_CACHE_TTL_MS,
+      allowStale: false,
+    });
+  }
+
+  private getOrCreateBreaker(key: string, opts?: Partial<CircuitBreakerOptions>): CircuitBreakerState {
+    let state = this.cache.get(key);
+
+    if (!state) {
+      state = {
+        state: 'closed',
+        failureCount: 0,
+        failureThreshold: opts?.failureThreshold ?? DEFAULT_OPTIONS.failureThreshold,
+        recoveryTimeout: opts?.recoveryTimeout ?? DEFAULT_OPTIONS.recoveryTimeout,
+        lastFailureTime: null,
+        lastSuccessTime: null,
+      };
+      this.cache.set(key, state);
+    }
+
+    return state;
+  }
+
   getState(key: string, opts?: Partial<CircuitBreakerOptions>): CircuitState {
-    const state = getOrCreateBreaker(key, opts);
+    const state = this.getOrCreateBreaker(key, opts);
 
     if (state.state === 'open' && state.lastFailureTime != null) {
       const elapsed = Date.now() - state.lastFailureTime;
       if (elapsed >= state.recoveryTimeout) {
         const nextState: CircuitBreakerState = { ...state, state: 'half-open' };
-        breakerCache.set(key, nextState);
+        this.cache.set(key, nextState);
         return 'half-open';
       }
     }
@@ -64,18 +71,18 @@ export class CircuitBreaker {
   }
 
   recordSuccess(key: string, opts?: Partial<CircuitBreakerOptions>): void {
-    const state = getOrCreateBreaker(key, opts);
+    const state = this.getOrCreateBreaker(key, opts);
     const nextState: CircuitBreakerState = {
       ...state,
       failureCount: 0,
       lastSuccessTime: Date.now(),
       state: 'closed',
     };
-    breakerCache.set(key, nextState);
+    this.cache.set(key, nextState);
   }
 
   recordFailure(key: string, opts?: Partial<CircuitBreakerOptions>): void {
-    const state = getOrCreateBreaker(key, opts);
+    const state = this.getOrCreateBreaker(key, opts);
 
     const newFailureCount = state.failureCount + 1;
     const nextState: CircuitBreakerState = {
@@ -84,7 +91,7 @@ export class CircuitBreaker {
       lastFailureTime: Date.now(),
       state: newFailureCount >= state.failureThreshold ? 'open' : state.state,
     };
-    breakerCache.set(key, nextState);
+    this.cache.set(key, nextState);
   }
 
   isCircuitOpen(key: string, opts?: Partial<CircuitBreakerOptions>): boolean {
@@ -96,11 +103,19 @@ export class CircuitBreaker {
   }
 
   clearCircuit(key: string): void {
-    breakerCache.delete(key);
+    this.cache.delete(key);
   }
 
   clearAllCircuits(): void {
-    breakerCache.clear();
+    this.cache.clear();
+  }
+
+  clearCircuitsMatching(prefix: string): void {
+    for (const key of this.cache.keys()) {
+      if (key.startsWith(prefix)) {
+        this.cache.delete(key);
+      }
+    }
   }
 }
 

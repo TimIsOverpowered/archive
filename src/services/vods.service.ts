@@ -285,8 +285,8 @@ export async function getVodByPlatformId(
 
   const staticData = await withStaleWhileRevalidate(
     cacheKey,
-    Cache.VOD_VOLATILE_TTL,
-    Cache.VOD_VOLATILE_TTL * CacheSwr.STALE_RATIO,
+    Cache.VOD_DETAILS_TTL,
+    Cache.VOD_DETAILS_TTL * CacheSwr.STALE_RATIO,
     fetcher
   );
 

@@ -88,6 +88,9 @@ export class CacheContext {
     const client = RedisService.getActiveClient();
     if (!client) return fetcher();
 
+    const existing = this.inflight.get(key) as Promise<T> | undefined;
+    if (existing) return existing;
+
     try {
       const cached = await client.getBuffer(key);
       if (cached != null && cached.length > 0) {

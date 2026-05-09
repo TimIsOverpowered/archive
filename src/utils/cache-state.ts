@@ -1,4 +1,4 @@
-import { defaultCircuitBreaker, breakerCache } from './circuit-breaker.js';
+import { defaultCircuitBreaker } from './circuit-breaker.js';
 
 const CACHE_STATE_KEY = '__cache_connection__';
 
@@ -15,9 +15,5 @@ export function markConnectionRestored(tenantId: string): void {
 }
 
 export function clearAllConnectionFailures(): void {
-  for (const key of breakerCache.keys()) {
-    if (key.startsWith(CACHE_STATE_KEY)) {
-      breakerCache.delete(key);
-    }
-  }
+  defaultCircuitBreaker.clearCircuitsMatching(CACHE_STATE_KEY);
 }
