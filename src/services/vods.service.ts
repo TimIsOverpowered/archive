@@ -58,6 +58,7 @@ function selectVodRelations(eb: ExpressionBuilder<StreamerDB, 'vods'>) {
       eb
         .selectFrom('games')
         .select([
+          'id',
           'start',
           'duration',
           'end',
