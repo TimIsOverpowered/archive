@@ -219,4 +219,5 @@ export const Jobs = {
   VOD_JOB_PREFIX: 'vod_',
   CHAT_JOB_PREFIX: 'chat_',
   DMCA_JOB_PREFIX: 'dmca_',
+  FINALIZE_JOB_PREFIX: 'finalize_',
 } as const;

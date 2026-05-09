@@ -5,17 +5,20 @@ import type { TenantConfig } from '../config/types.js';
 import chatProcessor from './chat.worker.js';
 import { createWorker } from './create-worker.js';
 import dmcaProcessor from './dmca.worker.js';
+import finalizeProcessor from './finalize.worker.js';
 import type {
   LiveDownloadJob,
   StandardVodJob,
   ChatDownloadJob,
   YoutubeUploadJob,
+  VodFinalizeFileJob,
   DmcaProcessingJob,
   MonitorJob,
   LiveDownloadResult,
   StandardVodResult,
   ChatDownloadResult,
   YoutubeUploadResult,
+  VodFinalizeFileResult,
   DmcaProcessingResult,
   MonitorJobResult,
 } from './jobs/types.js';
@@ -37,6 +40,7 @@ export type AllJobData =
   | StandardVodJob
   | ChatDownloadJob
   | YoutubeUploadJob
+  | VodFinalizeFileJob
   | DmcaProcessingJob
   | MonitorJob;
 
@@ -69,6 +73,11 @@ const workerDefs = {
     processor: youtubeProcessor,
   } satisfies WorkerDef<YoutubeUploadJob, YoutubeUploadResult>,
 
+  [QUEUE_NAMES.VOD_FINALIZE_FILE]: {
+    name: QUEUE_NAMES.VOD_FINALIZE_FILE,
+    processor: finalizeProcessor,
+  } satisfies WorkerDef<VodFinalizeFileJob, VodFinalizeFileResult>,
+
   [QUEUE_NAMES.DMCA_PROCESSING]: {
     name: QUEUE_NAMES.DMCA_PROCESSING,
     processor: dmcaProcessor,
@@ -92,6 +101,7 @@ export function registerWorkers(
     [QUEUE_NAMES.VOD_STANDARD]: workerConfig.VOD_STANDARD_CONCURRENCY,
     [QUEUE_NAMES.CHAT_DOWNLOAD]: workerConfig.CHAT_DOWNLOAD_CONCURRENCY,
     [QUEUE_NAMES.YOUTUBE_UPLOAD]: workerConfig.YOUTUBE_UPLOAD_CONCURRENCY,
+    [QUEUE_NAMES.VOD_FINALIZE_FILE]: workerConfig.VOD_FINALIZE_FILE_CONCURRENCY,
     [QUEUE_NAMES.MONITOR]: workerConfig.MONITOR_CONCURRENCY,
   };
 

@@ -115,7 +115,6 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
         downloadJobId: jobId ?? undefined,
         type,
         workDir,
-        skipFinalize: true,
       });
       return buildVodJobResponse({
         hasDownload: jobId != null,

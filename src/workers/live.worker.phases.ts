@@ -6,15 +6,14 @@ import { SOURCE_TYPES } from '../types/platforms.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { updateAlert, initRichAlert } from '../utils/discord-alerts.js';
 import { extractErrorDetails } from '../utils/error.js';
-import { fileExists, getTmpDirPath, getVodFilePath } from '../utils/path.js';
+import { fileExists, getTmpDirPath } from '../utils/path.js';
 import { triggerChatDownload } from './jobs/chat.job.js';
 import type { LiveDownloadJob } from './jobs/types.js';
-import { queueYoutubeUploads, type YoutubeUploadJobResult } from './jobs/youtube.job.js';
+import { queueYoutubeUploads, enqueueFinalizeJob, type YoutubeUploadJobResult } from './jobs/youtube.job.js';
 import type { BaseWorkerContext, LiveCompletionData } from './types.js';
 import { createLiveWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
 import type { LiveWorkerAlerts } from './utils/alert-factories.js';
 import { getMetadata } from './utils/ffmpeg.js';
-import { finalizeFile } from './utils/file-finalization.js';
 import { getJobContext } from './utils/job-context.js';
 import { downloadHlsStream } from './vod/hls-orchestrator.js';
 import { cleanupOrphanedTmpFiles } from './vod/hls-utils.js';
@@ -171,7 +170,6 @@ export async function runPostProcessing(
       platform: ctx.platform,
       type: SOURCE_TYPES.VOD,
       workDir: getTmpDirPath({ tenantId: ctx.tenantId, vodId: ctx.vodId }),
-      skipFinalize: true,
     });
     if (youtubeResult.vodJobId != null || youtubeResult.gameJobIds.length > 0) {
       await updateAlert(ctx.messageId, ctx.alerts.uploadQueued(ctx.vodId, ctx.streamerName));
@@ -180,20 +178,17 @@ export async function runPostProcessing(
     ctx.log.warn({ ...extractErrorDetails(error), vodId: ctx.vodId }, 'Failed to queue upload (non-fatal)');
   }
 
-  // YouTube disabled -- finalize path ourselves
+  // YouTube disabled -- enqueue finalize job ourselves
   const uploadEnabled = ctx.config.youtube?.upload === true;
   const vodUploadEnabled = ctx.config.youtube?.vodUpload === true;
-  if (!uploadEnabled || !vodUploadEnabled) {
+  const perGameUploadEnabled = ctx.config.youtube?.perGameUpload === true;
+  if (!uploadEnabled || (!vodUploadEnabled && !perGameUploadEnabled)) {
     try {
-      await finalizeFile({
-        filePath: downloadResult.finalMp4Path,
-        destPath: getVodFilePath({ tenantId: ctx.tenantId, vodId: ctx.vodId }),
-        tmpDir: getTmpDirPath({ tenantId: ctx.tenantId, vodId: ctx.vodId }),
-        saveMP4: ctx.config.settings.saveMP4 ?? false,
-        log: ctx.log,
+      await enqueueFinalizeJob(ctx, ctx.dbId, ctx.vodId, downloadResult.finalMp4Path, SOURCE_TYPES.VOD, {
+        workDir: getTmpDirPath({ tenantId: ctx.tenantId, vodId: ctx.vodId }),
       });
     } catch (err) {
-      ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Failed to finalize live VOD to storage');
+      ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Failed to enqueue finalize job');
     }
   }
 

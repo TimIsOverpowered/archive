@@ -437,7 +437,7 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
         true,
         undefined,
         ctx.part,
-        { workDir: ctx.workDir, skipFinalize: true }
+        { workDir: ctx.workDir }
       );
     } catch (err) {
       ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'YouTube upload queue failed');

@@ -14,7 +14,12 @@ import {
 } from '../../utils/domain-errors.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
-import { getFlowProducer, getStandardVodQueue, getYoutubeUploadQueue } from '../queues/queue.js';
+import {
+  getFlowProducer,
+  getStandardVodQueue,
+  getYoutubeUploadQueue,
+  getVodFinalizeFileQueue,
+} from '../queues/queue.js';
 import { enqueueJobWithLogging } from './enqueue.js';
 import type { YoutubeVodUploadJob, YoutubeGameUploadJob } from './types.js';
 
@@ -225,6 +230,108 @@ export async function enqueueVodUpload(job: YoutubeVodUploadJob, downloadJobId?:
     } else {
       log.debug({ jobId, tenantId: job.tenantId, error: msg }, 'YouTube VOD upload enqueue failed (chained)');
     }
+    return null;
+  }
+}
+
+/**
+ * Creates a finalize job data object for use in flow producer chains.
+ */
+function createFinalizeData(
+  ctx: TenantContext,
+  dbId: number,
+  vodId: string,
+  type: SourceType,
+  filePath: string | undefined,
+  options?: { workDir?: string | undefined; saveMP4?: boolean | undefined; streamId?: string | undefined }
+) {
+  return {
+    tenantId: ctx.tenantId,
+    dbId,
+    vodId,
+    filePath,
+    type,
+    platform: undefined,
+    workDir: options?.workDir,
+    saveMP4: options?.saveMP4 ?? ctx.config.settings.saveMP4 ?? false,
+    streamId: options?.streamId,
+  };
+}
+
+/**
+ * Creates a VOD upload job data object for use in flow producer chains.
+ */
+function createVodUploadData(
+  ctx: TenantContext,
+  dbId: number,
+  vodId: string,
+  type: SourceType,
+  options?: {
+    dmcaProcessed?: boolean | undefined;
+    part?: number | undefined;
+    workDir?: string | undefined;
+    streamId?: string | undefined;
+  }
+) {
+  return {
+    kind: 'vod' as const,
+    tenantId: ctx.tenantId,
+    dbId,
+    vodId,
+    filePath: undefined,
+    type,
+    platform: undefined,
+    dmcaProcessed: options?.dmcaProcessed,
+    part: options?.part,
+    workDir: options?.workDir,
+    streamId: options?.streamId,
+  };
+}
+
+/**
+ * Enqueues a standalone finalize job (no flow children).
+ * Used when the file already exists and needs to be finalized directly.
+ */
+export async function enqueueFinalizeJob(
+  ctx: TenantContext,
+  dbId: number,
+  vodId: string,
+  filePath: string,
+  type: SourceType,
+  options?: { workDir?: string | undefined; saveMP4?: boolean | undefined; streamId?: string | undefined }
+): Promise<string | null> {
+  const queue = getVodFinalizeFileQueue();
+  const jobId = `${Jobs.FINALIZE_JOB_PREFIX}${vodId}_1`;
+
+  try {
+    const result = await enqueueJobWithLogging({
+      queue,
+      jobName: 'vod_finalize_file',
+      data: {
+        tenantId: ctx.tenantId,
+        dbId,
+        vodId,
+        filePath,
+        type,
+        workDir: options?.workDir,
+        saveMP4: options?.saveMP4 ?? ctx.config.settings.saveMP4 ?? false,
+        streamId: options?.streamId,
+      },
+      options: {
+        jobId,
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+      logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
+      successMessage: 'VOD finalize job enqueued',
+      extraContext: { tenantId: ctx.tenantId, vodId },
+    });
+    return result.isNew ? result.jobId : null;
+  } catch (error) {
+    log.error(
+      { jobId, tenantId: ctx.tenantId, error: extractErrorDetails(error).message },
+      'Failed to enqueue finalize job'
+    );
     return null;
   }
 }
@@ -455,7 +562,6 @@ export interface QueueYoutubeUploadsOptions {
   downloadJobId?: string | undefined;
   type: SourceType;
   workDir?: string | undefined;
-  skipFinalize?: boolean | undefined;
   streamId?: string | undefined;
 }
 
@@ -481,7 +587,6 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
     type,
     dmcaProcessed,
     workDir,
-    skipFinalize,
     streamId,
   } = options;
   const { config } = ctx;
@@ -491,11 +596,12 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
     gameJobIds: [],
   };
 
-  const queue = getYoutubeUploadQueue();
+  const youtubeQueue = getYoutubeUploadQueue();
+  const finalizeQueue = getVodFinalizeFileQueue();
   const vodUploadEnabled = config.youtube?.upload === true && config.youtube?.vodUpload === true;
   const gameUploadEnabled = config?.youtube?.perGameUpload === true;
 
-  // ALL mode with both game and VOD uploads: chain games -> VOD so VOD waits for games
+  // ALL mode with both game and VOD uploads: finalize -> vod -> [games] -> download
   if (uploadMode === UPLOAD_MODES.ALL && gameUploadEnabled && vodUploadEnabled) {
     try {
       const gameJobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform, workDir);
@@ -506,86 +612,46 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
         gameJobIds.push(gameJobId);
       }
 
+      const finalizeJobId = `finalize_${vodId}_1`;
       const vodJobId = `youtube_${vodId}_vod_1`;
 
-      if (downloadJobId != null) {
-        // Flow: VOD -> [games] -> download (grandchildren)
-        const flowChildren = gameJobs.map((job, idx) => ({
+      // Build game children for VOD upload
+      const buildGameChildren = () =>
+        gameJobs.map((job, idx) => ({
           name: 'youtube_upload',
-          queueName: queue.name,
-          data: { ...job, filePath: undefined },
+          queueName: youtubeQueue.name,
+          data: downloadJobId != null ? { ...job, filePath: undefined } : { ...job, workDir },
           opts: { jobId: gameJobIds[idx] ?? '', removeOnComplete: true, removeOnFail: true },
-          children: [
-            {
-              name: 'standard_vod_download',
-              queueName: getStandardVodQueue().name,
-              opts: { jobId: downloadJobId },
-            },
-          ],
+          ...(downloadJobId != null && {
+            children: [
+              {
+                name: 'standard_vod_download',
+                queueName: getStandardVodQueue().name,
+                opts: { jobId: downloadJobId },
+              },
+            ],
+          }),
         }));
 
-        const flow = await getFlowProducer().add({
-          name: 'youtube_upload',
-          queueName: queue.name,
-          data: {
-            kind: 'vod',
-            tenantId: ctx.tenantId,
-            dbId,
-            vodId,
-            filePath: undefined,
-            type,
-            platform,
-            dmcaProcessed,
-            workDir,
-            skipFinalize,
-            streamId,
-          },
-          opts: {
-            jobId: vodJobId,
-            removeOnComplete: true,
-            removeOnFail: true,
-          },
-          children: flowChildren,
-        });
+      // Build VOD upload child with game grandchildren
+      const vodChild = {
+        name: 'youtube_upload',
+        queueName: youtubeQueue.name,
+        data: createVodUploadData(ctx, dbId, vodId, type, { dmcaProcessed, workDir, streamId }),
+        opts: { jobId: vodJobId, removeOnComplete: true, removeOnFail: true },
+        children: buildGameChildren(),
+      };
 
-        result.vodJobId = flow.job.id ?? null;
-        result.gameJobIds = gameJobIds;
-      } else {
-        // Flow: VOD -> [games] (file exists, no download dependency)
-        const flowChildren = gameJobs.map((job, idx) => ({
-          name: 'youtube_upload',
-          queueName: queue.name,
-          data: { ...job, workDir, skipFinalize },
-          opts: { jobId: gameJobIds[idx] ?? '', removeOnComplete: true, removeOnFail: true },
-        }));
+      const flow = await getFlowProducer().add({
+        name: 'vod_finalize_file',
+        queueName: finalizeQueue.name,
+        data: createFinalizeData(ctx, dbId, vodId, type, filePath, { workDir, streamId }),
+        opts: { jobId: finalizeJobId, removeOnComplete: true, removeOnFail: true },
+        children: [vodChild],
+      });
 
-        const flow = await getFlowProducer().add({
-          name: 'youtube_upload',
-          queueName: queue.name,
-          data: {
-            kind: 'vod',
-            tenantId: ctx.tenantId,
-            dbId,
-            vodId,
-            filePath: undefined,
-            type,
-            platform,
-            dmcaProcessed,
-            workDir,
-            skipFinalize,
-            streamId,
-          },
-          opts: {
-            jobId: vodJobId,
-            removeOnComplete: true,
-            removeOnFail: true,
-          },
-          children: flowChildren,
-        });
-
-        result.vodJobId = flow.job.id ?? null;
-        result.gameJobIds = gameJobIds;
-      }
+      result.vodJobId = flow.job.id ?? null;
+      result.gameJobIds = gameJobIds;
 
       log.info(
         { vodId, chained: downloadJobId != null, gameJobsCount: result.gameJobIds.length },
@@ -597,47 +663,93 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
       log.warn({ ...details, vodId }, 'Failed to queue YouTube uploads');
     }
   } else {
-    // Game Uploads (ALL mode, no VOD or VOD not enabled)
+    // Game Uploads only (ALL mode, no VOD enabled): finalize -> [games] -> download
     if (uploadMode === UPLOAD_MODES.ALL && gameUploadEnabled) {
       try {
-        const jobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform, workDir);
+        const gameJobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform, workDir);
+        const gameJobIds: string[] = [];
 
-        for (const job of jobs) {
-          const gameJobId = await enqueueGameUpload(job, downloadJobId);
-          if (gameJobId != null) {
-            result.gameJobIds.push(gameJobId);
-          }
+        for (const job of gameJobs) {
+          const gameJobId = `youtube_${vodId}_game_${job.chapterId}_${job.chapterStart}`;
+          gameJobIds.push(gameJobId);
         }
 
-        log.info(
-          { vodId, chained: downloadJobId != null, gameJobsCount: result.gameJobIds.length },
-          'Queued YouTube game uploads'
-        );
+        if (!vodUploadEnabled) {
+          const finalizeJobId = `finalize_${vodId}_1`;
+
+          const flowChildren = gameJobs.map((job, idx) => ({
+            name: 'youtube_upload',
+            queueName: youtubeQueue.name,
+            data: downloadJobId != null ? { ...job, filePath: undefined } : { ...job, workDir },
+            opts: { jobId: gameJobIds[idx] ?? '', removeOnComplete: true, removeOnFail: true },
+            ...(downloadJobId != null && {
+              children: [
+                {
+                  name: 'standard_vod_download',
+                  queueName: getStandardVodQueue().name,
+                  opts: { jobId: downloadJobId },
+                },
+              ],
+            }),
+          }));
+
+          const flow = await getFlowProducer().add({
+            name: 'vod_finalize_file',
+            queueName: finalizeQueue.name,
+            data: createFinalizeData(ctx, dbId, vodId, type, filePath, { workDir, streamId }),
+            opts: { jobId: finalizeJobId, removeOnComplete: true, removeOnFail: true },
+            children: flowChildren,
+          });
+
+          result.vodJobId = flow.job.id ?? null;
+          result.gameJobIds = gameJobIds;
+
+          log.info(
+            { vodId, chained: downloadJobId != null, gameJobsCount: result.gameJobIds.length },
+            'Queued YouTube game uploads'
+          );
+          log.info({ vodId, chained: downloadJobId != null, vodJobId: result.vodJobId }, 'Queued VOD finalizer');
+        }
       } catch (error) {
         const details = extractErrorDetails(error);
         log.warn({ ...details, vodId }, 'Failed to queue YouTube game uploads');
       }
     }
 
-    // VOD Upload (VOD mode, or ALL mode without game uploads)
+    // VOD Upload only (VOD mode, or ALL mode without game uploads): finalize -> vod -> download
     if (
       (uploadMode === UPLOAD_MODES.VOD || (!gameUploadEnabled && uploadMode === UPLOAD_MODES.ALL)) &&
       vodUploadEnabled
     ) {
       try {
-        const vodJobId = await queueYoutubeVodUpload(
-          ctx,
-          dbId,
-          vodId,
-          filePath,
-          platform,
-          type,
-          dmcaProcessed,
-          downloadJobId,
-          undefined,
-          streamId != null ? { streamId } : {}
-        );
-        result.vodJobId = vodJobId;
+        const finalizeJobId = `finalize_${vodId}_1`;
+        const vodJobId = `youtube_${vodId}_vod_1`;
+
+        const vodChild = {
+          name: 'youtube_upload',
+          queueName: youtubeQueue.name,
+          data: createVodUploadData(ctx, dbId, vodId, type, { dmcaProcessed, workDir, streamId }),
+          opts: { jobId: vodJobId, removeOnComplete: true, removeOnFail: true },
+          ...(downloadJobId != null && {
+            children: [
+              {
+                name: 'standard_vod_download',
+                queueName: getStandardVodQueue().name,
+                opts: { jobId: downloadJobId },
+              },
+            ],
+          }),
+        };
+
+        const flow = await getFlowProducer().add({
+          name: 'vod_finalize_file',
+          queueName: finalizeQueue.name,
+          data: createFinalizeData(ctx, dbId, vodId, type, filePath, { workDir, streamId }),
+          opts: { jobId: finalizeJobId, removeOnComplete: true, removeOnFail: true },
+          children: [vodChild],
+        });
+
+        result.vodJobId = flow.job.id ?? null;
         log.info({ vodId, chained: downloadJobId != null, vodJobId }, 'Queued YouTube VOD upload');
       } catch (error) {
         const details = extractErrorDetails(error);

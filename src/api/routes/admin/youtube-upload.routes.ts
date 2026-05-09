@@ -119,7 +119,6 @@ export default function youtubeUploadRoutes(fastify: FastifyInstance, _options: 
         downloadJobId: jobId ?? undefined,
         type,
         workDir,
-        skipFinalize: true,
       });
 
       return buildVodJobResponse({

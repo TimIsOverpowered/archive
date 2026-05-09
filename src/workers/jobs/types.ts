@@ -62,6 +62,18 @@ export interface YoutubeGameUploadJob extends BaseJobData {
 
 export type YoutubeUploadJob = YoutubeVodUploadJob | YoutubeGameUploadJob;
 
+export interface VodFinalizeFileJob extends BaseJobData {
+  filePath?: string | undefined;
+  type: SourceType;
+  workDir?: string | undefined;
+  saveMP4: boolean;
+  streamId?: string | undefined;
+}
+
+export interface VodFinalizeFileResult {
+  success: true;
+}
+
 export interface DmcaProcessingJob extends BaseJobData {
   receivedClaims: DMCAClaim[];
   type: SourceType;

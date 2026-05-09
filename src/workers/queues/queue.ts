@@ -8,6 +8,8 @@ import type {
   ChatDownloadResult,
   YoutubeUploadJob,
   YoutubeUploadResult,
+  VodFinalizeFileJob,
+  VodFinalizeFileResult,
   DmcaProcessingJob,
   DmcaProcessingResult,
   MonitorJob,
@@ -20,6 +22,7 @@ export const QUEUE_NAMES = {
   VOD_STANDARD: 'vod_standard',
   CHAT_DOWNLOAD: 'chat_download',
   YOUTUBE_UPLOAD: 'youtube_upload',
+  VOD_FINALIZE_FILE: 'vod_finalize_file',
   DMCA_PROCESSING: 'dmca_processing',
   MONITOR: 'monitor',
 } as const;
@@ -80,6 +83,10 @@ export function getChatDownloadQueue(): Queue<ChatDownloadJob, ChatDownloadResul
 
 export function getYoutubeUploadQueue(): Queue<YoutubeUploadJob, YoutubeUploadResult, string> {
   return getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD, exponentialBackoff(10_000, 3));
+}
+
+export function getVodFinalizeFileQueue(): Queue<VodFinalizeFileJob, VodFinalizeFileResult, string> {
+  return getQueue(QUEUE_NAMES.VOD_FINALIZE_FILE, exponentialBackoff(5_000, 3));
 }
 
 export function getDmcaProcessingQueue(): Queue<DmcaProcessingJob, DmcaProcessingResult, string> {

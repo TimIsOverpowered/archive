@@ -1,13 +1,11 @@
 import type { Job } from 'bullmq';
-import { SOURCE_TYPES } from '../types/platforms.js';
 import { updateAlert } from '../utils/discord-alerts.js';
 import { extractErrorDetails } from '../utils/error.js';
-import { getLiveFilePath, getVodFilePath } from '../utils/path.js';
 import { cleanupTempFiles } from './dmca/dmca.js';
 import { buildDmcaProcessorContext, trimDmcaVideo, processDmcaClaims, queueDmcaUpload } from './dmca.worker.phases.js';
 import type { DmcaProcessorContext } from './dmca.worker.phases.js';
 import type { DmcaProcessingJob, DmcaProcessingResult } from './jobs/types.js';
-import { finalizeFile } from './utils/file-finalization.js';
+import { enqueueFinalizeJob } from './jobs/youtube.job.js';
 import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
 
 const errorMeta = (ctx: DmcaProcessorContext, job: Job<unknown>) => ({
@@ -44,20 +42,21 @@ const dmcaProcessor = wrapWorkerProcessor<DmcaProcessingJob, DmcaProcessorContex
       if (ctx.tempFiles.length > 0) {
         await cleanupTempFiles(ctx.tempFiles);
       }
-      // Finalize: move original full VOD to storage or delete from tmpPath
+      // Enqueue finalize job to move original VOD to storage or clean up tmpDir
       try {
-        await finalizeFile({
-          filePath: ctx.filePath,
-          destPath:
-            ctx.type === SOURCE_TYPES.LIVE
-              ? getLiveFilePath({ tenantId: ctx.tenantId, streamId: ctx.streamId ?? '' })
-              : getVodFilePath({ tenantId: ctx.tenantId, vodId: ctx.vodId }),
-          tmpDir: ctx.workDir,
-          saveMP4: ctx.config.settings.saveMP4 ?? false,
-          log: ctx.log,
-        });
+        await enqueueFinalizeJob(
+          { tenantId: ctx.tenantId, config: ctx.config, db: ctx.db },
+          ctx.dbId,
+          ctx.vodId,
+          ctx.filePath,
+          ctx.type,
+          { workDir: ctx.workDir, streamId: ctx.streamId }
+        );
       } catch (err) {
-        ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Failed to finalize DMCA processed VOD');
+        ctx.log.warn(
+          { err: extractErrorDetails(err), vodId: ctx.vodId },
+          'Failed to enqueue finalize job for DMCA VOD'
+        );
       }
     },
   }
