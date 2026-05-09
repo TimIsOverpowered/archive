@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { Queue } from 'bullmq';
 import { loadWorkersConfig } from '../config/env.js';
+import type { TenantConfigSubscriber } from '../config/tenant-config-subscriber.js';
 import { registerTenantConfigSubscriberWorker } from '../config/tenant-config-subscriber.js';
 import { configService } from '../config/tenant-config.js';
 import { Vod } from '../constants.js';
@@ -21,7 +22,7 @@ import { registerWorkers } from './worker-definitions.js';
 interface AppContext {
   workerConfig: ReturnType<typeof loadWorkersConfig>;
   configs: Awaited<ReturnType<typeof configService.loadAll>>;
-  tenantConfigSubscriber: ReturnType<typeof registerTenantConfigSubscriberWorker>;
+  tenantConfigSubscriber: TenantConfigSubscriber;
 }
 
 registerProcessErrorHandlers();

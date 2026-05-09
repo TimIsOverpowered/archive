@@ -1,8 +1,11 @@
-import { Redis } from 'ioredis';
 import { createRedisSubscriber } from '../utils/redis-subscriber.js';
 import { configService } from './tenant-config.js';
 
 const CONFIG_CHANNEL = 'cache:tenant';
+
+export interface TenantConfigSubscriber {
+  quit(): Promise<'OK'>;
+}
 
 interface ConfigChangeEvent {
   type: 'TENANT_CONFIG_CHANGED';
@@ -25,7 +28,7 @@ export function registerTenantConfigSubscriber(fastify: {
   fastify.addHook('onClose', destroy);
 }
 
-export function registerTenantConfigSubscriberWorker(): Redis {
+export function registerTenantConfigSubscriberWorker(): TenantConfigSubscriber {
   const { client } = createRedisSubscriber({
     channel: CONFIG_CHANNEL,
     handler: handleConfigEvent,

@@ -2,8 +2,6 @@ import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import { resetEnvConfig } from '../../src/config/env.js';
 import {
-  getVodStaticCache,
-  setVodStaticCache,
   getVodVolatileCache,
   setVodVolatileCache,
   getVodVolatileCacheBatch,
@@ -28,108 +26,6 @@ function setupBaseEnv(): void {
 }
 
 setupBaseEnv();
-
-describe('VodCache: getVodStaticCache', () => {
-  let mockClient: any;
-
-  beforeEach(() => {
-    mockClient = {
-      get: async () => null,
-    };
-    (RedisService as any)._instance = {
-      client: mockClient,
-    };
-    resetEnvConfig();
-  });
-
-  afterEach(() => {
-    (RedisService as any)._instance = null;
-    resetEnvConfig();
-  });
-
-  it('should return null when Redis client is not available', async () => {
-    (RedisService as any)._instance = null;
-    const result = await getVodStaticCache('tenant-1', 42);
-    assert.strictEqual(result, null);
-  });
-
-  it('should return null when key does not exist', async () => {
-    mockClient.get = async () => null;
-    const result = await getVodStaticCache('tenant-1', 42);
-    assert.strictEqual(result, null);
-  });
-
-  it('should return cached value when key exists', async () => {
-    mockClient.get = async () => JSON.stringify({ id: 42, title: 'Test VOD' });
-    const result = await getVodStaticCache('tenant-1', 42);
-    assert.ok(result);
-    assert.ok(result.includes('Test VOD'));
-  });
-
-  it('should return null on Redis error', async () => {
-    mockClient.get = async () => {
-      throw new Error('ECONNREFUSED');
-    };
-    const result = await getVodStaticCache('tenant-1', 42);
-    assert.strictEqual(result, null);
-  });
-
-  it('should use correct cache key format', async () => {
-    let capturedKey = '';
-    mockClient.get = async (key: string) => {
-      capturedKey = key;
-      return null;
-    };
-    await getVodStaticCache('tenant-1', 42);
-    assert.ok(capturedKey.includes('tenant-1'));
-    assert.ok(capturedKey.includes('42'));
-  });
-});
-
-describe('VodCache: setVodStaticCache', () => {
-  let mockClient: any;
-  let setCalls: string[][] = [];
-
-  beforeEach(() => {
-    setCalls = [];
-    mockClient = {
-      set: async (...args: any[]) => {
-        setCalls.push(args);
-      },
-    };
-    (RedisService as any)._instance = {
-      client: mockClient,
-    };
-    resetEnvConfig();
-  });
-
-  afterEach(() => {
-    (RedisService as any)._instance = null;
-    resetEnvConfig();
-  });
-
-  it('should not call Redis when client is not available', async () => {
-    (RedisService as any)._instance = null;
-    await setVodStaticCache('tenant-1', 42, 'data', 3600);
-    assert.strictEqual(setCalls.length, 0);
-  });
-
-  it('should set cache with correct key and TTL', async () => {
-    await setVodStaticCache('tenant-1', 42, JSON.stringify({ id: 42 }), 3600);
-    assert.strictEqual(setCalls.length, 1);
-    assert.strictEqual(setCalls[0]?.[0], 'vod:{tenant-1}:42');
-    assert.strictEqual(setCalls[0]?.[1], JSON.stringify({ id: 42 }));
-    assert.strictEqual(setCalls[0]?.[2], 'EX');
-    assert.strictEqual(setCalls[0]?.[3], 3600);
-  });
-
-  it('should handle Redis error gracefully', async () => {
-    mockClient.set = async () => {
-      throw new Error('ECONNREFUSED');
-    };
-    await assert.doesNotReject(setVodStaticCache('tenant-1', 42, 'data', 3600));
-  });
-});
 
 describe('VodCache: getVodVolatileCache', () => {
   let mockClient: any;
@@ -346,7 +242,7 @@ describe('VodCache: invalidateVodStaticCache', () => {
 
   it('should unlink static cache key', async () => {
     await invalidateVodStaticCache('tenant-1', 42);
-    assert.ok(unlinkCalls.some((calls) => calls.includes('vod:{tenant-1}:42')));
+    assert.ok(unlinkCalls.some((calls) => calls.includes('swr:vod:{tenant-1}:42')));
   });
 
   it('should invalidate tags', async () => {

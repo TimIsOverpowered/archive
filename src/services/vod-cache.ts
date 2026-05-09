@@ -1,5 +1,5 @@
 import { isConnectionError } from '../db/utils/errors.js';
-import { CacheKeys, swrKeys, simpleKeys } from '../utils/cache-keys.js';
+import { CacheKeys, simpleKeys, swrKeys } from '../utils/cache-keys.js';
 import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { getLogger } from '../utils/logger.js';
@@ -12,33 +12,6 @@ export { invalidateVodVolatileCache };
 export interface VodVolatileData {
   duration: number;
   is_live: boolean;
-}
-
-/** Retrieve a cached VOD list query result from Redis. */
-export async function getVodStaticCache(tenantId: string, dbId: number): Promise<string | null> {
-  const client = RedisService.getActiveClient();
-  if (!client) return null;
-
-  try {
-    return await client.get(CacheKeys.vodStatic(tenantId, dbId));
-  } catch (err) {
-    const details = extractErrorDetails(err);
-    getLogger().debug({ err: details, tenantId, dbId }, 'Static cache read failed');
-    return null;
-  }
-}
-
-/** Store a VOD list query result in Redis with the given TTL. */
-export async function setVodStaticCache(tenantId: string, dbId: number, data: string, ttl: number): Promise<void> {
-  const client = RedisService.getActiveClient();
-  if (!client) return;
-
-  try {
-    await client.set(CacheKeys.vodStatic(tenantId, dbId), data, 'EX', ttl);
-  } catch (error) {
-    const details = extractErrorDetails(error);
-    getLogger().warn({ err: details, tenantId, dbId }, 'Static cache write failed');
-  }
 }
 
 /** Retrieve volatile cache data (duration, is_live) for a VOD from Redis. */
@@ -94,18 +67,17 @@ export async function getVodVolatileCacheBatch(
 
   try {
     const values = await client.mget(...keys);
-    if (values != null) {
-      dbIds.forEach((id, i) => {
-        if (values[i] != null && values[i] !== '') {
-          try {
-            result.set(id, JSON.parse(values[i]) as VodVolatileData);
-          } catch (err) {
-            const details = extractErrorDetails(err);
-            getLogger().debug({ err: details, id }, 'Skipping corrupt volatile cache entry');
-          }
+    dbIds.forEach((id, i) => {
+      const raw = values[i];
+      if (raw != null && raw !== '') {
+        try {
+          result.set(id, JSON.parse(raw) as VodVolatileData);
+        } catch (err) {
+          const details = extractErrorDetails(err);
+          getLogger().debug({ err: details, id }, 'Skipping corrupt volatile cache entry');
         }
-      });
-    }
+      }
+    });
   } catch (err) {
     const details = extractErrorDetails(err);
     getLogger().warn({ err: details, tenantId }, 'Volatile cache batch read failed');
@@ -123,7 +95,7 @@ export async function invalidateVodStaticCache(tenantId: string, dbId: number): 
   if (!client) return;
 
   try {
-    await client.unlink(CacheKeys.vodStatic(tenantId, dbId), swrKeys.vodStatic(tenantId, dbId));
+    await client.unlink(swrKeys.vodStatic(tenantId, dbId));
     await invalidateVodTags(tenantId, dbId);
 
     if (isConnectionFailed(tenantId)) {

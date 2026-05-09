@@ -200,6 +200,12 @@ export const RedisBatch = {
   SCAN_COUNT: 50,
 } as const;
 
+// ── Full-Text Search ─────────────────────────────────────────────────────────
+export const Fts = {
+  /** Max words in a single fts query to prevent massive tsquery strings */
+  MAX_WORDS: 20,
+} as const;
+
 // ── Cache ────────────────────────────────────────────────────────────────────
 export const CacheRefresh = {
   /** Pre-fetch threshold — refresh if TTL remaining is under 1 hour */

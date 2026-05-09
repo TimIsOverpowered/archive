@@ -2,7 +2,7 @@ import { sql } from 'kysely';
 import type { Expression, ExpressionBuilder, Kysely, SqlBool } from 'kysely';
 import { jsonArrayFrom } from 'kysely/helpers/postgres';
 import { z } from 'zod';
-import { Cache, CacheSwr } from '../constants.js';
+import { Cache, CacheSwr, Fts } from '../constants.js';
 import { buildPagination } from '../db/queries/builders.js';
 import type { StreamerDB, DBClient } from '../db/streamer-types.js';
 import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
@@ -21,7 +21,7 @@ function formatFtsTerm(term: string): string {
 }
 
 export function buildFtsQuery(text: string): string {
-  const words = text.trim().split(/\s+/).filter(Boolean);
+  const words = text.trim().split(/\s+/).filter(Boolean).slice(0, Fts.MAX_WORDS);
   if (words.length === 0) return '';
   return words.map(formatFtsTerm).join(' & ');
 }
@@ -305,7 +305,7 @@ export type VodNeighbors = {
   next: Pick<VodResponse, 'id' | 'platformVodId' | 'platform'> | null;
 };
 
-export async function getVodNeighbors(db: DBClient, _tenantId: string, vodId: number): Promise<VodNeighbors> {
+export async function getVodNeighbors(db: DBClient, vodId: number): Promise<VodNeighbors> {
   const [prev, next] = await Promise.all([
     db
       .selectFrom('vods')

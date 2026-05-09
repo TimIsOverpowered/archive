@@ -116,7 +116,7 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
         notFound('VOD not found');
       }
       const vod = await fetchVodByIdSafe(vodIdParsed.data, db, tenantId);
-      const neighbors = await getVodNeighbors(db, tenantId, vodIdParsed.data);
+      const neighbors = await getVodNeighbors(db, vodIdParsed.data);
       return ok({ ...vod, prev: neighbors.prev, next: neighbors.next });
     }
   );
