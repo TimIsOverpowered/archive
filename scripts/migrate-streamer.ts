@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import 'dotenv/config';
-import readline from 'readline';
 import pg, { type Pool, type PoolClient } from 'pg';
 import { initMetaClient, getMetaClient, closeMetaClient } from '../src/db/meta-client.js';
 import { extractErrorDetails } from '../src/utils/error.js';
+import { prompt, confirm } from './stdin.js';
 
 const META_DB_URL = process.env.META_DATABASE_URL;
 if (!META_DB_URL) {
@@ -13,28 +13,6 @@ if (!META_DB_URL) {
 
 initMetaClient();
 const metaClient = getMetaClient();
-
-const createInterface = () => readline.createInterface({ input: process.stdin, output: process.stdout });
-
-const prompt = (question: string): Promise<string> => {
-  const rl = createInterface();
-  return new Promise((resolve) => {
-    rl.question(`${question} `, (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
-  });
-};
-
-const confirm = (question: string): Promise<boolean> => {
-  const rl = createInterface();
-  return new Promise((resolve) => {
-    rl.question(`${question} [y/N]: `, (answer) => {
-      rl.close();
-      resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
-    });
-  });
-};
 
 const parseDuration = (durationStr: string): number => {
   if (!durationStr || durationStr === '00:00:00') return 0;

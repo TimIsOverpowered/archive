@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import 'dotenv/config';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -7,6 +8,7 @@ import type { InsertableTenants } from '../src/db/meta-types.js';
 import { getTenantById, createTenant } from '../src/services/meta-tenants.service.js';
 import { encryptObject, encryptScalar } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
+import { prompt, closeStdin } from './stdin.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -191,27 +193,21 @@ async function importConfig(channelName: string, dbUrl: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const args = process.argv.slice(2);
-
-  if (args.length === 0) {
-    console.log('Usage: tsx import-tenant.ts <channel_name> <database_url>');
-    console.log('Example: tsx import-tenant.ts moonmoon "postgresql://<user>:***@<host>:5432/<db>"');
-    process.exit(1);
-  }
-
-  const [channelName, dbUrl] = args;
-
-  if (!channelName) {
-    console.error('Channel name is required');
-    process.exit(1);
-  }
-
-  if (!dbUrl) {
-    console.error('Database URL is required');
-    process.exit(1);
-  }
-
   try {
+    const channelName = await prompt('Enter channel name');
+    const dbUrl = await prompt('Enter database URL');
+    closeStdin();
+
+    if (!channelName) {
+      console.error('Channel name is required');
+      process.exit(1);
+    }
+
+    if (!dbUrl) {
+      console.error('Database URL is required');
+      process.exit(1);
+    }
+
     initMetaClient();
     await importConfig(channelName, dbUrl);
     console.log('Done!');

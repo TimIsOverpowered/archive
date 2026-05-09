@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import crypto from 'crypto';
 import http from 'http';
-import readline from 'readline';
 import { program } from 'commander';
 import open from 'open';
 import { z } from 'zod';
@@ -10,6 +9,7 @@ import { initMetaClient } from '../src/db/meta-client.js';
 import { getTenantById, updateTenant } from '../src/services/meta-tenants.service.js';
 import { encryptObject, decryptObject } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
+import { prompt } from './stdin.js';
 
 const clientId = process.env.YOUTUBE_CLIENT_ID;
 const clientSecret = process.env.YOUTUBE_CLIENT_SECRET;
@@ -36,19 +36,8 @@ const YoutubeTokenResponseSchema = z
 let callbackServer: http.Server | null = null;
 
 async function waitForUserInput(): Promise<string> {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return new Promise((resolve) => {
-    console.log('\nPaste the authorization code or full callback URL here when ready:');
-
-    rl.question('> ', (answer) => {
-      resolve(answer.trim());
-      rl.close();
-    });
-  });
+  console.log('\nPaste the authorization code or full callback URL here when ready:');
+  return prompt('> ');
 }
 
 function extractAuthCode(input: string, expectedState: string): { error?: string } {

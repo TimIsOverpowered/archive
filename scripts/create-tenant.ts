@@ -3,7 +3,6 @@
 import 'dotenv/config';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as readline from 'readline';
 import { fileURLToPath } from 'url';
 import { Pool } from 'pg';
 import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
@@ -11,6 +10,7 @@ import type { InsertableTenants } from '../src/db/meta-types.js';
 import { getTenantById, createTenant, deleteTenant } from '../src/services/meta-tenants.service.js';
 import { validateEncryptionKey } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
+import { prompt, promptHidden, confirm } from './stdin.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,49 +54,6 @@ async function validatePostgresConnection(
   }
 }
 
-// Interactive prompts - create fresh readline interface for each prompt to avoid duplication issues
-function prompt(question: string): Promise<string> {
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-
-    rl.question(question + ': ', (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
-  });
-}
-
-function promptHidden(question: string): Promise<string> {
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-
-    rl.question(question + ' (shown in plain text): ', (answer) => {
-      rl.close();
-      resolve(answer);
-    });
-  });
-}
-
-function confirm(question: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-
-    rl.question(`${question} (y/N): `, (answer) => {
-      rl.close();
-      resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
-    });
-  });
-}
-
 interface DatabaseResult {
   success: boolean;
   isNew: boolean;
@@ -131,20 +88,7 @@ async function createDatabase(
       console.log(`ℹ️  Database '${dbName}' already exists`);
 
       // Use readline for reliable prompt after password input
-      const rl2 = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout,
-      });
-
-      const forceAnswer = await new Promise<string>((resolve) => {
-        rl2.question('Run migrations anyway? (y/N): ', (answer) => {
-          resolve(answer.trim().toLowerCase());
-        });
-      });
-
-      rl2.close();
-
-      const forceMigrations = forceAnswer === 'y' || forceAnswer === 'yes';
+      const forceMigrations = await confirm('Run migrations');
       pool.end();
       // If user wants to run migrations on existing DB, treat as "isNew" (needs migrations)
       return { success: true, isNew: forceMigrations };
@@ -183,20 +127,8 @@ async function createDatabase(
         verifyPool.end();
 
         // Use readline for reliable prompt after password input
-        const rl2 = readline.createInterface({
-          input: process.stdin,
-          output: process.stdout,
-        });
+        const forceMigrations = await confirm('Run migrations');
 
-        const forceAnswer = await new Promise<string>((resolve) => {
-          rl2.question('Run migrations anyway? (y/N): ', (answer) => {
-            resolve(answer.trim().toLowerCase());
-          });
-        });
-
-        rl2.close();
-
-        const forceMigrations = forceAnswer === 'y' || forceAnswer === 'yes';
         // If user wants to run migrations on existing DB, treat as "isNew" (needs migrations)
         return { success: true, isNew: forceMigrations };
       } catch (_verifyError) {
@@ -248,7 +180,7 @@ async function main(): Promise<void> {
     console.log('BASIC INFORMATION');
     console.log('='.repeat(50));
 
-    const channelName = await prompt('Channel Name (tenant ID, lowercase alphanumeric + underscore, max 25 chars): ');
+    const channelName = await prompt('Channel Name (tenant ID, lowercase alphanumeric + underscore, max 25 chars)');
 
     // Validate format
     if (!/^[a-z0-9_]+$/.test(channelName)) {
@@ -269,16 +201,16 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
-    const displayName = (await prompt('Display Name (or press Enter to use channel name): ')) || channelName;
+    const displayName = (await prompt('Display Name (or press Enter to use channel name)')) || channelName;
 
     console.log('\n='.repeat(50));
     console.log('POSTGRESQL SERVER');
     console.log('='.repeat(50));
 
-    const dbHost = (await prompt('PostgreSQL host: ')) || 'localhost';
-    const dbPort = parseInt((await prompt('PostgreSQL port: ')) || '5432') || 5432;
-    const dbUser = await prompt('PostgreSQL username: ');
-    const dbPassword = await promptHidden('PostgreSQL password: ');
+    const dbHost = (await prompt('PostgreSQL host')) || 'localhost';
+    const dbPort = parseInt((await prompt('PostgreSQL port')) || '5432') || 5432;
+    const dbUser = await prompt('PostgreSQL username');
+    const dbPassword = await promptHidden('PostgreSQL password');
     const dbName = channelName; // Use streamer ID as database name
 
     // Validate connection BEFORE continuing
@@ -315,14 +247,14 @@ async function main(): Promise<void> {
     console.log('STREAMING PLATFORMS');
     console.log('='.repeat(50));
 
-    const enableTwitch = await confirm('Enable Twitch?');
+    const enableTwitch = await confirm('Enable Twitch');
     let twitchData: any = null;
 
     if (enableTwitch) {
       console.log('\nTwitch Stream Info:');
-      const twitchId = String(await prompt('User ID (string): '));
-      const twitchUsername = await prompt('Username: ');
-      const isMainPlatform = await confirm('Is this the main platform?');
+      const twitchId = String(await prompt('User ID (string)'));
+      const twitchUsername = await prompt('Username');
+      const isMainPlatform = await confirm('Is this the main platform');
 
       console.log('\nNote: OAuth credentials are NOT collected here.');
       console.log('      Run "npm run auth:twitch" after tenant creation to configure authentication.\n');
@@ -335,14 +267,14 @@ async function main(): Promise<void> {
       };
     }
 
-    const enableKick = await confirm('\nEnable Kick?');
+    const enableKick = await confirm('\nEnable Kick');
     let kickData: any = null;
 
     if (enableKick) {
       console.log('\nKick Stream Info:');
-      const kickId = String(await prompt('User ID (string): '));
-      const kickUsername = await prompt('Username: ');
-      const isMainPlatform = await confirm('Is this the main platform?');
+      const kickId = String(await prompt('User ID (string)'));
+      const kickUsername = await prompt('Username');
+      const isMainPlatform = await confirm('Is this the main platform');
 
       kickData = {
         enabled: true,
@@ -373,20 +305,20 @@ async function main(): Promise<void> {
     let youtubeData: any = null;
 
     console.log('\nUpload Behavior:');
-    const youtubeDescription = await prompt('Video description template (use {channel} for name): ');
-    const youtubePublic = await confirm('Videos public by default?');
-    const youtubeVodUpload = await confirm('Enable VOD uploads?');
-    const youtubePerGame = await confirm('Per-game upload?');
+    const youtubeDescription = await prompt('Video description template (use {channel} for name)');
+    const youtubePublic = await confirm('Videos public by default');
+    const youtubeVodUpload = await confirm('Enable VOD uploads');
+    const youtubePerGame = await confirm('Per-game upload');
 
     let youtubeRestrictedGames: (string | null)[] = [];
     if (youtubePerGame) {
-      const excluded = await prompt('Games to EXCLUDE from upload (comma-separated, or "none"): ');
+      const excluded = await prompt('Games to EXCLUDE from upload (comma-separated, or "none")');
       if (excluded.toLowerCase() !== 'none') {
         youtubeRestrictedGames = excluded.split(',').map((g) => g.trim() || null);
       }
     }
 
-    const splitDurationStr = await prompt('Max VOD split duration (seconds, min: 10800/3hrs, max: 43199/12hrs): ');
+    const splitDurationStr = await prompt('Max VOD split duration (seconds, min: 10800/3hrs, max: 43199/12hrs)');
     let youtubeSplitDuration = parseInt(splitDurationStr) || 10800;
 
     // Validate YouTube's limits: minimum 3 hours (10800s), maximum ~12 hours (43199s)
@@ -399,9 +331,9 @@ async function main(): Promise<void> {
     }
 
     const youtubeLiveUpload = await confirm(
-      'Enable live upload while user is live (Will upload parts while stream is live)?'
+      'Enable live upload while user is live (Will upload parts while stream is live)'
     );
-    const youtubeMultiTrack = await confirm('Multi-track audio upload?');
+    const youtubeMultiTrack = await confirm('Multi-track audio upload');
     // YouTube uploads always enabled by default
     const youtubeUploadEnabled = true;
 
@@ -425,13 +357,13 @@ async function main(): Promise<void> {
     console.log('ARCHIVE SETTINGS');
     console.log('='.repeat(50));
 
-    const domainName = await prompt('Domain name (e.g., moon2.tv): ');
-    const timezone = (await prompt('Timezone (e.g., America/Chicago): ')) || 'UTC';
+    const domainName = await prompt('Domain name (e.g., moon2.tv)');
+    const timezone = (await prompt('Timezone (e.g., America/Chicago)')) || 'UTC';
 
-    const chatDownload = await confirm('Download chat logs?');
-    const vodDownload = await confirm('Download VODs?');
-    const saveHLS = await confirm('Save HLS to disk?');
-    const saveMP4 = await confirm('Save MP4 to disk?');
+    const chatDownload = await confirm('Download chat logs');
+    const vodDownload = await confirm('Download VODs');
+    const saveHLS = await confirm('Save HLS to disk');
+    const saveMP4 = await confirm('Save MP4 to disk');
 
     // Phase 6: Summary & Confirmation
     console.log('\n' + '='.repeat(50));
@@ -554,7 +486,7 @@ async function main(): Promise<void> {
 
     // Rollback if tenant was created
     if (tenantId !== null) {
-      const rollback = await confirm('\nTenant was partially created. Rollback from meta DB?');
+      const rollback = await confirm('\nTenant was partially created. Rollback from meta DB');
       if (rollback) {
         try {
           await deleteTenant(tenantId);
