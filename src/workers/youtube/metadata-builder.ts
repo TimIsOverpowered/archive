@@ -3,6 +3,11 @@ import type { Platform, SourceType } from '../../types/platforms.js';
 import { capitalizePlatform, SOURCE_TYPES } from '../../types/platforms.js';
 import dayjs from '../../utils/dayjs.js';
 
+/** Removes characters that YouTube rejects in video metadata. */
+export function sanitizeYoutubeText(text: string): string {
+  return text.replace(/[<>]/g, '');
+}
+
 export interface YoutubeMetadataOptions {
   channelName: string;
   platform: Platform;
@@ -39,7 +44,10 @@ export function buildYoutubeMetadata(options: YoutubeMetadataOptions): YoutubeMe
     title = part != null && part > 0 ? `${baseTitle} PART ${part}` : baseTitle;
   }
 
-  const description = `Chat Replay: https://${domainName}${replayPath}\nStream Title: ${vodRecord.title?.replace(/<[^>]*>/g, '') ?? ''}\n${youtubeDescription ?? ''}`;
+  const sanitizedTitle = vodRecord.title != null && vodRecord.title !== '' ? sanitizeYoutubeText(vodRecord.title) : '';
+  const sanitizedDesc =
+    youtubeDescription != null && youtubeDescription !== '' ? sanitizeYoutubeText(youtubeDescription) : '';
+  const description = `Chat Replay: https://${domainName}${replayPath}\nStream Title: ${sanitizedTitle}\n${sanitizedDesc}`;
 
   return { title, description };
 }

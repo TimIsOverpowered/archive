@@ -53,17 +53,17 @@ describe('buildYoutubeMetadata', () => {
     assert.ok(result.title.includes('Kick'));
   });
 
-  it('should strip HTML tags from stream title', () => {
+  it('should strip angled brackets from stream title', () => {
     const result = buildYoutubeMetadata({
       ...baseOptions,
       vodRecord: {
         ...baseOptions.vodRecord,
-        title: '<b>Stream</b> with <i>tags</i>',
+        title: 'Stream <<< hype >>> here',
       },
     });
     assert.ok(!result.description.includes('<'));
     assert.ok(!result.description.includes('>'));
-    assert.ok(result.description.includes('Stream with tags'));
+    assert.ok(result.description.includes('Stream  hype  here'));
   });
 
   it('should handle null stream title', () => {
