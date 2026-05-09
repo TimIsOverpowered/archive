@@ -40,17 +40,17 @@ export const RedisConfig = {
 // ── Cache TTLs (seconds) ────────────────────────────────────────────────────
 export const Cache = {
   /** 1 hour for individual VODs */
-  VOD_DETAILS_TTL: 3_600,
+  VOD_DETAILS_TTL: 60 * 60,
   /** 15 minutes for list queries */
-  VOD_LIST_TTL: 900,
+  VOD_LIST_TTL: 15 * 60,
   /** 15 seconds for live status/duration */
   VOD_VOLATILE_TTL: 15,
   /** 1 day for emotes */
-  EMOTE_TTL: 86_400,
+  EMOTE_TTL: 24 * 60 * 60,
   /** 1 day for badges */
-  BADGES_TTL: 86_400,
+  BADGES_TTL: 24 * 60 * 60,
   /** 3 days for chat cache */
-  CHAT_TTL: 3 * 24 * 3600,
+  CHAT_TTL: 3 * 24 * 60 * 60,
   /** Cap paginated list cache to prevent tag explosion */
   MAX_PAGES: 10,
 } as const;

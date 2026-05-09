@@ -41,6 +41,11 @@ export interface CacheMetrics {
   swrErrors: number;
 }
 
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
 const emptyMetrics = (): CacheMetrics => ({
   hits: 0,
   misses: 0,
@@ -293,11 +298,6 @@ export async function withCache<T>(
   ctx: CacheContext = defaultCacheContext
 ): Promise<T> {
   return ctx.withCache(key, ttl, fetcher);
-}
-
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
 }
 
 /**

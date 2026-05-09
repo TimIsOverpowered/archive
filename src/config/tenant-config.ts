@@ -172,8 +172,15 @@ export class ConfigService {
   }
 
   /**
-   * Reload a single tenant from the database, replacing the cached entry.
-   * Used by the Redis Pub/Sub subscriber to keep cross-process caches in sync.
+   * Reload a single tenant from the database, replacing the cached entry,
+   * then publishes a config-changed event so sibling processes stay in sync.
+   *
+   * Re-publishing is safe: each recipient re-reads from the authoritative DB
+   * rather than relaying in-memory state, so there is no state amplification —
+   * only bounded redundant DB reads in the worst case.
+   *
+   * Called both by the Redis Pub/Sub subscriber (cross-process sync) and
+   * directly when a caller needs to force a cache refresh.
    */
   async reloadTenant(tenantId: string): Promise<void> {
     initMetaClient();
@@ -185,6 +192,7 @@ export class ConfigService {
     const config = buildTenantConfig(tenant);
     if (config) {
       this.cache.set(config.id, config);
+      this.publishConfigChanged(tenantId);
     }
   }
 

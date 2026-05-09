@@ -52,8 +52,8 @@ export const BaseConfigSchema = z.object({
   FLARESOLVERR_BASE_URL: z.string().url().default('http://localhost:8191'),
   FLARESOLVERR_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
   FLARESOLVERR_SESSION_TTL: z.coerce.number().int().positive().default(3600),
-  TWITCH_CLIENT_ID: z.string().default(''),
-  TWITCH_CLIENT_SECRET: z.string().default(''),
+  TWITCH_CLIENT_ID: z.string().optional(),
+  TWITCH_CLIENT_SECRET: z.string().optional(),
 
   /** Base path for temporary processing files (local SSD), normalized to absolute */
   TMP_PATH: z.string().min(1, 'TMP_PATH is required').transform(normalizePathForSchema),
