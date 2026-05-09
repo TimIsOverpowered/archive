@@ -10,7 +10,7 @@
 - Scraping: Flaresolverr, CycleTLS
 - Media: hls-parser, ffmpeg
 - Auth: @fastify/jwt + bcrypt
-- Logging: Pino + pino-pretty
+- Logging: Pino (pino-pretty is dev-only)
 - Process manager: PM2
 
 ## Do

@@ -3,11 +3,11 @@ import { getTwitchAppCredentials } from '../../utils/credentials.js';
 import { sendDiscordAlert, trackFailure, resetFailures } from '../../utils/discord-alerts.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { request } from '../../utils/http-client.js';
-import { getLogger } from '../../utils/logger.js';
+import { childLogger } from '../../utils/logger.js';
 import { RedisService } from '../../utils/redis-service.js';
 import { createTwitchClient, type TwitchClient } from './client.js';
 
-const log = getLogger().child({ module: 'twitch-auth' });
+const log = childLogger({ module: 'twitch-auth' });
 
 let tokenState: { token: string; expiresAt: number } | null = null;
 let refreshing: Promise<string> | null = null;

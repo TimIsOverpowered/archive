@@ -1,10 +1,10 @@
 import pino from 'pino';
-import pretty from 'pino-pretty';
+import type { SerializedRequest, SerializedResponse } from 'pino';
 import { getRequestId, getTenantId, getDisplayName } from './async-context.js';
 
-export type AppLogger = pino.Logger;
+export type AppLogger = pino.Logger<'metric'>;
 
-let _logger: pino.Logger | null = null;
+let _logger: AppLogger | null = null;
 let _loggerConfig: { level: string; isProduction: boolean } | null = null;
 
 export function setLoggerConfig(opts: { level: string; isProduction: boolean }): void {
@@ -12,40 +12,46 @@ export function setLoggerConfig(opts: { level: string; isProduction: boolean }):
   _logger = null;
 }
 
-export function setGlobalLogger(logger: pino.Logger): void {
+export function setGlobalLogger(logger: AppLogger): void {
   _logger = logger;
 }
 
-export function createLogger(opts: { level: string; isProduction: boolean }): pino.Logger {
-  return pino(
-    {
-      level: opts.level,
-      customLevels: { metric: 35 },
-      redact: ['headers.authorization', 'headers.cookie'],
-      serializers: {
-        req: (request: pino.SerializedRequest) => ({
-          method: request.method,
-          url: request.url,
-        }),
-        res: (reply: { statusCode: number }) => ({ statusCode: reply.statusCode }),
-      },
-      mixin: () => {
-        const ctx = { reqId: getRequestId(), tenantId: getTenantId(), displayName: getDisplayName() };
-        return Object.fromEntries(Object.entries(ctx).filter(([, v]) => v != null));
-      },
+export function createLogger(opts: { level: string; isProduction: boolean }): AppLogger {
+  const pinoOpts: pino.LoggerOptions<'metric'> = {
+    level: opts.level,
+    customLevels: { metric: 35 },
+    redact: ['headers.authorization', 'headers.cookie'],
+    serializers: {
+      req: (request: SerializedRequest) => ({
+        method: request.method,
+        url: request.url,
+      }),
+      res: (reply: SerializedResponse) => ({ statusCode: reply.statusCode }),
     },
-    opts.isProduction
-      ? undefined
-      : pretty({
-          colorize: true,
-          translateTime: 'mmmm dd yyyy HH:mm:ss',
-          ignore: 'pid,hostname,tenant,reqId',
-          singleLine: false,
-        })
-  ) as unknown as pino.Logger;
+    mixin: () => {
+      const ctx = { reqId: getRequestId(), tenantId: getTenantId(), displayName: getDisplayName() };
+      return Object.fromEntries(Object.entries(ctx).filter(([, v]) => v != null));
+    },
+  };
+
+  if (opts.isProduction) {
+    return pino(pinoOpts);
+  }
+
+  const transport = pino.transport({
+    target: 'pino-pretty',
+    options: {
+      colorize: true,
+      translateTime: 'mmmm dd yyyy HH:mm:ss',
+      ignore: 'pid,hostname,tenant,reqId',
+      singleLine: false,
+    },
+  });
+
+  return pino(pinoOpts, transport);
 }
 
-export function getLogger(): pino.Logger {
+export function getLogger(): AppLogger {
   if (!_logger) {
     _loggerConfig ??= { level: 'info', isProduction: false };
     _logger = createLogger(_loggerConfig);
@@ -53,7 +59,7 @@ export function getLogger(): pino.Logger {
   return _logger;
 }
 
-interface LogContext {
+export interface LogContext {
   reqId?: string;
   tenantId?: string;
   vodId?: number;
@@ -62,7 +68,24 @@ interface LogContext {
 }
 
 export function childLogger(context: LogContext): AppLogger {
-  return getLogger().child(context);
+  const handler: ProxyHandler<AppLogger> = {
+    get(_target, key: string | symbol) {
+      if (key === 'child') {
+        return (subCtx: Record<string, unknown>) => childLogger({ ...context, ...subCtx });
+      }
+
+      const child = getLogger().child(context);
+      const val = Reflect.get(child, key) as unknown;
+
+      if (typeof val === 'function') {
+        return (val as (...args: unknown[]) => unknown).bind(child) as unknown;
+      }
+
+      return val;
+    },
+  };
+
+  return new Proxy<AppLogger>({} as AppLogger, handler);
 }
 
 export function resetLogger(): void {
