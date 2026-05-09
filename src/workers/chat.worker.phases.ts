@@ -240,7 +240,7 @@ export async function downloadChatMessages(
     }
   }
 
-  log.info({ vodId }, 'Reached end of chat stream');
+  log.debug({ vodId }, 'Reached end of chat stream');
 
   if (batchBuffer.length > 0) {
     const result = await flushChatBatch({
@@ -284,7 +284,7 @@ export function sendChatCompletionAlert(
   result: { totalMessages: number; batchCount: number }
 ): void {
   resetFailures(ctx.tenantId);
-  ctx.log.debug(
+  ctx.log.info(
     { component: 'chat-worker', vodId: ctx.vodId, ...result, finalOffset: ctx.effectiveOffset },
     'Download completed successfully'
   );

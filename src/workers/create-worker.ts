@@ -76,7 +76,7 @@ export function createWorker<TData, TResult = unknown>(config: WorkerConfig<TDat
 
   worker.on('completed', (job) => {
     if (job == null) return;
-    getLogger().debug({ jobId: String(job.id), ...extractJobMeta(job.data) }, `[${name}] job completed`);
+    getLogger().info({ jobId: String(job.id), ...extractJobMeta(job.data) }, `[${name}] job completed`);
   });
 
   worker.on('failed', (job, err) => {
