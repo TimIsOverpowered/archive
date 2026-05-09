@@ -500,7 +500,7 @@ const main = async () => {
       process.exit(1);
     }
 
-    const metaUrl = new URL(META_DB_URL!);
+    const metaUrl = new URL(META_DB_URL);
     metaUrl.pathname = `/${tenant.database_name}`;
     dbUrl = metaUrl.toString();
   } catch (error) {

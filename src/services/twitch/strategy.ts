@@ -10,7 +10,7 @@ import type {
   VodCreateData,
   VodUpdateData,
 } from '../platforms/strategy.js';
-import { saveVodChapters } from './chapters.js';
+import { getChapters, saveVodChapters } from './chapters.js';
 import { getTwitchStreamStatus, getLatestTwitchVodObject } from './live.js';
 import { getVodData } from './vod.js';
 
@@ -94,7 +94,14 @@ export const strategy: PlatformStrategy = {
 
   async finalizeChapters(ctx, dbId, vodId, finalDurationSeconds): Promise<void> {
     try {
-      await saveVodChapters({ ctx: { tenantId: ctx.tenantId, config: ctx.config }, dbId, vodId, finalDurationSeconds });
+      const chapters = await getChapters(vodId, ctx.tenantId);
+      await saveVodChapters({
+        ctx: { tenantId: ctx.tenantId, config: ctx.config },
+        dbId,
+        vodId,
+        finalDurationSeconds,
+        chapters,
+      });
     } catch (error) {
       getLogger().error(createErrorContext(error, { vodId }), 'Failed to finalize Twitch chapters');
     }

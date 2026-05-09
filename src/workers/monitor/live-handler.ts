@@ -10,13 +10,13 @@ import type { StreamerDB, InsertableVods, SelectableVods } from '../../db/stream
 import { publishVodUpdate } from '../../services/cache-invalidator.js';
 import { getStrategy, type PlatformStreamStatus, type PlatformVodMetadata } from '../../services/platforms/index.js';
 import type { TwitchStreamStatus } from '../../services/twitch/live.js';
-import type { Platform } from '../../types/platforms.js';
+import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { enqueueJobWithLogging } from '../jobs/enqueue.js';
 import type { LiveDownloadJob } from '../jobs/types.js';
 import { getLiveDownloadQueue } from '../queues/queue.js';
-import { sendStreamOfflineAlert, sendStreamLiveAlert } from './alert-helpers.js';
+import { sendStreamLiveAlert } from './alert-helpers.js';
 
 interface LiveStreamContext {
   db: Kysely<StreamerDB>;
@@ -74,11 +74,12 @@ export async function handlePlatformLiveCheck(
 
   if (!streamStatus) {
     await handleOfflineStream(
-      db,
       tenantId,
       platform,
+      config,
+      strategy,
+      platformUserId,
       platformUsername ?? undefined,
-      config.displayName,
       log,
       activeLiveVod
     );
@@ -127,11 +128,12 @@ export async function handlePlatformLiveCheckWithStreamStatus(
 
   if (!twitchStatus || twitchStatus.type !== 'live') {
     await handleOfflineStream(
-      db,
       tenantId,
       platform,
+      config,
+      strategy,
+      platformUserId,
       platformUsername ?? undefined,
-      config.displayName,
       log,
       activeLiveVod
     );
@@ -161,31 +163,70 @@ export async function handlePlatformLiveCheckWithStreamStatus(
 }
 
 async function handleOfflineStream(
-  db: Kysely<StreamerDB>,
   tenantId: string,
   platform: Platform,
-  username: string | undefined,
-  displayName: string | undefined,
+  config: TenantConfig,
+  strategy: NonNullable<ReturnType<typeof getStrategy>>,
+  platformUserId: string,
+  platformUsername: string | undefined,
   log: ReturnType<typeof createAutoLogger>,
   activeLiveVod: ActiveLiveVodResult | null = null
 ): Promise<void> {
-  log.debug({ component: 'monitor', username }, 'Streamer is OFFLINE');
+  log.debug({ component: 'monitor', platform }, 'Streamer is OFFLINE');
 
-  if (activeLiveVod) {
-    log.info({ component: 'monitor', vodId: activeLiveVod.platform_vod_id }, 'Marking VOD as ended');
+  if (!activeLiveVod || activeLiveVod.platform_vod_id == null || activeLiveVod.platform_vod_id === '') return;
 
-    await db.updateTable('vods').set({ is_live: false }).where('id', '=', activeLiveVod.id).execute();
+  const liveQueue = getLiveDownloadQueue();
+  const jobId = `${Jobs.LIVE_HLS_JOB_PREFIX}${activeLiveVod.platform_vod_id}`;
+  const queuedJob = await liveQueue.getJob(jobId);
 
-    await publishVodUpdate(tenantId, activeLiveVod.id);
-
-    await sendStreamOfflineAlert(
-      platform,
-      activeLiveVod.platform_vod_id ?? '',
-      activeLiveVod.started_at ?? undefined,
-      username ?? undefined,
-      displayName
-    );
+  if (queuedJob !== undefined) {
+    const [isActive, isWaiting, isDelayed] = await Promise.all([
+      queuedJob.isActive(),
+      queuedJob.isWaiting(),
+      queuedJob.isDelayed(),
+    ]);
+    if (isActive || isWaiting || isDelayed) {
+      log.debug(
+        { component: 'monitor', vodId: activeLiveVod.platform_vod_id },
+        'Skipping - live worker job still in queue'
+      );
+      return;
+    }
   }
+
+  let sourceUrl: string | undefined;
+  if (platform === PLATFORMS.KICK) {
+    try {
+      const vodMetadata = await strategy.fetchVodMetadata(activeLiveVod.platform_vod_id, {
+        tenantId,
+        config,
+        platform,
+      });
+      sourceUrl = vodMetadata?.sourceUrl ?? undefined;
+    } catch (error) {
+      log.warn(
+        { vodId: activeLiveVod.platform_vod_id, err: extractErrorDetails(error).message },
+        'Failed to fetch Kick VOD metadata for re-queue'
+      );
+    }
+  }
+
+  log.info(
+    { component: 'monitor', vodId: activeLiveVod.platform_vod_id },
+    'No active job found — re-queuing live download for recovery'
+  );
+
+  await enqueueLiveHlsDownload({
+    dbId: activeLiveVod.id,
+    vodId: activeLiveVod.platform_vod_id,
+    platform,
+    tenantId,
+    platformUserId,
+    platformUsername,
+    startedAt: activeLiveVod.started_at ?? new Date(),
+    sourceUrl,
+  });
 }
 
 async function handleLiveStream(ctx: LiveStreamContext): Promise<void> {

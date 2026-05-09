@@ -4,14 +4,15 @@ import { publishVodDurationUpdate } from '../../services/cache-invalidator.js';
 import type { TenantContext } from '../../types/context.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { extractErrorDetails } from '../../utils/error.js';
-import { childLogger } from '../../utils/logger.js';
+import { childLogger, getLogger } from '../../utils/logger.js';
 import { getMetadata } from '../utils/ffmpeg.js';
 
 const log = childLogger({ module: 'duration-updater' });
 
 /**
- * Fire-and-forget duration updater for live HLS downloads.
- * Never throws - all errors are caught and logged internally.
+ * Duration updater for live HLS downloads.
+ * Logs errors at error level and re-throws so callers can retry or handle failures.
+ * The caller (hls-orchestrator) handles this as fire-and-forget via .catch().
  */
 export async function updateVodDurationDuringDownload(
   ctx: TenantContext,
@@ -65,8 +66,11 @@ export async function updateVodDurationDuringDownload(
       log.debug({ vodId, duration, previous: current?.duration }, 'Duration updated');
     });
   } catch (error) {
-    // Fire-and-forget: log but never throw
-    log.debug({ vodId, error: extractErrorDetails(error).message }, 'Duration update failed (non-fatal)');
+    getLogger().error(
+      { vodId, dbId, error: extractErrorDetails(error).message },
+      'Duration update failed — VOD duration will not be updated, downstream workers may produce incorrect splits'
+    );
+    throw error;
   }
 }
 

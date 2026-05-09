@@ -86,18 +86,20 @@ async function processPerTenantJob(job: Job<MonitorJob>, tenantId: string): Prom
     if (activeLiveVod && activeLiveVod.platform_vod_id != null && activeLiveVod.platform_vod_id !== '') {
       const jobId = `${Jobs.LIVE_HLS_JOB_PREFIX}${activeLiveVod.platform_vod_id}`;
       const queuedJob = await liveQueue.getJob(jobId);
-      const hasActiveJob = queuedJob !== undefined && (await queuedJob.isActive());
-      if (hasActiveJob) {
-        log.debug(
-          { component: 'monitor', platform, vodId: activeLiveVod.platform_vod_id },
-          'Skipping - live worker active'
-        );
-        continue;
+      if (queuedJob !== undefined) {
+        const [isActive, isWaiting, isDelayed] = await Promise.all([
+          queuedJob.isActive(),
+          queuedJob.isWaiting(),
+          queuedJob.isDelayed(),
+        ]);
+        if (isActive || isWaiting || isDelayed) {
+          log.debug(
+            { component: 'monitor', platform, vodId: activeLiveVod.platform_vod_id },
+            'Skipping - live worker job still in queue'
+          );
+          continue;
+        }
       }
-      log.debug(
-        { component: 'monitor', platform, vodId: activeLiveVod.platform_vod_id },
-        'No active job found, rechecking'
-      );
     }
 
     try {
@@ -132,13 +134,19 @@ async function processTenantWithStreamStatus(
   if (activeLiveVod && activeLiveVod.platform_vod_id != null && activeLiveVod.platform_vod_id !== '') {
     const jobId = `${Jobs.LIVE_HLS_JOB_PREFIX}${activeLiveVod.platform_vod_id}`;
     const queuedJob = await liveQueue.getJob(jobId);
-    const hasActiveJob = queuedJob !== undefined && (await queuedJob.isActive());
-    if (hasActiveJob) {
-      log.debug(
-        { component: 'monitor', platform, vodId: activeLiveVod.platform_vod_id },
-        'Skipping - live worker active'
-      );
-      return;
+    if (queuedJob !== undefined) {
+      const [isActive, isWaiting, isDelayed] = await Promise.all([
+        queuedJob.isActive(),
+        queuedJob.isWaiting(),
+        queuedJob.isDelayed(),
+      ]);
+      if (isActive || isWaiting || isDelayed) {
+        log.debug(
+          { component: 'monitor', platform, vodId: activeLiveVod.platform_vod_id },
+          'Skipping - live worker job still in queue'
+        );
+        return;
+      }
     }
   }
 

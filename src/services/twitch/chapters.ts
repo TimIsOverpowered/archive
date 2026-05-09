@@ -84,21 +84,23 @@ export interface SaveVodChaptersOptions {
   vodId: string;
   finalDurationSeconds: number;
   publishUpdate?: boolean;
+  chapters?: unknown[] | null;
 }
 
 export async function saveVodChapters(options: SaveVodChaptersOptions): Promise<number> {
-  const { ctx, dbId, vodId, finalDurationSeconds, publishUpdate = true } = options;
+  const { ctx, dbId, vodId, finalDurationSeconds, publishUpdate = true, chapters: preFetchedChapters } = options;
   const { tenantId } = ctx;
   const logger = createAutoLogger('twitch-chapters');
+
+  let chapters = preFetchedChapters;
+  if (chapters === undefined) {
+    chapters = await getChapters(vodId, tenantId);
+  }
+
   try {
     return await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
       await db.deleteFrom('chapters').where('vod_id', '=', dbId).execute();
 
-      if (publishUpdate) {
-        await publishVodUpdate(tenantId, dbId);
-      }
-
-      const chapters = await getChapters(vodId, tenantId);
       if (!chapters) {
         logger.warn({ vodId }, 'No chapters data available from Twitch API');
         return 0;

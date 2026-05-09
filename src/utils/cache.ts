@@ -197,14 +197,15 @@ export class CacheContext {
   }
 
   private withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-    return Promise.race([
-      promise,
-      new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(new Error(`In-flight fetch timed out after ${ms}ms`));
-        }, ms);
-      }),
-    ]);
+    let timer: NodeJS.Timeout;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new Error(`In-flight fetch timed out after ${ms}ms`));
+      }, ms);
+    });
+    return Promise.race([promise, timeoutPromise]).finally(() => {
+      clearTimeout(timer);
+    });
   }
 
   private async revalidateWithRetry<T>(
