@@ -78,19 +78,25 @@ export async function getGameData(
   return result;
 }
 
-export async function saveVodChapters(
-  ctx: Omit<TenantContext, 'db'>,
-  dbId: number,
-  vodId: string,
-  finalDurationSeconds: number
-): Promise<number> {
+export interface SaveVodChaptersOptions {
+  ctx: Omit<TenantContext, 'db'>;
+  dbId: number;
+  vodId: string;
+  finalDurationSeconds: number;
+  publishUpdate?: boolean;
+}
+
+export async function saveVodChapters(options: SaveVodChaptersOptions): Promise<number> {
+  const { ctx, dbId, vodId, finalDurationSeconds, publishUpdate = true } = options;
   const { tenantId } = ctx;
   const logger = createAutoLogger('twitch-chapters');
   try {
     return await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
       await db.deleteFrom('chapters').where('vod_id', '=', dbId).execute();
 
-      await publishVodUpdate(tenantId, dbId);
+      if (publishUpdate) {
+        await publishVodUpdate(tenantId, dbId);
+      }
 
       const chapters = await getChapters(vodId, tenantId);
       if (!chapters) {
@@ -130,7 +136,9 @@ export async function saveVodChapters(
           })
           .execute();
 
-        await publishVodUpdate(tenantId, dbId);
+        if (publishUpdate) {
+          await publishVodUpdate(tenantId, dbId);
+        }
 
         logger.info(
           { dbId, vodId, game: typeof game.displayName === 'string' ? game.displayName : 'unknown' },
@@ -193,7 +201,9 @@ export async function saveVodChapters(
             await db.insertInto('chapters').values(ch).execute();
           }
 
-          await publishVodUpdate(tenantId, dbId);
+          if (publishUpdate) {
+            await publishVodUpdate(tenantId, dbId);
+          }
 
           logger.info({ dbId, vodId, chapterCount: chaptersToCreate.length }, 'Saved all chapters');
           return chaptersToCreate.length;

@@ -65,12 +65,18 @@ interface SevenTVResponse {
  * Fetch emote metadata from FFZ, BTTV, and 7TV APIs, then upsert to the database.
  * Supports Twitch and Kick platforms. Publishes cache invalidation on success.
  */
+export interface FetchAndSaveEmotesOptions {
+  publishUpdate?: boolean;
+}
+
 export async function fetchAndSaveEmotes(
   ctx: TenantContext,
   vodId: number,
   platform: Platform,
-  platformId: string
+  platformId: string,
+  options: FetchAndSaveEmotesOptions = {}
 ): Promise<void> {
+  const { publishUpdate = true } = options;
   let ffzEmotes: EmoteData[] = [];
   let bttvEmotes: EmoteData[] = [];
   let sevenTvEmotes: EmoteData[] = [];
@@ -151,7 +157,9 @@ export async function fetchAndSaveEmotes(
         .execute();
 
       await invalidateEmoteCache(ctx.tenantId, vodId);
-      await publishVodUpdate(ctx.tenantId, vodId);
+      if (publishUpdate) {
+        await publishVodUpdate(ctx.tenantId, vodId);
+      }
     });
   } catch {
     getLogger().error({ vodId }, 'Failed to save emotes');

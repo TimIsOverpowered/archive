@@ -11,7 +11,7 @@ import { type AppLogger } from '../../../../utils/logger.js';
 import { getTmpFilePath, getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
 import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
 import { getMetadata } from '../../../../workers/utils/ffmpeg.js';
-import { finalizeFile } from '../../../../workers/utils/file-finalization.js';
+import { copyFileWithRetry } from '../../../../workers/utils/file-finalization.js';
 import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { refreshVodRecord } from './vod-records.js';
 
@@ -52,26 +52,29 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
       ? getLiveFilePath({ tenantId, streamId: vodRecord.platform_stream_id ?? '' })
       : getVodFilePath({ tenantId, vodId });
 
-  let durationCheckRecord: Pick<SelectableVods, 'duration'> | null = vodRecord;
-  if (vodRecord.duration === 0) {
-    log.info({ dbId, vodId }, 'VOD duration is 0, refreshing metadata before download check');
-    const refreshed = await refreshVodRecord(ctx, vodId, dbId, platformUserId, platformUsername, log);
-    if (refreshed) {
-      durationCheckRecord = refreshed;
-    }
-  }
+  // Refresh from platform API to get authoritative duration, preventing stale
+  // intermediate durations from interrupted workers from causing false mismatches.
+  const refreshed = await refreshVodRecord(ctx, vodId, dbId, log);
+  const durationCheckRecord = refreshed ?? vodRecord;
 
-  const needsDownload = await checkIfDownloadNeeded(filePath, dbId, durationCheckRecord ?? { duration: 0 }, log);
+  const needsDownload = await checkIfDownloadNeeded(tenantId, vodId, filePath, dbId, durationCheckRecord, log);
 
   if (!needsDownload) {
     log.debug({ vodId, filePath, type }, 'VOD file already exists and is valid');
 
-    // If tmpPath is configured, copy to tmpPath for local processing
+    // If tmpPath is configured, ensure file is available in tmpPath for local processing
     const tmpPath = getTmpPath();
     if (tmpPath != null) {
       const tmpFilePath = getTmpFilePath({ tenantId, vodId });
+      const tmpExists = await fileExists(tmpFilePath);
+
+      if (tmpExists) {
+        log.debug({ path: tmpFilePath }, 'VOD already exists in tmpPath');
+        return { filePath: tmpFilePath, jobId: null, workDir: tmpPath };
+      }
+
       try {
-        await finalizeFile({ filePath, destPath: tmpFilePath, log });
+        await copyFileWithRetry(filePath, tmpFilePath, log);
         log.info({ filePath, tmpFilePath }, 'Copied existing VOD from storage to tmpPath');
         return { filePath: tmpFilePath, jobId: null, workDir: tmpPath };
       } catch (err) {
@@ -103,11 +106,28 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
  * Checks if a VOD file needs to be downloaded (missing or duration mismatch).
  */
 async function checkIfDownloadNeeded(
+  tenantId: string,
+  vodId: string,
   filePath: string,
   dbId: number,
   vodRecord: Pick<SelectableVods, 'duration'>,
   log: AppLogger
 ): Promise<boolean> {
+  const tmpFilePath = getTmpFilePath({ tenantId, vodId });
+
+  const tmpExists = await fileExists(tmpFilePath);
+  if (tmpExists) {
+    const meta = await getMetadata(tmpFilePath);
+    const actualDuration = meta?.duration;
+    if (actualDuration != null && !Number.isNaN(actualDuration)) {
+      const diff = Math.abs(actualDuration - vodRecord.duration);
+      if (diff <= Vod.DURATION_TOLERANCE_SECONDS) {
+        log.debug({ path: tmpFilePath }, 'File exists in tmp path with valid duration');
+        return false;
+      }
+    }
+  }
+
   const exists = await fileExists(filePath);
   if (!exists) {
     log.debug({ filePath }, 'File does not exist');

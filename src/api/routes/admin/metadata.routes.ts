@@ -80,7 +80,12 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
 
       const durationSeconds =
         vodRecord.duration != null && vodRecord.duration > 0 ? parseInt(vodRecord.duration.toString()) : 0;
-      const savedCount = await saveVodChapters(tenantCtx, vodRecord.id, vodId, durationSeconds);
+      const savedCount = await saveVodChapters({
+        ctx: tenantCtx,
+        dbId: vodRecord.id,
+        vodId,
+        finalDurationSeconds: durationSeconds,
+      });
 
       if (savedCount === 0) {
         return ok({ message: `No chapters found for ${vodId}`, vodId, count: 0 });

@@ -6,6 +6,37 @@ import type { AppLogger } from '../../utils/logger.js';
 const RETRY_ATTEMPTS = 3;
 const RETRY_DELAYS = [5000, 10000, 15000];
 
+/**
+ * Copies a file from source to destination with retry logic.
+ * Does not delete source or clean up directories — pure copy operation.
+ */
+export async function copyFileWithRetry(filePath: string, destPath: string, log: AppLogger): Promise<void> {
+  const destDir = path.dirname(destPath);
+  await fsPromises.mkdir(destDir, { recursive: true });
+
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
+    try {
+      await fsPromises.copyFile(filePath, destPath);
+      log.info({ filePath, destPath }, 'Copied file');
+      return;
+    } catch (err) {
+      lastError = err;
+      const delay = RETRY_DELAYS[attempt] ?? RETRY_DELAYS[RETRY_ATTEMPTS - 1];
+      log.warn(
+        { filePath, destPath, attempt: attempt + 1, error: extractErrorDetails(err).message },
+        `Failed to copy file (attempt ${attempt + 1}/${RETRY_ATTEMPTS})`
+      );
+      if (attempt < RETRY_ATTEMPTS - 1) {
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 export interface FinalizeFileOptions {
   filePath: string;
   destPath: string;

@@ -2,6 +2,7 @@ import type { Kysely } from 'kysely';
 import { getDisplayName, requirePlatformConfig } from '../../../../config/types.js';
 import { findVodByPlatformId } from '../../../../db/queries/vods.js';
 import type { StreamerDB, InsertableVods, SelectableVods, UpdateableVods } from '../../../../db/streamer-types.js';
+import { publishVodUpdate } from '../../../../services/cache-invalidator.js';
 import { fetchAndSaveEmotes } from '../../../../services/emotes.js';
 import { getStrategy } from '../../../../services/platforms/index.js';
 import { saveVodChapters } from '../../../../services/twitch/index.js';
@@ -75,8 +76,17 @@ export async function findOrCreateVodRecord(
     .executeTakeFirst()) as SelectableVods;
 
   if (platform === PLATFORMS.TWITCH) {
-    await saveVodChapters(ctx, vodRecord.id, vodRecord.platform_vod_id ?? '', vodRecord.duration);
-    await fetchAndSaveEmotes(ctx, vodRecord.id, platform, platformUserId);
+    void Promise.allSettled([
+      saveVodChapters({
+        ctx,
+        dbId: vodRecord.id,
+        vodId,
+        finalDurationSeconds: vodRecord.duration,
+        publishUpdate: false,
+      }),
+      fetchAndSaveEmotes(ctx, vodRecord.id, platform, platformUserId, { publishUpdate: false }),
+    ]).finally(() => publishVodUpdate(tenantId, vodRecord.id));
+
     void triggerChatDownload({
       tenantId,
       displayName: getDisplayName(ctx.config),
@@ -102,8 +112,6 @@ export async function refreshVodRecord(
   ctx: TenantPlatformContext,
   vodId: string,
   dbId: number,
-  platformUserId: string,
-  platformUsername: string,
   log: AppLogger
 ): Promise<SelectableVods | null> {
   const { db, platform } = ctx;
@@ -141,21 +149,6 @@ export async function refreshVodRecord(
     .executeTakeFirst()) as SelectableVods;
 
   log.info({ vodId, platform, duration: updatedRecord.duration }, 'VOD metadata refreshed');
-
-  if (platform === PLATFORMS.TWITCH) {
-    await saveVodChapters(ctx, updatedRecord.id, updatedRecord.platform_vod_id ?? '', updatedRecord.duration);
-    await fetchAndSaveEmotes(ctx, updatedRecord.id, platform, platformUserId);
-    void triggerChatDownload({
-      tenantId: ctx.tenantId,
-      displayName: getDisplayName(ctx.config),
-      platformUserId,
-      dbId: updatedRecord.id,
-      vodId,
-      platform,
-      duration: Math.round(updatedRecord.duration),
-      platformUsername,
-    });
-  }
 
   return updatedRecord;
 }
