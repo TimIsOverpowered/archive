@@ -248,15 +248,6 @@ export async function downloadChatMessages(
       buffer: batchBuffer,
       log,
       vodId,
-      onProgress: (offset, batchNumber, messagesInBatch) => {
-        reportProgress(offset);
-        safeUpdateAlert(
-          messageId,
-          alerts.progress(displayName, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration),
-          log,
-          vodId
-        );
-      },
       lastOffset: ctx.effectiveOffset,
       totalMessages,
       batchCount,
