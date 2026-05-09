@@ -132,7 +132,7 @@ function processSettings(raw: RawConfig) {
   return settings;
 }
 
-async function importConfig(channelName: string, dbUrl: string): Promise<void> {
+async function importConfig(channelName: string, databaseName: string): Promise<void> {
   // Validate format
   if (!/^[a-z0-9_]+$/.test(channelName)) {
     console.error(`❌ Invalid channel name format: ${channelName}. Must be lowercase alphanumeric + underscore only.`);
@@ -172,14 +172,12 @@ async function importConfig(channelName: string, dbUrl: string): Promise<void> {
     if (kick) kick.mainPlatform = true;
   }
 
-  const dbName = dbUrl.split('/').pop() || channelName;
-
   const displayName = rawConfig.channel || channelName;
 
   const createData: any = {
     id: channelName,
     display_name: displayName,
-    database_name: dbName,
+    database_name: databaseName,
     settings,
   };
 
@@ -195,7 +193,7 @@ async function importConfig(channelName: string, dbUrl: string): Promise<void> {
 async function main(): Promise<void> {
   try {
     const channelName = await prompt('Enter channel name');
-    const dbUrl = await prompt('Enter database URL');
+    const databaseName = (await prompt('Database name')) || channelName;
     closeStdin();
 
     if (!channelName) {
@@ -203,13 +201,8 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
-    if (!dbUrl) {
-      console.error('Database URL is required');
-      process.exit(1);
-    }
-
     initMetaClient();
-    await importConfig(channelName, dbUrl);
+    await importConfig(channelName, databaseName);
     console.log('Done!');
   } catch (error) {
     const details = extractErrorDetails(error);

@@ -10,7 +10,7 @@ import type { InsertableTenants } from '../src/db/meta-types.js';
 import { getTenantById, createTenant, deleteTenant } from '../src/services/meta-tenants.service.js';
 import { validateEncryptionKey } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
-import { prompt, promptHidden, confirm } from './stdin.js';
+import { prompt, confirm } from './stdin.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -203,15 +203,17 @@ async function main(): Promise<void> {
 
     const displayName = (await prompt('Display Name (or press Enter to use channel name)')) || channelName;
 
+    // Phase 2: Database Setup
     console.log('\n='.repeat(50));
-    console.log('POSTGRESQL SERVER');
+    console.log('DATABASE SETUP');
     console.log('='.repeat(50));
 
-    const dbHost = (await prompt('PostgreSQL host')) || 'localhost';
-    const dbPort = parseInt((await prompt('PostgreSQL port')) || '5432') || 5432;
-    const dbUser = await prompt('PostgreSQL username');
-    const dbPassword = await promptHidden('PostgreSQL password');
-    const dbName = channelName; // Use streamer ID as database name
+    const metaUrl = new URL(process.env.META_DATABASE_URL!);
+    const dbHost = metaUrl.hostname;
+    const dbPort = parseInt(metaUrl.port || '5432', 10) || 5432;
+    const dbUser = metaUrl.username;
+    const dbPassword = metaUrl.password;
+    const dbName = (await prompt('Database name')) || channelName;
 
     // Validate connection BEFORE continuing
     console.log('\n🔍 Validating PostgreSQL connection...');
@@ -221,18 +223,14 @@ async function main(): Promise<void> {
     }
     console.log('✓ Connection validated');
 
-    // Phase 2: Database Setup
-    console.log('\n='.repeat(50));
-    console.log('DATABASE SETUP');
-    console.log('='.repeat(50));
-
     const dbResult = await createDatabase(dbHost, dbPort, dbUser, dbPassword, dbName);
     if (!dbResult.success) {
       console.error('❌ Could not set up database. Aborting.');
       process.exit(1);
     }
 
-    const dbUrl = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}`;
+    metaUrl.pathname = `/${dbName}`;
+    const dbUrl = metaUrl.toString();
 
     // Only run migrations for new databases or if explicitly requested
     if (dbResult.isNew) {
