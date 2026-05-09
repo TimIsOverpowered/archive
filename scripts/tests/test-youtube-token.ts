@@ -36,7 +36,7 @@ program
   .option('-v, --verbose', 'Show detailed output including full token objects')
   .option('--check-only', 'Only check current state without forcing refresh')
   .action(async (options: { tenant?: string; forceRefresh: boolean; verbose: boolean; checkOnly: boolean }) => {
-    await initMetaClient();
+    initMetaClient();
     console.log('YouTube Token Test');
     console.log('==================\n');
 

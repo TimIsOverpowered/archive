@@ -62,6 +62,7 @@ export function createTwitchGqlClient(
         body,
         timeoutMs: 10000,
         logContext: tenantId != null ? { tenantId } : undefined,
+        parseReviver: (key: string, value: unknown) => (key === '__typename' ? undefined : value),
       });
 
       if (result != null && typeof result === 'object' && 'errors' in result) {

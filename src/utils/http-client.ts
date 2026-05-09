@@ -27,6 +27,7 @@ export interface RequestOptions<R extends ResponseType = 'json'> {
   logContext?: Record<string, unknown> | undefined;
   signal?: AbortSignal | undefined;
   dispatcher?: Agent | undefined;
+  parseReviver?: (key: string, value: unknown) => unknown;
 }
 
 /** Type-level mapping from ResponseType to the corresponding JavaScript type. */
@@ -183,7 +184,8 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
         let parsedData: unknown;
         switch (actualResponseType) {
           case 'json':
-            parsedData = await response.body.json();
+            const text = await response.body.text();
+            parsedData = options?.parseReviver ? JSON.parse(text, options.parseReviver) : JSON.parse(text);
             break;
           case 'text':
             parsedData = await response.body.text();

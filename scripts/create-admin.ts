@@ -9,7 +9,7 @@ import { extractErrorDetails } from '../src/utils/error.js';
 const BCRYPT_COST = 10;
 
 async function createAdminUser(username: string): Promise<void> {
-  await initMetaClient();
+  initMetaClient();
   const existing = await findAdminByUsername(username);
 
   if (existing) {

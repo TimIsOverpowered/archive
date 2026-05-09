@@ -9,7 +9,7 @@ import { extractErrorDetails } from '../src/utils/error.js';
 const BCRYPT_COST = 10;
 
 async function resetAdminKey(username: string): Promise<void> {
-  await initMetaClient();
+  initMetaClient();
   const admin = await findAdminByUsername(username);
 
   if (!admin) {

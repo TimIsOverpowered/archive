@@ -11,7 +11,7 @@ if (!META_DB_URL) {
   process.exit(1);
 }
 
-await initMetaClient();
+initMetaClient();
 const metaClient = getMetaClient();
 
 const createInterface = () => readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -54,24 +54,10 @@ const parseDuration = (durationStr: string): number => {
   return 0;
 };
 
-function stripTypename(obj: any): any {
-  if (obj === null || obj === undefined) return obj;
-  if (Array.isArray(obj)) return obj.map(stripTypename);
-  if (typeof obj === 'object') {
-    const cleaned: Record<string, any> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      if (key !== '__typename') cleaned[key] = stripTypename(value);
-    }
-    return cleaned;
-  }
-  return obj;
-}
-
-function hasTypename(obj: any): boolean {
-  if (!obj) return false;
-  const str = typeof obj === 'string' ? obj : JSON.stringify(obj);
-  return str.includes('__typename');
-}
+const TYPENAME_REVIVER = (_key: string, value: unknown) =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([k]) => k !== '__typename'))
+    : value;
 
 interface ChatWorkerProgress {
   workerId: number;
@@ -161,17 +147,9 @@ async function migrateChatWorker(
           colors.push(row.user_color);
           createdAts.push(row.createdAt);
 
-          let msg = row.message;
-          if (msg && hasTypename(msg)) {
-            msg = stripTypename(msg);
-          }
-          messages.push(msg ? JSON.stringify(msg) : null);
+          messages.push(row.message ? JSON.stringify(row.message, TYPENAME_REVIVER) : null);
 
-          let badgesVal = row.user_badges;
-          if (badgesVal && hasTypename(badgesVal)) {
-            badgesVal = stripTypename(badgesVal);
-          }
-          badges.push(badgesVal ? JSON.stringify(badgesVal) : null);
+          badges.push(row.user_badges ? JSON.stringify(row.user_badges, TYPENAME_REVIVER) : null);
         }
       }
       const processTime = Date.now() - processStart;
@@ -522,14 +500,9 @@ const main = async () => {
       process.exit(1);
     }
 
-    dbUrl = await prompt(
-      `Database connection string for tenant "${streamerName}" (postgresql://user:pass@host:port/${tenant.database_name}): `
-    );
-    if (!dbUrl) {
-      console.error('❌ Database connection string is required');
-      await closeMetaClient();
-      process.exit(1);
-    }
+    const metaUrl = new URL(META_DB_URL!);
+    metaUrl.pathname = `/${tenant.database_name}`;
+    dbUrl = metaUrl.toString();
   } catch (error) {
     const details = extractErrorDetails(error);
     console.error('❌ Failed to fetch tenant from meta database:', details.message);

@@ -455,7 +455,7 @@ program
   .option('--open', 'Automatically open browser for OAuth flow and start callback server (default: manual paste mode)')
 
   .action(async (streamerId: string, _options) => {
-    await initMetaClient();
+    initMetaClient();
     const tenant = await getTenant(streamerId);
 
     if (!tenant) {

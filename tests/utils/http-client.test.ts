@@ -54,13 +54,14 @@ describe('HTTP Client', () => {
       };
     } = {}
   ) {
+    const jsonFn = opts.body?.json ?? (() => Promise.resolve({}));
     return {
       statusCode: opts.statusCode ?? 200,
       statusMessage: opts.statusMessage ?? 'OK',
       headers: {},
       body: {
-        json: opts.body?.json ?? (() => Promise.resolve({})),
-        text: opts.body?.text ?? (() => Promise.resolve('')),
+        json: jsonFn,
+        text: opts.body?.text ?? (() => jsonFn().then((v) => JSON.stringify(v))),
         arrayBuffer: opts.body?.arrayBuffer ?? (() => Promise.resolve(new ArrayBuffer(0))),
       },
       trailers: {},

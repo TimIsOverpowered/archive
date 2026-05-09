@@ -212,7 +212,7 @@ async function main(): Promise<void> {
   }
 
   try {
-    await initMetaClient();
+    initMetaClient();
     await importConfig(channelName, dbUrl);
     console.log('Done!');
   } catch (error) {

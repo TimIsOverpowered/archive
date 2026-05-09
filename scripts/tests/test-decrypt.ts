@@ -157,7 +157,7 @@ async function main(): Promise<void> {
   }
 
   try {
-    await initMetaClient();
+    initMetaClient();
     // Find tenant by ID or display name
     let tenant: any | null = await getTenantById(program.args[0]);
 

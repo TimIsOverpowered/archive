@@ -1,27 +1,12 @@
 import type { Kysely } from 'kysely';
 import type { StreamerDB } from '../../db/streamer-types.js';
-import type { TwitchChatEdge, TwitchChatMessageNode, TwitchCommentsConnection } from '../../services/twitch/index.js';
-
-/**
- * Removes __typename fields from GraphQL response objects recursively.
- * Useful for cleaning GraphQL responses before storing in database.
- */
-export function stripTypename(obj: unknown): unknown {
-  if (obj === null || obj === undefined) return obj;
-  if (Array.isArray(obj)) {
-    return obj.map((item) => stripTypename(item));
-  }
-  if (typeof obj === 'object') {
-    const cleaned: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      if (key !== '__typename') {
-        cleaned[key] = stripTypename(value);
-      }
-    }
-    return cleaned;
-  }
-  return obj;
-}
+import type {
+  TwitchChatEdge,
+  TwitchChatMessageNode,
+  TwitchCommentsConnection,
+  TwitchEmoteFragment,
+  TwitchUserBadgesArray,
+} from '../../services/twitch/index.js';
 
 /**
  * Extracts edges from GraphQL pagination response.
@@ -79,27 +64,19 @@ export async function calculateResumeOffset(
 }
 
 export function extractMessageData(node: TwitchChatMessageNode | null | undefined): {
-  message: unknown[];
-  userBadges?: Record<string, unknown> | undefined;
+  message: TwitchEmoteFragment[];
+  userBadges?: TwitchUserBadgesArray | undefined;
 } {
   if (!node || !node.message) {
     return { message: [], userBadges: undefined };
   }
 
-  const rawFragments = node.message.fragments ?? [];
-  const cleanFragments = stripTypename(rawFragments);
-
-  const badgesRaw = node.message.userBadges ?? null;
+  const fragments = Array.isArray(node.message.fragments) ? node.message.fragments : [];
+  const badgesRaw =
+    node.message.userBadges && typeof node.message.userBadges === 'object' ? node.message.userBadges : undefined;
 
   return {
-    message: Array.isArray(cleanFragments)
-      ? cleanFragments.map((frag) =>
-          typeof frag === 'object' && frag !== null ? { ...(frag as Record<string, unknown>) } : {}
-        )
-      : [],
-    userBadges:
-      badgesRaw && typeof stripTypename(badgesRaw) === 'object'
-        ? (stripTypename(badgesRaw) as Record<string, unknown>)
-        : undefined,
+    message: fragments,
+    userBadges: badgesRaw,
   };
 }
