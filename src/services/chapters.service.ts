@@ -1,5 +1,5 @@
 import { sql } from 'kysely';
-import type { Kysely } from 'kysely';
+import type { ReadonlyKysely } from 'kysely/readonly';
 import { z } from 'zod';
 import { Cache, CacheSwr } from '../constants.js';
 import { buildPagination } from '../db/queries/builders.js';
@@ -37,9 +37,10 @@ function buildQueryCacheKey(tenantId: string, query: ChapterLibraryQuery, page: 
  * Supports filtering by chapter_name and sorting by count, name, or last_played.
  */
 export async function getChaptersLibrary(
-  db: Kysely<StreamerDB>,
+  db: ReadonlyKysely<StreamerDB>,
   tenantId: string,
-  query: ChapterLibraryQuery
+  query: ChapterLibraryQuery,
+  options?: { signal?: AbortSignal }
 ): Promise<{ chapters: ChapterLibraryEntry[]; total: number }> {
   const { page, offset, limit } = buildPagination({ page: query.page, limit: query.limit, maxLimit: 100 });
 
@@ -57,7 +58,7 @@ export async function getChaptersLibrary(
           (eb) => eb.fn.count('vods.id').distinct().as('count'),
           (eb) => eb.fn.max('vods.created_at').as('last_played'),
         ])
-        .where('chapters.game_id', 'is not', null)
+        .where('chapters.game_id', '!=', null)
         .where('chapters.game_id', '!=', '')
         .where((eb) =>
           query.chapter_name != null ? eb('chapters.name', 'ilike', `%${query.chapter_name}%`) : sql`true`
@@ -71,17 +72,17 @@ export async function getChaptersLibrary(
         )
         .limit(limit + 1)
         .offset(offset)
-        .execute(),
+        .execute(options),
       db
         .selectFrom('chapters')
         .innerJoin('vods', 'chapters.vod_id', 'vods.id')
         .select((eb) => [eb.fn.count('chapters.game_id').distinct().as('cnt')])
-        .where('chapters.game_id', 'is not', null)
+        .where('chapters.game_id', '!=', null)
         .where('chapters.game_id', '!=', '')
         .where((eb) =>
           query.chapter_name != null ? eb('chapters.name', 'ilike', `%${query.chapter_name}%`) : sql`true`
         )
-        .executeTakeFirst(),
+        .executeTakeFirst(options),
     ]);
 
     const total = Number(totalRow?.cnt ?? 0);

@@ -1,4 +1,4 @@
-import { Kysely, PostgresDialect } from 'kysely';
+import { Kysely, PostgresDialect, SafeNullComparisonPlugin } from 'kysely';
 import { Pool } from 'pg';
 import { getBaseConfig } from '../config/env.js';
 import { Db } from '../constants.js';
@@ -42,7 +42,7 @@ export function initMetaClient(): Kysely<MetaDB> {
 
   const pool = new Pool({ connectionString: url, query_timeout: Db.QUERY_TIMEOUT_MS });
   const dialect = new PostgresDialect({ pool });
-  const db = new Kysely<MetaDB>({ dialect });
+  const db = new Kysely<MetaDB>({ dialect, plugins: [new SafeNullComparisonPlugin()] });
 
   _metaDb = db;
   if (NODE_ENV !== 'production') globalForMeta.metaDb = db;

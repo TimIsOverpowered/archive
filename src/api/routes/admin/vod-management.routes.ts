@@ -46,10 +46,15 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
+      const controller = new AbortController();
+      request.raw.once('close', () => {
+        controller.abort();
+      });
+
       const tenantCtx = requireTenant(request);
       const { tenantId, db } = tenantCtx;
 
-      const stats = await getTenantStats(db, tenantId, getApiConfig().STATS_CACHE_TTL);
+      const stats = await getTenantStats(db, tenantId, getApiConfig().STATS_CACHE_TTL, { signal: controller.signal });
       return ok(stats);
     }
   );

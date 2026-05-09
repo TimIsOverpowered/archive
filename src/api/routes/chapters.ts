@@ -1,4 +1,6 @@
 import { FastifyInstance } from 'fastify';
+import type { ReadonlyKysely } from 'kysely/readonly';
+import type { StreamerDB } from '../../db/streamer-types.js';
 import { getChaptersLibrary, ChapterLibraryQuerySchema } from '../../services/chapters.service.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
@@ -45,11 +47,21 @@ export default function chaptersRoutes(fastify: FastifyInstance, _options: Chapt
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
+      const controller = new AbortController();
+      request.raw.once('close', () => {
+        controller.abort();
+      });
+
       const tenantCtx = requireTenant(request);
       const { tenantId, db } = tenantCtx;
 
       const query = ChapterLibraryQuerySchema.parse(request.query);
-      const { chapters, total } = await getChaptersLibrary(db, tenantId, query);
+      const { chapters, total } = await getChaptersLibrary(
+        db as unknown as ReadonlyKysely<StreamerDB>,
+        tenantId,
+        query,
+        { signal: controller.signal }
+      );
 
       return okPaginated(chapters, {
         page: query.page,

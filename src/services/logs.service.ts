@@ -1,4 +1,4 @@
-import type { Kysely } from 'kysely';
+import type { ReadonlyKysely } from 'kysely/readonly';
 import { Cache, Logs } from '../constants.js';
 import type { StreamerDB, SelectableChatMessages } from '../db/streamer-types.js';
 import { simpleKeys } from '../utils/cache-keys.js';
@@ -26,7 +26,11 @@ interface VodMeta {
  * Fetch VOD metadata (created_at, duration) with Redis caching.
  * Prevents repeated DB queries on every chat request.
  */
-async function fetchVodMeta(db: Kysely<StreamerDB>, vodId: number): Promise<VodMeta> {
+async function fetchVodMeta(
+  db: ReadonlyKysely<StreamerDB>,
+  vodId: number,
+  options?: { signal?: AbortSignal }
+): Promise<VodMeta> {
   const redis = RedisService.getActiveClient();
 
   if (redis) {
@@ -46,7 +50,11 @@ async function fetchVodMeta(db: Kysely<StreamerDB>, vodId: number): Promise<VodM
     }
   }
 
-  const vod = await db.selectFrom('vods').select(['created_at', 'duration']).where('id', '=', vodId).executeTakeFirst();
+  const vod = await db
+    .selectFrom('vods')
+    .select(['created_at', 'duration'])
+    .where('id', '=', vodId)
+    .executeTakeFirst(options);
 
   if (!vod) throw new VodNotFoundError(vodId, 'logs service');
 
@@ -69,12 +77,13 @@ async function fetchVodMeta(db: Kysely<StreamerDB>, vodId: number): Promise<VodM
  * Returns raw comments array (no cursor, no peek).
  */
 async function fetchSingleBucket(
-  db: Kysely<StreamerDB>,
+  db: ReadonlyKysely<StreamerDB>,
   tenantId: string,
   vodId: number,
   bucketStart: number,
   streamStart: Date,
-  streamEnd: Date
+  streamEnd: Date,
+  options?: { signal?: AbortSignal }
 ): Promise<SelectableChatMessages[]> {
   const bucketEnd = bucketStart + Logs.BUCKET_SIZE;
   const cacheKey = simpleKeys.bucket(tenantId, vodId, bucketStart);
@@ -114,7 +123,7 @@ async function fetchSingleBucket(
     .orderBy('content_offset_seconds', 'asc')
     .orderBy('created_at', 'asc')
     .limit(Logs.BUCKET_LIMIT)
-    .execute();
+    .execute(options);
 
   if (redis) {
     try {
@@ -137,19 +146,28 @@ async function fetchSingleBucket(
  * cached 60-second Lego bricks, preserving CDN cacheability.
  */
 async function fetchAggregatedBuckets(
-  db: Kysely<StreamerDB>,
+  db: ReadonlyKysely<StreamerDB>,
   tenantId: string,
   vodId: number,
-  requestedOffset: number
+  requestedOffset: number,
+  options?: { signal?: AbortSignal }
 ): Promise<{ comments: SelectableChatMessages[]; cursor?: string | undefined }> {
-  const vodMeta = await fetchVodMeta(db, vodId);
+  const vodMeta = await fetchVodMeta(db, vodId, options);
   const streamStart = vodMeta.created_at;
   const streamEnd = new Date(streamStart.getTime() + (vodMeta.duration + 7200) * 1000);
 
   const anchorBucketStart = Math.floor(requestedOffset / Logs.BUCKET_SIZE) * Logs.BUCKET_SIZE;
 
   // 1. Fetch anchor bucket
-  const anchorComments = await fetchSingleBucket(db, tenantId, vodId, anchorBucketStart, streamStart, streamEnd);
+  const anchorComments = await fetchSingleBucket(
+    db,
+    tenantId,
+    vodId,
+    anchorBucketStart,
+    streamStart,
+    streamEnd,
+    options
+  );
 
   // 2. Split at requested offset
   const pastComments: SelectableChatMessages[] = anchorComments.filter(
@@ -165,7 +183,7 @@ async function fetchAggregatedBuckets(
     const prevBucket = anchorBucketStart - backSteps * Logs.BUCKET_SIZE;
     if (prevBucket < 0) break;
 
-    const olderComments = await fetchSingleBucket(db, tenantId, vodId, prevBucket, streamStart, streamEnd);
+    const olderComments = await fetchSingleBucket(db, tenantId, vodId, prevBucket, streamStart, streamEnd, options);
     pastComments.unshift(...olderComments);
     backSteps++;
   }
@@ -175,7 +193,7 @@ async function fetchAggregatedBuckets(
   while (futureComments.length < Logs.TARGET_FUTURE && forwardSteps <= Logs.MAX_EXPANSION) {
     const nextBucket = anchorBucketStart + forwardSteps * Logs.BUCKET_SIZE;
 
-    const newerComments = await fetchSingleBucket(db, tenantId, vodId, nextBucket, streamStart, streamEnd);
+    const newerComments = await fetchSingleBucket(db, tenantId, vodId, nextBucket, streamStart, streamEnd, options);
     futureComments.push(...newerComments);
     forwardSteps++;
   }
@@ -197,7 +215,7 @@ async function fetchAggregatedBuckets(
       .where('created_at', '<=', streamEnd)
       .orderBy('content_offset_seconds', 'asc')
       .limit(1)
-      .executeTakeFirst();
+      .executeTakeFirst(options);
 
     if (peek) {
       nextCursorOffset = Math.floor(peek.content_offset_seconds / Logs.BUCKET_SIZE) * Logs.BUCKET_SIZE;
@@ -219,12 +237,13 @@ async function fetchAggregatedBuckets(
  * Uses bi-directional bucket aggregation to guarantee minimum comment counts.
  */
 export async function getLogsByOffset(
-  db: Kysely<StreamerDB>,
+  db: ReadonlyKysely<StreamerDB>,
   tenantId: string,
   vodId: number,
-  offsetSeconds: number
+  offsetSeconds: number,
+  options?: { signal?: AbortSignal }
 ): Promise<{ comments: SelectableChatMessages[]; cursor?: string | undefined }> {
-  return fetchAggregatedBuckets(db, tenantId, vodId, offsetSeconds);
+  return fetchAggregatedBuckets(db, tenantId, vodId, offsetSeconds, options);
 }
 
 /**
@@ -232,10 +251,11 @@ export async function getLogsByOffset(
  * Cursor encodes the offset of the next bucket boundary.
  */
 export async function getLogsByCursor(
-  db: Kysely<StreamerDB>,
+  db: ReadonlyKysely<StreamerDB>,
   tenantId: string,
   vodId: number,
-  cursor: string
+  cursor: string,
+  options?: { signal?: AbortSignal }
 ): Promise<{ comments: SelectableChatMessages[]; cursor?: string | undefined }> {
   let cursorJson: CursorPayload | null = null;
   try {
@@ -248,5 +268,5 @@ export async function getLogsByCursor(
     badRequest('Invalid cursor: missing offset');
   }
 
-  return fetchAggregatedBuckets(db, tenantId, vodId, cursorJson.offset);
+  return fetchAggregatedBuckets(db, tenantId, vodId, cursorJson.offset, options);
 }

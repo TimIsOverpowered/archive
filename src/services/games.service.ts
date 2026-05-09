@@ -1,5 +1,6 @@
 import { sql } from 'kysely';
-import type { Expression, ExpressionBuilder, Kysely, SqlBool } from 'kysely';
+import type { Expression, ExpressionBuilder, SqlBool } from 'kysely';
+import type { ReadonlyKysely } from 'kysely/readonly';
 import { z } from 'zod';
 import { Cache, CacheSwr } from '../constants.js';
 import { buildPagination } from '../db/queries/builders.js';
@@ -90,9 +91,10 @@ export function buildGameQuery(query: GameQuery): {
  * List games for a tenant with filtering, pagination, and Redis caching.
  */
 export async function getGames(
-  db: Kysely<StreamerDB>,
+  db: ReadonlyKysely<StreamerDB>,
   tenantId: string,
-  query: GameQuery
+  query: GameQuery,
+  options?: { signal?: AbortSignal }
 ): Promise<{ games: GameResponse[]; total: number }> {
   const { page, offset, limit } = buildPagination({ page: query.page, limit: query.limit, maxLimit: 100 });
 
@@ -108,12 +110,12 @@ export async function getGames(
         .orderBy(sql.ref(orderBy.col), orderBy.dir)
         .limit(limit + 1)
         .offset(offset)
-        .execute(),
+        .execute(options),
       db
         .selectFrom('games')
         .select((eb) => [eb.fn.count('id').as('cnt')])
         .where(where)
-        .executeTakeFirst(),
+        .executeTakeFirst(options),
     ]);
 
     const total = Number(totalRow?.cnt ?? 0);
@@ -162,9 +164,10 @@ function buildGameLibraryCacheKey(tenantId: string, query: GameLibraryQuery, pag
  * Supports filtering by game_id, game_name, and sorting by count, name, or last_played.
  */
 export async function getGamesLibrary(
-  db: Kysely<StreamerDB>,
+  db: ReadonlyKysely<StreamerDB>,
   tenantId: string,
-  query: GameLibraryQuery
+  query: GameLibraryQuery,
+  options?: { signal?: AbortSignal }
 ): Promise<{ games: GameLibraryEntry[]; total: number }> {
   const { page, offset, limit } = buildPagination({ page: query.page, limit: query.limit, maxLimit: 100 });
 
@@ -182,7 +185,7 @@ export async function getGamesLibrary(
           (eb) => eb.fn.count('vods.id').distinct().as('count'),
           (eb) => eb.fn.max('vods.created_at').as('last_played'),
         ])
-        .where('games.game_id', 'is not', null)
+        .where('games.game_id', '!=', null)
         .where('games.game_id', '!=', '')
         .where((eb) => (query.game_name != null ? eb('games.game_name', 'ilike', `%${query.game_name}%`) : sql`true`))
         .where((eb) => (query.game_id != null ? eb('games.game_id', '=', query.game_id) : sql`true`))
@@ -195,16 +198,16 @@ export async function getGamesLibrary(
         )
         .limit(limit + 1)
         .offset(offset)
-        .execute(),
+        .execute(options),
       db
         .selectFrom('games')
         .innerJoin('vods', 'games.vod_id', 'vods.id')
         .select((eb) => [eb.fn.count('games.game_id').distinct().as('cnt')])
-        .where('games.game_id', 'is not', null)
+        .where('games.game_id', '!=', null)
         .where('games.game_id', '!=', '')
         .where((eb) => (query.game_name != null ? eb('games.game_name', 'ilike', `%${query.game_name}%`) : sql`true`))
         .where((eb) => (query.game_id != null ? eb('games.game_id', '=', query.game_id) : sql`true`))
-        .executeTakeFirst(),
+        .executeTakeFirst(options),
     ]);
 
     const total = Number(totalRow?.cnt ?? 0);

@@ -1,4 +1,4 @@
-import { Kysely, PostgresDialect } from 'kysely';
+import { Kysely, PostgresDialect, SafeNullComparisonPlugin } from 'kysely';
 import { Pool } from 'pg';
 import { getBaseConfig } from '../config/env.js';
 import { TenantConfig } from '../config/types.js';
@@ -64,7 +64,10 @@ class PoolManager {
       max: Db.POOL_MAX_PER_TENANT,
       query_timeout: Db.QUERY_TIMEOUT_MS,
     });
-    const db = new Kysely<StreamerDB>({ dialect: new PostgresDialect({ pool }) });
+    const db = new Kysely<StreamerDB>({
+      dialect: new PostgresDialect({ pool }),
+      plugins: [new SafeNullComparisonPlugin()],
+    });
 
     return { pool, db, lastAccessedAt: Date.now(), createdAt: Date.now() };
   }

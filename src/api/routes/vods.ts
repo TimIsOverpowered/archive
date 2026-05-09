@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
+import type { ReadonlyKysely } from 'kysely/readonly';
 import { z } from 'zod';
 import { Db } from '../../constants.js';
 import type { StreamerDB } from '../../db/streamer-types.js';
@@ -27,8 +28,13 @@ interface VodRoutesOptions {
 /**
  * Validate and fetch a VOD by numeric ID, throwing 404 on invalid/missing.
  */
-async function fetchVodByIdSafe(vodId: number, db: Kysely<StreamerDB>, tenantId: string) {
-  const vod = await getVodById(db, tenantId, vodId);
+async function fetchVodByIdSafe(
+  vodId: number,
+  db: Kysely<StreamerDB>,
+  tenantId: string,
+  options?: { signal?: AbortSignal }
+) {
+  const vod = await getVodById(db, tenantId, vodId, options);
   if (!vod) notFound('VOD not found');
   return vod;
 }
@@ -76,11 +82,18 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
+      const controller = new AbortController();
+      request.raw.once('close', () => {
+        controller.abort();
+      });
+
       const tenantCtx = requireTenant(request);
       const { tenantId, db } = tenantCtx;
 
       const query = VodQuerySchema.parse(request.query);
-      const { vods, total } = await getVods(db, tenantId, query);
+      const { vods, total } = await getVods(db as unknown as ReadonlyKysely<StreamerDB>, tenantId, query, {
+        signal: controller.signal,
+      });
 
       return okPaginated(vods, {
         page: query.page,
@@ -108,6 +121,11 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
+      const controller = new AbortController();
+      request.raw.once('close', () => {
+        controller.abort();
+      });
+
       const { tenantId, vodId } = request.params;
       const tenantCtx = requireTenant(request);
       const { db } = tenantCtx;
@@ -115,8 +133,8 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
       if (!vodIdParsed.success) {
         notFound('VOD not found');
       }
-      const vod = await fetchVodByIdSafe(vodIdParsed.data, db, tenantId);
-      const neighbors = await getVodNeighbors(db, vodIdParsed.data);
+      const vod = await fetchVodByIdSafe(vodIdParsed.data, db, tenantId, { signal: controller.signal });
+      const neighbors = await getVodNeighbors(db, vodIdParsed.data, { signal: controller.signal });
       return ok({ ...vod, prev: neighbors.prev, next: neighbors.next });
     }
   );
@@ -140,11 +158,22 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
+      const controller = new AbortController();
+      request.raw.once('close', () => {
+        controller.abort();
+      });
+
       const { tenantId, platform, platformVodId } = request.params;
       const tenantCtx = requireTenant(request);
       const { db } = tenantCtx;
 
-      const vod = await getVodByPlatformId(db, tenantId, platform, platformVodId);
+      const vod = await getVodByPlatformId(
+        db as unknown as ReadonlyKysely<StreamerDB>,
+        tenantId,
+        platform,
+        platformVodId,
+        { signal: controller.signal }
+      );
 
       if (!vod) {
         notFound('VOD not found');
@@ -172,6 +201,11 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
+      const controller = new AbortController();
+      request.raw.once('close', () => {
+        controller.abort();
+      });
+
       const { tenantId, vodId } = request.params;
       const tenantCtx = requireTenant(request);
       const { db } = tenantCtx;
@@ -179,7 +213,7 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
       if (!vodIdParsed.success) {
         notFound('VOD not found');
       }
-      await fetchVodByIdSafe(vodIdParsed.data, db, tenantId);
+      await fetchVodByIdSafe(vodIdParsed.data, db, tenantId, { signal: controller.signal });
       const emotes = await getEmotesByVodId(db, tenantId, vodIdParsed.data);
 
       if (!emotes) {

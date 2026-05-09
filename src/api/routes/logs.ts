@@ -1,5 +1,7 @@
 import { FastifyInstance, FastifySchema } from 'fastify';
+import type { ReadonlyKysely } from 'kysely/readonly';
 import { z } from 'zod';
+import type { StreamerDB } from '../../db/streamer-types.js';
 import { getLogsByOffset, getLogsByCursor } from '../../services/logs.service.js';
 import { badRequest } from '../../utils/http-error.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
@@ -59,6 +61,11 @@ export default function logsRoutes(fastify: FastifyInstance, _options: LogsRoute
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
+      const controller = new AbortController();
+      request.raw.once('close', () => {
+        controller.abort();
+      });
+
       const { tenantId, vodId } = request.params;
       const tenantCtx = requireTenant(request);
       const { db } = tenantCtx;
@@ -79,9 +86,17 @@ export default function logsRoutes(fastify: FastifyInstance, _options: LogsRoute
       let result;
 
       if (cursor != null) {
-        result = await getLogsByCursor(db, tenantId, vodIdNum, cursor);
+        result = await getLogsByCursor(db as unknown as ReadonlyKysely<StreamerDB>, tenantId, vodIdNum, cursor, {
+          signal: controller.signal,
+        });
       } else if (content_offset_seconds !== undefined && !isNaN(content_offset_seconds)) {
-        result = await getLogsByOffset(db, tenantId, vodIdNum, content_offset_seconds);
+        result = await getLogsByOffset(
+          db as unknown as ReadonlyKysely<StreamerDB>,
+          tenantId,
+          vodIdNum,
+          content_offset_seconds,
+          { signal: controller.signal }
+        );
       } else {
         badRequest('Invalid content_offset_seconds value');
       }

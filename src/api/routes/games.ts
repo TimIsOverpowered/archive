@@ -1,4 +1,6 @@
 import { FastifyInstance } from 'fastify';
+import type { ReadonlyKysely } from 'kysely/readonly';
+import type { StreamerDB } from '../../db/streamer-types.js';
 import { getGames, getGamesLibrary, GameQuerySchema, GameLibraryQuerySchema } from '../../services/games.service.js';
 import { PLATFORM_VALUES } from '../../types/platforms.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
@@ -52,11 +54,18 @@ export default function gamesRoutes(fastify: FastifyInstance, _options: GamesRou
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
+      const controller = new AbortController();
+      request.raw.once('close', () => {
+        controller.abort();
+      });
+
       const tenantCtx = requireTenant(request);
       const { tenantId, db } = tenantCtx;
 
       const query = GameQuerySchema.parse(request.query);
-      const { games, total } = await getGames(db, tenantId, query);
+      const { games, total } = await getGames(db as unknown as ReadonlyKysely<StreamerDB>, tenantId, query, {
+        signal: controller.signal,
+      });
 
       return okPaginated(games, {
         page: query.page,
@@ -94,11 +103,18 @@ export default function gamesRoutes(fastify: FastifyInstance, _options: GamesRou
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
+      const controller = new AbortController();
+      request.raw.once('close', () => {
+        controller.abort();
+      });
+
       const tenantCtx = requireTenant(request);
       const { tenantId, db } = tenantCtx;
 
       const query = GameLibraryQuerySchema.parse(request.query);
-      const { games, total } = await getGamesLibrary(db, tenantId, query);
+      const { games, total } = await getGamesLibrary(db as unknown as ReadonlyKysely<StreamerDB>, tenantId, query, {
+        signal: controller.signal,
+      });
 
       return okPaginated(games, {
         page: query.page,

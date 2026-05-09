@@ -1,6 +1,7 @@
 import { sql } from 'kysely';
-import type { Expression, ExpressionBuilder, Kysely, SqlBool } from 'kysely';
+import type { Expression, ExpressionBuilder, SqlBool } from 'kysely';
 import { jsonArrayFrom } from 'kysely/helpers/postgres';
+import type { ReadonlyKysely } from 'kysely/readonly';
 import { z } from 'zod';
 import { Cache, CacheSwr, Fts } from '../constants.js';
 import { buildPagination } from '../db/queries/builders.js';
@@ -178,9 +179,10 @@ export function buildVodQuery(query: VodQuery): {
  * Applies volatile cache data (duration, is_live) on top of cached static data.
  */
 export async function getVods(
-  db: Kysely<StreamerDB>,
+  db: ReadonlyKysely<StreamerDB>,
   tenantId: string,
-  query: VodQuery
+  query: VodQuery,
+  options?: { signal?: AbortSignal }
 ): Promise<{ vods: VodResponse[]; total: number }> {
   const { page, offset, limit } = buildPagination({ page: query.page, limit: query.limit, maxLimit: 100 });
 
@@ -197,12 +199,12 @@ export async function getVods(
         .orderBy(sql.ref(orderBy.col), orderBy.dir)
         .limit(limit + 1)
         .offset(offset)
-        .execute(),
+        .execute(options),
       db
         .selectFrom('vods')
         .select((eb) => [eb.fn.count('id').as('cnt')])
         .where(where)
-        .executeTakeFirst(),
+        .executeTakeFirst(options),
     ]);
 
     const total = Number(totalRow?.cnt ?? 0);
@@ -226,7 +228,12 @@ export async function getVods(
  * Fetch a single VOD by its numeric DB ID with stale-while-revalidate caching.
  * Merges volatile data (duration, is_live) from Redis on top of cached static data.
  */
-export async function getVodById(db: DBClient, tenantId: string, vodId: number): Promise<VodResponse | null> {
+export async function getVodById(
+  db: DBClient,
+  tenantId: string,
+  vodId: number,
+  options?: { signal?: AbortSignal }
+): Promise<VodResponse | null> {
   const cacheKey = swrKeys.vodStatic(tenantId, vodId);
 
   const fetcher = async () => {
@@ -235,7 +242,7 @@ export async function getVodById(db: DBClient, tenantId: string, vodId: number):
       .selectAll('vods')
       .select((eb) => selectVodRelations(eb))
       .where('id', '=', vodId)
-      .executeTakeFirst();
+      .executeTakeFirst(options);
 
     if (!vod) return null;
     return vod as unknown as VodResponse;
@@ -263,10 +270,11 @@ export async function getVodById(db: DBClient, tenantId: string, vodId: number):
  * Merges volatile data (duration, is_live) from Redis on top of cached static data.
  */
 export async function getVodByPlatformId(
-  db: Kysely<StreamerDB>,
+  db: ReadonlyKysely<StreamerDB>,
   tenantId: string,
   platform: Platform,
-  platformVodId: string
+  platformVodId: string,
+  options?: { signal?: AbortSignal }
 ): Promise<VodResponse | null> {
   const cacheKey = swrKeys.vodPlatform(tenantId, platform, platformVodId);
 
@@ -277,7 +285,7 @@ export async function getVodByPlatformId(
       .select((eb) => selectVodRelations(eb))
       .where('platform', '=', platform)
       .where('platform_vod_id', '=', platformVodId)
-      .executeTakeFirst();
+      .executeTakeFirst(options);
 
     if (!vod) return null;
     return vod as unknown as VodResponse;
@@ -305,7 +313,11 @@ export type VodNeighbors = {
   next: Pick<VodResponse, 'id' | 'platformVodId' | 'platform'> | null;
 };
 
-export async function getVodNeighbors(db: DBClient, vodId: number): Promise<VodNeighbors> {
+export async function getVodNeighbors(
+  db: DBClient,
+  vodId: number,
+  options?: { signal?: AbortSignal }
+): Promise<VodNeighbors> {
   const [prev, next] = await Promise.all([
     db
       .selectFrom('vods')
@@ -313,14 +325,14 @@ export async function getVodNeighbors(db: DBClient, vodId: number): Promise<VodN
       .where('id', '<', vodId)
       .orderBy('id', 'desc')
       .limit(1)
-      .executeTakeFirst(),
+      .executeTakeFirst(options),
     db
       .selectFrom('vods')
       .select(['id', 'platform_vod_id', 'platform'])
       .where('id', '>', vodId)
       .orderBy('id', 'asc')
       .limit(1)
-      .executeTakeFirst(),
+      .executeTakeFirst(options),
   ]);
 
   return {

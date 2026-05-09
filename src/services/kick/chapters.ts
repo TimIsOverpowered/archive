@@ -144,7 +144,7 @@ export async function finalizeKickChapters(
         .selectFrom('chapters')
         .selectAll()
         .where('vod_id', '=', dbId)
-        .where('end', 'is', null)
+        .where('end', '=', null)
         .orderBy('start', 'desc')
         .executeTakeFirst();
 

@@ -55,7 +55,12 @@ interface TenantStats {
  * Fetch aggregated statistics for a tenant with Redis caching.
  * Includes VOD counts by platform, upload success rate, chapter/game counts.
  */
-export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, cacheTtl = 60): Promise<TenantStats> {
+export async function getTenantStats(
+  db: Kysely<StreamerDB>,
+  tenantId: string,
+  cacheTtl = 60,
+  options?: { signal?: AbortSignal }
+): Promise<TenantStats> {
   const config = await configService.get(tenantId);
 
   if (!config) {
@@ -82,7 +87,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
           eb.fn.count('id').filterWhere('created_at', '>=', thisMonthStart).as('this_month_cnt'),
         ])
         .groupBy('platform')
-        .execute(),
+        .execute(options),
       db
         .selectFrom('vod_uploads')
         .select((eb) => [
@@ -90,16 +95,16 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
           eb.fn.count('upload_id').filterWhere('status', 'in', ['COMPLETED', 'FAILED']).as('total_cnt'),
           eb.fn.max('created_at').filterWhere('status', '=', 'COMPLETED').as('last_upload'),
         ])
-        .executeTakeFirst(),
+        .executeTakeFirst(options),
       db
         .selectFrom('chapters')
         .select((eb) => [eb.fn.count('id').as('cnt')])
-        .executeTakeFirst(),
+        .executeTakeFirst(options),
       db
         .selectFrom('chapters')
         .select(sql<string>`COUNT(DISTINCT game_id)`.as('cnt'))
-        .where('game_id', 'is not', null)
-        .executeTakeFirst(),
+        .where('game_id', '!=', null)
+        .executeTakeFirst(options),
     ]);
 
     const chapterCount = Number(chapterRow?.cnt ?? 0);
