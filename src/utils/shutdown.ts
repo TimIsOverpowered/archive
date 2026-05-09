@@ -6,7 +6,7 @@ export interface ShutdownResource {
   close: () => Promise<void>;
 }
 
-export function registerShutdownHandlers(resources: ShutdownResource[], timeoutMs = Server.SHUTDOWN_TIMEOUT_MS): void {
+export function registerShutdownHandlers(tiers: ShutdownResource[][], timeoutMs = Server.SHUTDOWN_TIMEOUT_MS): void {
   const shutdown = async (signal: string) => {
     const logger = getLogger();
     logger.info({ signal }, 'Received shutdown signal');
@@ -16,13 +16,17 @@ export function registerShutdownHandlers(resources: ShutdownResource[], timeoutM
       process.exit(1);
     }, timeoutMs);
 
-    for (const { name, close } of resources) {
-      try {
-        await close();
-        logger.info({ name }, 'Resource closed');
-      } catch (err) {
-        logger.error({ name, error: String(err) }, 'Error closing resource');
-      }
+    for (const resources of tiers) {
+      await Promise.allSettled(
+        resources.map(async ({ name, close }) => {
+          try {
+            await close();
+            logger.info({ name }, 'Resource closed');
+          } catch (err) {
+            logger.error({ name, error: String(err) }, 'Error closing resource');
+          }
+        })
+      );
     }
 
     clearTimeout(timer);

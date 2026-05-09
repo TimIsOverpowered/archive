@@ -72,31 +72,35 @@ async function start() {
 }
 
 registerShutdownHandlers([
-  {
-    name: 'http-server',
-    close: async () => {
-      if (!server) {
-        getLogger().warn('No server instance found, skipping shutdown');
-        return;
-      }
-      await server.close();
+  [
+    {
+      name: 'http-server',
+      close: async () => {
+        if (!server) {
+          getLogger().warn('No server instance found, skipping shutdown');
+          return;
+        }
+        await server.close();
+      },
     },
-  },
-  { name: 'redis', close: closeRedisClient },
-  {
-    name: 'db-client-cleanup',
-    close: () => {
-      stopClientCleanup();
-      return Promise.resolve();
+  ],
+  [
+    { name: 'redis', close: closeRedisClient },
+    {
+      name: 'db-client-cleanup',
+      close: () => {
+        stopClientCleanup();
+        return Promise.resolve();
+      },
     },
-  },
-  {
-    name: 'database',
-    close: async () => {
-      await closeAllClients();
-      await closeMetaClient();
+    {
+      name: 'database',
+      close: async () => {
+        await closeAllClients();
+        await closeMetaClient();
+      },
     },
-  },
+  ],
 ]);
 
 // Start the server

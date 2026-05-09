@@ -66,7 +66,7 @@ async function fetchFromFlareSolverr(
     }),
   });
 
-  const body = (await response.json()) as unknown as FlareSolverrResponse;
+  const body = (await response.json()) as FlareSolverrResponse;
 
   if (body.status === 'error' || body.error != null) {
     throw new Error(body.error ?? body.message ?? 'Unknown FlareSolverr error');

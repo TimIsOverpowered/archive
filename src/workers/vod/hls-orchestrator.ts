@@ -19,8 +19,9 @@ import { updateVodDurationDuringDownload } from './duration-updater.js';
 import { cleanupHlsFiles } from './hls-cleanup.js';
 import {
   downloadSegmentsParallel,
-  fetchTwitchPlaylist,
   fetchKickPlaylist,
+  fetchTwitchPlaylist,
+  type FetchPlaylistResult,
   resolveDownloadStrategy,
 } from './hls-utils.js';
 
@@ -287,9 +288,15 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
       consecutiveErrors = 0;
 
       if (platform === PLATFORMS.KICK) {
-        void updateChapterDuringDownload(ctx.ctx, ctx.dbId, vodId);
+        updateChapterDuringDownload(ctx.ctx, ctx.dbId, vodId).catch((err) => {
+          log.warn(extractErrorDetails(err), 'chapter update failed');
+        });
       }
-      void updateVodDurationDuringDownload(ctx.ctx, ctx.dbId, vodId, platform, ctx.m3u8Path, variantM3u8String);
+      updateVodDurationDuringDownload(ctx.ctx, ctx.dbId, vodId, platform, ctx.m3u8Path, variantM3u8String).catch(
+        (err) => {
+          log.warn(extractErrorDetails(err), 'duration update failed');
+        }
+      );
 
       await sleep(Hls.POLL_INTERVAL_MS);
     } catch (error) {
@@ -358,7 +365,7 @@ export async function fetchPlaylist(
     maxDelayMs?: number;
     shouldRetry?: (error: unknown) => boolean;
   }
-) {
+): Promise<FetchPlaylistResult> {
   const tenantId = ctx.ctx.tenantId;
 
   if (ctx.platform === PLATFORMS.TWITCH) {

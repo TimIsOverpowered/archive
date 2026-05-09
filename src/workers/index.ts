@@ -65,7 +65,7 @@ export async function bootstrap() {
     };
 
     await initWorkers(ctx);
-    await initBackgroundServices(ctx);
+    await initBackgroundServices();
     registerShutdownHandlers(ctx);
 
     getLogger().info('All workers started successfully');
@@ -111,7 +111,7 @@ async function initWorkers(ctx: AppContext) {
   getLogger().info({ component: 'workers' }, 'All workers ready');
 }
 
-async function initBackgroundServices(_ctx: AppContext) {
+async function initBackgroundServices() {
   getLogger().info({ component: 'background' }, 'Initializing background services');
 
   await startMonitorService();
@@ -120,55 +120,59 @@ async function initBackgroundServices(_ctx: AppContext) {
 
 function registerShutdownHandlers(ctx: AppContext) {
   registerShutdown([
-    {
-      name: 'monitor',
-      close: () => {
-        stopMonitorService();
-        return Promise.resolve();
+    [
+      {
+        name: 'monitor',
+        close: () => {
+          stopMonitorService();
+          return Promise.resolve();
+        },
       },
-    },
-    {
-      name: 'workers',
-      close: async () => {
-        for (const { worker } of workerRegistry.getAll()) {
-          await worker.close(true);
-        }
+      {
+        name: 'workers',
+        close: async () => {
+          for (const { worker } of workerRegistry.getAll()) {
+            await worker.close(true);
+          }
+        },
       },
-    },
-    { name: 'queues', close: closeQueues },
-    { name: 'cycletls', close: closeCycleTLS },
-    {
-      name: 'db-client-cleanup',
-      close: () => {
-        stopClientCleanup();
-        return Promise.resolve();
+      { name: 'queues', close: closeQueues },
+      { name: 'cycletls', close: closeCycleTLS },
+      {
+        name: 'tenant-subscriber',
+        close: async () => {
+          try {
+            await ctx.tenantConfigSubscriber.quit();
+          } catch {
+            /* subscriber already closed */
+          }
+        },
       },
-    },
-    {
-      name: 'database',
-      close: async () => {
-        await closeAllClients();
-        await closeMetaClient();
+    ],
+    [
+      {
+        name: 'db-client-cleanup',
+        close: () => {
+          stopClientCleanup();
+          return Promise.resolve();
+        },
       },
-    },
-    {
-      name: 'tenant-subscriber',
-      close: async () => {
-        try {
-          await ctx.tenantConfigSubscriber.quit();
-        } catch {
-          /* subscriber already closed */
-        }
+      {
+        name: 'database',
+        close: async () => {
+          await closeAllClients();
+          await closeMetaClient();
+        },
       },
-    },
-    { name: 'workers-redis', close: closeWorkersRedis },
-    {
-      name: 'config',
-      close: () => {
-        configService.reset();
-        return Promise.resolve();
+      { name: 'workers-redis', close: closeWorkersRedis },
+      {
+        name: 'config',
+        close: () => {
+          configService.reset();
+          return Promise.resolve();
+        },
       },
-    },
+    ],
   ]);
 }
 

@@ -40,7 +40,7 @@ export async function checkFlareSolverrHealth(): Promise<FlareSolverrHealthResul
       body: JSON.stringify({ cmd: 'status' }),
     });
 
-    const body = (await response.json()) as unknown as FlareSolverrStatusResponse;
+    const body = (await response.json()) as FlareSolverrStatusResponse;
 
     if (body.status !== 'ok') {
       const result: FlareSolverrHealthResult = { status: 'error', stats: { version: 'unknown', sessions: 0 } };

@@ -1,4 +1,4 @@
-import { Agent, request as undiciRequest, type BodyInit as UndiciBodyInit, type Dispatcher } from 'undici';
+import { Agent, request as undiciRequest, type Dispatcher } from 'undici';
 import { Http } from '../constants.js';
 import { DownloadAbortedError } from './domain-errors.js';
 import { extractErrorDetails } from './error.js';
@@ -72,7 +72,7 @@ function prepareBodyAndHeaders(
   body: unknown,
   headers: Record<string, string>
 ): {
-  body: BodyInit | undefined;
+  body: string | Buffer | Uint8Array | ReadableStream<Uint8Array> | null | undefined;
   headers: Record<string, string>;
 } {
   if (body === undefined || body === null) {
@@ -92,7 +92,7 @@ function prepareBodyAndHeaders(
     };
   }
 
-  return { body: body as BodyInit, headers };
+  return { body: body as string | Buffer | Uint8Array | ReadableStream<Uint8Array>, headers };
 }
 
 /**
@@ -165,7 +165,7 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
           signal: combinedSignal,
         };
         if (preparedBody !== undefined) {
-          undiciOpts.body = preparedBody as UndiciBodyInit;
+          undiciOpts.body = preparedBody;
         }
         if (dispatcher !== undefined) {
           undiciOpts.dispatcher = dispatcher;

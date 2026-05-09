@@ -68,24 +68,7 @@ export interface LogContext {
 }
 
 export function childLogger(context: LogContext): AppLogger {
-  const handler: ProxyHandler<AppLogger> = {
-    get(_target, key: string | symbol) {
-      if (key === 'child') {
-        return (subCtx: Record<string, unknown>) => childLogger({ ...context, ...subCtx });
-      }
-
-      const child = getLogger().child(context);
-      const val = Reflect.get(child, key) as unknown;
-
-      if (typeof val === 'function') {
-        return (val as (...args: unknown[]) => unknown).bind(child) as unknown;
-      }
-
-      return val;
-    },
-  };
-
-  return new Proxy<AppLogger>({} as AppLogger, handler);
+  return getLogger().child(context);
 }
 
 export function resetLogger(): void {

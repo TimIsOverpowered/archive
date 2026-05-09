@@ -61,8 +61,7 @@ export class CircuitBreaker {
     if (state.state === 'open' && state.lastFailureTime != null) {
       const elapsed = Date.now() - state.lastFailureTime;
       if (elapsed >= state.recoveryTimeout) {
-        const nextState: CircuitBreakerState = { ...state, state: 'half-open' };
-        this.cache.set(key, nextState);
+        state.state = 'half-open';
         return 'half-open';
       }
     }
@@ -72,26 +71,19 @@ export class CircuitBreaker {
 
   recordSuccess(key: string, opts?: Partial<CircuitBreakerOptions>): void {
     const state = this.getOrCreateBreaker(key, opts);
-    const nextState: CircuitBreakerState = {
-      ...state,
-      failureCount: 0,
-      lastSuccessTime: Date.now(),
-      state: 'closed',
-    };
-    this.cache.set(key, nextState);
+    state.failureCount = 0;
+    state.lastSuccessTime = Date.now();
+    state.state = 'closed';
   }
 
   recordFailure(key: string, opts?: Partial<CircuitBreakerOptions>): void {
     const state = this.getOrCreateBreaker(key, opts);
 
-    const newFailureCount = state.failureCount + 1;
-    const nextState: CircuitBreakerState = {
-      ...state,
-      failureCount: newFailureCount,
-      lastFailureTime: Date.now(),
-      state: newFailureCount >= state.failureThreshold ? 'open' : state.state,
-    };
-    this.cache.set(key, nextState);
+    state.failureCount += 1;
+    state.lastFailureTime = Date.now();
+    if (state.failureCount >= state.failureThreshold) {
+      state.state = 'open';
+    }
   }
 
   isCircuitOpen(key: string, opts?: Partial<CircuitBreakerOptions>): boolean {

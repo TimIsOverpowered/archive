@@ -14,7 +14,6 @@ interface PgPoolEntry {
   pool: InstanceType<typeof Pool>;
   db: Kysely<StreamerDB>;
   lastAccessedAt: number;
-  createdAt: number;
 }
 
 class PoolManager {
@@ -48,14 +47,6 @@ class PoolManager {
       }
     }
 
-    const creationPromise = Promise.resolve(this.createConnection(config)).finally(() =>
-      this.creationLocks.delete(config.id)
-    );
-    this.creationLocks.set(config.id, creationPromise);
-    return creationPromise;
-  }
-
-  private buildConnection(config: TenantConfig): PgPoolEntry {
     const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
     const url = buildPgBouncerUrl(pgbouncerUrl, config.database.name);
 
@@ -69,17 +60,11 @@ class PoolManager {
       plugins: [new SafeNullComparisonPlugin()],
     });
 
-    return { pool, db, lastAccessedAt: Date.now(), createdAt: Date.now() };
-  }
+    this.pools.set(config.id, { pool, db, lastAccessedAt: Date.now() });
 
-  private registerConnection(tenantId: string, entry: PgPoolEntry): void {
-    this.pools.set(tenantId, entry);
-  }
-
-  private createConnection(config: TenantConfig): Kysely<StreamerDB> {
-    const entry = this.buildConnection(config);
-    this.registerConnection(config.id, entry);
-    return entry.db;
+    const creationPromise = Promise.resolve(db).finally(() => this.creationLocks.delete(config.id));
+    this.creationLocks.set(config.id, creationPromise);
+    return creationPromise;
   }
 
   async closeClient(tenantId: string): Promise<void> {

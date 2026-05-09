@@ -29,7 +29,7 @@ describe('HTTP Client', () => {
     mockUndiciRequest.mock.resetCalls();
     mockUndiciRequest.mock.restore();
 
-    global.setTimeout = ((callback: TimerHandler, delay?: number) => {
+    global.setTimeout = ((callback: (...args: unknown[]) => void, delay?: number) => {
       const id = originalSetTimeout(callback, delay);
       return id;
     }) as typeof global.setTimeout;

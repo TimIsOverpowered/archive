@@ -117,7 +117,6 @@ export async function buildServer(config: ApiConfig) {
           },
         },
       },
-      security: [],
     },
   });
 
@@ -140,7 +139,7 @@ export async function buildServer(config: ApiConfig) {
   await fastify.register(async (instance) => {
     await instance.register(healthRoutes, { prefix: '/api/v1' });
 
-    // Register VODs, games, and logs under same prefix to avoid duplicate OPTIONS handlers
+    // Register VODs, games, chapters, and logs under same prefix to avoid duplicate OPTIONS handlers
     await instance.register(
       async (vodInstance) => {
         await vodInstance.register(vodsRoutes, { prefix: '' });

@@ -1,4 +1,4 @@
-type FetchMock = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+type FetchMock = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 interface FetchMockOptions {
   status?: number;
@@ -18,7 +18,7 @@ export function mockFetch(options: FetchMockOptions = {}): { cleanup: () => void
     originalFetch = globalThis.fetch;
   }
 
-  const mock: FetchMock = async (input: RequestInfo | URL, init?: RequestInit) => {
+  const mock: FetchMock = async (input: string | URL | Request, init?: RequestInit) => {
     const url = input instanceof URL ? input.href : typeof input === 'string' ? input : String(input);
 
     for (const [pattern, handler] of handlers) {
@@ -51,7 +51,7 @@ export function mockFetchFor(urlPattern: string, options: FetchMockOptions = {})
   const { cleanup } = mockFetch(options);
 
   const url = typeof urlPattern === 'string' ? urlPattern : String(urlPattern);
-  const mock: FetchMock = async (input: RequestInfo | URL) => {
+  const mock: FetchMock = async (input: string | URL | Request) => {
     const target = input instanceof URL ? input.href : typeof input === 'string' ? input : String(input);
     if (!target.includes(url)) {
       throw new Error(`Fetch mock expected URL to contain "${url}", got: ${target}`);

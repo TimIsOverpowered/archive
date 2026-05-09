@@ -25,6 +25,13 @@ import { QUEUE_NAMES, WorkerName } from './queues/queue.js';
 import standardVodProcessor from './vod.worker.js';
 import youtubeProcessor from './youtube.worker.js';
 
+function calcLiveConcurrency(configs: TenantConfig[], headroom: number, minConcurrency: number): number {
+  const active = configs.filter(
+    (c) => c.settings.vodDownload === true && (c.twitch?.enabled ?? c.kick?.enabled) === true
+  ).length;
+  return Math.max(active * 2 * headroom, minConcurrency);
+}
+
 export type AllJobData =
   | LiveDownloadJob
   | StandardVodJob
@@ -91,14 +98,7 @@ export function registerWorkers(
   for (const [name, def] of Object.entries(workerDefs) as Array<[WorkerName, WorkerDef<AllJobData, unknown>]>) {
     const concurrency =
       name === QUEUE_NAMES.VOD_LIVE
-        ? Math.max(
-            tenantConfigs.filter(
-              (c) => c.settings.vodDownload === true && (c.twitch?.enabled ?? c.kick?.enabled) === true
-            ).length *
-              2 *
-              vodLiveHeadroom,
-            vodMinConcurrency
-          )
+        ? calcLiveConcurrency(tenantConfigs, vodLiveHeadroom, vodMinConcurrency)
         : concurrencyMap[name];
 
     const config = { ...def, connection };

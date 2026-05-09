@@ -109,7 +109,7 @@ export function loadApiConfig(): ApiConfig {
 
   try {
     apiConfigCache = ApiConfigSchema.parse(process.env);
-    baseConfigCache ??= BaseConfigSchema.parse(apiConfigCache);
+    baseConfigCache ??= apiConfigCache as BaseConfig;
     return apiConfigCache;
   } catch (error) {
     throwConfigError('API', error);
@@ -126,7 +126,7 @@ export function loadWorkersConfig(): WorkersConfig {
 
   try {
     workersConfigCache = WorkersConfigSchema.parse(process.env);
-    baseConfigCache ??= BaseConfigSchema.parse(workersConfigCache);
+    baseConfigCache ??= workersConfigCache as BaseConfig;
     return workersConfigCache;
   } catch (error) {
     throwConfigError('Workers', error);

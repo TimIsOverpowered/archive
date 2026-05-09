@@ -115,6 +115,7 @@ export class CacheContext {
       getLogger().warn({ err: details, key }, 'Cache read failed, falling back to DB');
     }
 
+    // Second inflight check: another call may have started during the await above
     const inflight = this.inflight.get(key) as Promise<T> | undefined;
     if (inflight) return inflight;
 

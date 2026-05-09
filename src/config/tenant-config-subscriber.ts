@@ -13,7 +13,7 @@ interface ConfigChangeEvent {
 }
 
 async function handleConfigEvent(event: ConfigChangeEvent): Promise<void> {
-  await configService.reloadTenant(event.tenantId);
+  await configService.reloadTenant(event.tenantId, { publish: false });
 }
 
 export function registerTenantConfigSubscriber(fastify: {
