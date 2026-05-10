@@ -614,6 +614,17 @@ export interface YoutubeUploadJobResult {
 }
 
 /**
+ * Represents a recursive node in the BullMQ FlowProducer tree.
+ */
+interface SequentialFlowChild {
+  name: string;
+  queueName: string;
+  data: Record<string, unknown>;
+  opts: { jobId: string; removeOnComplete: boolean; removeOnFail: boolean };
+  children?: Array<SequentialFlowChild | { name: string; queueName: string; opts: { jobId: string } }>;
+}
+
+/**
  * Builds a sequential chain of game upload jobs to avoid BullMQ's shared-child deadlock.
  * Chain structure: game_0 -> game_1 -> ... -> game_N -> copy/download
  * Only the last game references baseChildren. Each earlier game depends on the next.
@@ -624,35 +635,26 @@ function buildSequentialGameChain(
   queueName: string,
   baseChildren: Array<{ name: string; queueName: string; opts: { jobId: string } }>,
   workDir?: string
-): {
-  name: string;
-  queueName: string;
-  data: Record<string, unknown>;
-  opts: { jobId: string; removeOnComplete: boolean; removeOnFail: boolean };
-  children?: Array<{ name: string; queueName: string; opts: { jobId: string } }>;
-} | null {
+): SequentialFlowChild | null {
   if (gameJobs.length === 0) return null;
 
-  let tailChild: {
-    name: string;
-    queueName: string;
-    data: Record<string, unknown>;
-    opts: { jobId: string; removeOnComplete: boolean; removeOnFail: boolean };
-    children?: Array<{ name: string; queueName: string; opts: { jobId: string } }>;
-  } | null = null;
+  let tailChild: SequentialFlowChild | null = null;
 
   for (let i = gameJobs.length - 1; i >= 0; i--) {
     const job = gameJobs[i];
     const jobId = gameJobIds[i] ?? '';
-    const data = baseChildren.length > 0 ? { ...job, filePath: undefined } : { ...job, workDir };
     const isLast = i === gameJobs.length - 1;
 
-    const children: Array<{ name: string; queueName: string; opts: { jobId: string } }> | undefined = isLast
+    // Strip filePath if depending on a copy/download job so it bubbles up correctly
+    const data = baseChildren.length > 0 ? { ...job, filePath: undefined } : { ...job, workDir };
+
+    // Pass the fully constructed tailChild instead of a skeleton object
+    const children: Array<SequentialFlowChild | { name: string; queueName: string; opts: { jobId: string } }> | undefined = isLast
       ? baseChildren.length > 0
         ? baseChildren
         : undefined
       : tailChild != null
-        ? [{ name: 'youtube_upload', queueName, opts: { jobId: gameJobIds[i + 1] ?? '' } }]
+        ? [tailChild]
         : undefined;
 
     tailChild = {
