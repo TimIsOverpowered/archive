@@ -234,12 +234,7 @@ export class CacheContext {
     });
   }
 
-  private async revalidateWithRetry<T>(
-    client: Redis,
-    key: string,
-    ttl: number,
-    fetcher: () => Promise<T>
-  ): Promise<T> {
+  private async revalidateWithRetry<T>(client: Redis, key: string, ttl: number, fetcher: () => Promise<T>): Promise<T> {
     const log = getLogger().child({ key });
     const failures = this.swrFailures.get(key) ?? 0;
 

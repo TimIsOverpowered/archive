@@ -7,6 +7,7 @@ import copyFileProcessor from './copy.worker.js';
 import { createWorker } from './create-worker.js';
 import dmcaProcessor from './dmca.worker.js';
 import finalizeProcessor from './finalize.worker.js';
+import { calcLiveConcurrency } from './utils/concurrency.js';
 import type {
   LiveDownloadJob,
   StandardVodJob,
@@ -30,13 +31,6 @@ import monitorProcessor from './monitor/processor.js';
 import { QUEUE_NAMES, WorkerName } from './queues/queue.js';
 import standardVodProcessor from './vod.worker.js';
 import youtubeProcessor from './youtube.worker.js';
-
-function calcLiveConcurrency(configs: TenantConfig[], headroom: number, minConcurrency: number): number {
-  const active = configs.filter(
-    (c) => c.settings.vodDownload === true && (c.twitch?.enabled ?? c.kick?.enabled) === true
-  ).length;
-  return Math.max(active * 2 * headroom, minConcurrency);
-}
 
 export type AllJobData =
   | LiveDownloadJob
