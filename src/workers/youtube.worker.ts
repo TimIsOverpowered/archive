@@ -173,7 +173,7 @@ const youtubeProcessor = wrapWorkerProcessor<YoutubeUploadJob, YoutubeProcessorC
         'Job completed successfully'
       );
 
-      return { success: true, videos: vodResult.uploadedVideos };
+      return { success: true, videos: vodResult.uploadedVideos, filePath: ctx.filePath };
     } else {
       const result = await processGameUpload({
         tenantId: ctx.tenantId,

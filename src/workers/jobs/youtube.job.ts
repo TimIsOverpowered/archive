@@ -166,9 +166,11 @@ export async function createGameUploadJobsForVod(
       const job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, chapter);
       jobs.push({ ...job, workDir });
     } catch (error) {
-      // Skip restricted games or other errors
       const details = extractErrorDetails(error);
-      log.warn({ chapter: chapter.name, tenantId, ...details }, 'Skipping game upload job');
+      log.warn(
+        { chapterId: chapter.id, chapterName: chapter.name, tenantId, vodId, dbId, ...details },
+        'Skipping game upload job'
+      );
     }
   }
 
@@ -612,6 +614,60 @@ export interface YoutubeUploadJobResult {
 }
 
 /**
+ * Builds a sequential chain of game upload jobs to avoid BullMQ's shared-child deadlock.
+ * Chain structure: game_0 -> game_1 -> ... -> game_N -> copy/download
+ * Only the last game references baseChildren. Each earlier game depends on the next.
+ */
+function buildSequentialGameChain(
+  gameJobs: YoutubeGameUploadJob[],
+  gameJobIds: string[],
+  queueName: string,
+  baseChildren: Array<{ name: string; queueName: string; opts: { jobId: string } }>,
+  workDir?: string
+): {
+  name: string;
+  queueName: string;
+  data: Record<string, unknown>;
+  opts: { jobId: string; removeOnComplete: boolean; removeOnFail: boolean };
+  children?: Array<{ name: string; queueName: string; opts: { jobId: string } }>;
+} | null {
+  if (gameJobs.length === 0) return null;
+
+  let tailChild: {
+    name: string;
+    queueName: string;
+    data: Record<string, unknown>;
+    opts: { jobId: string; removeOnComplete: boolean; removeOnFail: boolean };
+    children?: Array<{ name: string; queueName: string; opts: { jobId: string } }>;
+  } | null = null;
+
+  for (let i = gameJobs.length - 1; i >= 0; i--) {
+    const job = gameJobs[i];
+    const jobId = gameJobIds[i] ?? '';
+    const data = baseChildren.length > 0 ? { ...job, filePath: undefined } : { ...job, workDir };
+    const isLast = i === gameJobs.length - 1;
+
+    const children: Array<{ name: string; queueName: string; opts: { jobId: string } }> | undefined = isLast
+      ? baseChildren.length > 0
+        ? baseChildren
+        : undefined
+      : tailChild != null
+        ? [{ name: 'youtube_upload', queueName, opts: { jobId: gameJobIds[i + 1] ?? '' } }]
+        : undefined;
+
+    tailChild = {
+      name: 'youtube_upload',
+      queueName,
+      data,
+      opts: { jobId, removeOnComplete: true, removeOnFail: true },
+      ...(children != null && children.length > 0 ? { children } : {}),
+    };
+  }
+
+  return tailChild;
+}
+
+/**
  * Builds children array for FlowProducer chains, including download and/or copy job dependencies.
  */
 function buildCopyChildren(
@@ -668,7 +724,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
   const vodUploadEnabled = config.youtube?.upload === true && config.youtube?.vodUpload === true;
   const gameUploadEnabled = config?.youtube?.perGameUpload === true;
 
-  // ALL mode with both game and VOD uploads: finalize -> vod -> [games] -> download
+  // ALL mode: finalize -> vod_upload -> game_1 -> ... -> game_N -> copy/download
   if (uploadMode === UPLOAD_MODES.ALL && gameUploadEnabled && vodUploadEnabled) {
     try {
       const gameJobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform, workDir);
@@ -681,26 +737,20 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
 
       const finalizeJobId = `finalize_${vodId}_1`;
       const vodJobId = `youtube_${vodId}_vod_1`;
+      const baseChildren = buildCopyChildren(downloadJobId, copyJobId);
 
-      // Build game children for VOD upload
-      const buildGameChildren = () => {
-        const baseChildren = buildCopyChildren(downloadJobId, copyJobId);
-        return gameJobs.map((job, idx) => ({
-          name: 'youtube_upload',
-          queueName: youtubeQueue.name,
-          data: baseChildren.length > 0 ? { ...job, filePath: undefined } : { ...job, workDir },
-          opts: { jobId: gameJobIds[idx] ?? '', removeOnComplete: true, removeOnFail: true },
-          ...(baseChildren.length > 0 && { children: baseChildren }),
-        }));
-      };
+      const gameChainHead = buildSequentialGameChain(gameJobs, gameJobIds, youtubeQueue.name, baseChildren, workDir);
 
-      // Build VOD upload child with game grandchildren
       const vodChild = {
         name: 'youtube_upload',
         queueName: youtubeQueue.name,
         data: createVodUploadData(ctx, dbId, vodId, type, { dmcaProcessed, workDir, streamId }),
         opts: { jobId: vodJobId, removeOnComplete: true, removeOnFail: true },
-        children: buildGameChildren(),
+        ...(gameChainHead != null
+          ? { children: [gameChainHead] }
+          : baseChildren.length > 0
+            ? { children: baseChildren }
+            : {}),
       };
 
       const flow = await getFlowProducer().add({
@@ -724,7 +774,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
       log.warn({ ...details, vodId }, 'Failed to queue YouTube uploads');
     }
   } else {
-    // Game Uploads only (ALL mode, no VOD enabled): finalize -> [games] -> download
+    // Game Uploads only: finalize -> game_1 -> ... -> game_N -> copy/download
     if (uploadMode === UPLOAD_MODES.ALL && gameUploadEnabled) {
       try {
         const gameJobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform, workDir);
@@ -737,17 +787,17 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
 
         if (!vodUploadEnabled) {
           const finalizeJobId = `finalize_${vodId}_1`;
+          const baseChildren = buildCopyChildren(downloadJobId, copyJobId);
 
-          const flowChildren = gameJobs.map((job, idx) => {
-            const baseChildren = buildCopyChildren(downloadJobId, copyJobId);
-            return {
-              name: 'youtube_upload',
-              queueName: youtubeQueue.name,
-              data: baseChildren.length > 0 ? { ...job, filePath: undefined } : { ...job, workDir },
-              opts: { jobId: gameJobIds[idx] ?? '', removeOnComplete: true, removeOnFail: true },
-              ...(baseChildren.length > 0 && { children: baseChildren }),
-            };
-          });
+          const gameChainHead = buildSequentialGameChain(
+            gameJobs,
+            gameJobIds,
+            youtubeQueue.name,
+            baseChildren,
+            workDir
+          );
+
+          const flowChildren = gameChainHead != null ? [gameChainHead] : [];
 
           const flow = await getFlowProducer().add({
             name: 'vod_finalize_file',
