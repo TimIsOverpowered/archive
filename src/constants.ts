@@ -48,7 +48,7 @@ export const Cache = {
   /** 3 days for chat cache */
   CHAT_TTL: 3 * 24 * 60 * 60,
   /** Cap paginated list cache to prevent tag explosion */
-  MAX_PAGES: 10,
+  MAX_PAGES: 10_000,
 } as const;
 
 // ── Cache Stale-While-Revalidate ────────────────────────────────────────────
