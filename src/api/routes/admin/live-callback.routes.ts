@@ -11,7 +11,7 @@ import { PLATFORM_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest, notFound } from '../../../utils/http-error.js';
 import { assertPathWithinBase, fileExists, sanitizePathForLog } from '../../../utils/path.js';
-import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
+import { enqueueFinalizeJob, queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import {
@@ -111,35 +111,44 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
         log.info({ vodId: vodRecord.id, durationSecs }, 'Updated VOD duration');
       }
 
-      if (config?.youtube?.upload !== true) {
-        log.warn({ streamId }, 'YouTube upload not enabled, skipping queue');
+      if (config?.youtube?.upload === true) {
+        const { gameJobIds, vodJobId } = await queueYoutubeUploads({
+          ctx: tenantCtx,
+          dbId: vodRecord.id,
+          vodId: vodRecord.platform_vod_id ?? '',
+          filePath: inputPath,
+          platform,
+          type: SOURCE_TYPES.LIVE,
+          workDir: pathModule.dirname(inputPath),
+          streamId: vodRecord.platform_stream_id ?? undefined,
+          forceUpload: true,
+        });
 
         return ok({
-          message: 'YouTube upload is disabled for this tenant. Recording processed but no upload queued.',
+          message: 'YouTube upload queued successfully',
           vodId: vodRecord.id,
           streamId,
+          gameJobIds,
+          vodJobId,
           path: sanitizePathForLog(inputPath),
         });
       }
 
-      const { gameJobIds, vodJobId } = await queueYoutubeUploads({
-        ctx: tenantCtx,
-        dbId: vodRecord.id,
-        vodId: vodRecord.platform_vod_id ?? '',
-        filePath: inputPath,
+      const finalizeJobId = await enqueueFinalizeJob(
+        tenantCtx,
+        vodRecord.id,
+        vodRecord.platform_vod_id ?? '',
+        inputPath,
+        SOURCE_TYPES.LIVE,
         platform,
-        type: SOURCE_TYPES.LIVE,
-        workDir: pathModule.dirname(inputPath),
-        streamId: vodRecord.platform_stream_id ?? undefined,
-        forceUpload: true,
-      });
+        { workDir: pathModule.dirname(inputPath), streamId: vodRecord.platform_stream_id ?? undefined }
+      );
 
       return ok({
-        message: 'YouTube upload queued successfully',
+        message: 'YouTube upload is disabled. VOD finalized to storage.',
         vodId: vodRecord.id,
         streamId,
-        gameJobIds,
-        vodJobId,
+        finalizeJobId,
         path: sanitizePathForLog(inputPath),
       });
     },
