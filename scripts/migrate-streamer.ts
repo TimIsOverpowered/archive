@@ -450,14 +450,14 @@ const main = async () => {
 
   let chatWorkers = 8;
   let chatBatchSize = 100000;
-  const workersAnswer = await prompt(`Number of chat migration workers? [${chatWorkers}]:`);
+  const workersAnswer = await prompt(`Number of chat migration workers? [${chatWorkers}]`);
   if (workersAnswer && workersAnswer.trim()) {
     const parsed = parseInt(workersAnswer, 10);
     if (!isNaN(parsed) && parsed >= 1) {
       chatWorkers = parsed;
     }
   }
-  const batchSizeAnswer = await prompt(`Chat migration batch size? [${chatBatchSize}}]:`);
+  const batchSizeAnswer = await prompt(`Chat migration batch size? [${chatBatchSize}}]`);
   if (batchSizeAnswer && batchSizeAnswer.trim()) {
     const parsed = parseInt(batchSizeAnswer, 10);
     if (!isNaN(parsed) && parsed >= 10000 && parsed <= 500000) {
