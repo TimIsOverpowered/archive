@@ -530,7 +530,8 @@ const main = async () => {
         console.log('   Check tables: vods, emotes, games, chapters\n');
         poolEnded = true;
         await oldPool.end();
-        return;
+        await closeMetaClient();
+        process.exit(0);
       }
 
       const oldVodsCount = await oldPool.query('SELECT COUNT(*) FROM vods');
@@ -557,7 +558,8 @@ const main = async () => {
         console.log(`   Would migrate: ~${oldLogsCount.toLocaleString()} chat messages (estimated)\n`);
         poolEnded = true;
         await oldPool.end();
-        return;
+        await closeMetaClient();
+        process.exit(0);
       }
 
       const proceed = await confirm('Proceed with migration? This will create new tables and migrate data');
@@ -985,6 +987,7 @@ const main = async () => {
       if (!poolEnded) await oldPool.end();
       await closeMetaClient();
     }
+    process.exit(0);
   } catch (initError) {
     errors.push(`Initialization error: ${String(initError)}`);
     console.error('\n❌ Error:', initError);
