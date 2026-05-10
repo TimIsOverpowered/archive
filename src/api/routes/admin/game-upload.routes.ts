@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import type { SourceType, DownloadMethod } from '../../../types/platforms.js';
 import { DOWNLOAD_METHODS, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { internalServerError } from '../../../utils/http-error.js';
+import { internalServerError, badRequest } from '../../../utils/http-error.js';
 import { queueDmcaProcessing } from '../../../workers/jobs/dmca.job.js';
 import { queueYoutubeGameUploadByGame } from '../../../workers/jobs/youtube.job.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
@@ -10,7 +10,7 @@ import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import { tenantMiddleware, requireTenant } from '../../middleware/tenant-platform.js';
 import { ok } from '../../response.js';
 import { parseDmcaClaims } from './utils/dmca.js';
-import { resolveGameWithContext } from './utils/game-context.js';
+import { resolveGameWithContext, resolveChapterWithContext } from './utils/game-context.js';
 import { ensureVodDownload } from './utils/vod-downloads.js';
 import { buildVodJobResponse } from './utils/vod-job-response.js';
 
@@ -19,7 +19,8 @@ interface ReUploadGameParams {
 }
 
 interface ReUploadGameBody {
-  gameId: number;
+  gameId?: number;
+  chapterId?: number;
   downloadMethod?: DownloadMethod;
 }
 
@@ -44,7 +45,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
     {
       schema: {
         tags: ['Admin'],
-        description: 'Manually trigger YouTube re-upload for a single game',
+        description: 'Manually trigger YouTube re-upload for a single game (by gameId or chapterId)',
         params: {
           type: 'object',
           properties: { tenantId: { type: 'string', description: 'Tenant ID' } },
@@ -54,6 +55,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
           type: 'object',
           properties: {
             gameId: { type: 'number', description: 'Game database ID' },
+            chapterId: { type: 'number', description: 'Chapter database ID (alternative to gameId)' },
             downloadMethod: {
               type: 'string',
               enum: DOWNLOAD_METHODS_VALUES,
@@ -61,7 +63,6 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
               description: 'Download method',
             },
           },
-          required: ['gameId'],
         },
         security: [{ apiKey: [] }],
       },
@@ -70,14 +71,61 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
     async (request) => {
       const tenantCtx = requireTenant(request);
       const { tenantId, config, db } = tenantCtx;
-      const { gameId, downloadMethod } = request.body;
+      const { gameId, chapterId, downloadMethod } = request.body;
       const log = createAutoLogger(tenantId);
 
-      const resolved = await resolveGameWithContext(gameId, db, tenantCtx, config);
-      const { game, dbId, vodId, platform, tenantPlatformCtx } = resolved;
+      if (gameId == null && chapterId == null) {
+        return badRequest('Either gameId or chapterId must be provided');
+      }
+
       const type: SourceType = SOURCE_TYPES.VOD;
 
-      // Ensure VOD file is downloaded and valid
+      if (gameId != null) {
+        const resolved = await resolveGameWithContext(gameId, db, tenantCtx, config);
+        const { game, dbId, vodId, platform, tenantPlatformCtx } = resolved;
+
+        const { jobId, filePath, copyJobId, workDir } = await ensureVodDownload({
+          ctx: tenantPlatformCtx,
+          dbId,
+          vodId,
+          type,
+          downloadMethod,
+          log,
+        });
+
+        const gameJobId = await queueYoutubeGameUploadByGame(
+          tenantPlatformCtx,
+          dbId,
+          vodId,
+          filePath,
+          platform,
+          game,
+          jobId ?? undefined,
+          workDir,
+          copyJobId
+        );
+
+        if (gameJobId == null) {
+          return ok({
+            message: 'Game upload skipped (restricted game)',
+            gameId,
+            vodId,
+          });
+        }
+
+        return buildVodJobResponse({
+          hasDownload: jobId != null,
+          filePath,
+          downstreamJobId: gameJobId,
+          downstreamLabel: 'Game upload',
+          copyJobId,
+          base: { gameId, vodId },
+        });
+      }
+
+      const resolved = await resolveChapterWithContext(chapterId!, db, tenantCtx, config);
+      const { chapter, dbId, vodId, platform, tenantPlatformCtx } = resolved;
+
       const { jobId, filePath, copyJobId, workDir } = await ensureVodDownload({
         ctx: tenantPlatformCtx,
         dbId,
@@ -87,14 +135,30 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
         log,
       });
 
-      // Queue game upload using the game's own time range
+      const gameLike = {
+        id: chapter.id,
+        vod_id: chapter.vod_id,
+        start: chapter.start,
+        duration: chapter.duration,
+        end: chapter.end ?? 0,
+        video_provider: null,
+        video_id: null,
+        thumbnail_url: null,
+        game_id: chapter.game_id,
+        game_name: chapter.name,
+        title: chapter.name,
+        chapter_image: chapter.image,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
       const gameJobId = await queueYoutubeGameUploadByGame(
         tenantPlatformCtx,
         dbId,
         vodId,
         filePath,
         platform,
-        game,
+        gameLike,
         jobId ?? undefined,
         workDir,
         copyJobId
@@ -103,7 +167,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
       if (gameJobId == null) {
         return ok({
           message: 'Game upload skipped (restricted game)',
-          gameId,
+          chapterId,
           vodId,
         });
       }
@@ -114,7 +178,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
         downstreamJobId: gameJobId,
         downstreamLabel: 'Game upload',
         copyJobId,
-        base: { gameId, vodId },
+        base: { chapterId, vodId },
       });
     }
   );

@@ -80,6 +80,15 @@ export class GameNotFoundError extends DomainError {
   }
 }
 
+export class ChapterNotFoundError extends DomainError {
+  readonly code = 'CHAPTER_NOT_FOUND';
+  readonly statusCode = 404;
+
+  constructor(chapterId: number) {
+    super(`Chapter not found: ${chapterId}`);
+  }
+}
+
 export class PlatformNotMainSourceError extends DomainError {
   readonly code = 'PLATFORM_NOT_MAIN_SOURCE';
   readonly statusCode = 400;
