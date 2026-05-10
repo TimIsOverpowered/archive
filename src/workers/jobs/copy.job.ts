@@ -49,7 +49,7 @@ export async function queueFileCopy(options: QueueFileCopyOptions): Promise<stri
           {
             name: 'standard_vod_download',
             queueName: getStandardVodQueue().name,
-            opts: { jobId: downloadJobId },
+            opts: { jobId: downloadJobId, failParentOnFailure: false },
           },
         ],
       });

@@ -80,19 +80,23 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
 
   try {
     if (downloadJobId != null || copyJobId != null) {
-      const children: Array<{ name: string; queueName: string; opts: { jobId: string } }> = [];
+      const children: Array<{
+        name: string;
+        queueName: string;
+        opts: { jobId: string; failParentOnFailure?: boolean };
+      }> = [];
       if (downloadJobId != null) {
         children.push({
           name: 'standard_vod_download',
           queueName: getStandardVodQueue().name,
-          opts: { jobId: downloadJobId },
+          opts: { jobId: downloadJobId, failParentOnFailure: false },
         });
       }
       if (copyJobId != null) {
         children.push({
           name: 'file_copy',
           queueName: getFileCopyQueue().name,
-          opts: { jobId: copyJobId },
+          opts: { jobId: copyJobId, failParentOnFailure: false },
         });
       }
       const flow = await getFlowProducer().add({
