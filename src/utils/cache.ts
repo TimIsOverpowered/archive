@@ -16,6 +16,7 @@
  * Both use Brotli compression internally — primitives like numbers round-trip correctly.
  * The `withSimpleCache` function has been removed; use `withCache` for all use cases.
  */
+import { Redis } from 'ioredis';
 import { LRUCache } from 'lru-cache';
 import { CacheSwr, CacheInflight } from '../constants.js';
 import { getLogger } from '../utils/logger.js';
@@ -234,7 +235,7 @@ export class CacheContext {
   }
 
   private async revalidateWithRetry<T>(
-    client: ReturnType<typeof RedisService.getClient>,
+    client: Redis,
     key: string,
     ttl: number,
     fetcher: () => Promise<T>

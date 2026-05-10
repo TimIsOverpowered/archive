@@ -1,16 +1,17 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach } from 'node:test';
-import { createMockRedis } from '../helpers/mock-redis.js';
+import type { Redis } from 'ioredis';
+import RedisMock from 'ioredis-mock';
 
 describe('Integration: Mock Redis', () => {
-  let mock: ReturnType<typeof createMockRedis>;
+  let mock: Redis;
 
-  beforeEach(() => {
-    mock = createMockRedis();
+  beforeEach(async () => {
+    mock = new RedisMock({ lazyConnect: true });
+    await mock.connect();
   });
 
   it('should get/set values', async () => {
-    await mock.connect();
     await mock.set('key1', 'value1', 'EX', 60);
     const val = await mock.get('key1');
     assert.strictEqual(val, 'value1');
@@ -35,35 +36,40 @@ describe('Integration: Mock Redis', () => {
   });
 
   it('should support pipeline', async () => {
-    const pipeline = mock.pipeline();
-    pipeline.set('a', '1');
-    pipeline.incr('b');
-    const results = await pipeline.exec();
-    assert.strictEqual(results[0], 'OK');
-    assert.strictEqual(results[1], 1);
+    const results = (await mock.pipeline().set('a', '1').incr('b').exec())!;
+    assert.deepStrictEqual(results[0], [null, 'OK']);
+    assert.deepStrictEqual(results[1], [null, 1]);
   });
 
   it('should support publish/subscribe', async () => {
     let received: string | null = null;
-    mock.on('message', (_ch: string, msg: string) => {
+    const subClient = new RedisMock({ lazyConnect: true });
+    await subClient.connect();
+    subClient.on('message', (_ch: string, msg: string) => {
       received = msg;
     });
-    await mock.subscribe('test-channel');
-    await mock.publish('test-channel', 'hello');
+    await subClient.subscribe('test-channel');
+    await new Promise((resolve) => setImmediate(resolve));
+    const pubClient = new RedisMock({ lazyConnect: true });
+    await pubClient.connect();
+    await pubClient.publish('test-channel', 'hello');
+    await new Promise((resolve) => setImmediate(resolve));
     assert.strictEqual(received, 'hello');
+    await subClient.quit();
+    await pubClient.quit();
   });
 
   it('should support duplicate for subscriber', async () => {
-    await mock.connect();
     const dup = mock.duplicate();
     await dup.subscribe('ch');
     assert.ok(dup);
+    await dup.disconnect();
   });
 
   it('should reset all data', async () => {
     await mock.set('k1', 'v1');
     await mock.set('k2', 'v2');
-    mock.reset();
+    mock.flushdb();
     assert.strictEqual(await mock.get('k1'), null);
     assert.strictEqual(await mock.get('k2'), null);
   });

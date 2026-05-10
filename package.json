@@ -83,6 +83,7 @@
     "eslint": "^10.3.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import-x": "^4.16.2",
+    "ioredis-mock": "^8.13.1",
     "knip": "^6.12.2",
     "open": "^11.0.0",
     "pino-pretty": "^13.1.3",

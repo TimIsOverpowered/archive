@@ -21,7 +21,7 @@ interface VodUpdateEvent {
  * Handle a parsed cache event by updating volatile cache or invalidating static cache.
  * Fire-and-forget from the Redis message listener; errors are caught and logged.
  */
-async function handleCacheEvent(event: VodUpdateEvent): Promise<void> {
+export async function handleCacheEvent(event: VodUpdateEvent): Promise<void> {
   if (event.type === 'VOD_DURATION_UPDATED' && event.duration !== undefined) {
     await setVodVolatileCache(
       event.tenantId,

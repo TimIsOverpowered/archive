@@ -1,23 +1,24 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
+import type { Redis } from 'ioredis';
+import RedisMock from 'ioredis-mock';
 import { registerTenantConfigSubscriberWorker } from '../../src/config/tenant-config-subscriber.js';
 import { configService } from '../../src/config/tenant-config.js';
 import { RedisService } from '../../src/utils/redis-service.js';
-import { createMockRedis, type MockRedisClient } from '../helpers/mock-redis.js';
 
 const CONFIG_CHANNEL = 'cache:tenant';
 
 describe('tenant-config-subscriber', () => {
-  let mockRedis: MockRedisClient;
+  let mockRedis: Redis;
   let mockReloadCalls: string[] = [];
   let mockReloadThrow: Error | null = null;
   let subClient: any = null;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockReloadCalls = [];
     mockReloadThrow = null;
-    mockRedis = createMockRedis();
-    mockRedis.connect();
+    mockRedis = new RedisMock({ lazyConnect: true });
+    await mockRedis.connect();
 
     (RedisService as any)._instance = {
       client: mockRedis,
@@ -42,7 +43,7 @@ describe('tenant-config-subscriber', () => {
     subClient = registerTenantConfigSubscriberWorker();
     await new Promise((resolve) => setImmediate(resolve));
 
-    // Emit directly on the subscriber client because MockRedisClient.duplicate()
+    // Emit directly on the subscriber client because ioredis-mock duplicate()
     // does not properly link Pub/Sub events between instances.
     subClient.emit(
       'message',
