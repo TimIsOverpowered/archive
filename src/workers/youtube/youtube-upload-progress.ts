@@ -3,7 +3,7 @@ import type { UploadType } from '../../types/platforms.js';
 import { UPLOAD_TYPES } from '../../types/platforms.js';
 import { updateDiscordEmbed, isAlertsEnabled, createProgressBar } from '../../utils/discord-alerts.js';
 import { extractErrorDetails } from '../../utils/error.js';
-import { toHHMMSS } from '../../utils/formatting.js';
+import { formatBytes, toHHMMSS } from '../../utils/formatting.js';
 
 interface UploadProgressOptions {
   messageId: string | null;
@@ -14,19 +14,6 @@ interface UploadProgressOptions {
   part?: number;
   totalParts?: number;
   privacyStatus?: 'public' | 'unlisted' | 'private';
-}
-
-function formatBytes(bytes: number): string {
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let unitIndex = 0;
-  let size = bytes;
-
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex++;
-  }
-
-  return `${size.toFixed(1)} ${units[unitIndex]}`;
 }
 
 export function createYoutubeUploadProgressHandler({

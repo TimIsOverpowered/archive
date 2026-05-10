@@ -63,3 +63,17 @@ export function extractDatabaseName(connectionString: string): string {
     return 'postgres';
   }
 }
+
+/** Format bytes into human-readable string (B, KB, MB, GB). */
+export function formatBytes(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let unitIndex = 0;
+  let size = bytes;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex++;
+  }
+
+  return `${size.toFixed(1)} ${units[unitIndex]}`;
+}

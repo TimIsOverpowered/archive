@@ -7,7 +7,7 @@ import { capitalizePlatform, Platform } from '../../types/platforms.js';
 import { createProgressBar, updateAlert } from '../../utils/discord-alerts.js';
 import type { RichEmbedData } from '../../utils/discord-alerts.js';
 import { extractErrorDetails } from '../../utils/error.js';
-import { toHHMMSS } from '../../utils/formatting.js';
+import { formatBytes, toHHMMSS } from '../../utils/formatting.js';
 import type { AppLogger } from '../../utils/logger.js';
 import type { LiveCompletionData } from '../types.js';
 
@@ -549,6 +549,91 @@ export function createDmcaWorkerAlerts(): DmcaWorkerAlerts {
       status: 'error',
       fields: [
         { name: 'VOD ID', value: vodId, inline: false },
+        { name: 'Error', value: errorMsg.substring(0, 500), inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+    }),
+  };
+}
+
+// ============================================================================
+// Copy Worker Alerts
+// ============================================================================
+
+export interface CopyWorkerAlerts {
+  init: (vodId: string, sourcePath: string, destPath: string, fileSize: number) => RichEmbedData;
+  progress: (
+    vodId: string,
+    percent: number,
+    bytesCopied: number,
+    totalBytes: number,
+    speedBps: number,
+    etaSeconds: number
+  ) => RichEmbedData;
+  complete: (vodId: string, destPath: string, fileSize: number, elapsedSeconds: number) => RichEmbedData;
+  error: (vodId: string, bytesCopied: number, totalBytes: number, errorMsg: string) => RichEmbedData;
+}
+
+export function createCopyWorkerAlerts(): CopyWorkerAlerts {
+  return {
+    init: (vodId, sourcePath, destPath, fileSize) => ({
+      title: `📋 Copying ${vodId}`,
+      description: 'Copying file to tmpPath for processing',
+      status: 'warning',
+      fields: [
+        { name: 'VOD ID', value: vodId, inline: true },
+        { name: 'Size', value: formatBytes(fileSize), inline: true },
+        { name: 'Source', value: sourcePath, inline: false },
+        { name: 'Destination', value: destPath, inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+    }),
+
+    progress: (vodId, percent, bytesCopied, totalBytes, speedBps, etaSeconds) => {
+      const progressBar = createProgressBar(percent);
+
+      return {
+        title: `📋 Copying ${vodId}`,
+        description: `Copying file to tmpPath for processing (${percent}%)`,
+        status: 'warning',
+        fields: [
+          { name: 'VOD ID', value: vodId, inline: true },
+          { name: 'Progress', value: progressBar, inline: false },
+          { name: 'Copied', value: `${formatBytes(bytesCopied)} / ${formatBytes(totalBytes)}`, inline: false },
+          { name: 'Speed', value: `${formatBytes(speedBps)}/s`, inline: true },
+          { name: 'ETA', value: toHHMMSS(Math.max(0, etaSeconds)), inline: true },
+        ],
+        timestamp: new Date().toISOString(),
+        updatedTimestamp: new Date().toISOString(),
+      };
+    },
+
+    complete: (vodId, destPath, fileSize, elapsedSeconds) => {
+      const avgSpeed = elapsedSeconds > 0 ? fileSize / elapsedSeconds : 0;
+
+      return {
+        title: `✅ Copy Complete ${vodId}`,
+        description: 'File copy to tmpPath completed',
+        status: 'success',
+        fields: [
+          { name: 'VOD ID', value: vodId, inline: true },
+          { name: 'Size', value: formatBytes(fileSize), inline: true },
+          { name: 'Time', value: toHHMMSS(elapsedSeconds), inline: true },
+          { name: 'Avg Speed', value: `${formatBytes(avgSpeed)}/s`, inline: true },
+          { name: 'Destination', value: destPath, inline: false },
+        ],
+        timestamp: new Date().toISOString(),
+        updatedTimestamp: new Date().toISOString(),
+      };
+    },
+
+    error: (vodId, bytesCopied, totalBytes, errorMsg) => ({
+      title: `❌ Copy Failed ${vodId}`,
+      description: 'File copy to tmpPath failed',
+      status: 'error',
+      fields: [
+        { name: 'VOD ID', value: vodId, inline: true },
+        { name: 'Copied', value: `${formatBytes(bytesCopied)} / ${formatBytes(totalBytes)}`, inline: true },
         { name: 'Error', value: errorMsg.substring(0, 500), inline: false },
       ],
       timestamp: new Date().toISOString(),
