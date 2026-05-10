@@ -113,6 +113,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
         filePath,
         downstreamJobId: gameJobId,
         downstreamLabel: 'Game upload',
+        copyJobId,
         base: { gameId, vodId },
       });
     }
@@ -197,6 +198,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
         filePath,
         downstreamJobId: dmcaJobId,
         downstreamLabel: 'DMCA processing',
+        copyJobId,
         base: { gameId, vodId },
       });
     }

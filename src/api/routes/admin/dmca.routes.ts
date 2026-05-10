@@ -147,6 +147,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         filePath,
         downstreamJobId: dmcaJobId,
         downstreamLabel: 'DMCA processing',
+        copyJobId,
         base: { dbId: vodRecord.id, vodId: vodRecord.platform_vod_id },
         extra: part !== undefined ? { part } : {},
       });

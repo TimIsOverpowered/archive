@@ -10,6 +10,8 @@ export interface BuildVodJobResponseOptions {
   downstreamJobId: string;
   /** Label for the downstream job (e.g. 'DMCA processing', 'YouTube upload') */
   downstreamLabel: string;
+  /** ID of the file copy job (when tmpPath copy is needed) */
+  copyJobId?: string | undefined;
   /** Base fields included in all responses (dbId, vodId, gameId, etc.) */
   base?: Record<string, unknown> | undefined;
   /** Additional fields to include in both response branches */
@@ -23,7 +25,7 @@ export interface BuildVodJobResponseOptions {
  * When file already exists: returns message indicating downstream job is queued.
  */
 export function buildVodJobResponse(opts: BuildVodJobResponseOptions): ReturnType<typeof ok<Record<string, unknown>>> {
-  const { hasDownload, filePath, downstreamJobId, downstreamLabel, base = {}, extra = {} } = opts;
+  const { hasDownload, filePath, downstreamJobId, downstreamLabel, copyJobId, base = {}, extra = {} } = opts;
 
   if (hasDownload) {
     return ok({
@@ -39,6 +41,7 @@ export function buildVodJobResponse(opts: BuildVodJobResponseOptions): ReturnTyp
     message: `${downstreamLabel} queued!`,
     filePath,
     downstreamJobId,
+    ...(copyJobId != null && copyJobId !== '' ? { copyJobId } : {}),
     ...base,
     ...extra,
   });

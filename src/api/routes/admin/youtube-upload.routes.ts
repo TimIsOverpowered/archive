@@ -127,6 +127,7 @@ export default function youtubeUploadRoutes(fastify: FastifyInstance, _options: 
         filePath,
         downstreamJobId: jobId ?? '',
         downstreamLabel: 'YouTube upload',
+        copyJobId,
         base: jobId != null ? { dbId: vodRecord.id, vodId: vodRecord.platform_vod_id, jobId } : {},
       });
     }

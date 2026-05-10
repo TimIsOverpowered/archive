@@ -122,6 +122,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
         filePath,
         downstreamJobId: jobId ?? '',
         downstreamLabel: 'YouTube upload',
+        copyJobId,
         base: jobId != null ? { dbId: vodRecord.id, vodId: vodRecord.platform_vod_id, jobId } : {},
       });
     }
@@ -180,7 +181,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
       const dbId = vodRecord.id;
 
       // Ensure vod download
-      const { jobId, filePath } = await ensureVodDownload({
+      const { jobId, filePath, copyJobId } = await ensureVodDownload({
         ctx: tenantCtx,
         dbId,
         vodId,
@@ -195,6 +196,13 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
           dbId,
           vodId,
           jobId,
+        });
+      } else if (copyJobId != null && copyJobId !== '') {
+        return ok({
+          message: 'File copy queued!',
+          dbId,
+          vodId,
+          copyJobId,
         });
       } else {
         badRequest(`File already exists at ${filePath}`);
