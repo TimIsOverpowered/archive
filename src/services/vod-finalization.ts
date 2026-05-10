@@ -31,16 +31,19 @@ export async function finalizeVod(options: FinalizeVodOptions): Promise<void> {
 
   const dur = parsedDuration.success ? (parsedDuration.data.duration ?? null) : null;
 
-  await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-    if (dur != null) {
-      const strategy = getStrategy(platform);
-      if (strategy != null && strategy.finalizeChapters != null) {
-        await strategy.finalizeChapters({ ...ctx, platform, db }, dbId, vodId, dur);
-      }
-      await db.updateTable('vods').set({ is_live: false, duration: dur }).where('id', '=', dbId).execute();
-    } else {
-      await db.updateTable('vods').set({ is_live: false }).where('id', '=', dbId).execute();
+  if (dur != null) {
+    const strategy = getStrategy(platform);
+    if (strategy != null && strategy.finalizeChapters != null) {
+      await strategy.finalizeChapters({ ...ctx, platform, db: ctx.db }, dbId, vodId, dur);
     }
+  }
+
+  await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+    await db
+      .updateTable('vods')
+      .set({ is_live: false, ...(dur != null ? { duration: dur } : {}) })
+      .where('id', '=', dbId)
+      .execute();
   });
 
   await publishVodDurationUpdate(ctx.tenantId, dbId, dur ?? 0, false);
