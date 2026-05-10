@@ -686,10 +686,14 @@ const main = async () => {
         }
 
         const emotes = await oldPool.query('SELECT * FROM emotes');
+        let migratedEmotes = 0;
+        let skippedEmotes = 0;
         for (const emote of emotes.rows) {
           const newVodId = vodIdMap.get(emote.vod_id);
           if (!newVodId) {
-            throw new Error(`Emote references non-existent VOD ${emote.vod_id} - FK integrity failed`);
+            console.warn(`⚠️  Skipping emote ${emote.id} - references non-existent VOD ${emote.vod_id}`);
+            skippedEmotes++;
+            continue;
           }
           await schemaClient.query(
             `INSERT INTO "emotes_new" (vod_id, ffz_emotes, bttv_emotes, seventv_emotes)
@@ -704,22 +708,29 @@ const main = async () => {
               JSON.stringify(emote['7tv_emotes']),
             ]
           );
+          migratedEmotes++;
         }
 
-        console.log(`✅ Migrated ${emotes.rows.length} emote records`);
+        console.log(`✅ Migrated ${migratedEmotes} emote records (${skippedEmotes} orphaned skipped)`);
 
         const games = await oldPool.query('SELECT * FROM games');
         let migratedGames = 0;
+        let skippedGames = 0;
+        let orphanedGames = 0;
         for (const game of games.rows) {
           const newVodId = vodIdMap.get(game.vod_id);
           if (!newVodId) {
-            throw new Error(`Game references non-existent VOD ${game.vod_id} - FK integrity failed`);
+            console.warn(`⚠️  Skipping game ${game.id} - references non-existent VOD ${game.vod_id}`);
+            orphanedGames++;
+            skippedGames++;
+            continue;
           }
           const start = game.start_time ? Math.round(Number(game.start_time)) : null;
           const duration = game.end_time ? Math.round(Number(game.end_time)) : null;
 
           if (start === null || duration === null) {
             console.warn(`⚠️  Skipping game ${game.id} (null start_time or end_time)`);
+            skippedGames++;
             continue;
           }
           const end = start + duration;
@@ -751,7 +762,7 @@ const main = async () => {
           migratedGames++;
         }
 
-        console.log(`✅ Migrated ${migratedGames} games (${games.rows.length - migratedGames} skipped)`);
+        console.log(`✅ Migrated ${migratedGames} games (${skippedGames} skipped, ${orphanedGames} orphaned)`);
 
         try {
           await applySchemaMigrations(schemaClient);
