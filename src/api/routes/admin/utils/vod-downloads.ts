@@ -8,7 +8,7 @@ import { DOWNLOAD_METHODS, SOURCE_TYPES } from '../../../../types/platforms.js';
 import { PlatformNotConfiguredError, VodNotFoundError } from '../../../../utils/domain-errors.js';
 import { extractErrorDetails } from '../../../../utils/error.js';
 import { type AppLogger } from '../../../../utils/logger.js';
-import { getTmpFilePath, getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
+import { getTmpFilePath, getTmpDirPath, getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
 import { queueFileCopy } from '../../../../workers/jobs/copy.job.js';
 import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
 import { getMetadata } from '../../../../workers/utils/ffmpeg.js';
@@ -71,7 +71,7 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
 
       if (tmpExists) {
         log.debug({ path: tmpFilePath }, 'VOD already exists in tmpPath');
-        return { filePath: tmpFilePath, jobId: null, workDir: tmpPath };
+        return { filePath: tmpFilePath, jobId: null, workDir: getTmpDirPath({ tenantId, vodId }) };
       }
 
       try {
@@ -84,7 +84,7 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
           destPath: tmpFilePath,
         });
         log.info({ filePath, tmpFilePath, copyJobId }, 'Queued file copy from storage to tmpPath');
-        return { filePath: tmpFilePath, jobId: null, copyJobId, workDir: tmpPath };
+        return { filePath: tmpFilePath, jobId: null, copyJobId, workDir: getTmpDirPath({ tenantId, vodId }) };
       } catch (err) {
         log.warn({ error: extractErrorDetails(err).message }, 'Failed to queue file copy to tmpPath');
       }
@@ -106,8 +106,7 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
   });
 
   log.info({ jobId, vodId, filePath, type }, 'VOD download queued');
-  const tmpPath = getTmpPath();
-  return { filePath, jobId, workDir: tmpPath ?? undefined };
+  return { filePath, jobId, workDir: getTmpDirPath({ tenantId, vodId }) };
 }
 
 /**

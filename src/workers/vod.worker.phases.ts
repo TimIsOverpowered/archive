@@ -161,7 +161,8 @@ export async function sendVodCompletion(ctx: VodProcessorContext): Promise<void>
         ctx.vodId,
         ctx.finalPath,
         SOURCE_TYPES.VOD,
-        ctx.platform
+        ctx.platform,
+        { workDir: getTmpDirPath({ tenantId: ctx.tenantId, vodId: ctx.vodId }) }
       );
     } catch (err) {
       ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Failed to enqueue finalize job');
