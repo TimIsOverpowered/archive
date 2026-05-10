@@ -3,7 +3,13 @@ import type { Platform, SourceType } from '../../types/platforms.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
 import type { DMCAClaim } from '../dmca/dmca.js';
-import { defaultJobOptions, getDmcaProcessingQueue, getFlowProducer, getStandardVodQueue } from '../queues/queue.js';
+import {
+  defaultJobOptions,
+  getDmcaProcessingQueue,
+  getFileCopyQueue,
+  getFlowProducer,
+  getStandardVodQueue,
+} from '../queues/queue.js';
 import { enqueueJobWithLogging } from './enqueue.js';
 import type { DmcaProcessingJob } from './types.js';
 
@@ -18,6 +24,7 @@ export interface QueueDmcaProcessingOptions {
   platform: Platform;
   part?: number | undefined;
   downloadJobId?: string | undefined;
+  copyJobId?: string | undefined;
   filePath?: string | undefined;
   gameId?: number | undefined;
   gameStart?: number | undefined;
@@ -37,6 +44,7 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
     platform,
     part,
     downloadJobId,
+    copyJobId,
     filePath,
     gameId,
     gameStart,
@@ -71,7 +79,22 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
   };
 
   try {
-    if (downloadJobId != null) {
+    if (downloadJobId != null || copyJobId != null) {
+      const children: Array<{ name: string; queueName: string; opts: { jobId: string } }> = [];
+      if (downloadJobId != null) {
+        children.push({
+          name: 'standard_vod_download',
+          queueName: getStandardVodQueue().name,
+          opts: { jobId: downloadJobId },
+        });
+      }
+      if (copyJobId != null) {
+        children.push({
+          name: 'file_copy',
+          queueName: getFileCopyQueue().name,
+          opts: { jobId: copyJobId },
+        });
+      }
       const flow = await getFlowProducer().add({
         name: 'dmca_processing',
         queueName: getDmcaProcessingQueue().name,
@@ -81,13 +104,7 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
           deduplication: { id: jobId },
           ...defaultJobOptions,
         },
-        children: [
-          {
-            name: 'standard_vod_download',
-            queueName: getStandardVodQueue().name,
-            opts: { jobId: downloadJobId },
-          },
-        ],
+        children,
       });
 
       const resultJobId = flow.job.id ?? null;
@@ -113,7 +130,7 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
     return result.isNew ? result.jobId : null;
   } catch (error) {
     const msg = extractErrorDetails(error).message;
-    if (downloadJobId == null) {
+    if (downloadJobId == null && copyJobId == null) {
       log.error({ jobId, tenantId, error: msg }, 'Failed to enqueue DMCA processing job');
     } else {
       log.debug({ jobId, tenantId, error: msg }, 'DMCA processing enqueue failed (chained)');

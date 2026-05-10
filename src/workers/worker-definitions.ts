@@ -3,6 +3,7 @@ import type { Redis } from 'ioredis';
 import { getWorkersConfig } from '../config/env.js';
 import type { TenantConfig } from '../config/types.js';
 import chatProcessor from './chat.worker.js';
+import copyFileProcessor from './copy.worker.js';
 import { createWorker } from './create-worker.js';
 import dmcaProcessor from './dmca.worker.js';
 import finalizeProcessor from './finalize.worker.js';
@@ -14,6 +15,8 @@ import type {
   VodFinalizeFileJob,
   DmcaProcessingJob,
   MonitorJob,
+  CopyFileJob,
+  CopyFileResult,
   LiveDownloadResult,
   StandardVodResult,
   ChatDownloadResult,
@@ -42,7 +45,8 @@ export type AllJobData =
   | YoutubeUploadJob
   | VodFinalizeFileJob
   | DmcaProcessingJob
-  | MonitorJob;
+  | MonitorJob
+  | CopyFileJob;
 
 // Typed per-worker definition — no type erasure here
 interface WorkerDef<TData, TResult = unknown> {
@@ -87,6 +91,11 @@ const workerDefs = {
     name: QUEUE_NAMES.MONITOR,
     processor: monitorProcessor,
   } satisfies WorkerDef<MonitorJob, MonitorJobResult>,
+
+  [QUEUE_NAMES.FILE_COPY]: {
+    name: QUEUE_NAMES.FILE_COPY,
+    processor: copyFileProcessor,
+  } satisfies WorkerDef<CopyFileJob, CopyFileResult>,
 };
 
 export function registerWorkers(
@@ -103,6 +112,7 @@ export function registerWorkers(
     [QUEUE_NAMES.YOUTUBE_UPLOAD]: workerConfig.YOUTUBE_UPLOAD_CONCURRENCY,
     [QUEUE_NAMES.VOD_FINALIZE_FILE]: workerConfig.VOD_FINALIZE_FILE_CONCURRENCY,
     [QUEUE_NAMES.MONITOR]: workerConfig.MONITOR_CONCURRENCY,
+    [QUEUE_NAMES.FILE_COPY]: workerConfig.FILE_COPY_CONCURRENCY,
   };
 
   for (const [name, def] of Object.entries(workerDefs) as Array<[WorkerName, WorkerDef<AllJobData, unknown>]>) {

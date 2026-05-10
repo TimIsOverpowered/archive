@@ -78,7 +78,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
       const type: SourceType = SOURCE_TYPES.VOD;
 
       // Ensure VOD file is downloaded and valid
-      const { jobId, filePath, workDir } = await ensureVodDownload({
+      const { jobId, filePath, copyJobId, workDir } = await ensureVodDownload({
         ctx: tenantPlatformCtx,
         dbId,
         vodId,
@@ -96,7 +96,8 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
         platform,
         game,
         jobId ?? undefined,
-        workDir
+        workDir,
+        copyJobId
       );
 
       if (gameJobId == null) {
@@ -159,7 +160,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
       const type: SourceType = SOURCE_TYPES.VOD;
 
       // Ensure VOD file is downloaded and valid
-      const { jobId, filePath } = await ensureVodDownload({
+      const { jobId, filePath, copyJobId } = await ensureVodDownload({
         ctx: tenantPlatformCtx,
         dbId,
         vodId,
@@ -183,6 +184,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
         gameStart: game.start,
         gameDuration: game.end - game.start,
         downloadJobId: jobId ?? undefined,
+        copyJobId,
         filePath,
       });
 

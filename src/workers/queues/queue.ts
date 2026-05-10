@@ -14,6 +14,8 @@ import type {
   DmcaProcessingResult,
   MonitorJob,
   MonitorJobResult,
+  CopyFileJob,
+  CopyFileResult,
 } from '../jobs/types.js';
 import { getRedisInstance } from '../redis.js';
 
@@ -25,6 +27,7 @@ export const QUEUE_NAMES = {
   VOD_FINALIZE_FILE: 'vod_finalize_file',
   DMCA_PROCESSING: 'dmca_processing',
   MONITOR: 'monitor',
+  FILE_COPY: 'file_copy',
 } as const;
 
 export type WorkerName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -95,6 +98,10 @@ export function getDmcaProcessingQueue(): Queue<DmcaProcessingJob, DmcaProcessin
 
 export function getMonitorQueue(): Queue<MonitorJob, MonitorJobResult, string> {
   return getQueue(QUEUE_NAMES.MONITOR, defaultJobOptions);
+}
+
+export function getFileCopyQueue(): Queue<CopyFileJob, CopyFileResult, string> {
+  return getQueue(QUEUE_NAMES.FILE_COPY, exponentialBackoff(5_000, 3));
 }
 
 export async function closeQueues(): Promise<void> {

@@ -97,7 +97,11 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
       if (!vodRecord) notFound('VOD not found');
 
       // Step 2: Ensure VOD download (like /upload does)
-      const { jobId: downloadJobId, filePath } = await ensureVodDownload({
+      const {
+        jobId: downloadJobId,
+        filePath,
+        copyJobId,
+      } = await ensureVodDownload({
         ctx: asTenantPlatformContext(requireTenant(request)),
         dbId: vodRecord.id,
         vodId,
@@ -119,6 +123,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         platform,
         part,
         downloadJobId: downloadJobId ?? undefined,
+        copyJobId,
         filePath,
         workDir: filePath ?? undefined,
         skipFinalize: true, // DMCA worker will handle finalization

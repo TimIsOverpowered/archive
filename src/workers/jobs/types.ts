@@ -147,3 +147,13 @@ export type DmcaProcessingResult = DmcaProcessingSuccessResult;
 export interface MonitorJobResult {
   success: true;
 }
+
+export interface CopyFileJob extends BaseJobData {
+  sourcePath: string;
+  destPath: string;
+}
+
+export interface CopyFileResult {
+  success: true;
+  filePath: string;
+}

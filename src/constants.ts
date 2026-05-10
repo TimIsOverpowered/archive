@@ -220,4 +220,5 @@ export const Jobs = {
   CHAT_JOB_PREFIX: 'chat_',
   DMCA_JOB_PREFIX: 'dmca_',
   FINALIZE_JOB_PREFIX: 'finalize_',
+  COPY_JOB_PREFIX: 'copy_',
 } as const;

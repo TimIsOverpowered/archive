@@ -9,9 +9,9 @@ import { PlatformNotConfiguredError, VodNotFoundError } from '../../../../utils/
 import { extractErrorDetails } from '../../../../utils/error.js';
 import { type AppLogger } from '../../../../utils/logger.js';
 import { getTmpFilePath, getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
+import { queueFileCopy } from '../../../../workers/jobs/copy.job.js';
 import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
 import { getMetadata } from '../../../../workers/utils/ffmpeg.js';
-import { copyFileWithRetry } from '../../../../workers/utils/file-finalization.js';
 import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
 import { refreshVodRecord } from './vod-records.js';
 
@@ -27,6 +27,7 @@ export interface EnsureVodDownloadOptions {
 export interface EnsureVodDownloadResponse {
   filePath?: string;
   jobId: string | null;
+  copyJobId?: string | undefined;
   workDir?: string | undefined;
 }
 
@@ -74,11 +75,18 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
       }
 
       try {
-        await copyFileWithRetry(filePath, tmpFilePath, log);
-        log.info({ filePath, tmpFilePath }, 'Copied existing VOD from storage to tmpPath');
-        return { filePath: tmpFilePath, jobId: null, workDir: tmpPath };
+        const copyJobId = await queueFileCopy({
+          tenantId,
+          dbId,
+          vodId,
+          platform,
+          sourcePath: filePath,
+          destPath: tmpFilePath,
+        });
+        log.info({ filePath, tmpFilePath, copyJobId }, 'Queued file copy from storage to tmpPath');
+        return { filePath: tmpFilePath, jobId: null, copyJobId, workDir: tmpPath };
       } catch (err) {
-        log.warn({ error: extractErrorDetails(err).message }, 'Failed to copy VOD to tmpPath');
+        log.warn({ error: extractErrorDetails(err).message }, 'Failed to queue file copy to tmpPath');
       }
     }
 
