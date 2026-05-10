@@ -1,19 +1,22 @@
-import { defaultCircuitBreaker } from './circuit-breaker.js';
+import { CircuitBreaker } from './circuit-breaker.js';
 
 const CACHE_STATE_KEY = '__cache_connection__';
 
+export const cacheStateBreaker = new CircuitBreaker();
+
 export function isConnectionFailed(tenantId: string): boolean {
-  return defaultCircuitBreaker.isCircuitOpen(`${CACHE_STATE_KEY}:${tenantId}`);
+  return cacheStateBreaker.isCircuitOpen(`${CACHE_STATE_KEY}:${tenantId}`);
 }
 
 export function markConnectionFailed(tenantId: string): void {
-  defaultCircuitBreaker.recordFailure(`${CACHE_STATE_KEY}:${tenantId}`, { failureThreshold: 1 });
+  cacheStateBreaker.register(`${CACHE_STATE_KEY}:${tenantId}`, { failureThreshold: 1, recoveryTimeout: 30_000 });
+  cacheStateBreaker.recordFailure(`${CACHE_STATE_KEY}:${tenantId}`);
 }
 
 export function markConnectionRestored(tenantId: string): void {
-  defaultCircuitBreaker.recordSuccess(`${CACHE_STATE_KEY}:${tenantId}`);
+  cacheStateBreaker.recordSuccess(`${CACHE_STATE_KEY}:${tenantId}`);
 }
 
 export function clearAllConnectionFailures(): void {
-  defaultCircuitBreaker.clearCircuitsMatching(CACHE_STATE_KEY);
+  cacheStateBreaker.clearCircuitsMatching(CACHE_STATE_KEY);
 }

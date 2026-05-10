@@ -37,15 +37,27 @@ export class CircuitBreaker {
     });
   }
 
-  private getOrCreateBreaker(key: string, opts?: Partial<CircuitBreakerOptions>): CircuitBreakerState {
+  register(key: string, opts: CircuitBreakerOptions): void {
+    if (this.cache.has(key)) return;
+    this.cache.set(key, {
+      state: 'closed',
+      failureCount: 0,
+      failureThreshold: opts.failureThreshold,
+      recoveryTimeout: opts.recoveryTimeout,
+      lastFailureTime: null,
+      lastSuccessTime: null,
+    });
+  }
+
+  private getOrCreateBreaker(key: string): CircuitBreakerState {
     let state = this.cache.get(key);
 
     if (!state) {
       state = {
         state: 'closed',
         failureCount: 0,
-        failureThreshold: opts?.failureThreshold ?? DEFAULT_OPTIONS.failureThreshold,
-        recoveryTimeout: opts?.recoveryTimeout ?? DEFAULT_OPTIONS.recoveryTimeout,
+        failureThreshold: DEFAULT_OPTIONS.failureThreshold,
+        recoveryTimeout: DEFAULT_OPTIONS.recoveryTimeout,
         lastFailureTime: null,
         lastSuccessTime: null,
       };
@@ -55,8 +67,8 @@ export class CircuitBreaker {
     return state;
   }
 
-  getState(key: string, opts?: Partial<CircuitBreakerOptions>): CircuitState {
-    const state = this.getOrCreateBreaker(key, opts);
+  getState(key: string): CircuitState {
+    const state = this.getOrCreateBreaker(key);
 
     if (state.state === 'open' && state.lastFailureTime != null) {
       const elapsed = Date.now() - state.lastFailureTime;
@@ -69,15 +81,15 @@ export class CircuitBreaker {
     return state.state;
   }
 
-  recordSuccess(key: string, opts?: Partial<CircuitBreakerOptions>): void {
-    const state = this.getOrCreateBreaker(key, opts);
+  recordSuccess(key: string): void {
+    const state = this.getOrCreateBreaker(key);
     state.failureCount = 0;
     state.lastSuccessTime = Date.now();
     state.state = 'closed';
   }
 
-  recordFailure(key: string, opts?: Partial<CircuitBreakerOptions>): void {
-    const state = this.getOrCreateBreaker(key, opts);
+  recordFailure(key: string): void {
+    const state = this.getOrCreateBreaker(key);
 
     state.failureCount += 1;
     state.lastFailureTime = Date.now();
@@ -86,12 +98,12 @@ export class CircuitBreaker {
     }
   }
 
-  isCircuitOpen(key: string, opts?: Partial<CircuitBreakerOptions>): boolean {
-    return this.getState(key, opts) === 'open';
+  isCircuitOpen(key: string): boolean {
+    return this.getState(key) === 'open';
   }
 
-  isCircuitHalfOpen(key: string, opts?: Partial<CircuitBreakerOptions>): boolean {
-    return this.getState(key, opts) === 'half-open';
+  isCircuitHalfOpen(key: string): boolean {
+    return this.getState(key) === 'half-open';
   }
 
   clearCircuit(key: string): void {

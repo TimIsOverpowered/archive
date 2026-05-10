@@ -3,8 +3,8 @@
  * Use the factory functions (badRequest, notFound, etc.) instead of constructing directly.
  */
 export class HttpError extends Error {
-  statusCode: number;
-  code: string;
+  readonly statusCode: number;
+  readonly code: string;
 
   constructor(statusCode: number, message: string, code?: string) {
     super(message);

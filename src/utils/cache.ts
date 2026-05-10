@@ -39,6 +39,8 @@ export interface CacheMetrics {
   swrStale: number;
   /** Number of stale-while-revalidate errors */
   swrErrors: number;
+  /** Number of cache reads with unexpected format (SWR entry in simple cache or vice versa) */
+  formatErrors: number;
 }
 
 interface CacheEntry<T> {
@@ -53,6 +55,7 @@ const emptyMetrics = (): CacheMetrics => ({
   swrHits: 0,
   swrStale: 0,
   swrErrors: 0,
+  formatErrors: 0,
 });
 
 function isCacheEntry(raw: unknown): raw is CacheEntry<unknown> {
@@ -101,8 +104,8 @@ export class CacheContext {
       if (cached != null && cached.length > 0) {
         const parsed: unknown = await decompressData(cached);
         if (isCacheEntry(parsed)) {
-          this.metrics.misses++;
-          getLogger().debug({ key }, 'Cache miss: unexpected SWR-format entry in simple cache');
+          this.metrics.formatErrors++;
+          getLogger().debug({ key }, 'Unexpected SWR-format entry in simple cache');
           return fetcher();
         }
         this.metrics.hits++;
@@ -152,8 +155,8 @@ export class CacheContext {
       if (cached != null && cached.length > 0) {
         const parsed: unknown = await decompressData(cached);
         if (!isCacheEntry(parsed)) {
-          this.metrics.misses++;
-          getLogger().debug({ key }, 'Cache miss: unexpected simple-format entry in SWR cache');
+          this.metrics.formatErrors++;
+          getLogger().debug({ key }, 'Unexpected simple-format entry in SWR cache');
           return fetcher();
         }
         const entry = parsed as CacheEntry<T>;
@@ -215,8 +218,7 @@ export class CacheContext {
     fetcher: () => Promise<T>
   ): Promise<T> {
     const log = getLogger().child({ key });
-    const failureKey = `swr:failures:${key}`;
-    const failures = await this.getSwrFailureCount(client, failureKey);
+    const failures = this.swrFailures.get(key) ?? 0;
 
     if (failures >= CacheSwr.MAX_FAILURES) {
       this.swrFailures.delete(key);
@@ -226,7 +228,6 @@ export class CacheContext {
 
     try {
       const data = await retryWithBackoff(fetcher, { attempts: 2, baseDelayMs: 2000 });
-      await this.clearSwrFailureCount(client, failureKey);
       this.swrFailures.delete(key);
       try {
         const compressed = await compressData({ data, timestamp: Date.now() });
@@ -236,49 +237,13 @@ export class CacheContext {
       }
       return data;
     } catch (err) {
-      await this.incrementSwrFailureCount(client, failureKey);
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        log.debug('SWR revalidation aborted (client disconnected)');
+        throw err;
+      }
       this.swrFailures.set(key, failures + 1);
       log.error({ err: extractErrorDetails(err) }, 'SWR revalidation exhausted retries');
       throw err;
-    }
-  }
-
-  private async getSwrFailureCount(
-    client: ReturnType<typeof RedisService.getClient>,
-    failureKey: string
-  ): Promise<number> {
-    try {
-      const val = await client.get(failureKey);
-      if (val != null && val !== '') return parseInt(val, 10);
-      return 0;
-    } catch {
-      return this.swrFailures.get(failureKey) ?? 0;
-    }
-  }
-
-  private async incrementSwrFailureCount(
-    client: ReturnType<typeof RedisService.getClient>,
-    failureKey: string
-  ): Promise<void> {
-    try {
-      const pipeline = client.pipeline();
-      pipeline.incr(failureKey);
-      pipeline.expire(failureKey, CacheSwr.FAILURES_TTL_MS / 1_000);
-      await pipeline.exec();
-    } catch {
-      const current = this.swrFailures.get(failureKey) ?? 0;
-      this.swrFailures.set(failureKey, current + 1);
-    }
-  }
-
-  private async clearSwrFailureCount(
-    client: ReturnType<typeof RedisService.getClient>,
-    failureKey: string
-  ): Promise<void> {
-    try {
-      await client.del(failureKey);
-    } catch {
-      this.swrFailures.delete(failureKey);
     }
   }
 }

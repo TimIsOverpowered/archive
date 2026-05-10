@@ -3,8 +3,7 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 import { resetEnvConfig } from '../../src/config/env.js';
 import { Cache } from '../../src/constants.js';
 import { registerVodTags } from '../../src/services/cache-tags.js';
-import { markConnectionFailed, markConnectionRestored } from '../../src/utils/cache-state.js';
-import { defaultCircuitBreaker } from '../../src/utils/circuit-breaker.js';
+import { markConnectionFailed, markConnectionRestored, cacheStateBreaker } from '../../src/utils/cache-state.js';
 import { RedisService } from '../../src/utils/redis-service.js';
 
 describe('CacheTags: registerVodTags', () => {
@@ -15,7 +14,7 @@ describe('CacheTags: registerVodTags', () => {
   beforeEach(() => {
     pipelineCalls = [];
     pipelineItems = [];
-    defaultCircuitBreaker.clearAllCircuits();
+    cacheStateBreaker.clearAllCircuits();
     mockClient = {
       pipeline: () => {
         const pipe = {

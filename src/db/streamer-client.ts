@@ -60,10 +60,9 @@ class PoolManager {
       plugins: [new SafeNullComparisonPlugin()],
     });
 
-    this.pools.set(config.id, { pool, db, lastAccessedAt: Date.now() });
-
     const creationPromise = Promise.resolve(db).finally(() => this.creationLocks.delete(config.id));
     this.creationLocks.set(config.id, creationPromise);
+    this.pools.set(config.id, { pool, db, lastAccessedAt: Date.now() });
     return creationPromise;
   }
 

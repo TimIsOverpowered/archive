@@ -4,6 +4,8 @@ export const YouTube = {
   MAX_DURATION: 43_199,
   CATEGORY_ID: '20', // Gaming
   REDIRECT_URI: 'https://developers.google.com/oauthplayground',
+  /** Default VOD split duration in seconds (max duration) */
+  DEFAULT_SPLIT_DURATION: 43_199,
 } as const;
 
 // ── VOD / Live Worker ────────────────────────────────────────────────────────
@@ -129,6 +131,12 @@ export const Logs = {
   TARGET_FUTURE: 30,
   /** Maximum buckets to scan in either direction (4 minutes) */
   MAX_EXPANSION: 4,
+} as const;
+
+// ── Discord Alerts ───────────────────────────────────────────────────────────
+export const DiscordAlert = {
+  /** Max characters for embedded field values */
+  FIELD_VALUE_TRUNCATE: 500,
 } as const;
 
 // ── Token Health ─────────────────────────────────────────────────────────────

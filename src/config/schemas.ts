@@ -75,7 +75,7 @@ export const YoutubeSchema = z.object({
   /** Enable multi-track audio upload (default: false) */
   multiTrack: z.boolean().default(false),
   /** Maximum duration per upload in seconds (default: 3600) */
-  splitDuration: z.number().default(YouTube.MAX_DURATION),
+  splitDuration: z.number().default(YouTube.DEFAULT_SPLIT_DURATION),
   /** Upload game highlight clips separately (default: false) */
   perGameUpload: z.boolean().default(false),
   /** List of restricted game names for per-game upload filtering */

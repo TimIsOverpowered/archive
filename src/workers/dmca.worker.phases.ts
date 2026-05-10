@@ -1,4 +1,5 @@
 import { Job } from 'bullmq';
+import { DiscordAlert, YouTube } from '../constants.js';
 import type { SelectableGames } from '../db/streamer-types.js';
 import type { SourceType } from '../types/platforms.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
@@ -166,8 +167,8 @@ export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Pr
 
 export async function trimDmcaVideo(ctx: DmcaProcessorContext): Promise<void> {
   if (ctx.part != null && ctx.config.youtube != null) {
-    const splitDuration = ctx.config.youtube.splitDuration ?? 10800;
-    const startOffset = splitDuration * (parseInt(String(ctx.part)) - 1);
+    const splitDuration = ctx.config.youtube.splitDuration ?? YouTube.DEFAULT_SPLIT_DURATION;
+    const startOffset = splitDuration * (ctx.part - 1);
 
     ctx.log.info({ vodId: ctx.vodId, part: ctx.part }, 'Extracting part from VOD');
 
@@ -190,7 +191,11 @@ export async function trimDmcaVideo(ctx: DmcaProcessorContext): Promise<void> {
         ];
 
         if (dmcaTrimFfmpegCmd != null) {
-          alertFields.push({ name: 'FFmpeg', value: `\`${dmcaTrimFfmpegCmd.substring(0, 500)}\``, inline: false });
+          alertFields.push({
+            name: 'FFmpeg',
+            value: `\`${dmcaTrimFfmpegCmd.substring(0, DiscordAlert.FIELD_VALUE_TRUNCATE)}\``,
+            inline: false,
+          });
         }
 
         alertFields.push({ name: 'ETA', value: toHHMMSS(Math.max(0, eta)), inline: true });
@@ -243,7 +248,11 @@ export async function trimDmcaVideo(ctx: DmcaProcessorContext): Promise<void> {
         ];
 
         if (dmcaGameTrimFfmpegCmd != null) {
-          alertFields.push({ name: 'FFmpeg', value: `\`${dmcaGameTrimFfmpegCmd.substring(0, 500)}\``, inline: false });
+          alertFields.push({
+            name: 'FFmpeg',
+            value: `\`${dmcaGameTrimFfmpegCmd.substring(0, DiscordAlert.FIELD_VALUE_TRUNCATE)}\``,
+            inline: false,
+          });
         }
 
         alertFields.push({ name: 'ETA', value: toHHMMSS(Math.max(0, eta)), inline: true });

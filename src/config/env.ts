@@ -187,6 +187,7 @@ export function resetEnvConfig(): void {
   apiConfigCache = null;
   workersConfigCache = null;
   baseConfigCache = null;
+  _keyBuffer = null;
 }
 
 // --- Storage path accessors ---

@@ -183,21 +183,26 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
 
         let parsedData: unknown;
         switch (actualResponseType) {
-          case 'json':
+          case 'json': {
             const text = await response.body.text();
             parsedData = options?.parseReviver ? JSON.parse(text, options.parseReviver) : JSON.parse(text);
             break;
-          case 'text':
+          }
+          case 'text': {
             parsedData = await response.body.text();
             break;
-          case 'blob':
+          }
+          case 'blob': {
             parsedData = new Blob([await response.body.arrayBuffer()]);
             break;
-          case 'arrayBuffer':
+          }
+          case 'arrayBuffer': {
             parsedData = await response.body.arrayBuffer();
             break;
-          case 'response':
+          }
+          case 'response': {
             return response;
+          }
         }
 
         return parsedData as RequestResult<T, R>;

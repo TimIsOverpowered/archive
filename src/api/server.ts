@@ -135,34 +135,34 @@ export async function buildServer(config: ApiConfig) {
     exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'X-Request-ID'],
   });
 
-  // Register public routes
-  await fastify.register(async (instance) => {
-    await instance.register(healthRoutes, { prefix: '/api/v1' });
-
-    // Register VODs, games, chapters, and logs under same prefix to avoid duplicate OPTIONS handlers
-    await instance.register(
-      async (vodInstance) => {
-        await vodInstance.register(vodsRoutes, { prefix: '' });
-        await vodInstance.register(gamesRoutes, { prefix: '' });
-        await vodInstance.register(chaptersRoutes, { prefix: '' });
-        await vodInstance.register(logsRoutes, { prefix: '' });
-      },
-      { prefix: '/api/v1/' }
-    );
-
-    // Register badges route under /api/v1/:id/badges/twitch
-    await instance.register(badgesRoutes, { prefix: '/api/v1' });
-  });
+  // Register public API routes under a single /api/v1 prefix
+  await fastify.register(
+    async (instance) => {
+      await instance.register(healthRoutes, { prefix: '/health' });
+      await instance.register(vodsRoutes, { prefix: '' });
+      await instance.register(gamesRoutes, { prefix: '' });
+      await instance.register(chaptersRoutes, { prefix: '' });
+      await instance.register(logsRoutes, { prefix: '' });
+      await instance.register(badgesRoutes, { prefix: '' });
+    },
+    { prefix: '/api/v1' }
+  );
 
   // Register global admin routes (no tenantId required)
-  await fastify.register(async (instance) => {
-    await instance.register(globalAdminRoutes, { prefix: '/api/v1/admin' });
-  });
+  await fastify.register(
+    async (instance) => {
+      await instance.register(globalAdminRoutes, { prefix: '/admin' });
+    },
+    { prefix: '/api/v1' }
+  );
 
   // Register tenant-scoped admin routes
-  await fastify.register(async (instance) => {
-    await instance.register(adminRoutes, { prefix: '/api/v1/:tenantId/admin' });
-  });
+  await fastify.register(
+    async (instance) => {
+      await instance.register(adminRoutes, { prefix: '/admin' });
+    },
+    { prefix: '/api/v1' }
+  );
 
   return fastify;
 }
