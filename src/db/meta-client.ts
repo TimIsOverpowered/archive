@@ -22,7 +22,7 @@ let _metaDb: Kysely<MetaDB> | null = null;
  * Note: Synchronous — PgPool defers actual connection until the first query.
  * Callers using `await` are unaffected (await on a non-Thenable is a no-op).
  */
-export function initMetaClient(): Kysely<MetaDB> {
+export function initMetaClient(opts?: { silent?: boolean }): Kysely<MetaDB> {
   if (_metaDb) return _metaDb;
 
   const { NODE_ENV, PGBOUNCER_URL, META_DATABASE_URL } = getBaseConfig();
@@ -47,7 +47,9 @@ export function initMetaClient(): Kysely<MetaDB> {
   _metaDb = db;
   if (NODE_ENV !== 'production') globalForMeta.metaDb = db;
 
-  getLogger().info({ component: 'meta-client' }, 'Initialized (Kysely)');
+  if (opts?.silent !== true) {
+    getLogger().info({ component: 'meta-client' }, 'Initialized (Kysely)');
+  }
   return _metaDb;
 }
 

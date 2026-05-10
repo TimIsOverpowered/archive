@@ -169,7 +169,7 @@ async function main(): Promise<void> {
   let tenantId: string | null = null;
 
   try {
-    initMetaClient();
+    initMetaClient({ silent: true });
     console.log('╔════════════════════════════════════════════╗');
     console.log('║     CREATE TENANT - Interactive Wizard     ║');
     console.log('╚════════════════════════════════════════════╝');

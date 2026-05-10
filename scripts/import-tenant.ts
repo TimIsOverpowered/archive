@@ -201,7 +201,7 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
-    initMetaClient();
+    initMetaClient({ silent: true });
     await importConfig(channelName, databaseName);
     console.log('Done!');
   } catch (error) {

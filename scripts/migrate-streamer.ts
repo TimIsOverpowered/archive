@@ -11,7 +11,7 @@ if (!META_DB_URL) {
   process.exit(1);
 }
 
-initMetaClient();
+initMetaClient({ silent: true });
 const metaClient = getMetaClient();
 
 const parseDuration = (durationStr: string): number => {
