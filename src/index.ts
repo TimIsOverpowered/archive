@@ -52,7 +52,9 @@ async function start() {
     await server.listen({ port: Number(PORT), host: HOST });
 
     getLogger().info({ url: `http://${HOST}:${PORT}` }, 'Server started successfully');
-    getLogger().info({ docs: `http://${HOST}:${PORT}/docs` }, 'Swagger documentation available');
+    if (config.NODE_ENV !== 'production') {
+      getLogger().info({ docs: `http://${HOST}:${PORT}/docs` }, 'Swagger documentation available');
+    }
 
     startClientCleanup();
     getLogger().info('DB client cleanup started');

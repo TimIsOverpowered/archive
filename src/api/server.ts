@@ -98,35 +98,37 @@ export async function buildServer(config: ApiConfig) {
   // Pub/Sub subscriber for tenant config invalidation events
   registerTenantConfigSubscriber(fastify);
 
-  // Swagger/OpenAPI documentation
-  await fastify.register(swagger, {
-    openapi: {
-      info: {
-        title: 'Archive API',
-        description: 'VOD and Chat Management API for Streamers',
-        version: '1.0.0',
-      },
-      servers: [{ url: 'https://archive.overpowered.tv/api/v1' }],
-      components: {
-        securitySchemes: {
-          apiKey: {
-            type: 'apiKey',
-            in: 'header',
-            name: 'X-API-Key',
-            description: 'API key (starts with "archive_"). Also accepts Authorization header as Bearer token.',
+  // Swagger/OpenAPI documentation (disabled in production)
+  if (config.NODE_ENV !== 'production') {
+    await fastify.register(swagger, {
+      openapi: {
+        info: {
+          title: 'Archive API',
+          description: 'VOD and Chat Management API for Streamers',
+          version: '1.0.0',
+        },
+        servers: [{ url: 'https://archive.overpowered.tv/api/v1' }],
+        components: {
+          securitySchemes: {
+            apiKey: {
+              type: 'apiKey',
+              in: 'header',
+              name: 'X-API-Key',
+              description: 'API key (starts with "archive_"). Also accepts Authorization header as Bearer token.',
+            },
           },
         },
       },
-    },
-  });
+    });
 
-  await fastify.register(swaggerUI, {
-    routePrefix: '/docs',
-    uiConfig: {
-      docExpansion: 'list',
-      deepLinking: false,
-    },
-  });
+    await fastify.register(swaggerUI, {
+      routePrefix: '/docs',
+      uiConfig: {
+        docExpansion: 'list',
+        deepLinking: false,
+      },
+    });
+  }
 
   // Global CORS with route-based origin checking
   await fastify.register(cors, {
