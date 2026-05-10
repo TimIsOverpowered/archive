@@ -56,10 +56,13 @@ export type YoutubeAuthObject = z.infer<typeof YoutubeAuthSchema>;
  * Decrypts and parses non-empty values automatically at parse time.
  */
 function encryptedYoutubeAuth() {
-  return z.any().transform((val) => {
-    if (typeof val !== 'string' || val === '') return undefined;
-    return decryptObject<YoutubeAuthObject>(val);
-  });
+  return z
+    .string()
+    .optional()
+    .transform((val) => {
+      if (val == null || val === '') return undefined;
+      return decryptObject<YoutubeAuthObject>(val);
+    });
 }
 
 /** YouTube upload configuration for a tenant. */

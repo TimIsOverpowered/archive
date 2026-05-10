@@ -7,7 +7,6 @@ import copyFileProcessor from './copy.worker.js';
 import { createWorker } from './create-worker.js';
 import dmcaProcessor from './dmca.worker.js';
 import finalizeProcessor from './finalize.worker.js';
-import { calcLiveConcurrency } from './utils/concurrency.js';
 import type {
   LiveDownloadJob,
   StandardVodJob,
@@ -29,6 +28,7 @@ import type {
 import liveProcessor from './live.worker.js';
 import monitorProcessor from './monitor/processor.js';
 import { QUEUE_NAMES, WorkerName } from './queues/queue.js';
+import { calcLiveConcurrency } from './utils/concurrency.js';
 import standardVodProcessor from './vod.worker.js';
 import youtubeProcessor from './youtube.worker.js';
 

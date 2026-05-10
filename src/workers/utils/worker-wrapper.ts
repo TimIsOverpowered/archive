@@ -31,7 +31,9 @@ export function wrapWorkerProcessor<TJobData, TCtx extends { log: AppLogger }, T
         getLogger().error({ jobId: job.id, error: extractErrorDetails(error) }, 'Worker context build failed');
       } else {
         const errorMsg = handleWorkerError(error, ctx.log, options.errorMeta(ctx, job));
-        await options.errorAlert(ctx, job, errorMsg);
+        await options.errorAlert(ctx, job, errorMsg).catch((alertErr) => {
+          getLogger().warn({ alertErr: extractErrorDetails(alertErr) }, 'Error alert failed to send');
+        });
       }
       throw error;
     } finally {

@@ -21,7 +21,7 @@ export interface RequestOptions<R extends ResponseType = 'json'> {
         attempts?: number | undefined;
         baseDelayMs?: number | undefined;
         maxDelayMs?: number | undefined;
-        shouldRetry?: ((error: unknown) => boolean) | undefined;
+        shouldRetry?: ((error: unknown, attempt: number) => boolean) | undefined;
       }
     | undefined;
   logContext?: Record<string, unknown> | undefined;
@@ -130,7 +130,7 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
   const { body: preparedBody, headers: finalHeaders } = prepareBodyAndHeaders(body, customHeaders);
   const externalSignal = options?.signal;
 
-  const defaultShouldRetry = (error: unknown): boolean => {
+  const defaultShouldRetry = (error: unknown, _attempt: number): boolean => {
     if (error instanceof HttpError) {
       const { statusCode } = error;
       if (statusCode === 400 || statusCode === 401 || statusCode === 403 || statusCode === 404) {
@@ -146,11 +146,11 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
     return false;
   };
 
-  const shouldRetry = (error: unknown): boolean => {
+  const shouldRetry = (error: unknown, attempt: number): boolean => {
     if (retryOptions?.shouldRetry) {
-      return retryOptions.shouldRetry(error);
+      return retryOptions.shouldRetry(error, attempt);
     }
-    return defaultShouldRetry(error);
+    return defaultShouldRetry(error, attempt);
   };
 
   try {

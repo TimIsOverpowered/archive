@@ -78,7 +78,12 @@ export async function buildVodProcessorContext(
 
 export async function runVodDownload(ctx: VodProcessorContext): Promise<void> {
   if (ctx.downloadMethod === DOWNLOAD_METHODS.FFMPEG) {
-    await downloadVodWithFfmpeg(ctx.platform, ctx.vodId, ctx.finalPath, ctx.config, ctx.log);
+    await downloadVodWithFfmpeg(ctx.platform, ctx.vodId, ctx.finalPath, ctx.config, ctx.log, {
+      messageId: ctx.messageId,
+      updateProgress: (pct, ffmpegCmd) => {
+        safeUpdateAlert(ctx.messageId, ctx.alerts.converting(ctx.vodId, pct, ffmpegCmd), ctx.log, ctx.vodId);
+      },
+    });
   } else {
     const vodDirPath = getTmpDirPath({ tenantId: ctx.tenantId, vodId: ctx.vodId });
     if (await fileExists(vodDirPath)) {

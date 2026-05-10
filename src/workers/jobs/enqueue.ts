@@ -1,4 +1,5 @@
 import { Queue, JobsOptions, type JobState } from 'bullmq';
+import { getLogger } from '../../utils/logger.js';
 
 export interface JobLogger {
   info: (context: Record<string, unknown>, message: string) => void;
@@ -25,6 +26,7 @@ export async function enqueueJobWithLogging(opts: EnqueueJobWithLoggingOpts): Pr
   const jobId = options.jobId;
 
   if (jobId == null) {
+    getLogger().warn({ queue: queue.name, jobName }, 'enqueueJobWithLogging called without jobId — skipping');
     return { jobId: '', isNew: false };
   }
 
