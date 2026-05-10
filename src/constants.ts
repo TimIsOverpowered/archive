@@ -67,6 +67,8 @@ export const CacheInflight = {
   TIMEOUT_MS: 30_000,
   /** Max concurrent in-flight requests per process */
   CACHE_MAX: 1000,
+  /** 5s backoff window after fetch failure to avoid amplifying failures */
+  FAILURE_BACKOFF_MS: 5000,
 } as const;
 
 // ── Config Cache ─────────────────────────────────────────────────────────────
@@ -180,6 +182,13 @@ export const Http = {
   DEFAULT_ATTEMPTS: 3,
   DEFAULT_BASE_DELAY_MS: 1_000,
   DEFAULT_MAX_DELAY_MS: 30_000,
+  /**
+   * Max concurrent connections for segment download agent.
+   * HLS segment downloads are short-lived (~1s each) and highly concurrent —
+   * a single video stream can have hundreds of segments fetched simultaneously.
+   * The undici Agent reuses connections rapidly for these transient requests,
+   * so the high ceiling does not hold persistent connections open.
+   */
   SEGMENT_DOWNLOAD_MAX_CONNECTIONS: 5000,
   SEGMENT_DOWNLOAD_PIPELINING: 1,
 } as const;

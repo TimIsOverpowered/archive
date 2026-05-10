@@ -79,15 +79,22 @@ class PoolManager {
   }
 
   async evictOldestIdleClient(): Promise<boolean> {
-    const entries = Array.from(this.pools.entries()).sort((a, b) => a[1].lastAccessedAt - b[1].lastAccessedAt);
-
-    for (const [tenantId, entry] of entries) {
-      if (entry.pool.idleCount === entry.pool.totalCount) {
-        await this.closeClient(tenantId);
-        getLogger().info({ tenantId }, 'Evicted oldest idle client due to MAX_CLIENTS limit');
-        return true;
+    let oldestEntry: [string, PgPoolEntry] | null = null;
+    for (const [tenantId, entry] of this.pools.entries()) {
+      if (!oldestEntry || entry.lastAccessedAt < oldestEntry[1].lastAccessedAt) {
+        oldestEntry = [tenantId, entry];
       }
     }
+
+    if (!oldestEntry) return false;
+
+    const [tenantId, entry] = oldestEntry;
+    if (entry.pool.idleCount === entry.pool.totalCount) {
+      await this.closeClient(tenantId);
+      getLogger().info({ tenantId }, 'Evicted oldest idle client due to MAX_CLIENTS limit');
+      return true;
+    }
+
     return false;
   }
 

@@ -87,3 +87,24 @@ export function getLiveFilePath(options: LivePathOptions): string {
   }
   return path.join(livePath, options.tenantId, options.streamId, `${options.streamId}.mp4`);
 }
+
+/**
+ * Returns only the filename component of a path for safe logging.
+ * Strips directory components to prevent leaking server directory structure.
+ */
+export function sanitizePathForLog(filePath: string): string {
+  return path.basename(filePath);
+}
+
+/**
+ * Validates that a resolved path is within an expected base directory.
+ * Prevents path traversal attacks where an attacker provides `../../../etc/passwd`.
+ * Uses `path.resolve` to normalize the input, then checks it starts with the base path.
+ */
+export function assertPathWithinBase(resolvedPath: string, basePath: string): void {
+  const normalizedResolved = path.resolve(resolvedPath);
+  const normalizedBase = path.resolve(basePath);
+  if (!normalizedResolved.startsWith(normalizedBase + path.sep) && normalizedResolved !== normalizedBase) {
+    throw new Error('Path traversal detected');
+  }
+}

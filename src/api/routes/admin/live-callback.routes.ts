@@ -2,6 +2,7 @@ import type { Stats as FsStats } from 'node:fs';
 import fs from 'node:fs/promises';
 import * as pathModule from 'node:path';
 import type { FastifyInstance } from 'fastify';
+import { getLivePath } from '../../../config/env.js';
 import { VodUpdateSchema } from '../../../config/schemas.js';
 import { findVodByStreamId } from '../../../db/queries/vods.js';
 import { publishVodDurationUpdate } from '../../../services/cache-invalidator.js';
@@ -9,7 +10,7 @@ import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest, notFound } from '../../../utils/http-error.js';
-import { fileExists } from '../../../utils/path.js';
+import { assertPathWithinBase, fileExists, sanitizePathForLog } from '../../../utils/path.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
@@ -68,23 +69,33 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
     handler: async (request) => {
       const tenantCtx = asTenantPlatformContext(requireTenant(request));
       const { tenantId, config, db, platform } = tenantCtx;
-      const { streamId, path, durationSecs } = request.body;
+      const { streamId, path: inputPath, durationSecs } = request.body;
       const log = createAutoLogger(tenantId);
 
+      // Validate the path is within the expected LIVE_PATH directory
+      const livePath = getLivePath();
+      if (livePath !== null && livePath !== undefined) {
+        try {
+          assertPathWithinBase(inputPath, livePath);
+        } catch {
+          badRequest('Invalid recording path: must be within LIVE_PATH');
+        }
+      }
+
       // Validate file path exists and is accessible
-      const exists = await fileExists(path);
+      const exists = await fileExists(inputPath);
       if (!exists) {
-        badRequest(`File at ${path} does not exist`);
+        badRequest(`Recording file does not exist`);
       }
 
       let stats: FsStats;
       try {
-        stats = await fs.stat(path);
+        stats = await fs.stat(inputPath);
       } catch {
         notFound('Recording file not found or inaccessible');
       }
       if (!stats.isFile() || stats.size === 0) {
-        badRequest(`File at ${path} is invalid (not a regular file or empty)`);
+        badRequest(`Recording file is invalid (not a regular file or empty)`);
       }
 
       const vodRecord = await findVodByStreamId(db, streamId, platform);
@@ -107,7 +118,7 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
           message: 'YouTube upload is disabled for this tenant. Recording processed but no upload queued.',
           vodId: vodRecord.id,
           streamId,
-          path: path,
+          path: sanitizePathForLog(inputPath),
         });
       }
 
@@ -115,10 +126,10 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
         ctx: tenantCtx,
         dbId: vodRecord.id,
         vodId: vodRecord.platform_vod_id ?? '',
-        filePath: path,
+        filePath: inputPath,
         platform,
         type: SOURCE_TYPES.LIVE,
-        workDir: pathModule.dirname(path),
+        workDir: pathModule.dirname(inputPath),
         streamId: vodRecord.platform_stream_id ?? undefined,
       });
 
@@ -128,7 +139,7 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
         streamId,
         gameJobIds,
         vodJobId,
-        path: path,
+        path: sanitizePathForLog(inputPath),
       });
     },
   });

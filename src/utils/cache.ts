@@ -75,6 +75,11 @@ export class CacheContext {
     ttl: CacheSwr.FAILURES_TTL_MS,
     allowStale: false,
   });
+  private readonly fetchFailures = new LRUCache<string, number>({
+    max: CacheInflight.CACHE_MAX,
+    ttl: CacheInflight.FAILURE_BACKOFF_MS,
+    allowStale: false,
+  });
   private readonly inflight = new LRUCache<string, Promise<unknown>>({
     max: CacheInflight.CACHE_MAX,
     ttl: CacheInflight.TIMEOUT_MS,
@@ -122,8 +127,14 @@ export class CacheContext {
     const inflight = this.inflight.get(key) as Promise<T> | undefined;
     if (inflight) return inflight;
 
+    // Backoff gate: suppress thundering herd after a fetch failure
+    if (this.fetchFailures.has(key)) {
+      throw new Error('fetch backoff');
+    }
+
     const promise = fetcher()
       .then(async (result) => {
+        this.fetchFailures.delete(key);
         try {
           const compressed = await compressData(result);
           await client.set(key, compressed, 'EX', ttl);
@@ -132,6 +143,10 @@ export class CacheContext {
           getLogger().warn({ err: details, key }, 'Cache write failed');
         }
         return result;
+      })
+      .catch((err) => {
+        this.fetchFailures.set(key, Date.now());
+        throw err;
       })
       .finally(() => this.inflight.delete(key));
 
@@ -190,8 +205,15 @@ export class CacheContext {
     const existing = this.inflight.get(key);
     if (existing) return (await existing) as T;
 
+    // Backoff gate: suppress thundering herd after a fetch failure
+    if (this.fetchFailures.has(key)) {
+      throw new Error('fetch backoff');
+    }
+
     const fetchPromise = this.withTimeout(
-      this.revalidateWithRetry(client, key, ttl, fetcher).finally(() => this.inflight.delete(key)),
+      this.revalidateWithRetry(client, key, ttl, fetcher).finally(() => {
+        this.inflight.delete(key);
+      }),
       CacheInflight.TIMEOUT_MS
     );
 
@@ -229,6 +251,7 @@ export class CacheContext {
     try {
       const data = await retryWithBackoff(fetcher, { attempts: 2, baseDelayMs: 2000 });
       this.swrFailures.delete(key);
+      this.fetchFailures.delete(key);
       try {
         const compressed = await compressData({ data, timestamp: Date.now() });
         await client.set(key, compressed, 'EX', ttl);
@@ -242,6 +265,7 @@ export class CacheContext {
         throw err;
       }
       this.swrFailures.set(key, failures + 1);
+      this.fetchFailures.set(key, Date.now());
       log.error({ err: extractErrorDetails(err) }, 'SWR revalidation exhausted retries');
       throw err;
     }

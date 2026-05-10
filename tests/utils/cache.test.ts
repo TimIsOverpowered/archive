@@ -3,6 +3,7 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 import { resetEnvConfig } from '../../src/config/env.js';
 import { simpleKeys, swrKeys } from '../../src/utils/cache-keys.js';
 import { withCache, withStaleWhileRevalidate, CacheContext } from '../../src/utils/cache.js';
+import { RedisService } from '../../src/utils/redis-service.js';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
@@ -102,6 +103,144 @@ describe('withCache', () => {
       } catch (error) {
         assert.ok(error instanceof Error);
         assert.strictEqual(error.message, 'Fetcher failed');
+      }
+    });
+
+    it('should deduplicate concurrent callers during a single failing fetch', async () => {
+      const store = new Map<string, Buffer>();
+      const mockClient = {
+        getBuffer: async (key: string) => store.get(key) ?? null,
+        set: async (key: string, value: Buffer | string, ..._args: unknown[]) => {
+          store.set(key, value as Buffer);
+        },
+      };
+      const originalGetActive = RedisService.getActiveClient.bind(RedisService);
+      RedisService.getActiveClient = () => mockClient as unknown as ReturnType<typeof RedisService.getActiveClient>;
+
+      try {
+        let fetcherCalled = 0;
+        const fetcher = async () => {
+          fetcherCalled++;
+          await new Promise((r) => setTimeout(r, 100));
+          throw new Error('Fetcher failed');
+        };
+
+        const key = simpleKeys.stats('dedup-key');
+        const p1 = withCache(key, 60, fetcher, ctx);
+        const p2 = withCache(key, 60, fetcher, ctx);
+        const p3 = withCache(key, 60, fetcher, ctx);
+
+        for (const p of [p1, p2, p3]) {
+          try {
+            await p;
+          } catch (error) {
+            assert.ok(error instanceof Error);
+          }
+        }
+
+        assert.strictEqual(fetcherCalled, 1, 'Only one fetch should fire for concurrent callers');
+      } finally {
+        RedisService.getActiveClient = originalGetActive;
+      }
+    });
+
+    it('should suppress thundering herd after fetch failure via backoff gate', async () => {
+      const store = new Map<string, Buffer>();
+      const mockClient = {
+        getBuffer: async (key: string) => store.get(key) ?? null,
+        set: async (key: string, value: Buffer | string, ..._args: unknown[]) => {
+          store.set(key, value as Buffer);
+        },
+      };
+      const originalGetActive = RedisService.getActiveClient.bind(RedisService);
+      RedisService.getActiveClient = () => mockClient as unknown as ReturnType<typeof RedisService.getActiveClient>;
+
+      try {
+        let fetcherCalled = 0;
+        const fetcher = async () => {
+          fetcherCalled++;
+          await new Promise((r) => setTimeout(r, 50));
+          throw new Error('Fetcher failed');
+        };
+
+        const key = simpleKeys.stats('backoff-key');
+
+        // First call: triggers fetch which will fail
+        try {
+          await withCache(key, 60, fetcher, ctx);
+        } catch (error) {
+          assert.ok(error instanceof Error);
+        }
+        assert.strictEqual(fetcherCalled, 1);
+
+        // Second call during backoff window: should get backoff error immediately
+        let gotBackoff = false;
+        try {
+          await withCache(key, 60, fetcher, ctx);
+        } catch (error) {
+          if (error instanceof Error && error.message === 'fetch backoff') {
+            gotBackoff = true;
+          }
+        }
+        assert.ok(gotBackoff, 'Should throw fetch backoff error during backoff window');
+        assert.strictEqual(fetcherCalled, 1, 'Fetcher should not be called again during backoff');
+      } finally {
+        RedisService.getActiveClient = originalGetActive;
+      }
+    });
+
+    it('should clear backoff after successful fetch', async () => {
+      const store = new Map<string, Buffer>();
+      const mockClient = {
+        getBuffer: async (key: string) => store.get(key) ?? null,
+        set: async (key: string, value: Buffer | string, ..._args: unknown[]) => {
+          store.set(key, value as Buffer);
+        },
+      };
+      const originalGetActive = RedisService.getActiveClient.bind(RedisService);
+      RedisService.getActiveClient = () => mockClient as unknown as ReturnType<typeof RedisService.getActiveClient>;
+
+      try {
+        let fetcherCalled = 0;
+        const failingFetcher = async () => {
+          fetcherCalled++;
+          throw new Error('Fetcher failed');
+        };
+
+        const key = simpleKeys.stats('backoff-clear-key');
+
+        try {
+          await withCache(key, 60, failingFetcher, ctx);
+        } catch (error) {
+          assert.ok(error instanceof Error);
+        }
+
+        assert.strictEqual(fetcherCalled, 1);
+
+        // Second call during backoff: should be suppressed
+        let gotBackoff = false;
+        try {
+          await withCache(key, 60, failingFetcher, ctx);
+        } catch (error) {
+          if (error instanceof Error && error.message === 'fetch backoff') {
+            gotBackoff = true;
+          }
+        }
+        assert.ok(gotBackoff, 'Should be suppressed during backoff window');
+
+        // Manually clear backoff to simulate TTL expiry or recovery
+        ctx['fetchFailures'].delete(key);
+
+        const successFetcher = async () => {
+          fetcherCalled++;
+          return { data: 'recovered' };
+        };
+
+        const result = await withCache(key, 60, successFetcher, ctx);
+        assert.deepStrictEqual(result, { data: 'recovered' });
+        assert.strictEqual(fetcherCalled, 2, 'Should allow new fetch after backoff cleared');
+      } finally {
+        RedisService.getActiveClient = originalGetActive;
       }
     });
   });
