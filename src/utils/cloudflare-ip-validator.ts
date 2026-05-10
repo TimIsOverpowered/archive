@@ -24,7 +24,7 @@ export interface CloudflareCacheInfo {
 }
 
 /** Fetch Cloudflare IP ranges from official source */
-export async function fetchCloudflareIpRanges(): Promise<CloudflareIpRanges> {
+async function fetchCloudflareIpRanges(): Promise<CloudflareIpRanges> {
   const [v4Response, v6Response] = await Promise.all([
     request(CF_IP_V4_URL, { responseType: 'text' }),
     request(CF_IP_V6_URL, { responseType: 'text' }),
@@ -71,7 +71,7 @@ export async function getCloudflareIpRanges(): Promise<CloudflareIpRanges | null
 }
 
 /** Check if IP is within Cloudflare ranges */
-export function isFromCloudflare(ip: string, ranges?: CloudflareIpRanges): boolean {
+function isFromCloudflare(ip: string, ranges?: CloudflareIpRanges): boolean {
   try {
     const parsed = ipaddr.parse(ip);
     const ipKind = parsed.kind();

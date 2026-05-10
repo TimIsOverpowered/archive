@@ -18,7 +18,7 @@ export interface FormattedError {
   isClientError: boolean;
 }
 
-export function hasStatusCode(e: unknown): e is { statusCode: number } {
+function hasStatusCode(e: unknown): e is { statusCode: number } {
   if (typeof e !== 'object' || e === null) return false;
   const val = (e as Record<string, unknown>).statusCode;
   return 'statusCode' in e && typeof val === 'number';

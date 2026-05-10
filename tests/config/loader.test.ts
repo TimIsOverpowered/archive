@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach } from 'node:test';
-import { loadApiConfig, getApiConfig, clearConfigCache } from './app-config.js';
+import { loadApiConfig, getApiConfig, resetEnvConfig } from '../../src/config/env.js';
 
 describe('API Config Loader', () => {
   let originalEnv: NodeJS.ProcessEnv;
@@ -22,17 +22,17 @@ describe('API Config Loader', () => {
     process.env.YOUTUBE_CLIENT_SECRET = 'test-youtube-client-secret';
     process.env.TMP_PATH = '/tmp/test-tmp';
     process.env.VOD_PATH = '/tmp/test-vods';
-    clearConfigCache();
+    resetEnvConfig();
   };
 
   afterEach(() => {
     Object.assign(process.env, originalEnv);
-    clearConfigCache();
+    resetEnvConfig();
   });
 
   describe('required fields', () => {
     beforeEach(() => {
-      clearConfigCache();
+      resetEnvConfig();
       setupBaseEnv();
     });
 

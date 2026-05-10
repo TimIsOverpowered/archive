@@ -67,9 +67,7 @@ export type GameUploadResult =
     }
   | { success: true; videoId: ''; gameId: ''; filePath: string };
 
-export async function uploadAndUpsertGame(
-  params: GameUploadAndUpsertParams
-): Promise<{ videoId: string; gameId: string }> {
+async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{ videoId: string; gameId: string }> {
   const {
     tenantId,
     dbId,

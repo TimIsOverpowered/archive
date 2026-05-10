@@ -40,14 +40,6 @@ export default fp(redisPlugin);
 
 export { RedisService };
 
-export function getRedisStatus(): { status: string; connected: boolean } {
-  return RedisService.getStatus();
-}
-
-export function getRedisClient() {
-  return RedisService.getClient();
-}
-
 export async function closeRedisClient(): Promise<void> {
   await RedisService.close();
 }

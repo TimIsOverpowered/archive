@@ -32,12 +32,3 @@ export async function buildTestServer(): Promise<TestServer> {
     },
   };
 }
-
-export async function withTestServer<T>(callback: (server: FastifyInstance) => Promise<T>): Promise<T> {
-  const { server } = await buildTestServer();
-  try {
-    return await callback(server);
-  } finally {
-    await server.close();
-  }
-}

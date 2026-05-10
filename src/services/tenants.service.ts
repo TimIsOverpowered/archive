@@ -11,7 +11,7 @@ import { TenantNotFoundError } from '../utils/domain-errors.js';
 import { toPercentage } from '../utils/formatting.js';
 
 /** Return the list of enabled platform names for a tenant config. */
-export function getEnabledPlatforms(config: Pick<TenantConfig, 'twitch' | 'kick'>): string[] {
+function getEnabledPlatforms(config: Pick<TenantConfig, 'twitch' | 'kick'>): string[] {
   const platforms: string[] = [];
   if (config.twitch?.enabled === true) platforms.push(PLATFORMS.TWITCH);
   if (config.kick?.enabled === true) platforms.push(PLATFORMS.KICK);

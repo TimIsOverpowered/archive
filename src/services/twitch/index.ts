@@ -33,6 +33,5 @@ export {
   getTwitchStreamStatus,
   getTwitchStreamStatusBatch,
   getLatestTwitchVodObject,
-  getLatestTwitchVodObjectBatch,
   type TwitchStreamStatus,
 } from './live.js';

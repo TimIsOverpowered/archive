@@ -31,7 +31,7 @@ function throwConfigError(label: string, error: unknown): never {
 }
 
 // Shared base schema (used by both API and workers)
-export const BaseConfigSchema = z.object({
+const BaseConfigSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   REDIS_URL: z.string().min(1, 'REDIS_URL is required'),
   META_DATABASE_URL: z.string().min(1, 'META_DATABASE_URL is required'),
@@ -69,7 +69,7 @@ export const BaseConfigSchema = z.object({
 });
 
 // API-specific schema (extends base + API-only fields)
-export const ApiConfigSchema = BaseConfigSchema.extend({
+const ApiConfigSchema = BaseConfigSchema.extend({
   PORT: z.coerce.number().min(1).max(65535).default(3030),
   HOST: z.string().default('0.0.0.0'),
   STATS_CACHE_TTL: z.coerce.number().int().positive().default(60),
@@ -83,7 +83,7 @@ export const ApiConfigSchema = BaseConfigSchema.extend({
 });
 
 // Workers-specific schema (extends base + workers-only fields)
-export const WorkersConfigSchema = BaseConfigSchema.extend({
+const WorkersConfigSchema = BaseConfigSchema.extend({
   CLEAR_QUEUES_ON_STARTUP: envBoolWithDefault(false).default(false),
   VOD_STANDARD_CONCURRENCY: z.coerce.number().int().positive().default(1),
   YOUTUBE_UPLOAD_CONCURRENCY: z.coerce.number().int().positive().default(1),
@@ -139,7 +139,7 @@ export function getWorkersConfig(): WorkersConfig {
   return workersConfigCache ?? loadWorkersConfig();
 }
 
-export function loadBaseConfig(): BaseConfig {
+function loadBaseConfig(): BaseConfig {
   if (baseConfigCache) return baseConfigCache;
   try {
     baseConfigCache = BaseConfigSchema.parse(process.env);
@@ -168,10 +168,6 @@ export function getEncryptionKeyBuffer(): Buffer {
 
 export function getDiscordAlertWebhookUrl(): string | undefined {
   return getBaseConfig().DISCORD_ALERT_WEBHOOK_URL;
-}
-
-export function getFlareSolverrConcurrency(): number {
-  return getBaseConfig().FLARESOLVERR_CONCURRENCY;
 }
 
 export function getRedisCompression(): 'brotli' | 'gzip' | 'none' {

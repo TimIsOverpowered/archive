@@ -106,12 +106,3 @@ export class RestrictedGameError extends DomainError {
     super(`Game "${gameName}" is in restricted games list`);
   }
 }
-
-export class NoResultError extends DomainError {
-  readonly code = 'NO_RESULT';
-  readonly statusCode = 404;
-
-  constructor(queryDescription: string) {
-    super(`No results for ${queryDescription}`);
-  }
-}

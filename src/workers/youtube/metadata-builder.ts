@@ -3,8 +3,7 @@ import type { Platform, SourceType } from '../../types/platforms.js';
 import { capitalizePlatform, SOURCE_TYPES } from '../../types/platforms.js';
 import dayjs from '../../utils/dayjs.js';
 
-/** Removes characters that YouTube rejects in video metadata. */
-export function sanitizeYoutubeText(text: string): string {
+function sanitizeYoutubeText(text: string): string {
   return text.replace(/[<>]/g, '');
 }
 

@@ -134,7 +134,7 @@ export function buildMockDb(opts: MockDbOptions = {}): any {
   };
 }
 
-export function buildMockClient(): any {
+function buildMockClient(): any {
   return {
     get: async () => null,
     publish: async () => {},

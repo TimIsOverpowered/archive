@@ -39,7 +39,7 @@ function buildQueryCacheKey(tenantId: string, query: GameQuery, page: number, li
  * Build Kysely where clause and order-by config from a GameQuery.
  * Handles game_name FTS, title ILIKE, platform filter, date range, and game_id.
  */
-export function buildGameQuery(query: GameQuery): {
+function buildGameQuery(query: GameQuery): {
   where: (eb: ExpressionBuilder<StreamerDB, 'games'>) => Expression<SqlBool>;
   orderBy: { col: GamesOrderByCol; dir: 'asc' | 'desc' };
 } {

@@ -194,7 +194,7 @@ export async function createClient(config: TenantConfig): Promise<Kysely<Streame
   return poolManager.createClient(config);
 }
 
-export async function closeClient(tenantId: string): Promise<void> {
+async function closeClient(tenantId: string): Promise<void> {
   return poolManager.closeClient(tenantId);
 }
 
@@ -210,10 +210,6 @@ export function stopClientCleanup(): void {
   poolManager.stopCleanup();
 }
 
-export function getClientCount(): number {
-  return poolManager.getCount();
-}
-
 export function resetClientManager(): void {
   poolManager.reset();
 }
@@ -221,14 +217,14 @@ export function resetClientManager(): void {
 /**
  * Check if pool is still valid (not evicted due to idle timeout)
  */
-export function isClientValid(tenantId: string): boolean {
+function isClientValid(tenantId: string): boolean {
   return poolManager.isPoolValid(tenantId);
 }
 
 /**
  * Touch pool to prevent eviction during long-running operations
  */
-export function touchClient(tenantId: string): boolean {
+function touchClient(tenantId: string): boolean {
   return poolManager.touchPool(tenantId);
 }
 
