@@ -28,7 +28,7 @@ export default async function adminRoutes(fastify: FastifyInstance, _options: Ad
 
   await fastify.register(vodManagementRoutes);
 
-  await fastify.register(liveCallbackRoutes, { prefix: '' });
+  await fastify.register(liveCallbackRoutes);
 }
 
 export { default as globalAdminRoutes } from './global.routes.js';
