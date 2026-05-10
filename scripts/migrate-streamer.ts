@@ -642,18 +642,40 @@ const main = async () => {
           }
 
           if (vod.chapters && Array.isArray(vod.chapters) && vod.chapters.length > 0) {
+            const isLegacyChapters = vod.chapters[0].end === undefined;
+
             for (let i = 0; i < vod.chapters.length; i++) {
               const chapter = vod.chapters[i];
-              const start = Math.round(Number(chapter.start) || 0);
-              let chapterDuration = chapter.end ? Math.round(Number(chapter.end)) : null;
-              if (!chapterDuration && i === vod.chapters.length - 1) {
-                chapterDuration = duration;
+
+              let start: number;
+              let chapterDuration: number;
+              let end: number | null;
+
+              if (isLegacyChapters) {
+                start = parseDuration(String(chapter.duration || '00:00:00'));
+                if (isNaN(start)) start = 0;
+                let nextStart =
+                  i + 1 < vod.chapters.length
+                    ? parseDuration(String(vod.chapters[i + 1].duration || '00:00:00'))
+                    : duration;
+                if (isNaN(nextStart)) nextStart = duration;
+                chapterDuration = Math.max(0, nextStart - start);
+                end = start + chapterDuration;
+              } else {
+                start = Math.round(Number(chapter.start) || 0);
+                let chDuration: number | null = chapter.end ? Math.round(Number(chapter.end)) : null;
+                if (!chDuration && i === vod.chapters.length - 1) {
+                  chDuration = duration;
+                }
+                end = chDuration !== null ? start + chDuration : null;
+                chapterDuration = chDuration ?? 0;
               }
-              const end = chapterDuration !== null ? start + chapterDuration : null;
 
               let image = chapter.image || null;
               if (!image && platform?.toLowerCase() === 'twitch' && chapter.game_id) {
                 image = `https://static-cdn.jtvnw.net/ttv-boxart/${chapter.game_id}_IGDB-{width}x{height}.jpg`;
+              } else if (!image && platform?.toLowerCase() === 'twitch' && chapter.name) {
+                image = `https://static-cdn.jtvnw.net/ttv-boxart/${encodeURIComponent(chapter.name)}-{width}x{height}.jpg`;
               }
 
               if (image && platform?.toLowerCase() === 'twitch') {
