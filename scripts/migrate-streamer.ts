@@ -512,11 +512,7 @@ const main = async () => {
       statement_timeout: 0,
     });
 
-    oldPool.on('connect', (client) => {
-      client.query('SET statement_timeout = 0').catch((err) => {
-        console.error('⚠️ Failed to set statement_timeout to 0 on new connection', err);
-      });
-    });
+    await oldPool.query('SET statement_timeout = 0');
 
     let isAlreadyMigrated = false;
     try {
@@ -812,8 +808,10 @@ const main = async () => {
       await oldPool.query(`ALTER TABLE chat_messages_new SET (autovacuum_enabled = false)`);
 
       // Disable synchronous_commit for faster inserts — safe for migration
-      await oldPool.query(`ALTER SYSTEM SET synchronous_commit = off`);
-      await oldPool.query(`SELECT pg_reload_conf()`);
+      await Promise.all([
+        oldPool.query(`ALTER SYSTEM SET synchronous_commit = off`),
+        oldPool.query(`SELECT pg_reload_conf()`),
+      ]);
       console.log('⚡ synchronous_commit disabled for migration performance\n');
 
       let chatResult: { processed: number };
@@ -829,8 +827,10 @@ const main = async () => {
       } finally {
         // Always restore synchronous_commit and autovacuum regardless of success/failure
         try {
-          await oldPool.query(`ALTER SYSTEM SET synchronous_commit = on`);
-          await oldPool.query(`SELECT pg_reload_conf()`);
+          await Promise.all([
+            oldPool.query(`ALTER SYSTEM SET synchronous_commit = on`),
+            oldPool.query(`SELECT pg_reload_conf()`),
+          ]);
           console.log('✅ synchronous_commit restored\n');
         } catch (e) {
           errors.push(`Failed to restore synchronous_commit: ${String(e)}`);
