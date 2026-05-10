@@ -1,30 +1,14 @@
-import type { Kysely } from 'kysely';
 import { getDisplayName, requirePlatformConfig } from '../../../../config/types.js';
 import { findVodByPlatformId } from '../../../../db/queries/vods.js';
-import type { StreamerDB, InsertableVods, SelectableVods, UpdateableVods } from '../../../../db/streamer-types.js';
+import type { InsertableVods, SelectableVods, UpdateableVods } from '../../../../db/streamer-types.js';
 import { publishVodUpdate } from '../../../../services/cache-invalidator.js';
 import { fetchAndSaveEmotes } from '../../../../services/emotes.js';
 import { getStrategy } from '../../../../services/platforms/index.js';
 import { saveVodChapters } from '../../../../services/twitch/index.js';
-import type { Platform } from '../../../../types/platforms.js';
 import { PLATFORMS } from '../../../../types/platforms.js';
-import { VodNotFoundError } from '../../../../utils/domain-errors.js';
 import { type AppLogger } from '../../../../utils/logger.js';
 import { triggerChatDownload } from '../../../../workers/jobs/chat.job.js';
 import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
-
-/**
- * Fetches VOD record or throws 404 if not found
- */
-export async function requireVodRecord(
-  db: Kysely<StreamerDB>,
-  vodId: string,
-  platform: Platform
-): Promise<SelectableVods> {
-  const record = await findVodByPlatformId(db, vodId, platform);
-  if (!record) throw new VodNotFoundError(vodId);
-  return record;
-}
 
 /**
  * Finds an existing VOD record or creates one from platform API metadata.

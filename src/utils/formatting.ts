@@ -1,15 +1,5 @@
 import dayjs from './dayjs.js';
 
-/** Parse seconds into hours, minutes, seconds components using dayjs. */
-export function parseDuration(seconds: number): { hrs: number; mins: number; secs: number } {
-  const dur = dayjs.duration(seconds, 'seconds');
-  return {
-    hrs: dur.hours(),
-    mins: dur.minutes(),
-    secs: dur.seconds(),
-  };
-}
-
 /** Format seconds as HH:mm:ss string. */
 export function toHHMMSS(seconds: number): string {
   return dayjs.duration(seconds, 'seconds').format('HH:mm:ss');

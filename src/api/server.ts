@@ -166,5 +166,3 @@ export async function buildServer(config: ApiConfig) {
 
   return fastify;
 }
-
-export default buildServer;

@@ -31,12 +31,6 @@ export const Hls = {
   SEGMENT_CONCURRENCY: 5,
 } as const;
 
-// ── Redis ────────────────────────────────────────────────────────────────────
-export const RedisConfig = {
-  RETRY_TIMEOUT_MS: 30_000,
-  MAX_RETRIES: 10,
-} as const;
-
 // ── Cache TTLs (seconds) ────────────────────────────────────────────────────
 export const Cache = {
   /** 1 hour for individual VODs */

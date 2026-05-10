@@ -121,65 +121,67 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
           copyJobId,
           base: { gameId, vodId },
         });
-      }
+      } else if (chapterId != null) {
+        const resolved = await resolveChapterWithContext(chapterId, db, tenantCtx, config);
+        const { chapter, dbId, vodId, platform, tenantPlatformCtx } = resolved;
 
-      const resolved = await resolveChapterWithContext(chapterId!, db, tenantCtx, config);
-      const { chapter, dbId, vodId, platform, tenantPlatformCtx } = resolved;
-
-      const { jobId, filePath, copyJobId, workDir } = await ensureVodDownload({
-        ctx: tenantPlatformCtx,
-        dbId,
-        vodId,
-        type,
-        downloadMethod,
-        log,
-      });
-
-      const gameLike = {
-        id: chapter.id,
-        vod_id: chapter.vod_id,
-        start: chapter.start,
-        duration: chapter.duration,
-        end: chapter.end ?? 0,
-        video_provider: null,
-        video_id: null,
-        thumbnail_url: null,
-        game_id: chapter.game_id,
-        game_name: chapter.name,
-        title: chapter.name,
-        chapter_image: chapter.image,
-        created_at: new Date(),
-        updated_at: new Date(),
-      };
-
-      const gameJobId = await queueYoutubeGameUploadByGame(
-        tenantPlatformCtx,
-        dbId,
-        vodId,
-        filePath,
-        platform,
-        gameLike,
-        jobId ?? undefined,
-        workDir,
-        copyJobId
-      );
-
-      if (gameJobId == null) {
-        return ok({
-          message: 'Game upload skipped (restricted game)',
-          chapterId,
+        const { jobId, filePath, copyJobId, workDir } = await ensureVodDownload({
+          ctx: tenantPlatformCtx,
+          dbId,
           vodId,
+          type,
+          downloadMethod,
+          log,
         });
-      }
 
-      return buildVodJobResponse({
-        hasDownload: jobId != null,
-        filePath,
-        downstreamJobId: gameJobId,
-        downstreamLabel: 'Game upload',
-        copyJobId,
-        base: { chapterId, vodId },
-      });
+        const gameLike = {
+          id: chapter.id,
+          vod_id: chapter.vod_id,
+          start: chapter.start,
+          duration: chapter.duration,
+          end: chapter.end ?? 0,
+          video_provider: null,
+          video_id: null,
+          thumbnail_url: null,
+          game_id: chapter.game_id,
+          game_name: chapter.name,
+          title: chapter.name,
+          chapter_image: chapter.image,
+          created_at: new Date(),
+          updated_at: new Date(),
+        };
+
+        const gameJobId = await queueYoutubeGameUploadByGame(
+          tenantPlatformCtx,
+          dbId,
+          vodId,
+          filePath,
+          platform,
+          gameLike,
+          jobId ?? undefined,
+          workDir,
+          copyJobId
+        );
+
+        if (gameJobId == null) {
+          return ok({
+            message: 'Game upload skipped (restricted game)',
+            chapterId,
+            vodId,
+          });
+        }
+
+        return buildVodJobResponse({
+          hasDownload: jobId != null,
+          filePath,
+          downstreamJobId: gameJobId,
+          downstreamLabel: 'Game upload',
+          copyJobId,
+          base: { chapterId, vodId },
+        });
+      } else {
+        return badRequest('Either gameId or chapterId must be provided');
+      }
     }
   );
 

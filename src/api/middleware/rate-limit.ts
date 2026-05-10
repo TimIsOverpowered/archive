@@ -3,7 +3,6 @@ import { RateLimiterRedis, RateLimiterMemory, RateLimiterRes } from 'rate-limite
 import { validateCloudflareRequest } from '../../utils/cloudflare-ip-validator.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
-import { RedisService } from '../../utils/redis-service.js';
 import { errorResponse } from '../response.js';
 import { getClientIp } from './ip.js';
 
@@ -60,22 +59,4 @@ export default function createRateLimitMiddleware(options: RateLimitOptions) {
       return reply.status(500).send(errorResponse(500, 'Internal server error', 'INTERNAL_SERVER_ERROR'));
     }
   };
-}
-
-/**
- * Create a rate limit middleware for admin routes.
- * Uses the 'rate:admin' Redis limiter.
- */
-export function createAdminRateLimitMiddleware() {
-  const limiter = RedisService.requireLimiter('rate:admin');
-  return createRateLimitMiddleware({ limiter });
-}
-
-/**
- * Create a rate limit middleware for public routes.
- * Uses the 'rate:vods' Redis limiter.
- */
-export function createPublicRateLimitMiddleware() {
-  const limiter = RedisService.requireLimiter('rate:vods');
-  return createRateLimitMiddleware({ limiter });
 }
