@@ -120,6 +120,7 @@ export default function youtubeUploadRoutes(fastify: FastifyInstance, _options: 
         copyJobId,
         type,
         workDir,
+        forceUpload: true,
       });
 
       return buildVodJobResponse({

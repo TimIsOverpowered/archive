@@ -610,6 +610,8 @@ export interface QueueYoutubeUploadsOptions {
   type: SourceType;
   workDir?: string | undefined;
   streamId?: string | undefined;
+  /** Force upload regardless of vodUpload config. Admin routes use this to bypass VOD upload gating. */
+  forceUpload?: boolean;
 }
 
 export interface YoutubeUploadJobResult {
@@ -730,7 +732,9 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
 
   const youtubeQueue = getYoutubeUploadQueue();
   const finalizeQueue = getVodFinalizeFileQueue();
-  const vodUploadEnabled = config.youtube?.upload === true && config.youtube?.vodUpload === true;
+  const uploadEnabled = config.youtube?.upload === true;
+  const vodUploadConfig = config.youtube?.vodUpload === true;
+  const vodUploadEnabled = uploadEnabled && (options.forceUpload === true || vodUploadConfig);
   const gameUploadEnabled = config?.youtube?.perGameUpload === true;
 
   // ALL mode: finalize -> vod_upload -> game_1 -> ... -> game_N -> copy/download
