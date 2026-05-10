@@ -3,14 +3,16 @@ import type { Job } from 'bullmq';
 import type { Kysely } from 'kysely';
 import { TenantConfig } from '../config/types.js';
 import type { StreamerDB } from '../db/streamer-types.js';
-import type { SourceType } from '../types/platforms.js';
+import type { Platform, SourceType } from '../types/platforms.js';
 import { SOURCE_TYPES } from '../types/platforms.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
+import { initRichAlert, isAlertsEnabled } from '../utils/discord-alerts.js';
 import { ConfigNotConfiguredError } from '../utils/domain-errors.js';
 import { extractErrorDetails } from '../utils/error.js';
 import type { AppLogger } from '../utils/logger.js';
 import { getLiveFilePath, getVodFilePath } from '../utils/path.js';
 import type { VodFinalizeFileJob, VodFinalizeFileResult } from './jobs/types.js';
+import { createFinalizeWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
 import { finalizeFile } from './utils/file-finalization.js';
 import { getJobContext } from './utils/job-context.js';
 import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
@@ -21,6 +23,7 @@ interface FinalizeProcessorContext {
   dbId: number;
   vodId: string;
   type: SourceType;
+  platform: Platform;
   filePath: string;
   config: TenantConfig;
   db: Kysely<StreamerDB>;
@@ -31,7 +34,7 @@ interface FinalizeProcessorContext {
 }
 
 const buildFinalizeContext = async (job: Job<VodFinalizeFileJob>): Promise<FinalizeProcessorContext> => {
-  const { tenantId, dbId, vodId, type, filePath } = job.data;
+  const { tenantId, dbId, vodId, type, filePath, platform } = job.data;
   const log = createAutoLogger(String(tenantId));
   const startTime = Date.now();
 
@@ -66,6 +69,7 @@ const buildFinalizeContext = async (job: Job<VodFinalizeFileJob>): Promise<Final
     dbId,
     vodId,
     type,
+    platform,
     filePath: actualFilePath,
     config,
     db,
@@ -87,20 +91,84 @@ const errorMeta = (ctx: FinalizeProcessorContext, job: Job) => ({
 const finalizeProcessor = wrapWorkerProcessor<VodFinalizeFileJob, FinalizeProcessorContext, VodFinalizeFileResult>(
   buildFinalizeContext,
   async (ctx) => {
+    const destPath =
+      ctx.type === SOURCE_TYPES.LIVE
+        ? getLiveFilePath({ tenantId: ctx.tenantId, streamId: ctx.streamId ?? '' })
+        : getVodFilePath({ tenantId: ctx.tenantId, vodId: ctx.vodId });
+
+    const alerts = createFinalizeWorkerAlerts();
+    let messageId: string | null = null;
+
+    if (ctx.saveMP4 && isAlertsEnabled()) {
+      const stat = await fsPromises.stat(ctx.filePath);
+      messageId = await initRichAlert(
+        alerts.init(ctx.vodId, ctx.platform, ctx.type, ctx.filePath, destPath, stat.size, ctx.saveMP4)
+      );
+    } else if (!ctx.saveMP4 && isAlertsEnabled()) {
+      messageId = await initRichAlert(
+        alerts.init(ctx.vodId, ctx.platform, ctx.type, ctx.filePath, destPath, 0, ctx.saveMP4)
+      );
+    }
+
+    let tmpDirCleaned = false;
+
     if (ctx.saveMP4) {
+      let lastBucket = -1;
+      const startTime = Date.now();
+
       await finalizeFile({
         filePath: ctx.filePath,
-        destPath:
-          ctx.type === SOURCE_TYPES.LIVE
-            ? getLiveFilePath({ tenantId: ctx.tenantId, streamId: ctx.streamId ?? '' })
-            : getVodFilePath({ tenantId: ctx.tenantId, vodId: ctx.vodId }),
+        destPath,
         log: ctx.log,
         ...(ctx.workDir != null && { tmpDir: ctx.workDir }),
+        onProgress: (bytesCopied, totalBytes) => {
+          if (messageId == null) return;
+
+          const percent = Math.min(Math.round((bytesCopied / totalBytes) * 100), 100);
+          const elapsedSeconds = (Date.now() - startTime) / 1000;
+          const speed = elapsedSeconds > 0 ? bytesCopied / elapsedSeconds : 0;
+          const eta = speed > 0 ? (totalBytes - bytesCopied) / speed : 0;
+
+          const bucket = Math.floor(percent / 25) * 25;
+          if (bucket > lastBucket) {
+            lastBucket = bucket;
+            safeUpdateAlert(
+              messageId,
+              alerts.progress(ctx.vodId, percent, bytesCopied, totalBytes, speed, Math.round(eta)),
+              ctx.log,
+              ctx.vodId
+            );
+          }
+        },
       });
+
+      tmpDirCleaned = ctx.workDir != null;
+
+      const elapsedSeconds = (Date.now() - startTime) / 1000;
+      const stat = await fsPromises.stat(destPath);
+
+      if (messageId != null) {
+        safeUpdateAlert(
+          messageId,
+          alerts.complete(ctx.vodId, ctx.platform, destPath, stat.size, elapsedSeconds, tmpDirCleaned),
+          ctx.log,
+          ctx.vodId
+        );
+      }
     } else if (ctx.workDir != null) {
       await fsPromises.rm(ctx.workDir, { recursive: true, force: true }).catch((err) => {
         ctx.log.warn({ workDir: ctx.workDir, error: extractErrorDetails(err).message }, 'Failed to clean up tmpDir');
       });
+      tmpDirCleaned = true;
+
+      if (messageId != null) {
+        safeUpdateAlert(
+          messageId,
+          alerts.complete(ctx.vodId, ctx.platform, destPath, 0, 0, tmpDirCleaned),
+          ctx.log,
+          ctx.vodId
+        );
+      }
     }
 
     const duration = Date.now() - ctx.startTime;
@@ -108,7 +176,20 @@ const finalizeProcessor = wrapWorkerProcessor<VodFinalizeFileJob, FinalizeProces
 
     return { success: true };
   },
-  { errorMeta, errorAlert: async () => {} }
+  {
+    errorMeta,
+    errorAlert: (ctx, _job, errorMsg) => {
+      const alerts = createFinalizeWorkerAlerts();
+      const destPath =
+        ctx.type === SOURCE_TYPES.LIVE
+          ? getLiveFilePath({ tenantId: ctx.tenantId, streamId: ctx.streamId ?? '' })
+          : getVodFilePath({ tenantId: ctx.tenantId, vodId: ctx.vodId });
+      if (isAlertsEnabled()) {
+        void initRichAlert(alerts.error(ctx.vodId, ctx.platform, ctx.filePath, destPath, errorMsg)).catch(() => {});
+      }
+      return Promise.resolve();
+    },
+  }
 );
 
 export default finalizeProcessor;

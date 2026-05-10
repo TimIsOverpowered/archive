@@ -50,6 +50,7 @@ const dmcaProcessor = wrapWorkerProcessor<DmcaProcessingJob, DmcaProcessorContex
           ctx.vodId,
           ctx.filePath,
           ctx.type,
+          ctx.platform,
           { workDir: ctx.workDir, streamId: ctx.streamId }
         );
       } catch (err) {

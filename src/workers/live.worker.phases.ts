@@ -184,7 +184,7 @@ export async function runPostProcessing(
   const perGameUploadEnabled = ctx.config.youtube?.perGameUpload === true;
   if (!uploadEnabled || (!vodUploadEnabled && !perGameUploadEnabled)) {
     try {
-      await enqueueFinalizeJob(ctx, ctx.dbId, ctx.vodId, downloadResult.finalMp4Path, SOURCE_TYPES.VOD, {
+      await enqueueFinalizeJob(ctx, ctx.dbId, ctx.vodId, downloadResult.finalMp4Path, SOURCE_TYPES.VOD, ctx.platform, {
         workDir: getTmpDirPath({ tenantId: ctx.tenantId, vodId: ctx.vodId }),
       });
     } catch (err) {

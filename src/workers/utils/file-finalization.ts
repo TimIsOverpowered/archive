@@ -1,41 +1,10 @@
+import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import { extractErrorDetails } from '../../utils/error.js';
 import type { AppLogger } from '../../utils/logger.js';
 
-const RETRY_ATTEMPTS = 3;
-const RETRY_DELAYS = [5000, 10000, 15000];
-
-/**
- * Copies a file from source to destination with retry logic.
- * Does not delete source or clean up directories — pure copy operation.
- */
-export async function copyFileWithRetry(filePath: string, destPath: string, log: AppLogger): Promise<void> {
-  const destDir = path.dirname(destPath);
-  await fsPromises.mkdir(destDir, { recursive: true });
-
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
-    try {
-      await fsPromises.copyFile(filePath, destPath);
-      log.info({ filePath, destPath }, 'Copied file');
-      return;
-    } catch (err) {
-      lastError = err;
-      const delay = RETRY_DELAYS[attempt] ?? RETRY_DELAYS[RETRY_ATTEMPTS - 1];
-      log.warn(
-        { filePath, destPath, attempt: attempt + 1, error: extractErrorDetails(err).message },
-        `Failed to copy file (attempt ${attempt + 1}/${RETRY_ATTEMPTS})`
-      );
-      if (attempt < RETRY_ATTEMPTS - 1) {
-        await new Promise((r) => setTimeout(r, delay));
-      }
-    }
-  }
-
-  throw lastError;
-}
+const CHUNK_SIZE = 1024 * 1024;
 
 export interface FinalizeFileOptions {
   filePath: string;
@@ -43,49 +12,52 @@ export interface FinalizeFileOptions {
   tmpDir?: string;
   saveMP4?: boolean;
   log: AppLogger;
+  onProgress?: (bytesCopied: number, totalBytes: number) => void;
 }
 
 /**
- * Copies a file from source to destination with retry logic, then optionally cleans up tmpDir.
- * Uses sequential I/O (maxConcurrentIOs: 1) to avoid saturating storage mount.
+ * Copies a file from source to destination with streaming I/O and optional progress callback, then optionally cleans up tmpDir.
  * Deletes source on success.
  */
 export async function finalizeFile(options: FinalizeFileOptions): Promise<void> {
-  const { filePath, destPath, tmpDir, saveMP4 = true, log } = options;
+  const { filePath, destPath, tmpDir, saveMP4 = true, log, onProgress } = options;
 
   if (saveMP4) {
     const destDir = path.dirname(destPath);
     await fsPromises.mkdir(destDir, { recursive: true });
 
-    let lastError: unknown;
+    const stat = await fsPromises.stat(filePath);
+    const fileSize = stat.size;
 
-    for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
-      try {
-        await fsPromises.copyFile(filePath, destPath);
-        if (tmpDir != null) {
-          await fsPromises.rm(tmpDir, { recursive: true, force: true });
-          log.info({ filePath, destPath, tmpDir }, 'Finalized file to storage');
-        } else {
-          log.info({ filePath, destPath, attempt: attempt + 1 }, 'Finalized file to storage');
+    let bytesCopied = 0;
+
+    await new Promise<void>((resolve, reject) => {
+      const readStream = fs.createReadStream(filePath, { highWaterMark: CHUNK_SIZE });
+      const writeStream = fs.createWriteStream(destPath);
+
+      readStream.on('data', (chunk: Buffer) => {
+        bytesCopied += chunk.length;
+        if (onProgress) {
+          onProgress(bytesCopied, fileSize);
         }
-        return;
-      } catch (err) {
-        lastError = err;
-        const delay = RETRY_DELAYS[attempt] ?? RETRY_DELAYS[RETRY_ATTEMPTS - 1];
-        log.warn(
-          { filePath, destPath, attempt: attempt + 1, error: extractErrorDetails(err).message },
-          `Failed to finalize file to storage (attempt ${attempt + 1}/${RETRY_ATTEMPTS})`
-        );
-        if (attempt < RETRY_ATTEMPTS - 1) {
-          await new Promise((r) => setTimeout(r, delay));
-        }
-      }
+      });
+
+      readStream.on('error', reject);
+      writeStream.on('error', reject);
+      writeStream.on('finish', resolve);
+
+      readStream.pipe(writeStream);
+    });
+
+    if (tmpDir != null) {
+      await fsPromises.rm(tmpDir, { recursive: true, force: true });
+      log.info({ filePath, destPath, tmpDir }, 'Finalized file to storage');
+    } else {
+      log.info({ filePath, destPath }, 'Finalized file to storage');
     }
-
-    throw lastError;
   }
 
-  if (tmpDir != null) {
+  if (!saveMP4 && tmpDir != null) {
     try {
       await fsPromises.rm(tmpDir, { recursive: true, force: true });
       log.debug({ tmpDir }, 'Cleaned up tmpDir');

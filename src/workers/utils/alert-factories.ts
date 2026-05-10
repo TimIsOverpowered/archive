@@ -3,7 +3,7 @@
  * Each factory provides init, progress, complete, and error alert builders.
  */
 
-import { capitalizePlatform, Platform } from '../../types/platforms.js';
+import { capitalizePlatform, Platform, SOURCE_TYPES } from '../../types/platforms.js';
 import { createProgressBar, updateAlert } from '../../utils/discord-alerts.js';
 import type { RichEmbedData } from '../../utils/discord-alerts.js';
 import { extractErrorDetails } from '../../utils/error.js';
@@ -634,6 +634,115 @@ export function createCopyWorkerAlerts(): CopyWorkerAlerts {
       fields: [
         { name: 'VOD ID', value: vodId, inline: true },
         { name: 'Copied', value: `${formatBytes(bytesCopied)} / ${formatBytes(totalBytes)}`, inline: true },
+        { name: 'Error', value: errorMsg.substring(0, 500), inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+    }),
+  };
+}
+
+// ============================================================================
+// Finalize Worker Alerts
+// ============================================================================
+
+export interface FinalizeWorkerAlerts {
+  init: (
+    vodId: string,
+    platform: Platform,
+    sourceType: string,
+    sourcePath: string,
+    destPath: string,
+    fileSize: number,
+    saveMP4: boolean
+  ) => RichEmbedData;
+  progress: (
+    vodId: string,
+    percent: number,
+    bytesCopied: number,
+    totalBytes: number,
+    speedBps: number,
+    etaSeconds: number
+  ) => RichEmbedData;
+  complete: (
+    vodId: string,
+    platform: Platform,
+    destPath: string,
+    fileSize: number,
+    elapsedSeconds: number,
+    tmpDirCleaned: boolean
+  ) => RichEmbedData;
+  error: (vodId: string, platform: Platform, sourcePath: string, destPath: string, errorMsg: string) => RichEmbedData;
+}
+
+export function createFinalizeWorkerAlerts(): FinalizeWorkerAlerts {
+  return {
+    init: (vodId, platform, sourceType, sourcePath, destPath, fileSize, saveMP4) => ({
+      title: `📦 Finalizing ${sourceType === SOURCE_TYPES.LIVE ? '[Live]' : '[VOD]'} ${vodId}`,
+      description: saveMP4 ? 'Copying file to permanent storage' : 'Skipping MP4 save, cleaning up temp files',
+      status: 'warning',
+      fields: [
+        { name: 'VOD ID', value: vodId, inline: true },
+        { name: 'Platform', value: capitalizePlatform(platform), inline: true },
+        { name: 'Type', value: sourceType === SOURCE_TYPES.LIVE ? 'Live' : 'VOD', inline: true },
+        { name: 'Size', value: formatBytes(fileSize), inline: true },
+        { name: 'Save MP4', value: saveMP4 ? 'Yes' : 'No', inline: true },
+        { name: 'Source', value: sourcePath, inline: false },
+        { name: 'Destination', value: destPath, inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+    }),
+
+    progress: (vodId, percent, bytesCopied, totalBytes, speedBps, etaSeconds) => {
+      const progressBar = createProgressBar(percent);
+
+      return {
+        title: `📦 Finalizing ${vodId}`,
+        description: `Copying to permanent storage (${percent}%)`,
+        status: 'warning',
+        fields: [
+          { name: 'VOD ID', value: vodId, inline: true },
+          { name: 'Progress', value: progressBar, inline: false },
+          { name: 'Copied', value: `${formatBytes(bytesCopied)} / ${formatBytes(totalBytes)}`, inline: false },
+          { name: 'Speed', value: `${formatBytes(speedBps)}/s`, inline: true },
+          { name: 'ETA', value: toHHMMSS(Math.max(0, etaSeconds)), inline: true },
+        ],
+        timestamp: new Date().toISOString(),
+        updatedTimestamp: new Date().toISOString(),
+      };
+    },
+
+    complete: (vodId, platform, destPath, fileSize, elapsedSeconds, tmpDirCleaned) => {
+      const avgSpeed = elapsedSeconds > 0 ? fileSize / elapsedSeconds : 0;
+
+      const fields: Array<{ name: string; value: string; inline: boolean }> = [
+        { name: 'VOD ID', value: vodId, inline: true },
+        { name: 'Platform', value: capitalizePlatform(platform), inline: true },
+        { name: 'Size', value: formatBytes(fileSize), inline: true },
+        { name: 'Time', value: toHHMMSS(elapsedSeconds), inline: true },
+        { name: 'Avg Speed', value: `${formatBytes(avgSpeed)}/s`, inline: true },
+        { name: 'Temp Cleaned', value: tmpDirCleaned ? 'Yes' : 'No', inline: true },
+        { name: 'Destination', value: destPath, inline: false },
+      ];
+
+      return {
+        title: `✅ Finalized ${vodId}`,
+        description: 'File finalized to permanent storage',
+        status: 'success',
+        fields,
+        timestamp: new Date().toISOString(),
+        updatedTimestamp: new Date().toISOString(),
+      };
+    },
+
+    error: (vodId, platform, sourcePath, destPath, errorMsg) => ({
+      title: `❌ Finalization Failed ${vodId}`,
+      description: 'Failed to finalize file',
+      status: 'error',
+      fields: [
+        { name: 'VOD ID', value: vodId, inline: true },
+        { name: 'Platform', value: capitalizePlatform(platform), inline: true },
+        { name: 'Source', value: sourcePath, inline: false },
+        { name: 'Destination', value: destPath, inline: false },
         { name: 'Error', value: errorMsg.substring(0, 500), inline: false },
       ],
       timestamp: new Date().toISOString(),
