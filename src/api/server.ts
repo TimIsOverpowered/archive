@@ -9,7 +9,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { ApiConfig } from '../config/env.js';
 import { registerTenantConfigSubscriber } from '../config/tenant-config-subscriber.js';
 import { Server } from '../constants.js';
-import { registerCacheSubscriber } from '../services/cache-invalidator.js';
+import { registerCacheSubscriber, registerGameCacheSubscriber } from '../services/cache-invalidator.js';
 import { createErrorContext, formatErrorResponse } from '../utils/error.js';
 import { getLogger, createLogger, setGlobalLogger } from '../utils/logger.js';
 import createTenantLoggerMiddleware, { exitTenantContext } from './middleware/tenant-logger.js';
@@ -94,6 +94,9 @@ export async function buildServer(config: ApiConfig) {
 
   // Pub/Sub subscriber for cache invalidation events from workers
   registerCacheSubscriber(fastify);
+
+  // Pub/Sub subscriber for game cache invalidation events from workers
+  registerGameCacheSubscriber(fastify);
 
   // Pub/Sub subscriber for tenant config invalidation events
   registerTenantConfigSubscriber(fastify);

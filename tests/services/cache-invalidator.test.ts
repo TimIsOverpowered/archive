@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import { resetEnvConfig } from '../../src/config/env.js';
-import { publishVodUpdate, publishVodDurationUpdate } from '../../src/services/cache-invalidator.js';
+import { publishVodUpdate, publishVodDurationUpdate, publishGameUpdate } from '../../src/services/cache-invalidator.js';
 import { RedisService } from '../../src/utils/redis-service.js';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
@@ -157,5 +157,64 @@ describe('CacheInvalidator: publishVodDurationUpdate', () => {
     assert.ok('dbId' in event);
     assert.ok('duration' in event);
     assert.ok('is_live' in event);
+  });
+});
+
+describe('CacheInvalidator: publishGameUpdate', () => {
+  let mockClient: any;
+  let publishCalls: { channel: string; message: string }[] = [];
+
+  beforeEach(() => {
+    publishCalls = [];
+    mockClient = {
+      publish: async (channel: string, message: string) => {
+        publishCalls.push({ channel, message });
+      },
+    };
+    (RedisService as any)._instance = {
+      client: mockClient,
+    };
+    resetEnvConfig();
+  });
+
+  afterEach(() => {
+    (RedisService as any)._instance = null;
+    resetEnvConfig();
+  });
+
+  it('should not publish when Redis client is not available', async () => {
+    (RedisService as any)._instance = null;
+    await publishGameUpdate('tenant-1');
+    assert.strictEqual(publishCalls.length, 0);
+  });
+
+  it('should publish GAME_UPDATED event', async () => {
+    await publishGameUpdate('tenant-1');
+    assert.strictEqual(publishCalls.length, 1);
+    assert.strictEqual(publishCalls[0]?.channel, 'cache:game');
+    const event = JSON.parse(publishCalls[0]?.message);
+    assert.strictEqual(event.type, 'GAME_UPDATED');
+    assert.strictEqual(event.tenantId, 'tenant-1');
+  });
+
+  it('should handle Redis error gracefully', async () => {
+    mockClient.publish = async () => {
+      throw new Error('ECONNREFUSED');
+    };
+    await assert.doesNotReject(publishGameUpdate('tenant-1'));
+  });
+
+  it('should use correct Redis channel', async () => {
+    await publishGameUpdate('tenant-1');
+    assert.strictEqual(publishCalls[0]?.channel, 'cache:game');
+  });
+
+  it('should publish correct event structure', async () => {
+    await publishGameUpdate('tenant-2');
+    const event = JSON.parse(publishCalls[0]?.message ?? '');
+    assert.ok('type' in event);
+    assert.ok('tenantId' in event);
+    assert.strictEqual(event.type, 'GAME_UPDATED');
+    assert.strictEqual(event.tenantId, 'tenant-2');
   });
 });

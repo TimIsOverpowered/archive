@@ -4,10 +4,11 @@ import { extractErrorDetails } from '../utils/error.js';
 import { getLogger } from '../utils/logger.js';
 import { RedisService } from '../utils/redis-service.js';
 import { createRedisSubscriber } from '../utils/redis-subscriber.js';
-import { invalidateVodVolatileCache } from './cache-tags.js';
+import { invalidateGameTags, invalidateVodVolatileCache } from './cache-tags.js';
 import { setVodVolatileCache, invalidateVodStaticCache } from './vod-cache.js';
 
 const CACHE_CHANNEL = 'cache:vod';
+const GAME_CACHE_CHANNEL = 'cache:game';
 
 interface VodUpdateEvent {
   type: 'VOD_UPDATED' | 'VOD_DURATION_UPDATED';
@@ -15,6 +16,11 @@ interface VodUpdateEvent {
   dbId: number;
   duration?: number;
   is_live?: boolean;
+}
+
+interface GameUpdateEvent {
+  type: 'GAME_UPDATED';
+  tenantId: string;
 }
 
 /**
@@ -33,6 +39,13 @@ export async function handleCacheEvent(event: VodUpdateEvent): Promise<void> {
     await invalidateVodStaticCache(event.tenantId, event.dbId);
     await invalidateVodVolatileCache(event.tenantId, event.dbId);
   }
+}
+
+/**
+ * Handle a game update event by invalidating all game cache keys for the tenant.
+ */
+export async function handleGameCacheEvent(event: GameUpdateEvent): Promise<void> {
+  await invalidateGameTags(event.tenantId);
 }
 
 /**
@@ -77,6 +90,24 @@ export async function publishVodDurationUpdate(
 }
 
 /**
+ * Publish a game update event to Redis for cache invalidation.
+ * Subscribers will invalidate all game-related cache keys for the tenant.
+ */
+export async function publishGameUpdate(tenantId: string): Promise<void> {
+  const client = RedisService.getActiveClient();
+  if (!client) return;
+
+  const event: GameUpdateEvent = { type: 'GAME_UPDATED', tenantId };
+
+  try {
+    await client.publish(GAME_CACHE_CHANNEL, JSON.stringify(event));
+  } catch (error) {
+    const details = extractErrorDetails(error);
+    getLogger().warn({ err: details, tenantId }, 'Failed to publish game update event');
+  }
+}
+
+/**
  * Register a Redis Pub/Sub subscriber for VOD cache invalidation events.
  * Handles VOD_UPDATED (invalidates static cache) and VOD_DURATION_UPDATED (sets volatile cache).
  * Subscribes to the cache channel and hooks into fastify's onClose for cleanup.
@@ -86,6 +117,21 @@ export function registerCacheSubscriber(fastify: FastifyInstance): void {
     channel: CACHE_CHANNEL,
     handler: handleCacheEvent,
     loggerModule: 'cache-subscriber',
+  });
+
+  fastify.addHook('onClose', destroy);
+}
+
+/**
+ * Register a Redis Pub/Sub subscriber for game cache invalidation events.
+ * Handles GAME_UPDATED (invalidates all game cache keys for the tenant).
+ * Subscribes to the game cache channel and hooks into fastify's onClose for cleanup.
+ */
+export function registerGameCacheSubscriber(fastify: FastifyInstance): void {
+  const { destroy } = createRedisSubscriber({
+    channel: GAME_CACHE_CHANNEL,
+    handler: handleGameCacheEvent,
+    loggerModule: 'game-cache-subscriber',
   });
 
   fastify.addHook('onClose', destroy);
