@@ -649,7 +649,9 @@ function buildSequentialGameChain(
     const data = baseChildren.length > 0 ? { ...job, filePath: undefined } : { ...job, workDir };
 
     // Pass the fully constructed tailChild instead of a skeleton object
-    const children: Array<SequentialFlowChild | { name: string; queueName: string; opts: { jobId: string } }> | undefined = isLast
+    const children:
+      | Array<SequentialFlowChild | { name: string; queueName: string; opts: { jobId: string } }>
+      | undefined = isLast
       ? baseChildren.length > 0
         ? baseChildren
         : undefined
