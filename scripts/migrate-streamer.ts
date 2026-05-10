@@ -83,6 +83,7 @@ async function migrateChatWorker(
 
   const conn = await pool.connect();
   try {
+    await conn.query('SET statement_timeout = 0');
     while (currentPage < endPage) {
       const batchEndPage = Math.min(currentPage + pagesPerBatch, endPage);
 
@@ -881,6 +882,7 @@ const main = async () => {
 
       // Rebuild destination indexes and FK now that bulk load is complete
       console.log('🔨 Rebuilding indexes and FK on chat_messages_new...');
+      await oldPool.query('SET statement_timeout = 0');
       await oldPool.query(`
         CREATE INDEX IF NOT EXISTS idx_chat_messages_new_vod_offset_created
         ON chat_messages_new (vod_id, content_offset_seconds, created_at)
