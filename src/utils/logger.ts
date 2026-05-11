@@ -30,9 +30,25 @@ export function createLogger(opts: { level: string; isProduction: boolean }): Ap
     },
     hooks: {
       logMethod(inputArgs, method) {
-        if (inputArgs.length >= 2 && inputArgs[1] === 'premature close') {
+        const isPrematureClose = inputArgs.some((arg) => {
+          if (typeof arg === 'string' && arg === 'premature close') return true;
+          if (arg != null && typeof arg === 'object') {
+            if ('message' in arg && arg.message === 'premature close') return true;
+            if (
+              'err' in arg &&
+              typeof arg.err === 'object' &&
+              arg.err != null &&
+              (arg.err as Error).message === 'premature close'
+            )
+              return true;
+          }
+          return false;
+        });
+
+        if (isPrematureClose) {
           return;
         }
+
         method.apply(this, inputArgs);
       },
     },
