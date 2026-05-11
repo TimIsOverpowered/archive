@@ -64,6 +64,10 @@ interface HlsSegmentFilterResult {
   newNoChangeCount: number;
 }
 
+type SegmentWithMap = HLS.types.Segment & {
+  map?: { uri?: string };
+};
+
 export async function downloadHlsStream(options: HlsDownloadOptions): Promise<HlsDownloadResult> {
   const { ctx, dbId, vodId, platform, startedAt, sourceUrl, isLive = false, onProgress } = options;
   const { config, tenantId } = ctx;
@@ -271,8 +275,19 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
 
         const totalDuration = segments.reduce((sum, seg) => sum + (seg.duration ?? 0), 0);
 
+        const segmentsToDownload: { uri: string }[] = [];
+        const newSegmentsTyped = result.newSegments as SegmentWithMap[];
+        for (const seg of newSegmentsTyped) {
+          const mapUri = seg.map?.uri;
+          if (mapUri != null && !downloadedSegments.has(mapUri)) {
+            downloadedSegments.add(mapUri);
+            segmentsToDownload.push({ uri: mapUri });
+          }
+          segmentsToDownload.push(seg);
+        }
+
         await downloadSegmentsParallel(
-          result.newSegments,
+          segmentsToDownload,
           ctx.vodDir,
           baseURL,
           strategy,
@@ -335,25 +350,40 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
   await writeFile(m3u8Path, variantM3u8String);
 
   const parsed = HLS.parse(variantM3u8String) as HLS.types.MediaPlaylist;
-  const segments = parsed.segments ?? [];
+  const rawSegments = (parsed.segments ?? []) as SegmentWithMap[];
 
-  if (segments.length === 0) {
+  if (rawSegments.length === 0) {
     throw new Error('No segments found in HLS playlist');
   }
 
-  log.debug({ vodId, count: segments.length }, 'Found segments to download');
+  const segmentsToDownload: { uri: string }[] = [];
+  const seenUris = new Set<string>();
+
+  for (const seg of rawSegments) {
+    const mapUri = seg.map?.uri;
+    if (mapUri != null && !seenUris.has(mapUri)) {
+      seenUris.add(mapUri);
+      segmentsToDownload.push({ uri: mapUri });
+    }
+    if (!seenUris.has(seg.uri)) {
+      seenUris.add(seg.uri);
+      segmentsToDownload.push(seg);
+    }
+  }
+
+  log.debug({ vodId, count: segmentsToDownload.length }, 'Found segments to download (including init)');
 
   const strategy = resolveDownloadStrategy(platform, cycleTLS);
 
   await downloadSegmentsParallel(
-    segments,
+    segmentsToDownload,
     vodDir,
     baseURL,
     strategy,
     Hls.SEGMENT_CONCURRENCY,
     Hls.SEGMENT_RETRY_ATTEMPTS,
     log,
-    (completedCount) => onProgress?.(completedCount, segments.length)
+    (completedCount) => onProgress?.(completedCount, segmentsToDownload.length)
   );
 }
 
