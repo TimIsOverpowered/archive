@@ -34,6 +34,10 @@ export async function buildServer(config: ApiConfig) {
     loggerInstance: logger as unknown as FastifyBaseLogger,
     trustProxy: true,
     disableRequestLogging: true,
+    genReqId: (req) => {
+      const header = req.headers['x-request-id'];
+      return typeof header === 'string' && header !== '' ? header : randomUUID();
+    },
     routerOptions: {
       ignoreTrailingSlash: true,
     },
@@ -63,13 +67,6 @@ export async function buildServer(config: ApiConfig) {
   fastify.addHook('preHandler', tenantLoggerMiddleware);
   fastify.addHook('onResponse', (_request, _reply, done) => {
     exitTenantContext();
-    done();
-  });
-
-  // Request ID propagation
-  fastify.addHook('preHandler', (request, reply, done) => {
-    const requestId = (request.headers['x-request-id'] as string | undefined) ?? randomUUID();
-    reply.header('X-Request-ID', requestId);
     done();
   });
 

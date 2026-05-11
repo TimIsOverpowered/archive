@@ -1,6 +1,6 @@
 import pino from 'pino';
 import type { SerializedRequest, SerializedResponse } from 'pino';
-import { getRequestId, getTenantId, getDisplayName } from './async-context.js';
+import { getTenantId, getDisplayName } from './async-context.js';
 
 export type AppLogger = pino.Logger<'metric'>;
 
@@ -28,8 +28,16 @@ export function createLogger(opts: { level: string; isProduction: boolean }): Ap
       }),
       res: (reply: SerializedResponse) => ({ statusCode: reply.statusCode }),
     },
+    hooks: {
+      logMethod(inputArgs, method) {
+        if (inputArgs.length >= 2 && inputArgs[1] === 'premature close') {
+          return;
+        }
+        method.apply(this, inputArgs);
+      },
+    },
     mixin: () => {
-      const ctx = { reqId: getRequestId(), tenantId: getTenantId(), displayName: getDisplayName() };
+      const ctx = { tenantId: getTenantId(), displayName: getDisplayName() };
       return Object.fromEntries(Object.entries(ctx).filter(([, v]) => v != null));
     },
   };

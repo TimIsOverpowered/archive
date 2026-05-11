@@ -1,11 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { configService } from '../../config/tenant-config.js';
-import {
-  enterTenantContext,
-  exitTenantContext,
-  TenantContextData,
-  generateRequestId,
-} from '../../utils/async-context.js';
+import { enterTenantContext, exitTenantContext, TenantContextData } from '../../utils/async-context.js';
 
 /**
  * Simple middleware that sets tenant context in async-local storage.
@@ -33,8 +28,8 @@ export default function createTenantLoggerMiddleware() {
     const displayName = config?.displayName ?? tenantId;
     request.tenantDisplayName = displayName;
 
-    // Generate or reuse request ID for tracing across API → workers → DB
-    const reqId = generateRequestId();
+    // Use the ID Fastify natively generated for this request
+    const reqId = request.id;
     request.reqId = reqId;
     reply.header('X-Request-ID', reqId);
 
