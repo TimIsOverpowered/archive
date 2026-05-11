@@ -22,7 +22,7 @@ Interactive wizard to create a new streamer tenant from scratch.
 ```bash
 npx tsx scripts/create-tenant.ts
 # or use npm script:
-npm run tenant:create
+npm run create:tenant
 ```
 
 **Channel Name Validation:**
@@ -46,7 +46,7 @@ The script validates the channel name (which becomes the tenant ID):
 9. Shows a summary and requires confirmation before proceeding
 10. Registers tenant in meta database without encrypted credentials
 
-**Note:** After creating the tenant, use `npm run auth:twitch` or `npm run auth:youtube` to configure OAuth authentication separately.
+**Note:** After creating the tenant, use `npm run auth:youtube` to configure YouTube OAuth authentication separately.
 
 **Prerequisites:**
 
@@ -98,7 +98,6 @@ User ID (numeric, optional): 121059319
 Username (optional): moonmoon
 
 Note: OAuth credentials are NOT collected here.
-     Run "npm run auth:twitch" after tenant creation to configure authentication.
 
 Enable Kick? (y/N): n
 
@@ -145,10 +144,9 @@ Optional Authentication Setup:
 ────────────────────────────────
 To configure OAuth authentication for this tenant, run:
 
-  • Twitch Auth: npm run auth:twitch (then enter tenant ID "moonmoon")
   • YouTube Auth: npm run auth:youtube (then enter tenant ID "moonmoon")
 
-These scripts will guide you through the OAuth flow and securely store credentials.
+This script will guide you through the OAuth flow and securely store credentials.
 ```
 
 **Generated files:**
@@ -160,7 +158,6 @@ These scripts will guide you through the OAuth flow and securely store credentia
 
 After running auth scripts separately:
 
-- `twitch.auth` (client_id, client_secret) - configured via `npm run auth:twitch`
 - `youtube.auth` (access_token, refresh_token) - configured via `npm run auth:youtube`
 - `database_url`
 
@@ -210,85 +207,6 @@ npx tsx scripts/import-tenant.ts moonmoon "postgresql://<user>:***@<host>:5432/<
 ---
 
 ## OAuth Authentication
-
-### auth-twitch.ts
-
-Interactive script to configure Twitch OAuth credentials for an existing tenant.
-
-**Usage:**
-
-```bash
-npx tsx scripts/auth-twitch.ts
-# or use npm script:
-npm run auth:twitch
-```
-
-**What it does:**
-
-1. Prompts for tenant/streamer ID
-2. Validates tenant exists in meta database
-3. Prompts for Twitch Client ID
-4. Prompts for Twitch Client Secret (hidden input)
-5. Generates access token via Twitch OAuth client credentials flow
-6. Encrypts credentials with AES-256-GCM
-7. Stores encrypted auth object in tenant's `twitch.auth` field
-8. Enables Twitch for the tenant
-
-**Example session:**
-
-```bash
-$ npm run auth:twitch
-
-╔════════════════════════════╗
-║  TWITCH AUTH CONFIGURATOR  ║
-╚════════════════════════════╝
-
-────────────────────────────────────────
-TENANT SELECTION
-────────────────────────────────────────
-
-Tenant/Streamer ID: moonmoon
-
-✓ Tenant found!
-
-Current Twitch Status: Disabled (no credentials configured)
-
-────────────────────────────────────────
-CREDENTIALS INPUT
-────────────────────────────────────────
-
-Client ID: abc123def456
-Client Secret: ********************
-
-🔄 Generating access token via Twitch OAuth client credentials flow...
-✓ Access token generated successfully!
-
-Encrypting credentials with AES-256-GCM...
-Storing in meta database for tenant "moonmoon"...
-
-╔══════════════╗
-║ ✓ SUCCESSFUL ║
-╚══════════════╝
-
-Tenant ID: moonmoon
-
-Auth Object Generated & Stored:
-  • Client ID: abc123de...
-  • Access Token: 9a8b7c6d5e4f3g2h1i...
-
-Credentials encrypted with AES-256-GCM and stored in meta database.
-
-Note: Access token expires after ~6 hours but can be refreshed
-      automatically using the stored client_id + client_secret.
-```
-
-**Prerequisites:**
-
-- Tenant must already exist in meta database
-- `ENCRYPTION_MASTER_KEY` set in `.env` (64 hex characters)
-- `META_DATABASE_URL` set in `.env`
-
----
 
 ### auth-youtube.ts
 
