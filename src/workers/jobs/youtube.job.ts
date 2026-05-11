@@ -151,7 +151,8 @@ export async function createGameUploadJobsForVod(
 
   const platformCfg = getPlatformConfig(config, platform);
   if (platformCfg?.mainPlatform !== true) {
-    throw new PlatformNotMainSourceError(platform);
+    log.info({ platform, tenantId }, 'Skipped game uploads (platform not main source)');
+    return [];
   }
 
   // Fetch all chapters for this VOD
@@ -773,10 +774,14 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
       result.vodJobId = flow.job.id ?? null;
       result.gameJobIds = gameJobIds;
 
-      log.info(
-        { vodId, chained: downloadJobId != null, gameJobsCount: result.gameJobIds.length },
-        'Queued YouTube game uploads'
-      );
+      if (result.gameJobIds.length > 0) {
+        log.info(
+          { vodId, chained: downloadJobId != null, gameJobsCount: result.gameJobIds.length },
+          'Queued YouTube game uploads'
+        );
+      } else {
+        log.info({ vodId, chained: downloadJobId != null }, 'Skipped game uploads');
+      }
       log.info({ vodId, chained: downloadJobId != null, vodJobId: result.vodJobId }, 'Queued YouTube VOD upload');
     } catch (error) {
       const details = extractErrorDetails(error);
@@ -819,10 +824,14 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
           result.vodJobId = flow.job.id ?? null;
           result.gameJobIds = gameJobIds;
 
-          log.info(
-            { vodId, chained: downloadJobId != null, gameJobsCount: result.gameJobIds.length },
-            'Queued YouTube game uploads'
-          );
+          if (result.gameJobIds.length > 0) {
+            log.info(
+              { vodId, chained: downloadJobId != null, gameJobsCount: result.gameJobIds.length },
+              'Queued YouTube game uploads'
+            );
+          } else {
+            log.info({ vodId, chained: downloadJobId != null }, 'Skipped game uploads');
+          }
           log.info({ vodId, chained: downloadJobId != null, vodJobId: result.vodJobId }, 'Queued VOD finalizer');
         }
       } catch (error) {
