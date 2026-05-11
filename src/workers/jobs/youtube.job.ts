@@ -575,32 +575,6 @@ export async function queueYoutubeGameUploadByGame(
   return enqueueGameUpload({ ...job, workDir }, downloadJobId, copyJobId);
 }
 
-/**
- * Creates and enqueues YouTube game upload jobs for all chapters in a VOD.
- * Processes sequentially (one game at a time).
- * @param ctx - Tenant context
- * @param dbId - Database VOD ID
- * @param vodId - Platform VOD ID
- * @param filePath - Path to video file
- * @param platform - Source platform
- * @param downloadJobId - Optional: chains all uploads to wait for download
- * @returns Promise that resolves when all jobs are enqueued
- */
-export async function queueYoutubeGameUploadsForVod(
-  ctx: TenantContext,
-  dbId: number,
-  vodId: string,
-  filePath: string | undefined,
-  platform: Platform,
-  downloadJobId?: string
-): Promise<void> {
-  const jobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform);
-
-  for (const job of jobs) {
-    await enqueueGameUpload(job, downloadJobId);
-  }
-}
-
 // ============== Upload Queue Helpers ==============
 
 /**
@@ -645,8 +619,8 @@ interface SequentialFlowChild {
 
 /**
  * Builds a sequential chain of game upload jobs to avoid BullMQ's shared-child deadlock.
- * Chain structure: game_0 -> game_1 -> ... -> game_N -> copy/download
- * Only the last game references baseChildren. Each earlier game depends on the next.
+ * Chain structure: game_0 -> copy/download, game_1 -> game_0, ... , game_N -> game_(N-1)
+ * Only the first game references baseChildren. Each later game depends on the previous.
  */
 function buildSequentialGameChain(
   gameJobs: YoutubeGameUploadJob[],
@@ -657,28 +631,28 @@ function buildSequentialGameChain(
 ): SequentialFlowChild | null {
   if (gameJobs.length === 0) return null;
 
-  let tailChild: SequentialFlowChild | null = null;
+  let prevChild: SequentialFlowChild | null = null;
 
-  for (let i = gameJobs.length - 1; i >= 0; i--) {
+  for (let i = 0; i < gameJobs.length; i++) {
     const job = gameJobs[i];
     const jobId = gameJobIds[i] ?? '';
-    const isLast = i === gameJobs.length - 1;
+    const isFirst = i === 0;
 
     // Every job gets the path directly — no need to bubble via getChildrenValues
     const data = { ...job, workDir };
 
-    // Pass the fully constructed tailChild instead of a skeleton object
+    // First game depends on base children (download/copy). Each subsequent game depends on the previous.
     const children:
       | Array<SequentialFlowChild | { name: string; queueName: string; opts: { jobId: string } }>
-      | undefined = isLast
+      | undefined = isFirst
       ? baseChildren.length > 0
         ? baseChildren
         : undefined
-      : tailChild != null
-        ? [tailChild]
+      : prevChild != null
+        ? [prevChild]
         : undefined;
 
-    tailChild = {
+    prevChild = {
       name: 'youtube_upload',
       queueName,
       data,
@@ -687,7 +661,7 @@ function buildSequentialGameChain(
     };
   }
 
-  return tailChild;
+  return prevChild;
 }
 
 /**
@@ -751,7 +725,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
   const vodUploadEnabled = uploadEnabled && (options.forceUpload === true || vodUploadConfig);
   const gameUploadEnabled = config?.youtube?.perGameUpload === true;
 
-  // ALL mode: finalize -> vod_upload -> game_1 -> ... -> game_N -> copy/download
+  // ALL mode: finalize <- vod_upload <- game_0 <- ... <- game_N, with game_0 -> copy/download
   if (uploadMode === UPLOAD_MODES.ALL && gameUploadEnabled && vodUploadEnabled) {
     try {
       const gameJobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform, workDir);
@@ -801,7 +775,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
       log.warn({ ...details, vodId }, 'Failed to queue YouTube uploads');
     }
   } else {
-    // Game Uploads only: finalize -> game_1 -> ... -> game_N -> copy/download
+    // Game Uploads only: finalize <- game_0 <- ... <- game_N, with game_0 -> copy/download
     if (uploadMode === UPLOAD_MODES.ALL && gameUploadEnabled) {
       try {
         const gameJobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform, workDir);
