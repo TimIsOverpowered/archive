@@ -92,6 +92,9 @@ export class CycleTLSSession {
   constructor() {
     this.shouldRetryFn = (error) => {
       const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('deadline exceeded') || msg.includes('request canceled')) {
+        return true;
+      }
       const match = msg.match(/status\s+(\d+)/);
       const captured = match?.[1];
       if (captured == null || captured === '') return false;
@@ -126,7 +129,7 @@ export class CycleTLSSession {
 
   async fetchText(
     url: string,
-    retryOpts?: { attempts?: number; maxDelayMs?: number; shouldRetry?: RetryOptions['shouldRetry'] }
+    opts?: { timeoutMs?: number; attempts?: number; maxDelayMs?: number; shouldRetry?: RetryOptions['shouldRetry'] }
   ): Promise<string> {
     if (this.closed) throw new Error('Session is closed');
 
@@ -141,6 +144,7 @@ export class CycleTLSSession {
         userAgent: profile.userAgent,
         http2Fingerprint: profile.http2Fingerprint,
         responseType: 'text',
+        ...(opts?.timeoutMs != null && { timeout: opts.timeoutMs }),
       });
 
       if (response.status < 200 || response.status >= 300) {
@@ -150,14 +154,14 @@ export class CycleTLSSession {
       return response.data as string;
     };
 
-    if (!retryOpts || retryOpts.attempts == null) return fn();
-    return retryWithBackoff(fn, this.resolveRetryOpts(retryOpts));
+    if (!opts || opts.attempts == null) return fn();
+    return retryWithBackoff(fn, this.resolveRetryOpts(opts));
   }
 
   async streamToFile(
     url: string,
     outputPath: string,
-    retryOpts?: { attempts?: number; maxDelayMs?: number; shouldRetry?: RetryOptions['shouldRetry'] }
+    opts?: { timeoutMs?: number; attempts?: number; maxDelayMs?: number; shouldRetry?: RetryOptions['shouldRetry'] }
   ): Promise<void> {
     if (this.closed) throw new Error('Session is closed');
 
@@ -172,6 +176,7 @@ export class CycleTLSSession {
         userAgent: profile.userAgent,
         http2Fingerprint: profile.http2Fingerprint,
         responseType: 'stream',
+        ...(opts?.timeoutMs != null && { timeout: opts.timeoutMs }),
       });
 
       if (response.status < 200 || response.status >= 300) {
@@ -193,8 +198,8 @@ export class CycleTLSSession {
       }
     };
 
-    if (!retryOpts || retryOpts.attempts == null) return fn();
-    return retryWithBackoff(fn, this.resolveRetryOpts(retryOpts));
+    if (!opts || opts.attempts == null) return fn();
+    return retryWithBackoff(fn, this.resolveRetryOpts(opts));
   }
 
   close(): void {

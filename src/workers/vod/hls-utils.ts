@@ -120,6 +120,7 @@ export async function downloadSegmentsParallel(
             await pipeline(response.body, writer);
           } else {
             await strategy.session.streamToFile(`${baseURL}/${segment.uri}`, tempPath, {
+              timeoutMs: 30000,
               attempts: retryAttempts,
             });
           }
