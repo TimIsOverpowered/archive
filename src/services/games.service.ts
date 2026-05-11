@@ -107,7 +107,7 @@ export async function getGames(
         .selectFrom('games')
         .selectAll('games')
         .where(where)
-        .orderBy(sql.ref(orderBy.col), orderBy.dir)
+        .orderBy(sql`${sql.ref(orderBy.col)}`, orderBy.dir)
         .limit(limit + 1)
         .offset(offset)
         .execute(options),
@@ -174,10 +174,22 @@ export async function getGamesLibrary(
   const cacheKey = buildGameLibraryCacheKey(tenantId, query, page, limit);
 
   const fetcher = async () => {
+    let baseQuery = db
+      .selectFrom('games')
+      .innerJoin('vods', 'games.vod_id', 'vods.id')
+      .where('games.game_id', 'is not', null)
+      .where('games.game_id', '!=', '');
+
+    if (query.game_name != null) {
+      baseQuery = baseQuery.where('games.game_name', 'ilike', `%${query.game_name}%`);
+    }
+
+    if (query.game_id != null) {
+      baseQuery = baseQuery.where('games.game_id', '=', query.game_id);
+    }
+
     const [result, totalRow] = await Promise.all([
-      db
-        .selectFrom('games')
-        .innerJoin('vods', 'games.vod_id', 'vods.id')
+      baseQuery
         .select([
           'games.game_id',
           'games.game_name',
@@ -185,29 +197,21 @@ export async function getGamesLibrary(
           (eb) => eb.fn.count('vods.id').distinct().as('count'),
           (eb) => eb.fn.max('vods.created_at').as('last_played'),
         ])
-        .where('games.game_id', '!=', null)
-        .where('games.game_id', '!=', '')
-        .where((eb) => (query.game_name != null ? eb('games.game_name', 'ilike', `%${query.game_name}%`) : sql`true`))
-        .where((eb) => (query.game_id != null ? eb('games.game_id', '=', query.game_id) : sql`true`))
         .groupBy('games.game_id')
         .groupBy('games.game_name')
         .groupBy('games.chapter_image')
         .orderBy(
-          query.sort === 'count' ? sql`count` : query.sort === 'game_name' ? 'games.game_name' : sql`last_played`,
+          query.sort === 'count'
+            ? sql`${sql.ref('count')}`
+            : query.sort === 'game_name'
+              ? sql`${sql.ref('games.game_name')}`
+              : sql`${sql.ref('last_played')}`,
           query.order
         )
         .limit(limit + 1)
         .offset(offset)
         .execute(options),
-      db
-        .selectFrom('games')
-        .innerJoin('vods', 'games.vod_id', 'vods.id')
-        .select((eb) => [eb.fn.count('games.game_id').distinct().as('cnt')])
-        .where('games.game_id', '!=', null)
-        .where('games.game_id', '!=', '')
-        .where((eb) => (query.game_name != null ? eb('games.game_name', 'ilike', `%${query.game_name}%`) : sql`true`))
-        .where((eb) => (query.game_id != null ? eb('games.game_id', '=', query.game_id) : sql`true`))
-        .executeTakeFirst(options),
+      baseQuery.select((eb) => [eb.fn.count('games.game_id').distinct().as('cnt')]).executeTakeFirst(options),
     ]);
 
     const total = Number(totalRow?.cnt ?? 0);

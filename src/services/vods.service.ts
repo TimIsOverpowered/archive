@@ -196,7 +196,7 @@ export async function getVods(
         .selectAll('vods')
         .select((eb) => selectVodRelations(eb))
         .where(where)
-        .orderBy(sql.ref(orderBy.col), orderBy.dir)
+        .orderBy(sql`${sql.ref(orderBy.col)}`, orderBy.dir)
         .limit(limit + 1)
         .offset(offset)
         .execute(options),

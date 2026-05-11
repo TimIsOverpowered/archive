@@ -47,10 +47,18 @@ export async function getChaptersLibrary(
   const cacheKey = buildQueryCacheKey(tenantId, query, page, limit);
 
   const fetcher = async () => {
+    let baseQuery = db
+      .selectFrom('chapters')
+      .innerJoin('vods', 'chapters.vod_id', 'vods.id')
+      .where('chapters.game_id', 'is not', null)
+      .where('chapters.game_id', '!=', '');
+
+    if (query.chapter_name != null) {
+      baseQuery = baseQuery.where('chapters.name', 'ilike', `%${query.chapter_name}%`);
+    }
+
     const [result, totalRow] = await Promise.all([
-      db
-        .selectFrom('chapters')
-        .innerJoin('vods', 'chapters.vod_id', 'vods.id')
+      baseQuery
         .select([
           'chapters.game_id',
           'chapters.name',
@@ -58,31 +66,21 @@ export async function getChaptersLibrary(
           (eb) => eb.fn.count('vods.id').distinct().as('count'),
           (eb) => eb.fn.max('vods.created_at').as('last_played'),
         ])
-        .where('chapters.game_id', '!=', null)
-        .where('chapters.game_id', '!=', '')
-        .where((eb) =>
-          query.chapter_name != null ? eb('chapters.name', 'ilike', `%${query.chapter_name}%`) : sql`true`
-        )
         .groupBy('chapters.game_id')
         .groupBy('chapters.name')
         .groupBy('chapters.image')
         .orderBy(
-          query.sort === 'count' ? sql`count` : query.sort === 'chapter_name' ? 'chapters.name' : sql`last_played`,
+          query.sort === 'count'
+            ? sql`${sql.ref('count')}`
+            : query.sort === 'chapter_name'
+              ? sql`${sql.ref('chapters.name')}`
+              : sql`${sql.ref('last_played')}`,
           query.order
         )
         .limit(limit + 1)
         .offset(offset)
         .execute(options),
-      db
-        .selectFrom('chapters')
-        .innerJoin('vods', 'chapters.vod_id', 'vods.id')
-        .select((eb) => [eb.fn.count('chapters.game_id').distinct().as('cnt')])
-        .where('chapters.game_id', '!=', null)
-        .where('chapters.game_id', '!=', '')
-        .where((eb) =>
-          query.chapter_name != null ? eb('chapters.name', 'ilike', `%${query.chapter_name}%`) : sql`true`
-        )
-        .executeTakeFirst(options),
+      baseQuery.select((eb) => [eb.fn.count('chapters.game_id').distinct().as('cnt')]).executeTakeFirst(options),
     ]);
 
     const total = Number(totalRow?.cnt ?? 0);
