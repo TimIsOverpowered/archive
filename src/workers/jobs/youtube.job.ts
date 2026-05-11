@@ -266,7 +266,12 @@ function createFinalizeData(
   type: SourceType,
   filePath: string | undefined,
   platform: Platform,
-  options?: { workDir?: string | undefined; saveMP4?: boolean | undefined; streamId?: string | undefined }
+  options?: {
+    workDir?: string | undefined;
+    saveMP4?: boolean | undefined;
+    saveHLS?: boolean | undefined;
+    streamId?: string | undefined;
+  }
 ) {
   return {
     tenantId: ctx.tenantId,
@@ -277,6 +282,7 @@ function createFinalizeData(
     platform,
     workDir: options?.workDir,
     saveMP4: options?.saveMP4 ?? ctx.config.settings.saveMP4 ?? false,
+    saveHLS: options?.saveHLS ?? ctx.config.settings.saveHLS ?? false,
     streamId: options?.streamId,
   };
 }
@@ -323,7 +329,12 @@ export async function enqueueFinalizeJob(
   filePath: string,
   type: SourceType,
   platform: Platform,
-  options?: { workDir?: string | undefined; saveMP4?: boolean | undefined; streamId?: string | undefined }
+  options?: {
+    workDir?: string | undefined;
+    saveMP4?: boolean | undefined;
+    saveHLS?: boolean | undefined;
+    streamId?: string | undefined;
+  }
 ): Promise<string | null> {
   const queue = getVodFinalizeFileQueue();
   const jobId = `${Jobs.FINALIZE_JOB_PREFIX}${vodId}_1`;
@@ -341,6 +352,7 @@ export async function enqueueFinalizeJob(
         platform,
         workDir: options?.workDir,
         saveMP4: options?.saveMP4 ?? ctx.config.settings.saveMP4 ?? false,
+        saveHLS: options?.saveHLS ?? ctx.config.settings.saveHLS ?? false,
         streamId: options?.streamId,
       },
       options: {
@@ -725,6 +737,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
     streamId,
   } = options;
   const { config } = ctx;
+  const saveHls = config.settings.saveHLS ?? false;
 
   const result: YoutubeUploadJobResult = {
     vodJobId: null,
@@ -766,7 +779,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
       const flow = await getFlowProducer().add({
         name: 'vod_finalize_file',
         queueName: finalizeQueue.name,
-        data: createFinalizeData(ctx, dbId, vodId, type, filePath, platform, { workDir, streamId }),
+        data: createFinalizeData(ctx, dbId, vodId, type, filePath, platform, { workDir, saveHLS: saveHls, streamId }),
         opts: { jobId: finalizeJobId, removeOnComplete: true, removeOnFail: true, failParentOnFailure: false },
         children: [vodChild],
       });
@@ -816,7 +829,11 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
           const flow = await getFlowProducer().add({
             name: 'vod_finalize_file',
             queueName: finalizeQueue.name,
-            data: createFinalizeData(ctx, dbId, vodId, type, filePath, platform, { workDir, streamId }),
+            data: createFinalizeData(ctx, dbId, vodId, type, filePath, platform, {
+              workDir,
+              saveHLS: saveHls,
+              streamId,
+            }),
             opts: { jobId: finalizeJobId, removeOnComplete: true, removeOnFail: true, failParentOnFailure: false },
             children: flowChildren,
           });
@@ -862,7 +879,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
         const flow = await getFlowProducer().add({
           name: 'vod_finalize_file',
           queueName: finalizeQueue.name,
-          data: createFinalizeData(ctx, dbId, vodId, type, filePath, platform, { workDir, streamId }),
+          data: createFinalizeData(ctx, dbId, vodId, type, filePath, platform, { workDir, saveHLS: saveHls, streamId }),
           opts: { jobId: finalizeJobId, removeOnComplete: true, removeOnFail: true, failParentOnFailure: false },
           children: [vodChild],
         });

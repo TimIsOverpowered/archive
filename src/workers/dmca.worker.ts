@@ -51,7 +51,12 @@ const dmcaProcessor = wrapWorkerProcessor<DmcaProcessingJob, DmcaProcessorContex
           ctx.filePath,
           ctx.type,
           ctx.platform,
-          { workDir: ctx.workDir, streamId: ctx.streamId }
+          {
+            workDir: ctx.workDir,
+            saveMP4: ctx.config.settings.saveMP4,
+            saveHLS: ctx.config.settings.saveHLS,
+            streamId: ctx.streamId,
+          }
         );
       } catch (err) {
         ctx.log.warn(

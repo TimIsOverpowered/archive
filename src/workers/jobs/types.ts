@@ -67,6 +67,7 @@ export interface VodFinalizeFileJob extends BaseJobData {
   type: SourceType;
   workDir?: string | undefined;
   saveMP4: boolean;
+  saveHLS?: boolean;
   streamId?: string | undefined;
 }
 

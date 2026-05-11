@@ -39,7 +39,6 @@ const mockDownloadSegmentsParallel: any = mock.fn(async () => {});
 const mockResolveDownloadStrategy: any = mock.fn(() => ({ type: 'fetch', abort: () => {} }));
 const mockConvertHlsToMp4: any = mock.fn(async () => {});
 const mockDetectFmp4FromPlaylist: any = mock.fn(() => false);
-const mockCleanupHlsFiles: any = mock.fn(async () => {});
 const mockSleep: any = mock.fn(async () => {});
 const mockGetRetryDelay: any = mock.fn(() => 0);
 const mockCreateSession: any = mock.fn(() => ({
@@ -115,12 +114,6 @@ mock.module('../../../src/workers/utils/ffmpeg.js', {
   namedExports: {
     convertHlsToMp4: mockConvertHlsToMp4,
     detectFmp4FromPlaylist: mockDetectFmp4FromPlaylist,
-  },
-});
-
-mock.module('../../../src/workers/vod/hls-cleanup.js', {
-  namedExports: {
-    cleanupHlsFiles: mockCleanupHlsFiles,
   },
 });
 
@@ -492,7 +485,6 @@ describe('downloadHlsStream', () => {
     mockResolveDownloadStrategy.mock.resetCalls();
     mockConvertHlsToMp4.mock.resetCalls();
     mockDetectFmp4FromPlaylist.mock.resetCalls();
-    mockCleanupHlsFiles.mock.resetCalls();
     mockSleep.mock.resetCalls();
     mockGetRetryDelay.mock.resetCalls();
     mockCreateSession.mock.resetCalls();
@@ -519,7 +511,6 @@ describe('downloadHlsStream', () => {
       assert.strictEqual(mockFsWriteFile.mock.callCount(), 1);
       assert.strictEqual(mockDownloadSegmentsParallel.mock.callCount(), 1);
       assert.strictEqual(mockConvertHlsToMp4.mock.callCount(), 1);
-      assert.strictEqual(mockCleanupHlsFiles.mock.callCount(), 1);
     });
 
     it('should call convertHlsToMp4 with fmp4=false when detectFmp4FromPlaylist returns false', async () => {
@@ -782,56 +773,6 @@ describe('downloadHlsStream', () => {
       );
 
       assert.strictEqual(mockConvertHlsToMp4.mock.callCount(), 1);
-    });
-  });
-
-  describe('HLS cleanup behavior', () => {
-    it('should skip HLS cleanup when saveHLS is true', async () => {
-      await downloadHlsStream(
-        buildOptions({
-          platform: PLATFORMS.TWITCH,
-          isLive: false,
-          ctx: buildContext({
-            settings: {
-              domainName: 'test.com',
-              timezone: 'UTC',
-              saveHLS: true,
-              saveMP4: true,
-              vodDownload: true,
-              chatDownload: true,
-            },
-          }),
-        })
-      );
-
-      assert.strictEqual(mockCleanupHlsFiles.mock.callCount(), 1);
-      const cleanupCall = mockCleanupHlsFiles.mock.calls[0];
-      assert.ok(cleanupCall);
-      assert.strictEqual(cleanupCall.arguments[1], true);
-    });
-
-    it('should perform HLS cleanup when saveHLS is false', async () => {
-      await downloadHlsStream(
-        buildOptions({
-          platform: PLATFORMS.TWITCH,
-          isLive: false,
-          ctx: buildContext({
-            settings: {
-              domainName: 'test.com',
-              timezone: 'UTC',
-              saveHLS: false,
-              saveMP4: true,
-              vodDownload: true,
-              chatDownload: true,
-            },
-          }),
-        })
-      );
-
-      assert.strictEqual(mockCleanupHlsFiles.mock.callCount(), 1);
-      const cleanupCall = mockCleanupHlsFiles.mock.calls[0];
-      assert.ok(cleanupCall);
-      assert.strictEqual(cleanupCall.arguments[1], false);
     });
   });
 });

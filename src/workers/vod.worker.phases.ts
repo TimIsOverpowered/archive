@@ -155,10 +155,9 @@ export async function sendVodCompletion(ctx: VodProcessorContext): Promise<void>
   const metadata = await getMetadata(ctx.finalPath);
   const duration = metadata?.duration != null ? Math.round(metadata.duration) : undefined;
 
-  // Standalone download (no downstream consumer): enqueue finalize job if saveMP4
-  const saveMp4 = ctx.config.settings.saveMP4 === true;
+  // Standalone download (no downstream consumer): enqueue finalize job
   const skipFinalization = ctx.job.data.skipFinalize === true;
-  if (saveMp4 && !skipFinalization) {
+  if (!skipFinalization) {
     try {
       await enqueueFinalizeJob(
         { tenantId: ctx.tenantId, config: ctx.config, db: ctx.db },
@@ -167,7 +166,11 @@ export async function sendVodCompletion(ctx: VodProcessorContext): Promise<void>
         ctx.finalPath,
         SOURCE_TYPES.VOD,
         ctx.platform,
-        { workDir: getTmpDirPath({ tenantId: ctx.tenantId, vodId: ctx.vodId }) }
+        {
+          workDir: getTmpDirPath({ tenantId: ctx.tenantId, vodId: ctx.vodId }),
+          saveMP4: ctx.config.settings.saveMP4,
+          saveHLS: ctx.config.settings.saveHLS,
+        }
       );
     } catch (err) {
       ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Failed to enqueue finalize job');

@@ -89,6 +89,16 @@ export function getLiveFilePath(options: LivePathOptions): string {
 }
 
 /**
+ * Gets the HLS directory path for an archived VOD.
+ * Path: {VOD_PATH}/{tenantId}/{vodId}/hls
+ */
+export function getVodHlsDirPath(options: VodPathOptions): string {
+  const vodPath = getVodPath();
+  if (vodPath == null) throw new Error('VOD_PATH is not configured');
+  return path.join(vodPath, options.tenantId, options.vodId, 'hls');
+}
+
+/**
  * Returns only the filename component of a path for safe logging.
  * Strips directory components to prevent leaking server directory structure.
  */

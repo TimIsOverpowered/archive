@@ -186,6 +186,8 @@ export async function runPostProcessing(
     try {
       await enqueueFinalizeJob(ctx, ctx.dbId, ctx.vodId, downloadResult.finalMp4Path, SOURCE_TYPES.VOD, ctx.platform, {
         workDir: getTmpDirPath({ tenantId: ctx.tenantId, vodId: ctx.vodId }),
+        saveMP4: ctx.config.settings.saveMP4,
+        saveHLS: ctx.config.settings.saveHLS,
       });
     } catch (err) {
       ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Failed to enqueue finalize job');

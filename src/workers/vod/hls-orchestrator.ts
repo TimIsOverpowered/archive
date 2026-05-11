@@ -1,7 +1,6 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import HLS from 'hls-parser';
-import type { TenantConfig } from '../../config/types.js';
 import { Hls } from '../../constants.js';
 import { updateChapterDuringDownload } from '../../services/kick/index.js';
 import { TenantContext } from '../../types/context.js';
@@ -16,7 +15,6 @@ import { getTmpDirPath, getTmpFilePath } from '../../utils/path.js';
 import { createVodWorkerAlerts, safeUpdateAlert } from '../utils/alert-factories.js';
 import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
 import { updateVodDurationDuringDownload } from './duration-updater.js';
-import { cleanupHlsFiles } from './hls-cleanup.js';
 import {
   downloadSegmentsParallel,
   fetchKickPlaylist,
@@ -50,8 +48,6 @@ export interface HlsDownloadResult {
 
 interface HlsConvertOptions {
   vodId: string;
-  tenantId: string;
-  config: TenantConfig;
   onConversionProgress?: (percent: number) => void;
   discordMessageId?: string | null;
   onFfmpegStart?: (cmd: string) => void;
@@ -70,7 +66,7 @@ type SegmentWithMap = HLS.types.Segment & {
 
 export async function downloadHlsStream(options: HlsDownloadOptions): Promise<HlsDownloadResult> {
   const { ctx, dbId, vodId, platform, startedAt, sourceUrl, isLive = false, onProgress } = options;
-  const { config, tenantId } = ctx;
+  const { tenantId } = ctx;
   const log = createAutoLogger(tenantId);
 
   const vodDir = getTmpDirPath({ tenantId, vodId });
@@ -119,8 +115,6 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
       vodDir,
       {
         vodId,
-        tenantId,
-        config,
         onConversionProgress: (percent) => {
           if (options.discordMessageId != null) {
             const alertData = createVodWorkerAlerts().converting(vodId, percent);
@@ -165,7 +159,7 @@ async function convertAndCleanup(
   options: HlsConvertOptions,
   log: AppLogger
 ): Promise<{ segmentCount: number; finalMp4Path: string }> {
-  const { vodId, config } = options;
+  const { vodId } = options;
 
   const m3u8Content = await readFile(m3u8Path, 'utf8');
   const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
@@ -180,14 +174,6 @@ async function convertAndCleanup(
 
   const files = await readdir(vodDir);
   const segmentCount = files.filter((f) => f.endsWith('.mp4') || f.endsWith('.ts')).length;
-
-  const shouldKeepHls = config.settings.saveHLS ?? false;
-  if (shouldKeepHls) {
-    log.info({ vodId }, 'Preserving HLS files (saveHLS=true)');
-  } else {
-    log.info({ vodId }, 'Cleaning up HLS files');
-  }
-  await cleanupHlsFiles(vodDir, shouldKeepHls, finalMp4Path, log);
 
   return { segmentCount, finalMp4Path };
 }
