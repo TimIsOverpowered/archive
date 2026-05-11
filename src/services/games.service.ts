@@ -202,7 +202,7 @@ export async function getGamesLibrary(
           query.sort === 'count'
             ? sql`${sql.ref('count')}`
             : query.sort === 'game_name'
-              ? sql`${sql.ref('games.game_name')}`
+              ? sql`${sql.ref('game_name')}`
               : sql`${sql.ref('last_played')}`,
           query.order
         )
