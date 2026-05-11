@@ -1,7 +1,7 @@
 import type { ReadonlyKysely } from 'kysely/readonly';
 import { Cache, Logs } from '../constants.js';
 import type { StreamerDB, SelectableChatMessages } from '../db/streamer-types.js';
-import { simpleKeys } from '../utils/cache-keys.js';
+import { CacheKeys, simpleKeys } from '../utils/cache-keys.js';
 import { compressData, decompressData } from '../utils/compression.js';
 import { VodNotFoundError } from '../utils/domain-errors.js';
 import { extractErrorDetails } from '../utils/error.js';
@@ -28,6 +28,7 @@ interface VodMeta {
  */
 async function fetchVodMeta(
   db: ReadonlyKysely<StreamerDB>,
+  tenantId: string,
   vodId: number,
   options?: { signal?: AbortSignal }
 ): Promise<VodMeta> {
@@ -35,7 +36,7 @@ async function fetchVodMeta(
 
   if (redis) {
     try {
-      const cacheKey = `vod:meta:${vodId}`;
+      const cacheKey = CacheKeys.vodMeta(tenantId, vodId);
       const cached = await redis.getBuffer(cacheKey);
       if (cached != null && cached.length > 0) {
         const data = (await decompressData(cached)) as VodMeta;
@@ -60,7 +61,7 @@ async function fetchVodMeta(
 
   if (redis) {
     try {
-      const cacheKey = `vod:meta:${vodId}`;
+      const cacheKey = CacheKeys.vodMeta(tenantId, vodId);
       const compressed = await compressData(vod);
       await redis.set(cacheKey, compressed, 'EX', Cache.VOD_DETAILS_TTL);
     } catch {
@@ -152,7 +153,7 @@ async function fetchAggregatedBuckets(
   requestedOffset: number,
   options?: { signal?: AbortSignal }
 ): Promise<{ comments: SelectableChatMessages[]; cursor?: string | undefined }> {
-  const vodMeta = await fetchVodMeta(db, vodId, options);
+  const vodMeta = await fetchVodMeta(db, tenantId, vodId, options);
   const streamStart = vodMeta.created_at;
   const streamEnd = new Date(streamStart.getTime() + (vodMeta.duration + 7200) * 1000);
 

@@ -105,7 +105,11 @@ export async function invalidateVodVolatileCache(tenantId: string, dbId: number)
   if (!client) return;
 
   try {
-    await client.unlink(CacheKeys.vodVolatile(tenantId, dbId), swrKeys.vodVolatile(tenantId, dbId), `vod:meta:${dbId}`);
+    await client.unlink(
+      CacheKeys.vodVolatile(tenantId, dbId),
+      swrKeys.vodVolatile(tenantId, dbId),
+      CacheKeys.vodMeta(tenantId, dbId)
+    );
 
     if (isConnectionFailed(tenantId)) {
       markConnectionRestored(tenantId);
