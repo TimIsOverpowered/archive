@@ -49,7 +49,9 @@ export default function chaptersRoutes(fastify: FastifyInstance, _options: Chapt
     async (request) => {
       const controller = new AbortController();
       request.raw.once('close', () => {
-        controller.abort();
+        if (request.raw.destroyed) {
+          controller.abort();
+        }
       });
 
       try {

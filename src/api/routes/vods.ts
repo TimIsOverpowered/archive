@@ -84,7 +84,9 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
     async (request) => {
       const controller = new AbortController();
       request.raw.once('close', () => {
-        controller.abort();
+        if (request.raw.destroyed) {
+          controller.abort();
+        }
       });
 
       try {
@@ -128,7 +130,9 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
     async (request) => {
       const controller = new AbortController();
       request.raw.once('close', () => {
-        controller.abort();
+        if (request.raw.destroyed) {
+          controller.abort();
+        }
       });
 
       try {
@@ -170,7 +174,9 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
     async (request) => {
       const controller = new AbortController();
       request.raw.once('close', () => {
-        controller.abort();
+        if (request.raw.destroyed) {
+          controller.abort();
+        }
       });
 
       try {
@@ -218,7 +224,9 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
     async (request) => {
       const controller = new AbortController();
       request.raw.once('close', () => {
-        controller.abort();
+        if (request.raw.destroyed) {
+          controller.abort();
+        }
       });
 
       try {

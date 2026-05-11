@@ -56,7 +56,9 @@ export default function gamesRoutes(fastify: FastifyInstance, _options: GamesRou
     async (request) => {
       const controller = new AbortController();
       request.raw.once('close', () => {
-        controller.abort();
+        if (request.raw.destroyed) {
+          controller.abort();
+        }
       });
 
       try {
@@ -110,7 +112,9 @@ export default function gamesRoutes(fastify: FastifyInstance, _options: GamesRou
     async (request) => {
       const controller = new AbortController();
       request.raw.once('close', () => {
-        controller.abort();
+        if (request.raw.destroyed) {
+          controller.abort();
+        }
       });
 
       try {

@@ -192,6 +192,7 @@ export class CacheContext {
           );
 
           this.inflight.set(key, revalidatePromise);
+          revalidatePromise.catch(() => {});
         }
 
         return entry.data;

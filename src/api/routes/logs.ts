@@ -63,7 +63,9 @@ export default function logsRoutes(fastify: FastifyInstance, _options: LogsRoute
     async (request) => {
       const controller = new AbortController();
       request.raw.once('close', () => {
-        controller.abort();
+        if (request.raw.destroyed) {
+          controller.abort();
+        }
       });
 
       try {
