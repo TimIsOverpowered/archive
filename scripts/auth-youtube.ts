@@ -9,7 +9,7 @@ import { initMetaClient } from '../src/db/meta-client.js';
 import { getTenantById, updateTenant } from '../src/services/meta-tenants.service.js';
 import { encryptObject, decryptObject } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
-import { prompt } from './stdin.js';
+import { prompt, closeStdin } from './stdin.js';
 
 const clientId = process.env.YOUTUBE_CLIENT_ID;
 const clientSecret = process.env.YOUTUBE_CLIENT_SECRET;
@@ -164,6 +164,9 @@ async function startOAuthFlow(tenantId: string): Promise<void> {
     }
 
     await completeOAuth(tenantId, state, userInput);
+
+    closeStdin();
+    process.exit(0);
   }
 }
 

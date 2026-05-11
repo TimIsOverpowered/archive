@@ -5,12 +5,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { Pool } from 'pg';
+import { parse } from 'pg-connection-string';
 import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
 import type { InsertableTenants } from '../src/db/meta-types.js';
 import { getTenantById, createTenant, deleteTenant } from '../src/services/meta-tenants.service.js';
 import { validateEncryptionKey } from '../src/utils/encryption.js';
 import { extractErrorDetails } from '../src/utils/error.js';
-import { prompt, confirm } from './stdin.js';
+import { prompt, confirm, closeStdin } from './stdin.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -208,11 +209,11 @@ async function main(): Promise<void> {
     console.log('DATABASE SETUP');
     console.log('='.repeat(50));
 
-    const metaUrl = new URL(process.env.META_DATABASE_URL!);
-    const dbHost = metaUrl.hostname;
-    const dbPort = parseInt(metaUrl.port || '5432', 10) || 5432;
-    const dbUser = metaUrl.username;
-    const dbPassword = metaUrl.password;
+    const cfg = parse(process.env.META_DATABASE_URL!);
+    const dbHost = cfg.host ?? 'localhost';
+    const dbPort = Number(cfg.port || 5432);
+    const dbUser = cfg.user ?? 'postgres';
+    const dbPassword = cfg.password ?? '';
     const dbName = (await prompt('Database name')) || channelName;
 
     // Validate connection BEFORE continuing
@@ -229,8 +230,7 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
-    metaUrl.pathname = `/${dbName}`;
-    const dbUrl = metaUrl.toString();
+    const dbUrl = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}`;
 
     // Only run migrations for new databases or if explicitly requested
     if (dbResult.isNew) {
@@ -479,8 +479,12 @@ async function main(): Promise<void> {
       }
       console.log('\nThese scripts will guide you through the OAuth flow and securely store credentials.');
     }
-  } catch (_error: unknown) {
-    console.error('\n❌ Error during tenant creation:');
+
+    closeStdin();
+    process.exit(0);
+  } catch (error: unknown) {
+    const errorDetails = extractErrorDetails(error);
+    console.error('\n❌ Error during tenant creation:', errorDetails.message);
 
     // Rollback if tenant was created
     if (tenantId !== null) {

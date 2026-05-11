@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import 'dotenv/config';
 import pg, { type Pool, type PoolClient } from 'pg';
+import { parse as parseConnStr } from 'pg-connection-string';
 import { initMetaClient, getMetaClient, closeMetaClient } from '../src/db/meta-client.js';
 import { extractErrorDetails } from '../src/utils/error.js';
 import { prompt, confirm } from './stdin.js';
@@ -479,9 +480,8 @@ const main = async () => {
       process.exit(1);
     }
 
-    const metaUrl = new URL(META_DB_URL);
-    metaUrl.pathname = `/${tenant.database_name}`;
-    dbUrl = metaUrl.toString();
+    const cfg = parseConnStr(META_DB_URL);
+    dbUrl = `postgresql://${cfg.user ?? ''}:${cfg.password ?? ''}@${cfg.host ?? 'localhost'}:${cfg.port ?? 5432}/${tenant.database_name}`;
   } catch (error) {
     const details = extractErrorDetails(error);
     console.error('❌ Failed to fetch tenant from meta database:', details.message);
