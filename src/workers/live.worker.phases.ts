@@ -88,6 +88,7 @@ export async function runDownload(ctx: LiveProcessorContext): Promise<LivePhaseR
     discordMessageId: ctx.messageId ?? undefined,
     streamerName: ctx.streamerName,
     onProgress: (segmentsDownloaded, duration) => {
+      void ctx.job.updateProgress(segmentsDownloaded).catch(() => {});
       safeUpdateAlert(
         ctx.messageId,
         ctx.alerts.progress(ctx.vodId, ctx.platform, ctx.streamerName, segmentsDownloaded, duration),
@@ -98,7 +99,6 @@ export async function runDownload(ctx: LiveProcessorContext): Promise<LivePhaseR
   });
 
   await ctx.job.updateProgress(50);
-  await updateAlert(ctx.messageId, ctx.alerts.converting(ctx.vodId, downloadResult.segmentCount));
 
   return {
     segmentCount: downloadResult.segmentCount,

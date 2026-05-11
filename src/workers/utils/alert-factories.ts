@@ -131,7 +131,7 @@ export interface LiveWorkerAlerts {
     segmentsDownloaded: number,
     duration: number
   ) => RichEmbedData;
-  converting: (vodId: string, segmentCount: number) => RichEmbedData;
+  converting: (vodId: string, percent: number, segmentCount?: number) => RichEmbedData;
   emotesSaved: (vodId: string, streamerName: string) => RichEmbedData;
   chatQueued: (vodId: string, streamerName: string) => RichEmbedData;
   uploadQueued: (vodId: string, streamerName: string) => RichEmbedData;
@@ -153,26 +153,41 @@ export function createLiveWorkerAlerts(): LiveWorkerAlerts {
       timestamp: new Date().toISOString(),
     }),
 
-    progress: (vodId, platform, streamerName, segmentsDownloaded, duration) => ({
-      title: `[Live] Downloading ${streamerName} - ${vodId}`,
-      description: `Downloading segments from ${capitalizePlatform(platform)}...`,
-      status: 'warning',
-      fields: [
-        { name: 'Streamer', value: streamerName, inline: true },
-        { name: 'Platform', value: capitalizePlatform(platform), inline: true },
-        { name: 'Segments', value: `${segmentsDownloaded}`, inline: true },
-        { name: 'Duration', value: toHHMMSS(duration), inline: true },
-      ],
-      timestamp: new Date().toISOString(),
-    }),
+    progress: (vodId, platform, streamerName, segmentsDownloaded, duration) => {
+      const progressBar = createProgressBar(25);
 
-    converting: (vodId, segmentCount) => ({
-      title: `[Live] Converting ${vodId}`,
-      description: `Download complete. Converting ${segmentCount} segments to MP4...`,
-      status: 'warning',
-      fields: [{ name: 'Segments', value: String(segmentCount), inline: true }],
-      timestamp: new Date().toISOString(),
-    }),
+      return {
+        title: `[Live] Downloading ${streamerName} - ${vodId}`,
+        description: `Downloading segments from ${capitalizePlatform(platform)}...`,
+        status: 'warning',
+        fields: [
+          { name: 'Streamer', value: streamerName, inline: true },
+          { name: 'Platform', value: capitalizePlatform(platform), inline: true },
+          { name: 'Segments', value: `${segmentsDownloaded}`, inline: true },
+          { name: 'Duration', value: toHHMMSS(duration), inline: true },
+          { name: 'Progress', value: progressBar, inline: false },
+        ],
+        timestamp: new Date().toISOString(),
+      };
+    },
+
+    converting: (vodId, percent, segmentCount) => {
+      const fields: Array<{ name: string; value: string; inline: boolean }> = [
+        { name: 'Progress', value: createProgressBar(percent), inline: false },
+      ];
+
+      if (segmentCount != null) {
+        fields.push({ name: 'Segments', value: String(segmentCount), inline: true });
+      }
+
+      return {
+        title: `[Live] Converting ${vodId}`,
+        description: `Download complete. Converting segments to MP4...`,
+        status: 'warning',
+        fields,
+        timestamp: new Date().toISOString(),
+      };
+    },
 
     emotesSaved: (vodId, streamerName) => ({
       title: `[Live] ${streamerName} - Emotes Saved`,
