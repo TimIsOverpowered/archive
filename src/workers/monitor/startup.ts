@@ -2,7 +2,7 @@ import { configService } from '../../config/tenant-config.js';
 import type { TenantConfig } from '../../config/types.js';
 import { requirePlatformConfig } from '../../config/types.js';
 import { Monitor } from '../../constants.js';
-import { PLATFORMS } from '../../types/platforms.js';
+import { PLATFORMS, PLATFORM_VALUES } from '../../types/platforms.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
 import { getMonitorQueue } from '../queues/queue.js';
@@ -71,17 +71,19 @@ export async function registerAllMonitorRepeatJobs(): Promise<void> {
   }
 
   const twitchTenants = configs.filter((cfg) => requirePlatformConfig(cfg, PLATFORMS.TWITCH) != null);
-  const nonTwitchTenants = configs.filter((cfg) => requirePlatformConfig(cfg, PLATFORMS.TWITCH) == null);
+  const nonTwitchOnlyTenants = configs.filter((cfg) =>
+    PLATFORM_VALUES.some((p) => p !== PLATFORMS.TWITCH && requirePlatformConfig(cfg, p) != null)
+  );
 
   if (twitchTenants.length > 0) {
     await registerTwitchBatchMonitorJob();
   }
 
-  const perTenantJobs = nonTwitchTenants.map((config) => registerMonitorRepeatJob(config));
+  const perTenantJobs = nonTwitchOnlyTenants.map((config) => registerMonitorRepeatJob(config));
   await Promise.all(perTenantJobs);
 
   getLogger().info(
-    { twitchBatch: twitchTenants.length, perTenant: nonTwitchTenants.length },
+    { twitchBatch: twitchTenants.length, perTenant: nonTwitchOnlyTenants.length },
     'Registered monitor repeat jobs'
   );
 }

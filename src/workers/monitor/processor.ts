@@ -77,6 +77,9 @@ async function processPerTenantJob(job: Job<MonitorJob>, tenantId: string): Prom
   const liveQueue = getLiveDownloadQueue();
 
   for (const platform of PLATFORM_VALUES) {
+    if (platform === PLATFORMS.TWITCH) {
+      continue;
+    }
     if (!requirePlatformConfig(config, platform)) {
       continue;
     }
