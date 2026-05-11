@@ -6,8 +6,9 @@ import { getLivePath, getTmpPath, getVodPath } from '../../../config/env.js';
 import { VodUpdateSchema } from '../../../config/schemas.js';
 import { findVodByStreamId } from '../../../db/queries/vods.js';
 import { publishVodDurationUpdate } from '../../../services/cache-invalidator.js';
+import { saveVodChapters } from '../../../services/twitch/index.js';
 import type { Platform } from '../../../types/platforms.js';
-import { PLATFORM_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
+import { PLATFORM_VALUES, PLATFORMS, SOURCE_TYPES } from '../../../types/platforms.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest, notFound } from '../../../utils/http-error.js';
 import { assertPathWithinBase, fileExists, sanitizePathForLog } from '../../../utils/path.js';
@@ -109,6 +110,24 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
         await publishVodDurationUpdate(tenantId, vodRecord.id, durationSecs, vodRecord.is_live);
 
         log.info({ vodId: vodRecord.id, durationSecs }, 'Updated VOD duration');
+      }
+
+      // Fetch chapters for Twitch VODs if none exist yet (needed by game upload jobs)
+      if (platform === PLATFORMS.TWITCH && vodRecord.platform_vod_id != null) {
+        const existingChapters = await db
+          .selectFrom('chapters')
+          .where('vod_id', '=', vodRecord.id)
+          .selectAll()
+          .execute();
+        if (existingChapters.length === 0) {
+          await saveVodChapters({
+            ctx: tenantCtx,
+            dbId: vodRecord.id,
+            vodId: vodRecord.platform_vod_id,
+            finalDurationSeconds: durationSecs ?? vodRecord.duration,
+            publishUpdate: false,
+          });
+        }
       }
 
       if (config?.youtube?.upload === true) {
