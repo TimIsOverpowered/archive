@@ -19,6 +19,7 @@ function encodeCursor(offset: number): string {
 
 interface VodMeta {
   created_at: Date;
+  started_at: Date | null;
   duration: number;
 }
 
@@ -42,6 +43,7 @@ async function fetchVodMeta(
         const data = (await decompressData(cached)) as VodMeta;
         return {
           created_at: new Date(data.created_at),
+          started_at: data.started_at ? new Date(data.started_at) : null,
           duration: data.duration,
         };
       }
@@ -53,7 +55,7 @@ async function fetchVodMeta(
 
   const vod = await db
     .selectFrom('vods')
-    .select(['created_at', 'duration'])
+    .select(['created_at', 'started_at', 'duration'])
     .where('id', '=', vodId)
     .executeTakeFirst(options);
 
@@ -154,8 +156,13 @@ async function fetchAggregatedBuckets(
   options?: { signal?: AbortSignal }
 ): Promise<{ comments: SelectableChatMessages[]; cursor?: string | undefined }> {
   const vodMeta = await fetchVodMeta(db, tenantId, vodId, options);
-  const streamStart = vodMeta.created_at;
-  const streamEnd = new Date(streamStart.getTime() + (vodMeta.duration + 7200) * 1000);
+  let streamStart = vodMeta.created_at;
+  let streamEnd = new Date(streamStart.getTime() + (vodMeta.duration + 7200) * 1000);
+
+  if (!vodMeta.started_at) {
+    streamStart = new Date(streamStart.getTime() - Logs.LEGACY_PADDING_MS);
+    streamEnd = new Date(streamEnd.getTime() + Logs.LEGACY_PADDING_MS);
+  }
 
   const anchorBucketStart = Math.floor(requestedOffset / Logs.BUCKET_SIZE) * Logs.BUCKET_SIZE;
 

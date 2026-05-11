@@ -133,6 +133,8 @@ export const Logs = {
   TARGET_FUTURE: 30,
   /** Maximum buckets to scan in either direction (4 minutes) */
   MAX_EXPANSION: 4,
+  /** Time padding for legacy VODs without started_at (milliseconds) */
+  LEGACY_PADDING_MS: 30 * 24 * 60 * 60 * 1000,
 } as const;
 
 // ── Discord Alerts ───────────────────────────────────────────────────────────
