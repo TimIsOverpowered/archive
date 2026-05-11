@@ -33,6 +33,7 @@ export async function buildServer(config: ApiConfig) {
     exposeHeadRoutes: true,
     loggerInstance: logger as unknown as FastifyBaseLogger,
     trustProxy: true,
+    disableRequestLogging: true,
     routerOptions: {
       ignoreTrailingSlash: true,
     },
