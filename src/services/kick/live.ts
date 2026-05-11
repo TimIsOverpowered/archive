@@ -4,44 +4,55 @@ import { fetchUrl } from '../../utils/flaresolverr-client.js';
 import { getLogger } from '../../utils/logger.js';
 import { KickVod } from './vod.js';
 
-interface KickApiResponse {
-  data?: Record<string, unknown>;
+export interface KickCategoryRaw {
+  id: number;
+  name?: string;
+  slug?: string;
+  tags?: string[];
+  parent_category?: { id: number; slug: string };
+}
+
+interface KickThumbnailRaw {
+  src?: string;
+  srcset?: string;
+}
+
+export interface KickLiveStreamRaw {
+  id: number | string;
+  slug?: string;
+  session_title?: string;
+  created_at: string;
+  language?: string;
+  is_mature?: boolean;
+  viewers?: number;
+  category?: KickCategoryRaw | null;
+  playback_url?: string;
+  thumbnail?: KickThumbnailRaw | null;
+}
+
+interface KickLiveApiResponse {
+  data?: KickLiveStreamRaw | null;
   error?: string;
 }
 
-export interface KickStreamStatus {
-  id: string;
-  session_title?: string | null | undefined;
-  created_at: string;
-  playback_url?: string | null | undefined;
-  viewers?: number | null | undefined;
-  slug?: string | null | undefined;
-  language?: string | null | undefined;
-  is_mature?: boolean | null | undefined;
-  category?:
-    | {
-        id: number;
-        name?: string | null | undefined;
-        slug?: string | null | undefined;
-      }
-    | null
-    | undefined;
-  thumbnail?:
-    | {
-        src?: string | null | undefined;
-        srcset?: string | null | undefined;
-      }
-    | null
-    | undefined;
+export interface KickBannerImage {
+  src?: string;
 }
 
-export async function getKickStreamStatus(username: string): Promise<KickStreamStatus | null> {
+export interface KickCategoryInfo {
+  id: number;
+  name?: string;
+  slug?: string;
+  banner?: KickBannerImage | null;
+}
+
+export async function getKickStreamStatus(username: string): Promise<KickLiveStreamRaw | null> {
   try {
     const apiUrl = `https://kick.com/api/v2/channels/${username}/livestream`;
 
     getLogger().debug({ username, apiUrl }, 'Fetching Kick livestream data');
 
-    const result = await fetchUrl<KickApiResponse>(apiUrl, {
+    const result = await fetchUrl<KickLiveApiResponse>(apiUrl, {
       timeoutMs: Kick.LIVE_API_TIMEOUT_MS,
       maxRetries: 2,
     });
@@ -70,9 +81,7 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
       return null;
     }
 
-    const streamId = typeof data.id === 'string' ? data.id : typeof data.id === 'number' ? String(data.id) : '';
-
-    if (streamId === '') {
+    if (typeof data.id !== 'number' && typeof data.id !== 'string') {
       getLogger().debug(
         { username, availableKeys: Object.keys(data), idField: data.id },
         `Channel ${username} is offline (no livestream id in data)`
@@ -80,53 +89,9 @@ export async function getKickStreamStatus(username: string): Promise<KickStreamS
       return null;
     }
 
-    const sessionTitle = typeof data.session_title === 'string' ? data.session_title : '';
-    const createdAt = typeof data.created_at === 'string' ? data.created_at : '';
-    const playbackUrl =
-      typeof data.playback_url === 'string' && data.playback_url !== '' ? data.playback_url : undefined;
-    const viewers = typeof data.viewers === 'number' ? data.viewers : undefined;
-    const slug = typeof data.slug === 'string' && data.slug !== '' ? data.slug : undefined;
-    const language = typeof data.language === 'string' && data.language !== '' ? data.language : undefined;
-    const isMature = typeof data.is_mature === 'boolean' ? data.is_mature : undefined;
+    getLogger().debug({ username, streamId: data.id, sessionTitle: data.session_title }, 'Kick live stream detected');
 
-    let category: KickStreamStatus['category'] = null;
-    if (typeof data.category === 'object' && data.category !== null) {
-      const cat = data.category as Record<string, unknown>;
-      if ('id' in cat && typeof cat.id === 'number') {
-        category = { id: Number(cat.id), name: typeof cat.name === 'string' ? cat.name : null };
-      }
-    }
-
-    let thumbnail: KickStreamStatus['thumbnail'] = null;
-    if (typeof data.thumbnail === 'object' && data.thumbnail !== null) {
-      const thumb = data.thumbnail as Record<string, unknown>;
-      if ('src' in thumb) {
-        thumbnail = { src: typeof thumb.src === 'string' ? thumb.src : '', srcset: undefined };
-        if ('srcset' in thumb && typeof thumb.srcset === 'string') {
-          thumbnail.srcset = thumb.srcset;
-        }
-      }
-    }
-
-    const streamData: KickStreamStatus = {
-      id: streamId,
-      session_title: sessionTitle != null && sessionTitle !== '' ? sessionTitle : null,
-      created_at: createdAt,
-      playback_url: playbackUrl,
-      viewers: viewers,
-      slug: slug,
-      language: language,
-      is_mature: isMature,
-      category: category,
-      thumbnail: thumbnail,
-    };
-
-    getLogger().debug(
-      { username, streamId: streamData.id, sessionTitle: streamData.session_title },
-      'Kick live stream detected'
-    );
-
-    return streamData;
+    return data;
   } catch (error) {
     const details = extractErrorDetails(error);
     getLogger().error({ username, ...details }, 'Failed to get Kick stream status');

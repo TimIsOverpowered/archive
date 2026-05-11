@@ -24,10 +24,10 @@ export const strategy: PlatformStrategy<VodCreateData, VodUpdateData> = {
     }
 
     return {
-      id: streamStatus.id,
+      id: String(streamStatus.id),
       title: streamStatus.session_title ?? '',
       startedAt: streamStatus.created_at,
-      streamId: streamStatus.id,
+      streamId: String(streamStatus.id),
       platformUserId: cfg.platformUserId,
       platformUsername: cfg.platformUsername,
     };

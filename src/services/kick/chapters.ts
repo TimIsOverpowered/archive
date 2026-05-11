@@ -28,6 +28,20 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
     const { category, created_at } = streamData;
     const currentTimeSeconds = dayjs().diff(created_at, 'second');
 
+    let categoryGameId = String(category.id);
+    let bannerImage: string | null = null;
+    if (category.slug != null && category.slug !== '') {
+      try {
+        const categoryInfo = await getKickCategoryInfo(category.slug);
+        if (categoryInfo) {
+          categoryGameId = String(categoryInfo.id);
+          bannerImage = categoryInfo.banner?.src ?? null;
+        }
+      } catch (error) {
+        log.warn({ vodId, error: extractErrorDetails(error).message }, 'Failed to fetch category info');
+      }
+    }
+
     await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
       const lastChapter = await db
         .selectFrom('chapters')
@@ -36,7 +50,7 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
         .orderBy('start', 'desc')
         .executeTakeFirst();
 
-      if (lastChapter && lastChapter.game_id === String(category.id)) {
+      if (lastChapter && lastChapter.game_id === categoryGameId) {
         ChapterUpdateSchema.parse({ end: currentTimeSeconds, duration: currentTimeSeconds - lastChapter.start });
         await db
           .updateTable('chapters')
@@ -61,18 +75,6 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
         await publishVodUpdate(ctx.tenantId, dbId);
 
         log.debug({ vodId, chapterId: lastChapter.id }, 'Closed previous chapter');
-      }
-
-      let bannerImage: string | null = null;
-      if (category.slug != null && category.slug !== '') {
-        try {
-          const categoryInfo = await getKickCategoryInfo(category.slug);
-          if (categoryInfo && typeof categoryInfo.banner === 'object' && categoryInfo.banner !== null) {
-            bannerImage = (categoryInfo.banner as Record<string, unknown>).src as string | null;
-          }
-        } catch (error) {
-          log.warn({ vodId, error: extractErrorDetails(error).message }, 'Failed to fetch category info');
-        }
       }
 
       const existingChapter = await db
@@ -105,7 +107,7 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
         duration: 0,
         end: currentTimeSeconds,
         title: category.name,
-        game_id: String(category.id),
+        game_id: categoryGameId,
       });
       await db
         .insertInto('chapters')
