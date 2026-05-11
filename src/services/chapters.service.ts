@@ -61,14 +61,12 @@ export async function getChaptersLibrary(
       baseQuery
         .select([
           'chapters.game_id',
-          'chapters.name',
-          'chapters.image',
+          (eb) => eb.fn.max('chapters.name').as('name'),
+          (eb) => eb.fn.max('chapters.image').as('image'),
           (eb) => eb.fn.count('vods.id').distinct().as('count'),
           (eb) => eb.fn.max('vods.created_at').as('last_played'),
         ])
         .groupBy('chapters.game_id')
-        .groupBy('chapters.name')
-        .groupBy('chapters.image')
         .orderBy(
           query.sort === 'count'
             ? sql`${sql.ref('count')}`

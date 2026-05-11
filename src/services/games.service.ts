@@ -192,14 +192,12 @@ export async function getGamesLibrary(
       baseQuery
         .select([
           'games.game_id',
-          'games.game_name',
-          'games.chapter_image',
+          (eb) => eb.fn.max('games.game_name').as('game_name'),
+          (eb) => eb.fn.max('games.chapter_image').as('chapter_image'),
           (eb) => eb.fn.count('vods.id').distinct().as('count'),
           (eb) => eb.fn.max('vods.created_at').as('last_played'),
         ])
         .groupBy('games.game_id')
-        .groupBy('games.game_name')
-        .groupBy('games.chapter_image')
         .orderBy(
           query.sort === 'count'
             ? sql`${sql.ref('count')}`
