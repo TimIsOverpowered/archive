@@ -52,22 +52,27 @@ export default function chaptersRoutes(fastify: FastifyInstance, _options: Chapt
         controller.abort();
       });
 
-      const tenantCtx = requireTenant(request);
-      const { tenantId, db } = tenantCtx;
+      try {
+        const tenantCtx = requireTenant(request);
+        const { tenantId, db } = tenantCtx;
 
-      const query = ChapterLibraryQuerySchema.parse(request.query);
-      const { chapters, total } = await getChaptersLibrary(
-        db as unknown as ReadonlyKysely<StreamerDB>,
-        tenantId,
-        query,
-        { signal: controller.signal }
-      );
+        const query = ChapterLibraryQuerySchema.parse(request.query);
+        const { chapters, total } = await getChaptersLibrary(
+          db as unknown as ReadonlyKysely<StreamerDB>,
+          tenantId,
+          query,
+          { signal: controller.signal }
+        );
 
-      return okPaginated(chapters, {
-        page: query.page,
-        limit: query.limit,
-        total,
-      });
+        return okPaginated(chapters, {
+          page: query.page,
+          limit: query.limit,
+          total,
+        });
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        throw err;
+      }
     }
   );
 

@@ -59,19 +59,24 @@ export default function gamesRoutes(fastify: FastifyInstance, _options: GamesRou
         controller.abort();
       });
 
-      const tenantCtx = requireTenant(request);
-      const { tenantId, db } = tenantCtx;
+      try {
+        const tenantCtx = requireTenant(request);
+        const { tenantId, db } = tenantCtx;
 
-      const query = GameQuerySchema.parse(request.query);
-      const { games, total } = await getGames(db as unknown as ReadonlyKysely<StreamerDB>, tenantId, query, {
-        signal: controller.signal,
-      });
+        const query = GameQuerySchema.parse(request.query);
+        const { games, total } = await getGames(db as unknown as ReadonlyKysely<StreamerDB>, tenantId, query, {
+          signal: controller.signal,
+        });
 
-      return okPaginated(games, {
-        page: query.page,
-        limit: query.limit,
-        total,
-      });
+        return okPaginated(games, {
+          page: query.page,
+          limit: query.limit,
+          total,
+        });
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        throw err;
+      }
     }
   );
 
@@ -108,19 +113,24 @@ export default function gamesRoutes(fastify: FastifyInstance, _options: GamesRou
         controller.abort();
       });
 
-      const tenantCtx = requireTenant(request);
-      const { tenantId, db } = tenantCtx;
+      try {
+        const tenantCtx = requireTenant(request);
+        const { tenantId, db } = tenantCtx;
 
-      const query = GameLibraryQuerySchema.parse(request.query);
-      const { games, total } = await getGamesLibrary(db as unknown as ReadonlyKysely<StreamerDB>, tenantId, query, {
-        signal: controller.signal,
-      });
+        const query = GameLibraryQuerySchema.parse(request.query);
+        const { games, total } = await getGamesLibrary(db as unknown as ReadonlyKysely<StreamerDB>, tenantId, query, {
+          signal: controller.signal,
+        });
 
-      return okPaginated(games, {
-        page: query.page,
-        limit: query.limit,
-        total,
-      });
+        return okPaginated(games, {
+          page: query.page,
+          limit: query.limit,
+          total,
+        });
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        throw err;
+      }
     }
   );
 

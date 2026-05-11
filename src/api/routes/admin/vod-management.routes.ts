@@ -51,11 +51,16 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
         controller.abort();
       });
 
-      const tenantCtx = requireTenant(request);
-      const { tenantId, db } = tenantCtx;
+      try {
+        const tenantCtx = requireTenant(request);
+        const { tenantId, db } = tenantCtx;
 
-      const stats = await getTenantStats(db, tenantId, getApiConfig().STATS_CACHE_TTL, { signal: controller.signal });
-      return ok(stats);
+        const stats = await getTenantStats(db, tenantId, getApiConfig().STATS_CACHE_TTL, { signal: controller.signal });
+        return ok(stats);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        throw err;
+      }
     }
   );
 

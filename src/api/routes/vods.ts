@@ -87,19 +87,24 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
         controller.abort();
       });
 
-      const tenantCtx = requireTenant(request);
-      const { tenantId, db } = tenantCtx;
+      try {
+        const tenantCtx = requireTenant(request);
+        const { tenantId, db } = tenantCtx;
 
-      const query = VodQuerySchema.parse(request.query);
-      const { vods, total } = await getVods(db as unknown as ReadonlyKysely<StreamerDB>, tenantId, query, {
-        signal: controller.signal,
-      });
+        const query = VodQuerySchema.parse(request.query);
+        const { vods, total } = await getVods(db as unknown as ReadonlyKysely<StreamerDB>, tenantId, query, {
+          signal: controller.signal,
+        });
 
-      return okPaginated(vods, {
-        page: query.page,
-        limit: query.limit,
-        total,
-      });
+        return okPaginated(vods, {
+          page: query.page,
+          limit: query.limit,
+          total,
+        });
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        throw err;
+      }
     }
   );
 
@@ -126,16 +131,21 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
         controller.abort();
       });
 
-      const { tenantId, vodId } = request.params;
-      const tenantCtx = requireTenant(request);
-      const { db } = tenantCtx;
-      const vodIdParsed = VodIdParamSchema.safeParse(vodId);
-      if (!vodIdParsed.success) {
-        notFound('VOD not found');
+      try {
+        const { tenantId, vodId } = request.params;
+        const tenantCtx = requireTenant(request);
+        const { db } = tenantCtx;
+        const vodIdParsed = VodIdParamSchema.safeParse(vodId);
+        if (!vodIdParsed.success) {
+          notFound('VOD not found');
+        }
+        const vod = await fetchVodByIdSafe(vodIdParsed.data, db, tenantId, { signal: controller.signal });
+        const neighbors = await getVodNeighbors(db, vodIdParsed.data, { signal: controller.signal });
+        return ok({ ...vod, prev: neighbors.prev, next: neighbors.next });
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        throw err;
       }
-      const vod = await fetchVodByIdSafe(vodIdParsed.data, db, tenantId, { signal: controller.signal });
-      const neighbors = await getVodNeighbors(db, vodIdParsed.data, { signal: controller.signal });
-      return ok({ ...vod, prev: neighbors.prev, next: neighbors.next });
     }
   );
 
@@ -163,23 +173,28 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
         controller.abort();
       });
 
-      const { tenantId, platform, platformVodId } = request.params;
-      const tenantCtx = requireTenant(request);
-      const { db } = tenantCtx;
+      try {
+        const { tenantId, platform, platformVodId } = request.params;
+        const tenantCtx = requireTenant(request);
+        const { db } = tenantCtx;
 
-      const vod = await getVodByPlatformId(
-        db as unknown as ReadonlyKysely<StreamerDB>,
-        tenantId,
-        platform,
-        platformVodId,
-        { signal: controller.signal }
-      );
+        const vod = await getVodByPlatformId(
+          db as unknown as ReadonlyKysely<StreamerDB>,
+          tenantId,
+          platform,
+          platformVodId,
+          { signal: controller.signal }
+        );
 
-      if (!vod) {
-        notFound('VOD not found');
+        if (!vod) {
+          notFound('VOD not found');
+        }
+
+        return ok(vod);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        throw err;
       }
-
-      return ok(vod);
     }
   );
 
@@ -206,21 +221,26 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
         controller.abort();
       });
 
-      const { tenantId, vodId } = request.params;
-      const tenantCtx = requireTenant(request);
-      const { db } = tenantCtx;
-      const vodIdParsed = VodIdParamSchema.safeParse(vodId);
-      if (!vodIdParsed.success) {
-        notFound('VOD not found');
-      }
-      await fetchVodByIdSafe(vodIdParsed.data, db, tenantId, { signal: controller.signal });
-      const emotes = await getEmotesByVodId(db, tenantId, vodIdParsed.data);
+      try {
+        const { tenantId, vodId } = request.params;
+        const tenantCtx = requireTenant(request);
+        const { db } = tenantCtx;
+        const vodIdParsed = VodIdParamSchema.safeParse(vodId);
+        if (!vodIdParsed.success) {
+          notFound('VOD not found');
+        }
+        await fetchVodByIdSafe(vodIdParsed.data, db, tenantId, { signal: controller.signal });
+        const emotes = await getEmotesByVodId(db, tenantId, vodIdParsed.data);
 
-      if (!emotes) {
-        notFound('Emotes not found for this VOD');
-      }
+        if (!emotes) {
+          notFound('Emotes not found for this VOD');
+        }
 
-      return ok(emotes);
+        return ok(emotes);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        throw err;
+      }
     }
   );
 }

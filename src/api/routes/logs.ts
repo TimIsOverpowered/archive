@@ -66,42 +66,47 @@ export default function logsRoutes(fastify: FastifyInstance, _options: LogsRoute
         controller.abort();
       });
 
-      const { tenantId, vodId } = request.params;
-      const tenantCtx = requireTenant(request);
-      const { db } = tenantCtx;
-      const vodIdNum = Number(vodId);
-      if (isNaN(vodIdNum)) return badRequest('Invalid VOD ID');
+      try {
+        const { tenantId, vodId } = request.params;
+        const tenantCtx = requireTenant(request);
+        const { db } = tenantCtx;
+        const vodIdNum = Number(vodId);
+        if (isNaN(vodIdNum)) return badRequest('Invalid VOD ID');
 
-      const parsed = LogsQuerySchema.safeParse(request.query);
-      if (!parsed.success) {
-        badRequest('Invalid query parameters');
+        const parsed = LogsQuerySchema.safeParse(request.query);
+        if (!parsed.success) {
+          badRequest('Invalid query parameters');
+        }
+
+        const { content_offset_seconds, cursor } = parsed.data;
+
+        if (content_offset_seconds === undefined && cursor == null) {
+          badRequest('Missing required query parameter: content_offset_seconds or cursor');
+        }
+
+        let result;
+
+        if (cursor != null) {
+          result = await getLogsByCursor(db as unknown as ReadonlyKysely<StreamerDB>, tenantId, vodIdNum, cursor, {
+            signal: controller.signal,
+          });
+        } else if (content_offset_seconds !== undefined && !isNaN(content_offset_seconds)) {
+          result = await getLogsByOffset(
+            db as unknown as ReadonlyKysely<StreamerDB>,
+            tenantId,
+            vodIdNum,
+            content_offset_seconds,
+            { signal: controller.signal }
+          );
+        } else {
+          badRequest('Invalid content_offset_seconds value');
+        }
+
+        return ok(result);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        throw err;
       }
-
-      const { content_offset_seconds, cursor } = parsed.data;
-
-      if (content_offset_seconds === undefined && cursor == null) {
-        badRequest('Missing required query parameter: content_offset_seconds or cursor');
-      }
-
-      let result;
-
-      if (cursor != null) {
-        result = await getLogsByCursor(db as unknown as ReadonlyKysely<StreamerDB>, tenantId, vodIdNum, cursor, {
-          signal: controller.signal,
-        });
-      } else if (content_offset_seconds !== undefined && !isNaN(content_offset_seconds)) {
-        result = await getLogsByOffset(
-          db as unknown as ReadonlyKysely<StreamerDB>,
-          tenantId,
-          vodIdNum,
-          content_offset_seconds,
-          { signal: controller.signal }
-        );
-      } else {
-        badRequest('Invalid content_offset_seconds value');
-      }
-
-      return ok(result);
     }
   );
 }
