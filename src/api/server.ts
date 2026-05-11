@@ -162,7 +162,7 @@ export async function buildServer(config: ApiConfig) {
   // Register tenant-scoped admin routes
   await fastify.register(
     async (instance) => {
-      await instance.register(adminRoutes, { prefix: '/admin' });
+      await instance.register(adminRoutes, { prefix: '/:tenantId/admin' });
     },
     { prefix: '/api/v1' }
   );
