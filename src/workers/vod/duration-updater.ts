@@ -46,25 +46,29 @@ export async function updateVodDurationDuringDownload(
     }
 
     // Update DB if duration increased
-    await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-      const current = await db
-        .selectFrom('vods')
-        .select(['duration', 'is_live'])
-        .where('id', '=', dbId)
-        .executeTakeFirst();
+    let shouldPublish = false;
+    const current = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+      const row = await db.selectFrom('vods').select(['duration', 'is_live']).where('id', '=', dbId).executeTakeFirst();
 
-      // Skip update if current duration is already >= new duration
-      if (current?.duration != null && current.duration >= duration) {
-        return;
+      if (row?.duration != null && row.duration >= duration) {
+        return row;
       }
 
       VodUpdateSchema.parse({ duration });
       await db.updateTable('vods').set({ duration }).where('id', '=', dbId).execute();
 
-      await publishVodDurationUpdate(ctx.tenantId, dbId, duration, current?.is_live ?? false);
-
-      log.debug({ vodId, duration, previous: current?.duration }, 'Duration updated');
+      shouldPublish = true;
+      log.debug({ vodId, duration, previous: row?.duration }, 'Duration updated');
+      return row;
     });
+
+    if (shouldPublish) {
+      try {
+        await publishVodDurationUpdate(ctx.tenantId, dbId, duration, current?.is_live ?? false);
+      } catch (error) {
+        log.warn({ error: extractErrorDetails(error).message, dbId, vodId }, 'Failed to publish duration update');
+      }
+    }
   } catch (error) {
     getLogger().error(
       { vodId, dbId, error: extractErrorDetails(error).message },

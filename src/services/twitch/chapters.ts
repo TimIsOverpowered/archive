@@ -92,128 +92,137 @@ export async function saveVodChapters(options: SaveVodChaptersOptions): Promise<
   const { tenantId } = ctx;
   const logger = createAutoLogger('twitch-chapters');
 
-  let chapters = preFetchedChapters;
-  if (chapters === undefined) {
-    chapters = await getChapters(vodId, tenantId);
-  }
+  const chaptersToCreate: Array<{
+    vod_id: number;
+    game_id: string | null;
+    name: string | null;
+    image: string | null;
+    start: number;
+    duration: number;
+    end: number | null;
+  }> = [];
 
   try {
-    return await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-      await db.deleteFrom('chapters').where('vod_id', '=', dbId).execute();
+    let chapters = preFetchedChapters;
+    if (chapters === undefined) {
+      chapters = await getChapters(vodId, tenantId);
+    }
 
-      if (!chapters) {
-        logger.warn({ vodId }, 'No chapters data available from Twitch API');
+    if (!chapters) {
+      logger.warn({ vodId }, 'No chapters data available from Twitch API');
+      return 0;
+    }
+
+    if (chapters.length === 0) {
+      const chapter = await getChapter(vodId, tenantId);
+      if (chapter == null || chapter.game == null) {
+        logger.warn({ vodId }, 'No game info available');
         return 0;
       }
 
-      if (chapters.length === 0) {
-        const chapter = await getChapter(vodId, tenantId);
-        if (chapter == null || chapter.game == null) {
-          logger.warn({ vodId }, 'No game info available');
-          return 0;
-        }
+      const game = chapter.game as Record<string, unknown>;
+      const gameId = typeof game.id === 'string' ? game.id : null;
+      const gameData = gameId != null ? await getGameData(gameId, { tenantId }) : null;
 
-        const game = chapter.game as Record<string, unknown>;
-        const gameId = typeof game.id === 'string' ? game.id : null;
-        const gameData = gameId != null ? await getGameData(gameId, { tenantId }) : null;
+      const validatedChapter = ChapterCreateSchema.parse({
+        vod_id: dbId,
+        start: 0,
+        duration: finalDurationSeconds,
+        end: finalDurationSeconds,
+        title: typeof game.displayName === 'string' ? game.displayName : null,
+        game_id: gameId,
+      });
+      chaptersToCreate.push({
+        vod_id: validatedChapter.vod_id,
+        game_id: validatedChapter.game_id,
+        name: validatedChapter.title,
+        image: gameData && typeof gameData.box_art_url === 'string' ? gameData.box_art_url : null,
+        start: validatedChapter.start,
+        duration: validatedChapter.duration,
+        end: validatedChapter.end,
+      });
 
-        const validatedChapter = ChapterCreateSchema.parse({
-          vod_id: dbId,
-          start: 0,
-          duration: finalDurationSeconds,
-          end: finalDurationSeconds,
-          title: typeof game.displayName === 'string' ? game.displayName : null,
-          game_id: gameId,
-        });
-        await db
-          .insertInto('chapters')
-          .values({
+      logger.info(
+        { dbId, vodId, game: typeof game.displayName === 'string' ? game.displayName : 'unknown' },
+        'Created single chapter from game info'
+      );
+    } else {
+      for (const ch of chapters) {
+        try {
+          const chapterObj = ch as Record<string, unknown>;
+          const node = (chapterObj.node as Record<string, unknown>) ?? {};
+          const details = (node.details as Record<string, unknown>) ?? {};
+          const game = details.game as Record<string, unknown> | undefined;
+
+          const positionMs = Number(node.positionMilliseconds ?? 0);
+          const durationMs = Number(node.durationMilliseconds ?? 0);
+
+          const gameId = typeof game?.id === 'string' ? game.id : null;
+          const gameName = typeof game?.displayName === 'string' ? game.displayName : null;
+
+          let gameImage: string | null = null;
+          if (gameId != null && gameId !== '') {
+            const gameData = await getGameData(gameId, { tenantId });
+            if (gameData != null && typeof gameData.box_art_url === 'string') {
+              gameImage = gameData.box_art_url;
+            }
+          }
+
+          const startSeconds = Math.floor(positionMs / 1000);
+          const durationSeconds =
+            durationMs === 0 ? finalDurationSeconds - startSeconds : Math.floor(durationMs / 1000);
+
+          const validatedChapter = ChapterCreateSchema.parse({
+            vod_id: dbId,
+            start: startSeconds,
+            duration: durationSeconds,
+            end: startSeconds + durationSeconds,
+            title: gameName,
+            game_id: gameId,
+          });
+
+          chaptersToCreate.push({
             vod_id: validatedChapter.vod_id,
             game_id: validatedChapter.game_id,
             name: validatedChapter.title,
-            image: gameData && typeof gameData.box_art_url === 'string' ? gameData.box_art_url : null,
+            image: gameImage,
             start: validatedChapter.start,
             duration: validatedChapter.duration,
             end: validatedChapter.end,
-          })
-          .execute();
-
-        if (publishUpdate) {
-          await publishVodUpdate(tenantId, dbId);
+          });
+        } catch (error) {
+          logger.warn({ error: extractErrorDetails(error).message }, 'Failed to process chapter');
         }
-
-        logger.info(
-          { dbId, vodId, game: typeof game.displayName === 'string' ? game.displayName : 'unknown' },
-          'Created single chapter from game info'
-        );
-        return 1;
-      } else if (chapters.length > 0) {
-        const chaptersToCreate = [];
-
-        for (const ch of chapters) {
-          try {
-            const chapterObj = ch as Record<string, unknown>;
-            const node = (chapterObj.node as Record<string, unknown>) ?? {};
-            const details = (node.details as Record<string, unknown>) ?? {};
-            const game = details.game as Record<string, unknown> | undefined;
-
-            const positionMs = Number(node.positionMilliseconds ?? 0);
-            const durationMs = Number(node.durationMilliseconds ?? 0);
-
-            const gameId = typeof game?.id === 'string' ? game.id : null;
-            const gameName = typeof game?.displayName === 'string' ? game.displayName : null;
-
-            let gameImage: string | null = null;
-            if (gameId != null && gameId !== '') {
-              const gameData = await getGameData(gameId, { tenantId });
-              if (gameData != null && typeof gameData.box_art_url === 'string') {
-                gameImage = gameData.box_art_url;
-              }
-            }
-
-            const startSeconds = Math.floor(positionMs / 1000);
-            const durationSeconds =
-              durationMs === 0 ? finalDurationSeconds - startSeconds : Math.floor(durationMs / 1000);
-
-            const validatedChapter = ChapterCreateSchema.parse({
-              vod_id: dbId,
-              start: startSeconds,
-              duration: durationSeconds,
-              end: startSeconds + durationSeconds,
-              title: gameName,
-              game_id: gameId,
-            });
-
-            chaptersToCreate.push({
-              vod_id: validatedChapter.vod_id,
-              game_id: validatedChapter.game_id,
-              name: validatedChapter.title,
-              image: gameImage,
-              start: validatedChapter.start,
-              duration: validatedChapter.duration,
-              end: validatedChapter.end,
-            });
-          } catch (error) {
-            logger.warn({ error: extractErrorDetails(error).message }, 'Failed to process chapter');
-          }
-        }
-
-        if (chaptersToCreate.length > 0) {
-          for (const ch of chaptersToCreate) {
-            await db.insertInto('chapters').values(ch).execute();
-          }
-
-          if (publishUpdate) {
-            await publishVodUpdate(tenantId, dbId);
-          }
-
-          logger.info({ dbId, vodId, chapterCount: chaptersToCreate.length }, 'Saved all chapters');
-          return chaptersToCreate.length;
-        }
-        return 0;
       }
-      return 0;
+    }
+  } catch (error) {
+    logger.error({ error: extractErrorDetails(error).message, dbId, vodId }, 'Failed to fetch chapter data');
+    return 0;
+  }
+
+  if (chaptersToCreate.length === 0) {
+    return 0;
+  }
+
+  try {
+    await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+      await db.deleteFrom('chapters').where('vod_id', '=', dbId).execute();
+
+      for (const ch of chaptersToCreate) {
+        await db.insertInto('chapters').values(ch).execute();
+      }
     });
+
+    try {
+      if (publishUpdate) {
+        await publishVodUpdate(tenantId, dbId);
+      }
+    } catch (error) {
+      logger.warn({ error: extractErrorDetails(error).message, dbId, vodId }, 'Failed to publish chapter update');
+    }
+
+    logger.info({ dbId, vodId, chapterCount: chaptersToCreate.length }, 'Saved all chapters');
+    return chaptersToCreate.length;
   } catch (error) {
     logger.error({ error: extractErrorDetails(error).message, dbId, vodId }, 'Failed to save chapters');
     return 0;

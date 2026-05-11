@@ -6,6 +6,7 @@ import { TenantContext } from '../types/context.js';
 import { Platform, PLATFORMS } from '../types/platforms.js';
 import { simpleKeys } from '../utils/cache-keys.js';
 import { compressData, decompressData } from '../utils/compression.js';
+import { extractErrorDetails } from '../utils/error.js';
 import { safeRequest } from '../utils/http-client.js';
 import { getLogger } from '../utils/logger.js';
 import { RedisService } from '../utils/redis-service.js';
@@ -81,43 +82,48 @@ export async function fetchAndSaveEmotes(
   let bttvEmotes: EmoteData[] = [];
   let sevenTvEmotes: EmoteData[] = [];
 
-  if (platform === PLATFORMS.TWITCH && platformId != null && platformId !== '') {
-    const [ffzRes, bttvChannelRes, sevenTvRes] = await Promise.all([
-      safeRequest<FFZResponse>(`${Emote.FFZ_API_BASE}/${platformId}`, {}, { timeoutMs: 5000 }),
-      safeRequest<BTTVChannelResponse>(
-        `${Emote.BTTV_API_BASE}/users/twitch/${platformId}`,
-        { channelEmotes: [], sharedEmotes: [] },
-        { timeoutMs: 5000 }
-      ),
-      safeRequest<SevenTVResponse>(
-        `${Emote.SEVENTV_API_BASE}/users/twitch/${platformId}`,
+  try {
+    if (platform === PLATFORMS.TWITCH && platformId != null && platformId !== '') {
+      const [ffzRes, bttvChannelRes, sevenTvRes] = await Promise.all([
+        safeRequest<FFZResponse>(`${Emote.FFZ_API_BASE}/${platformId}`, {}, { timeoutMs: 5000 }),
+        safeRequest<BTTVChannelResponse>(
+          `${Emote.BTTV_API_BASE}/users/twitch/${platformId}`,
+          { channelEmotes: [], sharedEmotes: [] },
+          { timeoutMs: 5000 }
+        ),
+        safeRequest<SevenTVResponse>(
+          `${Emote.SEVENTV_API_BASE}/users/twitch/${platformId}`,
+          { emote_set: {} },
+          { timeoutMs: 5000 }
+        ),
+      ]);
+
+      const ffzSetKey = ffzRes.room?.set ?? null;
+      ffzEmotes = (ffzSetKey != null ? (ffzRes.sets?.[ffzSetKey]?.emoticons ?? []) : []).map((e) => ({
+        id: String(e.id),
+        code: e.name,
+      }));
+
+      bttvEmotes = [
+        ...(bttvChannelRes.channelEmotes ?? []).map(({ id, code }) => ({ id, code })),
+        ...(bttvChannelRes.sharedEmotes ?? []).map(({ id, code }) => ({ id, code })),
+      ];
+
+      sevenTvEmotes = (sevenTvRes.emote_set?.emotes ?? []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
+    } else if (platform === PLATFORMS.KICK && platformId != null && platformId !== '') {
+      const sevenTvRes = await safeRequest<SevenTVResponse>(
+        `${Emote.SEVENTV_API_BASE}/users/kick/${platformId}`,
         { emote_set: {} },
         { timeoutMs: 5000 }
-      ),
-    ]);
+      );
 
-    const ffzSetKey = ffzRes.room?.set ?? null;
-    ffzEmotes = (ffzSetKey != null ? (ffzRes.sets?.[ffzSetKey]?.emoticons ?? []) : []).map((e) => ({
-      id: String(e.id),
-      code: e.name,
-    }));
-
-    bttvEmotes = [
-      ...(bttvChannelRes.channelEmotes ?? []).map(({ id, code }) => ({ id, code })),
-      ...(bttvChannelRes.sharedEmotes ?? []).map(({ id, code }) => ({ id, code })),
-    ];
-
-    sevenTvEmotes = (sevenTvRes.emote_set?.emotes ?? []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
-  } else if (platform === PLATFORMS.KICK && platformId != null && platformId !== '') {
-    const sevenTvRes = await safeRequest<SevenTVResponse>(
-      `${Emote.SEVENTV_API_BASE}/users/kick/${platformId}`,
-      { emote_set: {} },
-      { timeoutMs: 5000 }
-    );
-
-    ffzEmotes = [];
-    bttvEmotes = [];
-    sevenTvEmotes = (sevenTvRes.emote_set?.emotes ?? []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
+      ffzEmotes = [];
+      bttvEmotes = [];
+      sevenTvEmotes = (sevenTvRes.emote_set?.emotes ?? []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
+    }
+  } catch (error) {
+    getLogger().warn({ error: extractErrorDetails(error).message, vodId }, 'Failed to fetch emote data');
+    return;
   }
 
   if (ffzEmotes.length === 0 && bttvEmotes.length === 0 && sevenTvEmotes.length === 0) {
@@ -132,13 +138,14 @@ export async function fetchAndSaveEmotes(
   };
 
   try {
+    const validatedEmotes = EmoteUpsertSchema.parse({
+      vod_id: vodId,
+      ffz_emotes: emoteData.ffz_emotes,
+      bttv_emotes: emoteData.bttv_emotes,
+      seventv_emotes: emoteData.seventv_emotes,
+    });
+
     await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-      const validatedEmotes = EmoteUpsertSchema.parse({
-        vod_id: vodId,
-        ffz_emotes: emoteData.ffz_emotes,
-        bttv_emotes: emoteData.bttv_emotes,
-        seventv_emotes: emoteData.seventv_emotes,
-      });
       await db
         .insertInto('emotes')
         .values({
@@ -155,12 +162,20 @@ export async function fetchAndSaveEmotes(
           })
         )
         .execute();
-
-      await invalidateEmoteCache(ctx.tenantId, vodId);
-      if (publishUpdate) {
-        await publishVodUpdate(ctx.tenantId, vodId);
-      }
     });
+
+    try {
+      await invalidateEmoteCache(ctx.tenantId, vodId);
+    } catch (error) {
+      getLogger().warn({ error: extractErrorDetails(error).message, vodId }, 'Failed to invalidate emote cache');
+    }
+    if (publishUpdate) {
+      try {
+        await publishVodUpdate(ctx.tenantId, vodId);
+      } catch (error) {
+        getLogger().warn({ error: extractErrorDetails(error).message, vodId }, 'Failed to publish emote update');
+      }
+    }
   } catch {
     getLogger().error({ vodId }, 'Failed to save emotes');
   }

@@ -42,6 +42,8 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
       }
     }
 
+    let updatedChapterId: number | null = null;
+
     await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
       const lastChapter = await db
         .selectFrom('chapters')
@@ -58,8 +60,7 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
           .where('id', '=', lastChapter.id)
           .execute();
 
-        await publishVodUpdate(ctx.tenantId, dbId);
-
+        updatedChapterId = lastChapter.id;
         log.debug({ vodId, chapterId: lastChapter.id, currentTime: currentTimeSeconds }, 'Updated chapter end time');
         return;
       }
@@ -72,8 +73,7 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
           .where('id', '=', lastChapter.id)
           .execute();
 
-        await publishVodUpdate(ctx.tenantId, dbId);
-
+        updatedChapterId = lastChapter.id;
         log.debug({ vodId, chapterId: lastChapter.id }, 'Closed previous chapter');
       }
 
@@ -92,8 +92,7 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
           .where('id', '=', existingChapter.id)
           .execute();
 
-        await publishVodUpdate(ctx.tenantId, dbId);
-
+        updatedChapterId = existingChapter.id;
         log.debug(
           { dbId, vodId, categoryId: category.id, categoryName: category.name, startTime: currentTimeSeconds },
           'Created new chapter'
@@ -122,13 +121,19 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
         })
         .execute();
 
-      await publishVodUpdate(ctx.tenantId, dbId);
-
       log.debug(
         { dbId, vodId, categoryId: category.id, categoryName: category.name, startTime: currentTimeSeconds },
         'Created new chapter'
       );
     });
+
+    if (updatedChapterId != null) {
+      try {
+        await publishVodUpdate(ctx.tenantId, dbId);
+      } catch (error) {
+        log.warn({ error: extractErrorDetails(error).message, dbId, vodId }, 'Failed to publish chapter update');
+      }
+    }
   } catch (error) {
     log.error(createErrorContext(error, { dbId, vodId }), 'Failed to update chapter');
   }
@@ -141,6 +146,8 @@ export async function finalizeKickChapters(
   finalDurationSeconds: number
 ): Promise<void> {
   try {
+    let finalizedChapterId: number | null = null;
+
     await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
       const incompleteChapter = await db
         .selectFrom('chapters')
@@ -166,13 +173,20 @@ export async function finalizeKickChapters(
           .where('id', '=', incompleteChapter.id)
           .execute();
 
-        await publishVodUpdate(ctx.tenantId, dbId);
-
+        finalizedChapterId = incompleteChapter.id;
         log.info({ vodId, chapterId: incompleteChapter.id, finalDuration: duration }, 'Finalized last chapter');
       } else {
         log.debug({ vodId }, 'No incomplete chapters to finalize');
       }
     });
+
+    if (finalizedChapterId != null) {
+      try {
+        await publishVodUpdate(ctx.tenantId, dbId);
+      } catch (error) {
+        log.warn({ error: extractErrorDetails(error).message, vodId }, 'Failed to publish chapter update');
+      }
+    }
   } catch (error) {
     log.error(createErrorContext(error, { vodId }), 'Failed to finalize chapters');
   }
