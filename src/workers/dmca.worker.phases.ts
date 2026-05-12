@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { DiscordAlert, YouTube } from '../constants.js';
+import { Jobs, DiscordAlert, YouTube } from '../constants.js';
 import type { SelectableGames } from '../db/streamer-types.js';
 import type { SourceType } from '../types/platforms.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
@@ -19,7 +19,8 @@ import {
 } from './dmca/dmca.js';
 import type { DMCAClaim } from './dmca/dmca.js';
 import type { DmcaProcessingJob } from './jobs/types.js';
-import { queueYoutubeVodUpload, queueYoutubeGameUploadByGame } from './jobs/youtube.job.js';
+import { createGameUploadJob } from './jobs/youtube.job.js';
+import { getFlowProducer, getYoutubeUploadQueue, getVodFinalizeFileQueue } from './queues/queue.js';
 import type { BaseWorkerContext } from './types.js';
 import { createDmcaWorkerAlerts, DmcaClaimInfo, safeUpdateAlert } from './utils/alert-factories.js';
 import type { DmcaWorkerAlerts } from './utils/alert-factories.js';
@@ -410,8 +411,11 @@ export async function processDmcaClaims(ctx: DmcaProcessorContext): Promise<void
 export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> {
   ctx.log.info(
     { vodId: ctx.vodId, part: ctx.part, gameId: ctx.gameId, isGameUpload: ctx.isGameUpload },
-    'Queuing YouTube upload'
+    'Queuing YouTube upload with finalize chain'
   );
+
+  const youtubeQueue = getYoutubeUploadQueue();
+  const finalizeQueue = getVodFinalizeFileQueue();
 
   if (ctx.isGameUpload && ctx.gameStart != null && ctx.gameDuration != null && ctx.gameId != null) {
     const game = (await ctx.db
@@ -421,35 +425,122 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
       .executeTakeFirst()) as SelectableGames;
 
     try {
-      await queueYoutubeGameUploadByGame(
+      const job = await createGameUploadJob(
         { tenantId: ctx.tenantId, config: ctx.config, db: ctx.db },
         ctx.dbId,
         ctx.vodId,
         ctx.processedPath,
         ctx.platform,
-        game,
-        undefined,
-        ctx.workDir
+        {
+          id: game.id,
+          vod_id: game.vod_id,
+          game_id: game.game_id,
+          name: game.game_name,
+          image: game.chapter_image,
+          start: game.start,
+          duration: game.duration,
+          end: game.end,
+        },
+        {
+          gameTitle: game.title ?? undefined,
+        }
       );
+
+      const flow = await getFlowProducer().add({
+        name: 'vod_finalize_file',
+        queueName: finalizeQueue.name,
+        data: {
+          tenantId: ctx.tenantId,
+          dbId: ctx.dbId,
+          vodId: ctx.vodId,
+          filePath: ctx.processedPath,
+          type: ctx.type,
+          platform: ctx.platform,
+          workDir: ctx.workDir,
+          saveMP4: ctx.config.settings.saveMP4 ?? false,
+          saveHLS: ctx.config.settings.saveHLS ?? false,
+          streamId: ctx.streamId,
+        },
+        opts: {
+          jobId: `finalize_${ctx.vodId}_1`,
+          removeOnComplete: true,
+          removeOnFail: true,
+          failParentOnFailure: false,
+        },
+        children: [
+          {
+            name: 'youtube_upload',
+            queueName: youtubeQueue.name,
+            data: { ...job, workDir: ctx.workDir },
+            opts: {
+              jobId: `${Jobs.YOUTUBE_JOB_PREFIX}${ctx.vodId}_game_${job.chapterId}_${job.chapterStart}`,
+              removeOnComplete: true,
+              removeOnFail: true,
+              failParentOnFailure: false,
+            },
+          },
+        ],
+      });
+
+      ctx.log.info({ vodId: ctx.vodId, finalizeJobId: flow.job.id }, 'Queued DMCA game upload with finalize chain');
     } catch (err) {
-      ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'Game upload queue failed');
+      const details = extractErrorDetails(err);
+      ctx.log.warn({ ...details, vodId: ctx.vodId }, 'Failed to queue DMCA game upload with finalize chain');
     }
   } else {
     try {
-      await queueYoutubeVodUpload(
-        { tenantId: ctx.tenantId, config: ctx.config, db: ctx.db },
-        ctx.dbId,
-        ctx.vodId,
-        ctx.processedPath,
-        ctx.platform,
-        'vod',
-        true,
-        undefined,
-        ctx.part,
-        { workDir: ctx.workDir }
-      );
+      const flow = await getFlowProducer().add({
+        name: 'vod_finalize_file',
+        queueName: finalizeQueue.name,
+        data: {
+          tenantId: ctx.tenantId,
+          dbId: ctx.dbId,
+          vodId: ctx.vodId,
+          filePath: ctx.processedPath,
+          type: ctx.type,
+          platform: ctx.platform,
+          workDir: ctx.workDir,
+          saveMP4: ctx.config.settings.saveMP4 ?? false,
+          saveHLS: ctx.config.settings.saveHLS ?? false,
+          streamId: ctx.streamId,
+        },
+        opts: {
+          jobId: `finalize_${ctx.vodId}_1`,
+          removeOnComplete: true,
+          removeOnFail: true,
+          failParentOnFailure: false,
+        },
+        children: [
+          {
+            name: 'youtube_upload',
+            queueName: youtubeQueue.name,
+            data: {
+              kind: 'vod',
+              tenantId: ctx.tenantId,
+              dbId: ctx.dbId,
+              vodId: ctx.vodId,
+              filePath: ctx.processedPath,
+              type: ctx.type,
+              platform: undefined,
+              dmcaProcessed: true,
+              part: ctx.part,
+              workDir: ctx.workDir,
+              streamId: ctx.streamId,
+            },
+            opts: {
+              jobId: `${Jobs.YOUTUBE_JOB_PREFIX}${ctx.vodId}_vod_${ctx.part ?? 1}`,
+              removeOnComplete: true,
+              removeOnFail: true,
+              failParentOnFailure: false,
+            },
+          },
+        ],
+      });
+
+      ctx.log.info({ vodId: ctx.vodId, finalizeJobId: flow.job.id }, 'Queued DMCA VOD upload with finalize chain');
     } catch (err) {
-      ctx.log.warn({ err: extractErrorDetails(err), vodId: ctx.vodId }, 'YouTube upload queue failed');
+      const details = extractErrorDetails(err);
+      ctx.log.warn({ ...details, vodId: ctx.vodId }, 'Failed to queue DMCA VOD upload with finalize chain');
     }
   }
 }

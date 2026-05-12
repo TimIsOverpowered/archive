@@ -62,7 +62,7 @@ function createVodUploadJob(
 
 // ============== Game Job Creation ==============
 
-async function createGameUploadJob(
+export async function createGameUploadJob(
   ctx: TenantContext,
   dbId: number,
   vodId: string,

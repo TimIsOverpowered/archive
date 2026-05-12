@@ -1,11 +1,9 @@
 import type { Job } from 'bullmq';
 import { updateAlert } from '../utils/discord-alerts.js';
-import { extractErrorDetails } from '../utils/error.js';
 import { cleanupTempFiles } from './dmca/dmca.js';
 import { buildDmcaProcessorContext, trimDmcaVideo, processDmcaClaims, queueDmcaUpload } from './dmca.worker.phases.js';
 import type { DmcaProcessorContext } from './dmca.worker.phases.js';
 import type { DmcaProcessingJob, DmcaProcessingResult } from './jobs/types.js';
-import { enqueueFinalizeJob } from './jobs/youtube.job.js';
 import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
 
 const errorMeta = (ctx: DmcaProcessorContext, job: Job<unknown>) => ({
@@ -41,28 +39,6 @@ const dmcaProcessor = wrapWorkerProcessor<DmcaProcessingJob, DmcaProcessorContex
     finally: async (ctx) => {
       if (ctx.tempFiles.length > 0) {
         await cleanupTempFiles(ctx.tempFiles);
-      }
-      // Enqueue finalize job to move original VOD to storage or clean up tmpDir
-      try {
-        await enqueueFinalizeJob(
-          { tenantId: ctx.tenantId, config: ctx.config, db: ctx.db },
-          ctx.dbId,
-          ctx.vodId,
-          ctx.filePath,
-          ctx.type,
-          ctx.platform,
-          {
-            workDir: ctx.workDir,
-            saveMP4: ctx.config.settings.saveMP4,
-            saveHLS: ctx.config.settings.saveHLS,
-            streamId: ctx.streamId,
-          }
-        );
-      } catch (err) {
-        ctx.log.warn(
-          { err: extractErrorDetails(err), vodId: ctx.vodId },
-          'Failed to enqueue finalize job for DMCA VOD'
-        );
       }
     },
   }
