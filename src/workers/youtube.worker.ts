@@ -3,6 +3,7 @@ import type { Kysely } from 'kysely';
 import { getDisplayName, TenantConfig } from '../config/types.js';
 import type { StreamerDB } from '../db/streamer-types.js';
 import { publishVodUpdate } from '../services/cache-invalidator.js';
+import { invalidateVodStaticCache } from '../services/vod-cache.js';
 import { saveUploadResult, markUploadFailed } from '../services/youtube/upload.js';
 import type { Platform, SourceType, UploadType } from '../types/platforms.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
@@ -15,7 +16,6 @@ import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
 import { processGameUpload } from './youtube/game-upload-processor.js';
 import { getEffectiveSplitDuration } from './youtube/validation.js';
 import { processVodUpload, linkVodPartsAfterDelay } from './youtube/vod-upload-processor.js';
-import { invalidateVodStaticCache } from '../services/vod-cache.js';
 
 interface YoutubeProcessorContext {
   log: AppLogger;

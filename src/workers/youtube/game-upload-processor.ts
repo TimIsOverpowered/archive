@@ -5,6 +5,8 @@ import { getDisplayName } from '../../config/types.js';
 import { YouTube } from '../../constants.js';
 import type { StreamerDB } from '../../db/streamer-types.js';
 import { publishGameUpdate, publishVodUpdate } from '../../services/cache-invalidator.js';
+import { invalidateGameTags } from '../../services/cache-tags.js';
+import { invalidateVodStaticCache } from '../../services/vod-cache.js';
 import { uploadVideo } from '../../services/youtube/index.js';
 import type { Platform } from '../../types/platforms.js';
 import { initRichAlert, createProgressBar } from '../../utils/discord-alerts.js';
@@ -15,8 +17,6 @@ import { safeUpdateAlert } from '../utils/alert-factories.js';
 import { trimVideo, splitVideo, getMetadata } from '../utils/ffmpeg.js';
 import { buildYoutubeMetadata } from './metadata-builder.js';
 import { createYoutubeUploadProgressHandler } from './youtube-upload-progress.js';
-import { invalidateGameTags } from '../../services/cache-tags.js';
-import { invalidateVodStaticCache } from '../../services/vod-cache.js';
 
 export interface GameUploadContext {
   tenantId: string;
