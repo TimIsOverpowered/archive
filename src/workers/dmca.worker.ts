@@ -31,6 +31,11 @@ const dmcaProcessor = wrapWorkerProcessor<DmcaProcessingJob, DmcaProcessorContex
     await processDmcaClaims(ctx);
     await queueDmcaUpload(ctx);
 
+    await updateAlert(
+      ctx.messageId,
+      ctx.alerts.complete(ctx.vodId, 'N/A', ctx.claimInfos, ctx.platform, ctx.displayName)
+    );
+
     return { success: true, vodId: ctx.vodId };
   },
   {
