@@ -257,6 +257,8 @@ export async function getVodById(
 
   if (!staticData) return null;
 
+  void registerVodTags(tenantId, [{ id: staticData.id }], cacheKey, Cache.VOD_DETAILS_TTL, 1);
+
   const volatile = await getVodVolatileCache(tenantId, staticData.id);
   if (volatile) {
     return { ...staticData, duration: volatile.duration, is_live: volatile.is_live };
@@ -299,6 +301,8 @@ export async function getVodByPlatformId(
   );
 
   if (!staticData) return null;
+
+  void registerVodTags(tenantId, [{ id: staticData.id }], cacheKey, Cache.VOD_DETAILS_TTL, 1);
 
   const volatile = await getVodVolatileCache(tenantId, staticData.id);
   if (volatile) {
