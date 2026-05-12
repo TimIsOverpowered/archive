@@ -15,6 +15,8 @@ import { safeUpdateAlert } from '../utils/alert-factories.js';
 import { trimVideo, splitVideo, getMetadata } from '../utils/ffmpeg.js';
 import { buildYoutubeMetadata } from './metadata-builder.js';
 import { createYoutubeUploadProgressHandler } from './youtube-upload-progress.js';
+import { invalidateGameTags } from '../../services/cache-tags.js';
+import { invalidateVodStaticCache } from '../../services/vod-cache.js';
 
 export interface GameUploadContext {
   tenantId: string;
@@ -175,6 +177,11 @@ async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{
 
   await publishVodUpdate(tenantId, dbId);
   await publishGameUpdate(tenantId);
+
+  setTimeout(() => {
+    invalidateVodStaticCache(tenantId, dbId).catch(() => {});
+    invalidateGameTags(tenantId).catch(() => {});
+  }, 3000);
 
   await deleteFileIfExists(filePath);
 

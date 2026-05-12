@@ -15,6 +15,7 @@ import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
 import { processGameUpload } from './youtube/game-upload-processor.js';
 import { getEffectiveSplitDuration } from './youtube/validation.js';
 import { processVodUpload, linkVodPartsAfterDelay } from './youtube/vod-upload-processor.js';
+import { invalidateVodStaticCache } from '../services/vod-cache.js';
 
 interface YoutubeProcessorContext {
   log: AppLogger;
@@ -163,6 +164,10 @@ const youtubeProcessor = wrapWorkerProcessor<YoutubeUploadJob, YoutubeProcessorC
 
       await saveUploadResult(ctx.db, ctx.dbId, ctx.type, vodResult.uploadedVideos);
       await publishVodUpdate(ctx.tenantId, ctx.dbId);
+
+      setTimeout(() => {
+        invalidateVodStaticCache(ctx.tenantId, ctx.dbId).catch(() => {});
+      }, 3000);
 
       const splitDuration = getEffectiveSplitDuration(ctx.config.youtube?.splitDuration);
       linkVodPartsAfterDelay(ctx.tenantId, ctx.dbId, vodResult.uploadedVideos, splitDuration, ctx.db, ctx.log);
