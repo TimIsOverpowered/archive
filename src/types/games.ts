@@ -12,6 +12,6 @@ export interface GameResponse {
   game_name: string | null;
   title: string | null;
   chapter_image: string | null;
-  createdAt: Date | null;
-  updatedAt: Date | null;
+  created_at: Date | null;
+  updated_at: Date | null;
 }

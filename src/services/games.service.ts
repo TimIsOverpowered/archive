@@ -121,14 +121,7 @@ export async function getGames(
     const total = Number(totalRow?.cnt ?? 0);
     const hasMore = result.length > limit;
     const resultGames = hasMore ? result.slice(0, limit) : result;
-    return {
-      games: resultGames.map((g) => ({
-        ...g,
-        createdAt: g.created_at,
-        updatedAt: g.updated_at,
-      })) as unknown as GameResponse[],
-      total,
-    };
+    return { games: resultGames as unknown as GameResponse[], total };
   };
 
   return withStaleWhileRevalidate(cacheKey, Cache.VOD_LIST_TTL, Cache.VOD_LIST_TTL * CacheSwr.STALE_RATIO, fetcher);
