@@ -3,6 +3,7 @@ import type { SourceType, DownloadMethod } from '../../../types/platforms.js';
 import { DOWNLOAD_METHODS, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { internalServerError, badRequest } from '../../../utils/http-error.js';
+import { getTmpDirPath } from '../../../utils/path.js';
 import { queueDmcaProcessing } from '../../../workers/jobs/dmca.job.js';
 import { queueYoutubeGameUploadByGame } from '../../../workers/jobs/youtube.job.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
@@ -252,7 +253,8 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
         gameDuration: game.end - game.start,
         downloadJobId: jobId ?? undefined,
         copyJobId,
-        filePath,
+        ...(jobId == null && copyJobId == null && { filePath }),
+        workDir: getTmpDirPath({ tenantId, vodId }),
       });
 
       if (dmcaJobId == null) {

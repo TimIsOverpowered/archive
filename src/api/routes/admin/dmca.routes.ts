@@ -10,6 +10,7 @@ import {
 } from '../../../types/platforms.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound, internalServerError } from '../../../utils/http-error.js';
+import { getTmpDirPath } from '../../../utils/path.js';
 import { queueDmcaProcessing } from '../../../workers/jobs/dmca.job.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
@@ -124,8 +125,8 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         part,
         downloadJobId: downloadJobId ?? undefined,
         copyJobId,
-        filePath,
-        workDir: filePath ?? undefined,
+        ...(downloadJobId == null && copyJobId == null && { filePath }),
+        workDir: getTmpDirPath({ tenantId, vodId }),
         skipFinalize: true, // DMCA worker will handle finalization
         streamId: vodRecord.platform_stream_id ?? undefined,
       });
