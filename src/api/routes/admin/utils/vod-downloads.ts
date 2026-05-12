@@ -22,6 +22,7 @@ export interface EnsureVodDownloadOptions {
   type: SourceType;
   downloadMethod?: DownloadMethod | undefined;
   log: AppLogger;
+  skipFinalize?: boolean;
 }
 
 export interface EnsureVodDownloadResponse {
@@ -38,7 +39,7 @@ export interface EnsureVodDownloadResponse {
  * @throws Error if download fails or configuration is missing
  */
 export async function ensureVodDownload(options: EnsureVodDownloadOptions): Promise<EnsureVodDownloadResponse> {
-  const { ctx, dbId, vodId, type, downloadMethod = DOWNLOAD_METHODS.HLS, log } = options;
+  const { ctx, dbId, vodId, type, downloadMethod = DOWNLOAD_METHODS.HLS, log, skipFinalize } = options;
   const { tenantId, platform, db } = ctx;
 
   const platformConfig = requirePlatformConfig(ctx.config, platform);
@@ -103,6 +104,7 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
     platformUserId,
     platformUsername,
     downloadMethod,
+    ...(skipFinalize !== undefined && { skipFinalize }),
   });
 
   log.info({ jobId, vodId, filePath, type }, 'VOD download queued');

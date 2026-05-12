@@ -106,6 +106,7 @@ export default function youtubeUploadRoutes(fastify: FastifyInstance, _options: 
         type,
         downloadMethod,
         log,
+        skipFinalize: true,
       });
 
       // Queue Youtube upload

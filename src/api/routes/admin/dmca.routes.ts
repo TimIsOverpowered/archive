@@ -109,6 +109,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         type,
         downloadMethod,
         log,
+        skipFinalize: true,
       });
 
       // Step 3: Parse claims (lenient - no validation)

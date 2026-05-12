@@ -104,6 +104,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
         type,
         downloadMethod,
         log,
+        skipFinalize: true,
       });
       await queueYoutubeUploads({
         ctx: tenantCtx,

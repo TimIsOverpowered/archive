@@ -92,6 +92,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
           type,
           downloadMethod,
           log,
+          skipFinalize: true,
         });
 
         const gameJobId = await queueYoutubeGameUploadByGame(
@@ -235,6 +236,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
         type,
         downloadMethod,
         log,
+        skipFinalize: true,
       });
 
       // Parse claims (lenient - no validation)
