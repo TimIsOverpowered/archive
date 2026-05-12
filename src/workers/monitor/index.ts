@@ -1,6 +1,6 @@
 import { extractErrorDetails } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
-import { registerAllMonitorRepeatJobs, removeMonitorRepeatJob, removeTwitchBatchMonitorJob } from './startup.js';
+import { registerAllMonitorRepeatJobs } from './startup.js';
 
 export async function startMonitorService(): Promise<void> {
   getLogger().info({ component: 'monitor' }, 'Starting Archive Monitor Service...');
@@ -20,5 +20,3 @@ export function stopMonitorService(): void {
   // No explicit cleanup is needed here.
   getLogger().info({ component: 'monitor' }, 'Monitor service stopped.');
 }
-
-export { removeMonitorRepeatJob, removeTwitchBatchMonitorJob };

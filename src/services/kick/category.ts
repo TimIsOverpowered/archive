@@ -7,7 +7,7 @@ import { KickCategoryInfo } from './live.js';
 
 const log = childLogger({ module: 'kick-category' });
 
-export const kickCategoryCache = new LRUCache<string, KickCategoryInfo>({
+const kickCategoryCache = new LRUCache<string, KickCategoryInfo>({
   max: 500,
   ttl: 7 * 24 * 60 * 60 * 1000,
   allowStale: false,

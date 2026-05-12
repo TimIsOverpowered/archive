@@ -27,8 +27,3 @@ export async function waitForRedisReady(): Promise<void> {
 export async function closeWorkersRedis(): Promise<void> {
   await RedisService.close();
 }
-
-export function isRedisReady(): boolean {
-  const status = RedisService.getStatus();
-  return status.connected;
-}

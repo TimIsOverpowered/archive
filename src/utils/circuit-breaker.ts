@@ -122,5 +122,3 @@ export class CircuitBreaker {
     }
   }
 }
-
-export const defaultCircuitBreaker = new CircuitBreaker();

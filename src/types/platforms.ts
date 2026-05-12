@@ -57,8 +57,6 @@ export const UPLOAD_TYPES = {
 /** Upload type identifier derived from UPLOAD_TYPES object. */
 export type UploadType = (typeof UPLOAD_TYPES)[keyof typeof UPLOAD_TYPES];
 
-export const UPLOAD_TYPE_VALUES = Object.values(UPLOAD_TYPES);
-
 // ============================================================================
 // Upload Mode Constants
 // ============================================================================
@@ -109,26 +107,6 @@ export function isValidPlatform(value: string): value is Platform {
 /** Type guard narrowing a platform to Twitch. */
 export function isTwitchPlatform(platform: Platform): platform is typeof PLATFORMS.TWITCH {
   return platform === PLATFORMS.TWITCH;
-}
-
-/** Validates if a string is a valid source type. */
-export function isValidSourceType(value: string): value is SourceType {
-  return SOURCE_TYPES_VALUES.includes(value as SourceType);
-}
-
-/** Validates if a string is a valid upload type. */
-export function isValidUploadType(value: string): value is UploadType {
-  return UPLOAD_TYPE_VALUES.includes(value as UploadType);
-}
-
-/** Validates if a string is a valid upload mode. */
-export function isValidUploadMode(value: string): value is UploadMode {
-  return UPLOAD_MODE_VALUES.includes(value as UploadMode);
-}
-
-/** Validates if a string is a valid download method. */
-export function isValidDownloadMethod(value: string): value is DownloadMethod {
-  return DOWNLOAD_METHODS_VALUES.includes(value as DownloadMethod);
 }
 
 // ============================================================================

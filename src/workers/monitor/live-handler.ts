@@ -425,7 +425,7 @@ async function handleAlreadyLiveStream(ctx: AlreadyLiveContext): Promise<void> {
 /**
  * Validate that the VOD path exists and is writable before queuing a download job
  */
-export async function validateVodPath(_tenantId: string): Promise<{ valid: boolean }> {
+async function validateVodPath(_tenantId: string): Promise<{ valid: boolean }> {
   const tmpPath = getTmpPath();
 
   if (tmpPath == null) {
@@ -443,7 +443,7 @@ export async function validateVodPath(_tenantId: string): Promise<{ valid: boole
 /**
  * Enqueue Live HLS Download job
  */
-export async function enqueueLiveHlsDownload(params: {
+async function enqueueLiveHlsDownload(params: {
   dbId: number;
   vodId: string;
   platform: Platform;

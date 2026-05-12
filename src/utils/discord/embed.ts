@@ -75,10 +75,6 @@ export function createProgressBar(percent: number): string {
   return createProgressBarInternal(percent) + ` ${percent}%`;
 }
 
-export function formatProgressMessage(percent: number): string {
-  return createProgressBar(percent);
-}
-
 function createProgressBarInternal(percent: number): string {
   const bars = 20;
   const filled = Math.round((percent / 100) * bars);

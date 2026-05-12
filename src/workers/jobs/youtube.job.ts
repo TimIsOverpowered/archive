@@ -28,7 +28,7 @@ const log = childLogger({ module: 'youtube-job' });
 
 // ============== VOD Job Creation ==============
 
-export function createVodUploadJob(
+function createVodUploadJob(
   ctx: TenantContext,
   dbId: number,
   vodId: string,
@@ -62,7 +62,7 @@ export function createVodUploadJob(
 
 // ============== Game Job Creation ==============
 
-export async function createGameUploadJob(
+async function createGameUploadJob(
   ctx: TenantContext,
   dbId: number,
   vodId: string,
@@ -132,7 +132,7 @@ export async function createGameUploadJob(
 
 // ============== Bulk Game Job Creation ==============
 
-export async function createGameUploadJobsForVod(
+async function createGameUploadJobsForVod(
   ctx: TenantContext,
   dbId: number,
   vodId: string,
@@ -186,7 +186,7 @@ export async function createGameUploadJobsForVod(
  * @param downloadJobId - Optional: if provided, chains upload to wait for download completion
  * @returns The job ID if successfully enqueued, null otherwise
  */
-export async function enqueueVodUpload(
+async function enqueueVodUpload(
   job: YoutubeVodUploadJob,
   downloadJobId?: string,
   copyJobId?: string
@@ -380,7 +380,7 @@ export async function enqueueFinalizeJob(
  * @param downloadJobId - Optional: if provided, chains upload to wait for download completion
  * @returns The job ID if successfully enqueued, null otherwise
  */
-export async function enqueueGameUpload(
+async function enqueueGameUpload(
   job: YoutubeGameUploadJob,
   downloadJobId?: string,
   copyJobId?: string
@@ -479,45 +479,6 @@ export async function queueYoutubeVodUpload(
 ): Promise<string | null> {
   const job = createVodUploadJob(ctx, dbId, vodId, filePath, platform, type, dmcaProcessed, part, options);
   return enqueueVodUpload(job, downloadJobId, copyJobId);
-}
-
-/**
- * Creates and enqueues a YouTube game upload job for a specific chapter.
- * @param ctx - Tenant context
- * @param dbId - Database VOD ID
- * @param vodId - Platform VOD ID
- * @param filePath - Path to video file
- * @param platform - Source platform
- * @param chapterId - Chapter ID to upload
- * @param downloadJobId - Optional: chains upload to wait for download
- * @returns The job ID if successfully enqueued, null otherwise
- */
-export async function queueYoutubeGameUpload(
-  ctx: TenantContext,
-  dbId: number,
-  vodId: string,
-  filePath: string | undefined,
-  platform: Platform,
-  chapterId: number,
-  downloadJobId?: string,
-  copyJobId?: string
-): Promise<string | null> {
-  const chapter = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-    return db.selectFrom('chapters').where('id', '=', chapterId).selectAll().executeTakeFirst();
-  });
-
-  if (!chapter) return null;
-
-  let job: YoutubeGameUploadJob;
-  try {
-    job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, chapter);
-  } catch (error) {
-    const details = extractErrorDetails(error);
-    log.warn({ chapterId, tenantId: ctx.tenantId, ...details }, 'Skipping game upload job');
-    return null;
-  }
-
-  return enqueueGameUpload(job, downloadJobId, copyJobId);
 }
 
 /**
