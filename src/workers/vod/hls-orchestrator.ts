@@ -232,7 +232,15 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
       const playlist = await fetchPlaylist(ctx, {
         attempts: 3,
         baseDelayMs: 2000,
-        shouldRetry: (err) => err instanceof HttpError && (err.statusCode === 403 || err.statusCode >= 500),
+        shouldRetry: (err) => {
+          if (err instanceof HttpError) return err.statusCode === 403 || err.statusCode >= 500;
+          const match = (err as Error).message?.match(/status (\d+)/);
+          if (match && match[1] != null) {
+            const status = parseInt(match[1], 10);
+            return status === 403 || status >= 500;
+          }
+          return false;
+        },
       });
 
       const { variantM3u8String, baseURL } = playlist;
