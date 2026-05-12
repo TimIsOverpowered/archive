@@ -105,19 +105,3 @@ export function getVodHlsDirPath(options: VodPathOptions): string {
 export function sanitizePathForLog(filePath: string): string {
   return path.basename(filePath);
 }
-
-/**
- * Validates that a resolved path is within any of the expected base directories.
- * Prevents path traversal attacks where an attacker provides `../../../etc/passwd`.
- * Uses `path.resolve` to normalize the input, then checks it starts with one of the base paths.
- */
-export function assertPathWithinBase(resolvedPath: string, basePaths: string[]): void {
-  const normalizedResolved = path.resolve(resolvedPath);
-  for (const basePath of basePaths) {
-    const normalizedBase = path.resolve(basePath);
-    if (normalizedResolved.startsWith(normalizedBase + path.sep) || normalizedResolved === normalizedBase) {
-      return;
-    }
-  }
-  throw new Error('Path traversal detected');
-}

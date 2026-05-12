@@ -2,7 +2,6 @@ import type { Stats as FsStats } from 'node:fs';
 import fs from 'node:fs/promises';
 import * as pathModule from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { getLivePath } from '../../../config/env.js';
 import { VodUpdateSchema } from '../../../config/schemas.js';
 import { findVodByStreamId } from '../../../db/queries/vods.js';
 import { publishVodDurationUpdate } from '../../../services/cache-invalidator.js';
@@ -11,7 +10,7 @@ import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, PLATFORMS, SOURCE_TYPES } from '../../../types/platforms.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest, notFound } from '../../../utils/http-error.js';
-import { assertPathWithinBase, fileExists, sanitizePathForLog } from '../../../utils/path.js';
+import { fileExists, sanitizePathForLog } from '../../../utils/path.js';
 import { enqueueFinalizeJob, queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
@@ -72,16 +71,6 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
       const { tenantId, config, db, platform } = tenantCtx;
       const { streamId, path: inputPath, durationSecs } = request.body;
       const log = createAutoLogger(tenantId);
-
-      const livePath = getLivePath();
-      if (livePath != null) {
-        const basePath = pathModule.dirname(livePath);
-        try {
-          assertPathWithinBase(inputPath, [basePath]);
-        } catch {
-          badRequest('Invalid recording path: must be within the live storage directory');
-        }
-      }
 
       // Validate file path exists and is accessible
       const exists = await fileExists(inputPath);
