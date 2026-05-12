@@ -2,7 +2,7 @@ import type { Stats as FsStats } from 'node:fs';
 import fs from 'node:fs/promises';
 import * as pathModule from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { getLivePath, getTmpPath, getVodPath } from '../../../config/env.js';
+import { getLivePath } from '../../../config/env.js';
 import { VodUpdateSchema } from '../../../config/schemas.js';
 import { findVodByStreamId } from '../../../db/queries/vods.js';
 import { publishVodDurationUpdate } from '../../../services/cache-invalidator.js';
@@ -73,13 +73,13 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
       const { streamId, path: inputPath, durationSecs } = request.body;
       const log = createAutoLogger(tenantId);
 
-      // Validate the path is within any configured storage directory
-      const allowedPaths = [getLivePath(), getVodPath(), getTmpPath()].filter((p): p is string => Boolean(p));
-      if (allowedPaths.length > 0) {
+      const livePath = getLivePath();
+      if (livePath != null) {
+        const basePath = pathModule.dirname(livePath);
         try {
-          assertPathWithinBase(inputPath, allowedPaths);
+          assertPathWithinBase(inputPath, [basePath]);
         } catch {
-          badRequest('Invalid recording path: must be within LIVE_PATH, VOD_PATH, or TMP_PATH');
+          badRequest('Invalid recording path: must be within the live storage directory');
         }
       }
 
