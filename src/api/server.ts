@@ -138,10 +138,17 @@ export async function buildServer(config: ApiConfig) {
     exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'X-Request-ID'],
   });
 
+  // Register health check endpoint (separate from public API — uses x-health-token)
+  await fastify.register(
+    async (instance) => {
+      await instance.register(healthRoutes, { prefix: '' });
+    },
+    { prefix: '/api/v1' }
+  );
+
   // Register public API routes under a single /api/v1 prefix
   await fastify.register(
     async (instance) => {
-      await instance.register(healthRoutes, { prefix: '/health' });
       await instance.register(vodsRoutes, { prefix: '' });
       await instance.register(gamesRoutes, { prefix: '' });
       await instance.register(chaptersRoutes, { prefix: '' });
