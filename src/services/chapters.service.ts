@@ -71,7 +71,7 @@ export async function getChaptersLibrary(
           query.sort === 'count'
             ? sql`${sql.ref('count')}`
             : query.sort === 'chapter_name'
-              ? sql`${sql.ref('chapters.name')}`
+              ? sql`${sql.ref('name')}`
               : sql`${sql.ref('last_played')}`,
           query.order
         )
