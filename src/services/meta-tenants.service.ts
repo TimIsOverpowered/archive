@@ -60,16 +60,28 @@ function stripEncryptedFields(tenant: SelectableTenants): SelectableTenants {
   return tenant;
 }
 
-/** Retrieve all tenants from the metadata database. */
+/** Retrieve all tenants from the metadata database (encrypted fields stripped for API responses). */
 export async function getAllTenants(): Promise<SelectableTenants[]> {
   const tenants = await getMetaClient().selectFrom('tenants').selectAll().execute();
   return tenants.map(stripEncryptedFields);
 }
 
-/** Look up a tenant by ID from the metadata database. */
+/** Retrieve all tenants from the metadata database without stripping encrypted fields. */
+export async function getAllTenantsRaw(): Promise<SelectableTenants[]> {
+  const tenants = await getMetaClient().selectFrom('tenants').selectAll().execute();
+  return tenants;
+}
+
+/** Look up a tenant by ID from the metadata database (encrypted fields stripped for API responses). */
 export async function getTenantById(id: string): Promise<SelectableTenants | undefined> {
   const tenant = await getMetaClient().selectFrom('tenants').selectAll().where('id', '=', id).executeTakeFirst();
   return tenant ? stripEncryptedFields(tenant) : undefined;
+}
+
+/** Look up a tenant by ID from the metadata database without stripping encrypted fields. */
+export async function getTenantByIdRaw(id: string): Promise<SelectableTenants | undefined> {
+  const tenant = await getMetaClient().selectFrom('tenants').selectAll().where('id', '=', id).executeTakeFirst();
+  return tenant;
 }
 
 /** Create a new tenant record in the metadata database. */

@@ -3,7 +3,7 @@ import type { ZodType } from 'zod';
 import { ConfigCache } from '../constants.js';
 import { initMetaClient } from '../db/meta-client.js';
 import type { SelectableTenants } from '../db/meta-types.js';
-import { getAllTenants, getTenantById } from '../services/meta-tenants.service.js';
+import { getAllTenantsRaw, getTenantByIdRaw } from '../services/meta-tenants.service.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { getLogger } from '../utils/logger.js';
 import { asJsonObject } from '../utils/object.js';
@@ -99,7 +99,7 @@ export class ConfigService {
 
   async loadAll(): Promise<TenantConfig[]> {
     initMetaClient();
-    const tenants = await getAllTenants();
+    const tenants = await getAllTenantsRaw();
     if (tenants.length === 0) return [];
 
     for (const tenant of tenants) {
@@ -182,7 +182,7 @@ export class ConfigService {
    */
   async reloadTenant(tenantId: string, { publish = true }: { publish?: boolean } = {}): Promise<void> {
     initMetaClient();
-    const tenant = await getTenantById(tenantId);
+    const tenant = await getTenantByIdRaw(tenantId);
     if (!tenant) {
       this.cache.delete(tenantId);
       return;
