@@ -2,13 +2,10 @@ import type { Stats as FsStats } from 'node:fs';
 import fs from 'node:fs/promises';
 import * as pathModule from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { VodUpdateSchema } from '../../../config/schemas.js';
 import { findVodByStreamId } from '../../../db/queries/vods.js';
-import { publishVodDurationUpdate } from '../../../services/cache-invalidator.js';
 import { saveVodChapters } from '../../../services/twitch/index.js';
 import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, PLATFORMS, SOURCE_TYPES } from '../../../types/platforms.js';
-import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest, notFound } from '../../../utils/http-error.js';
 import { fileExists, sanitizePathForLog } from '../../../utils/path.js';
 import { enqueueFinalizeJob, queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
@@ -68,9 +65,8 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
     preValidation: [platformValidationMiddleware],
     handler: async (request) => {
       const tenantCtx = asTenantPlatformContext(requireTenant(request));
-      const { tenantId, config, db, platform } = tenantCtx;
+      const { config, db, platform } = tenantCtx;
       const { streamId, path: inputPath, durationSecs } = request.body;
-      const log = createAutoLogger(tenantId);
 
       // Validate file path exists and is accessible
       const exists = await fileExists(inputPath);
@@ -90,16 +86,6 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
 
       const vodRecord = await findVodByStreamId(db, streamId, platform);
       if (!vodRecord) notFound(`VOD ${streamId} not found`);
-
-      // Update duration if provided and different from current value
-      if (durationSecs !== undefined && vodRecord.duration !== durationSecs) {
-        VodUpdateSchema.parse({ duration: durationSecs });
-        await db.updateTable('vods').set({ duration: durationSecs }).where('id', '=', vodRecord.id).execute();
-
-        await publishVodDurationUpdate(tenantId, vodRecord.id, durationSecs, vodRecord.is_live);
-
-        log.info({ vodId: vodRecord.id, durationSecs }, 'Updated VOD duration');
-      }
 
       // Fetch chapters for Twitch VODs if none exist yet (needed by game upload jobs)
       if (platform === PLATFORMS.TWITCH && vodRecord.platform_vod_id != null) {

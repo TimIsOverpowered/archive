@@ -153,7 +153,7 @@ export async function blackoutVideoSections(
     for (const section of sorted) {
       if (section.startSeconds > prevEnd) {
         const dur = section.startSeconds - prevEnd;
-        const file = path.join(workDir, `${vodId}-seg-normal-${prevEnd}.mp4`);
+        const file = path.join(workDir, `${vodId}-seg-normal-${prevEnd}.ts`);
         const result = await extractSegment(videoPath, file, prevEnd, dur, reportProgress, options?.onStart);
         if (result === null) return null;
         segmentFiles.push(result);
@@ -161,7 +161,7 @@ export async function blackoutVideoSections(
         reportStep(`extract:${toHHMMSS(prevEnd)}-${toHHMMSS(section.startSeconds)}`);
       }
 
-      const blackFile = path.join(workDir, `${vodId}-seg-black-${section.startSeconds}.mp4`);
+      const blackFile = path.join(workDir, `${vodId}-seg-black-${section.startSeconds}.ts`);
       const blackResult = await generateBlackSegment(
         blackFile,
         section.endSeconds - section.startSeconds,
@@ -179,7 +179,7 @@ export async function blackoutVideoSections(
 
     if (prevEnd < totalDuration) {
       const dur = totalDuration - prevEnd;
-      const file = path.join(workDir, `${vodId}-seg-normal-${prevEnd}.mp4`);
+      const file = path.join(workDir, `${vodId}-seg-normal-${prevEnd}.ts`);
       const result = await extractSegment(videoPath, file, prevEnd, dur, reportProgress, options?.onStart);
       if (result === null) return null;
       segmentFiles.push(result);
