@@ -337,7 +337,7 @@ export async function enqueueFinalizeJob(
   }
 ): Promise<string | null> {
   const queue = getVodFinalizeFileQueue();
-  const jobId = `${Jobs.FINALIZE_JOB_PREFIX}${vodId}_1`;
+  const jobId = `${Jobs.FINALIZE_JOB_PREFIX}${vodId}_1_${Date.now()}`;
 
   try {
     const result = await enqueueJobWithLogging({
@@ -759,7 +759,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
             workDir
           );
 
-          const flowChildren = gameChainHead != null ? [gameChainHead] : [];
+          const flowChildren = gameChainHead != null ? [gameChainHead] : baseChildren;
 
           const flow = await getFlowProducer().add({
             name: 'vod_finalize_file',
