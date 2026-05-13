@@ -203,6 +203,8 @@ export const Server = {
   COMPRESSION_THRESHOLD: 10240,
   /** Grace period before force-exit on SIGTERM/SIGINT */
   SHUTDOWN_TIMEOUT_MS: 5_000,
+  /** Health check endpoint timeout */
+  HEALTH_TIMEOUT_MS: 30_000,
 } as const;
 
 // ── Redis ────────────────────────────────────────────────────────────────────

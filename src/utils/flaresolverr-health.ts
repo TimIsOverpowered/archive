@@ -34,10 +34,12 @@ export async function checkFlareSolverrHealth(): Promise<FlareSolverrHealthResul
 
   try {
     const baseURL = getBaseConfig().FLARESOLVERR_BASE_URL;
+    const signal = AbortSignal.timeout(Flaresolverr.TIMEOUT_MS);
     const response = await fetch(`${baseURL}/v1`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cmd: 'status' }),
+      signal,
     });
 
     const body = (await response.json()) as FlareSolverrStatusResponse;

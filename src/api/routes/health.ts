@@ -3,6 +3,7 @@ import { FastifyInstance } from 'fastify';
 import { sql } from 'kysely';
 import { getBaseConfig } from '../../config/env.js';
 import { configService } from '../../config/tenant-config.js';
+import { Server } from '../../constants.js';
 import { getClient } from '../../db/streamer-client.js';
 import { defaultCacheContext } from '../../utils/cache.js';
 import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator.js';
@@ -42,12 +43,14 @@ export default function healthRoutes(fastify: FastifyInstance, _options: HealthR
     },
     async () => {
       const redis = fastify.redis;
-      const streamerConfigs = await configService.loadAll();
-      const redisStatusInfo = RedisService.getStatus();
+      const [streamerConfigs, redisStatusInfo] = await Promise.all([
+        configService.loadAll(),
+        Promise.resolve(RedisService.getStatus()),
+      ]);
 
       let redisStatus = 'ok';
       try {
-        await redis.ping();
+        await raceWithTimeout(redis.ping(), Server.HEALTH_TIMEOUT_MS, 'Redis ping');
         if (redisStatusInfo.status !== 'ready') {
           redisStatus = 'unstable';
         }
@@ -57,7 +60,8 @@ export default function healthRoutes(fastify: FastifyInstance, _options: HealthR
 
       const streamers = [];
       const dbStatuses = { ok: 0, error: 0, uninitialized: 0 };
-      for (const config of streamerConfigs) {
+
+      const dbChecks = streamerConfigs.map(async (config) => {
         const client = getClient(config.id);
         let dbStatus = 'uninitialized';
 
@@ -70,11 +74,14 @@ export default function healthRoutes(fastify: FastifyInstance, _options: HealthR
           }
         }
 
-        dbStatuses[dbStatus as 'ok' | 'error' | 'uninitialized']++;
-        streamers.push({
-          id: config.id,
-          db: dbStatus,
-        });
+        return { id: config.id, db: dbStatus };
+      });
+
+      const streamerResults = await Promise.all(dbChecks);
+
+      for (const result of streamerResults) {
+        dbStatuses[result.db as 'ok' | 'error' | 'uninitialized']++;
+        streamers.push(result);
       }
 
       const kickConfig = streamerConfigs.find((c) => c.kick?.enabled === true);
@@ -125,6 +132,26 @@ export default function healthRoutes(fastify: FastifyInstance, _options: HealthR
   );
 }
 
+/** Race a promise against a timeout. */
+async function raceWithTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    );
+  });
+}
+
 /** Fetch job counts for all registered worker queues. */
 async function getQueueMetrics(): Promise<
   Record<string, { waiting: number; active: number; failed: number; delayed: number }>
@@ -132,19 +159,24 @@ async function getQueueMetrics(): Promise<
   const result: Record<string, { waiting: number; active: number; failed: number; delayed: number }> = {};
   try {
     const redis = getRedisInstance();
-    for (const queueName of Object.values(QUEUE_NAMES)) {
+    const queueChecks = Object.values(QUEUE_NAMES).map(async (queueName) => {
       const queue = new Queue<AllJobData, AllJobData, string>(queueName, { connection: redis });
       try {
-        const counts = await queue.getJobCounts();
-        result[queueName] = {
+        const counts = await raceWithTimeout(queue.getJobCounts(), 10_000, `Queue metrics ${queueName}`);
+        return [queueName, {
           waiting: counts.waiting ?? 0,
           active: counts.active ?? 0,
           failed: counts.failed ?? 0,
           delayed: counts.delayed ?? 0,
-        };
+        }] as const;
       } catch {
-        result[queueName] = { waiting: -1, active: -1, failed: -1, delayed: -1 };
+        return [queueName, { waiting: -1, active: -1, failed: -1, delayed: -1 }] as const;
       }
+    });
+
+    const queueResults = await Promise.all(queueChecks);
+    for (const [name, metrics] of queueResults) {
+      result[name] = metrics;
     }
   } catch {
     // Redis unavailable — return empty metrics

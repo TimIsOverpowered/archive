@@ -16,7 +16,7 @@ function timingSafeEqual(a: string, b: string): boolean {
  * Health check token validation middleware.
  * Requires `x-health-token` header matching the configured token (timing-safe comparison).
  */
-export default function healthCheckMiddleware(request: FastifyRequest) {
+export default async function healthCheckMiddleware(request: FastifyRequest) {
   const rawToken = request.headers['x-health-token'];
   const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
   const expectedToken = getHealthToken();
@@ -24,4 +24,6 @@ export default function healthCheckMiddleware(request: FastifyRequest) {
   if (token == null || expectedToken == null || !timingSafeEqual(token, expectedToken)) {
     unauthorized('Invalid health check token');
   }
+
+  await Promise.resolve();
 }

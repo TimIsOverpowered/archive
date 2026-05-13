@@ -65,9 +65,8 @@ export async function buildServer(config: ApiConfig) {
   // Add tenant display name to logger for routes with streamer ID
   const tenantLoggerMiddleware = createTenantLoggerMiddleware();
   fastify.addHook('preHandler', tenantLoggerMiddleware);
-  fastify.addHook('onResponse', (_request, _reply, done) => {
+  fastify.addHook('onResponse', () => {
     exitTenantContext();
-    done();
   });
 
   // Security headers
