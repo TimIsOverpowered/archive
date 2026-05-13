@@ -254,15 +254,15 @@ export async function getVodById(
       db
         .selectFrom('vods')
         .select(['id', 'platform', 'platform_vod_id as platformVodId'])
-        .where('id', '<', vodId)
-        .orderBy('id', 'desc')
+        .where('id', '>', vodId)
+        .orderBy('id', 'asc')
         .limit(1)
         .executeTakeFirst(options),
       db
         .selectFrom('vods')
         .select(['id', 'platform', 'platform_vod_id as platformVodId'])
-        .where('id', '>', vodId)
-        .orderBy('id', 'asc')
+        .where('id', '<', vodId)
+        .orderBy('id', 'desc')
         .limit(1)
         .executeTakeFirst(options),
     ]);
@@ -323,15 +323,15 @@ export async function getVodByPlatformId(
       db
         .selectFrom('vods')
         .select(['id', 'platform', 'platform_vod_id as platformVodId'])
-        .where('id', '<', vod.id)
-        .orderBy('id', 'desc')
+        .where('id', '>', vod.id)
+        .orderBy('id', 'asc')
         .limit(1)
         .executeTakeFirst(options),
       db
         .selectFrom('vods')
         .select(['id', 'platform', 'platform_vod_id as platformVodId'])
-        .where('id', '>', vod.id)
-        .orderBy('id', 'asc')
+        .where('id', '<', vod.id)
+        .orderBy('id', 'desc')
         .limit(1)
         .executeTakeFirst(options),
     ]);
