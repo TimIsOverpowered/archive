@@ -10,7 +10,6 @@ import {
 } from '../../../services/meta-tenants.service.js';
 import { getTenantStats } from '../../../services/tenants.service.js';
 import { notFound } from '../../../utils/http-error.js';
-import type { AdminContext } from '../../middleware/admin-api-key.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import { tenantMiddleware, requireTenant } from '../../middleware/tenant-platform.js';
@@ -18,37 +17,6 @@ import { ok } from '../../response.js';
 
 export default function tenantsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
-
-  fastify.get(
-    '/admin/verify',
-    {
-      schema: {
-        tags: ['Admin'],
-        description: 'Verify admin API key and return authenticated identity',
-        security: [{ apiKey: [] }],
-        response: {
-          200: {
-            type: 'object',
-            properties: {
-              success: { type: 'boolean' },
-              data: {
-                type: 'object',
-                properties: {
-                  adminId: { type: 'number' },
-                  username: { type: 'string' },
-                },
-              },
-            },
-          },
-        },
-      },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
-    },
-    (request) => {
-      const ctx = request.admin as AdminContext;
-      return ok({ adminId: ctx.adminId, username: ctx.username });
-    }
-  );
 
   fastify.get(
     '/tenants',
@@ -74,7 +42,7 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
         description: 'Get a tenant by ID',
         params: {
           type: 'object',
-          properties: { id: { type: 'string', format: 'uuid' } },
+          properties: { id: { type: 'string', description: 'Tenant ID' } },
           required: ['id'],
         },
         security: [{ apiKey: [] }],
@@ -101,7 +69,7 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
         body: {
           type: 'object',
           properties: {
-            id: { type: 'string', format: 'uuid' },
+            id: { type: 'string', description: 'Tenant ID' },
             display_name: { type: 'string', nullable: true },
             twitch: { type: 'object', nullable: true },
             youtube: { type: 'object', nullable: true },
@@ -129,7 +97,7 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
         description: 'Update a tenant',
         params: {
           type: 'object',
-          properties: { id: { type: 'string', format: 'uuid' } },
+          properties: { id: { type: 'string', description: 'Tenant ID' } },
           required: ['id'],
         },
         body: {
@@ -166,7 +134,7 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
         description: 'Delete a tenant',
         params: {
           type: 'object',
-          properties: { id: { type: 'string', format: 'uuid' } },
+          properties: { id: { type: 'string', description: 'Tenant ID' } },
           required: ['id'],
         },
         security: [{ apiKey: [] }],
@@ -179,39 +147,27 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
     }
   );
 
-  fastify.get<{ Params: { id: string } }>(
-    '/tenants/:id/stats',
+  fastify.get<{ Params: { tenantId: string } }>(
+    '/tenants/:tenantId/stats',
     {
       schema: {
         tags: ['Admin'],
         description: 'Get detailed stats for a tenant',
         params: {
           type: 'object',
-          properties: { id: { type: 'string', format: 'uuid' } },
-          required: ['id'],
+          properties: { tenantId: { type: 'string', description: 'Tenant ID' } },
+          required: ['tenantId'],
         },
         security: [{ apiKey: [] }],
       },
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const controller = new AbortController();
-      request.raw.once('close', () => {
-        if (request.raw.destroyed) {
-          controller.abort();
-        }
-      });
+      const tenantCtx = requireTenant(request);
+      const { tenantId, db } = tenantCtx;
 
-      try {
-        const tenantCtx = requireTenant(request);
-        const { tenantId, db } = tenantCtx;
-
-        const stats = await getTenantStats(db, tenantId, getApiConfig().STATS_CACHE_TTL, { signal: controller.signal });
-        return ok(stats);
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        throw err;
-      }
+      const stats = await getTenantStats(db, tenantId, getApiConfig().STATS_CACHE_TTL);
+      return ok(stats);
     }
   );
 

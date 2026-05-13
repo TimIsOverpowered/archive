@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import { sql } from 'kysely';
-import type { Kysely } from 'kysely';
+import type { ExpressionBuilder, Kysely } from 'kysely';
 import { configService } from '../config/tenant-config.js';
 import type { TenantConfig } from '../config/types.js';
 import type { StreamerDB } from '../db/streamer-types.js';
@@ -9,6 +9,7 @@ import { simpleKeys } from '../utils/cache-keys.js';
 import { withCache } from '../utils/cache.js';
 import { TenantNotFoundError } from '../utils/domain-errors.js';
 import { toPercentage } from '../utils/formatting.js';
+import { getLogger } from '../utils/logger.js';
 
 /** Return the list of enabled platform names for a tenant config. */
 function getEnabledPlatforms(config: Pick<TenantConfig, 'twitch' | 'kick'>): string[] {
@@ -55,12 +56,7 @@ interface TenantStats {
  * Fetch aggregated statistics for a tenant with Redis caching.
  * Includes VOD counts by platform, upload success rate, chapter/game counts.
  */
-export async function getTenantStats(
-  db: Kysely<StreamerDB>,
-  tenantId: string,
-  cacheTtl = 60,
-  options?: { signal?: AbortSignal }
-): Promise<TenantStats> {
+export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, cacheTtl = 60): Promise<TenantStats> {
   const config = await configService.get(tenantId);
 
   if (!config) {
@@ -72,11 +68,14 @@ export async function getTenantStats(
   const thisMonthStart = dayjs().startOf('month').toDate();
 
   return await withCache(simpleKeys.stats(tenantId), cacheTtl, async () => {
-    const [healthCheck, vodStats, uploadStats, chapterRow, uniqueGamesCount] = await Promise.all([
+    const [healthCheck, vodStats, thisMonthVodStats, uploadStats, chapterRow, uniqueGamesCount] = await Promise.all([
       sql`SELECT 1`
         .execute(db)
         .then(() => 'connected')
-        .catch(() => 'error'),
+        .catch((err) => {
+          getLogger().error({ tenantId, error: err }, 'healthCheck query failed');
+          return 'error';
+        }),
       db
         .selectFrom('vods')
         .select((eb) => [
@@ -84,10 +83,22 @@ export async function getTenantStats(
           eb.fn.count('id').as('cnt'),
           eb.fn.sum('duration').as('dur'),
           eb.fn.max('created_at').as('last'),
-          eb.fn.count('id').filterWhere('created_at', '>=', thisMonthStart).as('this_month_cnt'),
         ])
         .groupBy('platform')
-        .execute(options),
+        .execute()
+        .catch((err) => {
+          getLogger().error({ tenantId, error: err }, 'vodStats query failed');
+          throw err;
+        }),
+      db
+        .selectFrom('vods')
+        .select((eb: ExpressionBuilder<StreamerDB, 'vods'>) => [eb.fn.count('id').as('cnt')])
+        .where('created_at', '>=', thisMonthStart)
+        .executeTakeFirst()
+        .catch((err) => {
+          getLogger().error({ tenantId, error: err }, 'thisMonthVodStats query failed');
+          throw err;
+        }),
       db
         .selectFrom('vod_uploads')
         .select((eb) => [
@@ -95,20 +106,32 @@ export async function getTenantStats(
           eb.fn.count('upload_id').filterWhere('status', 'in', ['COMPLETED', 'FAILED']).as('total_cnt'),
           eb.fn.max('created_at').filterWhere('status', '=', 'COMPLETED').as('last_upload'),
         ])
-        .executeTakeFirst(options),
+        .executeTakeFirst()
+        .catch((err) => {
+          getLogger().error({ tenantId, error: err }, 'uploadStats query failed');
+          throw err;
+        }),
       db
         .selectFrom('chapters')
         .select((eb) => [eb.fn.count('id').as('cnt')])
-        .executeTakeFirst(options),
+        .executeTakeFirst()
+        .catch((err) => {
+          getLogger().error({ tenantId, error: err }, 'chapterRow query failed');
+          throw err;
+        }),
       db
         .selectFrom('chapters')
-        .select(sql<string>`COUNT(DISTINCT game_id)`.as('cnt'))
-        .where('game_id', '!=', null)
-        .executeTakeFirst(options),
+        .select((eb) => [eb.fn.count('game_id').distinct().as('cnt')])
+        .where('game_id', 'is not', null)
+        .executeTakeFirst()
+        .catch((err) => {
+          getLogger().error({ tenantId, error: err }, 'uniqueGamesCount query failed');
+          throw err;
+        }),
     ]);
 
     const chapterCount = Number(chapterRow?.cnt ?? 0);
-    const thisMonthCount = vodStats.reduce((sum, s) => sum + Number(s.this_month_cnt ?? 0), 0);
+    const thisMonthCount = Number(thisMonthVodStats?.cnt ?? 0);
 
     const byPlatform: Record<string, number> = {};
     let totalDurationSeconds = 0;

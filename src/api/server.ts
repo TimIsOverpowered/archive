@@ -16,7 +16,7 @@ import createTenantLoggerMiddleware, { exitTenantContext } from './middleware/te
 import configPlugin from './plugins/config.plugin.js';
 import redisPlugin from './plugins/redis.plugin.js';
 import { errorResponse } from './response.js';
-import { tenantsRoutes, default as adminRoutes } from './routes/admin/index.js';
+import { authRoutes, tenantsRoutes, default as adminRoutes } from './routes/admin/index.js';
 import badgesRoutes from './routes/badges.js';
 import chaptersRoutes from './routes/chapters.js';
 import gamesRoutes from './routes/games.js';
@@ -161,6 +161,7 @@ export async function buildServer(config: ApiConfig) {
   // Register global admin routes (no tenantId required)
   await fastify.register(
     async (instance) => {
+      await instance.register(authRoutes, { prefix: '' });
       await instance.register(tenantsRoutes, { prefix: '' });
     },
     { prefix: '/api/v1' }

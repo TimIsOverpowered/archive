@@ -31,4 +31,5 @@ export default async function adminRoutes(fastify: FastifyInstance, _options: Ad
   await fastify.register(liveCallbackRoutes);
 }
 
+export { default as authRoutes } from './auth.routes.js';
 export { default as tenantsRoutes } from './tenants.routes.js';
