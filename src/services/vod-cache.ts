@@ -1,6 +1,7 @@
 import { isConnectionError } from '../db/utils/errors.js';
 import { CacheKeys, simpleKeys, swrKeys } from '../utils/cache-keys.js';
 import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
+import { defaultCacheContext } from '../utils/cache.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { getLogger } from '../utils/logger.js';
 import { RedisService } from '../utils/redis-service.js';
@@ -95,7 +96,9 @@ export async function invalidateVodStaticCache(tenantId: string, dbId: number): 
   if (!client) return;
 
   try {
-    await client.unlink(swrKeys.vodStatic(tenantId, dbId));
+    const swrKey = swrKeys.vodStatic(tenantId, dbId);
+    await client.unlink(swrKey);
+    defaultCacheContext.invalidateKey(swrKey);
     await invalidateVodTags(tenantId, dbId);
 
     if (isConnectionFailed(tenantId)) {

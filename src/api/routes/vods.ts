@@ -29,7 +29,7 @@ interface VodRoutesOptions {
  * Validate and fetch a VOD by numeric ID, throwing 404 on invalid/missing.
  */
 async function fetchVodByIdSafe(
-  vodId: number,
+   vodId: number,
   db: Kysely<StreamerDB>,
   tenantId: string,
   options?: { signal?: AbortSignal }
@@ -136,9 +136,9 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
       });
 
       try {
-        const { tenantId, vodId } = request.params;
+        const { vodId } = request.params;
         const tenantCtx = requireTenant(request);
-        const { db } = tenantCtx;
+        const { tenantId, db } = tenantCtx;
         const vodIdParsed = VodIdParamSchema.safeParse(vodId);
         if (!vodIdParsed.success) {
           notFound('VOD not found');
@@ -180,9 +180,9 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
       });
 
       try {
-        const { tenantId, platform, platformVodId } = request.params;
+        const { platform, platformVodId } = request.params;
         const tenantCtx = requireTenant(request);
-        const { db } = tenantCtx;
+        const { tenantId, db } = tenantCtx;
 
         const vod = await getVodByPlatformId(
           db as unknown as ReadonlyKysely<StreamerDB>,
@@ -230,9 +230,9 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
       });
 
       try {
-        const { tenantId, vodId } = request.params;
+        const { vodId } = request.params;
         const tenantCtx = requireTenant(request);
-        const { db } = tenantCtx;
+        const { tenantId, db } = tenantCtx;
         const vodIdParsed = VodIdParamSchema.safeParse(vodId);
         if (!vodIdParsed.success) {
           notFound('VOD not found');

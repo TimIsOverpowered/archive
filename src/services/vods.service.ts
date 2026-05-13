@@ -245,7 +245,9 @@ export async function getVodById(
       .executeTakeFirst(options);
 
     if (!vod) return null;
-    return vod as unknown as VodResponse;
+    const result = vod as unknown as VodResponse;
+    void registerVodTags(tenantId, [{ id: result.id }], cacheKey, Cache.VOD_DETAILS_TTL, 1);
+    return result;
   };
 
   const staticData = await withStaleWhileRevalidate(
@@ -256,8 +258,6 @@ export async function getVodById(
   );
 
   if (!staticData) return null;
-
-  void registerVodTags(tenantId, [{ id: staticData.id }], cacheKey, Cache.VOD_DETAILS_TTL, 1);
 
   const volatile = await getVodVolatileCache(tenantId, staticData.id);
   if (volatile) {
@@ -290,7 +290,9 @@ export async function getVodByPlatformId(
       .executeTakeFirst(options);
 
     if (!vod) return null;
-    return vod as unknown as VodResponse;
+    const result = vod as unknown as VodResponse;
+    void registerVodTags(tenantId, [{ id: result.id }], cacheKey, Cache.VOD_DETAILS_TTL, 1);
+    return result;
   };
 
   const staticData = await withStaleWhileRevalidate(
@@ -301,8 +303,6 @@ export async function getVodByPlatformId(
   );
 
   if (!staticData) return null;
-
-  void registerVodTags(tenantId, [{ id: staticData.id }], cacheKey, Cache.VOD_DETAILS_TTL, 1);
 
   const volatile = await getVodVolatileCache(tenantId, staticData.id);
   if (volatile) {

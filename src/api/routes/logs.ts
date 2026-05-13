@@ -69,9 +69,9 @@ export default function logsRoutes(fastify: FastifyInstance, _options: LogsRoute
       });
 
       try {
-        const { tenantId, vodId } = request.params;
+        const { vodId } = request.params;
         const tenantCtx = requireTenant(request);
-        const { db } = tenantCtx;
+        const { tenantId, db } = tenantCtx;
         const vodIdNum = Number(vodId);
         if (isNaN(vodIdNum)) return badRequest('Invalid VOD ID');
 

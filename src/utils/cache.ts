@@ -16,7 +16,7 @@
  * Both use Brotli compression internally — primitives like numbers round-trip correctly.
  * The `withSimpleCache` function has been removed; use `withCache` for all use cases.
  */
-import { Redis } from 'ioredis';
+import type { Redis } from 'ioredis';
 import { LRUCache } from 'lru-cache';
 import { CacheSwr, CacheInflight } from '../constants.js';
 import { getLogger } from '../utils/logger.js';
@@ -86,6 +86,11 @@ export class CacheContext {
     ttl: CacheInflight.TIMEOUT_MS,
     allowStale: false,
   });
+  private readonly lastInvalidated = new LRUCache<string, number>({
+    max: CacheInflight.CACHE_MAX,
+    ttl: 60_000,
+    allowStale: false,
+  });
 
   getMetrics(): Readonly<CacheMetrics> {
     return { ...this.metrics };
@@ -96,6 +101,13 @@ export class CacheContext {
     Object.assign(this.metrics, emptyMetrics());
     this.swrFailures.clear();
     this.inflight.clear();
+    this.lastInvalidated.clear();
+  }
+
+  /** Forcefully clears inflight promises and prevents stale writes from completing. */
+  invalidateKey(key: string): void {
+    this.inflight.delete(key);
+    this.lastInvalidated.set(key, Date.now());
   }
 
   async withCache<T>(key: SimpleKey, ttl: number, fetcher: () => Promise<T>): Promise<T> {
@@ -186,8 +198,11 @@ export class CacheContext {
         this.metrics.swrStale++;
         // Stale — serve immediately, revalidate in background
         if (!this.inflight.get(key)) {
+          const fetchStartTime = Date.now();
           const revalidatePromise = this.withTimeout(
-            this.revalidateWithRetry(client, key, ttl, fetcher).finally(() => this.inflight.delete(key)),
+            this.revalidateWithRetry(client, key, ttl, fetcher, fetchStartTime).finally(() =>
+              this.inflight.delete(key)
+            ),
             CacheInflight.TIMEOUT_MS
           );
 
@@ -212,8 +227,9 @@ export class CacheContext {
       throw new Error('fetch backoff');
     }
 
+    const fetchStartTime = Date.now();
     const fetchPromise = this.withTimeout(
-      this.revalidateWithRetry(client, key, ttl, fetcher).finally(() => {
+      this.revalidateWithRetry(client, key, ttl, fetcher, fetchStartTime).finally(() => {
         this.inflight.delete(key);
       }),
       CacheInflight.TIMEOUT_MS
@@ -235,7 +251,13 @@ export class CacheContext {
     });
   }
 
-  private async revalidateWithRetry<T>(client: Redis, key: string, ttl: number, fetcher: () => Promise<T>): Promise<T> {
+  private async revalidateWithRetry<T>(
+    client: Redis,
+    key: string,
+    ttl: number,
+    fetcher: () => Promise<T>,
+    fetchStartTime?: number
+  ): Promise<T> {
     const log = getLogger().child({ key });
     const failures = this.swrFailures.get(key) ?? 0;
 
@@ -249,6 +271,11 @@ export class CacheContext {
       const data = await retryWithBackoff(fetcher, { attempts: 2, baseDelayMs: 2000 });
       this.swrFailures.delete(key);
       this.fetchFailures.delete(key);
+      const invalidatedAt = this.lastInvalidated.get(key);
+      if (fetchStartTime != null && invalidatedAt != null && invalidatedAt >= fetchStartTime) {
+        log.debug({ key }, 'Key was invalidated during SWR fetch, skipping cache write');
+        return data;
+      }
       try {
         const compressed = await compressData({ data, timestamp: Date.now() });
         await client.set(key, compressed, 'EX', ttl);
