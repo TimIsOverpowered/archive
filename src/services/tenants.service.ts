@@ -35,6 +35,7 @@ interface TenantStats {
     totalCount: number;
     byPlatform: Record<string, number>;
     totalHours: number;
+    avgDurationSeconds: number;
     lastVodDate: Date | null;
     thisMonthCount: number;
   };
@@ -48,7 +49,18 @@ interface TenantStats {
     count: number;
   };
   games: {
-    count: number;
+    totalRows: number;
+    uniqueGames: number;
+    topGame: { name: string | null; count: number } | null;
+    lastDetectedAt: Date | null;
+  };
+  chat: {
+    totalMessages: number;
+    lastActivityAt: Date | null;
+  };
+  emotes: {
+    totalDetections: number;
+    byProvider: Record<string, number>;
   };
 }
 
@@ -68,14 +80,31 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
   const thisMonthStart = dayjs().startOf('month').toDate();
 
   return await withCache(simpleKeys.stats(tenantId), cacheTtl, async () => {
-    const [healthCheck, vodStats, thisMonthVodStats, uploadStats, chapterRow, uniqueGamesCount] = await Promise.all([
+    const t0 = performance.now();
+
+    const [
+      healthCheck,
+      vodStats,
+      thisMonthVodStats,
+      uploadStats,
+      chapterRow,
+      gamesStats,
+      topGameRow,
+      rowCount,
+      avgDurationRow,
+      chatStats,
+      chatRowCount,
+      emoteRowCount,
+      emoteProviders,
+    ] = await Promise.all([
       sql`SELECT 1`
         .execute(db)
         .then(() => 'connected')
-        .catch((err) => {
+        .catch((err: unknown) => {
           getLogger().error({ tenantId, error: err }, 'healthCheck query failed');
           return 'error';
         }),
+
       db
         .selectFrom('vods')
         .select((eb) => [
@@ -86,19 +115,21 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
         ])
         .groupBy('platform')
         .execute()
-        .catch((err) => {
+        .catch((err: unknown) => {
           getLogger().error({ tenantId, error: err }, 'vodStats query failed');
           throw err;
-        }),
+        }) as Promise<{ platform: string; cnt: number | bigint; dur: number | null; last: Date | null }[]>,
+
       db
         .selectFrom('vods')
         .select((eb: ExpressionBuilder<StreamerDB, 'vods'>) => [eb.fn.count('id').as('cnt')])
         .where('created_at', '>=', thisMonthStart)
         .executeTakeFirst()
-        .catch((err) => {
+        .catch((err: unknown) => {
           getLogger().error({ tenantId, error: err }, 'thisMonthVodStats query failed');
           throw err;
-        }),
+        }) as Promise<{ cnt: number | bigint } | undefined>,
+
       db
         .selectFrom('vod_uploads')
         .select((eb) => [
@@ -107,28 +138,108 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
           eb.fn.max('created_at').filterWhere('status', '=', 'COMPLETED').as('last_upload'),
         ])
         .executeTakeFirst()
-        .catch((err) => {
+        .catch((err: unknown) => {
           getLogger().error({ tenantId, error: err }, 'uploadStats query failed');
           throw err;
-        }),
+        }) as Promise<
+        { failed_cnt: number | bigint; total_cnt: number | bigint; last_upload: Date | null } | undefined
+      >,
+
       db
         .selectFrom('chapters')
         .select((eb) => [eb.fn.count('id').as('cnt')])
         .executeTakeFirst()
-        .catch((err) => {
+        .catch((err: unknown) => {
           getLogger().error({ tenantId, error: err }, 'chapterRow query failed');
           throw err;
-        }),
+        }) as Promise<{ cnt: number | bigint } | undefined>,
+
       db
-        .selectFrom('chapters')
-        .select((eb) => [eb.fn.count('game_id').distinct().as('cnt')])
-        .where('game_id', 'is not', null)
+        .selectFrom('games')
+        .select((eb) => [
+          eb.fn.count('game_id').distinct().as('unique_cnt'),
+          eb.fn.max('created_at').as('last_detected'),
+        ])
+        .where('games.game_id', 'is not', null)
+        .where('games.game_id', '!=', '')
         .executeTakeFirst()
-        .catch((err) => {
-          getLogger().error({ tenantId, error: err }, 'uniqueGamesCount query failed');
+        .catch((err: unknown) => {
+          getLogger().error({ tenantId, error: err }, 'gamesStats query failed');
+          throw err;
+        }) as Promise<{ unique_cnt: number | bigint; last_detected: Date | null } | undefined>,
+
+      db
+        .selectFrom('games')
+        .select(['game_name', (eb) => eb.fn.count('id').as('cnt')])
+        .where('games.game_id', 'is not', null)
+        .groupBy('games.game_name')
+        .orderBy(sql`${sql.ref('cnt')}`, 'desc')
+        .limit(1)
+        .executeTakeFirst()
+        .catch((err: unknown) => {
+          getLogger().error({ tenantId, error: err }, 'topGame query failed');
+          throw err;
+        }) as Promise<{ game_name: string | null; cnt: number | bigint } | undefined>,
+
+      sql<{ n_live_tup: number }>`SELECT n_live_tup FROM pg_stat_user_tables WHERE relname = 'games'`
+        .execute(db)
+        .then((result) => result.rows[0] ?? { n_live_tup: 0 })
+        .catch((err: unknown) => {
+          getLogger().error({ tenantId, error: err }, 'gamesRowCount query failed');
           throw err;
         }),
+
+      db
+        .selectFrom('vods')
+        .select((eb) => [eb.fn.avg('duration').as('avg_dur')])
+        .executeTakeFirst()
+        .catch((err: unknown) => {
+          getLogger().error({ tenantId, error: err }, 'avgDuration query failed');
+          throw err;
+        }) as Promise<{ avg_dur: number | null } | undefined>,
+
+      db
+        .selectFrom('chat_messages')
+        .select((eb) => [eb.fn.max('created_at').as('last_activity')])
+        .executeTakeFirst()
+        .catch((err: unknown) => {
+          getLogger().error({ tenantId, error: err }, 'chatStats query failed');
+          throw err;
+        }) as Promise<{ last_activity: Date | null } | undefined>,
+
+      sql<{ n_live_tup: number }>`SELECT n_live_tup FROM pg_stat_user_tables WHERE relname = 'chat_messages'`
+        .execute(db)
+        .then((result) => result.rows[0] ?? { n_live_tup: 0 })
+        .catch((err: unknown) => {
+          getLogger().error({ tenantId, error: err }, 'chatRowCount query failed');
+          throw err;
+        }),
+
+      sql<{ n_live_tup: number }>`SELECT n_live_tup FROM pg_stat_user_tables WHERE relname = 'emotes'`
+        .execute(db)
+        .then((result) => result.rows[0] ?? { n_live_tup: 0 })
+        .catch((err: unknown) => {
+          getLogger().error({ tenantId, error: err }, 'emoteRowCount query failed');
+          throw err;
+        }),
+
+      db
+        .selectFrom('emotes')
+        .select((eb) => [
+          eb.fn.count('ffz_emotes').filterWhere('ffz_emotes', 'is not', null).as('ffz_cnt'),
+          eb.fn.count('bttv_emotes').filterWhere('bttv_emotes', 'is not', null).as('bttv_cnt'),
+          eb.fn.count('seventv_emotes').filterWhere('seventv_emotes', 'is not', null).as('seventv_cnt'),
+        ])
+        .executeTakeFirst()
+        .catch((err: unknown) => {
+          getLogger().error({ tenantId, error: err }, 'emoteProviders query failed');
+          throw err;
+        }) as Promise<
+        { ffz_cnt: number | bigint; bttv_cnt: number | bigint; seventv_cnt: number | bigint } | undefined
+      >,
     ]);
+
+    getLogger().debug({ tenantId, ms: Math.round((performance.now() - t0) * 100) / 100 }, 'tenantStats total');
 
     const chapterCount = Number(chapterRow?.cnt ?? 0);
     const thisMonthCount = Number(thisMonthVodStats?.cnt ?? 0);
@@ -152,7 +263,23 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
 
     const uploadSuccessRate = totalUploadsCnt > 0 ? toPercentage(completedUploads / totalUploadsCnt) : 0;
 
-    const uniqueGameCount = Number(uniqueGamesCount?.cnt ?? 0);
+    const gamesUniqueCount = Number(gamesStats?.unique_cnt ?? 0);
+    const topGame = topGameRow != null ? { name: topGameRow.game_name, count: Number(topGameRow.cnt) } : null;
+
+    const avgDurationSeconds =
+      avgDurationRow != null && avgDurationRow.avg_dur != null
+        ? Math.round(Number(avgDurationRow.avg_dur) * 10) / 10
+        : 0;
+
+    const emoteProvidersObj: Record<string, number> = {};
+    if (emoteProviders != null) {
+      const ffz = Number(emoteProviders.ffz_cnt);
+      const bttv = Number(emoteProviders.bttv_cnt);
+      const seventv = Number(emoteProviders.seventv_cnt);
+      if (ffz > 0) emoteProvidersObj.ffz = ffz;
+      if (bttv > 0) emoteProvidersObj.bttv = bttv;
+      if (seventv > 0) emoteProvidersObj.seventv = seventv;
+    }
 
     const stats: TenantStats = {
       tenant: {
@@ -169,6 +296,7 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
         totalCount: vodStats.reduce((sum, s) => sum + Number(s.cnt), 0),
         byPlatform,
         totalHours: Math.round((totalDurationSeconds / 3600) * 10) / 10,
+        avgDurationSeconds,
         lastVodDate,
         thisMonthCount,
       },
@@ -182,7 +310,18 @@ export async function getTenantStats(db: Kysely<StreamerDB>, tenantId: string, c
         count: chapterCount,
       },
       games: {
-        count: uniqueGameCount,
+        totalRows: Number(rowCount?.n_live_tup ?? 0),
+        uniqueGames: gamesUniqueCount,
+        topGame,
+        lastDetectedAt: gamesStats?.last_detected ?? null,
+      },
+      chat: {
+        totalMessages: Number(chatRowCount?.n_live_tup ?? 0),
+        lastActivityAt: chatStats?.last_activity ?? null,
+      },
+      emotes: {
+        totalDetections: Number(emoteRowCount?.n_live_tup ?? 0),
+        byProvider: emoteProvidersObj,
       },
     };
 

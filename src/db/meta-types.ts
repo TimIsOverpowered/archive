@@ -52,16 +52,4 @@ export type UpdateableAdmins = Updateable<AdminsTable>;
 export type SelectableMigrations = Selectable<MigrationsTable>;
 export type InsertableMigrations = Insertable<MigrationsTable>;
 
-export interface TenantResult {
-  id: string;
-  displayName: string | null;
-  twitch: Record<string, unknown> | null;
-  youtube: Record<string, unknown> | null;
-  kick: Record<string, unknown> | null;
-  databaseName: string | null;
-  settings: Record<string, unknown>;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 export type MetaDBClient = Kysely<MetaDB> | Transaction<MetaDB>;

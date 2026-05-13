@@ -1,10 +1,10 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
-import type { TenantResult } from '../../src/db/meta-types.js';
+import type { SelectableTenants } from '../../src/db/meta-types.js';
 
 // 1. Setup Hoisted Mocks
-const mockGetAllTenants = mock.fn<() => Promise<TenantResult[]>>(async () => []);
-const mockGetTenantById = mock.fn<(id: string) => Promise<TenantResult | undefined>>(async () => undefined);
+const mockGetAllTenants = mock.fn<() => Promise<SelectableTenants[]>>(async () => []);
+const mockGetTenantById = mock.fn<(id: string) => Promise<SelectableTenants | undefined>>(async () => undefined);
 
 mock.module('../../src/services/meta-tenants.service.js', {
   namedExports: {
@@ -22,24 +22,24 @@ mock.module('../../src/db/meta-client.js', {
 // 2. Dynamically import the System Under Test AFTER mocks are registered
 const { buildTenantConfig, configService } = await import('../../src/config/tenant-config.js');
 
-function makeTenant(overrides: Partial<TenantResult> = {}): TenantResult {
+function makeTenant(overrides: Partial<SelectableTenants> = {}): SelectableTenants {
   return {
     id: 'tenant-1',
-    displayName: 'Test Tenant',
+    display_name: 'Test Tenant',
     twitch: null,
     youtube: null,
     kick: null,
-    databaseName: 'test',
+    database_name: 'test',
     settings: { domainName: 'example.com', timezone: 'UTC' },
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    created_at: new Date(),
+    updated_at: new Date(),
     ...overrides,
   };
 }
 
 describe('buildTenantConfig', () => {
-  it('returns null when databaseName is null', () => {
-    const tenant = makeTenant({ databaseName: null });
+  it('returns null when database_name is null', () => {
+    const tenant = makeTenant({ database_name: null });
     const result = buildTenantConfig(tenant);
     assert.strictEqual(result, null);
   });
@@ -100,8 +100,8 @@ describe('buildTenantConfig', () => {
 });
 
 describe('ConfigService', () => {
-  let fakeAllTenants: TenantResult[] = [];
-  let fakeById: ((id: string) => Promise<TenantResult | undefined>) | null = null;
+  let fakeAllTenants: SelectableTenants[] = [];
+  let fakeById: ((id: string) => Promise<SelectableTenants | undefined>) | null = null;
 
   beforeEach(() => {
     configService.reset();
@@ -133,10 +133,10 @@ describe('ConfigService', () => {
 
   describe('reloadTenant', () => {
     it('replaces cached entry with fresh data from db', async () => {
-      fakeAllTenants = [makeTenant({ id: 't1', displayName: 'Original' })];
+      fakeAllTenants = [makeTenant({ id: 't1', display_name: 'Original' })];
       await configService.loadAll();
 
-      fakeById = async (id) => (id === 't1' ? makeTenant({ id: 't1', displayName: 'Updated' }) : undefined);
+      fakeById = async (id) => (id === 't1' ? makeTenant({ id: 't1', display_name: 'Updated' }) : undefined);
       await configService.reloadTenant('t1');
 
       assert.strictEqual((await configService.get('t1'))?.displayName, 'Updated');

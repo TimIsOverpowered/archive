@@ -1,47 +1,92 @@
 import { getMetaClient } from '../db/meta-client.js';
-import type { InsertableTenants, TenantResult, UpdateableTenants } from '../db/meta-types.js';
+import type { InsertableTenants, SelectableTenants, UpdateableTenants } from '../db/meta-types.js';
+import { encryptObject, encryptScalar } from '../utils/encryption.js';
 
-const tenantSelect = [
+const tenantColumns = [
   'id',
-  'display_name as displayName',
+  'display_name',
   'twitch',
   'youtube',
   'kick',
-  'database_name as databaseName',
+  'database_name',
   'settings',
-  'created_at as createdAt',
-  'updated_at as updatedAt',
+  'created_at',
+  'updated_at',
 ] as const;
 
+function encryptYoutubeFields(youtube: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (youtube == null) return undefined;
+
+  const result = { ...youtube };
+
+  if (result.auth != null && typeof result.auth === 'object' && !Array.isArray(result.auth)) {
+    result.auth = encryptObject(result.auth);
+  }
+
+  if (typeof result.apiKey === 'string' && result.apiKey !== '') {
+    result.apiKey = encryptScalar(result.apiKey);
+  }
+
+  return result;
+}
+
+function encryptYoutubeInData(data: InsertableTenants): InsertableTenants;
+function encryptYoutubeInData(data: Partial<InsertableTenants>): Partial<InsertableTenants>;
+function encryptYoutubeInData(data: Partial<InsertableTenants>): Partial<InsertableTenants> {
+  const encrypted = { ...data };
+
+  if (encrypted.youtube != null && typeof encrypted.youtube === 'object') {
+    if (typeof encrypted.youtube === 'string') {
+      try {
+        const parsed = JSON.parse(encrypted.youtube) as Record<string, unknown>;
+        encrypted.youtube = JSON.stringify(encryptYoutubeFields(parsed));
+      } catch {
+        // not valid JSON, leave as-is
+      }
+    } else {
+      encrypted.youtube = JSON.stringify(encryptYoutubeFields(encrypted.youtube));
+    }
+  }
+
+  return encrypted;
+}
+
 /** Retrieve all tenants from the metadata database. */
-export async function getAllTenants(): Promise<TenantResult[]> {
-  return getMetaClient().selectFrom('tenants').select(tenantSelect).execute();
+export async function getAllTenants(): Promise<SelectableTenants[]> {
+  return getMetaClient().selectFrom('tenants').selectAll().execute();
 }
 
 /** Look up a tenant by ID from the metadata database. */
-export async function getTenantById(id: string): Promise<TenantResult | undefined> {
-  return getMetaClient().selectFrom('tenants').select(tenantSelect).where('id', '=', id).executeTakeFirst();
+export async function getTenantById(id: string): Promise<SelectableTenants | undefined> {
+  return getMetaClient().selectFrom('tenants').selectAll().where('id', '=', id).executeTakeFirst();
 }
 
 /** Create a new tenant record in the metadata database. */
-export async function createTenant(data: InsertableTenants): Promise<TenantResult> {
+export async function createTenant(data: InsertableTenants): Promise<SelectableTenants> {
+  const encrypted = encryptYoutubeInData(data);
+
   return getMetaClient()
     .insertInto('tenants')
     .values({
-      ...data,
+      ...encrypted,
       updated_at: new Date(),
     })
-    .returning(tenantSelect)
+    .returning(tenantColumns)
     .executeTakeFirstOrThrow();
 }
 
 /** Update an existing tenant record by ID. */
-export async function updateTenant(id: string, data: Partial<InsertableTenants>): Promise<TenantResult | undefined> {
+export async function updateTenant(
+  id: string,
+  data: Partial<InsertableTenants>
+): Promise<SelectableTenants | undefined> {
+  const encrypted = encryptYoutubeInData(data);
+
   return getMetaClient()
     .updateTable('tenants')
-    .set({ ...data, updated_at: new Date() } as UpdateableTenants)
+    .set({ ...encrypted, updated_at: new Date() } as UpdateableTenants)
     .where('id', '=', id)
-    .returning(tenantSelect)
+    .returning(tenantColumns)
     .executeTakeFirst();
 }
 

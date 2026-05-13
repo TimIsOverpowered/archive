@@ -1,12 +1,12 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import { SettingsSchema, TwitchSchema, YoutubeSchema, KickSchema } from '../../src/config/schemas.js';
-import type { TenantResult } from '../../src/db/meta-types.js';
+import type { SelectableTenants } from '../../src/db/meta-types.js';
 import { RedisService } from '../../src/utils/redis-service.js';
 
 // Hoist mock functions so we can alter their implementations in specific tests
-const mockGetAllTenants = mock.fn<() => Promise<TenantResult[]>>(async () => []);
-const mockGetTenantById = mock.fn<(id: string) => Promise<TenantResult | undefined>>(async () => undefined);
+const mockGetAllTenants = mock.fn<() => Promise<SelectableTenants[]>>(async () => []);
+const mockGetTenantById = mock.fn<(id: string) => Promise<SelectableTenants | undefined>>(async () => undefined);
 
 // Mock modules that have side effects (DB, encryption)
 mock.module('../../src/services/meta-tenants.service.js', {
@@ -41,17 +41,17 @@ function setupBaseEnv(): void {
 
 setupBaseEnv();
 
-function makeTenant(overrides: Partial<TenantResult> = {}): TenantResult {
+function makeTenant(overrides: Partial<SelectableTenants> = {}): SelectableTenants {
   return {
     id: 'tenant-1',
-    displayName: 'Test Tenant',
+    display_name: 'Test Tenant',
     twitch: null,
     youtube: null,
     kick: null,
-    databaseName: 'test',
+    database_name: 'test',
     settings: { domainName: 'example.com', timezone: 'UTC' },
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    created_at: new Date(),
+    updated_at: new Date(),
     ...overrides,
   };
 }
@@ -379,33 +379,33 @@ describe('buildTenantConfig parsing logic', () => {
       assert.strictEqual(result.id, 'unique-tenant-id');
     });
 
-    it('should preserve displayName', () => {
-      const tenant = makeTenant({ displayName: 'My Streamer' });
+    it('should preserve display_name', () => {
+      const tenant = makeTenant({ display_name: 'My Streamer' });
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
       assert.strictEqual(result.displayName, 'My Streamer');
     });
 
-    it('should set displayName to undefined when null', () => {
-      const tenant = makeTenant({ displayName: null });
+    it('should set display_name to undefined when null', () => {
+      const tenant = makeTenant({ display_name: null });
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
       assert.strictEqual(result.displayName, undefined);
     });
 
-    it('should preserve createdAt as Date', () => {
-      const createdAt = new Date('2024-01-15T10:00:00Z');
-      const tenant = makeTenant({ createdAt });
+    it('should preserve created_at as Date', () => {
+      const created_at = new Date('2024-01-15T10:00:00Z');
+      const tenant = makeTenant({ created_at });
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
-      assert.strictEqual(result.createdAt.getTime(), createdAt.getTime());
+      assert.strictEqual(result.createdAt.getTime(), created_at.getTime());
     });
 
     it('should include database name in config', () => {
-      const tenant = makeTenant({ databaseName: 'production' });
+      const tenant = makeTenant({ database_name: 'production' });
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
@@ -439,15 +439,15 @@ describe('buildTenantConfig parsing logic', () => {
 
   describe('database name handling', () => {
     it('should include database name in config', () => {
-      const tenant = makeTenant({ databaseName: 'encrypted' });
+      const tenant = makeTenant({ database_name: 'encrypted' });
 
       const result = buildTenantConfig(tenant);
       assert.ok(result);
       assert.strictEqual(result.database.name, 'encrypted');
     });
 
-    it('should return null when databaseName is null', () => {
-      const tenant = makeTenant({ databaseName: null });
+    it('should return null when database_name is null', () => {
+      const tenant = makeTenant({ database_name: null });
 
       const result = buildTenantConfig(tenant);
       assert.strictEqual(result, null);

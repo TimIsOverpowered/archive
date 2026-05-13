@@ -84,7 +84,6 @@ export default function healthRoutes(fastify: FastifyInstance, _options: HealthR
         streamers.push(result);
       }
 
-      const kickConfig = streamerConfigs.find((c) => c.kick?.enabled === true);
       const flaresolverrHealth = await checkFlareSolverrHealth();
 
       let cloudflareCache: { status: string } = { status: 'disabled' };
@@ -117,12 +116,7 @@ export default function healthRoutes(fastify: FastifyInstance, _options: HealthR
         streamers,
         dbStatuses,
         cloudflareIpCache: cloudflareCache,
-        ...(kickConfig && {
-          kick: {
-            flaresolverr: flaresolverrHealth.status,
-            version: flaresolverrHealth.stats.version,
-          },
-        }),
+        flaresolverr: flaresolverrHealth,
         cache: defaultCacheContext.getMetrics(),
         workerQueues,
       });
@@ -163,12 +157,15 @@ async function getQueueMetrics(): Promise<
       const queue = new Queue<AllJobData, AllJobData, string>(queueName, { connection: redis });
       try {
         const counts = await raceWithTimeout(queue.getJobCounts(), 10_000, `Queue metrics ${queueName}`);
-        return [queueName, {
-          waiting: counts.waiting ?? 0,
-          active: counts.active ?? 0,
-          failed: counts.failed ?? 0,
-          delayed: counts.delayed ?? 0,
-        }] as const;
+        return [
+          queueName,
+          {
+            waiting: counts.waiting ?? 0,
+            active: counts.active ?? 0,
+            failed: counts.failed ?? 0,
+            delayed: counts.delayed ?? 0,
+          },
+        ] as const;
       } catch {
         return [queueName, { waiting: -1, active: -1, failed: -1, delayed: -1 }] as const;
       }
