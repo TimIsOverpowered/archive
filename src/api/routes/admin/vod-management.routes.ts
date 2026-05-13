@@ -1,11 +1,9 @@
 import { FastifyInstance } from 'fastify';
-import { getApiConfig } from '../../../config/env.js';
 import { VodCreateSchema } from '../../../config/schemas.js';
 import { findVodByPlatformId } from '../../../db/queries/vods.js';
 import type { SelectableVods } from '../../../db/streamer-types.js';
 import { invalidateVodVolatileCache } from '../../../services/cache-tags.js';
 import { getStrategy } from '../../../services/platforms/index.js';
-import { getTenantStats } from '../../../services/tenants.service.js';
 import { invalidateVodStaticCache } from '../../../services/vod-cache.js';
 import { PLATFORM_VALUES } from '../../../types/platforms.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
@@ -19,7 +17,7 @@ import {
   requireTenant,
 } from '../../middleware/tenant-platform.js';
 import { ok } from '../../response.js';
-import type { StatsParams, CreateVodParams, DeleteVodParams, CreateVodBody, DeleteVodBody } from './types.js';
+import type { CreateVodParams, DeleteVodParams, CreateVodBody, DeleteVodBody } from './types.js';
 import { findOrCreateVodRecord } from './utils/vod-records.js';
 
 /**
@@ -28,43 +26,6 @@ import { findOrCreateVodRecord } from './utils/vod-records.js';
  */
 export default function vodManagementRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
-
-  // Get detailed stats for a tenant
-  fastify.get<{ Params: StatsParams }>(
-    '/stats',
-    {
-      schema: {
-        tags: ['Admin'],
-        description: 'Get detailed stats for a tenant',
-        params: {
-          type: 'object',
-          properties: { tenantId: { type: 'string', description: 'Tenant ID' } },
-          required: ['tenantId'],
-        },
-        security: [{ apiKey: [] }],
-      },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
-    },
-    async (request) => {
-      const controller = new AbortController();
-      request.raw.once('close', () => {
-        if (request.raw.destroyed) {
-          controller.abort();
-        }
-      });
-
-      try {
-        const tenantCtx = requireTenant(request);
-        const { tenantId, db } = tenantCtx;
-
-        const stats = await getTenantStats(db, tenantId, getApiConfig().STATS_CACHE_TTL, { signal: controller.signal });
-        return ok(stats);
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        throw err;
-      }
-    }
-  );
 
   // Create a VOD record manually
   fastify.post<{ Params: CreateVodParams; Body: CreateVodBody }>(

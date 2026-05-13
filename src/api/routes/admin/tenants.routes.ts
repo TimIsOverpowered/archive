@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { getApiConfig } from '../../../config/env.js';
 import type { InsertableTenants } from '../../../db/meta-types.js';
 import {
   createTenant,
@@ -7,10 +8,12 @@ import {
   updateTenant,
   deleteTenant,
 } from '../../../services/meta-tenants.service.js';
+import { getTenantStats } from '../../../services/tenants.service.js';
 import { notFound } from '../../../utils/http-error.js';
 import type { AdminContext } from '../../middleware/admin-api-key.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
+import { tenantMiddleware, requireTenant } from '../../middleware/tenant-platform.js';
 import { ok } from '../../response.js';
 
 export default function tenantsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
@@ -173,6 +176,42 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
     async (request) => {
       await deleteTenant(request.params.id);
       return ok({ message: `Tenant ${request.params.id} deleted` });
+    }
+  );
+
+  fastify.get<{ Params: { id: string } }>(
+    '/tenants/:id/stats',
+    {
+      schema: {
+        tags: ['Admin'],
+        description: 'Get detailed stats for a tenant',
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string', format: 'uuid' } },
+          required: ['id'],
+        },
+        security: [{ apiKey: [] }],
+      },
+      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+    },
+    async (request) => {
+      const controller = new AbortController();
+      request.raw.once('close', () => {
+        if (request.raw.destroyed) {
+          controller.abort();
+        }
+      });
+
+      try {
+        const tenantCtx = requireTenant(request);
+        const { tenantId, db } = tenantCtx;
+
+        const stats = await getTenantStats(db, tenantId, getApiConfig().STATS_CACHE_TTL, { signal: controller.signal });
+        return ok(stats);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        throw err;
+      }
     }
   );
 
