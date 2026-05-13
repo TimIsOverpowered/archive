@@ -14,36 +14,34 @@ export { muteAudioSections } from '../utils/ffmpeg.js';
 
 const log = childLogger({ module: 'dmca' });
 
-export const CLAIM_TYPES = {
-  AUDIO: 'CLAIM_TYPE_AUDIO',
-  VISUAL: 'CLAIM_TYPE_VISUAL',
-  AUDIOVISUAL: 'CLAIM_TYPE_AUDIOVISUAL',
+export const CLAIM_MATCH_TYPE_AUDIOVISUAL = 'CLAIM_MATCH_TYPE_AUDIOVISUAL' as const;
+export const CLAIM_MATCH_TYPE_AUDIO = 'CLAIM_MATCH_TYPE_AUDIO' as const;
+export const CLAIM_MATCH_TYPE_VIDEO = 'CLAIM_MATCH_TYPE_VIDEO' as const;
+
+export const CLAIM_MATCH_TYPES = {
+  AUDIOVISUAL: CLAIM_MATCH_TYPE_AUDIOVISUAL,
+  AUDIO: CLAIM_MATCH_TYPE_AUDIO,
+  VIDEO: CLAIM_MATCH_TYPE_VIDEO,
 } as const;
 
-export type ClaimType = (typeof CLAIM_TYPES)[keyof typeof CLAIM_TYPES];
+export type ClaimMatchType = (typeof CLAIM_MATCH_TYPES)[keyof typeof CLAIM_MATCH_TYPES];
 
 export interface DMCAClaim {
-  claimId?: string;
-  assetId?: string;
-  type: ClaimType;
-  asset?: {
-    metadata?: {
-      soundRecording?: {
-        title?: string;
-        artists?: string[];
-        recordLabel?: string;
-      };
-    };
-  };
-  claimPolicy: { primaryPolicy: { policyType: string } };
-  matchDetails: { longestMatchStartTimeSeconds: number; longestMatchDurationSeconds: number };
-}
-
-const BLOCKING_POLICY_TYPES = ['POLICY_TYPE_GLOBAL_BLOCK', 'POLICY_TYPE_MOSTLY_GLOBAL_BLOCK'];
-
-export function isBlockingPolicy(claim: DMCAClaim): boolean {
-  const policyType = claim.claimPolicy.primaryPolicy.policyType;
-  return BLOCKING_POLICY_TYPES.includes(policyType);
+  claimId?: string | undefined;
+  assetId?: string | undefined;
+  matchType: ClaimMatchType;
+  videoSegment: { startMillis: number; endMillis: number };
+  asset?:
+    | {
+        metadata?: {
+          soundRecording?: {
+            title?: string;
+            artists?: string[];
+            recordLabel?: string;
+          };
+        };
+      }
+    | undefined;
 }
 
 export function getClaimIdentifier(claim: DMCAClaim): string {
@@ -75,14 +73,14 @@ export interface MuteFilterResult {
   endTime: number;
 }
 
-export function buildMuteFilters(claims: DMCAClaim[]): string[] {
+export function buildAudioFilters(claims: DMCAClaim[]): string[] {
   const muteSection: string[] = [];
 
   for (const claim of claims) {
-    if (!isBlockingPolicy(claim)) continue;
+    if (claim.matchType !== CLAIM_MATCH_TYPE_AUDIO && claim.matchType !== CLAIM_MATCH_TYPE_AUDIOVISUAL) continue;
 
-    const startTime = claim.matchDetails.longestMatchStartTimeSeconds;
-    const endTime = startTime + claim.matchDetails.longestMatchDurationSeconds;
+    const startTime = claim.videoSegment.startMillis / 1000;
+    const endTime = claim.videoSegment.endMillis / 1000;
 
     muteSection.push(`volume=0:enable='between(t,${startTime},${endTime})'`);
   }

@@ -9,13 +9,11 @@ import { extractErrorDetails } from '../utils/error.js';
 import { toHHMMSS } from '../utils/formatting.js';
 import { fileExists, getTmpDirPath } from '../utils/path.js';
 import {
-  isBlockingPolicy,
-  buildMuteFilters,
+  buildAudioFilters,
   muteAudioSections,
   blackoutVideoSections,
   BlackoutSection,
-  CLAIM_TYPES,
-  getClaimIdentifier,
+  CLAIM_MATCH_TYPES,
 } from './dmca/dmca.js';
 import type { DMCAClaim } from './dmca/dmca.js';
 import type { DmcaProcessingJob } from './jobs/types.js';
@@ -78,16 +76,18 @@ export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Pr
     log.info({ vodId, filePath, part, gameId, isGameUpload }, 'DMCA processing started (file exists)');
   } else {
     const childResults = await job.getChildrenValues();
-    const downloadResult = Object.values(childResults)[0] as { finalPath?: string };
+    const downloadResult = Object.values(childResults)[0] as { finalPath?: string; filePath?: string };
 
-    if (downloadResult == null || downloadResult.finalPath == null) {
+    if (downloadResult?.finalPath != null && downloadResult.finalPath !== '') {
+      filePath = downloadResult.finalPath;
+    } else if (downloadResult?.filePath != null && downloadResult.filePath !== '') {
+      filePath = downloadResult.filePath;
+    } else {
       throw new Error(
         `File path not available for vodId=${vodId}, jobId=${job.id}: ` +
           `download job may have failed or not completed. Child results: ${JSON.stringify(childResults)}`
       );
     }
-
-    filePath = downloadResult.finalPath;
     log.info(
       { vodId, filePath, part, gameId, isGameUpload, jobId: job.id },
       'DMCA processing started (file path from download job)'
@@ -98,18 +98,15 @@ export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Pr
     throw new FileNotFound(filePath);
   }
 
-  const blockingClaims = receivedClaims.filter(isBlockingPolicy);
+  const blockingClaims = receivedClaims;
 
   const buildClaimInfo = (claim: (typeof blockingClaims)[0]): DmcaClaimInfo => {
-    const startSec = claim.matchDetails.longestMatchStartTimeSeconds ?? 0;
-    const durSec = claim.matchDetails.longestMatchDurationSeconds ?? 0;
+    const startSec = claim.videoSegment.startMillis / 1000;
+    const endSec = claim.videoSegment.endMillis / 1000;
     return {
-      claimId: claim.claimId,
-      identifier: getClaimIdentifier(claim),
       startTimestamp: toHHMMSS(startSec),
-      endTimestamp: toHHMMSS(startSec + durSec),
-      claimType: claim.type,
-      policyType: claim.claimPolicy.primaryPolicy.policyType,
+      endTimestamp: toHHMMSS(endSec),
+      claimType: claim.matchType,
     };
   };
 
@@ -128,8 +125,6 @@ export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Pr
       claimsCount: blockingClaims.length,
       jobId: job.id,
       claims: claimInfos.map((c) => ({
-        claimId: c.claimId,
-        identifier: c.identifier,
         type: c.claimType,
         range: `${c.startTimestamp}-${c.endTimestamp}`,
       })),
@@ -283,18 +278,18 @@ export async function trimDmcaVideo(ctx: DmcaProcessorContext): Promise<void> {
 }
 
 export async function processDmcaClaims(ctx: DmcaProcessorContext): Promise<void> {
-  const audioClaims = ctx.blockingClaims.filter((claim) => claim.type === CLAIM_TYPES.AUDIO);
-  const audioVisualClaims = ctx.blockingClaims.filter((claim) => claim.type === CLAIM_TYPES.AUDIOVISUAL);
-  const visualClaims = ctx.blockingClaims.filter((claim) => claim.type === CLAIM_TYPES.VISUAL);
-  const blackoutClaims = [...visualClaims, ...audioVisualClaims];
+  const audioClaims = ctx.blockingClaims.filter((claim) => claim.matchType === CLAIM_MATCH_TYPES.AUDIO);
+  const audioVisualClaims = ctx.blockingClaims.filter((claim) => claim.matchType === CLAIM_MATCH_TYPES.AUDIOVISUAL);
+  const videoClaims = ctx.blockingClaims.filter((claim) => claim.matchType === CLAIM_MATCH_TYPES.VIDEO);
+  const blackoutClaims = [...videoClaims, ...audioVisualClaims];
   const muteClaims = [...audioClaims, ...audioVisualClaims];
-  const muteFilters = muteClaims.length > 0 ? buildMuteFilters(muteClaims) : [];
+  const muteFilters = buildAudioFilters(muteClaims);
 
   const markClaimsCompleted = (claims: typeof ctx.blockingClaims) => {
     for (const claim of claims) {
-      const key = claim.claimId ?? getClaimIdentifier(claim);
-      if (!ctx.completedClaimIds.includes(key)) {
-        ctx.completedClaimIds.push(key);
+      const idx = ctx.blockingClaims.indexOf(claim);
+      if (idx !== -1 && !ctx.completedClaimIds.includes(String(idx))) {
+        ctx.completedClaimIds.push(String(idx));
       }
     }
   };
@@ -323,7 +318,10 @@ export async function processDmcaClaims(ctx: DmcaProcessorContext): Promise<void
       {
         vodId: ctx.vodId,
         count: blackoutClaims.length,
-        claims: blackoutClaims.map((c) => ({ claimId: c.claimId, identifier: getClaimIdentifier(c) })),
+        claims: blackoutClaims.map((c) => ({
+          startMillis: c.videoSegment.startMillis,
+          endMillis: c.videoSegment.endMillis,
+        })),
       },
       'Processing visual claims (blackout)'
     );
@@ -331,15 +329,13 @@ export async function processDmcaClaims(ctx: DmcaProcessorContext): Promise<void
     const blackoutSections: BlackoutSection[] = [];
 
     for (const claim of blackoutClaims) {
-      const startSeconds = claim.matchDetails.longestMatchStartTimeSeconds ?? 0;
-      const durationSeconds = claim.matchDetails.longestMatchDurationSeconds ?? 0;
-      const endSeconds = startSeconds + durationSeconds;
+      const startSeconds = claim.videoSegment.startMillis / 1000;
+      const endSeconds = claim.videoSegment.endMillis / 1000;
+      const durationSeconds = endSeconds - startSeconds;
 
       ctx.log.info(
         {
           vodId: ctx.vodId,
-          claimId: claim.claimId,
-          claimTitle: getClaimIdentifier(claim),
           startSeconds,
           endSeconds,
         },
@@ -378,7 +374,10 @@ export async function processDmcaClaims(ctx: DmcaProcessorContext): Promise<void
       {
         vodId: ctx.vodId,
         count: muteClaims.length,
-        claims: muteClaims.map((c) => ({ claimId: c.claimId, identifier: getClaimIdentifier(c) })),
+        claims: muteClaims.map((c) => ({
+          startMillis: c.videoSegment.startMillis,
+          endMillis: c.videoSegment.endMillis,
+        })),
       },
       'Processing audio claims (mute)'
     );

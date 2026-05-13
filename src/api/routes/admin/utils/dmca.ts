@@ -1,27 +1,30 @@
-interface DmcaClaim {
-  type?: string;
-  reason?: string;
-  url?: string;
-  [key: string]: unknown;
+import type { DMCAClaim } from '../../../../workers/dmca/dmca.js';
+
+interface NewDmcaClaimInput {
+  matchType: string;
+  videoSegment: { startMillis: number | string; endMillis: number | string };
+  claimId?: string;
+  assetId?: string;
+  asset?: Record<string, unknown>;
 }
 
 /**
  * Parse DMCA claims from array or string representation.
- * Coerces matchDetails numeric fields (returned as strings by YouTube API) to integers at deserialization time.
+ * Expects the new format: { matchType, videoSegment: { startMillis, endMillis } }.
  */
-export function parseDmcaClaims(claims: DmcaClaim[] | string): unknown[] {
-  const arr: DmcaClaim[] = Array.isArray(claims) ? claims : (JSON.parse(claims) as DmcaClaim[]);
-  return arr.map((claim) => {
-    const md = claim.matchDetails as Record<string, unknown> | undefined;
-    if (!md) return claim;
+export function parseDmcaClaims(claims: NewDmcaClaimInput[] | string): DMCAClaim[] {
+  const arr: NewDmcaClaimInput[] = Array.isArray(claims) ? claims : (JSON.parse(claims) as NewDmcaClaimInput[]);
 
-    return {
-      ...claim,
-      matchDetails: {
-        ...md,
-        longestMatchStartTimeSeconds: parseInt(String(md.longestMatchStartTimeSeconds), 10),
-        longestMatchDurationSeconds: parseInt(String(md.longestMatchDurationSeconds), 10),
+  return arr.map(
+    (claim): DMCAClaim => ({
+      matchType: claim.matchType as DMCAClaim['matchType'],
+      videoSegment: {
+        startMillis: Number(claim.videoSegment.startMillis),
+        endMillis: Number(claim.videoSegment.endMillis),
       },
-    };
-  });
+      ...(claim.claimId != null && { claimId: claim.claimId }),
+      ...(claim.assetId != null && { assetId: claim.assetId }),
+      ...(claim.asset != null && { asset: claim.asset }),
+    })
+  );
 }

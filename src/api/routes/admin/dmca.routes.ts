@@ -25,18 +25,19 @@ import { resolveGameWithContext } from './utils/game-context.js';
 import { ensureVodDownload } from './utils/vod-downloads.js';
 import { buildVodJobResponse } from './utils/vod-job-response.js';
 
-/** DMCA claim entry with optional typed fields. */
-interface DmcaClaim {
-  type?: string;
-  reason?: string;
-  url?: string;
-  [key: string]: unknown;
+/** DMCA claim entry with new format. */
+interface DmcaClaimInput {
+  matchType: string;
+  videoSegment: { startMillis: number; endMillis: number };
+  claimId?: string;
+  assetId?: string;
+  asset?: Record<string, unknown>;
 }
 
 /** Body for the DMCA processing endpoint. */
 interface DmcaRequestBody {
   vodId: string;
-  claims: DmcaClaim[] | string;
+  claims: DmcaClaimInput[] | string;
   platform: Platform;
   type?: SourceType;
   part?: number;
@@ -46,7 +47,7 @@ interface DmcaRequestBody {
 /** Body for the games DMCA processing endpoint. */
 interface DmcaGameBody {
   gameId: number;
-  claims: DmcaClaim[] | string;
+  claims: DmcaClaimInput[] | string;
   downloadMethod?: DownloadMethod;
 }
 

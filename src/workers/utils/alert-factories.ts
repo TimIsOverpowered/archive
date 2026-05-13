@@ -416,12 +416,9 @@ export function createChatWorkerAlerts(): ChatWorkerAlerts {
 // ============================================================================
 
 export interface DmcaClaimInfo {
-  claimId?: string | undefined;
-  identifier: string;
   startTimestamp: string;
   endTimestamp: string;
   claimType: string;
-  policyType: string;
 }
 
 export interface DmcaWorkerAlerts {
@@ -462,33 +459,28 @@ function formatClaimList(
   const sorted = [...claims].sort((a, b) => a.startTimestamp.localeCompare(b.startTimestamp));
 
   const claimTypeLabel: Record<string, string> = {
-    CLAIM_TYPE_AUDIO: '🔊 Audio',
-    CLAIM_TYPE_VISUAL: '👁️ Visual',
-    CLAIM_TYPE_AUDIOVISUAL: '🎬 AudioVisual',
+    CLAIM_MATCH_TYPE_AUDIO: '🔊 Audio',
+    CLAIM_MATCH_TYPE_VIDEO: '👁️ Video',
+    CLAIM_MATCH_TYPE_AUDIOVISUAL: '🎬 AudioVisual',
   };
 
-  for (const claim of sorted) {
-    const claimKey = claim.claimId ?? claim.identifier;
-    const isCompleted = completedClaimIds.includes(claimKey);
-    const isCurrent = !isCompleted && currentStep != null && currentStep.includes(claimKey ?? '');
+  sorted.forEach((claim, i) => {
+    const isCompleted = completedClaimIds.includes(String(i));
 
     let prefix = '⏳';
     let suffix = '';
 
     if (isCompleted) {
       prefix = '✅';
-    } else if (isCurrent) {
+    } else if (currentStep != null && currentStep.includes(String(i))) {
       prefix = '🔄';
       suffix = stepProgress != null ? ` (${stepProgress}%)` : '';
     }
 
     const timeRange = `${claim.startTimestamp} - ${claim.endTimestamp}`;
     const typeLabel = claimTypeLabel[claim.claimType] ?? claim.claimType;
-    const policyLabel =
-      claim.policyType !== '' && claim.policyType !== undefined ? claim.policyType.replace('POLICY_TYPE_', '') : '';
-    const labels = [typeLabel, policyLabel].filter(Boolean).join(' | ');
-    lines.push(`${prefix} ${claim.identifier} \`${timeRange}\` ${labels}${suffix}`);
-  }
+    lines.push(`${prefix} \`${timeRange}\` ${typeLabel}${suffix}`);
+  });
 
   return lines.join('\n');
 }
@@ -541,7 +533,7 @@ export function createDmcaWorkerAlerts(): DmcaWorkerAlerts {
     complete: (vodId, youtubeJobId, claims, platform, displayName) => {
       const claimList = formatClaimList(
         claims,
-        claims.map((c) => c.claimId ?? c.identifier)
+        claims.map((_, i) => String(i))
       );
 
       return {
