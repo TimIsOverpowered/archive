@@ -1,13 +1,10 @@
 import type { ReadonlyKysely } from 'kysely/readonly';
 import { Cache, Logs } from '../constants.js';
 import type { StreamerDB, SelectableChatMessages } from '../db/streamer-types.js';
-import { CacheKeys, simpleKeys } from '../utils/cache-keys.js';
-import { compressData, decompressData } from '../utils/compression.js';
+import { simpleKeys } from '../utils/cache-keys.js';
+import { defaultCacheContext } from '../utils/cache.js';
 import { VodNotFoundError } from '../utils/domain-errors.js';
-import { extractErrorDetails } from '../utils/error.js';
 import { badRequest } from '../utils/http-error.js';
-import { getLogger } from '../utils/logger.js';
-import { RedisService } from '../utils/redis-service.js';
 
 interface CursorPayload {
   offset: number;
@@ -34,51 +31,29 @@ async function fetchVodMeta(
   vodId: number,
   options?: { signal?: AbortSignal }
 ): Promise<VodMeta> {
-  const redis = RedisService.getActiveClient();
+  const cacheKey = simpleKeys.vodMeta(tenantId, vodId);
 
-  if (redis) {
-    try {
-      const cacheKey = CacheKeys.vodMeta(tenantId, vodId);
-      const cached = await redis.getBuffer(cacheKey);
-      if (cached != null && cached.length > 0) {
-        const data = (await decompressData(cached)) as VodMeta;
-        return {
-          created_at: new Date(data.created_at),
-          started_at: data.started_at ? new Date(data.started_at) : null,
-          duration: data.duration,
-          is_live: data.is_live,
-        };
-      }
-    } catch (error) {
-      const details = extractErrorDetails(error);
-      getLogger().warn({ vodId, ...details }, '[CACHE MISS] vod meta read failed');
-    }
-  }
+  return defaultCacheContext.withCache(cacheKey, Cache.VOD_DETAILS_TTL, async () => {
+    const vod = await db
+      .selectFrom('vods')
+      .select(['created_at', 'started_at', 'duration', 'is_live'])
+      .where('id', '=', vodId)
+      .executeTakeFirst(options);
 
-  const vod = await db
-    .selectFrom('vods')
-    .select(['created_at', 'started_at', 'duration', 'is_live'])
-    .where('id', '=', vodId)
-    .executeTakeFirst(options);
+    if (!vod) throw new VodNotFoundError(vodId, 'logs service');
 
-  if (!vod) throw new VodNotFoundError(vodId, 'logs service');
-
-  if (redis) {
-    try {
-      const cacheKey = CacheKeys.vodMeta(tenantId, vodId);
-      const compressed = await compressData(vod);
-      await redis.set(cacheKey, compressed, 'EX', Cache.VOD_DETAILS_TTL);
-    } catch {
-      // Ignore cache errors
-    }
-  }
-
-  return vod;
+    return {
+      created_at: new Date(vod.created_at),
+      started_at: typeof vod.started_at === 'string' ? new Date(vod.started_at) : vod.started_at,
+      duration: vod.duration,
+      is_live: vod.is_live,
+    };
+  });
 }
 
 /**
  * Fetch a single 60-second bucket of chat messages.
- * Checks Redis cache first, falls through to DB, then caches result.
+ * Uses CacheContext for compression, inflight deduplication, and race-condition immunity.
  * Bypasses permanent caching if the stream is live to prevent "poisoning"
  * the cache with empty chat arrays before the worker has downloaded them.
  */
@@ -92,7 +67,6 @@ async function fetchSingleBucket(
 ): Promise<SelectableChatMessages[]> {
   const bucketEnd = bucketStart + Logs.BUCKET_SIZE;
   const cacheKey = simpleKeys.bucket(tenantId, vodId, bucketStart);
-  const redis = RedisService.getActiveClient();
 
   let streamStart = vodMeta.created_at;
   let streamEnd = new Date(streamStart.getTime() + (vodMeta.duration + 7200) * 1000);
@@ -102,55 +76,31 @@ async function fetchSingleBucket(
     streamEnd = new Date(streamEnd.getTime() + Logs.LEGACY_PADDING_MS);
   }
 
-  if (redis) {
-    try {
-      const cached = await redis.getBuffer(cacheKey);
-      if (cached != null && cached.length > 0) {
-        getLogger().debug({ vodId, bucketStart }, '[CACHE HIT] bucket');
-        const data = (await decompressData(cached)) as SelectableChatMessages[];
-        return data;
-      }
-    } catch (error) {
-      const details = extractErrorDetails(error);
-      getLogger().warn({ vodId, bucketStart, ...details }, '[CACHE MISS] bucket read failed');
-    }
-  }
+  const ttl = vodMeta.is_live ? 15 : Cache.CHAT_TTL;
 
-  const comments = await db
-    .selectFrom('chat_messages')
-    .select([
-      'id',
-      'vod_id',
-      'display_name',
-      'content_offset_seconds',
-      'user_color',
-      'created_at',
-      'message',
-      'user_badges',
-    ])
-    .where('vod_id', '=', vodId)
-    .where('content_offset_seconds', '>=', bucketStart)
-    .where('content_offset_seconds', '<', bucketEnd)
-    .where('created_at', '>=', streamStart)
-    .where('created_at', '<=', streamEnd)
-    .orderBy('content_offset_seconds', 'asc')
-    .orderBy('created_at', 'asc')
-    .limit(Logs.BUCKET_LIMIT)
-    .execute(options);
-
-  if (redis) {
-    try {
-      const ttl = vodMeta.is_live ? 15 : Cache.CHAT_TTL;
-
-      const compressed = await compressData(comments);
-      await redis.set(cacheKey, compressed, 'EX', ttl);
-      getLogger().debug({ vodId, bucketStart }, '[CACHE SET] bucket');
-    } catch {
-      // Ignore cache errors
-    }
-  }
-
-  return comments;
+  return defaultCacheContext.withCache(cacheKey, ttl, async () => {
+    return db
+      .selectFrom('chat_messages')
+      .select([
+        'id',
+        'vod_id',
+        'display_name',
+        'content_offset_seconds',
+        'user_color',
+        'created_at',
+        'message',
+        'user_badges',
+      ])
+      .where('vod_id', '=', vodId)
+      .where('content_offset_seconds', '>=', bucketStart)
+      .where('content_offset_seconds', '<', bucketEnd)
+      .where('created_at', '>=', streamStart)
+      .where('created_at', '<=', streamEnd)
+      .orderBy('content_offset_seconds', 'asc')
+      .orderBy('created_at', 'asc')
+      .limit(Logs.BUCKET_LIMIT)
+      .execute(options);
+  });
 }
 
 /**

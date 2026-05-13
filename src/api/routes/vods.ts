@@ -5,13 +5,7 @@ import { z } from 'zod';
 import { Db } from '../../constants.js';
 import type { StreamerDB } from '../../db/streamer-types.js';
 import { getEmotesByVodId } from '../../services/emotes.js';
-import {
-  getVods,
-  getVodById,
-  getVodByPlatformId,
-  getVodNeighbors,
-  VodQuerySchema,
-} from '../../services/vods.service.js';
+import { getVods, getVodById, getVodByPlatformId, VodQuerySchema } from '../../services/vods.service.js';
 import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
 import { notFound } from '../../utils/http-error.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
@@ -144,8 +138,7 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
           notFound('VOD not found');
         }
         const vod = await fetchVodByIdSafe(vodIdParsed.data, db, tenantId, { signal: controller.signal });
-        const neighbors = await getVodNeighbors(db, vodIdParsed.data, { signal: controller.signal });
-        return ok({ ...vod, prev: neighbors.prev, next: neighbors.next });
+        return ok(vod);
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return;
         throw err;

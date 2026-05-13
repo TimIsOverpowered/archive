@@ -1,5 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { Cache } from '../constants.js';
+import { simpleKeys } from '../utils/cache-keys.js';
+import { defaultCacheContext } from '../utils/cache.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { getLogger } from '../utils/logger.js';
 import { RedisService } from '../utils/redis-service.js';
@@ -38,6 +40,14 @@ export async function handleCacheEvent(event: VodUpdateEvent): Promise<void> {
   } else {
     await invalidateVodStaticCache(event.tenantId, event.dbId);
     await invalidateVodVolatileCache(event.tenantId, event.dbId);
+
+    // Drop the tenant stats cache so the admin dashboard syncs immediately
+    const client = RedisService.getActiveClient();
+    if (client) {
+      const statsKey = simpleKeys.stats(event.tenantId);
+      await client.unlink(statsKey).catch(() => {});
+      defaultCacheContext.invalidateKey(statsKey);
+    }
   }
 }
 
@@ -46,6 +56,14 @@ export async function handleCacheEvent(event: VodUpdateEvent): Promise<void> {
  */
 export async function handleGameCacheEvent(event: GameUpdateEvent): Promise<void> {
   await invalidateGameTags(event.tenantId);
+
+  // Drop the tenant stats cache so the admin dashboard syncs immediately
+  const client = RedisService.getActiveClient();
+  if (client) {
+    const statsKey = simpleKeys.stats(event.tenantId);
+    await client.unlink(statsKey).catch(() => {});
+    defaultCacheContext.invalidateKey(statsKey);
+  }
 }
 
 /**

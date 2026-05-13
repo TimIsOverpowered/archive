@@ -233,6 +233,7 @@ export async function getVods(
 /**
  * Fetch a single VOD by its numeric DB ID with stale-while-revalidate caching.
  * Merges volatile data (duration, is_live) from Redis on top of cached static data.
+ * Also embeds prev/next neighbors securely to prevent DB thundering herds.
  */
 export async function getVodById(
   db: DBClient,
@@ -243,15 +244,35 @@ export async function getVodById(
   const cacheKey = swrKeys.vodStatic(tenantId, vodId);
 
   const fetcher = async () => {
-    const vod = await db
-      .selectFrom('vods')
-      .selectAll('vods')
-      .select((eb) => selectVodRelations(eb))
-      .where('id', '=', vodId)
-      .executeTakeFirst(options);
+    const [vod, prev, next] = await Promise.all([
+      db
+        .selectFrom('vods')
+        .selectAll('vods')
+        .select((eb) => selectVodRelations(eb))
+        .where('id', '=', vodId)
+        .executeTakeFirst(options),
+      db
+        .selectFrom('vods')
+        .select(['id', 'platform', 'platform_vod_id as platformVodId'])
+        .where('id', '<', vodId)
+        .orderBy('id', 'desc')
+        .limit(1)
+        .executeTakeFirst(options),
+      db
+        .selectFrom('vods')
+        .select(['id', 'platform', 'platform_vod_id as platformVodId'])
+        .where('id', '>', vodId)
+        .orderBy('id', 'asc')
+        .limit(1)
+        .executeTakeFirst(options),
+    ]);
 
     if (!vod) return null;
-    const result = vod as unknown as VodResponse;
+    const result = {
+      ...(vod as unknown as VodResponse),
+      prev: prev ?? null,
+      next: next ?? null,
+    };
     void registerVodTags(tenantId, [{ id: result.id }], cacheKey, Cache.VOD_DETAILS_TTL, 1);
     return result;
   };
@@ -276,6 +297,7 @@ export async function getVodById(
 /**
  * Fetch a single VOD by platform-specific ID with stale-while-revalidate caching.
  * Merges volatile data (duration, is_live) from Redis on top of cached static data.
+ * Also embeds prev/next neighbors securely to prevent DB thundering herds.
  */
 export async function getVodByPlatformId(
   db: ReadonlyKysely<StreamerDB>,
@@ -296,7 +318,29 @@ export async function getVodByPlatformId(
       .executeTakeFirst(options);
 
     if (!vod) return null;
-    const result = vod as unknown as VodResponse;
+
+    const [prev, next] = await Promise.all([
+      db
+        .selectFrom('vods')
+        .select(['id', 'platform', 'platform_vod_id as platformVodId'])
+        .where('id', '<', vod.id)
+        .orderBy('id', 'desc')
+        .limit(1)
+        .executeTakeFirst(options),
+      db
+        .selectFrom('vods')
+        .select(['id', 'platform', 'platform_vod_id as platformVodId'])
+        .where('id', '>', vod.id)
+        .orderBy('id', 'asc')
+        .limit(1)
+        .executeTakeFirst(options),
+    ]);
+
+    const result = {
+      ...(vod as unknown as VodResponse),
+      prev: prev ?? null,
+      next: next ?? null,
+    };
     void registerVodTags(tenantId, [{ id: result.id }], cacheKey, Cache.VOD_DETAILS_TTL, 1);
     return result;
   };
@@ -316,37 +360,4 @@ export async function getVodByPlatformId(
   }
 
   return staticData;
-}
-
-export type VodNeighbors = {
-  prev: Pick<VodResponse, 'id' | 'platformVodId' | 'platform'> | null;
-  next: Pick<VodResponse, 'id' | 'platformVodId' | 'platform'> | null;
-};
-
-export async function getVodNeighbors(
-  db: DBClient,
-  vodId: number,
-  options?: { signal?: AbortSignal }
-): Promise<VodNeighbors> {
-  const [prev, next] = await Promise.all([
-    db
-      .selectFrom('vods')
-      .select(['id', 'platform_vod_id', 'platform'])
-      .where('id', '<', vodId)
-      .orderBy('id', 'desc')
-      .limit(1)
-      .executeTakeFirst(options),
-    db
-      .selectFrom('vods')
-      .select(['id', 'platform_vod_id', 'platform'])
-      .where('id', '>', vodId)
-      .orderBy('id', 'asc')
-      .limit(1)
-      .executeTakeFirst(options),
-  ]);
-
-  return {
-    prev: (prev ?? null) as VodNeighbors['prev'],
-    next: (next ?? null) as VodNeighbors['next'],
-  };
 }

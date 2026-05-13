@@ -167,6 +167,35 @@ export async function invalidateVodVolatileCache(tenantId: string, dbId: number)
 }
 
 /**
+ * Invalidate all chapter list queries for a tenant using Redis SCAN.
+ * This guarantees the chapter library updates immediately when VODs are updated.
+ */
+export async function invalidateChapterQueries(tenantId: string): Promise<void> {
+  const client = RedisService.getActiveClient();
+  if (!client) return;
+
+  try {
+    let cursor = '0';
+    do {
+      const result = await client.scan(cursor, 'MATCH', `*chapters*:{${tenantId}}*`, 'COUNT', RedisBatch.SCAN_COUNT);
+      cursor = result[0];
+      const keys = result[1];
+
+      if (keys.length > 0) {
+        await client.unlink(...keys);
+        for (const k of keys) {
+          defaultCacheContext.invalidateKey(k);
+        }
+      }
+    } while (cursor !== '0');
+  } catch (error) {
+    if (!isConnectionFailed(tenantId) && isConnectionError(error)) {
+      markConnectionFailed(tenantId);
+    }
+  }
+}
+
+/**
  * Invalidate all game-related cache keys for a tenant.
  * Uses Redis SCAN with pattern matching to find and unlink all games* keys.
  */
@@ -178,12 +207,15 @@ export async function invalidateGameTags(tenantId: string): Promise<void> {
     let cursor = '0';
 
     do {
-      const result = await client.scan(cursor, 'MATCH', 'games*', 'COUNT', RedisBatch.SCAN_COUNT);
+      const result = await client.scan(cursor, 'MATCH', `*games*:{${tenantId}}*`, 'COUNT', RedisBatch.SCAN_COUNT);
       cursor = result[0];
       const keys = result[1];
 
       if (keys.length > 0) {
         await client.unlink(...keys);
+        for (const k of keys) {
+          defaultCacheContext.invalidateKey(k);
+        }
       }
     } while (cursor !== '0');
 

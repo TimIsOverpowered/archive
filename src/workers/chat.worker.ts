@@ -1,7 +1,9 @@
 import type { Job, Processor } from 'bullmq';
+import { invalidateChatCache } from '../services/vod-cache.js';
 import { isTwitchPlatform } from '../types/platforms.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { updateAlert } from '../utils/discord-alerts.js';
+import { extractErrorDetails } from '../utils/error.js';
 import {
   buildChatProcessorContext,
   checkChatCompletion,
@@ -33,6 +35,17 @@ const wrappedChatProcessor = wrapWorkerProcessor<ChatDownloadJob, ChatProcessorC
     }
 
     const result = await downloadChatMessages(ctx);
+
+    // Purge any partial buckets users may have permanently cached during the download phase
+    try {
+      await invalidateChatCache(ctx.tenantId, ctx.dbId);
+    } catch (err) {
+      ctx.log.warn(
+        { err: extractErrorDetails(err).message, vodId: ctx.vodId },
+        'Failed to invalidate chat cache after successful download'
+      );
+    }
+
     sendChatCompletionAlert(ctx, result);
 
     return { success: true, ...result };

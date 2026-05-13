@@ -3,12 +3,12 @@ import { configService } from '../../config/tenant-config.js';
 import { Cache } from '../../constants.js';
 import { getChannelBadges, getGlobalBadges } from '../../services/twitch/index.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { compressData, decompressData } from '../../utils/compression.js';
+import { simpleKeys } from '../../utils/cache-keys.js';
+import { defaultCacheContext } from '../../utils/cache.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { notFound } from '../../utils/http-error.js';
-import { RedisService } from '../../utils/redis-service.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
-import { ok, errorResponse } from '../response.js';
+import { errorResponse, ok } from '../response.js';
 
 /** Options for registering the badges routes plugin. */
 interface BadgesRoutesOptions {
@@ -47,39 +47,17 @@ export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesR
 
       if (config?.twitch?.id == null) notFound('Twitch not configured for this tenant');
 
-      const redis = RedisService.getActiveClient();
-      // Check Redis cache first
-      if (redis) {
-        try {
-          const cachedBadges = await redis.getBuffer(`twitch_badges:${tenantId}`);
+      const cacheKey = simpleKeys.badges(tenantId);
 
-          if (cachedBadges != null && cachedBadges.length > 0) {
-            return ok((await decompressData(cachedBadges)) as Record<string, unknown>);
-          }
-        } catch (err) {
-          const details = extractErrorDetails(err);
-          log.warn({ err: details }, 'Redis cache read failed for Twitch badges, continuing to API fetch');
-        }
-      }
-
-      // Fetch from Twitch API on cache miss
       try {
-        const [channelBadges, globalBadges] = await Promise.all([
-          getChannelBadges(tenantId).catch(() => null),
-          getGlobalBadges(tenantId).catch(() => null),
-        ]);
+        const badgesData = await defaultCacheContext.withCache(cacheKey, Cache.BADGES_TTL, async () => {
+          const [channelBadges, globalBadges] = await Promise.all([
+            getChannelBadges(tenantId).catch(() => null),
+            getGlobalBadges(tenantId).catch(() => null),
+          ]);
 
-        const badgesData = { channel: channelBadges ?? null, global: globalBadges ?? null };
-
-        // Cache in Redis if fetch succeeded
-        if (redis) {
-          try {
-            const compressed = await compressData(badgesData);
-            await redis.set(`twitch_badges:${tenantId}`, compressed, 'EX', Cache.BADGES_TTL);
-          } catch {
-            log.warn('Failed to cache Twitch badges in Redis, returning uncached result');
-          }
-        }
+          return { channel: channelBadges ?? null, global: globalBadges ?? null };
+        });
 
         return ok(badgesData);
       } catch (err) {

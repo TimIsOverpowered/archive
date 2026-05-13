@@ -6,7 +6,12 @@ import { defaultCacheContext } from '../utils/cache.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { getLogger } from '../utils/logger.js';
 import { RedisService } from '../utils/redis-service.js';
-import { invalidateVodTags, invalidateVodQueries, invalidateVodVolatileCache } from './cache-tags.js';
+import {
+  invalidateVodTags,
+  invalidateVodQueries,
+  invalidateChapterQueries,
+  invalidateVodVolatileCache,
+} from './cache-tags.js';
 
 export { invalidateVodVolatileCache };
 
@@ -102,6 +107,7 @@ export async function invalidateVodStaticCache(tenantId: string, dbId: number): 
     defaultCacheContext.invalidateKey(swrKey);
     await invalidateVodTags(tenantId, dbId);
     await invalidateVodQueries(tenantId);
+    await invalidateChapterQueries(tenantId);
 
     if (isConnectionFailed(tenantId)) {
       markConnectionRestored(tenantId);
@@ -180,6 +186,11 @@ export async function invalidateChatCache(tenantId: string, vodId: number): Prom
       } while (cursor !== '0');
     }
     getLogger().debug({ tenantId, vodId }, 'Chat bucket cache invalidated');
+
+    // Drop the tenant stats cache so the admin dashboard syncs immediately
+    const statsKey = simpleKeys.stats(tenantId);
+    await client.unlink(statsKey).catch(() => {});
+    defaultCacheContext.invalidateKey(statsKey);
   } catch (error) {
     if (!isConnectionFailed(tenantId) && isConnectionError(error)) {
       markConnectionFailed(tenantId);

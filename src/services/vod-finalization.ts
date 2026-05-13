@@ -4,7 +4,7 @@ import { withDbRetry } from '../db/streamer-client.js';
 import { TenantContext } from '../types/context.js';
 import { Platform } from '../types/platforms.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { publishVodDurationUpdate } from './cache-invalidator.js';
+import { publishVodDurationUpdate, publishVodUpdate } from './cache-invalidator.js';
 import { getStrategy } from './platforms/strategy.js';
 
 /** Options for finalizing a VOD after download completes. */
@@ -47,4 +47,7 @@ export async function finalizeVod(options: FinalizeVodOptions): Promise<void> {
   });
 
   await publishVodDurationUpdate(ctx.tenantId, dbId, dur ?? 0, false);
+
+  // Guarantee the static cache drops the stale `is_live: true` state
+  await publishVodUpdate(ctx.tenantId, dbId);
 }

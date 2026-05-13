@@ -145,9 +145,17 @@ export class CacheContext {
       throw new Error('fetch backoff');
     }
 
+    const fetchStartTime = Date.now();
     const promise = fetcher()
       .then(async (result) => {
         this.fetchFailures.delete(key);
+
+        const invalidatedAt = this.lastInvalidated.get(key);
+        if (typeof invalidatedAt === 'number' && invalidatedAt >= fetchStartTime) {
+          getLogger().debug({ key }, 'Key was invalidated during simple fetch, skipping cache write');
+          return result;
+        }
+
         try {
           const compressed = await compressData(result);
           await client.set(key, compressed, 'EX', ttl);

@@ -102,6 +102,7 @@ export const simpleKeys = {
   cursor: (tenantId: string, vodId: number, cursor: string): SimpleKey =>
     simpleKey(`simple:{${tenantId}}:${vodId}:cursor:${cursor}`),
   emotes: (tenantId: string, vodId: number): SimpleKey => simpleKey(`simple:emotes:{${tenantId}}:${vodId}`),
+  badges: (tenantId: string): SimpleKey => simpleKey(`simple:badges:{${tenantId}}`),
   vodPlatform: (tenantId: string, platform: string, platformVodId: string): SimpleKey =>
     simpleKey(`simple:vod:platform:{${tenantId}}:${platform}:${platformVodId}`),
   vodQuery: (
@@ -140,6 +141,7 @@ export const CacheKeys = {
   bucket: (tenantId: string, vodId: number, bucket: number) => `{${tenantId}}:${vodId}:bucket:${bucket}`,
   cursor: (tenantId: string, vodId: number, cursor: string) => `{${tenantId}}:${vodId}:cursor:${cursor}`,
   emotes: (tenantId: string, vodId: number) => `emotes:{${tenantId}}:${vodId}`,
+  badges: (tenantId: string) => `badges:{${tenantId}}`,
   vodPlatform: (tenantId: string, platform: string, platformVodId: string) =>
     `vod:platform:{${tenantId}}:${platform}:${platformVodId}`,
   vodQuery: buildVodQueryKey,

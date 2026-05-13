@@ -134,5 +134,7 @@ export async function refreshVodRecord(
 
   log.info({ vodId, platform, duration: updatedRecord.duration }, 'VOD metadata refreshed');
 
+  await publishVodUpdate(ctx.tenantId, dbId);
+
   return updatedRecord;
 }
