@@ -4,7 +4,7 @@ import type { ReadonlyKysely } from 'kysely/readonly';
 import { z } from 'zod';
 import { Cache, CacheSwr } from '../constants.js';
 import { buildPagination } from '../db/queries/builders.js';
-import type { StreamerDB } from '../db/streamer-types.js';
+import type { DBClient, StreamerDB } from '../db/streamer-types.js';
 import type { GameResponse } from '../types/games.js';
 import { PLATFORM_VALUES } from '../types/platforms.js';
 import type { SWRKey } from '../utils/cache-keys.js';
@@ -212,4 +212,55 @@ export async function getGamesLibrary(
   };
 
   return withStaleWhileRevalidate(cacheKey, Cache.VOD_LIST_TTL, Cache.VOD_LIST_TTL * CacheSwr.STALE_RATIO, fetcher);
+}
+
+/**
+ * Fetch a single game by its numeric DB ID with stale-while-revalidate caching.
+ * Also embeds prev/next neighbors to prevent client-side thundering herds.
+ */
+export async function getGameById(
+  db: DBClient,
+  tenantId: string,
+  gameId: number,
+  options?: { signal?: AbortSignal }
+): Promise<GameResponse | null> {
+  const cacheKey = swrKeys.gameStatic(tenantId, gameId);
+
+  const fetcher = async () => {
+    const [game, prev, next] = await Promise.all([
+      db.selectFrom('games').selectAll('games').where('id', '=', gameId).executeTakeFirst(options),
+      db
+        .selectFrom('games')
+        .select(['id'])
+        .where('id', '<', gameId)
+        .orderBy('id', 'desc')
+        .limit(1)
+        .executeTakeFirst(options),
+      db
+        .selectFrom('games')
+        .select(['id'])
+        .where('id', '>', gameId)
+        .orderBy('id', 'asc')
+        .limit(1)
+        .executeTakeFirst(options),
+    ]);
+
+    if (!game) return null;
+    const result = {
+      ...(game as unknown as GameResponse),
+      prev: prev ?? null,
+      next: next ?? null,
+    };
+    return result;
+  };
+
+  const staticData = await withStaleWhileRevalidate(
+    cacheKey,
+    Cache.DETAILS_TTL,
+    Cache.DETAILS_TTL * CacheSwr.STALE_RATIO,
+    fetcher
+  );
+
+  if (!staticData) return null;
+  return staticData;
 }

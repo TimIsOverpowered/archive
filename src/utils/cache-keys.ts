@@ -76,6 +76,7 @@ export const swrKeys = {
     page: number,
     limit: number
   ): SWRKey => swrKey(`swr:${buildGameQueryKey(tenantId, query, page, limit)}`),
+  gameStatic: (tenantId: string, dbId: number): SWRKey => swrKey(`swr:game:{${tenantId}}:${dbId}`),
   chapterLibrary: (
     tenantId: string,
     query: Record<string, string | number | undefined>,
@@ -117,6 +118,7 @@ export const simpleKeys = {
     page: number,
     limit: number
   ): SimpleKey => simpleKey(`simple:${buildGameQueryKey(tenantId, query, page, limit)}`),
+  gameStatic: (tenantId: string, dbId: number): SimpleKey => simpleKey(`simple:game:{${tenantId}}:${dbId}`),
   chapterLibrary: (
     tenantId: string,
     query: Record<string, string | number | undefined>,
@@ -146,6 +148,7 @@ export const CacheKeys = {
     `vod:platform:{${tenantId}}:${platform}:${platformVodId}`,
   vodQuery: buildVodQueryKey,
   gameQuery: buildGameQueryKey,
+  gameStatic: (tenantId: string, dbId: number) => `game:{${tenantId}}:${dbId}`,
   chapterLibrary: buildChapterLibraryKey,
   gameLibrary: buildGameLibraryKey,
 } as const;

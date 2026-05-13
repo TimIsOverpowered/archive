@@ -35,8 +35,8 @@ export const Hls = {
 
 // ── Cache TTLs (seconds) ────────────────────────────────────────────────────
 export const Cache = {
-  /** 5 mins for individual VODs */
-  VOD_DETAILS_TTL: 5 * 60,
+  /** 5 mins for individual details */
+  DETAILS_TTL: 5 * 60,
   /** 5 mins for list queries */
   VOD_LIST_TTL: 5 * 60,
   /** 15 seconds for live status/duration */

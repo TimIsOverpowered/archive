@@ -1,11 +1,22 @@
 import { FastifyInstance } from 'fastify';
 import type { ReadonlyKysely } from 'kysely/readonly';
+import { z } from 'zod';
+import { Db } from '../../constants.js';
 import type { StreamerDB } from '../../db/streamer-types.js';
-import { getGames, getGamesLibrary, GameQuerySchema, GameLibraryQuerySchema } from '../../services/games.service.js';
+import {
+  getGames,
+  getGameById,
+  getGamesLibrary,
+  GameQuerySchema,
+  GameLibraryQuerySchema,
+} from '../../services/games.service.js';
 import { PLATFORM_VALUES } from '../../types/platforms.js';
+import { notFound } from '../../utils/http-error.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
-import { okPaginated } from '../response.js';
+import { ok, okPaginated } from '../response.js';
+
+const GameIdParamSchema = z.coerce.number().int().min(0).max(Db.INT32_MAX);
 
 /** Options for registering the games routes plugin. */
 interface GamesRoutesOptions {
@@ -75,6 +86,53 @@ export default function gamesRoutes(fastify: FastifyInstance, _options: GamesRou
           limit: query.limit,
           total,
         });
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        throw err;
+      }
+    }
+  );
+
+  fastify.get<{ Params: { tenantId: string; gameId: string } }>(
+    '/:tenantId/games/:gameId',
+    {
+      schema: {
+        tags: ['Games'],
+        description: 'Get a single game by ID',
+        params: {
+          type: 'object',
+          properties: {
+            tenantId: { type: 'string', description: 'Tenant ID' },
+            gameId: { type: 'integer', minimum: 0, maximum: Db.INT32_MAX, description: 'Game ID' },
+          },
+          required: ['tenantId', 'gameId'],
+        },
+      },
+      onRequest: [rateLimitMiddleware, tenantMiddleware],
+    },
+    async (request) => {
+      const controller = new AbortController();
+      request.raw.once('close', () => {
+        if (request.raw.destroyed) {
+          controller.abort();
+        }
+      });
+
+      try {
+        const { gameId } = request.params;
+        const tenantCtx = requireTenant(request);
+        const { tenantId, db } = tenantCtx;
+        const gameIdParsed = GameIdParamSchema.safeParse(gameId);
+        if (!gameIdParsed.success) {
+          notFound('Game not found');
+        }
+        const game = await getGameById(db, tenantId, gameIdParsed.data, { signal: controller.signal });
+
+        if (!game) {
+          notFound('Game not found');
+        }
+
+        return ok(game);
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return;
         throw err;

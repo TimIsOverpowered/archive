@@ -14,4 +14,6 @@ export interface GameResponse {
   chapter_image: string | null;
   created_at: Date | null;
   updated_at: Date | null;
+  prev?: { id: number } | null;
+  next?: { id: number } | null;
 }

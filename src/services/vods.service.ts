@@ -273,14 +273,14 @@ export async function getVodById(
       prev: prev ?? null,
       next: next ?? null,
     };
-    void registerVodTags(tenantId, [{ id: result.id }], cacheKey, Cache.VOD_DETAILS_TTL, 1);
+    void registerVodTags(tenantId, [{ id: result.id }], cacheKey, Cache.DETAILS_TTL, 1);
     return result;
   };
 
   const staticData = await withStaleWhileRevalidate(
     cacheKey,
-    Cache.VOD_DETAILS_TTL,
-    Cache.VOD_DETAILS_TTL * CacheSwr.STALE_RATIO,
+    Cache.DETAILS_TTL,
+    Cache.DETAILS_TTL * CacheSwr.STALE_RATIO,
     fetcher
   );
 
@@ -341,14 +341,14 @@ export async function getVodByPlatformId(
       prev: prev ?? null,
       next: next ?? null,
     };
-    void registerVodTags(tenantId, [{ id: result.id }], cacheKey, Cache.VOD_DETAILS_TTL, 1);
+    void registerVodTags(tenantId, [{ id: result.id }], cacheKey, Cache.DETAILS_TTL, 1);
     return result;
   };
 
   const staticData = await withStaleWhileRevalidate(
     cacheKey,
-    Cache.VOD_DETAILS_TTL,
-    Cache.VOD_DETAILS_TTL * CacheSwr.STALE_RATIO,
+    Cache.DETAILS_TTL,
+    Cache.DETAILS_TTL * CacheSwr.STALE_RATIO,
     fetcher
   );
 

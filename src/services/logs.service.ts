@@ -33,7 +33,7 @@ async function fetchVodMeta(
 ): Promise<VodMeta> {
   const cacheKey = simpleKeys.vodMeta(tenantId, vodId);
 
-  return defaultCacheContext.withCache(cacheKey, Cache.VOD_DETAILS_TTL, async () => {
+  return defaultCacheContext.withCache(cacheKey, Cache.DETAILS_TTL, async () => {
     const vod = await db
       .selectFrom('vods')
       .select(['created_at', 'started_at', 'duration', 'is_live'])
