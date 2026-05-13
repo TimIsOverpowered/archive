@@ -5,8 +5,6 @@ import { getDisplayName } from '../../config/types.js';
 import { YouTube } from '../../constants.js';
 import type { StreamerDB } from '../../db/streamer-types.js';
 import { publishGameUpdate, publishVodUpdate } from '../../services/cache-invalidator.js';
-import { invalidateGameTags } from '../../services/cache-tags.js';
-import { invalidateVodStaticCache } from '../../services/vod-cache.js';
 import { uploadVideo } from '../../services/youtube/index.js';
 import type { Platform } from '../../types/platforms.js';
 import { initRichAlert, createProgressBar } from '../../utils/discord-alerts.js';
@@ -177,11 +175,6 @@ async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{
 
   await publishVodUpdate(tenantId, dbId);
   await publishGameUpdate(tenantId);
-
-  setTimeout(() => {
-    invalidateVodStaticCache(tenantId, dbId).catch(() => {});
-    invalidateGameTags(tenantId).catch(() => {});
-  }, 3000);
 
   await deleteFileIfExists(filePath);
 

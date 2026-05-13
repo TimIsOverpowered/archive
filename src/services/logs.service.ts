@@ -21,10 +21,11 @@ interface VodMeta {
   created_at: Date;
   started_at: Date | null;
   duration: number;
+  is_live: boolean;
 }
 
 /**
- * Fetch VOD metadata (created_at, duration) with Redis caching.
+ * Fetch VOD metadata (created_at, duration, is_live) with Redis caching.
  * Prevents repeated DB queries on every chat request.
  */
 async function fetchVodMeta(
@@ -45,6 +46,7 @@ async function fetchVodMeta(
           created_at: new Date(data.created_at),
           started_at: data.started_at ? new Date(data.started_at) : null,
           duration: data.duration,
+          is_live: data.is_live,
         };
       }
     } catch (error) {
@@ -55,7 +57,7 @@ async function fetchVodMeta(
 
   const vod = await db
     .selectFrom('vods')
-    .select(['created_at', 'started_at', 'duration'])
+    .select(['created_at', 'started_at', 'duration', 'is_live'])
     .where('id', '=', vodId)
     .executeTakeFirst(options);
 
@@ -77,20 +79,28 @@ async function fetchVodMeta(
 /**
  * Fetch a single 60-second bucket of chat messages.
  * Checks Redis cache first, falls through to DB, then caches result.
- * Returns raw comments array (no cursor, no peek).
+ * Bypasses permanent caching if the stream is live to prevent "poisoning"
+ * the cache with empty chat arrays before the worker has downloaded them.
  */
 async function fetchSingleBucket(
   db: ReadonlyKysely<StreamerDB>,
   tenantId: string,
   vodId: number,
   bucketStart: number,
-  streamStart: Date,
-  streamEnd: Date,
+  vodMeta: VodMeta,
   options?: { signal?: AbortSignal }
 ): Promise<SelectableChatMessages[]> {
   const bucketEnd = bucketStart + Logs.BUCKET_SIZE;
   const cacheKey = simpleKeys.bucket(tenantId, vodId, bucketStart);
   const redis = RedisService.getActiveClient();
+
+  let streamStart = vodMeta.created_at;
+  let streamEnd = new Date(streamStart.getTime() + (vodMeta.duration + 7200) * 1000);
+
+  if (!vodMeta.started_at) {
+    streamStart = new Date(streamStart.getTime() - Logs.LEGACY_PADDING_MS);
+    streamEnd = new Date(streamEnd.getTime() + Logs.LEGACY_PADDING_MS);
+  }
 
   if (redis) {
     try {
@@ -130,8 +140,10 @@ async function fetchSingleBucket(
 
   if (redis) {
     try {
+      const ttl = vodMeta.is_live ? 15 : Cache.CHAT_TTL;
+
       const compressed = await compressData(comments);
-      await redis.set(cacheKey, compressed, 'EX', Cache.CHAT_TTL);
+      await redis.set(cacheKey, compressed, 'EX', ttl);
       getLogger().debug({ vodId, bucketStart }, '[CACHE SET] bucket');
     } catch {
       // Ignore cache errors
@@ -156,6 +168,7 @@ async function fetchAggregatedBuckets(
   options?: { signal?: AbortSignal }
 ): Promise<{ comments: SelectableChatMessages[]; cursor?: string | undefined }> {
   const vodMeta = await fetchVodMeta(db, tenantId, vodId, options);
+
   let streamStart = vodMeta.created_at;
   let streamEnd = new Date(streamStart.getTime() + (vodMeta.duration + 7200) * 1000);
 
@@ -167,15 +180,7 @@ async function fetchAggregatedBuckets(
   const anchorBucketStart = Math.floor(requestedOffset / Logs.BUCKET_SIZE) * Logs.BUCKET_SIZE;
 
   // 1. Fetch anchor bucket
-  const anchorComments = await fetchSingleBucket(
-    db,
-    tenantId,
-    vodId,
-    anchorBucketStart,
-    streamStart,
-    streamEnd,
-    options
-  );
+  const anchorComments = await fetchSingleBucket(db, tenantId, vodId, anchorBucketStart, vodMeta, options);
 
   // 2. Split at requested offset
   const pastComments: SelectableChatMessages[] = anchorComments.filter(
@@ -191,7 +196,7 @@ async function fetchAggregatedBuckets(
     const prevBucket = anchorBucketStart - backSteps * Logs.BUCKET_SIZE;
     if (prevBucket < 0) break;
 
-    const olderComments = await fetchSingleBucket(db, tenantId, vodId, prevBucket, streamStart, streamEnd, options);
+    const olderComments = await fetchSingleBucket(db, tenantId, vodId, prevBucket, vodMeta, options);
     pastComments.unshift(...olderComments);
     backSteps++;
   }
@@ -201,7 +206,7 @@ async function fetchAggregatedBuckets(
   while (futureComments.length < Logs.TARGET_FUTURE && forwardSteps <= Logs.MAX_EXPANSION) {
     const nextBucket = anchorBucketStart + forwardSteps * Logs.BUCKET_SIZE;
 
-    const newerComments = await fetchSingleBucket(db, tenantId, vodId, nextBucket, streamStart, streamEnd, options);
+    const newerComments = await fetchSingleBucket(db, tenantId, vodId, nextBucket, vodMeta, options);
     futureComments.push(...newerComments);
     forwardSteps++;
   }

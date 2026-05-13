@@ -210,18 +210,24 @@ export async function getVods(
     const total = Number(totalRow?.cnt ?? 0);
     const hasMore = result.length > limit;
     const resultVods = (hasMore ? result.slice(0, limit) : result) as unknown as VodResponse[];
-    const dbIds = resultVods.map((v) => v.id);
-    const volatileMap = await getVodVolatileCacheBatch(tenantId, dbIds);
-    const mergedVods = applyVolatileData(resultVods, volatileMap);
 
-    const hasLiveVod = mergedVods.some((vod) => vod.is_live);
-    const ttl = hasLiveVod ? Cache.VOD_VOLATILE_TTL : Cache.VOD_LIST_TTL;
-    await registerVodTags(tenantId, mergedVods, cacheKey, ttl, page);
+    await registerVodTags(tenantId, resultVods, cacheKey, Cache.VOD_LIST_TTL, page);
 
-    return { vods: mergedVods, total };
+    return { vods: resultVods, total };
   };
 
-  return withStaleWhileRevalidate(cacheKey, Cache.VOD_LIST_TTL, Cache.VOD_LIST_TTL * CacheSwr.STALE_RATIO, fetcher);
+  const staticData = await withStaleWhileRevalidate(
+    cacheKey,
+    Cache.VOD_LIST_TTL,
+    Cache.VOD_LIST_TTL * CacheSwr.STALE_RATIO,
+    fetcher
+  );
+
+  const dbIds = staticData.vods.map((v) => v.id);
+  const volatileMap = await getVodVolatileCacheBatch(tenantId, dbIds);
+  const mergedVods = applyVolatileData(staticData.vods, volatileMap);
+
+  return { vods: mergedVods, total: staticData.total };
 }
 
 /**

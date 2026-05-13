@@ -1,3 +1,4 @@
+import { RedisBatch } from '../constants.js';
 import { isConnectionError } from '../db/utils/errors.js';
 import { CacheKeys, simpleKeys, swrKeys } from '../utils/cache-keys.js';
 import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
@@ -5,7 +6,7 @@ import { defaultCacheContext } from '../utils/cache.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { getLogger } from '../utils/logger.js';
 import { RedisService } from '../utils/redis-service.js';
-import { invalidateVodTags, invalidateVodVolatileCache } from './cache-tags.js';
+import { invalidateVodTags, invalidateVodQueries, invalidateVodVolatileCache } from './cache-tags.js';
 
 export { invalidateVodVolatileCache };
 
@@ -100,6 +101,7 @@ export async function invalidateVodStaticCache(tenantId: string, dbId: number): 
     await client.unlink(swrKey);
     defaultCacheContext.invalidateKey(swrKey);
     await invalidateVodTags(tenantId, dbId);
+    await invalidateVodQueries(tenantId);
 
     if (isConnectionFailed(tenantId)) {
       markConnectionRestored(tenantId);
@@ -131,6 +133,8 @@ export async function invalidateEmoteCache(tenantId: string, vodId: number): Pro
 
   try {
     await client.unlink(cacheKey, simpleCacheKey);
+    defaultCacheContext.invalidateKey(cacheKey);
+    defaultCacheContext.invalidateKey(simpleCacheKey);
 
     if (isConnectionFailed(tenantId)) {
       markConnectionRestored(tenantId);
@@ -144,6 +148,44 @@ export async function invalidateEmoteCache(tenantId: string, vodId: number): Pro
       getLogger().warn(
         { tenantId, vodId, error: extractErrorDetails(error) },
         'Redis connection lost, emote cache invalidation suspended'
+      );
+    }
+  }
+}
+
+/**
+ * Invalidate all paginated chat buckets and cursors for a VOD.
+ * Used during forced chat re-downloads to prevent ghost messages.
+ */
+export async function invalidateChatCache(tenantId: string, vodId: number): Promise<void> {
+  const client = RedisService.getActiveClient();
+  if (!client) return;
+
+  try {
+    const patterns = [`*simple:{${tenantId}}:${vodId}:bucket*`, `*simple:{${tenantId}}:${vodId}:cursor*`];
+
+    for (const pattern of patterns) {
+      let cursor = '0';
+      do {
+        const result = await client.scan(cursor, 'MATCH', pattern, 'COUNT', RedisBatch.SCAN_COUNT);
+        cursor = result[0];
+        const keys = result[1];
+
+        if (keys.length > 0) {
+          await client.unlink(...keys);
+          for (const k of keys) {
+            defaultCacheContext.invalidateKey(k);
+          }
+        }
+      } while (cursor !== '0');
+    }
+    getLogger().debug({ tenantId, vodId }, 'Chat bucket cache invalidated');
+  } catch (error) {
+    if (!isConnectionFailed(tenantId) && isConnectionError(error)) {
+      markConnectionFailed(tenantId);
+      getLogger().warn(
+        { tenantId, vodId, error: extractErrorDetails(error) },
+        'Redis connection lost, chat cache invalidation suspended'
       );
     }
   }

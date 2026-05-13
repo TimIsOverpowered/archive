@@ -2,6 +2,7 @@ import { Cache, CacheTag, RedisBatch } from '../constants.js';
 import { isConnectionError } from '../db/utils/errors.js';
 import { CacheKeys, swrKeys } from '../utils/cache-keys.js';
 import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
+import { defaultCacheContext } from '../utils/cache.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { getLogger } from '../utils/logger.js';
 import { RedisService } from '../utils/redis-service.js';
@@ -76,6 +77,9 @@ export async function invalidateVodTags(tenantId: string, dbId: number): Promise
 
       if (taggedKeys.length > 0) {
         await client.unlink(...taggedKeys);
+        for (const k of taggedKeys) {
+          defaultCacheContext.invalidateKey(k);
+        }
       }
     } while (cursor !== '0');
 
@@ -97,6 +101,35 @@ export async function invalidateVodTags(tenantId: string, dbId: number): Promise
 }
 
 /**
+ * Invalidate all VOD list queries for a tenant using Redis SCAN.
+ * This guarantees lists update immediately when new VODs are added.
+ */
+export async function invalidateVodQueries(tenantId: string): Promise<void> {
+  const client = RedisService.getActiveClient();
+  if (!client) return;
+
+  try {
+    let cursor = '0';
+    do {
+      const result = await client.scan(cursor, 'MATCH', `*vods:{${tenantId}}*`, 'COUNT', RedisBatch.SCAN_COUNT);
+      cursor = result[0];
+      const keys = result[1];
+
+      if (keys.length > 0) {
+        await client.unlink(...keys);
+        for (const k of keys) {
+          defaultCacheContext.invalidateKey(k);
+        }
+      }
+    } while (cursor !== '0');
+  } catch (error) {
+    if (!isConnectionFailed(tenantId) && isConnectionError(error)) {
+      markConnectionFailed(tenantId);
+    }
+  }
+}
+
+/**
  * Invalidate the volatile cache entry for a VOD (duration, is_live).
  * Tracks Redis connection state to suspend/resume invalidation on failures.
  */
@@ -105,11 +138,16 @@ export async function invalidateVodVolatileCache(tenantId: string, dbId: number)
   if (!client) return;
 
   try {
-    await client.unlink(
+    const keys = [
       CacheKeys.vodVolatile(tenantId, dbId),
       swrKeys.vodVolatile(tenantId, dbId),
-      CacheKeys.vodMeta(tenantId, dbId)
-    );
+      CacheKeys.vodMeta(tenantId, dbId),
+    ];
+
+    await client.unlink(...keys);
+    for (const k of keys) {
+      defaultCacheContext.invalidateKey(k);
+    }
 
     if (isConnectionFailed(tenantId)) {
       markConnectionRestored(tenantId);

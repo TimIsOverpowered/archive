@@ -4,6 +4,7 @@ import { getDisplayName, type TenantConfig } from '../config/types.js';
 import { Chat } from '../constants.js';
 import type { StreamerDB } from '../db/streamer-types.js';
 import { fetchComments, fetchNextComments, type TwitchVideoCommentResponse } from '../services/twitch/index.js';
+import { invalidateChatCache } from '../services/vod-cache.js';
 import { type Platform } from '../types/platforms.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { sleep, jitter } from '../utils/delay.js';
@@ -170,7 +171,8 @@ export async function downloadChatMessages(
 
   if (forceRerun === true) {
     await db.deleteFrom('chat_messages').where('vod_id', '=', dbId).execute();
-    log.info({ vodId }, 'Cleared existing chat messages for force rerun');
+    await invalidateChatCache(tenantId, dbId);
+    log.info({ vodId }, 'Cleared existing chat messages and cache for force rerun');
   }
 
   const reportProgress = (offset: number) => {

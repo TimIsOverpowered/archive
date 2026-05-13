@@ -29,7 +29,7 @@ interface VodRoutesOptions {
  * Validate and fetch a VOD by numeric ID, throwing 404 on invalid/missing.
  */
 async function fetchVodByIdSafe(
-   vodId: number,
+  vodId: number,
   db: Kysely<StreamerDB>,
   tenantId: string,
   options?: { signal?: AbortSignal }

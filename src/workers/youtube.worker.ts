@@ -3,7 +3,6 @@ import type { Kysely } from 'kysely';
 import { getDisplayName, TenantConfig } from '../config/types.js';
 import type { StreamerDB } from '../db/streamer-types.js';
 import { publishVodUpdate } from '../services/cache-invalidator.js';
-import { invalidateVodStaticCache } from '../services/vod-cache.js';
 import { saveUploadResult, markUploadFailed } from '../services/youtube/upload.js';
 import type { Platform, SourceType, UploadType } from '../types/platforms.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
@@ -164,10 +163,6 @@ const youtubeProcessor = wrapWorkerProcessor<YoutubeUploadJob, YoutubeProcessorC
 
       await saveUploadResult(ctx.db, ctx.dbId, ctx.type, vodResult.uploadedVideos);
       await publishVodUpdate(ctx.tenantId, ctx.dbId);
-
-      setTimeout(() => {
-        invalidateVodStaticCache(ctx.tenantId, ctx.dbId).catch(() => {});
-      }, 3000);
 
       const splitDuration = getEffectiveSplitDuration(ctx.config.youtube?.splitDuration);
       linkVodPartsAfterDelay(ctx.tenantId, ctx.dbId, vodResult.uploadedVideos, splitDuration, ctx.db, ctx.log);
