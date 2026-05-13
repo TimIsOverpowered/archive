@@ -68,7 +68,7 @@ async function fetchSingleBucket(
   const bucketEnd = bucketStart + Logs.BUCKET_SIZE;
   const cacheKey = simpleKeys.bucket(tenantId, vodId, bucketStart);
 
-  let streamStart = vodMeta.created_at;
+  let streamStart = new Date(vodMeta.created_at);
   let streamEnd = new Date(streamStart.getTime() + (vodMeta.duration + 7200) * 1000);
 
   if (!vodMeta.started_at) {
@@ -119,7 +119,7 @@ async function fetchAggregatedBuckets(
 ): Promise<{ comments: SelectableChatMessages[]; cursor?: string | undefined }> {
   const vodMeta = await fetchVodMeta(db, tenantId, vodId, options);
 
-  let streamStart = vodMeta.created_at;
+  let streamStart = new Date(vodMeta.created_at);
   let streamEnd = new Date(streamStart.getTime() + (vodMeta.duration + 7200) * 1000);
 
   if (!vodMeta.started_at) {
