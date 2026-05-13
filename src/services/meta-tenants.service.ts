@@ -51,14 +51,25 @@ function encryptYoutubeInData(data: Partial<InsertableTenants>): Partial<Inserta
   return encrypted;
 }
 
+function stripEncryptedFields(tenant: SelectableTenants): SelectableTenants {
+  const youtube = tenant.youtube;
+  if (youtube != null) {
+    const { auth: _auth, apiKey: _apiKey, ...safeYoutube } = youtube;
+    return { ...tenant, youtube: Object.keys(safeYoutube).length > 0 ? safeYoutube : null };
+  }
+  return tenant;
+}
+
 /** Retrieve all tenants from the metadata database. */
 export async function getAllTenants(): Promise<SelectableTenants[]> {
-  return getMetaClient().selectFrom('tenants').selectAll().execute();
+  const tenants = await getMetaClient().selectFrom('tenants').selectAll().execute();
+  return tenants.map(stripEncryptedFields);
 }
 
 /** Look up a tenant by ID from the metadata database. */
 export async function getTenantById(id: string): Promise<SelectableTenants | undefined> {
-  return getMetaClient().selectFrom('tenants').selectAll().where('id', '=', id).executeTakeFirst();
+  const tenant = await getMetaClient().selectFrom('tenants').selectAll().where('id', '=', id).executeTakeFirst();
+  return tenant ? stripEncryptedFields(tenant) : undefined;
 }
 
 /** Create a new tenant record in the metadata database. */
