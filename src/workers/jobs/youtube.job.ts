@@ -736,8 +736,8 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
       log.warn({ ...details, vodId }, 'Failed to queue YouTube uploads');
     }
   } else {
-    // Game Uploads only: finalize <- game_0 <- ... <- game_N, with game_0 -> copy/download
-    if (uploadMode === UPLOAD_MODES.ALL && gameUploadEnabled) {
+    // Game Uploads only (GAMES or ALL without VOD): finalize <- game_0 <- ... <- game_N, with game_0 -> copy/download
+    if ((uploadMode === UPLOAD_MODES.GAMES || uploadMode === UPLOAD_MODES.ALL) && gameUploadEnabled) {
       try {
         const gameJobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform, workDir);
         const gameJobIds: string[] = [];
@@ -747,45 +747,37 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
           gameJobIds.push(gameJobId);
         }
 
-        if (!vodUploadEnabled) {
-          const finalizeJobId = `finalize_${vodId}_1`;
-          const baseChildren = buildCopyChildren(downloadJobId, copyJobId);
+        const finalizeJobId = `finalize_${vodId}_1`;
+        const baseChildren = buildCopyChildren(downloadJobId, copyJobId);
 
-          const gameChainHead = buildSequentialGameChain(
-            gameJobs,
-            gameJobIds,
-            youtubeQueue.name,
-            baseChildren,
-            workDir
+        const gameChainHead = buildSequentialGameChain(gameJobs, gameJobIds, youtubeQueue.name, baseChildren, workDir);
+
+        const flowChildren = gameChainHead != null ? [gameChainHead] : baseChildren;
+
+        const flow = await getFlowProducer().add({
+          name: 'vod_finalize_file',
+          queueName: finalizeQueue.name,
+          data: createFinalizeData(ctx, dbId, vodId, type, filePath, platform, {
+            workDir,
+            saveHLS: saveHls,
+            streamId,
+          }),
+          opts: { jobId: finalizeJobId, removeOnComplete: true, removeOnFail: true, failParentOnFailure: false },
+          children: flowChildren,
+        });
+
+        result.vodJobId = flow.job.id ?? null;
+        result.gameJobIds = gameJobIds;
+
+        if (result.gameJobIds.length > 0) {
+          log.info(
+            { vodId, chained: downloadJobId != null, gameJobsCount: result.gameJobIds.length },
+            'Queued YouTube game uploads'
           );
-
-          const flowChildren = gameChainHead != null ? [gameChainHead] : baseChildren;
-
-          const flow = await getFlowProducer().add({
-            name: 'vod_finalize_file',
-            queueName: finalizeQueue.name,
-            data: createFinalizeData(ctx, dbId, vodId, type, filePath, platform, {
-              workDir,
-              saveHLS: saveHls,
-              streamId,
-            }),
-            opts: { jobId: finalizeJobId, removeOnComplete: true, removeOnFail: true, failParentOnFailure: false },
-            children: flowChildren,
-          });
-
-          result.vodJobId = flow.job.id ?? null;
-          result.gameJobIds = gameJobIds;
-
-          if (result.gameJobIds.length > 0) {
-            log.info(
-              { vodId, chained: downloadJobId != null, gameJobsCount: result.gameJobIds.length },
-              'Queued YouTube game uploads'
-            );
-          } else {
-            log.info({ vodId, chained: downloadJobId != null }, 'Skipped game uploads');
-          }
-          log.info({ vodId, chained: downloadJobId != null, vodJobId: result.vodJobId }, 'Queued VOD finalizer');
+        } else {
+          log.info({ vodId, chained: downloadJobId != null }, 'Skipped game uploads');
         }
+        log.info({ vodId, chained: downloadJobId != null, vodJobId: result.vodJobId }, 'Queued VOD finalizer');
       } catch (error) {
         const details = extractErrorDetails(error);
         log.warn({ ...details, vodId }, 'Failed to queue YouTube game uploads');

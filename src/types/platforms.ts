@@ -65,10 +65,12 @@ export type UploadType = (typeof UPLOAD_TYPES)[keyof typeof UPLOAD_TYPES];
  * Upload mode determines what content to upload.
  * 'vod' = upload only the full VOD
  * 'all' = upload VOD plus game clips (if perGameUpload is enabled)
+ * 'games' = upload only game clips (if perGameUpload is enabled)
  */
 export const UPLOAD_MODES = {
   VOD: 'vod',
   ALL: 'all',
+  GAMES: 'games',
 } as const;
 
 /** Upload mode identifier derived from UPLOAD_MODES object. */
