@@ -167,10 +167,6 @@ export async function getAllPublicTenants(): Promise<PublicTenant[]> {
 
 /** Retrieve a single tenant by ID with only public fields. */
 export async function getPublicTenantById(id: string): Promise<PublicTenant | undefined> {
-  const tenant = await getMetaClient()
-    .selectFrom('tenants')
-    .selectAll()
-    .where('id', '=', id)
-    .executeTakeFirst();
+  const tenant = await getMetaClient().selectFrom('tenants').selectAll().where('id', '=', id).executeTakeFirst();
   return tenant ? toPublicTenant(tenant) : undefined;
 }
