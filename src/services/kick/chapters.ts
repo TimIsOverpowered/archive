@@ -28,13 +28,12 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
     const { category, created_at } = streamData;
     const currentTimeSeconds = dayjs().diff(created_at, 'second');
 
-    let categoryGameId = String(category.id);
+    const categoryGameId = String(category.id);
     let bannerImage: string | null = null;
     if (category.slug != null && category.slug !== '') {
       try {
         const categoryInfo = await getKickCategoryInfo(category.slug);
         if (categoryInfo) {
-          categoryGameId = String(categoryInfo.id);
           bannerImage = categoryInfo.banner?.src ?? null;
         }
       } catch (error) {
@@ -52,24 +51,26 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
         .orderBy('start', 'desc')
         .executeTakeFirst();
 
+      const clampedTime = Math.max(currentTimeSeconds, lastChapter?.end ?? 0);
+
       if (lastChapter && lastChapter.game_id === categoryGameId) {
-        ChapterUpdateSchema.parse({ end: currentTimeSeconds, duration: currentTimeSeconds - lastChapter.start });
+        ChapterUpdateSchema.parse({ end: clampedTime, duration: clampedTime - lastChapter.start });
         await db
           .updateTable('chapters')
-          .set({ end: currentTimeSeconds, duration: currentTimeSeconds - lastChapter.start })
+          .set({ end: clampedTime, duration: clampedTime - lastChapter.start })
           .where('id', '=', lastChapter.id)
           .execute();
 
         updatedChapterId = lastChapter.id;
-        log.debug({ vodId, chapterId: lastChapter.id, currentTime: currentTimeSeconds }, 'Updated chapter end time');
+        log.debug({ vodId, chapterId: lastChapter.id, currentTime: clampedTime }, 'Updated chapter end time');
         return;
       }
 
       if (lastChapter) {
-        ChapterUpdateSchema.parse({ end: currentTimeSeconds, duration: currentTimeSeconds - lastChapter.start });
+        ChapterUpdateSchema.parse({ end: clampedTime, duration: clampedTime - lastChapter.start });
         await db
           .updateTable('chapters')
-          .set({ end: currentTimeSeconds, duration: currentTimeSeconds - lastChapter.start })
+          .set({ end: clampedTime, duration: clampedTime - lastChapter.start })
           .where('id', '=', lastChapter.id)
           .execute();
 
@@ -81,20 +82,20 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
         .selectFrom('chapters')
         .selectAll()
         .where('vod_id', '=', dbId)
-        .where('start', '=', currentTimeSeconds)
+        .where('start', '=', clampedTime)
         .executeTakeFirst();
 
       if (existingChapter) {
-        ChapterUpdateSchema.parse({ end: currentTimeSeconds, duration: 0 });
+        ChapterUpdateSchema.parse({ end: clampedTime, duration: 0 });
         await db
           .updateTable('chapters')
-          .set({ end: currentTimeSeconds, duration: 0 })
+          .set({ end: clampedTime, duration: 0 })
           .where('id', '=', existingChapter.id)
           .execute();
 
         updatedChapterId = existingChapter.id;
         log.debug(
-          { dbId, vodId, categoryId: category.id, categoryName: category.name, startTime: currentTimeSeconds },
+          { dbId, vodId, categoryId: category.id, categoryName: category.name, startTime: clampedTime },
           'Created new chapter'
         );
         return;
@@ -102,9 +103,9 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
 
       const validatedChapter = ChapterCreateSchema.parse({
         vod_id: dbId,
-        start: currentTimeSeconds,
+        start: clampedTime,
         duration: 0,
-        end: currentTimeSeconds,
+        end: clampedTime,
         title: category.name,
         game_id: categoryGameId,
       });
@@ -122,7 +123,7 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
         .execute();
 
       log.debug(
-        { dbId, vodId, categoryId: category.id, categoryName: category.name, startTime: currentTimeSeconds },
+        { dbId, vodId, categoryId: category.id, categoryName: category.name, startTime: clampedTime },
         'Created new chapter'
       );
     });
@@ -176,7 +177,37 @@ export async function finalizeKickChapters(
         finalizedChapterId = incompleteChapter.id;
         log.info({ vodId, chapterId: incompleteChapter.id, finalDuration: duration }, 'Finalized last chapter');
       } else {
-        log.debug({ vodId }, 'No incomplete chapters to finalize');
+        const lastChapter = await db
+          .selectFrom('chapters')
+          .selectAll()
+          .where('vod_id', '=', dbId)
+          .orderBy('start', 'desc')
+          .executeTakeFirst();
+
+        if (lastChapter && (lastChapter.end === null || lastChapter.end < finalDurationSeconds)) {
+          const duration = finalDurationSeconds - lastChapter.start;
+          if (duration <= 0) {
+            log.debug({ vodId }, 'Last chapter already covers full duration');
+          } else {
+            ChapterUpdateSchema.parse({ duration, end: finalDurationSeconds });
+            await db
+              .updateTable('chapters')
+              .set({
+                duration,
+                end: finalDurationSeconds,
+              })
+              .where('id', '=', lastChapter.id)
+              .execute();
+
+            finalizedChapterId = lastChapter.id;
+            log.info(
+              { vodId, chapterId: lastChapter.id, finalDuration: duration },
+              'Finalized last chapter (clock skew fix)'
+            );
+          }
+        } else {
+          log.debug({ vodId }, 'No incomplete chapters to finalize');
+        }
       }
     });
 
