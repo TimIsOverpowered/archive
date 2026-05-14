@@ -3,6 +3,7 @@ import { PLATFORMS } from '../../types/platforms.js';
 import { createErrorContext } from '../../utils/error.js';
 import { parseTwitchDuration } from '../../utils/formatting.js';
 import { getLogger } from '../../utils/logger.js';
+import { retryWithBackoff } from '../../utils/retry.js';
 import type {
   PlatformStrategy,
   PlatformStreamStatus,
@@ -94,14 +95,19 @@ export const strategy: PlatformStrategy = {
 
   async finalizeChapters(ctx, dbId, vodId, finalDurationSeconds): Promise<void> {
     try {
-      const chapters = await getChapters(vodId, ctx.tenantId);
-      await saveVodChapters({
-        ctx: { tenantId: ctx.tenantId, config: ctx.config },
-        dbId,
-        vodId,
-        finalDurationSeconds,
-        chapters,
-      });
+      await retryWithBackoff(
+        async () => {
+          const chapters = await getChapters(vodId, ctx.tenantId);
+          await saveVodChapters({
+            ctx: { tenantId: ctx.tenantId, config: ctx.config },
+            dbId,
+            vodId,
+            finalDurationSeconds,
+            chapters,
+          });
+        },
+        { attempts: 3, baseDelayMs: 1000, maxDelayMs: 10000 }
+      );
     } catch (error) {
       getLogger().error(createErrorContext(error, { vodId }), 'Failed to finalize Twitch chapters');
     }

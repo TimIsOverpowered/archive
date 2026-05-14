@@ -76,6 +76,7 @@ export function createTwitchGqlClient(
             },
             'API returned errors'
           );
+          throw new Error(`GQL request failed with ${errors.length} error(s)`);
         }
       }
 

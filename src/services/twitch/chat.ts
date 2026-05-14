@@ -1,4 +1,5 @@
 import { Twitch } from '../../constants.js';
+import { retryWithBackoff } from '../../utils/retry.js';
 import { createTwitchGqlClient } from './client.js';
 
 function getTwitchGqlClient(tenantId?: string) {
@@ -69,43 +70,61 @@ export interface TwitchVideoCommentResponse {
 export async function fetchComments(
   vodId: string,
   offset = 0,
-  tenantId?: string
+  tenantId?: string,
+  retryOptions?: { attempts?: number; baseDelayMs?: number; maxDelayMs?: number }
 ): Promise<TwitchVideoCommentResponse | null> {
   const client = getTwitchGqlClient(tenantId);
-  const data = await client.post<{ data?: { video?: TwitchVideoCommentResponse } }>({
-    operationName: 'VideoCommentsByOffsetOrCursor',
-    variables: {
-      videoID: vodId,
-      contentOffsetSeconds: offset,
-    },
-    extensions: {
-      persistedQuery: {
-        version: 1,
-        sha256Hash: 'b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a',
-      },
-    },
-  });
+  const attempts = retryOptions?.attempts ?? 3;
+  const baseDelayMs = retryOptions?.baseDelayMs ?? 1000;
+  const maxDelayMs = retryOptions?.maxDelayMs ?? 10000;
+
+  const data = await retryWithBackoff(
+    async () =>
+      client.post<{ data?: { video?: TwitchVideoCommentResponse } }>({
+        operationName: 'VideoCommentsByOffsetOrCursor',
+        variables: {
+          videoID: vodId,
+          contentOffsetSeconds: offset,
+        },
+        extensions: {
+          persistedQueries: {
+            version: 1,
+            sha256Hash: 'b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a',
+          },
+        },
+      }),
+    { attempts, baseDelayMs, maxDelayMs }
+  );
   return data.data?.video ?? null;
 }
 
 export async function fetchNextComments(
   vodId: string,
   cursor: string,
-  tenantId?: string
+  tenantId?: string,
+  retryOptions?: { attempts?: number; baseDelayMs?: number; maxDelayMs?: number }
 ): Promise<TwitchVideoCommentResponse | null> {
   const client = createTwitchGqlClient(tenantId, Twitch.BACKUP_GQL_CLIENT_ID);
-  const data = await client.post<{ data?: { video?: TwitchVideoCommentResponse } }>({
-    operationName: 'VideoCommentsByOffsetOrCursor',
-    variables: {
-      videoID: vodId,
-      cursor: cursor,
-    },
-    extensions: {
-      persistedQuery: {
-        version: 1,
-        sha256Hash: 'b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a',
-      },
-    },
-  });
+  const attempts = retryOptions?.attempts ?? 3;
+  const baseDelayMs = retryOptions?.baseDelayMs ?? 1000;
+  const maxDelayMs = retryOptions?.maxDelayMs ?? 10000;
+
+  const data = await retryWithBackoff(
+    async () =>
+      client.post<{ data?: { video?: TwitchVideoCommentResponse } }>({
+        operationName: 'VideoCommentsByOffsetOrCursor',
+        variables: {
+          videoID: vodId,
+          cursor: cursor,
+        },
+        extensions: {
+          persistedQueries: {
+            version: 1,
+            sha256Hash: 'b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a',
+          },
+        },
+      }),
+    { attempts, baseDelayMs, maxDelayMs }
+  );
   return data.data?.video ?? null;
 }

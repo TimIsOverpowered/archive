@@ -2,6 +2,7 @@ import { requirePlatformConfig } from '../../config/types.js';
 import { PLATFORMS } from '../../types/platforms.js';
 import { createErrorContext } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
+import { retryWithBackoff } from '../../utils/retry.js';
 import type {
   PlatformStrategy,
   PlatformStreamStatus,
@@ -97,7 +98,12 @@ export const strategy: PlatformStrategy<VodCreateData, VodUpdateData> = {
 
   async finalizeChapters(ctx, dbId, vodId, finalDurationSeconds): Promise<void> {
     try {
-      await finalizeKickChapters({ tenantId: ctx.tenantId, config: ctx.config }, dbId, vodId, finalDurationSeconds);
+      await retryWithBackoff(
+        async () => {
+          await finalizeKickChapters({ tenantId: ctx.tenantId, config: ctx.config }, dbId, vodId, finalDurationSeconds);
+        },
+        { attempts: 3, baseDelayMs: 1000, maxDelayMs: 10000 }
+      );
     } catch (error) {
       getLogger().error(createErrorContext(error, { vodId }), 'Failed to finalize Kick chapters');
     }

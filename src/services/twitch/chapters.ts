@@ -102,17 +102,17 @@ export async function saveVodChapters(options: SaveVodChaptersOptions): Promise<
     end: number | null;
   }> = [];
 
+  let chapters = preFetchedChapters;
+  if (chapters === undefined) {
+    chapters = await getChapters(vodId, tenantId);
+  }
+
+  if (!chapters) {
+    logger.warn({ vodId }, 'No chapters data available from Twitch API');
+    return 0;
+  }
+
   try {
-    let chapters = preFetchedChapters;
-    if (chapters === undefined) {
-      chapters = await getChapters(vodId, tenantId);
-    }
-
-    if (!chapters) {
-      logger.warn({ vodId }, 'No chapters data available from Twitch API');
-      return 0;
-    }
-
     if (chapters.length === 0) {
       const chapter = await getChapter(vodId, tenantId);
       if (chapter == null || chapter.game == null) {

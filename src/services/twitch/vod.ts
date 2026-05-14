@@ -1,6 +1,7 @@
 import { Twitch } from '../../constants.js';
 import { VodNotFoundError } from '../../utils/domain-errors.js';
 import { request } from '../../utils/http-client.js';
+import { retryWithBackoff } from '../../utils/retry.js';
 import { getTwitchClient } from './auth.js';
 import { createTwitchGqlClient } from './client.js';
 
@@ -39,26 +40,37 @@ export async function getVodData(vodId: string, logContext?: Record<string, unkn
   return data.data[0] as VodData;
 }
 
-export async function getVodTokenSig(vodId: string, tenantId?: string): Promise<VodTokenSig> {
+export async function getVodTokenSig(
+  vodId: string,
+  tenantId?: string,
+  retryOptions?: { attempts?: number; baseDelayMs?: number; maxDelayMs?: number }
+): Promise<VodTokenSig> {
   const client = createTwitchGqlClient(tenantId);
+  const attempts = retryOptions?.attempts ?? 3;
+  const baseDelayMs = retryOptions?.baseDelayMs ?? 1000;
+  const maxDelayMs = retryOptions?.maxDelayMs ?? 10000;
 
-  const data = await client.post<{ data: { videoPlaybackAccessToken: VodTokenSig } }>({
-    operationName: 'PlaybackAccessToken',
-    variables: {
-      isLive: false,
-      isVod: true,
-      login: '',
-      platform: 'web',
-      playerType: 'site',
-      vodID: vodId,
-    },
-    extensions: {
-      persistedQuery: {
-        version: 1,
-        sha256Hash: 'ed230aa1e33e07eebb8928504583da78a5173989fadfb1ac94be06a04f3cdbe9',
-      },
-    },
-  });
+  const data = await retryWithBackoff(
+    async () =>
+      client.post<{ data: { videoPlaybackAccessToken: VodTokenSig } }>({
+        operationName: 'PlaybackAccessToken',
+        variables: {
+          isLive: false,
+          isVod: true,
+          login: '',
+          platform: 'web',
+          playerType: 'site',
+          vodID: vodId,
+        },
+        extensions: {
+          persistedQueries: {
+            version: 1,
+            sha256Hash: 'ed230aa1e33e07eebb8928504583da78a5173989fadfb1ac94be06a04f3cdbe9',
+          },
+        },
+      }),
+    { attempts, baseDelayMs, maxDelayMs }
+  );
 
   const token = data.data.videoPlaybackAccessToken;
   if (token == null) {

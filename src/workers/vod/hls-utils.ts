@@ -194,7 +194,22 @@ export async function fetchTwitchPlaylist(
     shouldRetry?: (error: unknown) => boolean;
   }
 ): Promise<FetchPlaylistResult> {
-  const tokenSig = await getVodTokenSig(vodId, tenantId);
+  const opts =
+    retryOptions != null &&
+    [retryOptions.attempts, retryOptions.baseDelayMs, retryOptions.maxDelayMs].some((v) => v !== undefined);
+  const tokenSig = await getVodTokenSig(
+    vodId,
+    tenantId,
+    opts
+      ? Object.fromEntries(
+          Object.entries({
+            attempts: retryOptions.attempts,
+            baseDelayMs: retryOptions.baseDelayMs,
+            maxDelayMs: retryOptions.maxDelayMs,
+          }).filter(([, v]) => v !== undefined)
+        )
+      : undefined
+  );
 
   const masterPlaylistContent = await getTwitchM3u8(String(vodId), tokenSig.value, tokenSig.signature, retryOptions);
 
