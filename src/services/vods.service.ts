@@ -14,7 +14,7 @@ import { withStaleWhileRevalidate } from '../utils/cache.js';
 import { registerVodTags } from './cache-tags.js';
 import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.js';
 
-const FtsSpecialChars = /[&|()@:\\"]/g;
+const FtsSpecialChars = /[&|()@:"\\:]/g;
 
 function formatFtsTerm(term: string): string {
   const escaped = term.replace(FtsSpecialChars, '');
