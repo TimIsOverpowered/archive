@@ -18,6 +18,7 @@ const FtsSpecialChars = /[&|()@:"\\:]/g;
 
 function formatFtsTerm(term: string): string {
   const escaped = term.replace(FtsSpecialChars, '');
+  if (!escaped) return '';
   return `${escaped}:*`;
 }
 

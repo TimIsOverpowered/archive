@@ -195,6 +195,12 @@ describe('VodService: buildFtsQuery', () => {
   it('should return empty string for empty input', () => {
     assert.strictEqual(buildFtsQuery(''), '');
   });
+
+  it('should skip terms that are only special characters', () => {
+    assert.strictEqual(buildFtsQuery(':'), '');
+    assert.strictEqual(buildFtsQuery('&'), '');
+    assert.strictEqual(buildFtsQuery('hello : world'), 'hello:* & world:*');
+  });
 });
 
 describe('VodService: title and chapter filters', () => {
