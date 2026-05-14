@@ -21,6 +21,7 @@ CREATE UNIQUE INDEX "admins_api_key_hash_key" ON "admins"("api_key_hash");
 CREATE TABLE "tenants" (
     "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     "display_name" TEXT,
+    "profile_image_url" TEXT,
     "twitch" JSONB,
     "youtube" JSONB,
     "kick" JSONB,

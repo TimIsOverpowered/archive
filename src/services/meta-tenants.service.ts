@@ -5,6 +5,7 @@ import { encryptObject, encryptScalar } from '../utils/encryption.js';
 const tenantColumns = [
   'id',
   'display_name',
+  'profile_image_url',
   'twitch',
   'youtube',
   'kick',
@@ -13,6 +14,46 @@ const tenantColumns = [
   'created_at',
   'updated_at',
 ] as const;
+
+export interface PublicTenant {
+  id: string;
+  display_name: string | null;
+  profile_image_url: string | null;
+  created_at: Date;
+  platforms: Array<{ name: string; enabled: boolean; id: string | null }>;
+}
+
+function toPublicTenant(tenant: SelectableTenants): PublicTenant {
+  const platforms: PublicTenant['platforms'] = [];
+
+  const twitch = tenant.twitch;
+  if (twitch != null && typeof twitch === 'object' && !Array.isArray(twitch)) {
+    const t = twitch;
+    platforms.push({
+      name: 'twitch',
+      enabled: t.enabled === true,
+      id: (typeof t.id === 'string' ? t.id : null) ?? null,
+    });
+  }
+
+  const kick = tenant.kick;
+  if (kick != null && typeof kick === 'object' && !Array.isArray(kick)) {
+    const k = kick;
+    platforms.push({
+      name: 'kick',
+      enabled: k.enabled === true,
+      id: (typeof k.id === 'string' ? k.id : null) ?? null,
+    });
+  }
+
+  return {
+    id: tenant.id,
+    display_name: tenant.display_name,
+    profile_image_url: tenant.profile_image_url,
+    created_at: tenant.created_at,
+    platforms,
+  };
+}
 
 function encryptYoutubeFields(youtube: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
   if (youtube == null) return undefined;
@@ -116,4 +157,20 @@ export async function updateTenant(
 /** Delete a tenant record by ID. */
 export async function deleteTenant(id: string): Promise<void> {
   await getMetaClient().deleteFrom('tenants').where('id', '=', id).execute();
+}
+
+/** Retrieve all tenants with only public fields (no platform configs, no encrypted fields). */
+export async function getAllPublicTenants(): Promise<PublicTenant[]> {
+  const tenants = await getMetaClient().selectFrom('tenants').selectAll().execute();
+  return tenants.map(toPublicTenant);
+}
+
+/** Retrieve a single tenant by ID with only public fields. */
+export async function getPublicTenantById(id: string): Promise<PublicTenant | undefined> {
+  const tenant = await getMetaClient()
+    .selectFrom('tenants')
+    .selectAll()
+    .where('id', '=', id)
+    .executeTakeFirst();
+  return tenant ? toPublicTenant(tenant) : undefined;
 }

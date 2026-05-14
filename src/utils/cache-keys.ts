@@ -132,6 +132,8 @@ export const simpleKeys = {
     limit: number
   ): SimpleKey => simpleKey(`simple:${buildGameLibraryKey(tenantId, query, page, limit)}`),
   stats: (tenantId: string): SimpleKey => simpleKey(`simple:stats:${tenantId}`),
+  tenantList: (): SimpleKey => simpleKey('simple:tenants:list'),
+  tenantDetail: (tenantId: string): SimpleKey => simpleKey(`simple:tenants:detail:{${tenantId}}`),
 } as const;
 
 export const CacheKeys = {
@@ -151,4 +153,6 @@ export const CacheKeys = {
   gameStatic: (tenantId: string, dbId: number) => `game:{${tenantId}}:${dbId}`,
   chapterLibrary: buildChapterLibraryKey,
   gameLibrary: buildGameLibraryKey,
+  tenantList: () => 'tenants:list',
+  tenantDetail: (tenantId: string) => `tenants:detail:{${tenantId}}`,
 } as const;

@@ -9,17 +9,30 @@ import {
   deleteTenant,
 } from '../../../services/meta-tenants.service.js';
 import { getTenantStats } from '../../../services/tenants.service.js';
+import { CacheKeys, simpleKeys } from '../../../utils/cache-keys.js';
+import { defaultCacheContext } from '../../../utils/cache.js';
 import { notFound } from '../../../utils/http-error.js';
+import { RedisService } from '../../../utils/redis-service.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import { tenantMiddleware, requireTenant } from '../../middleware/tenant-platform.js';
 import { ok } from '../../response.js';
 
+function invalidatePublicTenantCache(tenantId: string): void {
+  defaultCacheContext.invalidateKey(simpleKeys.tenantList());
+  defaultCacheContext.invalidateKey(simpleKeys.tenantDetail(tenantId));
+
+  const client = RedisService.getActiveClient();
+  if (client) {
+    void client.unlink(CacheKeys.tenantList(), CacheKeys.tenantDetail(tenantId)).catch(() => {});
+  }
+}
+
 export default function tenantsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
 
   fastify.get(
-    '/tenants',
+    '/admin/tenants',
     {
       schema: {
         tags: ['Admin'],
@@ -35,7 +48,7 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
   );
 
   fastify.get<{ Params: { id: string } }>(
-    '/tenants/:id',
+    '/admin/tenants/:id',
     {
       schema: {
         tags: ['Admin'],
@@ -61,7 +74,7 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
   );
 
   fastify.post<{ Body: InsertableTenants }>(
-    '/tenants',
+    '/admin/tenants',
     {
       schema: {
         tags: ['Admin'],
@@ -85,12 +98,13 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
     },
     async (request) => {
       const tenant = await createTenant(request.body);
+      invalidatePublicTenantCache(tenant.id);
       return ok(tenant);
     }
   );
 
   fastify.put<{ Params: { id: string }; Body: Partial<InsertableTenants> }>(
-    '/tenants/:id',
+    '/admin/tenants/:id',
     {
       schema: {
         tags: ['Admin'],
@@ -122,12 +136,13 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
         notFound(`Tenant ${request.params.id} not found`);
       }
 
+      invalidatePublicTenantCache(tenant.id);
       return ok(tenant);
     }
   );
 
   fastify.delete<{ Params: { id: string } }>(
-    '/tenants/:id',
+    '/admin/tenants/:id',
     {
       schema: {
         tags: ['Admin'],
@@ -142,13 +157,14 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
       onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
     },
     async (request) => {
+      invalidatePublicTenantCache(request.params.id);
       await deleteTenant(request.params.id);
       return ok({ message: `Tenant ${request.params.id} deleted` });
     }
   );
 
   fastify.get<{ Params: { tenantId: string } }>(
-    '/tenants/:tenantId/stats',
+    '/admin/tenants/:tenantId/stats',
     {
       schema: {
         tags: ['Admin'],

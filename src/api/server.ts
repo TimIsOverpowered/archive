@@ -16,12 +16,13 @@ import createTenantLoggerMiddleware, { exitTenantContext } from './middleware/te
 import configPlugin from './plugins/config.plugin.js';
 import redisPlugin from './plugins/redis.plugin.js';
 import { errorResponse } from './response.js';
-import { authRoutes, tenantsRoutes, default as adminRoutes } from './routes/admin/index.js';
+import { authRoutes, tenantsRoutes as adminTenantsRoutes, default as adminRoutes } from './routes/admin/index.js';
 import badgesRoutes from './routes/badges.js';
 import chaptersRoutes from './routes/chapters.js';
 import gamesRoutes from './routes/games.js';
 import healthRoutes from './routes/health.js';
 import logsRoutes from './routes/logs.js';
+import publicTenantsRoutes from './routes/tenants.js';
 import vodsRoutes from './routes/vods.js';
 
 export async function buildServer(config: ApiConfig) {
@@ -153,6 +154,7 @@ export async function buildServer(config: ApiConfig) {
       await instance.register(chaptersRoutes, { prefix: '' });
       await instance.register(logsRoutes, { prefix: '' });
       await instance.register(badgesRoutes, { prefix: '' });
+      await instance.register(publicTenantsRoutes, { prefix: '' });
     },
     { prefix: '/api/v1' }
   );
@@ -161,7 +163,7 @@ export async function buildServer(config: ApiConfig) {
   await fastify.register(
     async (instance) => {
       await instance.register(authRoutes, { prefix: '' });
-      await instance.register(tenantsRoutes, { prefix: '' });
+      await instance.register(adminTenantsRoutes, { prefix: '' });
     },
     { prefix: '/api/v1' }
   );
