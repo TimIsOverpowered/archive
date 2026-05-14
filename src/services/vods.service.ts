@@ -24,7 +24,7 @@ function formatFtsTerm(term: string): string {
 export function buildFtsQuery(text: string): string {
   const words = text.trim().split(/\s+/).filter(Boolean).slice(0, Fts.MAX_WORDS);
   if (words.length === 0) return '';
-  return words.map(formatFtsTerm).join(' & ');
+  return words.map(formatFtsTerm).filter(Boolean).join(' & ');
 }
 
 function applyVolatileData(
