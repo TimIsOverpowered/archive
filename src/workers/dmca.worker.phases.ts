@@ -1,0 +1,547 @@
+import { Job } from 'bullmq';
+import { Jobs, DiscordAlert, YouTube } from '../constants.js';
+import type { SelectableGames } from '../db/streamer-types.js';
+import type { SourceType } from '../types/platforms.js';
+import { createAutoLogger } from '../utils/auto-tenant-logger.js';
+import { initRichAlert, createProgressBar } from '../utils/discord-alerts.js';
+import { ConfigNotConfiguredError, FileNotFound } from '../utils/domain-errors.js';
+import { extractErrorDetails } from '../utils/error.js';
+import { toHHMMSS } from '../utils/formatting.js';
+import { fileExists, getTmpDirPath } from '../utils/path.js';
+import {
+  buildAudioFilters,
+  muteAudioSections,
+  blackoutVideoSections,
+  BlackoutSection,
+  CLAIM_MATCH_TYPES,
+} from './dmca/dmca.js';
+import type { DMCAClaim } from './dmca/dmca.js';
+import type { DmcaProcessingJob } from './jobs/types.js';
+import { createGameUploadJob } from './jobs/youtube.job.js';
+import { getFlowProducer, getYoutubeUploadQueue, getVodFinalizeFileQueue } from './queues/queue.js';
+import type { BaseWorkerContext } from './types.js';
+import { createDmcaWorkerAlerts, DmcaClaimInfo, safeUpdateAlert } from './utils/alert-factories.js';
+import type { DmcaWorkerAlerts } from './utils/alert-factories.js';
+import { trimVideo } from './utils/ffmpeg.js';
+import { getJobContext } from './utils/job-context.js';
+
+export interface DmcaProcessorContext extends BaseWorkerContext {
+  job: Job<DmcaProcessingJob>;
+  type: SourceType;
+  displayName: string;
+  filePath: string;
+  processedPath: string;
+  blockingClaims: DMCAClaim[];
+  claimInfos: DmcaClaimInfo[];
+  isGameUpload: boolean;
+  gameId: number | undefined;
+  gameStart: number | undefined;
+  gameDuration: number | undefined;
+  part: number | undefined;
+  alerts: DmcaWorkerAlerts;
+  workDir: string;
+  tempFiles: string[];
+  completedClaimIds: string[];
+  streamId?: string | undefined;
+}
+
+export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Promise<DmcaProcessorContext> {
+  const {
+    tenantId,
+    dbId,
+    vodId,
+    receivedClaims,
+    platform,
+    part,
+    filePath: providedFilePath,
+    gameId,
+    gameStart,
+    gameDuration,
+    type,
+    streamId,
+  } = job.data;
+  const isGameUpload = gameId != null && gameStart != null && gameDuration != null;
+  const log = createAutoLogger(String(tenantId));
+
+  const { config, db } = await getJobContext(tenantId);
+
+  if (!config.youtube) {
+    throw new ConfigNotConfiguredError(`YouTube for tenant ${tenantId}`);
+  }
+
+  let filePath: string;
+
+  if (providedFilePath != null) {
+    filePath = providedFilePath;
+    log.info({ vodId, filePath, part, gameId, isGameUpload }, 'DMCA processing started (file exists)');
+  } else {
+    const childResults = await job.getChildrenValues();
+    const downloadResult = Object.values(childResults)[0] as { finalPath?: string; filePath?: string };
+
+    if (downloadResult?.finalPath != null && downloadResult.finalPath !== '') {
+      filePath = downloadResult.finalPath;
+    } else if (downloadResult?.filePath != null && downloadResult.filePath !== '') {
+      filePath = downloadResult.filePath;
+    } else {
+      throw new Error(
+        `File path not available for vodId=${vodId}, jobId=${job.id}: ` +
+          `download job may have failed or not completed. Child results: ${JSON.stringify(childResults)}`
+      );
+    }
+    log.info(
+      { vodId, filePath, part, gameId, isGameUpload, jobId: job.id },
+      'DMCA processing started (file path from download job)'
+    );
+  }
+
+  if (!(await fileExists(filePath))) {
+    throw new FileNotFound(filePath);
+  }
+
+  const blockingClaims = receivedClaims;
+
+  const buildClaimInfo = (claim: (typeof blockingClaims)[0]): DmcaClaimInfo => {
+    const startSec = claim.videoSegment.startMillis / 1000;
+    const endSec = claim.videoSegment.endMillis / 1000;
+    return {
+      startTimestamp: toHHMMSS(startSec),
+      endTimestamp: toHHMMSS(endSec),
+      claimType: claim.matchType,
+    };
+  };
+
+  const claimInfos: DmcaClaimInfo[] = blockingClaims.map(buildClaimInfo);
+  const alerts = createDmcaWorkerAlerts();
+  const displayName = config.displayName ?? config.id;
+  const messageId = await initRichAlert(alerts.processing(vodId, claimInfos, platform, displayName, part)).catch(
+    () => null
+  );
+
+  log.info(
+    {
+      vodId,
+      filePath,
+      part,
+      claimsCount: blockingClaims.length,
+      jobId: job.id,
+      claims: claimInfos.map((c) => ({
+        type: c.claimType,
+        range: `${c.startTimestamp}-${c.endTimestamp}`,
+      })),
+    },
+    'Starting DMCA processing'
+  );
+
+  return {
+    job,
+    config,
+    db,
+    tenantId,
+    dbId,
+    vodId,
+    platform,
+    type,
+    displayName,
+    filePath,
+    processedPath: filePath,
+    blockingClaims,
+    claimInfos,
+    isGameUpload,
+    gameId,
+    gameStart,
+    gameDuration,
+    part,
+    log,
+    alerts,
+    messageId,
+    workDir: getTmpDirPath({ tenantId, vodId }),
+    tempFiles: [],
+    completedClaimIds: [],
+    streamId,
+  };
+}
+
+export async function trimDmcaVideo(ctx: DmcaProcessorContext): Promise<void> {
+  if (ctx.part != null && ctx.config.youtube != null) {
+    const splitDuration = ctx.config.youtube.splitDuration ?? YouTube.DEFAULT_SPLIT_DURATION;
+    const startOffset = splitDuration * (ctx.part - 1);
+
+    ctx.log.info({ vodId: ctx.vodId, part: ctx.part }, 'Extracting part from VOD');
+
+    let dmcaTrimFfmpegCmd: string | undefined;
+    const trimStartTime = Date.now();
+
+    const trimmed = await trimVideo(
+      ctx.filePath,
+      startOffset,
+      splitDuration,
+      `${ctx.vodId}-part-${ctx.part}`,
+      (percent: number) => {
+        const elapsed = (Date.now() - trimStartTime) / 1000;
+        const eta = percent > 0 ? Math.round((elapsed / percent) * (100 - percent)) : 0;
+
+        const alertFields: Array<{ name: string; value: string; inline: boolean }> = [
+          { name: 'VOD ID', value: ctx.vodId, inline: true },
+          { name: 'Part', value: `${ctx.part}`, inline: true },
+          { name: 'Progress', value: createProgressBar(percent), inline: false },
+        ];
+
+        if (dmcaTrimFfmpegCmd != null) {
+          alertFields.push({
+            name: 'FFmpeg',
+            value: `\`${dmcaTrimFfmpegCmd.substring(0, DiscordAlert.FIELD_VALUE_TRUNCATE)}\``,
+            inline: false,
+          });
+        }
+
+        alertFields.push({ name: 'ETA', value: toHHMMSS(Math.max(0, eta)), inline: true });
+
+        safeUpdateAlert(
+          ctx.messageId,
+          {
+            title: `✂️ DMCA Processing - Trimming Part ${ctx.part}`,
+            description: `${ctx.displayName} - Extracting part ${ctx.part}/${ctx.blockingClaims.length}`,
+            status: 'warning',
+            fields: alertFields,
+            timestamp: new Date().toISOString(),
+            updatedTimestamp: new Date().toISOString(),
+          },
+          ctx.log,
+          ctx.vodId
+        );
+      },
+      (cmd) => {
+        dmcaTrimFfmpegCmd = cmd;
+      }
+    );
+
+    if (ctx.processedPath !== ctx.filePath) ctx.tempFiles.push(ctx.processedPath);
+    ctx.processedPath = trimmed;
+  }
+
+  if (ctx.isGameUpload && ctx.gameStart != null && ctx.gameDuration != null && ctx.gameId != null) {
+    ctx.log.info(
+      { vodId: ctx.vodId, gameId: ctx.gameId, gameStart: ctx.gameStart, gameDuration: ctx.gameDuration },
+      'Trimming VOD to game range'
+    );
+
+    let dmcaGameTrimFfmpegCmd: string | undefined;
+    const gameTrimStartTime = Date.now();
+
+    const trimmedPath = await trimVideo(
+      ctx.processedPath,
+      ctx.gameStart,
+      ctx.gameDuration,
+      `${ctx.vodId}-game-${ctx.gameId}-trimmed`,
+      (percent: number) => {
+        const elapsed = (Date.now() - gameTrimStartTime) / 1000;
+        const eta = percent > 0 ? Math.round((elapsed / percent) * (100 - percent)) : 0;
+
+        const alertFields: Array<{ name: string; value: string; inline: boolean }> = [
+          { name: 'VOD ID', value: ctx.vodId, inline: true },
+          { name: 'Game ID', value: String(ctx.gameId), inline: true },
+          { name: 'Progress', value: createProgressBar(percent), inline: false },
+        ];
+
+        if (dmcaGameTrimFfmpegCmd != null) {
+          alertFields.push({
+            name: 'FFmpeg',
+            value: `\`${dmcaGameTrimFfmpegCmd.substring(0, DiscordAlert.FIELD_VALUE_TRUNCATE)}\``,
+            inline: false,
+          });
+        }
+
+        alertFields.push({ name: 'ETA', value: toHHMMSS(Math.max(0, eta)), inline: true });
+
+        safeUpdateAlert(
+          ctx.messageId,
+          {
+            title: `✂️ DMCA Processing - Trimming Game Clip`,
+            description: `${ctx.displayName} - Extracting game clip from VOD ${ctx.vodId}`,
+            status: 'warning',
+            fields: alertFields,
+            timestamp: new Date().toISOString(),
+            updatedTimestamp: new Date().toISOString(),
+          },
+          ctx.log,
+          ctx.vodId
+        );
+      },
+      (cmd) => {
+        dmcaGameTrimFfmpegCmd = cmd;
+      }
+    );
+
+    if (ctx.processedPath !== ctx.filePath) ctx.tempFiles.push(ctx.processedPath);
+    ctx.processedPath = trimmedPath;
+  }
+}
+
+export async function processDmcaClaims(ctx: DmcaProcessorContext): Promise<void> {
+  const audioClaims = ctx.blockingClaims.filter((claim) => claim.matchType === CLAIM_MATCH_TYPES.AUDIO);
+  const audioVisualClaims = ctx.blockingClaims.filter((claim) => claim.matchType === CLAIM_MATCH_TYPES.AUDIOVISUAL);
+  const videoClaims = ctx.blockingClaims.filter((claim) => claim.matchType === CLAIM_MATCH_TYPES.VIDEO);
+  const blackoutClaims = [...videoClaims, ...audioVisualClaims];
+  const muteClaims = [...audioClaims, ...audioVisualClaims];
+  const muteFilters = buildAudioFilters(muteClaims);
+
+  const markClaimsCompleted = (claims: typeof ctx.blockingClaims) => {
+    for (const claim of claims) {
+      const idx = ctx.blockingClaims.indexOf(claim);
+      if (idx !== -1 && !ctx.completedClaimIds.includes(String(idx))) {
+        ctx.completedClaimIds.push(String(idx));
+      }
+    }
+  };
+
+  let currentCommand: string | undefined;
+
+  const sendAlert = (step: string, progress?: number) => {
+    const alertData =
+      progress != null
+        ? ctx.alerts.progress(
+            ctx.vodId,
+            ctx.claimInfos,
+            ctx.completedClaimIds,
+            step,
+            ctx.platform,
+            ctx.displayName,
+            progress,
+            currentCommand
+          )
+        : ctx.alerts.progress(ctx.vodId, ctx.claimInfos, ctx.completedClaimIds, step, ctx.platform, ctx.displayName);
+    safeUpdateAlert(ctx.messageId, alertData, ctx.log, ctx.vodId);
+  };
+
+  if (blackoutClaims.length > 0) {
+    ctx.log.info(
+      {
+        vodId: ctx.vodId,
+        count: blackoutClaims.length,
+        claims: blackoutClaims.map((c) => ({
+          startMillis: c.videoSegment.startMillis,
+          endMillis: c.videoSegment.endMillis,
+        })),
+      },
+      'Processing visual claims (blackout)'
+    );
+
+    const blackoutSections: BlackoutSection[] = [];
+
+    for (const claim of blackoutClaims) {
+      const startSeconds = claim.videoSegment.startMillis / 1000;
+      const endSeconds = claim.videoSegment.endMillis / 1000;
+      const durationSeconds = endSeconds - startSeconds;
+
+      ctx.log.info(
+        {
+          vodId: ctx.vodId,
+          startSeconds,
+          endSeconds,
+        },
+        'Blackouting section'
+      );
+
+      blackoutSections.push({ startSeconds, durationSeconds, endSeconds });
+    }
+
+    const blackoutedPath = await blackoutVideoSections(ctx.processedPath, ctx.vodId, blackoutSections, ctx.workDir, {
+      onProgress: (pct) => {
+        sendAlert('blackout-video', pct);
+      },
+      onStep: (step, current, total) => {
+        sendAlert(`blackout-video [${current}/${total}]: ${step}`);
+      },
+      onStart: (cmd) => {
+        currentCommand = cmd;
+      },
+      audioFilters: muteFilters,
+    });
+
+    if (blackoutedPath == null) {
+      throw new Error('Failed to process visual claims');
+    }
+
+    if (ctx.processedPath !== ctx.filePath) ctx.tempFiles.push(ctx.processedPath);
+    ctx.processedPath = blackoutedPath;
+    markClaimsCompleted(blackoutClaims);
+    if (muteFilters.length > 0) {
+      markClaimsCompleted(muteClaims);
+    }
+    sendAlert('visual-claims-complete');
+  } else if (muteClaims.length > 0) {
+    ctx.log.info(
+      {
+        vodId: ctx.vodId,
+        count: muteClaims.length,
+        claims: muteClaims.map((c) => ({
+          startMillis: c.videoSegment.startMillis,
+          endMillis: c.videoSegment.endMillis,
+        })),
+      },
+      'Processing audio claims (mute)'
+    );
+
+    const mutedPath = `${ctx.processedPath.replace('.mp4', '-muted.mp4')}`;
+
+    const mutedResult = await muteAudioSections(
+      ctx.processedPath,
+      muteFilters,
+      mutedPath,
+      (pct) => {
+        sendAlert('mute-audio', pct);
+      },
+      (cmd) => {
+        currentCommand = cmd;
+      }
+    );
+
+    if (mutedResult == null) {
+      throw new Error('Failed to process audio claims');
+    }
+
+    if (ctx.processedPath !== ctx.filePath) ctx.tempFiles.push(ctx.processedPath);
+    ctx.processedPath = mutedResult;
+    markClaimsCompleted(muteClaims);
+    sendAlert('mute-complete');
+  }
+}
+
+export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> {
+  ctx.log.info(
+    { vodId: ctx.vodId, part: ctx.part, gameId: ctx.gameId, isGameUpload: ctx.isGameUpload },
+    'Queuing YouTube upload with finalize chain'
+  );
+
+  const youtubeQueue = getYoutubeUploadQueue();
+  const finalizeQueue = getVodFinalizeFileQueue();
+
+  if (ctx.isGameUpload && ctx.gameStart != null && ctx.gameDuration != null && ctx.gameId != null) {
+    const game = (await ctx.db
+      .selectFrom('games')
+      .selectAll()
+      .where('id', '=', ctx.gameId)
+      .executeTakeFirst()) as SelectableGames;
+
+    try {
+      const job = await createGameUploadJob(
+        { tenantId: ctx.tenantId, config: ctx.config, db: ctx.db },
+        ctx.dbId,
+        ctx.vodId,
+        ctx.processedPath,
+        ctx.platform,
+        {
+          id: game.id,
+          vod_id: game.vod_id,
+          game_id: game.game_id,
+          name: game.game_name,
+          image: game.chapter_image,
+          start: game.start,
+          duration: game.duration,
+          end: game.end,
+        },
+        {
+          gameTitle: game.title ?? undefined,
+        }
+      );
+
+      const timestamp = Date.now();
+      const flow = await getFlowProducer().add({
+        name: 'vod_finalize_file',
+        queueName: finalizeQueue.name,
+        data: {
+          tenantId: ctx.tenantId,
+          dbId: ctx.dbId,
+          vodId: ctx.vodId,
+          filePath: ctx.filePath,
+          type: ctx.type,
+          platform: ctx.platform,
+          workDir: ctx.workDir,
+          saveMP4: ctx.config.settings.saveMP4 ?? false,
+          saveHLS: ctx.config.settings.saveHLS ?? false,
+          streamId: ctx.streamId,
+        },
+        opts: {
+          jobId: `finalize_${ctx.vodId}_1_${timestamp}`,
+          removeOnComplete: true,
+          removeOnFail: true,
+          failParentOnFailure: false,
+        },
+        children: [
+          {
+            name: 'youtube_upload',
+            queueName: youtubeQueue.name,
+            data: { ...job, workDir: ctx.workDir },
+            opts: {
+              jobId: `${Jobs.YOUTUBE_JOB_PREFIX}${ctx.vodId}_game_${job.chapterId}_${job.chapterStart}`,
+              removeOnComplete: true,
+              removeOnFail: true,
+              failParentOnFailure: false,
+            },
+          },
+        ],
+      });
+
+      ctx.log.info({ vodId: ctx.vodId, finalizeJobId: flow.job.id }, 'Queued DMCA game upload with finalize chain');
+    } catch (err) {
+      const details = extractErrorDetails(err);
+      ctx.log.warn({ ...details, vodId: ctx.vodId }, 'Failed to queue DMCA game upload with finalize chain');
+    }
+  } else {
+    try {
+      const timestamp = Date.now();
+      const flow = await getFlowProducer().add({
+        name: 'vod_finalize_file',
+        queueName: finalizeQueue.name,
+        data: {
+          tenantId: ctx.tenantId,
+          dbId: ctx.dbId,
+          vodId: ctx.vodId,
+          filePath: ctx.filePath,
+          type: ctx.type,
+          platform: ctx.platform,
+          workDir: ctx.workDir,
+          saveMP4: ctx.config.settings.saveMP4 ?? false,
+          saveHLS: ctx.config.settings.saveHLS ?? false,
+          streamId: ctx.streamId,
+        },
+        opts: {
+          jobId: `finalize_${ctx.vodId}_1_${timestamp}`,
+          removeOnComplete: true,
+          removeOnFail: true,
+          failParentOnFailure: false,
+        },
+        children: [
+          {
+            name: 'youtube_upload',
+            queueName: youtubeQueue.name,
+            data: {
+              kind: 'vod',
+              tenantId: ctx.tenantId,
+              dbId: ctx.dbId,
+              vodId: ctx.vodId,
+              filePath: ctx.processedPath,
+              type: ctx.type,
+              platform: undefined,
+              dmcaProcessed: true,
+              part: ctx.part,
+              workDir: ctx.workDir,
+              streamId: ctx.streamId,
+            },
+            opts: {
+              jobId: `${Jobs.YOUTUBE_JOB_PREFIX}${ctx.vodId}_vod_${ctx.part ?? 1}`,
+              removeOnComplete: true,
+              removeOnFail: true,
+              failParentOnFailure: false,
+            },
+          },
+        ],
+      });
+
+      ctx.log.info({ vodId: ctx.vodId, finalizeJobId: flow.job.id }, 'Queued DMCA VOD upload with finalize chain');
+    } catch (err) {
+      const details = extractErrorDetails(err);
+      ctx.log.warn({ ...details, vodId: ctx.vodId }, 'Failed to queue DMCA VOD upload with finalize chain');
+    }
+  }
+}

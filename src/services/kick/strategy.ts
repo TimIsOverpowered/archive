@@ -1,0 +1,111 @@
+import { requirePlatformConfig } from '../../config/types.js';
+import { PLATFORMS } from '../../types/platforms.js';
+import { createErrorContext } from '../../utils/error.js';
+import { getLogger } from '../../utils/logger.js';
+import { retryWithBackoff } from '../../utils/retry.js';
+import type {
+  PlatformStrategy,
+  PlatformStreamStatus,
+  PlatformVodMetadata,
+  VodCreateData,
+  VodUpdateData,
+} from '../platforms/strategy.js';
+import { getKickStreamStatus, getLatestKickVodObject, getVod, finalizeKickChapters } from './index.js';
+export const strategy: PlatformStrategy<VodCreateData, VodUpdateData> = {
+  async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
+    const { config, platform } = ctx;
+
+    const cfg = requirePlatformConfig(config, platform);
+    if (!cfg) return null;
+
+    const streamStatus = await getKickStreamStatus(cfg.platformUsername);
+
+    if (streamStatus == null) {
+      return null;
+    }
+
+    return {
+      id: String(streamStatus.id),
+      title: streamStatus.session_title ?? '',
+      startedAt: streamStatus.created_at,
+      streamId: String(streamStatus.id),
+      platformUserId: cfg.platformUserId,
+      platformUsername: cfg.platformUsername,
+    };
+  },
+
+  async fetchVodMetadata(vodId: string, ctx): Promise<PlatformVodMetadata | null> {
+    const { config, platform } = ctx;
+
+    const cfg = requirePlatformConfig(config, platform);
+    if (!cfg) return null;
+
+    const vodData = await getVod(cfg.platformUsername, vodId);
+
+    return {
+      id: `${vodData.id}`,
+      title: vodData.session_title ?? '',
+      createdAt: vodData.created_at,
+      duration: Math.floor(Number(vodData.duration) / 1000),
+      streamId: `${vodData.id}`,
+      sourceUrl: vodData.source ?? undefined,
+    };
+  },
+
+  async fetchVodObjectForLiveStream(streamId: string, ctx): Promise<PlatformVodMetadata | null> {
+    const { config, platform } = ctx;
+
+    const cfg = requirePlatformConfig(config, platform);
+    if (!cfg) return null;
+
+    const vodObject = await getLatestKickVodObject(cfg.platformUsername, streamId);
+
+    if (!vodObject) {
+      return null;
+    }
+
+    return {
+      id: String(vodObject.id),
+      title: vodObject.session_title ?? '',
+      createdAt: new Date(vodObject.created_at).toISOString(),
+      duration: 0,
+      streamId,
+      sourceUrl: vodObject.source ?? undefined,
+    };
+  },
+
+  createVodData(meta: PlatformVodMetadata): VodCreateData {
+    return {
+      platform_vod_id: meta.id,
+      title: meta.title === '' ? null : (meta.title ?? ''),
+      created_at: meta.createdAt,
+      duration: meta.duration,
+      platform_stream_id: meta.streamId ?? null,
+      platform: PLATFORMS.KICK,
+      is_live: false,
+    };
+  },
+
+  updateVodData(meta: PlatformVodMetadata): VodUpdateData {
+    return {
+      platform_vod_id: meta.id,
+      title: meta.title === '' ? null : (meta.title ?? ''),
+      created_at: new Date(meta.createdAt),
+      duration: meta.duration,
+      platform_stream_id: meta.streamId,
+    };
+  },
+
+  async finalizeChapters(ctx, dbId, vodId, finalDurationSeconds): Promise<void> {
+    try {
+      await retryWithBackoff(
+        async () => {
+          await finalizeKickChapters({ tenantId: ctx.tenantId, config: ctx.config }, dbId, vodId, finalDurationSeconds);
+        },
+        { attempts: 3, baseDelayMs: 1000, maxDelayMs: 10000 }
+      );
+    } catch (error) {
+      getLogger().error(createErrorContext(error, { vodId }), 'Failed to finalize Kick chapters');
+    }
+  },
+};

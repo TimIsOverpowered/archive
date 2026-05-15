@@ -1,0 +1,29 @@
+import { getWorkersConfig } from '../config/env.js';
+import { RedisService } from '../utils/redis-service.js';
+
+let initPromise: Promise<void> | null = null;
+
+export function getRedisInstance() {
+  return RedisService.getClient();
+}
+
+export async function initWorkersRedis(): Promise<void> {
+  if (RedisService.instance) return;
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    const url = getWorkersConfig().REDIS_URL;
+    await RedisService.init({ url, maxRetriesPerRequest: null }).connect();
+  })();
+
+  return initPromise;
+}
+
+export async function waitForRedisReady(): Promise<void> {
+  if (!initPromise) throw new Error('Call initWorkersRedis() first');
+  return initPromise;
+}
+
+export async function closeWorkersRedis(): Promise<void> {
+  await RedisService.close();
+}
