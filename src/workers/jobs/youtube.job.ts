@@ -697,8 +697,9 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
         gameJobIds.push(gameJobId);
       }
 
-      const finalizeJobId = `finalize_${vodId}_1`;
-      const vodJobId = `youtube_${vodId}_vod_1`;
+      const timestamp = Date.now();
+      const finalizeJobId = `finalize_${vodId}_1_${timestamp}`;
+      const vodJobId = `youtube_${vodId}_vod_1_${timestamp}`;
       const baseChildren = buildCopyChildren(downloadJobId, copyJobId);
 
       const gameChainHead = buildSequentialGameChain(gameJobs, gameJobIds, youtubeQueue.name, baseChildren, workDir);
@@ -747,7 +748,8 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
           gameJobIds.push(gameJobId);
         }
 
-        const finalizeJobId = `finalize_${vodId}_1`;
+        const timestamp = Date.now();
+        const finalizeJobId = `finalize_${vodId}_1_${timestamp}`;
         const baseChildren = buildCopyChildren(downloadJobId, copyJobId);
 
         const gameChainHead = buildSequentialGameChain(gameJobs, gameJobIds, youtubeQueue.name, baseChildren, workDir);
@@ -790,8 +792,9 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
       vodUploadEnabled
     ) {
       try {
-        const finalizeJobId = `finalize_${vodId}_1`;
-        const vodJobId = `youtube_${vodId}_vod_1`;
+        const timestamp = Date.now();
+        const finalizeJobId = `finalize_${vodId}_1_${timestamp}`;
+        const vodJobId = `youtube_${vodId}_vod_1_${timestamp}`;
 
         const vodChildBase = buildCopyChildren(downloadJobId, copyJobId);
 

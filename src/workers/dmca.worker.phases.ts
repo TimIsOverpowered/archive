@@ -445,6 +445,7 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
         }
       );
 
+      const timestamp = Date.now();
       const flow = await getFlowProducer().add({
         name: 'vod_finalize_file',
         queueName: finalizeQueue.name,
@@ -461,7 +462,7 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
           streamId: ctx.streamId,
         },
         opts: {
-          jobId: `finalize_${ctx.vodId}_1`,
+          jobId: `finalize_${ctx.vodId}_1_${timestamp}`,
           removeOnComplete: true,
           removeOnFail: true,
           failParentOnFailure: false,
@@ -488,6 +489,7 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
     }
   } else {
     try {
+      const timestamp = Date.now();
       const flow = await getFlowProducer().add({
         name: 'vod_finalize_file',
         queueName: finalizeQueue.name,
@@ -504,7 +506,7 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
           streamId: ctx.streamId,
         },
         opts: {
-          jobId: `finalize_${ctx.vodId}_1`,
+          jobId: `finalize_${ctx.vodId}_1_${timestamp}`,
           removeOnComplete: true,
           removeOnFail: true,
           failParentOnFailure: false,
