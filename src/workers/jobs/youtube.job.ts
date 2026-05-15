@@ -69,7 +69,7 @@ export async function createGameUploadJob(
   filePath: string | undefined,
   platform: Platform,
   chapter: SelectableChapters,
-  options?: { gameTitle?: string | undefined }
+  options?: { gameTitle?: string | undefined; localEpOffset?: number }
 ): Promise<YoutubeGameUploadJob> {
   const { config, tenantId } = ctx;
   if (config.youtube?.upload === false) {
@@ -108,7 +108,7 @@ export async function createGameUploadJob(
       .executeTakeFirst();
     return Number(result?.cnt ?? 0);
   });
-  const epNumber = gameCount + 1;
+  const epNumber = gameCount + 1 + (options?.localEpOffset ?? 0);
 
   return {
     kind: 'game',
@@ -161,10 +161,16 @@ async function createGameUploadJobsForVod(
   });
 
   const jobs: YoutubeGameUploadJob[] = [];
+  const localGameCounts = new Map<string, number>();
 
   for (const chapter of chapters) {
     try {
-      const job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, chapter);
+      const gameKey = chapter.name ?? 'unknown';
+      const localOffset = localGameCounts.get(gameKey) ?? 0;
+      const job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, chapter, {
+        localEpOffset: localOffset,
+      });
+      localGameCounts.set(gameKey, localOffset + 1);
       jobs.push({ ...job, workDir });
     } catch (error) {
       const details = extractErrorDetails(error);
