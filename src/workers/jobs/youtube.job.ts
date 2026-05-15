@@ -674,6 +674,8 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
   const { config } = ctx;
   const saveHls = config.settings.saveHLS ?? false;
 
+  const activeFilePath = downloadJobId != null || copyJobId != null ? undefined : filePath;
+
   const result: YoutubeUploadJobResult = {
     vodJobId: null,
     gameJobIds: [],
@@ -689,7 +691,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
   // ALL mode: finalize <- vod_upload <- game_0 <- ... <- game_N, with game_0 -> copy/download
   if (uploadMode === UPLOAD_MODES.ALL && gameUploadEnabled && vodUploadEnabled) {
     try {
-      const gameJobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform, workDir);
+      const gameJobs = await createGameUploadJobsForVod(ctx, dbId, vodId, activeFilePath, platform, workDir);
       const gameJobIds: string[] = [];
 
       for (const job of gameJobs) {
@@ -707,7 +709,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
       const vodChild = {
         name: 'youtube_upload',
         queueName: youtubeQueue.name,
-        data: createVodUploadData(ctx, dbId, vodId, type, filePath, { dmcaProcessed, workDir, streamId }),
+        data: createVodUploadData(ctx, dbId, vodId, type, activeFilePath, { dmcaProcessed, workDir, streamId }),
         opts: { jobId: vodJobId, removeOnComplete: true, removeOnFail: true, failParentOnFailure: false },
         children: gameChainHead != null ? [gameChainHead] : baseChildren,
       };
@@ -740,7 +742,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
     // Game Uploads only (GAMES or ALL without VOD): finalize <- game_0 <- ... <- game_N, with game_0 -> copy/download
     if ((uploadMode === UPLOAD_MODES.GAMES || uploadMode === UPLOAD_MODES.ALL) && gameUploadEnabled) {
       try {
-        const gameJobs = await createGameUploadJobsForVod(ctx, dbId, vodId, filePath, platform, workDir);
+        const gameJobs = await createGameUploadJobsForVod(ctx, dbId, vodId, activeFilePath, platform, workDir);
         const gameJobIds: string[] = [];
 
         for (const job of gameJobs) {
@@ -801,7 +803,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
         const vodChild = {
           name: 'youtube_upload',
           queueName: youtubeQueue.name,
-          data: createVodUploadData(ctx, dbId, vodId, type, filePath, { dmcaProcessed, workDir, streamId }),
+          data: createVodUploadData(ctx, dbId, vodId, type, activeFilePath, { dmcaProcessed, workDir, streamId }),
           opts: { jobId: vodJobId, removeOnComplete: true, removeOnFail: true, failParentOnFailure: false },
           ...(vodChildBase.length > 0 && { children: vodChildBase }),
         };
