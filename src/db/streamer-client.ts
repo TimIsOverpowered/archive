@@ -47,25 +47,29 @@ class PoolManager {
       }
     }
 
-    const creationPromise = (async () => {
-      const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
-      const url = buildPgBouncerUrl(pgbouncerUrl, config.database.name);
-
-      const pool = new this.PoolCtor({
-        connectionString: url,
-        max: Db.POOL_MAX_PER_TENANT,
-        query_timeout: Db.QUERY_TIMEOUT_MS,
-      });
-      const db = new Kysely<StreamerDB>({
-        dialect: new PostgresDialect({ pool }),
-        plugins: [new SafeNullComparisonPlugin()],
-      });
-
-      this.pools.set(config.id, { pool, db, lastAccessedAt: Date.now() });
-      return db;
-    })().finally(() => this.creationLocks.delete(config.id));
+    let resolveCreation!: (db: Kysely<StreamerDB>) => void;
+    const creationPromise = new Promise<Kysely<StreamerDB>>((resolve) => {
+      resolveCreation = resolve;
+    }).finally(() => this.creationLocks.delete(config.id));
 
     this.creationLocks.set(config.id, creationPromise);
+
+    const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
+    const url = buildPgBouncerUrl(pgbouncerUrl, config.database.name);
+
+    const pool = new this.PoolCtor({
+      connectionString: url,
+      max: Db.POOL_MAX_PER_TENANT,
+      query_timeout: Db.QUERY_TIMEOUT_MS,
+    });
+    const db = new Kysely<StreamerDB>({
+      dialect: new PostgresDialect({ pool }),
+      plugins: [new SafeNullComparisonPlugin()],
+    });
+
+    this.pools.set(config.id, { pool, db, lastAccessedAt: Date.now() });
+    resolveCreation(db);
+
     return creationPromise;
   }
 

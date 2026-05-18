@@ -44,7 +44,7 @@ export class TwitchTokenManager {
     }
   }
 
-  async getTwitchClient(): Promise<TwitchClient> {
+  getTwitchClient(): TwitchClient {
     return createTwitchClient(() => this.getAppAccessToken());
   }
 
