@@ -53,8 +53,12 @@ export function createLogger(opts: { level: string; isProduction: boolean }): Ap
       },
     },
     mixin: () => {
-      const ctx = { tenantId: getTenantId(), displayName: getDisplayName() };
-      return Object.fromEntries(Object.entries(ctx).filter(([, v]) => v != null));
+      const tenantId = getTenantId();
+      const displayName = getDisplayName();
+      return {
+        ...(tenantId != null && { tenantId }),
+        ...(displayName != null && { displayName }),
+      };
     },
   };
 
