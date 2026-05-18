@@ -39,6 +39,13 @@ class PoolManager {
     const inflight = this.creationLocks.get(config.id);
     if (inflight) return inflight;
 
+    let resolveCreation!: (db: Kysely<StreamerDB>) => void;
+    const creationPromise = new Promise<Kysely<StreamerDB>>((resolve) => {
+      resolveCreation = resolve;
+    }).finally(() => this.creationLocks.delete(config.id));
+
+    this.creationLocks.set(config.id, creationPromise);
+
     const totalConns = this.pools.size * Db.POOL_MAX_PER_TENANT;
     if (totalConns >= Db.POOL_GLOBAL_MAX_CONNECTIONS) {
       const evicted = await this.evictOldestIdleClient();
@@ -46,13 +53,6 @@ class PoolManager {
         throw new Error('Global connection limit reached. System under heavy load.');
       }
     }
-
-    let resolveCreation!: (db: Kysely<StreamerDB>) => void;
-    const creationPromise = new Promise<Kysely<StreamerDB>>((resolve) => {
-      resolveCreation = resolve;
-    }).finally(() => this.creationLocks.delete(config.id));
-
-    this.creationLocks.set(config.id, creationPromise);
 
     const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
     const url = buildPgBouncerUrl(pgbouncerUrl, config.database.name);
@@ -267,6 +267,10 @@ export async function withDbRetry<T>(
 ): Promise<T> {
   const { maxAttempts = 3, retryDelayMs = 1000 } = options;
 
+  if (maxAttempts < 1) {
+    throw new Error('maxAttempts must be at least 1');
+  }
+
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const client = await ensureClient(tenantId, config);
@@ -296,5 +300,6 @@ export async function withDbRetry<T>(
     }
   }
 
-  throw new Error('Unreachable: DB operation failed');
+  // Unreachable: the loop always returns or throws, but TS can't prove it.
+  throw new Error('DB operation failed');
 }

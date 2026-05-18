@@ -23,6 +23,7 @@ import { getLogger } from '../utils/logger.js';
 import { RedisService } from '../utils/redis-service.js';
 import type { SWRKey, SimpleKey } from './cache-keys.js';
 import { compressData, decompressData } from './compression.js';
+import { CacheBackoffError } from './domain-errors.js';
 import { extractErrorDetails } from './error.js';
 import { retryWithBackoff } from './retry.js';
 
@@ -142,7 +143,7 @@ export class CacheContext {
 
     // Backoff gate: suppress thundering herd after a fetch failure
     if (this.fetchFailures.has(key)) {
-      throw new Error('fetch backoff');
+      throw new CacheBackoffError();
     }
 
     const fetchStartTime = Date.now();
@@ -232,7 +233,7 @@ export class CacheContext {
 
     // Backoff gate: suppress thundering herd after a fetch failure
     if (this.fetchFailures.has(key)) {
-      throw new Error('fetch backoff');
+      throw new CacheBackoffError();
     }
 
     const fetchStartTime = Date.now();

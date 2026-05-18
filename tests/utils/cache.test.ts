@@ -3,6 +3,7 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 import { resetEnvConfig } from '../../src/config/env.js';
 import { simpleKeys, swrKeys } from '../../src/utils/cache-keys.js';
 import { withCache, withStaleWhileRevalidate, CacheContext } from '../../src/utils/cache.js';
+import { CacheBackoffError } from '../../src/utils/domain-errors.js';
 import { RedisService } from '../../src/utils/redis-service.js';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
@@ -178,11 +179,11 @@ describe('withCache', () => {
         try {
           await withCache(key, 60, fetcher, ctx);
         } catch (error) {
-          if (error instanceof Error && error.message === 'fetch backoff') {
+          if (error instanceof CacheBackoffError) {
             gotBackoff = true;
           }
         }
-        assert.ok(gotBackoff, 'Should throw fetch backoff error during backoff window');
+        assert.ok(gotBackoff, 'Should throw CacheBackoffError during backoff window');
         assert.strictEqual(fetcherCalled, 1, 'Fetcher should not be called again during backoff');
       } finally {
         RedisService.getActiveClient = originalGetActive;
@@ -222,7 +223,7 @@ describe('withCache', () => {
         try {
           await withCache(key, 60, failingFetcher, ctx);
         } catch (error) {
-          if (error instanceof Error && error.message === 'fetch backoff') {
+          if (error instanceof CacheBackoffError) {
             gotBackoff = true;
           }
         }

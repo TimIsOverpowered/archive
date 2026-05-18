@@ -106,3 +106,12 @@ export class RestrictedGameError extends DomainError {
     super(`Game "${gameName}" is in restricted games list`);
   }
 }
+
+export class CacheBackoffError extends DomainError {
+  readonly code = 'CACHE_BACKOFF';
+  readonly statusCode = 429;
+
+  constructor() {
+    super('Cache fetch backoff — please retry later');
+  }
+}
