@@ -56,11 +56,10 @@ function prefixKeys<T extends Record<string, (...args: never[]) => string>>(
   keys: T
 ): { [K in keyof T]: (...args: Parameters<T[K]>) => string } {
   const result = {} as { [K in keyof T]: (...args: Parameters<T[K]>) => string };
- for (const k of Object.keys(keys) as (keyof T)[]) {
+  for (const k of Object.keys(keys) as (keyof T)[]) {
     const fn = keys[k];
     if (fn == null) continue;
-    result[k] = ((...args: Parameters<T[typeof k]>) =>
-      `${prefix}${fn(...args)}`);
+    result[k] = (...args: Parameters<T[typeof k]>) => `${prefix}${fn(...args)}`;
   }
   return result;
 }
@@ -100,7 +99,8 @@ export const simpleKeys = {
   vodQuery: (...a: Parameters<typeof baseKeys.vodQuery>): SimpleKey => simpleKey(simpleRaw.vodQuery(...a)),
   gameQuery: (...a: Parameters<typeof baseKeys.gameQuery>): SimpleKey => simpleKey(simpleRaw.gameQuery(...a)),
   gameStatic: (...a: Parameters<typeof baseKeys.gameStatic>): SimpleKey => simpleKey(simpleRaw.gameStatic(...a)),
-  chapterLibrary: (...a: Parameters<typeof baseKeys.chapterLibrary>): SimpleKey => simpleKey(simpleRaw.chapterLibrary(...a)),
+  chapterLibrary: (...a: Parameters<typeof baseKeys.chapterLibrary>): SimpleKey =>
+    simpleKey(simpleRaw.chapterLibrary(...a)),
   gameLibrary: (...a: Parameters<typeof baseKeys.gameLibrary>): SimpleKey => simpleKey(simpleRaw.gameLibrary(...a)),
   stats: (...a: Parameters<typeof baseKeys.stats>): SimpleKey => simpleKey(simpleRaw.stats(...a)),
   tenantList: (...a: Parameters<typeof baseKeys.tenantList>): SimpleKey => simpleKey(simpleRaw.tenantList(...a)),
