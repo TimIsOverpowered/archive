@@ -102,5 +102,5 @@ export async function platformValidationMiddleware(request: FastifyRequest) {
     badRequest(`${requestPlatform} is not enabled for this tenant`);
   }
 
-  (request.tenant as TenantPlatformContext).platform = requestPlatform;
+  request.tenant = { ...tenant, platform: requestPlatform } as TenantPlatformContext;
 }
