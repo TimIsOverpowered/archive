@@ -239,6 +239,7 @@ export async function downloadChatMessages(
       });
       totalMessages = result.totalMessages;
       batchCount = result.batchCount;
+      if (result.bufferCleared) batchBuffer.length = 0;
     }
   }
 
@@ -256,6 +257,7 @@ export async function downloadChatMessages(
     });
     totalMessages = result.totalMessages;
     batchCount = result.batchCount;
+    if (result.bufferCleared) batchBuffer.length = 0;
   }
 
   return { totalMessages, batchCount };

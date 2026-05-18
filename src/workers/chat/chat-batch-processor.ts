@@ -8,6 +8,7 @@ import type { ChatMessageCreateInput } from './chat-types.js';
 export interface FlushBatchResult {
   totalMessages: number;
   batchCount: number;
+  bufferCleared: boolean;
 }
 
 export interface FlushBatchOptions {
@@ -38,7 +39,7 @@ export async function flushChatBatch(options: FlushBatchOptions): Promise<FlushB
   const { db, buffer, log, vodId, onProgress, lastOffset, totalMessages, batchCount } = options;
 
   if (buffer.length === 0) {
-    return { totalMessages, batchCount };
+    return { totalMessages, batchCount, bufferCleared: true };
   }
 
   await retryWithBackoff(
@@ -70,6 +71,5 @@ export async function flushChatBatch(options: FlushBatchOptions): Promise<FlushB
 
   onProgress?.(lastOffset, newBatchCount, buffer.length);
 
-  buffer.length = 0;
-  return { totalMessages: newTotalMessages, batchCount: newBatchCount };
+  return { totalMessages: newTotalMessages, batchCount: newBatchCount, bufferCleared: true };
 }

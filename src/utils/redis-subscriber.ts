@@ -33,7 +33,7 @@ export function createRedisSubscriber<TEvent>(options: RedisSubscriberOptions<TE
     log.debug({ channel }, 'Redis subscriber disconnected');
   });
 
-  subClient.on('reconnect', () => {
+  subClient.on('reconnecting', () => {
     log.warn('Redis subscriber reconnecting, re-subscribing');
     void subClient.subscribe(options.channel);
   });

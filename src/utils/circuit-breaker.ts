@@ -24,15 +24,13 @@ const DEFAULT_OPTIONS: CircuitBreakerOptions = {
 };
 
 const DEFAULT_CACHE_MAX = 5000;
-const DEFAULT_CACHE_TTL_MS = 120_000;
 
 export class CircuitBreaker {
   private readonly cache: LRUCache<string, CircuitBreakerState>;
 
-  constructor(options?: { max?: number; ttl?: number }) {
+  constructor(options?: { max?: number }) {
     this.cache = new LRUCache({
       max: options?.max ?? DEFAULT_CACHE_MAX,
-      ttl: options?.ttl ?? DEFAULT_CACHE_TTL_MS,
       allowStale: false,
     });
   }

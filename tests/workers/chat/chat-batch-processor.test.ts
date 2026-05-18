@@ -170,7 +170,7 @@ describe('flushChatBatch', () => {
     assert.strictEqual(p.messagesInBatch, 1);
   });
 
-  it('should clear the buffer after flushing', async () => {
+  it('should signal that the buffer should be cleared', async () => {
     const db = createMockDb();
     const log = createMockLog();
 
@@ -186,8 +186,11 @@ describe('flushChatBatch', () => {
       batchCount: 5,
     };
 
-    await flushChatBatch(options);
+    const result = await flushChatBatch(options);
 
+    assert.strictEqual(result.bufferCleared, true);
+    assert.strictEqual(messages.length, 1);
+    if (result.bufferCleared) messages.length = 0;
     assert.strictEqual(messages.length, 0);
   });
 
@@ -301,7 +304,7 @@ describe('flushChatBatch', () => {
 
     assert.strictEqual(result.totalMessages, 600);
     assert.strictEqual(result.batchCount, 11);
-    assert.strictEqual(messages.length, 0);
+    assert.strictEqual(result.bufferCleared, true);
   });
 
   it('should not call onProgress when buffer is empty', async () => {
