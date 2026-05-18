@@ -1,8 +1,10 @@
 import { FastifyInstance, FastifySchema } from 'fastify';
 import type { ReadonlyKysely } from 'kysely/readonly';
 import { z } from 'zod';
+import { Routing } from '../../constants.js';
 import type { StreamerDB } from '../../db/streamer-types.js';
 import { getLogsByOffset, getLogsByCursor } from '../../services/logs.service.js';
+import { resolveVodIdByPlatformVodId } from '../../services/vods.service.js';
 import { badRequest } from '../../utils/http-error.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
@@ -72,8 +74,22 @@ export default function logsRoutes(fastify: FastifyInstance, _options: LogsRoute
         const { vodId } = request.params;
         const tenantCtx = requireTenant(request);
         const { tenantId, db } = tenantCtx;
-        const vodIdNum = Number(vodId);
-        if (isNaN(vodIdNum)) return badRequest('Invalid VOD ID');
+
+        const parsedAsInt = parseInt(vodId, 10);
+        const isStrictInt = !isNaN(parsedAsInt) && String(parsedAsInt) === vodId;
+        const isNewInternalId = isStrictInt && parsedAsInt < Routing.LEGACY_ID_THRESHOLD;
+
+        let actualDbId: number;
+
+        if (isNewInternalId) {
+          actualDbId = parsedAsInt;
+        } else {
+          const resolved = await resolveVodIdByPlatformVodId(db, vodId, { signal: controller.signal });
+          if (resolved == null) {
+            return badRequest('Invalid VOD ID');
+          }
+          actualDbId = resolved;
+        }
 
         const parsed = LogsQuerySchema.safeParse(request.query);
         if (!parsed.success) {
@@ -89,14 +105,14 @@ export default function logsRoutes(fastify: FastifyInstance, _options: LogsRoute
         let result;
 
         if (cursor != null) {
-          result = await getLogsByCursor(db as unknown as ReadonlyKysely<StreamerDB>, tenantId, vodIdNum, cursor, {
+          result = await getLogsByCursor(db as unknown as ReadonlyKysely<StreamerDB>, tenantId, actualDbId, cursor, {
             signal: controller.signal,
           });
         } else if (content_offset_seconds !== undefined && !isNaN(content_offset_seconds)) {
           result = await getLogsByOffset(
             db as unknown as ReadonlyKysely<StreamerDB>,
             tenantId,
-            vodIdNum,
+            actualDbId,
             content_offset_seconds,
             { signal: controller.signal }
           );

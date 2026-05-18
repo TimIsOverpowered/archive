@@ -394,20 +394,17 @@ const createNormalizedSchema = async (client: PoolClient) => {
 
     SELECT add_compression_policy('chat_messages_new', INTERVAL '30 days');
 
-    CREATE INDEX "vods_new_platform_idx" ON "vods_new"("platform");
+    CREATE INDEX "vods_is_live_idx" ON "vods_new"("is_live");
+    CREATE INDEX "vods_created_at_idx" ON "vods_new"("created_at" DESC);
     CREATE INDEX "vods_new_title_fts_idx" ON "vods_new" USING GIN (to_tsvector('english', coalesce(title, '')));
-    CREATE INDEX "vod_uploads_vod_id_idx" ON "vod_uploads"("vod_id");
     CREATE INDEX "vod_uploads_status_idx" ON "vod_uploads"("status");
-    CREATE INDEX "vod_uploads_type_idx" ON "vod_uploads"("type");
-    CREATE INDEX "vod_uploads_vod_id_type_part_idx" ON "vod_uploads"("vod_id", "type", "part");
     CREATE INDEX "games_new_game_name_idx" ON "games_new"("game_name");
-    CREATE INDEX "games_new_vod_id_start_idx" ON "games_new"("vod_id", "start");
     CREATE INDEX "games_new_game_name_fts_idx" ON "games_new" USING GIN (to_tsvector('english', coalesce(game_name, '')));
     CREATE INDEX "games_new_game_id_idx" ON "games_new"("game_id");
-    CREATE INDEX "chapters_vod_id_start_idx" ON "chapters"("vod_id", "start");
     CREATE INDEX "chapters_name_fts_idx" ON "chapters" USING GIN (to_tsvector('english', coalesce(name, '')));
     CREATE INDEX "chapters_game_id_idx" ON "chapters"("game_id");
-    CREATE UNIQUE INDEX "vod_uploads_vod_id_type_part_key" ON "vod_uploads"("vod_id", "type", "part");
+    CREATE INDEX "vods_new_platform_vod_id_only_idx" ON "vods_new"("platform_vod_id");
+    CREATE INDEX "vods_new_platform_stream_id_only_idx" ON "vods_new"("platform_stream_id");
     CREATE UNIQUE INDEX "games_unique_chapter_key" ON "games_new"("vod_id", "start", "end");
 
     ALTER TABLE "vod_uploads" ADD CONSTRAINT "vod_uploads_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods_new"("id") ON DELETE CASCADE ON UPDATE CASCADE;

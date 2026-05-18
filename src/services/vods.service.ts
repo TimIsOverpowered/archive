@@ -362,3 +362,21 @@ export async function getVodByPlatformId(
 
   return staticData;
 }
+
+/**
+ * Resolve an internal VOD ID from a legacy platform-specific VOD ID.
+ * Does not use caching — this is just a lightweight ID lookup step before
+ * the heavy fetchVodByIdSafe/getVodByPlatformId calls handle caching downstream.
+ */
+export async function resolveVodIdByPlatformVodId(
+  db: DBClient,
+  platformVodId: string,
+  options?: { signal?: AbortSignal }
+): Promise<number | null> {
+  const record = await db
+    .selectFrom('vods')
+    .select('id')
+    .where('platform_vod_id', '=', platformVodId)
+    .executeTakeFirst(options);
+  return record?.id ?? null;
+}

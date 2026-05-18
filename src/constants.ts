@@ -85,6 +85,12 @@ export const CacheTag = {
   TTL_BUFFER_MS: 60_000,
 } as const;
 
+// ── Heuristic Routing ────────────────────────────────────────────────────────
+export const Routing = {
+  /** New internal IDs are below this threshold; legacy platform IDs are >= this */
+  LEGACY_ID_THRESHOLD: 1_000_000,
+};
+
 // ── Database ─────────────────────────────────────────────────────────────────
 export const Db = {
   /** PostgreSQL integer column limit */

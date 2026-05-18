@@ -92,7 +92,22 @@ CREATE TABLE "chat_messages" (
 );
 
 -- CreateIndex
-CREATE INDEX "vods_new_platform_idx" ON "vods"("platform");
+CREATE UNIQUE INDEX "vods_platform_vod_id_key" ON "vods"("platform", "platform_vod_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "vods_platform_stream_id_key" ON "vods"("platform", "platform_stream_id");
+
+-- CreateIndex
+CREATE INDEX "vods_platform_vod_id_only_idx" ON "vods"("platform_vod_id");
+
+-- CreateIndex
+CREATE INDEX "vods_platform_stream_id_only_idx" ON "vods"("platform_stream_id");
+
+-- CreateIndex
+CREATE INDEX "vods_is_live_idx" ON "vods"("is_live");
+
+-- CreateIndex
+CREATE INDEX "vods_created_at_idx" ON "vods"("created_at" DESC);
 
 -- CreateIndex
 CREATE INDEX "vods_title_fts_idx" ON "vods" USING GIN (to_tsvector('english', coalesce(title, '')));
@@ -104,22 +119,7 @@ CREATE INDEX "chapters_name_fts_idx" ON "chapters" USING GIN (to_tsvector('engli
 CREATE INDEX "chapters_game_id_idx" ON "chapters"("game_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "vods_platform_vod_id_key" ON "vods"("platform", "platform_vod_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "vods_platform_stream_id_key" ON "vods"("platform", "platform_stream_id");
-
--- CreateIndex
-CREATE INDEX "vod_uploads_vod_id_idx" ON "vod_uploads"("vod_id");
-
--- CreateIndex
 CREATE INDEX "vod_uploads_status_idx" ON "vod_uploads"("status");
-
--- CreateIndex
-CREATE INDEX "vod_uploads_type_idx" ON "vod_uploads"("type");
-
--- CreateIndex
-CREATE INDEX "vod_uploads_vod_id_type_part_idx" ON "vod_uploads"("vod_id", "type", "part");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "emotes_new_vod_id_key" ON "emotes"("vod_id");
@@ -131,13 +131,7 @@ CREATE INDEX "games_new_game_name_idx" ON "games"("game_name");
 CREATE INDEX "games_new_game_id_idx" ON "games"("game_id");
 
 -- CreateIndex
-CREATE INDEX "games_new_vod_id_start_idx" ON "games"("vod_id", "start");
-
--- CreateIndex
 CREATE INDEX "games_new_game_name_fts_idx" ON "games" USING GIN (to_tsvector('english', coalesce("game_name", '')));
-
--- CreateIndex
-CREATE INDEX "chapters_vod_id_start_idx" ON "chapters"("vod_id", "start");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "chapters_vod_id_start_key" ON "chapters"("vod_id", "start");
@@ -156,9 +150,6 @@ ALTER TABLE "games" ADD CONSTRAINT "games_new_vod_id_fkey" FOREIGN KEY ("vod_id"
 
 -- AddForeignKey
 ALTER TABLE "chapters" ADD CONSTRAINT "chapters_vod_id_fkey" FOREIGN KEY ("vod_id") REFERENCES "vods"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- CreateIndex
-CREATE UNIQUE INDEX "vod_uploads_vod_id_type_part_key" ON "vod_uploads"("vod_id", "type", "part");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "games_unique_chapter_key" ON "games"("vod_id", "start", "end");
