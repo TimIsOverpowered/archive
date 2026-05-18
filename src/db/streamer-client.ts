@@ -47,22 +47,25 @@ class PoolManager {
       }
     }
 
-    const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
-    const url = buildPgBouncerUrl(pgbouncerUrl, config.database.name);
+    const creationPromise = (async () => {
+      const pgbouncerUrl = getBaseConfig().PGBOUNCER_URL;
+      const url = buildPgBouncerUrl(pgbouncerUrl, config.database.name);
 
-    const pool = new this.PoolCtor({
-      connectionString: url,
-      max: Db.POOL_MAX_PER_TENANT,
-      query_timeout: Db.QUERY_TIMEOUT_MS,
-    });
-    const db = new Kysely<StreamerDB>({
-      dialect: new PostgresDialect({ pool }),
-      plugins: [new SafeNullComparisonPlugin()],
-    });
+      const pool = new this.PoolCtor({
+        connectionString: url,
+        max: Db.POOL_MAX_PER_TENANT,
+        query_timeout: Db.QUERY_TIMEOUT_MS,
+      });
+      const db = new Kysely<StreamerDB>({
+        dialect: new PostgresDialect({ pool }),
+        plugins: [new SafeNullComparisonPlugin()],
+      });
 
-    const creationPromise = Promise.resolve(db).finally(() => this.creationLocks.delete(config.id));
+      this.pools.set(config.id, { pool, db, lastAccessedAt: Date.now() });
+      return db;
+    })().finally(() => this.creationLocks.delete(config.id));
+
     this.creationLocks.set(config.id, creationPromise);
-    this.pools.set(config.id, { pool, db, lastAccessedAt: Date.now() });
     return creationPromise;
   }
 
@@ -256,11 +259,11 @@ export async function withDbRetry<T>(
   tenantId: string,
   config: TenantConfig,
   operation: (db: Kysely<StreamerDB>) => Promise<T>,
-  options: { maxRetries?: number; retryDelayMs?: number } = {}
+  options: { maxAttempts?: number; retryDelayMs?: number } = {}
 ): Promise<T> {
-  const { maxRetries = 2, retryDelayMs = 1000 } = options;
+  const { maxAttempts = 3, retryDelayMs = 1000 } = options;
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const client = await ensureClient(tenantId, config);
       return await operation(client);
@@ -271,10 +274,10 @@ export async function withDbRetry<T>(
         throw error;
       }
 
-      if (attempt === maxRetries) {
+      if (attempt === maxAttempts - 1) {
         getLogger().error(
           { tenantId, attempt, error: extractErrorDetails(error) },
-          'DB operation failed after max retries'
+          'DB operation failed after max attempts'
         );
         throw error;
       }
