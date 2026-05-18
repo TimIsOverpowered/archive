@@ -43,14 +43,7 @@ export function detectFmp4FromPlaylist(m3u8Content: string): boolean {
       return true;
     }
 
-    const hasFmp4Segments = mediaPlaylist.segments.some(
-      (seg) =>
-        seg?.uri?.endsWith('.mp4') ||
-        seg?.uri?.endsWith('.m4s') ||
-        (!seg?.uri?.endsWith('.ts') && (seg.uri?.includes('fMP4') || seg.uri?.includes('init')))
-    );
-
-    return hasFmp4Segments;
+    return false;
   } catch {
     return false;
   }
