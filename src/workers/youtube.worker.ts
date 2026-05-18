@@ -1,0 +1,207 @@
+import type { Job } from 'bullmq';
+import type { Kysely } from 'kysely';
+import { getDisplayName, TenantConfig } from '../config/types.js';
+import type { StreamerDB } from '../db/streamer-types.js';
+import { publishVodUpdate } from '../services/cache-invalidator.js';
+import { saveUploadResult, markUploadFailed } from '../services/youtube/upload.js';
+import type { Platform, SourceType, UploadType } from '../types/platforms.js';
+import { createAutoLogger } from '../utils/auto-tenant-logger.js';
+import { resetFailures } from '../utils/discord-alerts.js';
+import { ConfigNotConfiguredError } from '../utils/domain-errors.js';
+import type { AppLogger } from '../utils/logger.js';
+import type { YoutubeUploadJob, YoutubeUploadResult } from './jobs/types.js';
+import { getJobContext } from './utils/job-context.js';
+import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
+import { processGameUpload } from './youtube/game-upload-processor.js';
+import { getEffectiveSplitDuration } from './youtube/validation.js';
+import { processVodUpload, linkVodPartsAfterDelay } from './youtube/vod-upload-processor.js';
+
+interface YoutubeProcessorContext {
+  log: AppLogger;
+  tenantId: string;
+  dbId: number;
+  vodId: string;
+  type: SourceType | UploadType;
+  filePath: string;
+  config: TenantConfig;
+  db: Kysely<StreamerDB>;
+  startTime: number;
+  kind: 'vod' | 'game';
+  displayName: string;
+  dmcaProcessed?: boolean | undefined;
+  part?: number | undefined;
+  chapterStart?: number | undefined;
+  chapterDuration?: number | undefined;
+  chapterEnd?: number | undefined;
+  chapterName?: string | undefined;
+  chapterGameId?: string | undefined;
+  chapterImage?: string | null | undefined;
+  platform?: Platform | undefined;
+  epNumber?: number | undefined;
+  gameTitle?: string | undefined;
+  workDir?: string | undefined;
+  skipFinalize?: boolean | undefined;
+  streamId?: string | undefined;
+}
+
+const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeProcessorContext> => {
+  const { tenantId, dbId, vodId, type, filePath, kind } = job.data;
+  const log = createAutoLogger(String(tenantId));
+  const startTime = Date.now();
+
+  let actualFilePath = filePath;
+
+  if (actualFilePath == null || actualFilePath === '') {
+    const childResults = await job.getChildrenValues();
+    const firstResult = Object.values(childResults)[0] as { finalPath?: string; filePath?: string };
+
+    if (firstResult?.filePath != null && firstResult.filePath !== '') {
+      actualFilePath = firstResult.filePath;
+      log.debug({ vodId, filePath: actualFilePath }, 'Retrieved filePath from game upload child result');
+    } else if (firstResult?.finalPath != null && firstResult.finalPath !== '') {
+      actualFilePath = firstResult.finalPath;
+      log.debug({ vodId, filePath: actualFilePath }, 'Retrieved filePath from download job result');
+    } else {
+      throw new Error(
+        `File path not available for vodId=${vodId}, jobId=${job.id}: child jobs may have failed or not completed`
+      );
+    }
+  }
+
+  const { config, db } = await getJobContext(tenantId);
+
+  if (config == null || config.youtube == null) {
+    throw new ConfigNotConfiguredError(`YouTube for tenant ${tenantId}`);
+  }
+
+  const displayName = getDisplayName(config);
+
+  const base = {
+    log,
+    tenantId,
+    dbId,
+    vodId,
+    type,
+    filePath: actualFilePath,
+    config,
+    db,
+    startTime,
+    kind,
+    displayName,
+  };
+
+  if (kind === 'game') {
+    const {
+      chapterStart,
+      chapterDuration,
+      chapterName,
+      chapterEnd,
+      chapterGameId,
+      chapterImage,
+      platform,
+      epNumber,
+      gameTitle,
+      workDir,
+    } = job.data;
+    return {
+      ...base,
+      chapterStart,
+      chapterDuration,
+      chapterEnd,
+      chapterName,
+      chapterGameId,
+      chapterImage,
+      platform,
+      epNumber,
+      gameTitle,
+      workDir,
+    };
+  }
+
+  const { dmcaProcessed, part, workDir, skipFinalize, streamId } = job.data;
+  return {
+    ...base,
+    dmcaProcessed,
+    part,
+    workDir,
+    skipFinalize,
+    streamId,
+  };
+};
+
+const errorMeta = (ctx: YoutubeProcessorContext, job: Job) => ({
+  vodId: ctx.vodId,
+  tenantId: ctx.tenantId,
+  dbId: ctx.dbId,
+  jobId: job.id,
+  filePath: ctx.filePath,
+});
+
+const errorAlert = async (ctx: YoutubeProcessorContext, _job: Job, _errorMsg: string) => {
+  await markUploadFailed(ctx.db, ctx.dbId, ctx.type);
+  await publishVodUpdate(ctx.tenantId, ctx.dbId);
+};
+
+const youtubeProcessor = wrapWorkerProcessor<YoutubeUploadJob, YoutubeProcessorContext, YoutubeUploadResult>(
+  buildYoutubeContext,
+  async (ctx) => {
+    if (ctx.kind === 'vod') {
+      const vodResult = await processVodUpload({
+        tenantId: ctx.tenantId,
+        dbId: ctx.dbId,
+        vodId: ctx.vodId,
+        filePath: ctx.filePath,
+        db: ctx.db,
+        config: ctx.config,
+        dmcaProcessed: ctx.dmcaProcessed ?? false,
+        log: ctx.log,
+        type: ctx.type as SourceType,
+        part: ctx.part,
+        workDir: ctx.workDir,
+        skipFinalize: ctx.skipFinalize,
+      });
+
+      await saveUploadResult(ctx.db, ctx.dbId, ctx.type, vodResult.uploadedVideos);
+      await publishVodUpdate(ctx.tenantId, ctx.dbId);
+
+      const splitDuration = getEffectiveSplitDuration(ctx.config.youtube?.splitDuration);
+      linkVodPartsAfterDelay(ctx.tenantId, ctx.dbId, vodResult.uploadedVideos, splitDuration, ctx.db, ctx.log);
+
+      const duration = Date.now() - ctx.startTime;
+      ctx.log.info(
+        { vodId: ctx.vodId, duration, uploadedVideosCount: vodResult.uploadedVideos?.length },
+        'Job completed successfully'
+      );
+
+      return { success: true, videos: vodResult.uploadedVideos, filePath: ctx.filePath };
+    } else {
+      const result = await processGameUpload({
+        tenantId: ctx.tenantId,
+        dbId: ctx.dbId,
+        vodId: ctx.vodId,
+        filePath: ctx.filePath,
+        chapterStart: ctx.chapterStart as number,
+        chapterDuration: ctx.chapterDuration as number,
+        chapterEnd: ctx.chapterEnd as number,
+        chapterName: ctx.chapterName as string,
+        chapterGameId: ctx.chapterGameId,
+        chapterImage: ctx.chapterImage,
+        platform: ctx.platform as Platform,
+        epNumber: ctx.epNumber as number,
+        gameTitle: ctx.gameTitle,
+        db: ctx.db,
+        config: ctx.config,
+        log: ctx.log,
+        displayName: ctx.displayName,
+      });
+
+      resetFailures(ctx.tenantId);
+      const duration = Date.now() - ctx.startTime;
+      ctx.log.info({ component: 'youtube-upload', vodId: ctx.vodId, duration }, 'Game upload completed successfully');
+      return result;
+    }
+  },
+  { errorMeta, errorAlert }
+);
+
+export default youtubeProcessor;

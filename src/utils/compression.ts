@@ -1,0 +1,58 @@
+import { promisify } from 'node:util';
+import * as zlib from 'node:zlib';
+import { getRedisCompression, getRedisCompressionLevel } from '../config/env.js';
+
+const brotliCompress = promisify(zlib.brotliCompress);
+const brotliDecompress = promisify(zlib.brotliDecompress);
+const gzipCompress = promisify(zlib.gzip);
+const gzipDecompress = promisify(zlib.gunzip);
+
+/**
+ * Compress data using Brotli, Gzip, or no compression (based on config).
+ * Serializes to JSON before compression.
+ */
+export async function compressData(data: unknown): Promise<Buffer> {
+  const algo = getRedisCompression();
+  const lvl = getRedisCompressionLevel();
+  const buffer = Buffer.from(JSON.stringify(data), 'utf8');
+
+  if (algo === 'none') {
+    return buffer;
+  }
+
+  if (algo === 'brotli') {
+    return brotliCompress(buffer, {
+      params: { [zlib.constants.BROTLI_PARAM_QUALITY]: lvl },
+    });
+  }
+
+  if (algo === 'gzip') {
+    return gzipCompress(buffer, { level: lvl });
+  }
+
+  return buffer;
+}
+
+/**
+ * Decompress data using the configured algorithm (Brotli, Gzip, or none).
+ * Parses JSON after decompression.
+ */
+export async function decompressData(compressed: Buffer): Promise<unknown> {
+  const algo = getRedisCompression();
+
+  if (algo === 'none') {
+    return JSON.parse(compressed.toString('utf8'));
+  }
+
+  let decompressed: Buffer;
+
+  if (algo === 'brotli') {
+    decompressed = await brotliDecompress(compressed);
+  } else if (algo === 'gzip') {
+    decompressed = await gzipDecompress(compressed);
+  } else {
+    throw new Error(`Unknown compression algorithm: ${algo as string}`);
+  }
+
+  return JSON.parse(decompressed.toString('utf8'));
+}
