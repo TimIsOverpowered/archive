@@ -10,6 +10,8 @@ mock.module('../../src/services/meta-tenants.service.js', {
   namedExports: {
     getAllTenants: mockGetAllTenants,
     getTenantById: mockGetTenantById,
+    getAllTenantsRaw: mockGetAllTenants,
+    getTenantByIdRaw: mockGetTenantById,
   },
 });
 

@@ -27,8 +27,7 @@ setupBaseEnv();
 describe('finalizeVod', () => {
   let mockDb: any;
   let mockStrategy: any;
-  let publishCalled = false;
-  let publishArgs: any = null;
+  let publishCalls: Array<{ channel: string; message: string }> = [];
   let mockClient: any;
   let updateSet: any = null;
   let operationCalls: any[] = [];
@@ -66,8 +65,7 @@ describe('finalizeVod', () => {
   }
 
   beforeEach(async () => {
-    publishCalled = false;
-    publishArgs = null;
+    publishCalls = [];
     updateSet = null;
     operationCalls = [];
 
@@ -83,8 +81,7 @@ describe('finalizeVod', () => {
 
     mockClient = {
       publish: async (channel: string, message: string) => {
-        publishCalled = true;
-        publishArgs = { channel, message };
+        publishCalls.push({ channel, message });
       },
     };
 
@@ -214,20 +211,16 @@ describe('finalizeVod', () => {
 
     await finalizeVod({ ctx, dbId: 42, vodId: 'vod-123', platform: 'twitch', durationSeconds: 3600 });
 
-    assert.strictEqual(publishCalled, true);
-    assert.ok(publishArgs);
-    const event = JSON.parse(publishArgs.message);
-    assert.strictEqual(event.type, 'VOD_DURATION_UPDATED');
-    assert.strictEqual(event.tenantId, 'tenant-1');
-    assert.strictEqual(event.dbId, 42);
-    assert.strictEqual(event.duration, 3600);
-    assert.strictEqual(event.is_live, false);
+    assert.strictEqual(publishCalls.length, 2);
+    const durationEvent = JSON.parse(publishCalls[0]!.message);
+    assert.strictEqual(durationEvent.type, 'VOD_DURATION_UPDATED');
+    assert.strictEqual(durationEvent.tenantId, 'tenant-1');
+    assert.strictEqual(durationEvent.dbId, 42);
+    assert.strictEqual(durationEvent.duration, 3600);
+    assert.strictEqual(durationEvent.is_live, false);
   });
 
   it('should publish event with duration 0 when durationSeconds is null', async () => {
-    publishCalled = false;
-    publishArgs = null;
-
     const ctx = {
       tenantId: 'tenant-1',
       config: createMockTenantConfig({
@@ -241,9 +234,7 @@ describe('finalizeVod', () => {
 
     await finalizeVod({ ctx, dbId: 42, vodId: 'vod-123', platform: 'twitch', durationSeconds: null });
 
-    assert.strictEqual(publishCalled, true);
-    assert.ok(publishArgs);
-    const event = JSON.parse(publishArgs.message);
-    assert.strictEqual(event.duration, 0);
+    const durationEvent = JSON.parse(publishCalls[0]!.message);
+    assert.strictEqual(durationEvent.duration, 0);
   });
 });

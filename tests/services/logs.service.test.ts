@@ -3,6 +3,7 @@ import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import { resetEnvConfig } from '../../src/config/env.js';
 import { resetClientManager } from '../../src/db/streamer-client.js';
 import { getLogsByOffset, getLogsByCursor } from '../../src/services/logs.service.js';
+import { defaultCacheContext } from '../../src/utils/cache.js';
 import { RedisService } from '../../src/utils/redis-service.js';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
@@ -32,7 +33,7 @@ setupBaseEnv();
  */
 function createMockDb(cfg: {
   /** VOD metadata. If undefined/null, VOD not found. */
-  vodResult?: { created_at: Date; duration: number } | null;
+  vodResult?: { created_at: Date; duration: number; started_at?: Date | null; is_live?: boolean } | null;
   /** Queue of chat message arrays. Each execute() pops one from the front. */
   bucketQueue: (any[] | null)[];
   /** Optional result for dead-air peek query (executeTakeFirst on chat_messages after buckets exhausted) */
@@ -41,6 +42,16 @@ function createMockDb(cfg: {
   let bucketIndex = 0;
   let vodReturned = false;
   let peekReturned = false;
+
+  const normalizedVod =
+    cfg.vodResult != null
+      ? {
+          created_at: cfg.vodResult.created_at,
+          duration: cfg.vodResult.duration,
+          started_at: cfg.vodResult.started_at ?? null,
+          is_live: cfg.vodResult.is_live ?? false,
+        }
+      : null;
 
   function chainable(): any {
     return {
@@ -56,7 +67,7 @@ function createMockDb(cfg: {
             executeTakeFirst: async () => {
               if (!vodReturned) {
                 vodReturned = true;
-                return cfg.vodResult ?? null;
+                return normalizedVod;
               }
               if (!peekReturned) {
                 peekReturned = true;
@@ -73,7 +84,7 @@ function createMockDb(cfg: {
           executeTakeFirst: async () => {
             if (!vodReturned) {
               vodReturned = true;
-              return cfg.vodResult ?? null;
+              return normalizedVod;
             }
             if (!peekReturned) {
               peekReturned = true;
@@ -91,7 +102,7 @@ function createMockDb(cfg: {
           executeTakeFirst: async () => {
             if (!vodReturned) {
               vodReturned = true;
-              return cfg.vodResult ?? null;
+              return normalizedVod;
             }
             if (!peekReturned) {
               peekReturned = true;
@@ -108,7 +119,7 @@ function createMockDb(cfg: {
         executeTakeFirst: async () => {
           if (!vodReturned) {
             vodReturned = true;
-            return cfg.vodResult ?? null;
+            return normalizedVod;
           }
           if (!peekReturned) {
             peekReturned = true;
@@ -125,7 +136,7 @@ function createMockDb(cfg: {
       executeTakeFirst: async () => {
         if (!vodReturned) {
           vodReturned = true;
-          return cfg.vodResult ?? null;
+          return normalizedVod;
         }
         if (!peekReturned) {
           peekReturned = true;
@@ -154,6 +165,7 @@ describe('LogsService: getLogsByOffset', () => {
     mockClient = {
       get: async () => null,
       getBuffer: async () => null,
+      set: async () => {},
     };
 
     (RedisService as any)._instance = {
@@ -162,6 +174,7 @@ describe('LogsService: getLogsByOffset', () => {
 
     resetEnvConfig();
     resetClientManager();
+    defaultCacheContext.reset();
   });
 
   afterEach(async () => {
@@ -551,6 +564,7 @@ describe('LogsService: getLogsByCursor', () => {
     mockClient = {
       get: async () => null,
       getBuffer: async () => null,
+      set: async () => {},
     };
 
     (RedisService as any)._instance = {
@@ -559,6 +573,7 @@ describe('LogsService: getLogsByCursor', () => {
 
     resetEnvConfig();
     resetClientManager();
+    defaultCacheContext.reset();
   });
 
   afterEach(async () => {
@@ -645,7 +660,7 @@ describe('LogsService: getLogsByCursor', () => {
     });
 
     try {
-      await getLogsByCursor(neverResolveDb, 'tenant-1', 999, cursor);
+      await getLogsByCursor(neverResolveDb, 'tenant-cursor', 999, cursor);
       assert.fail('Should have thrown');
     } catch (error) {
       assert.ok(error instanceof Error);
