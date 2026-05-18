@@ -182,7 +182,7 @@ describe('DB Client Lifecycle Management', () => {
           throw error;
         }),
         (err: Error) => {
-          assert.ok(err.message.includes('connection lost') || err.message.includes('max retries'));
+          assert.ok(err.message.includes('connection lost') || err.message.includes('max attempts'));
           return true;
         }
       );
@@ -219,7 +219,7 @@ describe('DB Client Lifecycle Management', () => {
           }
           return { success: true, attempts: attempt };
         },
-        { maxRetries: 3, retryDelayMs: 10 }
+        { maxAttempts: 3, retryDelayMs: 10 }
       );
       assert.strictEqual(attempt, 3);
       assert.strictEqual(result.success, true);
