@@ -76,6 +76,7 @@ export const swrKeys = {
   bucket: (...a: Parameters<typeof baseKeys.bucket>): SWRKey => swrKey(swrRaw.bucket(...a)),
   cursor: (...a: Parameters<typeof baseKeys.cursor>): SWRKey => swrKey(swrRaw.cursor(...a)),
   emotes: (...a: Parameters<typeof baseKeys.emotes>): SWRKey => swrKey(swrRaw.emotes(...a)),
+  badges: (...a: Parameters<typeof baseKeys.badges>): SWRKey => swrKey(swrRaw.badges(...a)),
   vodPlatform: (...a: Parameters<typeof baseKeys.vodPlatform>): SWRKey => swrKey(swrRaw.vodPlatform(...a)),
   vodQuery: (...a: Parameters<typeof baseKeys.vodQuery>): SWRKey => swrKey(swrRaw.vodQuery(...a)),
   gameQuery: (...a: Parameters<typeof baseKeys.gameQuery>): SWRKey => swrKey(swrRaw.gameQuery(...a)),
@@ -83,6 +84,8 @@ export const swrKeys = {
   chapterLibrary: (...a: Parameters<typeof baseKeys.chapterLibrary>): SWRKey => swrKey(swrRaw.chapterLibrary(...a)),
   gameLibrary: (...a: Parameters<typeof baseKeys.gameLibrary>): SWRKey => swrKey(swrRaw.gameLibrary(...a)),
   stats: (...a: Parameters<typeof baseKeys.stats>): SWRKey => swrKey(swrRaw.stats(...a)),
+  tenantList: (...a: Parameters<typeof baseKeys.tenantList>): SWRKey => swrKey(swrRaw.tenantList(...a)),
+  tenantDetail: (...a: Parameters<typeof baseKeys.tenantDetail>): SWRKey => swrKey(swrRaw.tenantDetail(...a)),
 } as const;
 
 export const simpleKeys = {

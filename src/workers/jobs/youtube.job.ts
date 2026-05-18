@@ -69,7 +69,7 @@ export async function createGameUploadJob(
   filePath: string | undefined,
   platform: Platform,
   chapter: SelectableChapters,
-  options?: { gameTitle?: string | undefined; localEpOffset?: number }
+  options?: { gameTitle?: string | undefined; localEpOffset?: number; gameCount?: number }
 ): Promise<YoutubeGameUploadJob> {
   const { config, tenantId } = ctx;
   if (config.youtube?.upload === false) {
@@ -99,15 +99,17 @@ export async function createGameUploadJob(
     throw new Error(`Chapter "${chapter.name}" duration (${chapter.duration}s) is less than 5 minutes`);
   }
 
-  const gameCount = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
-    const result = await db
-      .selectFrom('games')
-      .select((eb) => eb.fn.count<number>('id').as('cnt'))
-      .where('game_name', '=', chapter.name)
-      .where('vod_id', '!=', dbId)
-      .executeTakeFirst();
-    return Number(result?.cnt ?? 0);
-  });
+  const gameCount =
+    options?.gameCount ??
+    (await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+      const result = await db
+        .selectFrom('games')
+        .select((eb) => eb.fn.count<number>('id').as('cnt'))
+        .where('game_name', '=', chapter.name)
+        .where('vod_id', '!=', dbId)
+        .executeTakeFirst();
+      return Number(result?.cnt ?? 0);
+    }));
   const epNumber = gameCount + 1 + (options?.localEpOffset ?? 0);
 
   return {
@@ -160,6 +162,21 @@ async function createGameUploadJobsForVod(
     return db.selectFrom('chapters').where('vod_id', '=', dbId).orderBy('start', 'asc').selectAll().execute();
   });
 
+  const chapterNames = chapters.map((c) => c.name).filter((n): n is string => n != null);
+
+  const gameCounts = await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+    if (chapterNames.length === 0) return [];
+    return db
+      .selectFrom('games')
+      .select(['game_name', (eb) => eb.fn.count<number>('id').as('cnt')])
+      .where('game_name', 'in', chapterNames)
+      .where('vod_id', '!=', dbId)
+      .groupBy('game_name')
+      .execute();
+  });
+
+  const countMap = new Map(gameCounts.map((r) => [r.game_name, Number(r.cnt)]));
+
   const jobs: YoutubeGameUploadJob[] = [];
   const localGameCounts = new Map<string, number>();
 
@@ -169,6 +186,7 @@ async function createGameUploadJobsForVod(
       const localOffset = localGameCounts.get(gameKey) ?? 0;
       const job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, chapter, {
         localEpOffset: localOffset,
+        gameCount: chapter.name != null ? (countMap.get(chapter.name) ?? 0) : 0,
       });
       localGameCounts.set(gameKey, localOffset + 1);
       jobs.push({ ...job, workDir });

@@ -57,7 +57,10 @@ export async function waitForWorkersReady(workerInstances: Worker[], timeoutMs =
   await Promise.all(readyPromises);
 }
 
-export function createWorker<TData, TResult = unknown>(config: WorkerConfig<TData, TResult>): Worker<TData, TResult> {
+export function createWorker<TData, TResult = unknown>(
+  config: WorkerConfig<TData, TResult>,
+  registry?: WorkerRegistry
+): Worker<TData, TResult> {
   const { name, processor, connection, concurrency = 1, useWorkerThreads = false } = config;
 
   const worker = new Worker<TData, TResult>(name, processor, {
@@ -106,7 +109,9 @@ export function createWorker<TData, TResult = unknown>(config: WorkerConfig<TDat
     getLogger().error({ component: 'worker', workerName: name, err: details }, 'worker error');
   });
 
-  workerRegistry.register(name, worker as Worker<unknown, unknown>);
+  if (registry != null) {
+    registry.register(name, worker as Worker<unknown, unknown>);
+  }
   getLogger().info({ name }, 'Worker created');
 
   return worker;

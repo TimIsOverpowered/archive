@@ -43,33 +43,63 @@ function exponentialBackoff(delay: number, attempts: number): JobOpts {
   return { attempts, backoff: { type: 'exponential' as const, delay } };
 }
 
-const queueCache = new Map<string, Queue<unknown, unknown, string>>();
+/**
+ * Manages queue and flow producer instances with a centralized cache.
+ * Mirrors the WorkerRegistry pattern for testability — call close() to
+ * reset state between test cases without module reloading.
+ */
+export class QueueRegistry {
+  private cache = new Map<string, Queue<unknown, unknown, string>>();
+  private flowProducer: FlowProducer | null = null;
 
-let _flowProducer: FlowProducer | null = null;
+  getQueue<TData = unknown, TFinishedData = unknown>(
+    name: string,
+    jobOptions: JobOpts
+  ): Queue<TData, TFinishedData, string> {
+    const cached = this.cache.get(name);
+    if (cached) {
+      return cached as Queue<TData, TFinishedData, string>;
+    }
+
+    const queue = new Queue<TData, TFinishedData, string>(name, {
+      connection: getRedisInstance(),
+      defaultJobOptions: jobOptions,
+    });
+
+    this.cache.set(name, queue);
+    return queue;
+  }
+
+  getFlowProducer(): FlowProducer {
+    this.flowProducer ??= new FlowProducer({
+      connection: getRedisInstance(),
+    });
+    return this.flowProducer;
+  }
+
+  async close(): Promise<void> {
+    for (const queue of this.cache.values()) {
+      await queue.close();
+    }
+    this.cache.clear();
+    if (this.flowProducer != null) {
+      await this.flowProducer.close();
+      this.flowProducer = null;
+    }
+  }
+}
+
+export const queueRegistry = new QueueRegistry();
 
 export function getFlowProducer(): FlowProducer {
-  _flowProducer ??= new FlowProducer({
-    connection: getRedisInstance(),
-  });
-  return _flowProducer;
+  return queueRegistry.getFlowProducer();
 }
 
 function getQueue<TData = unknown, TFinishedData = unknown>(
   name: string,
   jobOptions: JobOpts
 ): Queue<TData, TFinishedData, string> {
-  const cached = queueCache.get(name);
-  if (cached) {
-    return cached as Queue<TData, TFinishedData, string>;
-  }
-
-  const queue = new Queue<TData, TFinishedData, string>(name, {
-    connection: getRedisInstance(),
-    defaultJobOptions: jobOptions,
-  });
-
-  queueCache.set(name, queue);
-  return queue;
+  return queueRegistry.getQueue(name, jobOptions);
 }
 
 export function getLiveDownloadQueue(): Queue<LiveDownloadJob, LiveDownloadResult, string> {
@@ -105,14 +135,5 @@ export function getFileCopyQueue(): Queue<CopyFileJob, CopyFileResult, string> {
 }
 
 export async function closeQueues(): Promise<void> {
-  for (const queue of queueCache.values()) {
-    await queue.close();
-  }
-  queueCache.clear();
-  if (_flowProducer != null) {
-    await _flowProducer.close();
-    _flowProducer = null;
-  }
-  // Don't quit redis here - it's managed by workers/redis.ts
-  // The redis instance is shared and should only be closed during worker shutdown
+  return queueRegistry.close();
 }

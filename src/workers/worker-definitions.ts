@@ -4,7 +4,7 @@ import { getWorkersConfig } from '../config/env.js';
 import type { TenantConfig } from '../config/types.js';
 import chatProcessor from './chat.worker.js';
 import copyFileProcessor from './copy.worker.js';
-import { createWorker } from './create-worker.js';
+import { createWorker, workerRegistry } from './create-worker.js';
 import dmcaProcessor from './dmca.worker.js';
 import finalizeProcessor from './finalize.worker.js';
 import type {
@@ -119,6 +119,6 @@ export function registerWorkers(
     if (concurrency !== undefined) {
       config.concurrency = concurrency;
     }
-    createWorker<AllJobData>(config);
+    createWorker<AllJobData>(config, workerRegistry);
   }
 }

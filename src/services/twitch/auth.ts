@@ -111,20 +111,21 @@ export class TwitchTokenManager {
   }
 
   private async refreshToken(): Promise<string> {
-    const gotLock = await this.acquireLock();
+    let gotLock = false;
+    try {
+      gotLock = await this.acquireLock();
 
-    if (!gotLock) {
-      for (let attempt = 0; attempt < 10; attempt++) {
-        await new Promise((r) => setTimeout(r, 1000));
-        const redisToken = await this.tryLoadFromRedis();
-        if (redisToken != null && redisToken.expiresAt > Date.now() + 60 * 60 * 1000) {
-          this.tokenState = redisToken;
-          return redisToken.token;
+      if (!gotLock) {
+        for (let attempt = 0; attempt < 10; attempt++) {
+          await new Promise((r) => setTimeout(r, 1000));
+          const redisToken = await this.tryLoadFromRedis();
+          if (redisToken != null && redisToken.expiresAt > Date.now() + 60 * 60 * 1000) {
+            this.tokenState = redisToken;
+            return redisToken.token;
+          }
         }
       }
-    }
 
-    try {
       const { clientId, clientSecret } = getTwitchAppCredentials();
 
       const url = new URL(Twitch.TOKEN_URL);

@@ -1,4 +1,3 @@
-import { VodUpdateSchema } from '../../config/schemas.js';
 import { withDbRetry } from '../../db/streamer-client.js';
 import { publishVodDurationUpdate } from '../../services/cache-invalidator.js';
 import type { TenantContext } from '../../types/context.js';
@@ -54,7 +53,6 @@ export async function updateVodDurationDuringDownload(
         return row;
       }
 
-      VodUpdateSchema.parse({ duration });
       await db.updateTable('vods').set({ duration }).where('id', '=', dbId).execute();
 
       shouldPublish = true;

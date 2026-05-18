@@ -89,7 +89,7 @@ export const CacheTag = {
 export const Routing = {
   /** New internal IDs are below this threshold; legacy platform IDs are >= this */
   LEGACY_ID_THRESHOLD: 1_000_000,
-};
+} as const;
 
 // ── Database ─────────────────────────────────────────────────────────────────
 export const Db = {

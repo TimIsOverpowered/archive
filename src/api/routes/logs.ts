@@ -1,14 +1,13 @@
 import { FastifyInstance, FastifySchema } from 'fastify';
 import type { ReadonlyKysely } from 'kysely/readonly';
 import { z } from 'zod';
-import { Routing } from '../../constants.js';
 import type { StreamerDB } from '../../db/streamer-types.js';
 import { getLogsByOffset, getLogsByCursor } from '../../services/logs.service.js';
-import { resolveVodIdByPlatformVodId } from '../../services/vods.service.js';
 import { badRequest } from '../../utils/http-error.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
 import { ok } from '../response.js';
+import { createRequestController, resolveVodDbId } from '../route-helpers.js';
 
 const LogsQuerySchema = z.object({
   content_offset_seconds: z.number().nonnegative().optional(),
@@ -63,33 +62,14 @@ export default function logsRoutes(fastify: FastifyInstance, _options: LogsRoute
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const controller = new AbortController();
-      request.raw.once('close', () => {
-        if (request.raw.destroyed) {
-          controller.abort();
-        }
-      });
+      const controller = createRequestController(request);
 
       try {
         const { vodId } = request.params;
         const tenantCtx = requireTenant(request);
         const { tenantId, db } = tenantCtx;
 
-        const parsedAsInt = parseInt(vodId, 10);
-        const isStrictInt = !isNaN(parsedAsInt) && String(parsedAsInt) === vodId;
-        const isNewInternalId = isStrictInt && parsedAsInt < Routing.LEGACY_ID_THRESHOLD;
-
-        let actualDbId: number;
-
-        if (isNewInternalId) {
-          actualDbId = parsedAsInt;
-        } else {
-          const resolved = await resolveVodIdByPlatformVodId(db, vodId, { signal: controller.signal });
-          if (resolved == null) {
-            return badRequest('Invalid VOD ID');
-          }
-          actualDbId = resolved;
-        }
+        const actualDbId = await resolveVodDbId(db, vodId, controller.signal);
 
         const parsed = LogsQuerySchema.safeParse(request.query);
         if (!parsed.success) {

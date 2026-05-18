@@ -1,21 +1,15 @@
 import { FastifyInstance } from 'fastify';
 import type { ReadonlyKysely } from 'kysely/readonly';
 import { z } from 'zod';
-import { Routing } from '../../constants.js';
 import type { StreamerDB } from '../../db/streamer-types.js';
 import { getEmotesByVodId } from '../../services/emotes.js';
-import {
-  getVods,
-  getVodById,
-  getVodByPlatformId,
-  resolveVodIdByPlatformVodId,
-  VodQuerySchema,
-} from '../../services/vods.service.js';
+import { getVods, getVodById, getVodByPlatformId, VodQuerySchema } from '../../services/vods.service.js';
 import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
 import { notFound } from '../../utils/http-error.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
 import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
 import { ok, okPaginated } from '../response.js';
+import { createRequestController, resolveVodDbId } from '../route-helpers.js';
 
 const VodIdParamSchema = z.string().min(1).max(100);
 
@@ -67,12 +61,7 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const controller = new AbortController();
-      request.raw.once('close', () => {
-        if (request.raw.destroyed) {
-          controller.abort();
-        }
-      });
+      const controller = createRequestController(request);
 
       try {
         const tenantCtx = requireTenant(request);
@@ -113,12 +102,7 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const controller = new AbortController();
-      request.raw.once('close', () => {
-        if (request.raw.destroyed) {
-          controller.abort();
-        }
-      });
+      const controller = createRequestController(request);
 
       try {
         const { vodId } = request.params;
@@ -130,23 +114,7 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
           notFound('VOD not found');
         }
 
-        const rawVodId = vodIdParsed.data;
-        const parsedAsInt = parseInt(rawVodId, 10);
-
-        const isStrictInt = !isNaN(parsedAsInt) && String(parsedAsInt) === rawVodId;
-        const isNewInternalId = isStrictInt && parsedAsInt < Routing.LEGACY_ID_THRESHOLD;
-
-        let actualDbId: number;
-
-        if (isNewInternalId) {
-          actualDbId = parsedAsInt;
-        } else {
-          const resolved = await resolveVodIdByPlatformVodId(db, rawVodId, { signal: controller.signal });
-          if (resolved == null) {
-            notFound('VOD not found');
-          }
-          actualDbId = resolved;
-        }
+        const actualDbId = await resolveVodDbId(db, vodIdParsed.data, controller.signal);
 
         const vod = await getVodById(db, tenantId, actualDbId, { signal: controller.signal });
         if (vod == null) {
@@ -179,12 +147,7 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const controller = new AbortController();
-      request.raw.once('close', () => {
-        if (request.raw.destroyed) {
-          controller.abort();
-        }
-      });
+      const controller = createRequestController(request);
 
       try {
         const { platform, platformVodId } = request.params;
@@ -229,12 +192,7 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
       onRequest: [rateLimitMiddleware, tenantMiddleware],
     },
     async (request) => {
-      const controller = new AbortController();
-      request.raw.once('close', () => {
-        if (request.raw.destroyed) {
-          controller.abort();
-        }
-      });
+      const controller = createRequestController(request);
 
       try {
         const { vodId } = request.params;
@@ -246,23 +204,7 @@ export default function vodsRoutes(fastify: FastifyInstance, _options: VodRoutes
           notFound('VOD not found');
         }
 
-        const rawVodId = vodIdParsed.data;
-        const parsedAsInt = parseInt(rawVodId, 10);
-
-        const isStrictInt = !isNaN(parsedAsInt) && String(parsedAsInt) === rawVodId;
-        const isNewInternalId = isStrictInt && parsedAsInt < Routing.LEGACY_ID_THRESHOLD;
-
-        let actualDbId: number;
-
-        if (isNewInternalId) {
-          actualDbId = parsedAsInt;
-        } else {
-          const resolved = await resolveVodIdByPlatformVodId(db, rawVodId, { signal: controller.signal });
-          if (resolved == null) {
-            notFound('VOD not found');
-          }
-          actualDbId = resolved;
-        }
+        const actualDbId = await resolveVodDbId(db, vodIdParsed.data, controller.signal);
 
         const emotes = await getEmotesByVodId(db, tenantId, actualDbId);
 
