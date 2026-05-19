@@ -230,28 +230,7 @@ export async function getGameById(
     const game = await db.selectFrom('games').selectAll('games').where('id', '=', gameId).executeTakeFirst(options);
     if (!game) return null;
 
-    const [prevRecent, nextRecent] = await Promise.all([
-      db
-        .selectFrom('games')
-        .innerJoin('vods', 'games.vod_id', 'vods.id')
-        .select([
-          'games.id',
-          'games.vod_id',
-          'games.start',
-          'games.duration',
-          'games.end',
-          'games.game_name',
-          'games.game_id',
-          'games.title',
-          'games.thumbnail_url',
-          'games.chapter_image',
-          'games.created_at',
-        ])
-        .where('games.game_id', '=', game.game_id)
-        .where('games.id', '<', gameId)
-        .orderBy('vods.created_at', 'desc')
-        .limit(4)
-        .execute(options),
+    const [nextRecent, prevRecent] = await Promise.all([
       db
         .selectFrom('games')
         .innerJoin('vods', 'games.vod_id', 'vods.id')
@@ -271,6 +250,27 @@ export async function getGameById(
         .where('games.game_id', '=', game.game_id)
         .where('games.id', '>', gameId)
         .orderBy('vods.created_at', 'asc')
+        .limit(4)
+        .execute(options),
+      db
+        .selectFrom('games')
+        .innerJoin('vods', 'games.vod_id', 'vods.id')
+        .select([
+          'games.id',
+          'games.vod_id',
+          'games.start',
+          'games.duration',
+          'games.end',
+          'games.game_name',
+          'games.game_id',
+          'games.title',
+          'games.thumbnail_url',
+          'games.chapter_image',
+          'games.created_at',
+        ])
+        .where('games.game_id', '=', game.game_id)
+        .where('games.id', '<', gameId)
+        .orderBy('vods.created_at', 'desc')
         .limit(4)
         .execute(options),
     ]);

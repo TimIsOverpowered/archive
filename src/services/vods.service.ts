@@ -245,7 +245,7 @@ export async function getVodById(
   const cacheKey = swrKeys.vodStatic(tenantId, vodId);
 
   const fetcher = async () => {
-    const [vod, prevRecent, nextRecent] = await Promise.all([
+    const [vod, nextRecent, prevRecent] = await Promise.all([
       db
         .selectFrom('vods')
         .selectAll('vods')
@@ -264,8 +264,8 @@ export async function getVodById(
             .limit(1)
             .as('thumbnail_url')
         )
-        .where('id', '<', vodId)
-        .orderBy('id', 'desc')
+        .where('id', '>', vodId)
+        .orderBy('id', 'asc')
         .limit(4)
         .execute(options),
       db
@@ -280,8 +280,8 @@ export async function getVodById(
             .limit(1)
             .as('thumbnail_url')
         )
-        .where('id', '>', vodId)
-        .orderBy('id', 'asc')
+        .where('id', '<', vodId)
+        .orderBy('id', 'desc')
         .limit(4)
         .execute(options),
     ]);
@@ -383,23 +383,7 @@ export async function getVodByPlatformId(
 
     if (!vod) return null;
 
-    const [prevRecent, nextRecent] = await Promise.all([
-      db
-        .selectFrom('vods')
-        .select(['id', 'platform', 'platform_vod_id', 'title', 'duration', 'created_at'])
-        .select((eb) =>
-          eb
-            .selectFrom('vod_uploads')
-            .select('thumbnail_url')
-            .whereRef('vod_uploads.vod_id', '=', 'vods.id')
-            .orderBy('vod_uploads.created_at', 'asc')
-            .limit(1)
-            .as('thumbnail_url')
-        )
-        .where('id', '<', vod.id)
-        .orderBy('id', 'desc')
-        .limit(4)
-        .execute(options),
+    const [nextRecent, prevRecent] = await Promise.all([
       db
         .selectFrom('vods')
         .select(['id', 'platform', 'platform_vod_id', 'title', 'duration', 'created_at'])
@@ -414,6 +398,22 @@ export async function getVodByPlatformId(
         )
         .where('id', '>', vod.id)
         .orderBy('id', 'asc')
+        .limit(4)
+        .execute(options),
+      db
+        .selectFrom('vods')
+        .select(['id', 'platform', 'platform_vod_id', 'title', 'duration', 'created_at'])
+        .select((eb) =>
+          eb
+            .selectFrom('vod_uploads')
+            .select('thumbnail_url')
+            .whereRef('vod_uploads.vod_id', '=', 'vods.id')
+            .orderBy('vod_uploads.created_at', 'asc')
+            .limit(1)
+            .as('thumbnail_url')
+        )
+        .where('id', '<', vod.id)
+        .orderBy('id', 'desc')
         .limit(4)
         .execute(options),
     ]);
