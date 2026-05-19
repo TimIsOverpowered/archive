@@ -114,7 +114,7 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
     method = 'GET',
     headers: customHeaders = {},
     body,
-    timeoutMs = 10000,
+    timeoutMs = 15000,
     responseType,
     retryOptions,
     logContext = {},
@@ -139,7 +139,7 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
       return true;
     }
 
-    if (error instanceof Error && error.name === 'AbortError') {
+    if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
       return externalSignal == null || !externalSignal.aborted;
     }
 
@@ -219,7 +219,7 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
   } catch (error) {
     const duration = Date.now() - startTime;
 
-    if (error instanceof Error && error.name === 'AbortError') {
+    if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
       getLogger().error(
         { component: 'http-client', method, url: scrubbedUrl, duration, error: 'Download aborted' },
         'FAILED'
