@@ -7,7 +7,7 @@ import { Cache, CacheSwr, Fts } from '../constants.js';
 import { buildPagination } from '../db/queries/builders.js';
 import type { StreamerDB, DBClient } from '../db/streamer-types.js';
 import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
-import type { VodResponse } from '../types/vods.js';
+import type { VodNeighbor, VodResponse } from '../types/vods.js';
 import type { SWRKey } from '../utils/cache-keys.js';
 import { swrKeys } from '../utils/cache-keys.js';
 import { withStaleWhileRevalidate } from '../utils/cache.js';
@@ -245,13 +245,16 @@ export async function getVodById(
   const cacheKey = swrKeys.vodStatic(tenantId, vodId);
 
   const fetcher = async () => {
-    const [vod, nextRecent, prevRecent] = await Promise.all([
-      db
-        .selectFrom('vods')
-        .selectAll('vods')
-        .select((eb) => selectVodRelations(eb))
-        .where('id', '=', vodId)
-        .executeTakeFirst(options),
+    const vod = await db
+      .selectFrom('vods')
+      .selectAll('vods')
+      .select((eb) => selectVodRelations(eb))
+      .where('id', '=', vodId)
+      .executeTakeFirst(options);
+
+    if (!vod) return null;
+
+    const [prevRaw, nextRaw] = await Promise.all([
       db
         .selectFrom('vods')
         .select(['id', 'platform', 'platform_vod_id', 'title', 'duration', 'created_at'])
@@ -264,7 +267,13 @@ export async function getVodById(
             .limit(1)
             .as('thumbnail_url')
         )
-        .where('id', '>', vodId)
+        .where((eb) =>
+          eb.or([
+            eb('created_at', '>', vod.created_at),
+            eb.and([eb('created_at', '=', vod.created_at), eb('id', '>', vodId)]),
+          ])
+        )
+        .orderBy('created_at', 'asc')
         .orderBy('id', 'asc')
         .limit(4)
         .execute(options),
@@ -280,56 +289,24 @@ export async function getVodById(
             .limit(1)
             .as('thumbnail_url')
         )
-        .where('id', '<', vodId)
+        .where((eb) =>
+          eb.or([
+            eb('created_at', '<', vod.created_at),
+            eb.and([eb('created_at', '=', vod.created_at), eb('id', '<', vodId)]),
+          ])
+        )
+        .orderBy('created_at', 'desc')
         .orderBy('id', 'desc')
         .limit(4)
         .execute(options),
     ]);
 
-    if (!vod) return null;
-
-    const prev = (
-      prevRecent as {
-        id: number;
-        platform: string;
-        platform_vod_id: string | null;
-        title: string | null;
-        duration: number;
-        created_at: Date;
-        thumbnail_url: string | null;
-      }[]
-    )
-      .slice(0, 2)
-      .map((i) => ({ ...i, created_at: new Date(i.created_at) }));
-    let next = (
-      nextRecent as {
-        id: number;
-        platform: string;
-        platform_vod_id: string | null;
-        title: string | null;
-        duration: number;
-        created_at: Date;
-        thumbnail_url: string | null;
-      }[]
-    )
-      .slice(0, 4)
-      .map((i) => ({ ...i, created_at: new Date(i.created_at) }));
+    const prev = (prevRaw as VodNeighbor[]).slice(0, 2);
+    let next = (nextRaw as VodNeighbor[]).slice(0, 4);
 
     if (prev.length < 2 && next.length >= 2) {
       const fill = 4 - prev.length;
-      next = (
-        nextRecent as {
-          id: number;
-          platform: string;
-          platform_vod_id: string | null;
-          title: string | null;
-          duration: number;
-          created_at: Date;
-          thumbnail_url: string | null;
-        }[]
-      )
-        .slice(0, fill)
-        .map((i) => ({ ...i, created_at: new Date(i.created_at) }));
+      next = (nextRaw as VodNeighbor[]).slice(0, fill);
     }
 
     const result = {
@@ -383,7 +360,7 @@ export async function getVodByPlatformId(
 
     if (!vod) return null;
 
-    const [nextRecent, prevRecent] = await Promise.all([
+    const [prevRaw, nextRaw] = await Promise.all([
       db
         .selectFrom('vods')
         .select(['id', 'platform', 'platform_vod_id', 'title', 'duration', 'created_at'])
@@ -396,7 +373,13 @@ export async function getVodByPlatformId(
             .limit(1)
             .as('thumbnail_url')
         )
-        .where('id', '>', vod.id)
+        .where((eb) =>
+          eb.or([
+            eb('created_at', '>', vod.created_at),
+            eb.and([eb('created_at', '=', vod.created_at), eb('id', '>', vod.id)]),
+          ])
+        )
+        .orderBy('created_at', 'asc')
         .orderBy('id', 'asc')
         .limit(4)
         .execute(options),
@@ -412,54 +395,24 @@ export async function getVodByPlatformId(
             .limit(1)
             .as('thumbnail_url')
         )
-        .where('id', '<', vod.id)
+        .where((eb) =>
+          eb.or([
+            eb('created_at', '<', vod.created_at),
+            eb.and([eb('created_at', '=', vod.created_at), eb('id', '<', vod.id)]),
+          ])
+        )
+        .orderBy('created_at', 'desc')
         .orderBy('id', 'desc')
         .limit(4)
         .execute(options),
     ]);
 
-    const prev = (
-      prevRecent as {
-        id: number;
-        platform: string;
-        platform_vod_id: string | null;
-        title: string | null;
-        duration: number;
-        created_at: Date;
-        thumbnail_url: string | null;
-      }[]
-    )
-      .slice(0, 2)
-      .map((i) => ({ ...i, created_at: new Date(i.created_at) }));
-    let next = (
-      nextRecent as {
-        id: number;
-        platform: string;
-        platform_vod_id: string | null;
-        title: string | null;
-        duration: number;
-        created_at: Date;
-        thumbnail_url: string | null;
-      }[]
-    )
-      .slice(0, 4)
-      .map((i) => ({ ...i, created_at: new Date(i.created_at) }));
+    const prev = (prevRaw as VodNeighbor[]).slice(0, 2);
+    let next = (nextRaw as VodNeighbor[]).slice(0, 4);
 
     if (prev.length < 2 && next.length >= 2) {
       const fill = 4 - prev.length;
-      next = (
-        nextRecent as {
-          id: number;
-          platform: string;
-          platform_vod_id: string | null;
-          title: string | null;
-          duration: number;
-          created_at: Date;
-          thumbnail_url: string | null;
-        }[]
-      )
-        .slice(0, fill)
-        .map((i) => ({ ...i, created_at: new Date(i.created_at) }));
+      next = (nextRaw as VodNeighbor[]).slice(0, fill);
     }
 
     const result = {

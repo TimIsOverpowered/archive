@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Cache, CacheSwr } from '../constants.js';
 import { buildPagination } from '../db/queries/builders.js';
 import type { DBClient, StreamerDB } from '../db/streamer-types.js';
-import type { GameResponse } from '../types/games.js';
+import type { GameNeighbor, GameResponse } from '../types/games.js';
 import { PLATFORM_VALUES } from '../types/platforms.js';
 import type { SWRKey } from '../utils/cache-keys.js';
 import { swrKeys } from '../utils/cache-keys.js';
@@ -230,7 +230,7 @@ export async function getGameById(
     const game = await db.selectFrom('games').selectAll('games').where('id', '=', gameId).executeTakeFirst(options);
     if (!game) return null;
 
-    const [nextRecent, prevRecent] = await Promise.all([
+    const [prevRaw, nextRaw] = await Promise.all([
       db
         .selectFrom('games')
         .innerJoin('vods', 'games.vod_id', 'vods.id')
@@ -248,8 +248,14 @@ export async function getGameById(
           'games.created_at',
         ])
         .where('games.game_id', '=', game.game_id)
-        .where('games.id', '>', gameId)
+        .where((eb) =>
+          eb.or([
+            eb('vods.created_at', '>', game.created_at),
+            eb.and([eb('vods.created_at', '=', game.created_at), eb('games.id', '>', gameId)]),
+          ])
+        )
         .orderBy('vods.created_at', 'asc')
+        .orderBy('games.id', 'asc')
         .limit(4)
         .execute(options),
       db
@@ -269,60 +275,24 @@ export async function getGameById(
           'games.created_at',
         ])
         .where('games.game_id', '=', game.game_id)
-        .where('games.id', '<', gameId)
+        .where((eb) =>
+          eb.or([
+            eb('vods.created_at', '<', game.created_at),
+            eb.and([eb('vods.created_at', '=', game.created_at), eb('games.id', '<', gameId)]),
+          ])
+        )
         .orderBy('vods.created_at', 'desc')
+        .orderBy('games.id', 'desc')
         .limit(4)
         .execute(options),
     ]);
 
-    const prev = (
-      prevRecent as {
-        id: number;
-        vod_id: number;
-        start: number;
-        duration: number;
-        end: number;
-        game_name: string | null;
-        game_id: string | null;
-        title: string | null;
-        thumbnail_url: string | null;
-        chapter_image: string | null;
-        created_at: Date | null;
-      }[]
-    ).slice(0, 2);
-    let next = (
-      nextRecent as {
-        id: number;
-        vod_id: number;
-        start: number;
-        duration: number;
-        end: number;
-        game_name: string | null;
-        game_id: string | null;
-        title: string | null;
-        thumbnail_url: string | null;
-        chapter_image: string | null;
-        created_at: Date | null;
-      }[]
-    ).slice(0, 4);
+    const prev = (prevRaw as GameNeighbor[]).slice(0, 2);
+    let next = (nextRaw as GameNeighbor[]).slice(0, 4);
 
     if (prev.length < 2 && next.length >= 2) {
       const fill = 4 - prev.length;
-      next = (
-        nextRecent as {
-          id: number;
-          vod_id: number;
-          start: number;
-          duration: number;
-          end: number;
-          game_name: string | null;
-          game_id: string | null;
-          title: string | null;
-          thumbnail_url: string | null;
-          chapter_image: string | null;
-          created_at: Date | null;
-        }[]
-      ).slice(0, fill);
+      next = (nextRaw as GameNeighbor[]).slice(0, fill);
     }
 
     const result = {
