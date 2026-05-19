@@ -254,11 +254,11 @@ describe('VodService: VodResponse type', () => {
   it('should accept a valid VodResponse object', () => {
     const vod: VodResponse = {
       id: 1,
-      platformVodId: 'abc123',
+      platform_vod_id: 'abc123',
       platform: 'twitch',
       title: 'Test Stream',
       duration: 3600,
-      platformStreamId: 'stream-1',
+      platform_stream_id: 'stream-1',
       created_at: new Date(),
       updated_at: new Date(),
       is_live: false,
@@ -266,6 +266,8 @@ describe('VodService: VodResponse type', () => {
       vod_uploads: [],
       chapters: [],
       games: [],
+      prev: [],
+      next: [],
     };
     assert.strictEqual(vod.id, 1);
     assert.strictEqual(vod.platform, 'twitch');
@@ -277,11 +279,11 @@ describe('VodService: VodResponse type', () => {
   it('should accept VodResponse with populated relations', () => {
     const vod: VodResponse = {
       id: 1,
-      platformVodId: 'abc123',
+      platform_vod_id: 'abc123',
       platform: 'twitch',
       title: 'Test Stream',
       duration: 3600,
-      platformStreamId: 'stream-1',
+      platform_stream_id: 'stream-1',
       created_at: new Date(),
       updated_at: new Date(),
       is_live: false,
@@ -321,6 +323,8 @@ describe('VodService: VodResponse type', () => {
           chapter_image: null,
         },
       ],
+      prev: [],
+      next: [],
     };
     assert.strictEqual(vod.vod_uploads.length, 1);
     assert.strictEqual(vod.chapters.length, 1);

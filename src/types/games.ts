@@ -14,6 +14,30 @@ export interface GameResponse {
   chapter_image: string | null;
   created_at: Date | null;
   updated_at: Date | null;
-  prev?: { id: number } | null;
-  next?: { id: number } | null;
+  prev: {
+    id: number;
+    vod_id: number;
+    start: number;
+    duration: number;
+    end: number;
+    game_name: string | null;
+    game_id: string | null;
+    title: string | null;
+    thumbnail_url: string | null;
+    chapter_image: string | null;
+    created_at: Date | null;
+  }[];
+  next: {
+    id: number;
+    vod_id: number;
+    start: number;
+    duration: number;
+    end: number;
+    game_name: string | null;
+    game_id: string | null;
+    title: string | null;
+    thumbnail_url: string | null;
+    chapter_image: string | null;
+    created_at: Date | null;
+  }[];
 }

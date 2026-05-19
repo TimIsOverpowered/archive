@@ -227,29 +227,108 @@ export async function getGameById(
   const cacheKey = swrKeys.gameStatic(tenantId, gameId);
 
   const fetcher = async () => {
-    const [game, prev, next] = await Promise.all([
-      db.selectFrom('games').selectAll('games').where('id', '=', gameId).executeTakeFirst(options),
+    const game = await db.selectFrom('games').selectAll('games').where('id', '=', gameId).executeTakeFirst(options);
+    if (!game) return null;
+
+    const [prevRecent, nextRecent] = await Promise.all([
       db
         .selectFrom('games')
-        .select(['id'])
-        .where('id', '<', gameId)
-        .orderBy('id', 'desc')
-        .limit(1)
-        .executeTakeFirst(options),
+        .innerJoin('vods', 'games.vod_id', 'vods.id')
+        .select([
+          'games.id',
+          'games.vod_id',
+          'games.start',
+          'games.duration',
+          'games.end',
+          'games.game_name',
+          'games.game_id',
+          'games.title',
+          'games.thumbnail_url',
+          'games.chapter_image',
+          'games.created_at',
+        ])
+        .where('games.game_id', '=', game.game_id)
+        .where('games.id', '<', gameId)
+        .orderBy('vods.created_at', 'desc')
+        .limit(4)
+        .execute(options),
       db
         .selectFrom('games')
-        .select(['id'])
-        .where('id', '>', gameId)
-        .orderBy('id', 'asc')
-        .limit(1)
-        .executeTakeFirst(options),
+        .innerJoin('vods', 'games.vod_id', 'vods.id')
+        .select([
+          'games.id',
+          'games.vod_id',
+          'games.start',
+          'games.duration',
+          'games.end',
+          'games.game_name',
+          'games.game_id',
+          'games.title',
+          'games.thumbnail_url',
+          'games.chapter_image',
+          'games.created_at',
+        ])
+        .where('games.game_id', '=', game.game_id)
+        .where('games.id', '>', gameId)
+        .orderBy('vods.created_at', 'asc')
+        .limit(4)
+        .execute(options),
     ]);
 
-    if (!game) return null;
+    const prev = (
+      prevRecent as {
+        id: number;
+        vod_id: number;
+        start: number;
+        duration: number;
+        end: number;
+        game_name: string | null;
+        game_id: string | null;
+        title: string | null;
+        thumbnail_url: string | null;
+        chapter_image: string | null;
+        created_at: Date | null;
+      }[]
+    ).slice(0, 2);
+    let next = (
+      nextRecent as {
+        id: number;
+        vod_id: number;
+        start: number;
+        duration: number;
+        end: number;
+        game_name: string | null;
+        game_id: string | null;
+        title: string | null;
+        thumbnail_url: string | null;
+        chapter_image: string | null;
+        created_at: Date | null;
+      }[]
+    ).slice(0, 4);
+
+    if (prev.length < 2 && next.length >= 2) {
+      const fill = 4 - prev.length;
+      next = (
+        nextRecent as {
+          id: number;
+          vod_id: number;
+          start: number;
+          duration: number;
+          end: number;
+          game_name: string | null;
+          game_id: string | null;
+          title: string | null;
+          thumbnail_url: string | null;
+          chapter_image: string | null;
+          created_at: Date | null;
+        }[]
+      ).slice(0, fill);
+    }
+
     const result = {
       ...(game as unknown as GameResponse),
-      prev: prev ?? null,
-      next: next ?? null,
+      prev,
+      next,
     };
     return result;
   };

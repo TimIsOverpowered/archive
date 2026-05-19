@@ -245,7 +245,7 @@ export async function getVodById(
   const cacheKey = swrKeys.vodStatic(tenantId, vodId);
 
   const fetcher = async () => {
-    const [vod, prev, next] = await Promise.all([
+    const [vod, prevRecent, nextRecent] = await Promise.all([
       db
         .selectFrom('vods')
         .selectAll('vods')
@@ -254,25 +254,88 @@ export async function getVodById(
         .executeTakeFirst(options),
       db
         .selectFrom('vods')
-        .select(['id', 'platform', 'platform_vod_id as platformVodId'])
-        .where('id', '>', vodId)
-        .orderBy('id', 'asc')
-        .limit(1)
-        .executeTakeFirst(options),
-      db
-        .selectFrom('vods')
-        .select(['id', 'platform', 'platform_vod_id as platformVodId'])
+        .select(['id', 'platform', 'platform_vod_id', 'title', 'duration', 'created_at'])
+        .select((eb) =>
+          eb
+            .selectFrom('vod_uploads')
+            .select('thumbnail_url')
+            .whereRef('vod_uploads.vod_id', '=', 'vods.id')
+            .orderBy('vod_uploads.created_at', 'asc')
+            .limit(1)
+            .as('thumbnail_url')
+        )
         .where('id', '<', vodId)
         .orderBy('id', 'desc')
-        .limit(1)
-        .executeTakeFirst(options),
+        .limit(4)
+        .execute(options),
+      db
+        .selectFrom('vods')
+        .select(['id', 'platform', 'platform_vod_id', 'title', 'duration', 'created_at'])
+        .select((eb) =>
+          eb
+            .selectFrom('vod_uploads')
+            .select('thumbnail_url')
+            .whereRef('vod_uploads.vod_id', '=', 'vods.id')
+            .orderBy('vod_uploads.created_at', 'asc')
+            .limit(1)
+            .as('thumbnail_url')
+        )
+        .where('id', '>', vodId)
+        .orderBy('id', 'asc')
+        .limit(4)
+        .execute(options),
     ]);
 
     if (!vod) return null;
+
+    const prev = (
+      prevRecent as {
+        id: number;
+        platform: string;
+        platform_vod_id: string | null;
+        title: string | null;
+        duration: number;
+        created_at: Date;
+        thumbnail_url: string | null;
+      }[]
+    )
+      .slice(0, 2)
+      .map((i) => ({ ...i, created_at: new Date(i.created_at) }));
+    let next = (
+      nextRecent as {
+        id: number;
+        platform: string;
+        platform_vod_id: string | null;
+        title: string | null;
+        duration: number;
+        created_at: Date;
+        thumbnail_url: string | null;
+      }[]
+    )
+      .slice(0, 4)
+      .map((i) => ({ ...i, created_at: new Date(i.created_at) }));
+
+    if (prev.length < 2 && next.length >= 2) {
+      const fill = 4 - prev.length;
+      next = (
+        nextRecent as {
+          id: number;
+          platform: string;
+          platform_vod_id: string | null;
+          title: string | null;
+          duration: number;
+          created_at: Date;
+          thumbnail_url: string | null;
+        }[]
+      )
+        .slice(0, fill)
+        .map((i) => ({ ...i, created_at: new Date(i.created_at) }));
+    }
+
     const result = {
       ...(vod as unknown as VodResponse),
-      prev: prev ?? null,
-      next: next ?? null,
+      prev,
+      next,
     };
     void registerVodTags(tenantId, [{ id: result.id }], cacheKey, Cache.DETAILS_TTL, 1);
     return result;
@@ -304,10 +367,10 @@ export async function getVodByPlatformId(
   db: ReadonlyKysely<StreamerDB>,
   tenantId: string,
   platform: Platform,
-  platformVodId: string,
+  platform_vod_id: string,
   options?: { signal?: AbortSignal }
 ): Promise<VodResponse | null> {
-  const cacheKey = swrKeys.vodPlatform(tenantId, platform, platformVodId);
+  const cacheKey = swrKeys.vodPlatform(tenantId, platform, platform_vod_id);
 
   const fetcher = async () => {
     const vod = await db
@@ -315,32 +378,94 @@ export async function getVodByPlatformId(
       .selectAll('vods')
       .select((eb) => selectVodRelations(eb))
       .where('platform', '=', platform)
-      .where('platform_vod_id', '=', platformVodId)
+      .where('platform_vod_id', '=', platform_vod_id)
       .executeTakeFirst(options);
 
     if (!vod) return null;
 
-    const [prev, next] = await Promise.all([
+    const [prevRecent, nextRecent] = await Promise.all([
       db
         .selectFrom('vods')
-        .select(['id', 'platform', 'platform_vod_id as platformVodId'])
-        .where('id', '>', vod.id)
-        .orderBy('id', 'asc')
-        .limit(1)
-        .executeTakeFirst(options),
-      db
-        .selectFrom('vods')
-        .select(['id', 'platform', 'platform_vod_id as platformVodId'])
+        .select(['id', 'platform', 'platform_vod_id', 'title', 'duration', 'created_at'])
+        .select((eb) =>
+          eb
+            .selectFrom('vod_uploads')
+            .select('thumbnail_url')
+            .whereRef('vod_uploads.vod_id', '=', 'vods.id')
+            .orderBy('vod_uploads.created_at', 'asc')
+            .limit(1)
+            .as('thumbnail_url')
+        )
         .where('id', '<', vod.id)
         .orderBy('id', 'desc')
-        .limit(1)
-        .executeTakeFirst(options),
+        .limit(4)
+        .execute(options),
+      db
+        .selectFrom('vods')
+        .select(['id', 'platform', 'platform_vod_id', 'title', 'duration', 'created_at'])
+        .select((eb) =>
+          eb
+            .selectFrom('vod_uploads')
+            .select('thumbnail_url')
+            .whereRef('vod_uploads.vod_id', '=', 'vods.id')
+            .orderBy('vod_uploads.created_at', 'asc')
+            .limit(1)
+            .as('thumbnail_url')
+        )
+        .where('id', '>', vod.id)
+        .orderBy('id', 'asc')
+        .limit(4)
+        .execute(options),
     ]);
+
+    const prev = (
+      prevRecent as {
+        id: number;
+        platform: string;
+        platform_vod_id: string | null;
+        title: string | null;
+        duration: number;
+        created_at: Date;
+        thumbnail_url: string | null;
+      }[]
+    )
+      .slice(0, 2)
+      .map((i) => ({ ...i, created_at: new Date(i.created_at) }));
+    let next = (
+      nextRecent as {
+        id: number;
+        platform: string;
+        platform_vod_id: string | null;
+        title: string | null;
+        duration: number;
+        created_at: Date;
+        thumbnail_url: string | null;
+      }[]
+    )
+      .slice(0, 4)
+      .map((i) => ({ ...i, created_at: new Date(i.created_at) }));
+
+    if (prev.length < 2 && next.length >= 2) {
+      const fill = 4 - prev.length;
+      next = (
+        nextRecent as {
+          id: number;
+          platform: string;
+          platform_vod_id: string | null;
+          title: string | null;
+          duration: number;
+          created_at: Date;
+          thumbnail_url: string | null;
+        }[]
+      )
+        .slice(0, fill)
+        .map((i) => ({ ...i, created_at: new Date(i.created_at) }));
+    }
 
     const result = {
       ...(vod as unknown as VodResponse),
-      prev: prev ?? null,
-      next: next ?? null,
+      prev,
+      next,
     };
     void registerVodTags(tenantId, [{ id: result.id }], cacheKey, Cache.DETAILS_TTL, 1);
     return result;
@@ -370,13 +495,13 @@ export async function getVodByPlatformId(
  */
 export async function resolveVodIdByPlatformVodId(
   db: DBClient,
-  platformVodId: string,
+  platform_vod_id: string,
   options?: { signal?: AbortSignal }
 ): Promise<number | null> {
   const record = await db
     .selectFrom('vods')
     .select('id')
-    .where('platform_vod_id', '=', platformVodId)
+    .where('platform_vod_id', '=', platform_vod_id)
     .executeTakeFirst(options);
   return record?.id ?? null;
 }

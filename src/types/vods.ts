@@ -1,11 +1,11 @@
 /** Shape of a VOD record with all its relations (uploads, chapters, games). */
 export interface VodResponse {
   id: number;
-  platformVodId: string | null;
+  platform_vod_id: string | null;
   platform: string;
   title: string | null;
   duration: number;
-  platformStreamId: string | null;
+  platform_stream_id: string | null;
   created_at: Date;
   updated_at: Date;
   is_live: boolean;
@@ -39,6 +39,22 @@ export interface VodResponse {
     title: string | null;
     chapter_image: string | null;
   }>;
-  prev?: { id: number; platformVodId: string | null; platform: string } | null;
-  next?: { id: number; platformVodId: string | null; platform: string } | null;
+  prev: {
+    id: number;
+    platform_vod_id: string | null;
+    platform: string;
+    title: string | null;
+    duration: number;
+    thumbnail_url: string | null;
+    created_at: Date;
+  }[];
+  next: {
+    id: number;
+    platform_vod_id: string | null;
+    platform: string;
+    title: string | null;
+    duration: number;
+    thumbnail_url: string | null;
+    created_at: Date;
+  }[];
 }
