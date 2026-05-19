@@ -19,12 +19,12 @@ import { tenantMiddleware, requireTenant } from '../../middleware/tenant-platfor
 import { ok } from '../../response.js';
 
 function invalidatePublicTenantCache(tenantId: string): void {
-  defaultCacheContext.invalidateKey(simpleKeys.tenantList());
+  defaultCacheContext.invalidateKey(simpleKeys.tenantList(1, 20));
   defaultCacheContext.invalidateKey(simpleKeys.tenantDetail(tenantId));
 
   const client = RedisService.getActiveClient();
   if (client) {
-    void client.unlink(CacheKeys.tenantList(), CacheKeys.tenantDetail(tenantId)).catch(() => {});
+    void client.unlink(CacheKeys.tenantList(1, 20), CacheKeys.tenantDetail(tenantId)).catch(() => {});
   }
 }
 

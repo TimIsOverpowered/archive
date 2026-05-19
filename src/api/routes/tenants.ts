@@ -1,11 +1,13 @@
 import { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { Cache } from '../../constants.js';
-import { getAllPublicTenants, getPublicTenantById } from '../../services/meta-tenants.service.js';
+import { buildPagination } from '../../db/queries/builders.js';
+import { getAllPublicTenantsPaginated, getPublicTenantById } from '../../services/meta-tenants.service.js';
 import { simpleKeys } from '../../utils/cache-keys.js';
 import { defaultCacheContext } from '../../utils/cache.js';
 import { notFound } from '../../utils/http-error.js';
 import createRateLimitMiddleware from '../middleware/rate-limit.js';
-import { ok } from '../response.js';
+import { ok, okPaginated } from '../response.js';
 
 export default function tenantsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.publicRateLimiter });
@@ -16,16 +18,32 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
       schema: {
         tags: ['Public'],
         description: 'List all tenants with public information only',
+        query: {
+          type: 'object',
+          properties: {
+            page: { type: 'integer', minimum: 1, default: 1, description: 'Page number' },
+            limit: { type: 'integer', minimum: 1, maximum: 100, default: 20, description: 'Items per page' },
+          },
+        },
       },
       onRequest: [rateLimitMiddleware],
     },
-    async () => {
-      const cacheKey = simpleKeys.tenantList();
-      const tenants = await defaultCacheContext.withCache(cacheKey, Cache.TENANT_LIST_TTL, async () => {
-        return getAllPublicTenants();
+    async (request) => {
+      const query = z
+        .object({
+          page: z.coerce.number().int().min(1).default(1),
+          limit: z.coerce.number().int().min(1).max(100).default(20),
+        })
+        .parse(request.query);
+
+      const { page, limit } = buildPagination({ page: query.page, limit: query.limit, maxLimit: 100 });
+
+      const cacheKey = simpleKeys.tenantList(page, limit);
+      const result = await defaultCacheContext.withCache(cacheKey, Cache.TENANT_LIST_TTL, async () => {
+        return getAllPublicTenantsPaginated({ page, limit });
       });
 
-      return ok(tenants);
+      return okPaginated(result.tenants, { page, limit, total: result.total });
     }
   );
 

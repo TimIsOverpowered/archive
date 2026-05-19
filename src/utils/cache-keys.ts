@@ -45,7 +45,7 @@ const baseKeys = {
   gameLibrary: (t: string, q: Record<string, string | number | undefined>, p: number, l: number) =>
     buildPaginatedQueryKey('games-library', t, q, p, l),
   stats: (tenantId: string) => `stats:${tenantId}`,
-  tenantList: () => 'tenants:list',
+  tenantList: (page: number, limit: number) => `tenants:list:page:${page}:limit:${limit}`,
   tenantDetail: (tenantId: string) => `tenants:detail:{${tenantId}}`,
 };
 

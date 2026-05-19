@@ -211,6 +211,34 @@ export async function getAllPublicTenants(): Promise<PublicTenant[]> {
   return tenants.map(toPublicTenant);
 }
 
+/** Retrieve tenants with only public fields, paginated. */
+export async function getAllPublicTenantsPaginated(opts: {
+  page: number;
+  limit: number;
+}): Promise<{ tenants: PublicTenant[]; total: number }> {
+  const { page, limit } = opts;
+  const offset = (page - 1) * limit;
+
+  const [result, totalRow] = await Promise.all([
+    getMetaClient()
+      .selectFrom('tenants')
+      .selectAll()
+      .limit(limit + 1)
+      .offset(offset)
+      .execute(),
+    getMetaClient()
+      .selectFrom('tenants')
+      .select((eb) => [eb.fn.count('id').as('cnt')])
+      .executeTakeFirst(),
+  ]);
+
+  const total = Number(totalRow?.cnt ?? 0);
+  const hasMore = result.length > limit;
+  const tenants = hasMore ? result.slice(0, limit) : result;
+
+  return { tenants: tenants.map(toPublicTenant), total };
+}
+
 /** Retrieve a single tenant by ID with only public fields. */
 export async function getPublicTenantById(id: string): Promise<PublicTenant | undefined> {
   const tenant = await getMetaClient().selectFrom('tenants').selectAll().where('id', '=', id).executeTakeFirst();
