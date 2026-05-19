@@ -28,6 +28,7 @@ export interface TenantsTable {
   twitch: JSONColumnType<Record<string, unknown>> | null;
   youtube: JSONColumnType<Record<string, unknown>> | null;
   kick: JSONColumnType<Record<string, unknown>> | null;
+  social_media: JSONColumnType<Record<string, string>> | null;
   database_name: string | null;
   settings: JSONColumnType<Record<string, unknown>>;
   created_at: ColumnType<Date, string | undefined, never>;

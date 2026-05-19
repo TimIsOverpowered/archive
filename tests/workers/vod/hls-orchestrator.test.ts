@@ -442,6 +442,7 @@ function buildContext(overrides: Record<string, unknown> = {}) {
         saveMP4: true,
         vodDownload: true,
         chatDownload: true,
+        cdn: { enabled: false, baseUrl: '' },
       },
       ...overrides,
     },

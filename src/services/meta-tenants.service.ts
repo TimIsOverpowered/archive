@@ -1,3 +1,4 @@
+import { YouTube } from '../constants.js';
 import { getMetaClient } from '../db/meta-client.js';
 import type { InsertableTenants, SelectableTenants, UpdateableTenants } from '../db/meta-types.js';
 import { encryptObject, encryptScalar } from '../utils/encryption.js';
@@ -9,11 +10,17 @@ const tenantColumns = [
   'twitch',
   'youtube',
   'kick',
+  'social_media',
   'database_name',
   'settings',
   'created_at',
   'updated_at',
 ] as const;
+
+export interface PublicTenantCdn {
+  enabled: boolean;
+  baseUrl: string;
+}
 
 export interface PublicTenant {
   id: string;
@@ -21,6 +28,9 @@ export interface PublicTenant {
   profile_image_url: string | null;
   created_at: Date;
   platforms: Array<{ name: string; enabled: boolean; id: string | null }>;
+  social_media: Array<{ name: string; url: string }>;
+  default_delay: number;
+  cdn: PublicTenantCdn;
 }
 
 function toPublicTenant(tenant: SelectableTenants): PublicTenant {
@@ -46,12 +56,45 @@ function toPublicTenant(tenant: SelectableTenants): PublicTenant {
     });
   }
 
+  const social_media: PublicTenant['social_media'] = [];
+  const sm = tenant.social_media;
+  if (sm != null && typeof sm === 'object' && !Array.isArray(sm)) {
+    for (const [name, url] of Object.entries(sm)) {
+      if (typeof url === 'string' && url !== '') {
+        social_media.push({ name, url });
+      }
+    }
+  }
+
+  let default_delay: number = YouTube.DEFAULT_SPLIT_DURATION;
+  const youtube = tenant.youtube;
+  if (youtube != null && typeof youtube === 'object' && !Array.isArray(youtube)) {
+    const sd = youtube.splitDuration;
+    if (typeof sd === 'number') {
+      default_delay = sd;
+    }
+  }
+
+  const cdn: PublicTenantCdn = { enabled: false, baseUrl: '' };
+  const settings = tenant.settings;
+  if (settings != null && typeof settings === 'object' && !Array.isArray(settings)) {
+    const sCdn = settings.cdn;
+    if (sCdn != null && typeof sCdn === 'object' && !Array.isArray(sCdn)) {
+      const cdnObj = sCdn as Record<string, unknown>;
+      if (cdnObj.enabled === true) cdn.enabled = true;
+      if (typeof cdnObj.baseUrl === 'string' && cdnObj.baseUrl !== '') cdn.baseUrl = cdnObj.baseUrl;
+    }
+  }
+
   return {
     id: tenant.id,
     display_name: tenant.display_name,
     profile_image_url: tenant.profile_image_url,
     created_at: tenant.created_at,
     platforms,
+    social_media,
+    default_delay,
+    cdn,
   };
 }
 

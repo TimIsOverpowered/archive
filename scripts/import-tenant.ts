@@ -45,6 +45,11 @@ interface KickConfig {
   id?: string;
 }
 
+interface CdnConfig {
+  enabled?: boolean;
+  baseUrl?: string;
+}
+
 interface SettingsConfig {
   channel?: string;
   domainName: string;
@@ -53,6 +58,7 @@ interface SettingsConfig {
   vodDownload: boolean;
   saveHLS: boolean;
   saveMP4: boolean;
+  cdn?: CdnConfig;
 }
 
 interface RawConfig {
@@ -66,6 +72,8 @@ interface RawConfig {
   vodDownload: boolean;
   saveHLS: boolean;
   saveMP4: boolean;
+  cdn?: CdnConfig;
+  social_media?: Record<string, string>;
 }
 
 function processTwitch(config: TwitchConfig | undefined) {
@@ -129,6 +137,13 @@ function processSettings(raw: RawConfig) {
     saveMP4: raw.saveMP4,
   };
 
+  if (raw.cdn) {
+    settings.cdn = {
+      enabled: raw.cdn.enabled ?? false,
+      baseUrl: raw.cdn.baseUrl ?? '',
+    };
+  }
+
   return settings;
 }
 
@@ -184,6 +199,7 @@ async function importConfig(channelName: string, databaseName: string): Promise<
   if (twitch) createData.twitch = twitch;
   if (youtube) createData.youtube = youtube;
   if (kick) createData.kick = kick;
+  if (rawConfig.social_media) createData.social_media = rawConfig.social_media;
 
   await createTenant(createData as InsertableTenants);
 

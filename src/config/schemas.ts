@@ -20,6 +20,15 @@ function encryptedStringSchema() {
 /**
  * Tenant-level settings controlling which features are enabled and storage paths.
  */
+export const CdnSchema = z.object({
+  /** Whether CDN is enabled (default: false) */
+  enabled: z.boolean().default(false),
+  /** CDN base URL (default: '') */
+  baseUrl: z.string().default(''),
+});
+
+export type TenantCdn = z.infer<typeof CdnSchema>;
+
 export const SettingsSchema = z.object({
   /** Domain name associated with the tenant */
   domainName: z.string().min(1, 'domainName is required'),
@@ -33,6 +42,8 @@ export const SettingsSchema = z.object({
   vodDownload: z.boolean().default(true),
   /** Whether to download chat messages (default: true) */
   chatDownload: z.boolean().default(true),
+  /** CDN configuration */
+  cdn: CdnSchema.default({ enabled: false, baseUrl: '' }),
 });
 
 /** YouTube OAuth token credentials. */

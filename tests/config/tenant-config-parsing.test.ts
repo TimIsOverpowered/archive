@@ -51,6 +51,7 @@ function makeTenant(overrides: Partial<SelectableTenants> = {}): SelectableTenan
     twitch: null,
     youtube: null,
     kick: null,
+    social_media: null,
     database_name: 'test',
     settings: { domainName: 'example.com', timezone: 'UTC' },
     created_at: new Date(),
@@ -436,6 +437,7 @@ describe('buildTenantConfig parsing logic', () => {
         saveHLS: true,
         vodDownload: false,
         chatDownload: false,
+        cdn: { enabled: false, baseUrl: '' },
       });
     });
   });

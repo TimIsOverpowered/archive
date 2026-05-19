@@ -32,6 +32,7 @@ function makeTenant(overrides: Partial<SelectableTenants> = {}): SelectableTenan
     twitch: null,
     youtube: null,
     kick: null,
+    social_media: null,
     database_name: 'test',
     settings: { domainName: 'example.com', timezone: 'UTC' },
     created_at: new Date(),

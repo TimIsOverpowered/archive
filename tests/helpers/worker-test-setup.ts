@@ -65,6 +65,7 @@ export function createMockTenantConfig(overrides: MockTenantConfigOverrides = {}
       saveHLS: overrides.settings?.saveHLS ?? false,
       vodDownload: overrides.settings?.vodDownload ?? true,
       chatDownload: overrides.settings?.chatDownload ?? true,
+      cdn: overrides.settings?.cdn ?? { enabled: false, baseUrl: '' },
     },
   };
 }

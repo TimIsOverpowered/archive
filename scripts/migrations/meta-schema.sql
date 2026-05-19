@@ -19,12 +19,13 @@ CREATE UNIQUE INDEX "admins_api_key_hash_key" ON "admins"("api_key_hash");
 -- Each tenant represents a streamer/channel with platform-specific OAuth data
 -- and a separate database connection.
 CREATE TABLE "tenants" (
-    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "id" TEXT,
     "display_name" TEXT,
     "profile_image_url" TEXT,
     "twitch" JSONB,
     "youtube" JSONB,
     "kick" JSONB,
+    "social_media" JSONB,
     "database_name" TEXT,
     "settings" JSONB NOT NULL DEFAULT '{}'::jsonb,
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,

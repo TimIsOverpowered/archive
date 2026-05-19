@@ -2,6 +2,7 @@ import { Platform } from '../types/platforms.js';
 import type { TwitchConfig, YouTubeConfig, KickConfig, TenantSettings } from './schemas.js';
 
 export type { TwitchConfig, YouTubeConfig, KickConfig, TenantSettings } from './schemas.js';
+export type { TenantCdn } from './schemas.js';
 
 export interface TenantBase {
   id: string;

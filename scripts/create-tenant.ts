@@ -296,6 +296,28 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
+    // Phase 3b: Social Media Links
+    console.log('\n='.repeat(50));
+    console.log('SOCIAL MEDIA LINKS');
+    console.log('='.repeat(50));
+
+    const socialMedia: Record<string, string> = {};
+
+    const addSocial = await confirm('Add social media links');
+
+    if (addSocial) {
+      let addAnother = true;
+      while (addAnother) {
+        const platformName = await prompt('Platform name (e.g., twitter_x, instagram, discord)');
+        if (!platformName) break;
+        const platformUrl = await prompt('URL');
+        if (platformUrl) {
+          socialMedia[platformName] = platformUrl;
+        }
+        addAnother = await confirm('Add another link');
+      }
+    }
+
     // Phase 4: YouTube Upload Settings
     console.log('\n='.repeat(50));
     console.log('YOUTUBE UPLOAD SETTINGS');
@@ -365,6 +387,13 @@ async function main(): Promise<void> {
     const saveHLS = await confirm('Save HLS to disk');
     const saveMP4 = await confirm('Save MP4 to disk');
 
+    console.log('\nCDN Configuration:');
+    const cdnEnabled = await confirm('Enable CDN');
+    let cdnBaseUrl = '';
+    if (cdnEnabled) {
+      cdnBaseUrl = (await prompt('CDN base URL (e.g., https://cdn.example.com)')) || '';
+    }
+
     // Phase 6: Summary & Confirmation
     console.log('\n' + '='.repeat(50));
     console.log('TENANT CREATION SUMMARY');
@@ -409,6 +438,17 @@ async function main(): Promise<void> {
     console.log(`  VOD Download: ${vodDownload ? 'yes' : 'no'}`);
     console.log(`  Save HLS: ${saveHLS ? 'yes' : 'no'}`);
     console.log(`  Save MP4: ${saveMP4 ? 'yes' : 'no'}`);
+    console.log(`  CDN: ${cdnEnabled ? 'yes' : 'no'}`);
+    if (cdnEnabled && cdnBaseUrl) {
+      console.log(`  CDN Base URL: ${cdnBaseUrl}`);
+    }
+
+    if (Object.keys(socialMedia).length > 0) {
+      console.log('\nSocial Media:');
+      for (const [name, url] of Object.entries(socialMedia)) {
+        console.log(`  ${name}: ${url}`);
+      }
+    }
 
     // Phase 7: Execution - Register tenant in meta database
 
@@ -423,8 +463,13 @@ async function main(): Promise<void> {
         vodDownload,
         saveHLS,
         saveMP4,
+        cdn: { enabled: cdnEnabled, baseUrl: cdnBaseUrl },
       },
     };
+
+    if (Object.keys(socialMedia).length > 0) {
+      tenantData.social_media = socialMedia;
+    }
 
     if (profileImageUrl) {
       tenantData.profile_image_url = profileImageUrl;
