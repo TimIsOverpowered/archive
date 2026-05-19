@@ -13,6 +13,7 @@ const tenantColumns = [
   'social_media',
   'database_name',
   'settings',
+  'status',
   'created_at',
   'updated_at',
 ] as const;
@@ -27,6 +28,7 @@ export interface PublicTenant {
   display_name: string | null;
   profile_image_url: string | null;
   created_at: Date;
+  status: string;
   platforms: Array<{ name: string; enabled: boolean; id: string | null }>;
   social_media: Array<{ name: string; url: string }>;
   default_delay: number;
@@ -91,6 +93,7 @@ function toPublicTenant(tenant: SelectableTenants): PublicTenant {
     display_name: tenant.display_name,
     profile_image_url: tenant.profile_image_url,
     created_at: tenant.created_at,
+    status: tenant.status,
     platforms,
     social_media,
     default_delay,

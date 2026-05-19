@@ -20,6 +20,7 @@ export interface MockTenantConfigOverrides {
   kick?: Partial<KickConfig>;
   database?: Partial<DatabaseConfig>;
   settings?: Partial<TenantSettings>;
+  status?: 'active' | 'inactive';
 }
 
 export function createMockTenantConfig(overrides: MockTenantConfigOverrides = {}): TenantConfig {
@@ -67,6 +68,7 @@ export function createMockTenantConfig(overrides: MockTenantConfigOverrides = {}
       chatDownload: overrides.settings?.chatDownload ?? true,
       cdn: overrides.settings?.cdn ?? { enabled: false, baseUrl: '' },
     },
+    status: overrides.status ?? 'active',
   };
 }
 

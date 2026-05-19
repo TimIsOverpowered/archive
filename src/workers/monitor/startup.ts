@@ -120,5 +120,5 @@ export async function removeTwitchBatchMonitorJob(): Promise<void> {
 }
 
 function getTenantConfigsForMonitoring(): TenantConfig[] {
-  return configService.getAll().filter((config) => config.settings.vodDownload === true);
+  return configService.getAll().filter((config) => config.settings.vodDownload === true && config.status === 'active');
 }

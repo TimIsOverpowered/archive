@@ -59,6 +59,7 @@ export function buildTenantConfig(tenant: SelectableTenants): TenantConfig | nul
     createdAt: tenant.created_at,
     database: { name: databaseName },
     settings,
+    status: tenant.status ?? 'active',
   };
 
   const twitchConfig = parsePlatformConfig(tenant.id, tenant.twitch, TwitchSchema, 'Twitch');

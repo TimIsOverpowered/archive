@@ -444,6 +444,7 @@ function buildContext(overrides: Record<string, unknown> = {}) {
         chatDownload: true,
         cdn: { enabled: false, baseUrl: '' },
       },
+      status: 'active' as const,
       ...overrides,
     },
     db: {} as any,

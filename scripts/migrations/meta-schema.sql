@@ -28,6 +28,7 @@ CREATE TABLE "tenants" (
     "social_media" JSONB,
     "database_name" TEXT,
     "settings" JSONB NOT NULL DEFAULT '{}'::jsonb,
+    "status" TEXT NOT NULL DEFAULT 'active',
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

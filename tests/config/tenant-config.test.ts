@@ -35,6 +35,7 @@ function makeTenant(overrides: Partial<SelectableTenants> = {}): SelectableTenan
     social_media: null,
     database_name: 'test',
     settings: { domainName: 'example.com', timezone: 'UTC' },
+    status: 'active',
     created_at: new Date(),
     updated_at: new Date(),
     ...overrides,

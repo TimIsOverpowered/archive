@@ -31,6 +31,7 @@ export interface TenantsTable {
   social_media: JSONColumnType<Record<string, string>> | null;
   database_name: string | null;
   settings: JSONColumnType<Record<string, unknown>>;
+  status: ColumnType<'active' | 'inactive', 'active', 'active' | 'inactive'>;
   created_at: ColumnType<Date, string | undefined, never>;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
