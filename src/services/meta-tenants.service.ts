@@ -1,6 +1,7 @@
+import type { ExpressionBuilder } from 'kysely';
 import { YouTube } from '../constants.js';
 import { getMetaClient } from '../db/meta-client.js';
-import type { InsertableTenants, SelectableTenants, UpdateableTenants } from '../db/meta-types.js';
+import type { InsertableTenants, MetaDB, SelectableTenants, UpdateableTenants } from '../db/meta-types.js';
 import { encryptObject, encryptScalar } from '../utils/encryption.js';
 
 const tenantColumns = [
@@ -223,16 +224,25 @@ export async function getAllPublicTenantsPaginated(opts: {
   const { page, limit, search } = opts;
   const offset = (page - 1) * limit;
 
-  const baseQuery = getMetaClient().selectFrom('tenants').selectAll();
-  const filteredQuery = search != null && search !== '' ? baseQuery.where('id', 'ilike', `%${search}%`) : baseQuery;
+  const searchWhere =
+    search != null && search !== ''
+      ? (eb: ExpressionBuilder<MetaDB, 'tenants'>) => eb('id', 'ilike', `%${search}%`)
+      : undefined;
 
   const [result, totalRow] = await Promise.all([
-    filteredQuery
+    getMetaClient()
+      .selectFrom('tenants')
+      .selectAll()
+      .where(searchWhere ?? ((eb) => eb.lit(true)))
       .orderBy('id', 'asc')
       .limit(limit + 1)
       .offset(offset)
       .execute(),
-    filteredQuery.select((eb) => [eb.fn.count('id').as('cnt')]).executeTakeFirst(),
+    getMetaClient()
+      .selectFrom('tenants')
+      .select((eb) => [eb.fn.count('id').as('cnt')])
+      .where(searchWhere ?? ((eb) => eb.lit(true)))
+      .executeTakeFirst(),
   ]);
 
   const total = Number(totalRow?.cnt ?? 0);
