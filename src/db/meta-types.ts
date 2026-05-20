@@ -25,6 +25,7 @@ export interface TenantsTable {
   id: string;
   display_name: string | null;
   profile_image_url: string | null;
+  background_image_url: string | null;
   twitch: JSONColumnType<Record<string, unknown>> | null;
   youtube: JSONColumnType<Record<string, unknown>> | null;
   kick: JSONColumnType<Record<string, unknown>> | null;

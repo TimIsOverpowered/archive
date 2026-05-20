@@ -84,6 +84,8 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
           properties: {
             id: { type: 'string', description: 'Tenant ID' },
             display_name: { type: 'string', nullable: true },
+            profile_image_url: { type: 'string', nullable: true },
+            background_image_url: { type: 'string', nullable: true },
             twitch: { type: 'object', nullable: true },
             youtube: { type: 'object', nullable: true },
             kick: { type: 'object', nullable: true },
@@ -120,6 +122,8 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
           type: 'object',
           properties: {
             display_name: { type: 'string', nullable: true },
+            profile_image_url: { type: 'string', nullable: true },
+            background_image_url: { type: 'string', nullable: true },
             twitch: { type: 'object', nullable: true },
             youtube: { type: 'object', nullable: true },
             kick: { type: 'object', nullable: true },

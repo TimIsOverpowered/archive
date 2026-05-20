@@ -48,6 +48,7 @@ function makeTenant(overrides: Partial<SelectableTenants> = {}): SelectableTenan
     id: 'tenant-1',
     display_name: 'Test Tenant',
     profile_image_url: null,
+    background_image_url: null,
     twitch: null,
     youtube: null,
     kick: null,

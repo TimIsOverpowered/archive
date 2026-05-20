@@ -7,6 +7,7 @@ const tenantColumns = [
   'id',
   'display_name',
   'profile_image_url',
+  'background_image_url',
   'twitch',
   'youtube',
   'kick',
@@ -27,6 +28,7 @@ export interface PublicTenant {
   id: string;
   display_name: string | null;
   profile_image_url: string | null;
+  background_image_url: string | null;
   created_at: Date;
   status: string;
   platforms: Array<{ name: string; enabled: boolean; id: string | null }>;
@@ -92,6 +94,7 @@ function toPublicTenant(tenant: SelectableTenants): PublicTenant {
     id: tenant.id,
     display_name: tenant.display_name,
     profile_image_url: tenant.profile_image_url,
+    background_image_url: tenant.background_image_url,
     created_at: tenant.created_at,
     status: tenant.status,
     platforms,

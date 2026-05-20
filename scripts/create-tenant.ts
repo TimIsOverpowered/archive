@@ -205,6 +205,7 @@ async function main(): Promise<void> {
     const displayName = (await prompt('Display Name (or press Enter to use channel name)')) || channelName;
 
     const profileImageUrl = await prompt('Profile image URL (optional)');
+    const backgroundImageUrl = await prompt('Background image URL (optional)');
 
     // Phase 2: Database Setup
     console.log('\n='.repeat(50));
@@ -473,6 +474,10 @@ async function main(): Promise<void> {
 
     if (profileImageUrl) {
       tenantData.profile_image_url = profileImageUrl;
+    }
+
+    if (backgroundImageUrl) {
+      tenantData.background_image_url = backgroundImageUrl;
     }
 
     if (twitchData) {
