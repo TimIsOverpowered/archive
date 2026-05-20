@@ -218,21 +218,21 @@ export async function getAllPublicTenants(): Promise<PublicTenant[]> {
 export async function getAllPublicTenantsPaginated(opts: {
   page: number;
   limit: number;
+  search?: string;
 }): Promise<{ tenants: PublicTenant[]; total: number }> {
-  const { page, limit } = opts;
+  const { page, limit, search } = opts;
   const offset = (page - 1) * limit;
 
+  const baseQuery = getMetaClient().selectFrom('tenants').selectAll();
+  const filteredQuery = search != null && search !== '' ? baseQuery.where('id', 'ilike', `%${search}%`) : baseQuery;
+
   const [result, totalRow] = await Promise.all([
-    getMetaClient()
-      .selectFrom('tenants')
-      .selectAll()
+    filteredQuery
+      .orderBy('id', 'asc')
       .limit(limit + 1)
       .offset(offset)
       .execute(),
-    getMetaClient()
-      .selectFrom('tenants')
-      .select((eb) => [eb.fn.count('id').as('cnt')])
-      .executeTakeFirst(),
+    filteredQuery.select((eb) => [eb.fn.count('id').as('cnt')]).executeTakeFirst(),
   ]);
 
   const total = Number(totalRow?.cnt ?? 0);

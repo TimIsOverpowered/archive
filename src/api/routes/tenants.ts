@@ -23,6 +23,12 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
           properties: {
             page: { type: 'integer', minimum: 1, default: 1, description: 'Page number' },
             limit: { type: 'integer', minimum: 1, maximum: 100, default: 20, description: 'Items per page' },
+            search: {
+              type: 'string',
+              minLength: 1,
+              maxLength: 50,
+              description: 'Search tenant ID (case-insensitive partial match)',
+            },
           },
         },
       },
@@ -33,14 +39,17 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
         .object({
           page: z.coerce.number().int().min(1).default(1),
           limit: z.coerce.number().int().min(1).max(100).default(20),
+          search: z.string().min(1).max(50).optional(),
         })
         .parse(request.query);
 
       const { page, limit } = buildPagination({ page: query.page, limit: query.limit, maxLimit: 100 });
 
-      const cacheKey = simpleKeys.tenantList(page, limit);
-      const result = await defaultCacheContext.withCache(cacheKey, Cache.TENANT_LIST_TTL, async () => {
-        return getAllPublicTenantsPaginated({ page, limit });
+      const searchCacheKey = simpleKeys.tenantList(page, limit, { search: query.search });
+      const result = await defaultCacheContext.withCache(searchCacheKey, Cache.TENANT_LIST_TTL, async () => {
+        const opts: { page: number; limit: number; search?: string } = { page, limit };
+        if (query.search != null) opts.search = query.search;
+        return getAllPublicTenantsPaginated(opts);
       });
 
       return okPaginated(result.tenants, { page, limit, total: result.total });
