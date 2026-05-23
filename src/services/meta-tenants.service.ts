@@ -36,6 +36,7 @@ export interface PublicTenant {
   social_media: Array<{ name: string; url: string }>;
   default_delay: number;
   games: boolean;
+  vods: boolean;
   cdn: PublicTenantCdn;
 }
 
@@ -74,6 +75,7 @@ function toPublicTenant(tenant: SelectableTenants): PublicTenant {
 
   let default_delay: number = YouTube.DEFAULT_SPLIT_DURATION;
   let games: boolean = false;
+  let vods: boolean = false;
   const youtube = tenant.youtube;
   if (youtube != null && typeof youtube === 'object' && !Array.isArray(youtube)) {
     const sd = youtube.splitDuration;
@@ -82,6 +84,9 @@ function toPublicTenant(tenant: SelectableTenants): PublicTenant {
     }
     if (youtube.perGameUpload === true) {
       games = true;
+    }
+    if (youtube.vodUpload === true || youtube.multiTrack === true) {
+      vods = true;
     }
   }
 
@@ -107,6 +112,7 @@ function toPublicTenant(tenant: SelectableTenants): PublicTenant {
     social_media,
     default_delay,
     games,
+    vods,
     cdn,
   };
 }

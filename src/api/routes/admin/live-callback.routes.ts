@@ -6,7 +6,7 @@ import { findVodByStreamId } from '../../../db/queries/vods.js';
 import { saveVodChapters } from '../../../services/twitch/index.js';
 import type { Platform } from '../../../types/platforms.js';
 import { PLATFORM_VALUES, PLATFORMS, SOURCE_TYPES } from '../../../types/platforms.js';
-import { badRequest, notFound } from '../../../utils/http-error.js';
+import { badRequest, forbidden, notFound } from '../../../utils/http-error.js';
 import { fileExists, sanitizePathForLog } from '../../../utils/path.js';
 import { enqueueFinalizeJob, queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
@@ -67,6 +67,10 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
       const tenantCtx = asTenantPlatformContext(requireTenant(request));
       const { config, db, platform } = tenantCtx;
       const { streamId, path: inputPath, durationSecs } = request.body;
+
+      if (config?.youtube?.multiTrack !== true) {
+        forbidden('Live upload requires multiTrack to be enabled for this tenant');
+      }
 
       // Validate file path exists and is accessible
       const exists = await fileExists(inputPath);
