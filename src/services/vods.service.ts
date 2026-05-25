@@ -267,6 +267,14 @@ export async function getVodById(
             .limit(1)
             .as('thumbnail_url')
         )
+        .select((eb) =>
+          jsonArrayFrom(
+            eb
+              .selectFrom('chapters')
+              .select(['name', 'image', 'start', 'duration', 'end'])
+              .whereRef('chapters.vod_id', '=', 'vods.id')
+          ).as('chapters')
+        )
         .where((eb) =>
           eb.or([
             eb('created_at', '>', vod.created_at),
@@ -288,6 +296,14 @@ export async function getVodById(
             .orderBy('vod_uploads.created_at', 'asc')
             .limit(1)
             .as('thumbnail_url')
+        )
+        .select((eb) =>
+          jsonArrayFrom(
+            eb
+              .selectFrom('chapters')
+              .select(['name', 'image', 'start', 'duration', 'end'])
+              .whereRef('chapters.vod_id', '=', 'vods.id')
+          ).as('chapters')
         )
         .where((eb) =>
           eb.or([
@@ -373,6 +389,14 @@ export async function getVodByPlatformId(
             .limit(1)
             .as('thumbnail_url')
         )
+        .select((eb) =>
+          jsonArrayFrom(
+            eb
+              .selectFrom('chapters')
+              .select(['name', 'image', 'start', 'duration', 'end'])
+              .whereRef('chapters.vod_id', '=', 'vods.id')
+          ).as('chapters')
+        )
         .where((eb) =>
           eb.or([
             eb('created_at', '>', vod.created_at),
@@ -394,6 +418,14 @@ export async function getVodByPlatformId(
             .orderBy('vod_uploads.created_at', 'asc')
             .limit(1)
             .as('thumbnail_url')
+        )
+        .select((eb) =>
+          jsonArrayFrom(
+            eb
+              .selectFrom('chapters')
+              .select(['name', 'image', 'start', 'duration', 'end'])
+              .whereRef('chapters.vod_id', '=', 'vods.id')
+          ).as('chapters')
         )
         .where((eb) =>
           eb.or([

@@ -7,6 +7,13 @@ export type VodNeighbor = {
   duration: number;
   thumbnail_url: string | null;
   created_at: Date;
+  chapters: Array<{
+    name: string | null;
+    image: string | null;
+    duration: number;
+    start: number;
+    end: number | null;
+  }>;
 };
 
 /** Shape of a VOD record with all its relations (uploads, chapters, games). */
