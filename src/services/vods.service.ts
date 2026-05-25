@@ -275,6 +275,25 @@ export async function getVodById(
               .whereRef('chapters.vod_id', '=', 'vods.id')
           ).as('chapters')
         )
+        .select((eb) =>
+          jsonArrayFrom(
+            eb
+              .selectFrom('games')
+              .select([
+                'start',
+                'duration',
+                'end',
+                'video_provider',
+                'video_id',
+                'thumbnail_url',
+                'game_id',
+                'game_name',
+                'title',
+                'chapter_image',
+              ])
+              .whereRef('games.vod_id', '=', 'vods.id')
+          ).as('games')
+        )
         .where((eb) =>
           eb.or([
             eb('created_at', '>', vod.created_at),
@@ -304,6 +323,25 @@ export async function getVodById(
               .select(['name', 'image', 'start', 'duration', 'end'])
               .whereRef('chapters.vod_id', '=', 'vods.id')
           ).as('chapters')
+        )
+        .select((eb) =>
+          jsonArrayFrom(
+            eb
+              .selectFrom('games')
+              .select([
+                'start',
+                'duration',
+                'end',
+                'video_provider',
+                'video_id',
+                'thumbnail_url',
+                'game_id',
+                'game_name',
+                'title',
+                'chapter_image',
+              ])
+              .whereRef('games.vod_id', '=', 'vods.id')
+          ).as('games')
         )
         .where((eb) =>
           eb.or([
@@ -397,6 +435,25 @@ export async function getVodByPlatformId(
               .whereRef('chapters.vod_id', '=', 'vods.id')
           ).as('chapters')
         )
+        .select((eb) =>
+          jsonArrayFrom(
+            eb
+              .selectFrom('games')
+              .select([
+                'start',
+                'duration',
+                'end',
+                'video_provider',
+                'video_id',
+                'thumbnail_url',
+                'game_id',
+                'game_name',
+                'title',
+                'chapter_image',
+              ])
+              .whereRef('games.vod_id', '=', 'vods.id')
+          ).as('games')
+        )
         .where((eb) =>
           eb.or([
             eb('created_at', '>', vod.created_at),
@@ -426,6 +483,25 @@ export async function getVodByPlatformId(
               .select(['name', 'image', 'start', 'duration', 'end'])
               .whereRef('chapters.vod_id', '=', 'vods.id')
           ).as('chapters')
+        )
+        .select((eb) =>
+          jsonArrayFrom(
+            eb
+              .selectFrom('games')
+              .select([
+                'start',
+                'duration',
+                'end',
+                'video_provider',
+                'video_id',
+                'thumbnail_url',
+                'game_id',
+                'game_name',
+                'title',
+                'chapter_image',
+              ])
+              .whereRef('games.vod_id', '=', 'vods.id')
+          ).as('games')
         )
         .where((eb) =>
           eb.or([
