@@ -257,7 +257,7 @@ export async function getVodById(
     const [prevRaw, nextRaw] = await Promise.all([
       db
         .selectFrom('vods')
-        .select(['id', 'platform', 'platform_vod_id', 'title', 'duration', 'created_at'])
+        .select(['id', 'platform', 'platform_vod_id', 'title', 'duration', 'is_live', 'created_at'])
         .select((eb) =>
           eb
             .selectFrom('vod_uploads')
@@ -306,7 +306,7 @@ export async function getVodById(
         .execute(options),
       db
         .selectFrom('vods')
-        .select(['id', 'platform', 'platform_vod_id', 'title', 'duration', 'created_at'])
+        .select(['id', 'platform', 'platform_vod_id', 'title', 'duration', 'is_live', 'created_at'])
         .select((eb) =>
           eb
             .selectFrom('vod_uploads')
@@ -417,7 +417,7 @@ export async function getVodByPlatformId(
     const [prevRaw, nextRaw] = await Promise.all([
       db
         .selectFrom('vods')
-        .select(['id', 'platform', 'platform_vod_id', 'title', 'duration', 'created_at'])
+        .select(['id', 'platform', 'platform_vod_id', 'title', 'duration', 'is_live', 'created_at'])
         .select((eb) =>
           eb
             .selectFrom('vod_uploads')
@@ -466,7 +466,7 @@ export async function getVodByPlatformId(
         .execute(options),
       db
         .selectFrom('vods')
-        .select(['id', 'platform', 'platform_vod_id', 'title', 'duration', 'created_at'])
+        .select(['id', 'platform', 'platform_vod_id', 'title', 'duration', 'is_live', 'created_at'])
         .select((eb) =>
           eb
             .selectFrom('vod_uploads')

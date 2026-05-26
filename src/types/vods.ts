@@ -5,6 +5,7 @@ export type VodNeighbor = {
   platform_vod_id: string | null;
   title: string | null;
   duration: number;
+  is_live: boolean;
   thumbnail_url: string | null;
   created_at: Date;
   chapters: Array<{
