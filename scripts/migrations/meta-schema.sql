@@ -22,6 +22,7 @@ CREATE TABLE "tenants" (
     "id" TEXT,
     "display_name" TEXT,
     "profile_image_url" TEXT,
+    "banner_image_url" TEXT,
     "background_image_url" TEXT,
     "twitch" JSONB,
     "youtube" JSONB,

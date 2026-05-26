@@ -205,6 +205,7 @@ async function main(): Promise<void> {
     const displayName = (await prompt('Display Name (or press Enter to use channel name)')) || channelName;
 
     const profileImageUrl = await prompt('Profile image URL (optional)');
+    const bannerImageUrl = await prompt('Banner image URL (optional)');
     const backgroundImageUrl = await prompt('Background image URL (optional)');
 
     // Phase 2: Database Setup
@@ -402,6 +403,7 @@ async function main(): Promise<void> {
 
     console.log(`\nStreamer ID: ${channelName}`);
     console.log(`Display Name: ${displayName}`);
+    if (bannerImageUrl) console.log(`Banner Image: ${bannerImageUrl}`);
     console.log(`Database: postgresql://${dbUser}:***@${dbHost}:${dbPort}/${dbName}`);
 
     console.log('\nStreaming Platforms:');
@@ -474,6 +476,10 @@ async function main(): Promise<void> {
 
     if (profileImageUrl) {
       tenantData.profile_image_url = profileImageUrl;
+    }
+
+    if (bannerImageUrl) {
+      tenantData.banner_image_url = bannerImageUrl;
     }
 
     if (backgroundImageUrl) {
