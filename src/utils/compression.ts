@@ -12,6 +12,9 @@ const gzipDecompress = promisify(zlib.gunzip);
  * Serializes to JSON before compression.
  */
 export async function compressData(data: unknown): Promise<Buffer> {
+  if (data === undefined) {
+    throw new TypeError('Cannot compress undefined data');
+  }
   const algo = getRedisCompression();
   const lvl = getRedisCompressionLevel();
   const buffer = Buffer.from(JSON.stringify(data), 'utf8');

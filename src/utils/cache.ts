@@ -151,6 +151,10 @@ export class CacheContext {
       .then(async (result) => {
         this.fetchFailures.delete(key);
 
+        if (result == null) {
+          return result;
+        }
+
         const invalidatedAt = this.lastInvalidated.get(key);
         if (typeof invalidatedAt === 'number' && invalidatedAt >= fetchStartTime) {
           getLogger().debug({ key }, 'Key was invalidated during simple fetch, skipping cache write');
