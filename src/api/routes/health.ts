@@ -1,4 +1,4 @@
-import { Queue } from 'bullmq';
+import { Queue, ConnectionOptions } from 'bullmq';
 import { FastifyInstance } from 'fastify';
 import { sql } from 'kysely';
 import { getBaseConfig } from '../../config/env.js';
@@ -154,7 +154,9 @@ async function getQueueMetrics(): Promise<
   try {
     const redis = getRedisInstance();
     const queueChecks = Object.values(QUEUE_NAMES).map(async (queueName) => {
-      const queue = new Queue<AllJobData, AllJobData, string>(queueName, { connection: redis });
+      const queue = new Queue<AllJobData, AllJobData, string>(queueName, { 
+        connection: redis as unknown as ConnectionOptions 
+      });
       try {
         const counts = await raceWithTimeout(queue.getJobCounts(), 10_000, `Queue metrics ${queueName}`);
         return [

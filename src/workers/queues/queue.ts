@@ -1,4 +1,4 @@
-import { Queue, QueueOptions, FlowProducer } from 'bullmq';
+import { Queue, QueueOptions, FlowProducer, ConnectionOptions } from 'bullmq';
 import type {
   LiveDownloadJob,
   LiveDownloadResult,
@@ -58,21 +58,21 @@ export class QueueRegistry {
   ): Queue<TData, TFinishedData, string> {
     const cached = this.cache.get(name);
     if (cached) {
-      return cached as Queue<TData, TFinishedData, string>;
+      return cached as unknown as Queue<TData, TFinishedData, string>;
     }
 
-    const queue = new Queue<TData, TFinishedData, string>(name, {
-      connection: getRedisInstance(),
+    const queue = new Queue(name, {
+      connection: getRedisInstance() as unknown as ConnectionOptions,
       defaultJobOptions: jobOptions,
-    });
+    }) as unknown as Queue<TData, TFinishedData, string>;
 
-    this.cache.set(name, queue);
+    this.cache.set(name, queue as unknown as Queue<unknown, unknown, string>);
     return queue;
   }
 
   getFlowProducer(): FlowProducer {
     this.flowProducer ??= new FlowProducer({
-      connection: getRedisInstance(),
+      connection: getRedisInstance() as unknown as ConnectionOptions,
     });
     return this.flowProducer;
   }

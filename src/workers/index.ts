@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { Queue } from 'bullmq';
+import { Queue, ConnectionOptions } from 'bullmq';
 import { loadWorkersConfig } from '../config/env.js';
 import type { TenantConfigSubscriber } from '../config/tenant-config-subscriber.js';
 import { registerTenantConfigSubscriberWorker } from '../config/tenant-config-subscriber.js';
@@ -36,7 +36,9 @@ async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkers
   );
 
   for (const name of Object.values(QUEUE_NAMES)) {
-    const queue = new Queue(name, { connection: getRedisInstance() });
+    const queue = new Queue(name, { 
+      connection: getRedisInstance() as unknown as ConnectionOptions 
+    });
     try {
       await queue.pause();
       await queue.obliterate({ force: true });

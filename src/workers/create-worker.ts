@@ -1,4 +1,4 @@
-import { Processor, Worker, BaseJobOptions } from 'bullmq';
+import { Processor, Worker, BaseJobOptions, ConnectionOptions } from 'bullmq';
 import type { Redis } from 'ioredis';
 import { extractErrorDetails } from '../utils/error.js';
 import { getLogger } from '../utils/logger.js';
@@ -64,7 +64,7 @@ export function createWorker<TData, TResult = unknown>(
   const { name, processor, connection, concurrency = 1, useWorkerThreads = false } = config;
 
   const worker = new Worker<TData, TResult>(name, processor, {
-    connection,
+    connection: connection as unknown as ConnectionOptions,
     concurrency,
     useWorkerThreads,
   });
