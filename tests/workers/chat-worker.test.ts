@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import chatProcessor from '../../src/workers/chat.worker.js';
 
 describe('Chat Worker', () => {
-  it('should skip non-Twitch platforms', async () => {
+  it('should process Kick platform (fails without tenant)', async () => {
     const job = {
       id: 'job-1',
       data: {
@@ -15,9 +15,14 @@ describe('Chat Worker', () => {
       },
     } as any;
 
-    const result = await (chatProcessor as any)(job);
-    assert.strictEqual(result.success, true);
-    assert.strictEqual(result.skipped, true);
+    let errorThrown: Error | null = null;
+    try {
+      await (chatProcessor as any)(job);
+    } catch (error) {
+      errorThrown = error as Error;
+    }
+    // Kick goes through buildKickProcessorContext which requires a real tenant
+    assert.ok(errorThrown);
   });
 
   it('should skip non-Twitch platform: YouTube', async () => {

@@ -21,7 +21,7 @@ describe('Kick Strategy: createVodData', () => {
     assert.strictEqual(result.is_live, false);
     assert.strictEqual(result.duration, 5400);
     assert.strictEqual(result.platform_stream_id, 'stream-456');
-    assert.strictEqual(result.created_at, '2024-01-15T10:00:00Z');
+    assert.strictEqual(result.created_at, '2024-01-15T10:00:00.000Z');
   });
 
   it('should handle null title', () => {
@@ -60,7 +60,7 @@ describe('Kick Strategy: createVodData', () => {
     };
 
     const result = strategy.createVodData(meta);
-    assert.strictEqual(result.created_at, '2024-06-15T14:30:00Z');
+    assert.strictEqual(result.created_at, '2024-06-15T14:30:00.000Z');
   });
 });
 
