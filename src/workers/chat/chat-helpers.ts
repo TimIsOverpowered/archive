@@ -82,8 +82,8 @@ export function extractMessageData(node: TwitchChatMessageNode | null | undefine
 }
 
 export interface ChatFragment {
-  id?: string;
   text: string;
+  emote: { id: string } | null;
 }
 
 export function parseKickContent(content: string | null | undefined): ChatFragment[] {
@@ -97,19 +97,19 @@ export function parseKickContent(content: string | null | undefined): ChatFragme
 
   while ((match = emoteRegex.exec(content)) !== null) {
     if (match.index > lastIndex) {
-      fragments.push({ text: content.substring(lastIndex, match.index) });
+      fragments.push({ text: content.slice(lastIndex, match.index), emote: null });
     }
 
     fragments.push({
-      id: match[1],
-      text: match[2],
-    } as ChatFragment);
+      text: match[2] ?? '',
+      emote: { id: match[1] ?? '' },
+    });
 
     lastIndex = emoteRegex.lastIndex;
   }
 
   if (lastIndex < content.length) {
-    fragments.push({ text: content.substring(lastIndex) });
+    fragments.push({ text: content.slice(lastIndex), emote: null });
   }
 
   return fragments;
