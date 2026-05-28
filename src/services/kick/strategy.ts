@@ -1,5 +1,6 @@
 import { requirePlatformConfig } from '../../config/types.js';
 import { PLATFORMS } from '../../types/platforms.js';
+import { toUtcDate, toUtcISO } from '../../utils/datetime.js';
 import { createErrorContext } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
 import { retryWithBackoff } from '../../utils/retry.js';
@@ -27,7 +28,7 @@ export const strategy: PlatformStrategy<VodCreateData, VodUpdateData> = {
     return {
       id: String(streamStatus.id),
       title: streamStatus.session_title ?? '',
-      startedAt: streamStatus.created_at,
+      startedAt: toUtcISO(streamStatus.created_at),
       streamId: String(streamStatus.id),
       platformUserId: cfg.platformUserId,
       platformUsername: cfg.platformUsername,
@@ -45,7 +46,7 @@ export const strategy: PlatformStrategy<VodCreateData, VodUpdateData> = {
     return {
       id: `${vodData.id}`,
       title: vodData.session_title ?? '',
-      createdAt: vodData.created_at,
+      createdAt: toUtcISO(vodData.created_at),
       duration: Math.floor(Number(vodData.duration) / 1000),
       streamId: `${vodData.id}`,
       sourceUrl: vodData.source ?? undefined,
@@ -67,7 +68,7 @@ export const strategy: PlatformStrategy<VodCreateData, VodUpdateData> = {
     return {
       id: String(vodObject.id),
       title: vodObject.session_title ?? '',
-      createdAt: new Date(vodObject.created_at).toISOString(),
+      createdAt: toUtcISO(vodObject.created_at),
       duration: 0,
       streamId,
       sourceUrl: vodObject.source ?? undefined,
@@ -78,7 +79,7 @@ export const strategy: PlatformStrategy<VodCreateData, VodUpdateData> = {
     return {
       platform_vod_id: meta.id,
       title: meta.title === '' ? null : (meta.title ?? ''),
-      created_at: meta.createdAt,
+      created_at: toUtcISO(meta.createdAt),
       duration: meta.duration,
       platform_stream_id: meta.streamId ?? null,
       platform: PLATFORMS.KICK,
@@ -90,7 +91,7 @@ export const strategy: PlatformStrategy<VodCreateData, VodUpdateData> = {
     return {
       platform_vod_id: meta.id,
       title: meta.title === '' ? null : (meta.title ?? ''),
-      created_at: new Date(meta.createdAt),
+      created_at: toUtcDate(meta.createdAt),
       duration: meta.duration,
       platform_stream_id: meta.streamId,
     };

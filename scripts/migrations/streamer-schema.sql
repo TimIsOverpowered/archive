@@ -9,10 +9,10 @@ CREATE TABLE "vods" (
     "title" TEXT,
     "duration" INTEGER NOT NULL DEFAULT 0,
     "platform_stream_id" TEXT,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "is_live" BOOLEAN NOT NULL DEFAULT false,
-    "started_at" TIMESTAMP(3),
+    "started_at" TIMESTAMPTZ(3),
 
     CONSTRAINT "vods_new_pkey" PRIMARY KEY ("id")
 );
@@ -27,7 +27,7 @@ CREATE TABLE "vod_uploads" (
     "part" INTEGER NOT NULL DEFAULT 1,
     "status" "UploadStatus" NOT NULL DEFAULT 'PENDING',
     "thumbnail_url" TEXT,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "vod_uploads_pkey" PRIMARY KEY ("id")
 );
@@ -57,8 +57,8 @@ CREATE TABLE "games" (
      "game_name" TEXT,
     "title" TEXT,
     "chapter_image" TEXT,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "games_new_pkey" PRIMARY KEY ("id")
 );

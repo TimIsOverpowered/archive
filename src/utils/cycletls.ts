@@ -107,7 +107,14 @@ export class CycleTLSSession {
     return this._closed;
   }
 
-  private getProfile(): BrowserProfile {
+  private getProfile(customUserAgent?: string): BrowserProfile {
+    if (customUserAgent != null && customUserAgent !== '') {
+      const isChrome = customUserAgent.includes('Chrome');
+      const matchingProfiles = BROWSER_PROFILES.filter((p) => p.userAgent.includes(isChrome ? 'Chrome' : 'Firefox'));
+      if (matchingProfiles.length > 0) {
+        return matchingProfiles[Math.floor(Math.random() * matchingProfiles.length)] as BrowserProfile;
+      }
+    }
     const idx = Math.floor(Math.random() * BROWSER_PROFILES.length);
     return BROWSER_PROFILES[idx] ?? DEFAULT_PROFILE;
   }
@@ -129,7 +136,14 @@ export class CycleTLSSession {
 
   async fetchText(
     url: string,
-    opts?: { timeoutMs?: number; attempts?: number; maxDelayMs?: number; shouldRetry?: RetryOptions['shouldRetry'] }
+    opts?: {
+      timeoutMs?: number;
+      attempts?: number;
+      maxDelayMs?: number;
+      shouldRetry?: RetryOptions['shouldRetry'];
+      headers?: Record<string, string>;
+      userAgent?: string;
+    }
   ): Promise<string> {
     if (this.closed) throw new Error('Session is closed');
 
@@ -138,11 +152,12 @@ export class CycleTLSSession {
     getLogger().debug({ url }, 'CycleTLS fetching text');
 
     const fn = async (): Promise<string> => {
-      const profile = this.getProfile();
+      const profile = this.getProfile(opts?.userAgent);
       const response = await client.get(url, {
         ja3: profile.ja3,
-        userAgent: profile.userAgent,
+        userAgent: opts?.userAgent ?? profile.userAgent,
         http2Fingerprint: profile.http2Fingerprint,
+        ...(opts?.headers && { headers: opts.headers }),
         responseType: 'text',
         ...(opts?.timeoutMs != null && { timeout: opts.timeoutMs }),
       });
@@ -161,7 +176,14 @@ export class CycleTLSSession {
   async streamToFile(
     url: string,
     outputPath: string,
-    opts?: { timeoutMs?: number; attempts?: number; maxDelayMs?: number; shouldRetry?: RetryOptions['shouldRetry'] }
+    opts?: {
+      timeoutMs?: number;
+      attempts?: number;
+      maxDelayMs?: number;
+      shouldRetry?: RetryOptions['shouldRetry'];
+      headers?: Record<string, string>;
+      userAgent?: string;
+    }
   ): Promise<void> {
     if (this.closed) throw new Error('Session is closed');
 
@@ -170,11 +192,12 @@ export class CycleTLSSession {
     getLogger().debug({ url, outputPath }, 'CycleTLS streaming to file');
 
     const fn = async (): Promise<void> => {
-      const profile = this.getProfile();
+      const profile = this.getProfile(opts?.userAgent);
       const response = await client.get(url, {
         ja3: profile.ja3,
-        userAgent: profile.userAgent,
+        userAgent: opts?.userAgent ?? profile.userAgent,
         http2Fingerprint: profile.http2Fingerprint,
+        ...(opts?.headers && { headers: opts.headers }),
         responseType: 'stream',
         ...(opts?.timeoutMs != null && { timeout: opts.timeoutMs }),
       });

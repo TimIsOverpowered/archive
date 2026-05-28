@@ -111,6 +111,11 @@ export function isTwitchPlatform(platform: Platform): platform is typeof PLATFOR
   return platform === PLATFORMS.TWITCH;
 }
 
+/** Type guard narrowing a platform to Kick. */
+export function isKickPlatform(platform: Platform): platform is typeof PLATFORMS.KICK {
+  return platform === PLATFORMS.KICK;
+}
+
 // ============================================================================
 // Formatting Utilities
 // ============================================================================

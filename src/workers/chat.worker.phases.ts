@@ -1,4 +1,5 @@
 import { Job } from 'bullmq';
+import dayjs from 'dayjs';
 import type { Kysely } from 'kysely';
 import { getDisplayName, type TenantConfig } from '../config/types.js';
 import { Chat } from '../constants.js';
@@ -11,8 +12,9 @@ import { sleep, jitter } from '../utils/delay.js';
 import { resetFailures, initRichAlert } from '../utils/discord-alerts.js';
 import type { AppLogger } from '../utils/logger.js';
 import { flushChatBatch } from './chat/chat-batch-processor.js';
-import { extractEdges, calculateResumeOffset, extractMessageData } from './chat/chat-helpers.js';
+import { extractEdges, calculateResumeOffset, extractMessageData, parseKickContent } from './chat/chat-helpers.js';
 import type { ChatMessageCreateInput } from './chat/chat-types.js';
+import { paginateKickChatCommentsParallel } from './chat/kick-chat-paginator.js';
 import type { ChatDownloadJob, ChatDownloadResult } from './jobs/types.js';
 import { createChatWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
 import type { ChatWorkerAlerts } from './utils/alert-factories.js';
@@ -291,6 +293,218 @@ export function sendChatCompletionAlert(
   ctx.log.info(
     { component: 'chat-worker', vodId: ctx.vodId, ...result, finalOffset: ctx.effectiveOffset },
     'Download completed successfully'
+  );
+
+  safeUpdateAlert(
+    ctx.messageId,
+    ctx.alerts.complete(ctx.displayName, ctx.vodId, ctx.platform, result.totalMessages, result.batchCount),
+    ctx.log,
+    ctx.vodId
+  );
+}
+
+export async function buildKickProcessorContext(job: Job<ChatDownloadJob>): Promise<ChatProcessorContext> {
+  const { tenantId, dbId, vodId, platform, duration, startOffset, forceRerun } = job.data;
+
+  const { config, db } = await getJobContext(tenantId);
+  const log = createAutoLogger(String(tenantId));
+
+  log.info({ component: 'worker', jobId: job.id, dbId, vodId, platform, tenantId }, 'Starting Kick chat job');
+  await job.updateProgress(0);
+
+  const displayName = getDisplayName(config);
+
+  let effectiveOffset = 0;
+  let hasExistingData = false;
+
+  if (startOffset != null) {
+    effectiveOffset = startOffset;
+  } else if (forceRerun !== true) {
+    const lastSavedRecord = await db
+      .selectFrom('chat_messages')
+      .select(['content_offset_seconds'])
+      .where('vod_id', '=', dbId)
+      .orderBy('content_offset_seconds', 'desc')
+      .executeTakeFirst();
+
+    if (lastSavedRecord?.content_offset_seconds != null && lastSavedRecord.content_offset_seconds > 0) {
+      effectiveOffset = lastSavedRecord.content_offset_seconds;
+      hasExistingData = true;
+    }
+  }
+
+  const isResume = hasExistingData && startOffset == null;
+  const alerts = createChatWorkerAlerts();
+  const messageId = await initRichAlert(
+    alerts.init(displayName, vodId, platform, isResume, isResume ? effectiveOffset : undefined)
+  ).catch(() => null);
+
+  return {
+    config,
+    db,
+    tenantId,
+    log,
+    dbId,
+    vodId,
+    platform,
+    duration,
+    displayName,
+    job,
+    effectiveOffset,
+    hasExistingData,
+    forceRerun: forceRerun ?? false,
+    alerts,
+    messageId,
+  };
+}
+
+export async function checkKickCompletion(ctx: ChatProcessorContext): Promise<ChatDownloadResult | null> {
+  const msgCountByOffset = await isCompleteByOffset(ctx.db, ctx.dbId, ctx.effectiveOffset, ctx.duration);
+  if (msgCountByOffset !== null) {
+    ctx.log.info(
+      { vodId: ctx.vodId, effectiveOffset: ctx.effectiveOffset, duration: ctx.duration, msgCountByOffset },
+      'Kick chat download already complete (offset exceeds duration)'
+    );
+    return markChatComplete(ctx, msgCountByOffset);
+  }
+
+  return null;
+}
+
+export async function downloadKickChat(
+  ctx: ChatProcessorContext
+): Promise<{ totalMessages: number; batchCount: number }> {
+  const { displayName, dbId, vodId, duration, log, alerts, messageId, db, tenantId, forceRerun, config } = ctx;
+  let totalMessages = 0;
+  let batchCount = 0;
+  const batchBuffer: ChatMessageCreateInput[] = [];
+
+  const channelId = config.kick?.id;
+
+  if (channelId == null || channelId === '') {
+    throw new Error('Kick channel ID is required for chat download');
+  }
+
+  const vodRecord = await db.selectFrom('vods').select(['created_at']).where('id', '=', dbId).executeTakeFirst();
+  if (!vodRecord) {
+    throw new Error(`VOD ${dbId} not found for chat download`);
+  }
+  const vodCreatedAt = dayjs.utc(vodRecord.created_at);
+
+  log.info({ vodId, effectiveOffset: ctx.effectiveOffset, channelId }, 'Starting Kick chat download');
+
+  if (forceRerun === true) {
+    await db.deleteFrom('chat_messages').where('vod_id', '=', dbId).execute();
+    await invalidateChatCache(tenantId, dbId);
+    log.info({ vodId }, 'Cleared existing chat messages and cache for force rerun');
+  }
+
+  const reportProgress = (offset: number) => {
+    if (duration > 0) {
+      const pct = Math.min(Math.round((offset / duration) * 100), 100);
+      void ctx.job.updateProgress(pct);
+    }
+  };
+
+  for await (const messages of paginateKickChatCommentsParallel(
+    channelId,
+    vodCreatedAt,
+    duration,
+    ctx.effectiveOffset,
+    log
+  )) {
+    if (messages.length === 0) continue;
+
+    let lastOffset = ctx.effectiveOffset;
+
+    for (const msg of messages) {
+      const msgTime = dayjs.utc(msg.created_at);
+      const offsetSeconds = Math.round(msgTime.diff(vodCreatedAt, 'second'));
+
+      if (offsetSeconds >= duration) continue;
+
+      lastOffset = Math.max(lastOffset, offsetSeconds);
+
+      const parsedMessageFragments = parseKickContent(msg.content);
+
+      batchBuffer.push({
+        id: msg.id,
+        vod_id: dbId,
+        display_name: msg.sender?.username ?? null,
+        content_offset_seconds: offsetSeconds,
+        createdAt: msgTime.toDate(),
+        message: parsedMessageFragments,
+        user_badges: msg.sender?.identity?.badges ?? [],
+        user_color: msg.sender?.identity?.color ?? '#FFFFFF',
+      });
+    }
+
+    log.debug(
+      { vodId, batchMessages: messages.length, bufferSize: batchBuffer.length, offset: lastOffset },
+      'Kick batch processed'
+    );
+
+    ctx.effectiveOffset = lastOffset;
+
+    if (batchBuffer.length >= Chat.BATCH_SIZE) {
+      const result = await flushChatBatch({
+        db,
+        buffer: batchBuffer,
+        log,
+        vodId,
+        onProgress: (offset, batchNumber, messagesInBatch) => {
+          reportProgress(offset);
+          safeUpdateAlert(
+            messageId,
+            alerts.progress(displayName, vodId, offset, batchNumber, messagesInBatch, totalMessages, duration),
+            log,
+            vodId
+          );
+        },
+        lastOffset,
+        totalMessages,
+        batchCount,
+      });
+      totalMessages = result.totalMessages;
+      batchCount = result.batchCount;
+      batchBuffer.length = 0;
+    }
+  }
+
+  log.debug({ vodId }, 'Reached end of Kick chat stream');
+
+  if (batchBuffer.length > 0) {
+    const result = await flushChatBatch({
+      db,
+      buffer: batchBuffer,
+      log,
+      vodId,
+      lastOffset: ctx.effectiveOffset,
+      totalMessages,
+      batchCount,
+    });
+    totalMessages = result.totalMessages;
+    batchCount = result.batchCount;
+    batchBuffer.length = 0;
+  }
+
+  if (totalMessages === 0) {
+    log.warn({ vodId }, 'No Kick chat messages found for VOD');
+    resetFailures(tenantId);
+    safeUpdateAlert(messageId, alerts.noMessages(displayName, vodId, ctx.platform, ctx.effectiveOffset), log, vodId);
+  }
+
+  return { totalMessages, batchCount };
+}
+
+export function sendKickChatCompletionAlert(
+  ctx: ChatProcessorContext,
+  result: { totalMessages: number; batchCount: number }
+): void {
+  resetFailures(ctx.tenantId);
+  ctx.log.info(
+    { component: 'chat-worker', vodId: ctx.vodId, ...result, finalOffset: ctx.effectiveOffset },
+    'Kick chat download completed successfully'
   );
 
   safeUpdateAlert(

@@ -9,3 +9,6 @@ export { updateChapterDuringDownload, finalizeKickChapters } from './chapters.js
 
 // Category
 export { getKickCategoryInfo } from './category.js';
+
+// Chat
+export { KickChatWaterfallClient, type KickMessagesResponse } from './chat.js';

@@ -1,6 +1,6 @@
 import type { Job, Processor } from 'bullmq';
 import { invalidateChatCache } from '../services/vod-cache.js';
-import { isTwitchPlatform } from '../types/platforms.js';
+import { isKickPlatform, isTwitchPlatform } from '../types/platforms.js';
 import { createAutoLogger } from '../utils/auto-tenant-logger.js';
 import { updateAlert } from '../utils/discord-alerts.js';
 import { extractErrorDetails } from '../utils/error.js';
@@ -9,6 +9,10 @@ import {
   checkChatCompletion,
   downloadChatMessages,
   sendChatCompletionAlert,
+  buildKickProcessorContext,
+  downloadKickChat,
+  sendKickChatCompletionAlert,
+  checkKickCompletion,
 } from './chat.worker.phases.js';
 import type { ChatProcessorContext } from './chat.worker.phases.js';
 import type { ChatDownloadJob, ChatDownloadResult } from './jobs/types.js';
@@ -36,7 +40,6 @@ const wrappedChatProcessor = wrapWorkerProcessor<ChatDownloadJob, ChatProcessorC
 
     const result = await downloadChatMessages(ctx);
 
-    // Purge any partial buckets users may have permanently cached during the download phase
     try {
       await invalidateChatCache(ctx.tenantId, ctx.dbId);
     } catch (err) {
@@ -53,8 +56,38 @@ const wrappedChatProcessor = wrapWorkerProcessor<ChatDownloadJob, ChatProcessorC
   { errorMeta, errorAlert }
 );
 
+const wrappedKickChatProcessor = wrapWorkerProcessor<ChatDownloadJob, ChatProcessorContext, ChatDownloadResult>(
+  buildKickProcessorContext,
+  async (ctx) => {
+    if (!ctx.forceRerun && ctx.hasExistingData) {
+      const skipResult = await checkKickCompletion(ctx);
+      if (skipResult) return skipResult;
+    }
+
+    const result = await downloadKickChat(ctx);
+
+    try {
+      await invalidateChatCache(ctx.tenantId, ctx.dbId);
+    } catch (err) {
+      ctx.log.warn(
+        { err: extractErrorDetails(err).message, vodId: ctx.vodId },
+        'Failed to invalidate chat cache after successful download'
+      );
+    }
+
+    sendKickChatCompletionAlert(ctx, result);
+
+    return { success: true, ...result };
+  },
+  { errorMeta, errorAlert }
+);
+
 const chatProcessor: Processor<ChatDownloadJob, ChatDownloadResult> = async (job) => {
   const { platform } = job.data;
+
+  if (isKickPlatform(platform)) {
+    return wrappedKickChatProcessor(job);
+  }
 
   if (!isTwitchPlatform(platform)) {
     const log = createAutoLogger(job.data.tenantId);

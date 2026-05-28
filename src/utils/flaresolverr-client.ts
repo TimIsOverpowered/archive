@@ -19,6 +19,8 @@ export interface FetchResult<T = unknown> {
   success: true;
   data: T;
   status: number;
+  cookies?: string;
+  userAgent?: string;
 }
 
 export interface FetchError {
@@ -43,6 +45,7 @@ interface FlareSolverrResponse {
     headers?: Record<string, string>;
     cookies: Array<{ name: string; value: string; domain?: string; path?: string }>;
     response: string;
+    userAgent?: string;
     userCurrentUrl?: string;
   };
 }
@@ -100,7 +103,14 @@ async function fetchFromFlareSolverr(
     }
   }
 
-  return { success: true, data, status };
+  const cookieString = solution.cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+  return {
+    success: true,
+    data,
+    status,
+    cookies: cookieString,
+    ...(solution.userAgent != null && { userAgent: solution.userAgent }),
+  };
 }
 
 export async function fetchUrl<T = unknown>(url: string, options?: FetchUrlOptions): Promise<FetchUrlResult<T>> {

@@ -267,6 +267,8 @@ async function main(): Promise<void> {
         username: twitchUsername,
         mainPlatform: isMainPlatform,
       };
+    } else {
+      twitchData = { enabled: false };
     }
 
     const enableKick = await confirm('\nEnable Kick');
@@ -284,6 +286,8 @@ async function main(): Promise<void> {
         username: kickUsername,
         mainPlatform: isMainPlatform,
       };
+    } else {
+      kickData = { enabled: false };
     }
 
     if (!twitchData && !kickData) {
@@ -407,13 +411,13 @@ async function main(): Promise<void> {
     console.log(`Database: postgresql://${dbUser}:***@${dbHost}:${dbPort}/${dbName}`);
 
     console.log('\nStreaming Platforms:');
-    if (twitchData) {
+    if (twitchData.enabled) {
       const mainBadge = twitchData.mainPlatform ? ' [MAIN]' : '';
       console.log(`  ✓ Twitch (${twitchData.id} / ${twitchData.username})${mainBadge}`);
     } else {
       console.log(`  ✗ Twitch disabled`);
     }
-    if (kickData) {
+    if (kickData.enabled) {
       const mainBadge = kickData.mainPlatform ? ' [MAIN]' : '';
       console.log(`  ✓ Kick (${kickData.id || 'N/A'} / ${kickData.username})${mainBadge}`);
     } else {
@@ -486,22 +490,26 @@ async function main(): Promise<void> {
       tenantData.background_image_url = backgroundImageUrl;
     }
 
-    if (twitchData) {
+    if (twitchData.enabled) {
       tenantData.twitch = {
         enabled: true,
         id: twitchData.id,
         username: twitchData.username,
         mainPlatform: twitchData.mainPlatform,
       };
+    } else {
+      tenantData.twitch = { enabled: false };
     }
 
-    if (kickData) {
+    if (kickData.enabled) {
       tenantData.kick = {
         enabled: true,
         id: kickData.id || null,
         username: kickData.username,
         mainPlatform: kickData.mainPlatform,
       };
+    } else {
+      tenantData.kick = { enabled: false };
     }
 
     if (youtubeData) {

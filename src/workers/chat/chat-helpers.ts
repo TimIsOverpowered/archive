@@ -80,3 +80,37 @@ export function extractMessageData(node: TwitchChatMessageNode | null | undefine
     userBadges: badgesRaw,
   };
 }
+
+export interface ChatFragment {
+  id?: string;
+  text: string;
+}
+
+export function parseKickContent(content: string | null | undefined): ChatFragment[] {
+  if (content == null || content === '') return [];
+
+  const fragments: ChatFragment[] = [];
+  const emoteRegex = /\[emote:(\d+):([^\]]+)\]/g;
+
+  let lastIndex = 0;
+  let match;
+
+  while ((match = emoteRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      fragments.push({ text: content.substring(lastIndex, match.index) });
+    }
+
+    fragments.push({
+      id: match[1],
+      text: match[2],
+    } as ChatFragment);
+
+    lastIndex = emoteRegex.lastIndex;
+  }
+
+  if (lastIndex < content.length) {
+    fragments.push({ text: content.substring(lastIndex) });
+  }
+
+  return fragments;
+}

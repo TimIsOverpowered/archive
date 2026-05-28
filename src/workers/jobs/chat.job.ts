@@ -1,5 +1,5 @@
 import { Jobs } from '../../constants.js';
-import { Platform, PLATFORMS } from '../../types/platforms.js';
+import type { Platform } from '../../types/platforms.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
 import { getChatDownloadQueue } from '../queues/queue.js';
@@ -47,7 +47,6 @@ export interface TriggerChatOptions {
 }
 
 export async function triggerChatDownload(opts: TriggerChatOptions): Promise<string | null> {
-  if (opts.platform === PLATFORMS.KICK) return null;
   return enqueue({
     tenantId: opts.tenantId,
     displayName: opts.displayName,

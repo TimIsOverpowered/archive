@@ -108,6 +108,12 @@ export const Kick = {
   LIVE_API_TIMEOUT_MS: 15_000,
   API_BASE: 'https://kick.com',
   SUBCATEGORIES_URL: 'https://kick.com/api/v1/subcategories',
+  CHAT_BLOCK_DURATION_MS: 5 * 60 * 1000,
+  CHAT_API_TIMEOUT_MS: 15_000,
+  CHAT_FETCH_CONCURRENCY: 5,
+  CHAT_FETCH_CHUNK_SIZE: 50,
+  CHAT_FETCH_STEP_SECONDS: 5,
+  CHAT_FETCH_STAGGER_MS: 50,
 } as const;
 
 // ── FlareSolverr ─────────────────────────────────────────────────────────────
