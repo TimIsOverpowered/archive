@@ -596,6 +596,7 @@ const main = async () => {
 
         const vods = await oldPool.query('SELECT * FROM vods ORDER BY "createdAt" ASC');
         vodIdMap = new Map<string, number>();
+        const platformMap = new Map<string, string>();
 
         for (const vod of vods.rows) {
           const legacyVodId = vod.id;
@@ -616,6 +617,7 @@ const main = async () => {
           const newId = insertResult.rows[0].id;
 
           vodIdMap.set(legacyVodId, newId);
+          platformMap.set(legacyVodId, platform);
 
           if (vod.youtube && Array.isArray(vod.youtube) && vod.youtube.length > 0) {
             for (const upload of vod.youtube) {
@@ -756,6 +758,13 @@ const main = async () => {
           let image = game.chapter_image || null;
           if (image) {
             image = image.replace('40x53', '{width}x{height}');
+          }
+
+          const gamePlatform = platformMap.get(game.vod_id);
+          if (!image && gamePlatform?.toLowerCase() === 'twitch' && game.game_id) {
+            image = `https://static-cdn.jtvnw.net/ttv-boxart/${game.game_id}_IGDB-{width}x{height}.jpg`;
+          } else if (!image && gamePlatform?.toLowerCase() === 'twitch' && game.name) {
+            image = `https://static-cdn.jtvnw.net/ttv-boxart/${encodeURIComponent(game.name)}-{width}x{height}.jpg`;
           }
 
           await schemaClient.query(
