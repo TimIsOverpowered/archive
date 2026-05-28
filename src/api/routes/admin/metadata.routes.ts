@@ -129,12 +129,9 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
 
       if (!vodRecord) notFound(`VOD ${vodId} not found`);
 
-      // Queue emote save job (fire-and-forget within request context)
-      const platformId = getPlatformConfig(config, platform)?.id;
+      if (config.twitch?.id == null) badRequest(`Twitch not configured for this tenant`);
 
-      if (platformId == null) badRequest(`No platform ID available for ${platform} ${vodId}`);
-
-      await fetchAndSaveEmotes(tenantCtx, vodRecord.id, platform, platformId);
+      await fetchAndSaveEmotes(tenantCtx, vodRecord.id);
 
       return ok({ message: `Emote saving completed for ${vodId}`, vodId, platform });
     }

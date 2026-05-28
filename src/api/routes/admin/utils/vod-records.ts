@@ -68,7 +68,7 @@ export async function findOrCreateVodRecord(
         finalDurationSeconds: vodRecord.duration,
         publishUpdate: false,
       }),
-      fetchAndSaveEmotes(ctx, vodRecord.id, platform, platformUserId, { publishUpdate: false }),
+      fetchAndSaveEmotes(ctx, vodRecord.id, { publishUpdate: false }),
     ]).finally(() => publishVodUpdate(tenantId, vodRecord.id));
 
     void triggerChatDownload({

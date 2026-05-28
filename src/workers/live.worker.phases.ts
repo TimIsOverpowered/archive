@@ -132,7 +132,7 @@ export async function runPostProcessing(
 
   // 4. Save Emotes (non-fatal)
   try {
-    await fetchAndSaveEmotes(ctx, ctx.dbId, ctx.platform, ctx.platformUserId);
+    await fetchAndSaveEmotes(ctx, ctx.dbId);
     emotesSaved = true;
     await updateAlert(ctx.messageId, ctx.alerts.emotesSaved(ctx.vodId, ctx.streamerName));
     ctx.log.info({ vodId: ctx.vodId }, 'Queued emote save');
