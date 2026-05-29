@@ -135,6 +135,7 @@ export async function buildServer(config: ApiConfig) {
   await fastify.register(cors, {
     origin: true,
     credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
     exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'X-Request-ID'],
   });
 
