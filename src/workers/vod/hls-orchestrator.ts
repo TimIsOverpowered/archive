@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import HLS from 'hls-parser';
 import { Hls } from '../../constants.js';
@@ -161,7 +161,34 @@ async function convertAndCleanup(
 ): Promise<{ segmentCount: number; finalMp4Path: string }> {
   const { vodId } = options;
 
-  const m3u8Content = await readFile(m3u8Path, 'utf8');
+  let m3u8Content = await readFile(m3u8Path, 'utf8');
+
+  let playlistModified = false;
+  const lines = m3u8Content.split('\n');
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line && !line.startsWith('#') && line.includes('-muted')) {
+      const unmutedLine = line.replace('-muted', '');
+      const unmutedPath = join(vodDir, unmutedLine);
+
+      try {
+        await access(unmutedPath);
+        lines[i] = unmutedLine;
+        playlistModified = true;
+      } catch {
+        // unmuted file doesn't exist; leave the -muted line intact
+      }
+    }
+  }
+
+  if (playlistModified) {
+    m3u8Content = lines.join('\n');
+    await writeFile(m3u8Path, m3u8Content, 'utf8');
+    log.info({ vodId }, 'Updated m3u8 playlist to use available non-muted segments');
+  }
+
   const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
 
   log.info({ vodId, isFmp4 }, 'Converting HLS to MP4');
