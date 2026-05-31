@@ -15,3 +15,6 @@ export { KickChatWaterfallClient, type KickMessagesResponse } from './chat.js';
 
 // Badges
 export { getKickChannelBadges } from './badges.js';
+
+// Cloudflare
+export { kickCloudflareManager } from './cloudflare.js';

@@ -2,6 +2,7 @@ import dayjs from 'dayjs';
 import pLimit from 'p-limit';
 import { Kick } from '../../constants.js';
 import { KickChatWaterfallClient, type KickChatMessage } from '../../services/kick/chat.js';
+import { kickCloudflareManager } from '../../services/kick/cloudflare.js';
 import { sleep } from '../../utils/delay.js';
 import type { AppLogger } from '../../utils/logger.js';
 
@@ -13,6 +14,13 @@ export async function* paginateKickChatCommentsParallel(
   logger: AppLogger
 ): AsyncGenerator<KickChatMessage[]> {
   const client = new KickChatWaterfallClient(logger);
+
+  const testUrl = `${Kick.API_BASE}/api/v2/channels/${channelId}/messages`;
+  try {
+    await kickCloudflareManager.ensureValidClearance(testUrl);
+  } catch {
+    logger.warn({ testUrl }, 'Pre-flight CF check failed. Proceeding without clearance.');
+  }
 
   const CONCURRENCY = Kick.CHAT_FETCH_CONCURRENCY;
   const CHUNK_SIZE = Kick.CHAT_FETCH_CHUNK_SIZE;

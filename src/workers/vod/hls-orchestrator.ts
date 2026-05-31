@@ -2,14 +2,14 @@ import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import HLS from 'hls-parser';
 import { Hls } from '../../constants.js';
-import { updateChapterDuringDownload } from '../../services/kick/index.js';
+import { kickCloudflareManager, updateChapterDuringDownload } from '../../services/kick/index.js';
 import { TenantContext } from '../../types/context.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { createSession, type ImpitSession } from '../../utils/impit-wrapper.js';
 import { sleep, getRetryDelay } from '../../utils/delay.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { HttpError } from '../../utils/http-error.js';
+import { createSession, type ImpitSession } from '../../utils/impit-wrapper.js';
 import type { AppLogger } from '../../utils/logger.js';
 import { getTmpDirPath, getTmpFilePath } from '../../utils/path.js';
 import { createVodWorkerAlerts, safeUpdateAlert } from '../utils/alert-factories.js';
@@ -79,6 +79,16 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
   if (impitSession) log.info({ vodId }, 'Impit session created');
 
   try {
+    if (platform === PLATFORMS.KICK && sourceUrl != null && sourceUrl !== '' && impitSession != null) {
+      try {
+        const creds = await kickCloudflareManager.ensureValidClearance(sourceUrl);
+        impitSession.setCloudflareCredentials(creds.cookies, creds.userAgent);
+        log.info({ vodId }, 'Cloudflare credentials applied to HLS session');
+      } catch {
+        log.warn({ vodId }, 'Pre-flight CF check failed. Proceeding without clearance.');
+      }
+    }
+
     if (isLive) {
       await runLivePollingLoop({
         ctx,
@@ -104,7 +114,6 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
         m3u8Path,
         impitSession,
         log,
-        onProgress,
       });
     }
 
