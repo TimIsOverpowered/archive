@@ -139,7 +139,13 @@ function registerShutdownHandlers(ctx: AppContext) {
         },
       },
       { name: 'queues', close: closeQueues },
-      { name: 'impit', close: () => { void closeImpit(); return Promise.resolve(); } },
+      {
+        name: 'impit',
+        close: () => {
+          void closeImpit();
+          return Promise.resolve();
+        },
+      },
       {
         name: 'tenant-subscriber',
         close: async () => {

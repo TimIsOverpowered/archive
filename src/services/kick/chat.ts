@@ -56,6 +56,7 @@ export interface KickMessagesResponse {
 export class KickChatWaterfallClient {
   private impitSession: ImpitSession;
   private logger: AppLogger;
+  private isCloudflareBlocked: boolean = false;
 
   constructor(log?: AppLogger) {
     this.impitSession = createSession();
@@ -65,9 +66,14 @@ export class KickChatWaterfallClient {
   async fetchPage(channelId: number | string, startTime: string): Promise<KickMessagesResponse | null> {
     const url = new URL(`${Kick.API_BASE}/api/v2/channels/${channelId}/messages`);
     url.searchParams.set('start_time', startTime);
+    const urlString = url.toString();
+
+    if (this.isCloudflareBlocked) {
+      return this.fetchViaFlareSolverr(urlString);
+    }
 
     try {
-      const response = await this.impitSession.fetchText(url.toString(), {
+      const response = await this.impitSession.fetchText(urlString, {
         timeoutMs: Kick.CHAT_API_TIMEOUT_MS,
       });
 
@@ -87,7 +93,9 @@ export class KickChatWaterfallClient {
         msg.includes('timeout') ||
         msg.includes('status 0')
       ) {
-        return this.fetchViaFlareSolverr(url.toString());
+        this.logger.info('Impit blocked by Cloudflare. Switching to FlareSolverr permanently for this VOD.');
+        this.isCloudflareBlocked = true;
+        return this.fetchViaFlareSolverr(urlString);
       }
 
       throw err;
@@ -95,12 +103,9 @@ export class KickChatWaterfallClient {
   }
 
   private async fetchViaFlareSolverr(url: string): Promise<KickMessagesResponse | null> {
-    this.logger.info({ url }, 'Impit blocked by Cloudflare. Falling back to FlareSolverr...');
-
-    const result = await fetchUrl(url, { maxRetries: 2 });
+    const result = await fetchUrl<KickMessagesResponse>(url, { maxRetries: 2 });
 
     if (result.success && result.data != null) {
-      this.logger.info({ url }, 'FlareSolverr returned data');
       return result.data;
     }
 
