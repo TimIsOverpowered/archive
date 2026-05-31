@@ -36,8 +36,8 @@ async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkers
   );
 
   for (const name of Object.values(QUEUE_NAMES)) {
-    const queue = new Queue(name, { 
-      connection: getRedisInstance() as unknown as ConnectionOptions 
+    const queue = new Queue(name, {
+      connection: getRedisInstance() as unknown as ConnectionOptions,
     });
     try {
       await queue.pause();

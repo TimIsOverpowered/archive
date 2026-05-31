@@ -38,7 +38,12 @@ async function processTwitchBatchJob(job: Job<MonitorJob>): Promise<{ success: t
 
   const twitchTenants = configService
     .getAll()
-    .filter((cfg) => cfg.status === 'active' && cfg.settings.vodDownload === true && requirePlatformConfig(cfg, PLATFORMS.TWITCH) != null);
+    .filter(
+      (cfg) =>
+        cfg.status === 'active' &&
+        cfg.settings.vodDownload === true &&
+        requirePlatformConfig(cfg, PLATFORMS.TWITCH) != null
+    );
 
   if (twitchTenants.length === 0) {
     log.debug({ component: 'monitor' }, 'No Twitch tenants to poll');
