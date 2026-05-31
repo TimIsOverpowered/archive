@@ -6,7 +6,20 @@ import { childLogger, type AppLogger } from '../../utils/logger.js';
 
 export interface KickMessageSenderIdentity {
   color?: string;
-  badges?: Array<{ name: string; value: string }>;
+  badges?: Array<{
+    type: string;
+    text: string;
+    count?: number;
+    sort_order?: number;
+  }>;
+  badges_v2?: Array<{
+    name: string;
+    badge_type: string;
+    image_url: string;
+    selected?: boolean;
+    metadata?: Record<string, unknown>;
+    sort_order?: number;
+  }>;
 }
 
 export interface KickMessageSender {

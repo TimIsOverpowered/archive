@@ -12,3 +12,6 @@ export { getKickCategoryInfo } from './category.js';
 
 // Chat
 export { KickChatWaterfallClient, type KickMessagesResponse } from './chat.js';
+
+// Badges
+export { getKickChannelBadges } from './badges.js';

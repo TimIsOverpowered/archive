@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { configService } from '../../config/tenant-config.js';
 import { Cache } from '../../constants.js';
 import { getChannelBadges, getGlobalBadges } from '../../services/twitch/index.js';
+import { getKickChannelBadges } from '../../services/kick/index.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { simpleKeys } from '../../utils/cache-keys.js';
 import { defaultCacheContext } from '../../utils/cache.js';
@@ -65,6 +66,47 @@ export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesR
         log.error({ err: details }, 'Failed to fetch Twitch badges');
 
         return reply.status(502).send(errorResponse(502, 'Failed to fetch badges from Twitch', 'BADGES_FETCH_FAILED'));
+      }
+    }
+  );
+
+  // Get Kick subscriber badges for a channel with Redis caching
+  fastify.get<{ Params: { tenantId: string } }>(
+    '/:tenantId/badges/kick',
+    {
+      schema: {
+        tags: ['Badges'],
+        description: 'Get Kick subscriber badges for a channel',
+        params: {
+          type: 'object',
+          properties: { tenantId: { type: 'string', description: 'Tenant ID' } },
+          required: ['tenantId'],
+        },
+      },
+      onRequest: [rateLimitMiddleware],
+    },
+    async (request, reply) => {
+      const tenantId = request.params.tenantId.toLowerCase();
+      const log = createAutoLogger(tenantId);
+
+      const config = await configService.get(tenantId);
+
+      if (config?.kick?.username == null) notFound('Kick not configured for this tenant');
+
+      const cacheKey = simpleKeys.badges(`${tenantId}:kick`);
+
+      try {
+        const badgesData = await defaultCacheContext.withCache(cacheKey, Cache.BADGES_TTL, async () => {
+          const channelBadges = await getKickChannelBadges(tenantId).catch(() => null);
+          return { subscriber: channelBadges ?? null };
+        });
+
+        return ok(badgesData);
+      } catch (err) {
+        const details = extractErrorDetails(err);
+        log.error({ err: details }, 'Failed to fetch Kick badges');
+
+        return reply.status(502).send(errorResponse(502, 'Failed to fetch badges from Kick', 'BADGES_FETCH_FAILED'));
       }
     }
   );
