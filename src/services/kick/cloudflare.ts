@@ -1,7 +1,6 @@
 import { Kick } from '../../constants.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { fetchUrl } from '../../utils/flaresolverr-client.js';
-import { createSession } from '../../utils/impit-wrapper.js';
 import { childLogger } from '../../utils/logger.js';
 import { RedisService } from '../../utils/redis-service.js';
 
@@ -60,8 +59,9 @@ export class KickCloudflareManager {
   }
 
   /**
-   * Pre-flight check. Makes exactly ONE request to test the cached credentials.
-   * If they are expired or missing, it blocks and refreshes them via FlareSolverr.
+   * Pre-flight check. Refreshes credentials via FlareSolverr if missing or expired.
+   * When fresh credentials exist (within TTL threshold), returns immediately
+   * without making any HTTP request — relies on TTL-based proactive refresh.
    */
   async ensureValidClearance(testUrl: string): Promise<KickCFCredentials> {
     const creds = await this.getCredentials();
@@ -71,26 +71,14 @@ export class KickCloudflareManager {
       return await this.refreshCredentials(testUrl);
     }
 
-    const session = createSession();
-    try {
-      await session.fetchText(testUrl, {
-        timeoutMs: 5000,
-        attempts: 1,
-        headers: { Cookie: creds.cookies },
-        userAgent: creds.userAgent,
-      });
-
-      return creds;
-    } catch (err: unknown) {
-      const msg = extractErrorDetails(err).message;
-      if (msg.includes('403') || msg.includes('503') || msg.includes('timeout')) {
-        log.info('Pre-flight check failed (Cloudflare block). Refreshing clearance...');
-        return await this.refreshCredentials(testUrl);
-      }
-      throw err;
-    } finally {
-      session.close();
+    const elapsed = Date.now() - (this.cacheTimestamp ?? 0);
+    const threshold = Kick.CF_CACHE_TTL_SECONDS * Kick.CF_REFRESH_THRESHOLD * 1000;
+    if (elapsed > threshold) {
+      log.info('Cached credentials past TTL threshold. Refreshing clearance...');
+      return await this.refreshCredentials(testUrl);
     }
+
+    return creds;
   }
 
   /**
@@ -186,10 +174,7 @@ export class KickCloudflareManager {
   /**
    * Attempts a fetch and retries once with fresh credentials on 403/503.
    */
-  async withRetry(
-    url: string,
-    fetchFn: (creds: KickCFCredentials | null) => Promise<string>,
-  ): Promise<string> {
+  async withRetry(url: string, fetchFn: (creds: KickCFCredentials | null) => Promise<string>): Promise<string> {
     const creds = await this.getCredentials();
     try {
       return await fetchFn(creds);
