@@ -3,13 +3,12 @@ import pathMod from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import HLS from 'hls-parser';
 import pLimit from 'p-limit';
-import { kickCloudflareManager } from '../../services/kick/cloudflare.js';
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch/index.js';
 import { PLATFORMS } from '../../types/platforms.js';
+import { createSession, type ImpitSession } from '../../utils/impit-wrapper.js';
 import { jitter, sleep } from '../../utils/delay.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { request, segmentDownloadAgent } from '../../utils/http-client.js';
-import { createSession, type ImpitSession } from '../../utils/impit-wrapper.js';
 import type { AppLogger } from '../../utils/logger.js';
 import { fileExists } from '../../utils/path.js';
 import type { RetryOptions } from '../../utils/retry.js';
@@ -261,19 +260,10 @@ export async function fetchKickPlaylist(
   const tempSession = session ?? createSession();
 
   try {
-    let masterContent: string;
-    let variantM3u8String: string;
-
     if (fetchUrl.includes('master.m3u8')) {
       const baseEndpoint = fetchUrl.substring(0, fetchUrl.lastIndexOf('/'));
 
-      masterContent = await kickCloudflareManager.withRetry(fetchUrl, async (cfCreds) => {
-        if (cfCreds) {
-          tempSession.setCloudflareCredentials(cfCreds.cookies, cfCreds.userAgent);
-        }
-        return await tempSession.fetchText(fetchUrl, retryOptions);
-      });
-
+      const masterContent = await tempSession.fetchText(fetchUrl, retryOptions);
       const parsedMaster = HLS.parse(masterContent) as HLS.types.MasterPlaylist;
       const bestVariant = parsedMaster.variants?.[0];
       if (!bestVariant) {
@@ -283,24 +273,16 @@ export async function fetchKickPlaylist(
 
       const variantUrl = `${baseEndpoint}/${bestVariant.uri}`;
       baseURL = variantUrl.substring(0, variantUrl.lastIndexOf('/'));
-      variantM3u8String = await kickCloudflareManager.withRetry(variantUrl, async (cfCreds) => {
-        if (cfCreds) {
-          tempSession.setCloudflareCredentials(cfCreds.cookies, cfCreds.userAgent);
-        }
-        return await tempSession.fetchText(variantUrl, retryOptions);
-      });
+      const variantM3u8String = await tempSession.fetchText(variantUrl, retryOptions);
+
+      return { variantM3u8String, baseURL };
     } else {
-      variantM3u8String = await kickCloudflareManager.withRetry(fetchUrl, async (cfCreds) => {
-        if (cfCreds) {
-          tempSession.setCloudflareCredentials(cfCreds.cookies, cfCreds.userAgent);
-        }
-        return await tempSession.fetchText(fetchUrl, retryOptions);
-      });
+      const response = await tempSession.fetchText(fetchUrl, retryOptions);
 
       baseURL = fetchUrl.substring(0, fetchUrl.lastIndexOf('/'));
-    }
 
-    return { variantM3u8String, baseURL };
+      return { variantM3u8String: response, baseURL };
+    }
   } finally {
     if (!session) {
       tempSession.close();

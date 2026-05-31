@@ -113,9 +113,7 @@ export const Kick = {
   CHAT_FETCH_CONCURRENCY: 5, // Safe baseline.
   CHAT_FETCH_CHUNK_SIZE: 50, // Keep chunks manageable.
   CHAT_FETCH_STEP_SECONDS: 5,
-  CHAT_FETCH_STAGGER_MS: 150, // Stagger requests
-  CF_CACHE_TTL_SECONDS: 3000,
-  CF_REFRESH_THRESHOLD: 0.8,
+  CHAT_FETCH_STAGGER_MS: 100, // Stagger requests
 } as const;
 
 // ── FlareSolverr ─────────────────────────────────────────────────────────────

@@ -2,7 +2,6 @@ import dayjs from 'dayjs';
 import pLimit from 'p-limit';
 import { Kick } from '../../constants.js';
 import { KickChatWaterfallClient, type KickChatMessage } from '../../services/kick/chat.js';
-import { kickCloudflareManager } from '../../services/kick/cloudflare.js';
 import { sleep } from '../../utils/delay.js';
 import type { AppLogger } from '../../utils/logger.js';
 
@@ -13,9 +12,6 @@ export async function* paginateKickChatCommentsParallel(
   startOffsetSeconds: number,
   logger: AppLogger
 ): AsyncGenerator<KickChatMessage[]> {
-  const testUrl = `${Kick.API_BASE}/api/v2/channels/${channelId}/messages?start_time=${vodCreatedAt.toISOString()}`;
-  await kickCloudflareManager.ensureValidClearance(testUrl);
-
   const client = new KickChatWaterfallClient(logger);
 
   const CONCURRENCY = Kick.CHAT_FETCH_CONCURRENCY;
