@@ -1,5 +1,5 @@
 import { Kick } from '../../constants.js';
-import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
+import { createSession, type ImpitSession } from '../../utils/impit-wrapper.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { fetchUrl } from '../../utils/flaresolverr-client.js';
 import { childLogger, type AppLogger } from '../../utils/logger.js';
@@ -54,7 +54,7 @@ export interface KickMessagesResponse {
 }
 
 export class KickChatWaterfallClient {
-  private cycleTlsSession: CycleTLSSession;
+  private impitSession: ImpitSession;
   private cfCookies?: string;
   private cfUserAgent?: string;
   private logger: AppLogger;
@@ -64,7 +64,7 @@ export class KickChatWaterfallClient {
   private challengePromise: Promise<void> | null = null;
 
   constructor(log?: AppLogger) {
-    this.cycleTlsSession = createSession();
+    this.impitSession = createSession();
     this.logger = log ?? childLogger({ module: 'kick-chat-waterfall' });
   }
 
@@ -78,8 +78,8 @@ export class KickChatWaterfallClient {
     }
 
     try {
-      // 1. FAST PATH: CycleTLS
-      const response = await this.cycleTlsSession.fetchText(url.toString(), {
+      // 1. FAST PATH: Impit
+      const response = await this.impitSession.fetchText(url.toString(), {
         timeoutMs: Kick.CHAT_API_TIMEOUT_MS,
         ...(this.cfCookies != null && this.cfCookies !== '' && { headers: { Cookie: this.cfCookies } }),
         ...(this.cfUserAgent != null && this.cfUserAgent !== '' && { userAgent: this.cfUserAgent }),
@@ -130,7 +130,7 @@ export class KickChatWaterfallClient {
       rejectChallenge = reject;
     });
 
-    this.logger.info('CycleTLS blocked by Cloudflare. Booting FlareSolverr (Lock acquired)...');
+    this.logger.info('Impit blocked by Cloudflare. Booting FlareSolverr (Lock acquired)...');
 
     try {
       // 3. HEAVY PATH: FlareSolverr
@@ -168,7 +168,7 @@ export class KickChatWaterfallClient {
     }
 
     try {
-      const response = await this.cycleTlsSession.fetchText(url, {
+      const response = await this.impitSession.fetchText(url, {
         timeoutMs: Kick.CHAT_API_TIMEOUT_MS,
         ...(this.cfCookies != null && this.cfCookies !== '' && { headers: { Cookie: this.cfCookies } }),
         ...(this.cfUserAgent != null && this.cfUserAgent !== '' && { userAgent: this.cfUserAgent }),
@@ -198,6 +198,6 @@ export class KickChatWaterfallClient {
   }
 
   close(): void {
-    this.cycleTlsSession.close();
+    this.impitSession.close();
   }
 }

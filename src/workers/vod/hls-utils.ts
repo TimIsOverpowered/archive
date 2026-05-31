@@ -5,7 +5,7 @@ import HLS from 'hls-parser';
 import pLimit from 'p-limit';
 import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch/index.js';
 import { PLATFORMS } from '../../types/platforms.js';
-import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
+import { createSession, type ImpitSession } from '../../utils/impit-wrapper.js';
 import { jitter, sleep } from '../../utils/delay.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { request, segmentDownloadAgent } from '../../utils/http-client.js';
@@ -15,18 +15,18 @@ import type { RetryOptions } from '../../utils/retry.js';
 
 export type DownloadStrategy =
   | { type: 'fetch'; signal?: AbortSignal; abort: () => void }
-  | { type: 'cycletls'; session: CycleTLSSession; abort: () => void };
+  | { type: 'impit'; session: ImpitSession; abort: () => void };
 
 export function resolveDownloadStrategy(
   platform: typeof PLATFORMS.KICK | typeof PLATFORMS.TWITCH,
-  cycleTLS: CycleTLSSession | null
+  impitSession: ImpitSession | null
 ): DownloadStrategy {
-  if (platform === PLATFORMS.KICK && cycleTLS) {
+  if (platform === PLATFORMS.KICK && impitSession) {
     return {
-      type: 'cycletls',
-      session: cycleTLS,
+      type: 'impit',
+      session: impitSession,
       abort: () => {
-        cycleTLS.close();
+        impitSession.close();
       },
     };
   }
@@ -48,7 +48,7 @@ export interface FetchPlaylistResult {
 /**
  * Download segments in parallel using p-limit for concurrency control
  * Universal function - works with both .ts and .mp4 (fMP4) segments
- * Supports both fetch (Twitch) and CycleTLS (Kick) download strategies
+ * Supports both fetch (Twitch) and Impit (Kick) download strategies
  * Uses Promise.allSettled with abort-on-first-failure to stop in-flight downloads
  */
 export async function downloadSegmentsParallel(
@@ -245,7 +245,7 @@ export async function fetchKickPlaylist(
   vodId: string,
   sourceUrl: string | undefined,
   log: AppLogger,
-  session?: CycleTLSSession,
+  session?: ImpitSession,
   retryOptions?: { attempts?: number; maxDelayMs?: number; shouldRetry?: RetryOptions['shouldRetry'] }
 ): Promise<FetchPlaylistResult> {
   const fetchUrl = sourceUrl;

@@ -3,7 +3,7 @@ import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import HLS from 'hls-parser';
 import { Hls } from '../../../src/constants.js';
 import { PLATFORMS } from '../../../src/types/platforms.js';
-import type { CycleTLSSession } from '../../../src/utils/cycletls.js';
+import type { ImpitSession } from '../../../src/utils/impit-wrapper.js';
 import { DownloadAbortedError } from '../../../src/utils/domain-errors.js';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
@@ -70,6 +70,7 @@ mock.module('fs/promises', {
     writeFile: mockFsWriteFile,
     readFile: mockFsReadFile,
     readdir: mockFsReaddir,
+    access: mock.fn(async () => {}),
   },
 });
 
@@ -88,7 +89,7 @@ mock.module('../../../src/utils/path.js', {
   },
 });
 
-mock.module('../../../src/utils/cycletls.js', {
+mock.module('../../../src/utils/impit-wrapper.js', {
   namedExports: {
     createSession: mockCreateSession,
   },
@@ -372,19 +373,19 @@ describe('fetchPlaylist', () => {
     assert.strictEqual(call.arguments[0], 'unique-vod-id');
   });
 
-  it('should pass sourceUrl and cycleTLS to fetchKickPlaylist', async () => {
+  it('should pass sourceUrl and impitSession to fetchKickPlaylist', async () => {
     const mockSession = {
       fetchText: mock.fn(async () => ''),
       closed: false,
       close: () => {},
-    } as unknown as CycleTLSSession;
+    } as unknown as ImpitSession;
     await fetchPlaylist(
       {
         ctx: { tenantId: 't1', config: {} as any, db: {} as any },
         vodId: 'vod-1',
         platform: PLATFORMS.KICK,
         sourceUrl: 'https://kick.example.com/playlist.m3u8',
-        cycleTLS: mockSession,
+        impitSession: mockSession,
       } as any,
       { attempts: 1 }
     );
@@ -536,7 +537,7 @@ describe('downloadHlsStream', () => {
       );
     });
 
-    it('should close CycleTLS session in finally block on error', async () => {
+    it('should close Impit session in finally block on error', async () => {
       mockDownloadSegmentsParallel.mock.mockImplementation(async () => {
         throw new Error('Download failed');
       });
@@ -549,13 +550,13 @@ describe('downloadHlsStream', () => {
       assert.strictEqual(sessionCloseCalled, true);
     });
 
-    it('should not create CycleTLS session for Twitch platform', async () => {
+    it('should not create Impit session for Twitch platform', async () => {
       await downloadHlsStream(buildOptions({ platform: PLATFORMS.TWITCH, isLive: false }));
 
       assert.strictEqual(mockCreateSession.mock.callCount(), 0);
     });
 
-    it('should create CycleTLS session for Kick platform', async () => {
+    it('should create Impit session for Kick platform', async () => {
       await downloadHlsStream(buildOptions({ platform: PLATFORMS.KICK, platformUserId: 'user-1', isLive: false }));
 
       assert.strictEqual(mockCreateSession.mock.callCount(), 1);
@@ -627,7 +628,7 @@ describe('downloadHlsStream', () => {
       assert.ok(progressCalls > 0, 'Expected onProgress to be called during live polling');
     });
 
-    it('should close CycleTLS session in finally block on live polling error', async () => {
+    it('should close Impit session in finally block on live polling error', async () => {
       mockFetchKickPlaylist.mock.mockImplementation(async () => {
         throw new Error('Playlist fetch failed');
       });
@@ -694,7 +695,7 @@ describe('downloadHlsStream', () => {
       assert.strictEqual(mockUpdateChapterDuringDownload.mock.callCount(), 0);
     });
 
-    it('should use fetch strategy for Twitch and cycleTLS strategy for Kick', async () => {
+    it('should use fetch strategy for Twitch and impit strategy for Kick', async () => {
       mockFetchTwitchPlaylist.mock.mockImplementation(async () => {
         return {
           variantM3u8String: `#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXTINF:10.0,\nseg001.ts\n#EXT-X-ENDLIST`,

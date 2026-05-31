@@ -1,6 +1,6 @@
 import HLS from 'hls-parser';
 import { Kick } from '../../constants.js';
-import { createSession } from '../../utils/cycletls.js';
+import { createSession } from '../../utils/impit-wrapper.js';
 import { VodNotFoundError } from '../../utils/domain-errors.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { fetchUrl } from '../../utils/flaresolverr-client.js';

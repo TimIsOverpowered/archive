@@ -6,7 +6,7 @@ import { updateChapterDuringDownload } from '../../services/kick/index.js';
 import { TenantContext } from '../../types/context.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { createSession, type CycleTLSSession } from '../../utils/cycletls.js';
+import { createSession, type ImpitSession } from '../../utils/impit-wrapper.js';
 import { sleep, getRetryDelay } from '../../utils/delay.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { HttpError } from '../../utils/http-error.js';
@@ -75,8 +75,8 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
 
   const m3u8Path = join(vodDir, `${vodId}.m3u8`);
 
-  const cycleTLS = platform === PLATFORMS.KICK ? createSession() : null;
-  if (cycleTLS) log.info({ vodId }, 'CycleTLS session created');
+  const impitSession = platform === PLATFORMS.KICK ? createSession() : null;
+  if (impitSession) log.info({ vodId }, 'Impit session created');
 
   try {
     if (isLive) {
@@ -89,7 +89,7 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
         startedAt,
         vodDir,
         m3u8Path,
-        cycleTLS,
+        impitSession,
         log,
         concurrency: Hls.SEGMENT_CONCURRENCY,
         onProgress,
@@ -102,7 +102,7 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
         sourceUrl,
         vodDir,
         m3u8Path,
-        cycleTLS,
+        impitSession,
         log,
         onProgress,
       });
@@ -145,9 +145,9 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
       finalMp4Path: result.finalMp4Path,
     };
   } finally {
-    if (cycleTLS) {
-      cycleTLS.close();
-      log.info({ vodId }, 'CycleTLS session closed');
+    if (impitSession) {
+      impitSession.close();
+      log.info({ vodId }, 'Impit session closed');
     }
   }
 }
@@ -236,7 +236,7 @@ interface LivePollingContext {
   startedAt?: string | undefined;
   vodDir: string;
   m3u8Path: string;
-  cycleTLS: CycleTLSSession | null;
+  impitSession: ImpitSession | null;
   log: AppLogger;
   concurrency: number;
   onProgress?: ((segmentsDownloaded: number, totalSegments: number) => void) | undefined;
@@ -292,7 +292,7 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
       noChangePollCount = result.newNoChangeCount;
 
       if (result.newSegments.length > 0) {
-        const strategy = resolveDownloadStrategy(platform, ctx.cycleTLS);
+        const strategy = resolveDownloadStrategy(platform, ctx.impitSession);
 
         const totalDuration = segments.reduce((sum, seg) => sum + (seg.duration ?? 0), 0);
 
@@ -356,13 +356,13 @@ interface ArchivedVodContext {
   sourceUrl?: string | undefined;
   vodDir: string;
   m3u8Path: string;
-  cycleTLS: CycleTLSSession | null;
+  impitSession: ImpitSession | null;
   log: AppLogger;
   onProgress?: ((segmentsDownloaded: number, totalSegments: number) => void) | undefined;
 }
 
 async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
-  const { vodId, platform, vodDir, m3u8Path, cycleTLS, log, onProgress } = ctx;
+  const { vodId, platform, vodDir, m3u8Path, impitSession, log, onProgress } = ctx;
 
   const playlist = await fetchPlaylist(ctx, { attempts: 3, baseDelayMs: 2000 });
 
@@ -394,7 +394,7 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
 
   log.debug({ vodId, count: segmentsToDownload.length }, 'Found segments to download (including init)');
 
-  const strategy = resolveDownloadStrategy(platform, cycleTLS);
+  const strategy = resolveDownloadStrategy(platform, impitSession);
 
   await downloadSegmentsParallel(
     segmentsToDownload,
@@ -422,5 +422,5 @@ export async function fetchPlaylist(
   if (ctx.platform === PLATFORMS.TWITCH) {
     return fetchTwitchPlaylist(ctx.vodId, ctx.log, tenantId, retryOptions);
   }
-  return fetchKickPlaylist(ctx.vodId, ctx.sourceUrl, ctx.log, ctx.cycleTLS ?? undefined, retryOptions);
+  return fetchKickPlaylist(ctx.vodId, ctx.sourceUrl, ctx.log, ctx.impitSession ?? undefined, retryOptions);
 }

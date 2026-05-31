@@ -8,7 +8,7 @@ import { Vod } from '../constants.js';
 import { closeMetaClient } from '../db/meta-client.js';
 import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/streamer-client.js';
 import { registerPlatformStrategies } from '../services/platforms/index.js';
-import { initCycleTLS, closeCycleTLS } from '../utils/cycletls.js';
+import { initImpit, closeImpit } from '../utils/impit-wrapper.js';
 import { extractErrorDetails } from '../utils/error.js';
 import { getLogger, setLoggerConfig } from '../utils/logger.js';
 import { registerProcessErrorHandlers } from '../utils/process-handlers.js';
@@ -87,7 +87,7 @@ async function initInfrastructure() {
   startClientCleanup();
   getLogger().info({ component: 'db' }, 'DB client cleanup started');
 
-  await initCycleTLS();
+  await initImpit();
 }
 
 async function initApplicationState() {
@@ -139,7 +139,7 @@ function registerShutdownHandlers(ctx: AppContext) {
         },
       },
       { name: 'queues', close: closeQueues },
-      { name: 'cycletls', close: closeCycleTLS },
+      { name: 'impit', close: closeImpit },
       {
         name: 'tenant-subscriber',
         close: async () => {

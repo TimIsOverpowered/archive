@@ -57,7 +57,7 @@
     "bullmq": "^5.77.6",
     "cheerio": "^1.2.0",
     "commander": "^15.0.0",
-    "cycletls": "^2.0.5",
+    "impit": "^0.14.1",
     "dayjs": "^1.11.21",
     "fastify": "^5.8.5",
     "googleapis": "^173.0.0",
