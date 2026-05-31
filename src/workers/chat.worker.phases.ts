@@ -426,6 +426,19 @@ export async function downloadKickChat(
       lastOffset = Math.max(lastOffset, offsetSeconds);
 
       const parsedMessageFragments = parseKickContent(msg.content);
+      const identity = msg.sender?.identity;
+
+      const normalizedBadges = [
+        ...(identity?.badges || []).map((b) => ({
+          setID: b.type,
+          badgeVersionId: String(b.count ?? '1'),
+        })),
+        ...(identity?.badges_v2 || []).map((b) => ({
+          setID: b.name,
+          badgeVersionId: String((b.metadata?.level as number) ?? '1'),
+          url: b.image_url,
+        })),
+      ];
 
       batchBuffer.push({
         id: msg.id,
@@ -434,8 +447,8 @@ export async function downloadKickChat(
         content_offset_seconds: offsetSeconds,
         createdAt: msgTime.toDate(),
         message: parsedMessageFragments,
-        user_badges: msg.sender?.identity?.badges ?? [],
-        user_color: msg.sender?.identity?.color ?? '#FFFFFF',
+        user_badges: normalizedBadges,
+        user_color: identity?.color ?? '#FFFFFF',
       });
     }
 
