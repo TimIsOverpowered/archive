@@ -12,13 +12,11 @@ let impitInstance: Impit | null = null;
 /**
  * Initialize impit client (singleton pattern)
  */
-function getImpit(): Promise<Impit> {
-  if (impitInstance) return Promise.resolve(impitInstance);
-
-  impitInstance = new Impit({
+function getImpit(): Impit {
+  impitInstance ??= new Impit({
     browser: 'chrome',
   });
-  return Promise.resolve(impitInstance);
+  return impitInstance;
 }
 
 /**
@@ -88,7 +86,7 @@ export class ImpitSession {
   ): Promise<string> {
     if (this.closed) throw new Error('Session is closed');
 
-    const client = await getImpit();
+    const client = getImpit();
 
     getLogger().debug({ url }, 'Impit fetching text');
 
@@ -135,7 +133,7 @@ export class ImpitSession {
   ): Promise<void> {
     if (this.closed) throw new Error('Session is closed');
 
-    const client = await getImpit();
+    const client = getImpit();
 
     getLogger().debug({ url, outputPath }, 'Impit streaming to file');
 
@@ -199,8 +197,8 @@ export function createSession(): ImpitSession {
 /**
  * Eagerly initialize Impit at startup so the binary is ready before first request.
  */
-export async function initImpit(): Promise<void> {
-  await getImpit();
+export function initImpit(): void {
+  getImpit();
   getLogger().info('Impit initialized');
 }
 

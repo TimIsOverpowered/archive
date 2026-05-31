@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { configService } from '../../config/tenant-config.js';
 import { Cache } from '../../constants.js';
-import { getChannelBadges, getGlobalBadges } from '../../services/twitch/index.js';
 import { getKickChannelBadges } from '../../services/kick/index.js';
+import { getChannelBadges, getGlobalBadges } from '../../services/twitch/index.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { simpleKeys } from '../../utils/cache-keys.js';
 import { defaultCacheContext } from '../../utils/cache.js';

@@ -3,8 +3,8 @@ import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import HLS from 'hls-parser';
 import { Hls } from '../../../src/constants.js';
 import { PLATFORMS } from '../../../src/types/platforms.js';
-import type { ImpitSession } from '../../../src/utils/impit-wrapper.js';
 import { DownloadAbortedError } from '../../../src/utils/domain-errors.js';
+import type { ImpitSession } from '../../../src/utils/impit-wrapper.js';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 

@@ -66,7 +66,7 @@ export class QueueRegistry {
       defaultJobOptions: jobOptions,
     }) as unknown as Queue<TData, TFinishedData, string>;
 
-    this.cache.set(name, queue as unknown as Queue<unknown, unknown, string>);
+    this.cache.set(name, queue);
     return queue;
   }
 

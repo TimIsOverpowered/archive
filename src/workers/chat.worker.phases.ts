@@ -429,11 +429,11 @@ export async function downloadKickChat(
       const identity = msg.sender?.identity;
 
       const normalizedBadges = [
-        ...(identity?.badges || []).map((b) => ({
+        ...(identity?.badges ?? []).map((b) => ({
           setID: b.type,
           badgeVersionId: String(b.count ?? '1'),
         })),
-        ...(identity?.badges_v2 || []).map((b) => ({
+        ...(identity?.badges_v2 ?? []).map((b) => ({
           setID: b.name,
           badgeVersionId: String((b.metadata?.level as number) ?? '1'),
           url: b.image_url,

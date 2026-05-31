@@ -38,7 +38,7 @@ export async function getKickChannelBadges(tenantId: string): Promise<Record<str
 
     const badgeMap: Record<string, string> = {};
     for (const badge of result.data.subscriber_badges) {
-      if (badge.months != null && badge.badge_image?.src) {
+      if (badge.months != null && badge.badge_image != null && badge.badge_image.src != null) {
         badgeMap[String(badge.months)] = badge.badge_image.src;
       }
     }

@@ -2,7 +2,7 @@ import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import HLS from 'hls-parser';
 import { Hls } from '../../constants.js';
-import { kickCloudflareManager, updateChapterDuringDownload } from '../../services/kick/index.js';
+import { updateChapterDuringDownload } from '../../services/kick/index.js';
 import { TenantContext } from '../../types/context.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
@@ -79,16 +79,6 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
   if (impitSession) log.info({ vodId }, 'Impit session created');
 
   try {
-    if (platform === PLATFORMS.KICK && sourceUrl != null && sourceUrl !== '' && impitSession != null) {
-      try {
-        const creds = await kickCloudflareManager.ensureValidClearance(sourceUrl);
-        impitSession.setCloudflareCredentials(creds.cookies, creds.userAgent);
-        log.info({ vodId }, 'Cloudflare credentials applied to HLS session');
-      } catch {
-        log.warn({ vodId }, 'Pre-flight CF check failed. Proceeding without clearance.');
-      }
-    }
-
     if (isLive) {
       await runLivePollingLoop({
         ctx,
@@ -114,6 +104,7 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
         m3u8Path,
         impitSession,
         log,
+        onProgress,
       });
     }
 
@@ -178,7 +169,7 @@ async function convertAndCleanup(
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    if (line && !line.startsWith('#') && line.includes('-muted')) {
+    if (line != null && line !== '' && !line.startsWith('#') && line.includes('-muted')) {
       const unmutedLine = line.replace('-muted', '');
       const unmutedPath = join(vodDir, unmutedLine);
 
