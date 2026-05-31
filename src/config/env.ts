@@ -88,7 +88,6 @@ const WorkersConfigSchema = BaseConfigSchema.extend({
   VOD_STANDARD_CONCURRENCY: z.coerce.number().int().positive().default(1),
   YOUTUBE_UPLOAD_CONCURRENCY: z.coerce.number().int().positive().default(1),
   VOD_FINALIZE_FILE_CONCURRENCY: z.coerce.number().int().positive().default(1),
-  CHAT_DOWNLOAD_CONCURRENCY: z.coerce.number().int().positive().default(1),
   MONITOR_CONCURRENCY: z.coerce.number().int().positive().default(10),
   FILE_COPY_CONCURRENCY: z.coerce.number().int().positive().default(2),
   YOUTUBE_CLIENT_ID: z.string().min(1, 'YOUTUBE_CLIENT_ID is required'),

@@ -3,6 +3,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import cycletlsMod from 'cycletls';
 import type { CycleTLSClient as CycleTLSClientType } from 'cycletls';
+import pLimit from 'p-limit';
 const cycletls = cycletlsMod as unknown as (opts?: {
   debug?: boolean;
   timeout?: number;
@@ -14,6 +15,8 @@ import type { RetryOptions } from './retry.js';
 import { retryWithBackoff } from './retry.js';
 
 type CycleTLSClient = Awaited<ReturnType<typeof cycletls>>;
+
+const cycleTlsLimit = pLimit(5);
 
 interface BrowserProfile {
   ja3: string;
@@ -153,14 +156,16 @@ export class CycleTLSSession {
 
     const fn = async (): Promise<string> => {
       const profile = this.getProfile(opts?.userAgent);
-      const response = await client.get(url, {
-        ja3: profile.ja3,
-        userAgent: opts?.userAgent ?? profile.userAgent,
-        http2Fingerprint: profile.http2Fingerprint,
-        ...(opts?.headers && { headers: opts.headers }),
-        responseType: 'text',
-        ...(opts?.timeoutMs != null && { timeout: opts.timeoutMs }),
-      });
+      const response = await cycleTlsLimit(() =>
+        client.get(url, {
+          ja3: profile.ja3,
+          userAgent: opts?.userAgent ?? profile.userAgent,
+          http2Fingerprint: profile.http2Fingerprint,
+          ...(opts?.headers && { headers: opts.headers }),
+          responseType: 'text',
+          ...(opts?.timeoutMs != null && { timeout: opts.timeoutMs }),
+        })
+      );
 
       if (response.status < 200 || response.status >= 300) {
         throw new Error(`CycleTLS request failed with status ${response.status}`);
@@ -193,14 +198,16 @@ export class CycleTLSSession {
 
     const fn = async (): Promise<void> => {
       const profile = this.getProfile(opts?.userAgent);
-      const response = await client.get(url, {
-        ja3: profile.ja3,
-        userAgent: opts?.userAgent ?? profile.userAgent,
-        http2Fingerprint: profile.http2Fingerprint,
-        ...(opts?.headers && { headers: opts.headers }),
-        responseType: 'stream',
-        ...(opts?.timeoutMs != null && { timeout: opts.timeoutMs }),
-      });
+      const response = await cycleTlsLimit(() =>
+        client.get(url, {
+          ja3: profile.ja3,
+          userAgent: opts?.userAgent ?? profile.userAgent,
+          http2Fingerprint: profile.http2Fingerprint,
+          ...(opts?.headers && { headers: opts.headers }),
+          responseType: 'stream',
+          ...(opts?.timeoutMs != null && { timeout: opts.timeoutMs }),
+        })
+      );
 
       if (response.status < 200 || response.status >= 300) {
         throw new Error(`CycleTLS request failed with status ${response.status}`);
