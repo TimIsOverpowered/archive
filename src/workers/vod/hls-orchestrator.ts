@@ -2,14 +2,14 @@ import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import HLS from 'hls-parser';
 import { Hls } from '../../constants.js';
-import { updateChapterDuringDownload } from '../../services/kick/index.js';
+import { kickCloudflareManager, updateChapterDuringDownload } from '../../services/kick/index.js';
 import { TenantContext } from '../../types/context.js';
 import { PLATFORMS, type Platform } from '../../types/platforms.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { createSession, type ImpitSession } from '../../utils/impit-wrapper.js';
 import { sleep, getRetryDelay } from '../../utils/delay.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { HttpError } from '../../utils/http-error.js';
+import { createSession, type ImpitSession } from '../../utils/impit-wrapper.js';
 import type { AppLogger } from '../../utils/logger.js';
 import { getTmpDirPath, getTmpFilePath } from '../../utils/path.js';
 import { createVodWorkerAlerts, safeUpdateAlert } from '../utils/alert-factories.js';
@@ -76,7 +76,13 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
   const m3u8Path = join(vodDir, `${vodId}.m3u8`);
 
   const impitSession = platform === PLATFORMS.KICK ? createSession() : null;
-  if (impitSession) log.info({ vodId }, 'Impit session created');
+  if (impitSession) {
+    log.info({ vodId }, 'Impit session created');
+    if (sourceUrl != null && sourceUrl !== '') {
+      const creds = await kickCloudflareManager.ensureValidClearance(sourceUrl);
+      impitSession.setCloudflareCredentials(creds.cookies, creds.userAgent);
+    }
+  }
 
   try {
     if (isLive) {
@@ -169,7 +175,7 @@ async function convertAndCleanup(
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    if (line && !line.startsWith('#') && line.includes('-muted')) {
+    if (line != null && line.length > 0 && !line.startsWith('#') && line.includes('-muted')) {
       const unmutedLine = line.replace('-muted', '');
       const unmutedPath = join(vodDir, unmutedLine);
 

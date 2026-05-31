@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { Impit } from 'impit';
-
 import { Http } from '../constants.js';
 import { getLogger } from './logger.js';
 import type { RetryOptions } from './retry.js';
@@ -13,13 +12,13 @@ let impitInstance: Impit | null = null;
 /**
  * Initialize impit client (singleton pattern)
  */
-async function getImpit(): Promise<Impit> {
-  if (impitInstance) return impitInstance;
+function getImpit(): Promise<Impit> {
+  if (impitInstance) return Promise.resolve(impitInstance);
 
   impitInstance = new Impit({
     browser: 'chrome',
   });
-  return impitInstance;
+  return Promise.resolve(impitInstance);
 }
 
 /**
@@ -27,6 +26,8 @@ async function getImpit(): Promise<Impit> {
  */
 export class ImpitSession {
   private _closed: boolean = false;
+  private _defaultCookies?: string;
+  private _defaultUserAgent?: string;
 
   constructor() {
     this.shouldRetryFn = (error) => {
@@ -44,6 +45,12 @@ export class ImpitSession {
 
   get closed(): boolean {
     return this._closed;
+  }
+
+  /** Stores Cloudflare clearance credentials to be attached to all subsequent requests. */
+  setCloudflareCredentials(cookies: string, userAgent: string): void {
+    this._defaultCookies = cookies;
+    this._defaultUserAgent = userAgent;
   }
 
   private readonly shouldRetryFn: (error: unknown) => boolean;
@@ -84,8 +91,15 @@ export class ImpitSession {
       const signal = signals.length === 1 ? signals[0] : AbortSignal.any(signals);
 
       const headers: Record<string, string> = { ...opts?.headers };
+
       if (opts?.userAgent != null) {
         headers['User-Agent'] = opts.userAgent;
+      } else if (this._defaultUserAgent != null) {
+        headers['User-Agent'] = this._defaultUserAgent;
+      }
+
+      if (this._defaultCookies != null && this._defaultCookies !== '' && headers['Cookie'] == null) {
+        headers['Cookie'] = this._defaultCookies;
       }
 
       const response = await client.fetch(url, {
@@ -128,8 +142,15 @@ export class ImpitSession {
       const signal = signals.length === 1 ? signals[0] : AbortSignal.any(signals);
 
       const headers: Record<string, string> = { ...opts?.headers };
+
       if (opts?.userAgent != null) {
         headers['User-Agent'] = opts.userAgent;
+      } else if (this._defaultUserAgent != null) {
+        headers['User-Agent'] = this._defaultUserAgent;
+      }
+
+      if (this._defaultCookies != null && this._defaultCookies !== '' && headers['Cookie'] == null) {
+        headers['Cookie'] = this._defaultCookies;
       }
 
       const response = await client.fetch(url, {
@@ -143,7 +164,7 @@ export class ImpitSession {
 
       const writeStream = fs.createWriteStream(outputPath);
       try {
-        const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
+        const nodeStream = Readable.fromWeb(response.body);
         await pipeline(nodeStream, writeStream);
       } catch (err) {
         try {
@@ -187,6 +208,7 @@ export async function initImpit(): Promise<void> {
 /**
  * Clean up impit client on shutdown (fallback for unclosed sessions)
  */
-export async function closeImpit(): Promise<void> {
+export function closeImpit(): Promise<void> {
   impitInstance = null;
+  return Promise.resolve();
 }

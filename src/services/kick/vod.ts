@@ -1,10 +1,11 @@
 import HLS from 'hls-parser';
 import { Kick } from '../../constants.js';
-import { createSession } from '../../utils/impit-wrapper.js';
 import { VodNotFoundError } from '../../utils/domain-errors.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { fetchUrl } from '../../utils/flaresolverr-client.js';
+import { createSession } from '../../utils/impit-wrapper.js';
 import { childLogger } from '../../utils/logger.js';
+import { kickCloudflareManager } from './cloudflare.js';
 
 const log = childLogger({ module: 'kick-vod' });
 
@@ -116,7 +117,12 @@ export async function getKickParsedM3u8ForFfmpeg(sourceUrl: string): Promise<str
   const session = createSession();
 
   try {
-    const m3u8Content = await session.fetchText(sourceUrl);
+    const m3u8Content = await kickCloudflareManager.withRetry(sourceUrl, async (cfCreds) => {
+      if (cfCreds) {
+        session.setCloudflareCredentials(cfCreds.cookies, cfCreds.userAgent);
+      }
+      return await session.fetchText(sourceUrl);
+    });
 
     if (m3u8Content == null || m3u8Content === '') {
       throw new Error('Empty HLS playlist response from Kick');
