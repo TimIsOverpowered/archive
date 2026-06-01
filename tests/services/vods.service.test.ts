@@ -201,6 +201,22 @@ describe('VodService: buildFtsQuery', () => {
     assert.strictEqual(buildFtsQuery('&'), '');
     assert.strictEqual(buildFtsQuery('hello : world'), 'hello:* & world:*');
   });
+
+  it('should strip exclamation marks', () => {
+    assert.strictEqual(buildFtsQuery('Only Up!'), 'Only:* & Up:*');
+  });
+
+  it('should strip angle brackets', () => {
+    assert.strictEqual(buildFtsQuery('A < B'), 'A:* & B:*');
+  });
+
+  it('should strip standalone NOT keyword', () => {
+    assert.strictEqual(buildFtsQuery('NOT Something'), 'Something:*');
+  });
+
+  it('should not strip NOT when part of a word', () => {
+    assert.strictEqual(buildFtsQuery('NOTorious'), 'NOTorious:*');
+  });
 });
 
 describe('VodService: title and chapter filters', () => {
