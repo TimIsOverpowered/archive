@@ -14,7 +14,6 @@ import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound } from '../../../utils/http-error.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import {
   tenantMiddleware,
   platformValidationMiddleware,
@@ -40,11 +39,9 @@ interface ReUploadYoutubeBody {
 
 /**
  * Register YouTube upload routes: re-upload a VOD to YouTube.
- * Requires admin API key authentication, tenant middleware, and rate limiting.
+ * Requires admin API key authentication and tenant middleware.
  */
 export default function youtubeUploadRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
-
   // Manually trigger YouTube re-upload for a VOD
   fastify.post<{ Params: ReUploadYoutubeParams; Body: ReUploadYoutubeBody }>(
     '/vods/re-upload',
@@ -80,7 +77,7 @@ export default function youtubeUploadRoutes(fastify: FastifyInstance, _options: 
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      onRequest: [adminApiKeyMiddleware, tenantMiddleware],
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {

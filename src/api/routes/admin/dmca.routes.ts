@@ -13,7 +13,6 @@ import { notFound, internalServerError } from '../../../utils/http-error.js';
 import { getTmpDirPath } from '../../../utils/path.js';
 import { queueDmcaProcessing } from '../../../workers/jobs/dmca.job.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import {
   tenantMiddleware,
   platformValidationMiddleware,
@@ -53,11 +52,9 @@ interface DmcaGameBody {
 
 /**
  * Register DMCA processing routes: ensure VOD download, queue DMCA processing job.
- * Requires admin API key authentication, tenant middleware, and rate limiting.
+ * Requires admin API key authentication and tenant middleware.
  */
 export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
-
   // Main DMCA endpoint - ensure VOD download, then queue DMCA processing
   fastify.post<{ Body: DmcaRequestBody; Params: { tenantId: string } }>(
     '/vods/dmca',
@@ -94,7 +91,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      onRequest: [adminApiKeyMiddleware, tenantMiddleware],
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
@@ -194,7 +191,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      onRequest: [adminApiKeyMiddleware, tenantMiddleware],
     },
     async (request) => {
       const tenantCtx = requireTenant(request);

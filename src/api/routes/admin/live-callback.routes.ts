@@ -10,7 +10,6 @@ import { badRequest, forbidden, notFound } from '../../../utils/http-error.js';
 import { fileExists, sanitizePathForLog } from '../../../utils/path.js';
 import { enqueueFinalizeJob, queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import {
   tenantMiddleware,
   platformValidationMiddleware,
@@ -35,8 +34,6 @@ type LiveCallbackParams = { tenantId: string };
  * Validates recording file, updates duration, queues YouTube upload.
  */
 export default function liveCallbackRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
-
   // Callback endpoint for twitch-recorder-go when live stream recording completes
   fastify.route<{ Params: LiveCallbackParams; Body: LiveCallbackBody }>({
     method: 'POST',
@@ -61,7 +58,7 @@ export default function liveCallbackRoutes(fastify: FastifyInstance, _options: R
       },
       security: [{ apiKey: [] }],
     },
-    onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+    onRequest: [adminApiKeyMiddleware, tenantMiddleware],
     preValidation: [platformValidationMiddleware],
     handler: async (request) => {
       const tenantCtx = asTenantPlatformContext(requireTenant(request));

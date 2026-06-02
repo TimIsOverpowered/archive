@@ -5,7 +5,6 @@ import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { badRequest } from '../../../utils/http-error.js';
 import { queueYoutubeGameUploadByGame } from '../../../workers/jobs/youtube.job.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import { tenantMiddleware, requireTenant } from '../../middleware/tenant-platform.js';
 import { ok } from '../../response.js';
 import { resolveGameWithContext, resolveChapterWithContext } from './utils/game-context.js';
@@ -23,8 +22,6 @@ interface ReUploadGameBody {
 }
 
 export default function gameUploadRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
-
   fastify.post<{ Params: ReUploadGameParams; Body: ReUploadGameBody }>(
     '/games/re-upload',
     {
@@ -51,7 +48,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      onRequest: [adminApiKeyMiddleware, tenantMiddleware],
     },
     async (request) => {
       const tenantCtx = requireTenant(request);

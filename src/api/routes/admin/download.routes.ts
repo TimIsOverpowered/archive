@@ -14,7 +14,6 @@ import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound, badRequest } from '../../../utils/http-error.js';
 import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import {
   tenantMiddleware,
   platformValidationMiddleware,
@@ -50,11 +49,9 @@ interface UploadBody {
 
 /**
  * Register download job routes: upload (create + download + queue), re-download.
- * Requires admin API key authentication, tenant middleware, and rate limiting.
+ * Requires admin API key authentication and tenant middleware.
  */
 export default function downloadJobsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
-
   // Main download endpoint - creates VOD record if missing, then queues download + emote + chat jobs + upload (Twitch/Kick)
   fastify.post<{ Body: UploadBody; Params: Params }>(
     '/vods/upload',
@@ -80,7 +77,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      onRequest: [adminApiKeyMiddleware, tenantMiddleware],
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
@@ -164,7 +161,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      onRequest: [adminApiKeyMiddleware, tenantMiddleware],
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {

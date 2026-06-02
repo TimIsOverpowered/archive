@@ -14,7 +14,6 @@ import { defaultCacheContext } from '../../../utils/cache.js';
 import { notFound } from '../../../utils/http-error.js';
 import { RedisService } from '../../../utils/redis-service.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import { tenantMiddleware, requireTenant } from '../../middleware/tenant-platform.js';
 import { ok } from '../../response.js';
 
@@ -29,8 +28,6 @@ function invalidatePublicTenantCache(tenantId: string): void {
 }
 
 export default function tenantsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
-
   fastify.get(
     '/admin/tenants',
     {
@@ -39,7 +36,7 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
         description: 'List all tenants from the metadata database',
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
+      onRequest: [adminApiKeyMiddleware],
     },
     async () => {
       const tenants = await getAllTenants();
@@ -60,7 +57,7 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
+      onRequest: [adminApiKeyMiddleware],
     },
     async (request) => {
       const tenant = await getTenantById(request.params.id);
@@ -99,7 +96,7 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
+      onRequest: [adminApiKeyMiddleware],
     },
     async (request) => {
       const tenant = await createTenant(request.body);
@@ -137,7 +134,7 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
+      onRequest: [adminApiKeyMiddleware],
     },
     async (request) => {
       const tenant = await updateTenant(request.params.id, request.body);
@@ -164,7 +161,7 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware],
+      onRequest: [adminApiKeyMiddleware],
     },
     async (request) => {
       invalidatePublicTenantCache(request.params.id);
@@ -186,7 +183,7 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      onRequest: [adminApiKeyMiddleware, tenantMiddleware],
     },
     async (request) => {
       const tenantCtx = requireTenant(request);

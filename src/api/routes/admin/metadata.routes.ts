@@ -8,7 +8,6 @@ import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
 import { notFound, badRequest } from '../../../utils/http-error.js';
 import { triggerChatDownload } from '../../../workers/jobs/chat.job.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import {
   tenantMiddleware,
   platformValidationMiddleware,
@@ -35,11 +34,9 @@ interface SaveBody {
 
 /**
  * Register metadata fetching routes: chapters, emotes, chat.
- * Requires admin API key authentication, tenant middleware, and rate limiting.
+ * Requires admin API key authentication and tenant middleware.
  */
 export default function metadataFetchingRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
-
   // Fetch and save game chapters from Twitch API (Twitch only)
   fastify.post<{ Params: RouteParams; Body: ChaptersBody }>(
     '/vods/chapters',
@@ -62,7 +59,7 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      onRequest: [adminApiKeyMiddleware, tenantMiddleware],
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
@@ -117,7 +114,7 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      onRequest: [adminApiKeyMiddleware, tenantMiddleware],
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
@@ -160,7 +157,7 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      onRequest: [adminApiKeyMiddleware, tenantMiddleware],
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {

@@ -9,7 +9,6 @@ import { PLATFORM_VALUES } from '../../../types/platforms.js';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
 import { notFound, badRequest } from '../../../utils/http-error.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import createRateLimitMiddleware from '../../middleware/rate-limit.js';
 import {
   tenantMiddleware,
   platformValidationMiddleware,
@@ -22,11 +21,9 @@ import { findOrCreateVodRecord } from './utils/vod-records.js';
 
 /**
  * Register VOD management routes: stats, create VOD, delete VOD.
- * Requires admin API key authentication, tenant middleware, and rate limiting.
+ * Requires admin API key authentication and tenant middleware.
  */
 export default function vodManagementRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
-  const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });
-
   // Create a VOD record manually
   fastify.post<{ Params: CreateVodParams; Body: CreateVodBody }>(
     '/vods/create',
@@ -53,7 +50,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      onRequest: [adminApiKeyMiddleware, tenantMiddleware],
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
@@ -150,7 +147,7 @@ export default function vodManagementRoutes(fastify: FastifyInstance, _options: 
         },
         security: [{ apiKey: [] }],
       },
-      onRequest: [adminApiKeyMiddleware, rateLimitMiddleware, tenantMiddleware],
+      onRequest: [adminApiKeyMiddleware, tenantMiddleware],
       preValidation: [platformValidationMiddleware],
     },
     async (request) => {
