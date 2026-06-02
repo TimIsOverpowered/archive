@@ -82,6 +82,7 @@ export class ImpitSession {
       shouldRetry?: RetryOptions['shouldRetry'];
       headers?: Record<string, string>;
       userAgent?: string;
+      signal?: AbortSignal;
     }
   ): Promise<string> {
     if (this.closed) throw new Error('Session is closed');
@@ -93,7 +94,8 @@ export class ImpitSession {
     const fn = async (): Promise<string> => {
       const signals: AbortSignal[] = [];
       if (opts?.timeoutMs != null) signals.push(AbortSignal.timeout(opts.timeoutMs));
-      const signal = signals.length === 1 ? signals[0] : AbortSignal.any(signals);
+      if (opts?.signal != null) signals.push(opts.signal);
+      const signal = signals.length === 0 ? undefined : signals.length === 1 ? signals[0] : AbortSignal.any(signals);
 
       const headers: Record<string, string> = { ...opts?.headers };
       if (opts?.userAgent != null) {
@@ -103,7 +105,7 @@ export class ImpitSession {
       }
 
       const response = await client.fetch(url, {
-        signal: signal as AbortSignal,
+        ...(signal != null && { signal }),
         ...(Object.keys(headers).length > 0 && { headers }),
         ...(this._defaultCookies != null && { cookies: this._defaultCookies }),
       });
@@ -129,6 +131,7 @@ export class ImpitSession {
       shouldRetry?: RetryOptions['shouldRetry'];
       headers?: Record<string, string>;
       userAgent?: string;
+      signal?: AbortSignal;
     }
   ): Promise<void> {
     if (this.closed) throw new Error('Session is closed');
@@ -140,7 +143,8 @@ export class ImpitSession {
     const fn = async (): Promise<void> => {
       const signals: AbortSignal[] = [];
       if (opts?.timeoutMs != null) signals.push(AbortSignal.timeout(opts.timeoutMs));
-      const signal = signals.length === 1 ? signals[0] : AbortSignal.any(signals);
+      if (opts?.signal != null) signals.push(opts.signal);
+      const signal = signals.length === 0 ? undefined : signals.length === 1 ? signals[0] : AbortSignal.any(signals);
 
       const headers: Record<string, string> = { ...opts?.headers };
       if (opts?.userAgent != null) {
@@ -150,7 +154,7 @@ export class ImpitSession {
       }
 
       const response = await client.fetch(url, {
-        signal: signal as AbortSignal,
+        ...(signal != null && { signal }),
         ...(Object.keys(headers).length > 0 && { headers }),
         ...(this._defaultCookies != null && { cookies: this._defaultCookies }),
       });

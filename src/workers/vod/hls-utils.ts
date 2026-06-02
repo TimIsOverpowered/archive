@@ -15,22 +15,25 @@ import type { RetryOptions } from '../../utils/retry.js';
 
 export type DownloadStrategy =
   | { type: 'fetch'; signal?: AbortSignal; abort: () => void }
-  | { type: 'impit'; session: ImpitSession; abort: () => void };
+  | { type: 'impit'; session: ImpitSession; signal?: AbortSignal; abort: () => void };
 
 export function resolveDownloadStrategy(
   platform: typeof PLATFORMS.KICK | typeof PLATFORMS.TWITCH,
   impitSession: ImpitSession | null
 ): DownloadStrategy {
+  const controller = new AbortController();
+
   if (platform === PLATFORMS.KICK && impitSession) {
     return {
       type: 'impit',
       session: impitSession,
+      signal: controller.signal,
       abort: () => {
-        impitSession.close();
+        controller.abort();
       },
     };
   }
-  const controller = new AbortController();
+
   return {
     type: 'fetch',
     signal: controller.signal,
@@ -78,8 +81,7 @@ export async function downloadSegmentsParallel(
     },
   };
 
-  const isAborted = () =>
-    abortRef.aborted || (strategy.type === 'fetch' ? strategy.signal?.aborted : strategy.session.closed);
+  const isAborted = () => abortRef.aborted || strategy.signal?.aborted;
 
   const results = await Promise.allSettled(
     segments.map(async (segment) => {
@@ -122,6 +124,7 @@ export async function downloadSegmentsParallel(
             await strategy.session.streamToFile(`${baseURL}/${segment.uri}`, tempPath, {
               timeoutMs: 30000,
               attempts: retryAttempts,
+              ...(strategy.signal != null && { signal: strategy.signal }),
             });
           }
         });
