@@ -24,6 +24,7 @@ The frontend web application uses **browser localStorage** exclusively to save v
 
 - **`lastPlayed`** — The resume position (timestamp) for VODs the viewer has watched, stored locally so playback can resume where the viewer left off. Keyed per creator and VOD ID.
 - **`player-settings`** — The viewer's player preferences, specifically volume level and muted state.
+- **`chat-settings`** — The viewer's chat preferences, including chat panel width, chat side (left/right), timestamp visibility, font family, font size, and any personal word filters the viewer has set.
 
 This data never leaves the viewer's browser and is not accessible to us. Viewers can clear this data at any time by clearing their browser's site data for this domain.
 
