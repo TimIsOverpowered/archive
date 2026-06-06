@@ -18,7 +18,6 @@ import {
   defaultJobOptions,
   getFlowProducer,
   getFileCopyQueue,
-  getHlsConvertQueue,
   getStandardVodQueue,
   getYoutubeUploadQueue,
   getVodFinalizeFileQueue,
@@ -215,14 +214,13 @@ async function createGameUploadJobsForVod(
 async function enqueueVodUpload(
   job: YoutubeVodUploadJob,
   downloadJobId?: string,
-  copyJobId?: string,
-  hlsConvertJobId?: string
+  copyJobId?: string
 ): Promise<string | null> {
   const queue = getYoutubeUploadQueue();
   const jobId = `${Jobs.YOUTUBE_JOB_PREFIX}${job.vodId}_vod_${job.part ?? 1}`;
 
   try {
-    if (downloadJobId != null || copyJobId != null || hlsConvertJobId != null) {
+    if (downloadJobId != null || copyJobId != null) {
       const children: Array<{
         name: string;
         queueName: string;
@@ -241,13 +239,6 @@ async function enqueueVodUpload(
           name: 'file_copy',
           queueName: getFileCopyQueue().name,
           opts: { jobId: copyJobId, failParentOnFailure: false, ...defaultJobOptions },
-        });
-      }
-      if (hlsConvertJobId != null) {
-        children.push({
-          name: 'hls_convert',
-          queueName: getHlsConvertQueue().name,
-          opts: { jobId: hlsConvertJobId, failParentOnFailure: false, ...defaultJobOptions },
         });
       }
       const flow = await getFlowProducer().add({
@@ -416,14 +407,13 @@ export async function enqueueFinalizeJob(
 async function enqueueGameUpload(
   job: YoutubeGameUploadJob,
   downloadJobId?: string,
-  copyJobId?: string,
-  hlsConvertJobId?: string
+  copyJobId?: string
 ): Promise<string | null> {
   const queue = getYoutubeUploadQueue();
   const jobId = `${Jobs.YOUTUBE_JOB_PREFIX}${job.vodId}_game_${job.chapterId}_${job.chapterStart}`;
 
   try {
-    if (downloadJobId != null || copyJobId != null || hlsConvertJobId != null) {
+    if (downloadJobId != null || copyJobId != null) {
       const children: Array<{
         name: string;
         queueName: string;
@@ -443,13 +433,6 @@ async function enqueueGameUpload(
           name: 'file_copy',
           queueName: getFileCopyQueue().name,
           opts: { jobId: copyJobId, failParentOnFailure: false, ...defaultJobOptions },
-        });
-      }
-      if (hlsConvertJobId != null) {
-        children.push({
-          name: 'hls_convert',
-          queueName: getHlsConvertQueue().name,
-          opts: { jobId: hlsConvertJobId, failParentOnFailure: false, ...defaultJobOptions },
         });
       }
       const flow = await getFlowProducer().add({
@@ -515,11 +498,10 @@ export async function queueYoutubeVodUpload(
   downloadJobId?: string,
   part?: number,
   options?: { workDir?: string; skipFinalize?: boolean; streamId?: string },
-  copyJobId?: string,
-  hlsConvertJobId?: string
+  copyJobId?: string
 ): Promise<string | null> {
   const job = createVodUploadJob(ctx, dbId, vodId, filePath, platform, type, dmcaProcessed, part, options);
-  return enqueueVodUpload(job, downloadJobId, copyJobId, hlsConvertJobId);
+  return enqueueVodUpload(job, downloadJobId, copyJobId);
 }
 
 /**
@@ -544,8 +526,7 @@ export async function queueYoutubeGameUploadByGame(
   game: SelectableGames,
   downloadJobId?: string,
   workDir?: string,
-  copyJobId?: string,
-  hlsConvertJobId?: string
+  copyJobId?: string
 ): Promise<string | null> {
   let job: YoutubeGameUploadJob;
   try {
@@ -575,7 +556,7 @@ export async function queueYoutubeGameUploadByGame(
     return null;
   }
 
-  return enqueueGameUpload({ ...job, workDir }, downloadJobId, copyJobId, hlsConvertJobId);
+  return enqueueGameUpload({ ...job, workDir }, downloadJobId, copyJobId);
 }
 
 // ============== Upload Queue Helpers ==============
@@ -597,7 +578,6 @@ export interface QueueYoutubeUploadsOptions {
    */
   downloadJobId?: string | undefined;
   copyJobId?: string | undefined;
-  hlsConvertJobId?: string | undefined;
   type: SourceType;
   workDir?: string | undefined;
   streamId?: string | undefined;
@@ -687,8 +667,7 @@ function buildSequentialGameChain(
  */
 function buildCopyChildren(
   downloadJobId: string | undefined,
-  copyJobId: string | undefined,
-  hlsConvertJobId: string | undefined
+  copyJobId: string | undefined
 ): Array<{ name: string; queueName: string; opts: { jobId: string; failParentOnFailure?: boolean } }> {
   const children: Array<{ name: string; queueName: string; opts: { jobId: string; failParentOnFailure?: boolean } }> =
     [];
@@ -704,13 +683,6 @@ function buildCopyChildren(
       name: 'file_copy',
       queueName: getFileCopyQueue().name,
       opts: { jobId: copyJobId, failParentOnFailure: false },
-    });
-  }
-  if (hlsConvertJobId != null) {
-    children.push({
-      name: 'hls_convert',
-      queueName: getHlsConvertQueue().name,
-      opts: { jobId: hlsConvertJobId, failParentOnFailure: false },
     });
   }
   return children;
@@ -731,7 +703,6 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
     uploadMode = UPLOAD_MODES.ALL,
     downloadJobId,
     copyJobId,
-    hlsConvertJobId,
     type,
     dmcaProcessed,
     workDir,
@@ -740,7 +711,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
   const { config } = ctx;
   const saveHls = config.settings.saveHLS ?? false;
 
-  const activeFilePath = downloadJobId != null || copyJobId != null || hlsConvertJobId != null ? undefined : filePath;
+  const activeFilePath = downloadJobId != null || copyJobId != null ? undefined : filePath;
 
   const result: YoutubeUploadJobResult = {
     vodJobId: null,
@@ -768,7 +739,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
       const timestamp = Date.now();
       const finalizeJobId = `finalize_${vodId}_1_${timestamp}`;
       const vodJobId = `youtube_${vodId}_vod_1_${timestamp}`;
-      const baseChildren = buildCopyChildren(downloadJobId, copyJobId, hlsConvertJobId);
+      const baseChildren = buildCopyChildren(downloadJobId, copyJobId);
 
       const gameChainHead = buildSequentialGameChain(gameJobs, gameJobIds, youtubeQueue.name, baseChildren, workDir);
 
@@ -818,7 +789,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
 
         const timestamp = Date.now();
         const finalizeJobId = `finalize_${vodId}_1_${timestamp}`;
-        const baseChildren = buildCopyChildren(downloadJobId, copyJobId, hlsConvertJobId);
+        const baseChildren = buildCopyChildren(downloadJobId, copyJobId);
 
         const gameChainHead = buildSequentialGameChain(gameJobs, gameJobIds, youtubeQueue.name, baseChildren, workDir);
 
@@ -864,7 +835,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
         const finalizeJobId = `finalize_${vodId}_1_${timestamp}`;
         const vodJobId = `youtube_${vodId}_vod_1_${timestamp}`;
 
-        const vodChildBase = buildCopyChildren(downloadJobId, copyJobId, hlsConvertJobId);
+        const vodChildBase = buildCopyChildren(downloadJobId, copyJobId);
 
         const vodChild = {
           name: 'youtube_upload',

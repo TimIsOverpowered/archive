@@ -577,6 +577,7 @@ export interface CopyWorkerAlerts {
     speedBps: number,
     etaSeconds: number
   ) => RichEmbedData;
+  converting: (vodId: string, percent: number, ffmpegCmd?: string) => RichEmbedData;
   complete: (vodId: string, destPath: string, fileSize: number, elapsedSeconds: number) => RichEmbedData;
   error: (vodId: string, bytesCopied: number, totalBytes: number, errorMsg: string) => RichEmbedData;
 }
@@ -609,6 +610,25 @@ export function createCopyWorkerAlerts(): CopyWorkerAlerts {
           { name: 'Copied', value: `${formatBytes(bytesCopied)} / ${formatBytes(totalBytes)}`, inline: false },
           { name: 'Speed', value: `${formatBytes(speedBps)}/s`, inline: true },
           { name: 'ETA', value: toHHMMSS(Math.max(0, etaSeconds)), inline: true },
+        ],
+        timestamp: new Date().toISOString(),
+        updatedTimestamp: new Date().toISOString(),
+      };
+    },
+
+    converting: (vodId, percent, ffmpegCmd) => {
+      const progressBar = createProgressBar(percent);
+
+      return {
+        title: `🔄 Converting ${vodId}`,
+        description: `Converting HLS to MP4 on local SSD (${percent}%)`,
+        status: 'warning',
+        fields: [
+          { name: 'VOD ID', value: vodId, inline: true },
+          { name: 'Progress', value: progressBar, inline: false },
+          ...(ffmpegCmd != null
+            ? [{ name: 'FFmpeg', value: `\`${ffmpegCmd.substring(0, 500)}\``, inline: false }]
+            : []),
         ],
         timestamp: new Date().toISOString(),
         updatedTimestamp: new Date().toISOString(),

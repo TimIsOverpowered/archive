@@ -15,11 +15,12 @@ export interface QueueFileCopyOptions {
   platform: Platform;
   sourcePath: string;
   destPath: string;
+  isHlsCopy?: boolean | undefined;
   downloadJobId?: string | undefined;
 }
 
 export async function queueFileCopy(options: QueueFileCopyOptions): Promise<string> {
-  const { tenantId, dbId, vodId, platform, sourcePath, destPath, downloadJobId } = options;
+  const { tenantId, dbId, vodId, platform, sourcePath, destPath, isHlsCopy, downloadJobId } = options;
 
   const jobId = `${Jobs.COPY_JOB_PREFIX}${vodId}`;
 
@@ -30,6 +31,7 @@ export async function queueFileCopy(options: QueueFileCopyOptions): Promise<stri
     platform,
     sourcePath,
     destPath,
+    isHlsCopy: isHlsCopy ?? false,
   };
 
   try {

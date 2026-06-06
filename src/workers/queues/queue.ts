@@ -16,8 +16,6 @@ import type {
   MonitorJobResult,
   CopyFileJob,
   CopyFileResult,
-  HlsConvertJob,
-  HlsConvertResult,
 } from '../jobs/types.js';
 import { getRedisInstance } from '../redis.js';
 
@@ -30,7 +28,6 @@ export const QUEUE_NAMES = {
   DMCA_PROCESSING: 'dmca_processing',
   MONITOR: 'monitor',
   FILE_COPY: 'file_copy',
-  HLS_CONVERT: 'hls_convert',
 } as const;
 
 export type WorkerName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -135,10 +132,6 @@ export function getMonitorQueue(): Queue<MonitorJob, MonitorJobResult, string> {
 
 export function getFileCopyQueue(): Queue<CopyFileJob, CopyFileResult, string> {
   return getQueue(QUEUE_NAMES.FILE_COPY, exponentialBackoff(5_000, 3));
-}
-
-export function getHlsConvertQueue(): Queue<HlsConvertJob, HlsConvertResult, string> {
-  return getQueue(QUEUE_NAMES.HLS_CONVERT, exponentialBackoff(5_000, 3));
 }
 
 export async function closeQueues(): Promise<void> {

@@ -66,7 +66,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
         const resolved = await resolveGameWithContext(gameId, db, tenantCtx, config);
         const { game, dbId, vodId, platform, tenantPlatformCtx } = resolved;
 
-        const { jobId, filePath, copyJobId, hlsConvertJobId, workDir } = await ensureVodDownload({
+        const { jobId, filePath, copyJobId, workDir } = await ensureVodDownload({
           ctx: tenantPlatformCtx,
           dbId,
           vodId,
@@ -85,8 +85,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
           game,
           jobId ?? undefined,
           workDir,
-          copyJobId,
-          hlsConvertJobId
+          copyJobId
         );
 
         if (gameJobId == null) {
@@ -103,14 +102,13 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
           downstreamJobId: gameJobId,
           downstreamLabel: 'Game upload',
           copyJobId,
-          hlsConvertJobId,
           base: { gameId, vodId },
         });
       } else if (chapterId != null) {
         const resolved = await resolveChapterWithContext(chapterId, db, tenantCtx, config);
         const { chapter, dbId, vodId, platform, tenantPlatformCtx } = resolved;
 
-        const { jobId, filePath, copyJobId, hlsConvertJobId, workDir } = await ensureVodDownload({
+        const { jobId, filePath, copyJobId, workDir } = await ensureVodDownload({
           ctx: tenantPlatformCtx,
           dbId,
           vodId,
@@ -145,8 +143,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
           gameLike,
           jobId ?? undefined,
           workDir,
-          copyJobId,
-          hlsConvertJobId
+          copyJobId
         );
 
         if (gameJobId == null) {
@@ -163,7 +160,6 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
           downstreamJobId: gameJobId,
           downstreamLabel: 'Game upload',
           copyJobId,
-          hlsConvertJobId,
           base: { chapterId, vodId },
         });
       } else {

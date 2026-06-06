@@ -18,7 +18,6 @@ import {
   fileExists,
 } from '../../../../utils/path.js';
 import { queueFileCopy } from '../../../../workers/jobs/copy.job.js';
-import { queueHlsConvert } from '../../../../workers/jobs/hls-convert.job.js';
 import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
 import { getMetadata } from '../../../../workers/utils/ffmpeg.js';
 import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
@@ -38,7 +37,6 @@ export interface EnsureVodDownloadResponse {
   filePath?: string;
   jobId: string | null;
   copyJobId?: string | undefined;
-  hlsConvertJobId?: string | undefined;
   workDir?: string | undefined;
 }
 
@@ -127,19 +125,21 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
     }
   }
 
-  // Convert HLS segments to MP4 in tmpPath
+  // Copy HLS segments to tmpPath and convert in-process
   if (result.source === 'hls') {
     const hlsDirPath = getVodHlsDirPath({ tenantId, vodId });
-    const hlsConvertJobId = await queueHlsConvert({
+    const tmpDirPath = getTmpDirPath({ tenantId, vodId });
+    const copyJobId = await queueFileCopy({
       tenantId,
       dbId,
       vodId,
       platform,
-      hlsDirPath,
-      outputMp4Path: tmpFilePath,
+      sourcePath: hlsDirPath,
+      destPath: tmpDirPath,
+      isHlsCopy: true,
     });
-    log.info({ hlsDirPath, tmpFilePath, hlsConvertJobId }, 'Queued HLS conversion from storage');
-    return { filePath: tmpFilePath, jobId: null, hlsConvertJobId, workDir: getTmpDirPath({ tenantId, vodId }) };
+    log.info({ hlsDirPath, tmpDirPath, copyJobId }, 'Queued HLS copy + conversion from storage');
+    return { filePath: tmpFilePath, jobId: null, copyJobId, workDir: getTmpDirPath({ tenantId, vodId }) };
   }
 
   return { filePath, jobId: null };

@@ -12,8 +12,6 @@ export interface BuildVodJobResponseOptions {
   downstreamLabel: string;
   /** ID of the file copy job (when tmpPath copy is needed) */
   copyJobId?: string | undefined;
-  /** ID of the HLS conversion job (when HLS segments need conversion) */
-  hlsConvertJobId?: string | undefined;
   /** Base fields included in all responses (dbId, vodId, gameId, etc.) */
   base?: Record<string, unknown> | undefined;
   /** Additional fields to include in both response branches */
@@ -27,16 +25,7 @@ export interface BuildVodJobResponseOptions {
  * When file already exists: returns message indicating downstream job is queued.
  */
 export function buildVodJobResponse(opts: BuildVodJobResponseOptions): ReturnType<typeof ok<Record<string, unknown>>> {
-  const {
-    hasDownload,
-    filePath,
-    downstreamJobId,
-    downstreamLabel,
-    copyJobId,
-    hlsConvertJobId,
-    base = {},
-    extra = {},
-  } = opts;
+  const { hasDownload, filePath, downstreamJobId, downstreamLabel, copyJobId, base = {}, extra = {} } = opts;
 
   if (hasDownload) {
     return ok({
@@ -53,7 +42,6 @@ export function buildVodJobResponse(opts: BuildVodJobResponseOptions): ReturnTyp
     filePath,
     downstreamJobId,
     ...(copyJobId != null && copyJobId !== '' ? { copyJobId } : {}),
-    ...(hlsConvertJobId != null && hlsConvertJobId !== '' ? { hlsConvertJobId } : {}),
     ...base,
     ...extra,
   });

@@ -96,7 +96,7 @@ export default function youtubeUploadRoutes(fastify: FastifyInstance, _options: 
       const dbId = vodRecord.id;
 
       // Ensure vod download
-      const { jobId, filePath, copyJobId, hlsConvertJobId, workDir } = await ensureVodDownload({
+      const { jobId, filePath, copyJobId, workDir } = await ensureVodDownload({
         ctx: tenantCtx,
         dbId,
         vodId,
@@ -116,7 +116,6 @@ export default function youtubeUploadRoutes(fastify: FastifyInstance, _options: 
         uploadMode,
         downloadJobId: jobId ?? undefined,
         copyJobId,
-        hlsConvertJobId,
         type,
         workDir,
         forceUpload: true,
@@ -128,7 +127,6 @@ export default function youtubeUploadRoutes(fastify: FastifyInstance, _options: 
         downstreamJobId: jobId ?? '',
         downstreamLabel: 'YouTube upload',
         copyJobId,
-        hlsConvertJobId,
         base: jobId != null ? { dbId: vodRecord.id, vodId: vodRecord.platform_vod_id, jobId } : {},
       });
     }
