@@ -15,6 +15,7 @@ import {
 import { extractErrorDetails } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
 import {
+  defaultJobOptions,
   getFlowProducer,
   getFileCopyQueue,
   getStandardVodQueue,
@@ -230,14 +231,14 @@ async function enqueueVodUpload(
         children.push({
           name: 'standard_vod_download',
           queueName: getStandardVodQueue().name,
-          opts: { jobId: downloadJobId, failParentOnFailure: false },
+          opts: { jobId: downloadJobId, failParentOnFailure: false, ...defaultJobOptions },
         });
       }
       if (copyJobId != null) {
         children.push({
           name: 'file_copy',
           queueName: getFileCopyQueue().name,
-          opts: { jobId: copyJobId, failParentOnFailure: false },
+          opts: { jobId: copyJobId, failParentOnFailure: false, ...defaultJobOptions },
         });
       }
       const flow = await getFlowProducer().add({
@@ -247,8 +248,7 @@ async function enqueueVodUpload(
         opts: {
           jobId,
           deduplication: { id: jobId },
-          removeOnComplete: true,
-          removeOnFail: true,
+          ...defaultJobOptions,
         },
         children,
       });
@@ -424,7 +424,7 @@ async function enqueueGameUpload(
         children.push({
           name: 'standard_vod_download',
           queueName: getStandardVodQueue().name,
-          opts: { jobId: downloadJobId, failParentOnFailure: false },
+          opts: { jobId: downloadJobId, failParentOnFailure: false, ...defaultJobOptions },
           data: {},
         });
       }
@@ -432,7 +432,7 @@ async function enqueueGameUpload(
         children.push({
           name: 'file_copy',
           queueName: getFileCopyQueue().name,
-          opts: { jobId: copyJobId, failParentOnFailure: false },
+          opts: { jobId: copyJobId, failParentOnFailure: false, ...defaultJobOptions },
         });
       }
       const flow = await getFlowProducer().add({
@@ -442,8 +442,7 @@ async function enqueueGameUpload(
         opts: {
           jobId,
           deduplication: { id: jobId },
-          removeOnComplete: true,
-          removeOnFail: true,
+          ...defaultJobOptions,
         },
         children,
       });
@@ -598,7 +597,14 @@ interface SequentialFlowChild {
   name: string;
   queueName: string;
   data: Record<string, unknown>;
-  opts: { jobId: string; removeOnComplete: boolean; removeOnFail: boolean; failParentOnFailure?: boolean };
+  opts: {
+    jobId: string;
+    removeOnComplete?: boolean | number;
+    removeOnFail?: boolean | number;
+    failParentOnFailure?: boolean;
+    attempts?: number;
+    backoff?: { type: string; delay: number };
+  };
   children?: Array<SequentialFlowChild | { name: string; queueName: string; opts: { jobId: string } }>;
 }
 
@@ -641,7 +647,14 @@ function buildSequentialGameChain(
       name: 'youtube_upload',
       queueName,
       data,
-      opts: { jobId, removeOnComplete: true, removeOnFail: true, failParentOnFailure: false },
+      opts: {
+        jobId,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: true,
+        removeOnFail: true,
+        failParentOnFailure: false,
+      },
       ...(children != null && children.length > 0 ? { children } : {}),
     };
   }
@@ -734,7 +747,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
         name: 'youtube_upload',
         queueName: youtubeQueue.name,
         data: createVodUploadData(ctx, dbId, vodId, type, activeFilePath, { dmcaProcessed, workDir, streamId }),
-        opts: { jobId: vodJobId, removeOnComplete: true, removeOnFail: true, failParentOnFailure: false },
+        opts: { jobId: vodJobId, ...defaultJobOptions, failParentOnFailure: false },
         children: gameChainHead != null ? [gameChainHead] : baseChildren,
       };
 
@@ -742,7 +755,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
         name: 'vod_finalize_file',
         queueName: finalizeQueue.name,
         data: createFinalizeData(ctx, dbId, vodId, type, filePath, platform, { workDir, saveHLS: saveHls, streamId }),
-        opts: { jobId: finalizeJobId, removeOnComplete: true, removeOnFail: true, failParentOnFailure: false },
+        opts: { jobId: finalizeJobId, ...defaultJobOptions, failParentOnFailure: false },
         children: [vodChild],
       });
 
@@ -790,7 +803,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
             saveHLS: saveHls,
             streamId,
           }),
-          opts: { jobId: finalizeJobId, removeOnComplete: true, removeOnFail: true, failParentOnFailure: false },
+          opts: { jobId: finalizeJobId, ...defaultJobOptions, failParentOnFailure: false },
           children: flowChildren,
         });
 
@@ -828,7 +841,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
           name: 'youtube_upload',
           queueName: youtubeQueue.name,
           data: createVodUploadData(ctx, dbId, vodId, type, activeFilePath, { dmcaProcessed, workDir, streamId }),
-          opts: { jobId: vodJobId, removeOnComplete: true, removeOnFail: true, failParentOnFailure: false },
+          opts: { jobId: vodJobId, ...defaultJobOptions, failParentOnFailure: false },
           ...(vodChildBase.length > 0 && { children: vodChildBase }),
         };
 
@@ -836,7 +849,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
           name: 'vod_finalize_file',
           queueName: finalizeQueue.name,
           data: createFinalizeData(ctx, dbId, vodId, type, filePath, platform, { workDir, saveHLS: saveHls, streamId }),
-          opts: { jobId: finalizeJobId, removeOnComplete: true, removeOnFail: true, failParentOnFailure: false },
+          opts: { jobId: finalizeJobId, ...defaultJobOptions, failParentOnFailure: false },
           children: [vodChild],
         });
 

@@ -18,7 +18,7 @@ import {
 import type { DMCAClaim } from './dmca/dmca.js';
 import type { DmcaProcessingJob } from './jobs/types.js';
 import { createGameUploadJob } from './jobs/youtube.job.js';
-import { getFlowProducer, getYoutubeUploadQueue, getVodFinalizeFileQueue } from './queues/queue.js';
+import { defaultJobOptions, getFlowProducer, getYoutubeUploadQueue, getVodFinalizeFileQueue } from './queues/queue.js';
 import type { BaseWorkerContext } from './types.js';
 import { createDmcaWorkerAlerts, DmcaClaimInfo, safeUpdateAlert } from './utils/alert-factories.js';
 import type { DmcaWorkerAlerts } from './utils/alert-factories.js';
@@ -474,8 +474,7 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
             data: { ...job, workDir: ctx.workDir },
             opts: {
               jobId: `${Jobs.YOUTUBE_JOB_PREFIX}${ctx.vodId}_game_${job.chapterId}_${job.chapterStart}`,
-              removeOnComplete: true,
-              removeOnFail: true,
+              ...defaultJobOptions,
               failParentOnFailure: false,
             },
           },
@@ -530,8 +529,7 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
             },
             opts: {
               jobId: `${Jobs.YOUTUBE_JOB_PREFIX}${ctx.vodId}_vod_${ctx.part ?? 1}`,
-              removeOnComplete: true,
-              removeOnFail: true,
+              ...defaultJobOptions,
               failParentOnFailure: false,
             },
           },
