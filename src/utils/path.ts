@@ -99,6 +99,33 @@ export function getVodHlsDirPath(options: VodPathOptions): string {
 }
 
 /**
+ * Checks if HLS segments exist in the final destination directory.
+ * Returns true only if both the m3u8 playlist and segment files are present.
+ */
+export async function hlsSegmentsExist(tenantId: string, vodId: string): Promise<boolean> {
+  const vodPath = getVodPath();
+  if (vodPath == null) return false;
+
+  const hlsDir = path.join(vodPath, tenantId, vodId, 'hls');
+  const m3u8Path = path.join(hlsDir, `${vodId}.m3u8`);
+
+  const m3u8Exists = await fileExists(m3u8Path);
+  if (!m3u8Exists) return false;
+
+  try {
+    const entries = await fsPromises.readdir(hlsDir, { withFileTypes: true });
+    return entries.some((entry) => {
+      const name = entry.name;
+      if (!entry.isFile()) return false;
+      if (name === `${vodId}.m3u8`) return false;
+      return name.endsWith('.ts') || name.endsWith('.mp4');
+    });
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Returns only the filename component of a path for safe logging.
  * Strips directory components to prevent leaking server directory structure.
  */

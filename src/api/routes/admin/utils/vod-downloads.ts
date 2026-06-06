@@ -8,8 +8,17 @@ import { DOWNLOAD_METHODS, SOURCE_TYPES } from '../../../../types/platforms.js';
 import { PlatformNotConfiguredError, VodNotFoundError } from '../../../../utils/domain-errors.js';
 import { extractErrorDetails } from '../../../../utils/error.js';
 import { type AppLogger } from '../../../../utils/logger.js';
-import { getTmpFilePath, getTmpDirPath, getVodFilePath, getLiveFilePath, fileExists } from '../../../../utils/path.js';
+import {
+  getTmpFilePath,
+  getTmpDirPath,
+  getVodFilePath,
+  getVodHlsDirPath,
+  getLiveFilePath,
+  fileExists,
+  hlsSegmentsExist,
+} from '../../../../utils/path.js';
 import { queueFileCopy } from '../../../../workers/jobs/copy.job.js';
+import { queueHlsConvert } from '../../../../workers/jobs/hls-convert.job.js';
 import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
 import { getMetadata } from '../../../../workers/utils/ffmpeg.js';
 import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
@@ -29,6 +38,7 @@ export interface EnsureVodDownloadResponse {
   filePath?: string;
   jobId: string | null;
   copyJobId?: string | undefined;
+  hlsConvertJobId?: string | undefined;
   workDir?: string | undefined;
 }
 
@@ -88,6 +98,22 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
         return { filePath: tmpFilePath, jobId: null, copyJobId, workDir: getTmpDirPath({ tenantId, vodId }) };
       } catch (err) {
         log.warn({ error: extractErrorDetails(err).message }, 'Failed to queue file copy to tmpPath');
+      }
+
+      // Check if HLS segments exist in storage and convert them to MP4
+      const hlsExists = await hlsSegmentsExist(tenantId, vodId);
+      if (hlsExists) {
+        const hlsDirPath = getVodHlsDirPath({ tenantId, vodId });
+        const hlsConvertJobId = await queueHlsConvert({
+          tenantId,
+          dbId,
+          vodId,
+          platform,
+          hlsDirPath,
+          outputMp4Path: tmpFilePath,
+        });
+        log.info({ hlsDirPath, tmpFilePath, hlsConvertJobId }, 'Queued HLS conversion from storage');
+        return { filePath: tmpFilePath, jobId: null, hlsConvertJobId, workDir: getTmpDirPath({ tenantId, vodId }) };
       }
     }
 

@@ -158,3 +158,13 @@ export interface CopyFileResult {
   success: true;
   filePath: string;
 }
+
+export interface HlsConvertJob extends BaseJobData {
+  hlsDirPath: string;
+  outputMp4Path: string;
+}
+
+export interface HlsConvertResult {
+  success: true;
+  filePath: string;
+}

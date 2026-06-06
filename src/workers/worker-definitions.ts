@@ -7,6 +7,7 @@ import copyFileProcessor from './copy.worker.js';
 import { createWorker, workerRegistry } from './create-worker.js';
 import dmcaProcessor from './dmca.worker.js';
 import finalizeProcessor from './finalize.worker.js';
+import hlsConvertProcessor from './hls-convert.worker.js';
 import type {
   LiveDownloadJob,
   StandardVodJob,
@@ -24,6 +25,8 @@ import type {
   VodFinalizeFileResult,
   DmcaProcessingResult,
   MonitorJobResult,
+  HlsConvertJob,
+  HlsConvertResult,
 } from './jobs/types.js';
 import liveProcessor from './live.worker.js';
 import monitorProcessor from './monitor/processor.js';
@@ -40,7 +43,8 @@ export type AllJobData =
   | VodFinalizeFileJob
   | DmcaProcessingJob
   | MonitorJob
-  | CopyFileJob;
+  | CopyFileJob
+  | HlsConvertJob;
 
 // Typed per-worker definition — no type erasure here
 interface WorkerDef<TData, TResult = unknown> {
@@ -90,6 +94,11 @@ const workerDefs = {
     name: QUEUE_NAMES.FILE_COPY,
     processor: copyFileProcessor,
   } satisfies WorkerDef<CopyFileJob, CopyFileResult>,
+
+  [QUEUE_NAMES.HLS_CONVERT]: {
+    name: QUEUE_NAMES.HLS_CONVERT,
+    processor: hlsConvertProcessor,
+  } satisfies WorkerDef<HlsConvertJob, HlsConvertResult>,
 };
 
 export function registerWorkers(

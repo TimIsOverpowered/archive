@@ -649,6 +649,56 @@ export function createCopyWorkerAlerts(): CopyWorkerAlerts {
 }
 
 // ============================================================================
+// HLS Convert Worker Alerts
+// ============================================================================
+
+export interface HlsConvertWorkerAlerts {
+  init: (vodId: string, hlsDirPath: string, outputMp4Path: string) => RichEmbedData;
+  complete: (vodId: string, destPath: string, elapsedSeconds: number) => RichEmbedData;
+  error: (vodId: string, bytesCopied: number, totalBytes: number, errorMsg: string) => RichEmbedData;
+}
+
+export function createHlsConvertWorkerAlerts(): HlsConvertWorkerAlerts {
+  return {
+    init: (vodId, hlsDirPath, outputMp4Path) => ({
+      title: `🔄 Converting HLS ${vodId}`,
+      description: 'Converting HLS segments from storage to MP4',
+      status: 'warning',
+      fields: [
+        { name: 'VOD ID', value: vodId, inline: true },
+        { name: 'HLS Source', value: hlsDirPath, inline: false },
+        { name: 'Output', value: outputMp4Path, inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+    }),
+
+    complete: (vodId, destPath, elapsedSeconds) => ({
+      title: `✅ HLS Conversion Complete ${vodId}`,
+      description: 'HLS segments converted to MP4 successfully',
+      status: 'success',
+      fields: [
+        { name: 'VOD ID', value: vodId, inline: true },
+        { name: 'Time', value: toHHMMSS(elapsedSeconds), inline: true },
+        { name: 'Output', value: destPath, inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+      updatedTimestamp: new Date().toISOString(),
+    }),
+
+    error: (vodId, _bytesCopied, _totalBytes, errorMsg) => ({
+      title: `❌ HLS Conversion Failed ${vodId}`,
+      description: 'HLS to MP4 conversion failed',
+      status: 'error',
+      fields: [
+        { name: 'VOD ID', value: vodId, inline: true },
+        { name: 'Error', value: errorMsg.substring(0, 500), inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+    }),
+  };
+}
+
+// ============================================================================
 // Finalize Worker Alerts
 // ============================================================================
 

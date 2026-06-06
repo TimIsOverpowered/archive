@@ -108,6 +108,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         jobId: downloadJobId,
         filePath,
         copyJobId,
+        hlsConvertJobId,
       } = await ensureVodDownload({
         ctx: asTenantPlatformContext(requireTenant(request)),
         dbId: vodRecord.id,
@@ -132,7 +133,8 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         part,
         downloadJobId: downloadJobId ?? undefined,
         copyJobId,
-        ...(downloadJobId == null && copyJobId == null && { filePath }),
+        hlsConvertJobId,
+        ...(downloadJobId == null && copyJobId == null && hlsConvertJobId == null && { filePath }),
         workDir: getTmpDirPath({ tenantId, vodId }),
         skipFinalize: true, // DMCA worker will handle finalization
         streamId: vodRecord.platform_stream_id ?? undefined,
@@ -156,6 +158,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         downstreamJobId: dmcaJobId,
         downstreamLabel: 'DMCA processing',
         copyJobId,
+        hlsConvertJobId,
         base: { dbId: vodRecord.id, vodId: vodRecord.platform_vod_id },
         extra: part !== undefined ? { part } : {},
       });
@@ -204,7 +207,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
       const type: SourceType = SOURCE_TYPES.VOD;
 
       // Ensure VOD file is downloaded and valid
-      const { jobId, filePath, copyJobId } = await ensureVodDownload({
+      const { jobId, filePath, copyJobId, hlsConvertJobId } = await ensureVodDownload({
         ctx: tenantPlatformCtx,
         dbId,
         vodId,
@@ -230,7 +233,8 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         gameDuration: game.end - game.start,
         downloadJobId: jobId ?? undefined,
         copyJobId,
-        ...(jobId == null && copyJobId == null && { filePath }),
+        hlsConvertJobId,
+        ...(jobId == null && copyJobId == null && hlsConvertJobId == null && { filePath }),
         workDir: getTmpDirPath({ tenantId, vodId }),
       });
 
@@ -244,6 +248,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         downstreamJobId: dmcaJobId,
         downstreamLabel: 'DMCA processing',
         copyJobId,
+        hlsConvertJobId,
         base: { gameId, vodId },
       });
     }

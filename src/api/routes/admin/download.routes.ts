@@ -94,7 +94,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
 
       const dbId = vodRecord.id;
 
-      const { jobId, filePath, copyJobId, workDir } = await ensureVodDownload({
+      const { jobId, filePath, copyJobId, hlsConvertJobId, workDir } = await ensureVodDownload({
         ctx: tenantCtx,
         dbId,
         vodId,
@@ -112,6 +112,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
         uploadMode,
         downloadJobId: jobId ?? undefined,
         copyJobId,
+        hlsConvertJobId,
         type,
         workDir,
         forceUpload: true,
@@ -122,6 +123,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
         downstreamJobId: jobId ?? '',
         downstreamLabel: 'YouTube upload',
         copyJobId,
+        hlsConvertJobId,
         base: jobId != null ? { dbId: vodRecord.id, vodId: vodRecord.platform_vod_id, jobId } : {},
       });
     }
@@ -180,7 +182,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
       const dbId = vodRecord.id;
 
       // Ensure vod download
-      const { jobId, filePath, copyJobId } = await ensureVodDownload({
+      const { jobId, filePath, copyJobId, hlsConvertJobId } = await ensureVodDownload({
         ctx: tenantCtx,
         dbId,
         vodId,
@@ -202,6 +204,13 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
           dbId,
           vodId,
           copyJobId,
+        });
+      } else if (hlsConvertJobId != null && hlsConvertJobId !== '') {
+        return ok({
+          message: 'HLS conversion queued!',
+          dbId,
+          vodId,
+          hlsConvertJobId,
         });
       } else {
         badRequest(`File already exists at ${filePath}`);

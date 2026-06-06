@@ -250,4 +250,5 @@ export const Jobs = {
   DMCA_JOB_PREFIX: 'dmca_',
   FINALIZE_JOB_PREFIX: 'finalize_',
   COPY_JOB_PREFIX: 'copy_',
+  HLS_CONVERT_JOB_PREFIX: 'hls_convert_',
 } as const;

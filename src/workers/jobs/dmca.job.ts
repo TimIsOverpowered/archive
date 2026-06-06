@@ -8,6 +8,7 @@ import {
   getDmcaProcessingQueue,
   getFileCopyQueue,
   getFlowProducer,
+  getHlsConvertQueue,
   getStandardVodQueue,
 } from '../queues/queue.js';
 import { enqueueJobWithLogging } from './enqueue.js';
@@ -25,6 +26,7 @@ export interface QueueDmcaProcessingOptions {
   part?: number | undefined;
   downloadJobId?: string | undefined;
   copyJobId?: string | undefined;
+  hlsConvertJobId?: string | undefined;
   filePath?: string | undefined;
   gameId?: number | undefined;
   gameStart?: number | undefined;
@@ -45,6 +47,7 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
     part,
     downloadJobId,
     copyJobId,
+    hlsConvertJobId,
     filePath,
     gameId,
     gameStart,
@@ -79,7 +82,7 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
   };
 
   try {
-    if (downloadJobId != null || copyJobId != null) {
+    if (downloadJobId != null || copyJobId != null || hlsConvertJobId != null) {
       const children: Array<{
         name: string;
         queueName: string;
@@ -97,6 +100,13 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
           name: 'file_copy',
           queueName: getFileCopyQueue().name,
           opts: { jobId: copyJobId, failParentOnFailure: false },
+        });
+      }
+      if (hlsConvertJobId != null) {
+        children.push({
+          name: 'hls_convert',
+          queueName: getHlsConvertQueue().name,
+          opts: { jobId: hlsConvertJobId, failParentOnFailure: false },
         });
       }
       const flow = await getFlowProducer().add({

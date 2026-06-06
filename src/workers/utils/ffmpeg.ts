@@ -1,11 +1,13 @@
 import { spawn } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import HLS from 'hls-parser';
 import { extractErrorDetails } from '../../utils/error.js';
 import { parseTimecode } from '../../utils/formatting.js';
+import type { AppLogger } from '../../utils/logger.js';
 import { childLogger } from '../../utils/logger.js';
-import { deleteFileIfExists } from '../../utils/path.js';
+import { deleteFileIfExists, fileExists } from '../../utils/path.js';
 
 const logger = childLogger({ module: 'ffmpeg' });
 
@@ -530,4 +532,34 @@ export async function convertHlsToMp4(source: string, outputPath: string, option
   };
 
   await runFfmpeg(args, knownDuration, options?.onProgress, customOnStart);
+}
+
+/**
+ * Converts HLS segments from a destination directory to MP4 in the work directory.
+ * Reads the m3u8 playlist from hlsDirPath, detects segment format, and uses ffmpeg to produce an MP4.
+ */
+export async function convertHlsSegmentsToMp4(
+  hlsDirPath: string,
+  outputMp4Path: string,
+  vodId: string,
+  log: AppLogger
+): Promise<void> {
+  const m3u8Path = path.join(hlsDirPath, `${vodId}.m3u8`);
+
+  if (!(await fileExists(m3u8Path))) {
+    throw new Error(`HLS playlist not found at ${m3u8Path}`);
+  }
+
+  const m3u8Content = readFileSync(m3u8Path, 'utf8');
+  const isFmp4 = detectFmp4FromPlaylist(m3u8Content);
+
+  const entries = await fsPromises.readdir(hlsDirPath);
+  const segmentFiles = entries.filter((e) => e.endsWith('.ts') || e.endsWith('.mp4'));
+  if (segmentFiles.length === 0) {
+    throw new Error(`No HLS segment files found in ${hlsDirPath}`);
+  }
+
+  log.info({ vodId, isFmp4, hlsDirPath, outputMp4Path }, 'Converting HLS segments from storage to MP4');
+  await convertHlsToMp4(m3u8Path, outputMp4Path, { vodId, isFmp4 });
+  log.info({ vodId, outputMp4Path }, 'HLS segments converted to MP4');
 }
