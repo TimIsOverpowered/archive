@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { getTmpPath } from '../../../../config/env.js';
 import { requirePlatformConfig } from '../../../../config/types.js';
 import { Vod } from '../../../../constants.js';
@@ -15,7 +16,6 @@ import {
   getVodHlsDirPath,
   getLiveFilePath,
   fileExists,
-  hlsSegmentsExist,
 } from '../../../../utils/path.js';
 import { queueFileCopy } from '../../../../workers/jobs/copy.job.js';
 import { queueHlsConvert } from '../../../../workers/jobs/hls-convert.job.js';
@@ -41,6 +41,12 @@ export interface EnsureVodDownloadResponse {
   hlsConvertJobId?: string | undefined;
   workDir?: string | undefined;
 }
+
+type DownloadCheckResult =
+  | { needed: true }
+  | { needed: false; source: 'tmp' }
+  | { needed: false; source: 'mp4' }
+  | { needed: false; source: 'hls' };
 
 /**
  * Ensures a VOD file exists and is valid. If missing or invalid, downloads and waits for completion.
@@ -69,85 +75,88 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
   const refreshed = await refreshVodRecord(ctx, vodId, dbId, log);
   const durationCheckRecord = refreshed ?? vodRecord;
 
-  const needsDownload = await checkIfDownloadNeeded(tenantId, vodId, filePath, dbId, durationCheckRecord, log);
+  const result = await checkValidSource(tenantId, vodId, filePath, dbId, durationCheckRecord, log);
 
-  if (!needsDownload) {
-    log.debug({ vodId, filePath, type }, 'VOD file already exists and is valid');
+  if (result.needed) {
+    log.info({ vodId, filePath, type }, 'Queuing VOD download');
 
-    // If tmpPath is configured, ensure file is available in tmpPath for local processing
-    const tmpPath = getTmpPath();
-    if (tmpPath != null) {
-      const tmpFilePath = getTmpFilePath({ tenantId, vodId });
-      const tmpExists = await fileExists(tmpFilePath);
+    const jobId = await triggerVodDownload({
+      tenantId,
+      dbId,
+      vodId,
+      platform,
+      platformUserId,
+      platformUsername,
+      downloadMethod,
+      ...(skipFinalize !== undefined && { skipFinalize }),
+    });
 
-      if (tmpExists) {
-        log.debug({ path: tmpFilePath }, 'VOD already exists in tmpPath');
-        return { filePath: tmpFilePath, jobId: null, workDir: getTmpDirPath({ tenantId, vodId }) };
-      }
+    log.info({ jobId, vodId, filePath, type }, 'VOD download queued');
+    return { filePath, jobId, workDir: getTmpDirPath({ tenantId, vodId }) };
+  }
 
-      try {
-        const copyJobId = await queueFileCopy({
-          tenantId,
-          dbId,
-          vodId,
-          platform,
-          sourcePath: filePath,
-          destPath: tmpFilePath,
-        });
-        log.info({ filePath, tmpFilePath, copyJobId }, 'Queued file copy from storage to tmpPath');
-        return { filePath: tmpFilePath, jobId: null, copyJobId, workDir: getTmpDirPath({ tenantId, vodId }) };
-      } catch (err) {
-        log.warn({ error: extractErrorDetails(err).message }, 'Failed to queue file copy to tmpPath');
-      }
-
-      // Check if HLS segments exist in storage and convert them to MP4
-      const hlsExists = await hlsSegmentsExist(tenantId, vodId);
-      if (hlsExists) {
-        const hlsDirPath = getVodHlsDirPath({ tenantId, vodId });
-        const hlsConvertJobId = await queueHlsConvert({
-          tenantId,
-          dbId,
-          vodId,
-          platform,
-          hlsDirPath,
-          outputMp4Path: tmpFilePath,
-        });
-        log.info({ hlsDirPath, tmpFilePath, hlsConvertJobId }, 'Queued HLS conversion from storage');
-        return { filePath: tmpFilePath, jobId: null, hlsConvertJobId, workDir: getTmpDirPath({ tenantId, vodId }) };
-      }
-    }
-
+  // If tmpPath is configured, ensure file is available in tmpPath for local processing
+  const tmpPath = getTmpPath();
+  if (tmpPath == null) {
     return { filePath, jobId: null };
   }
 
-  log.info({ vodId, filePath, type }, 'Queuing VOD download');
+  const tmpFilePath = getTmpFilePath({ tenantId, vodId });
 
-  const jobId = await triggerVodDownload({
-    tenantId,
-    dbId,
-    vodId,
-    platform,
-    platformUserId,
-    platformUsername,
-    downloadMethod,
-    ...(skipFinalize !== undefined && { skipFinalize }),
-  });
+  // tmp already valid — no job needed
+  if (result.source === 'tmp') {
+    log.debug({ path: tmpFilePath }, 'VOD already exists in tmpPath');
+    return { filePath: tmpFilePath, jobId: null, workDir: getTmpDirPath({ tenantId, vodId }) };
+  }
 
-  log.info({ jobId, vodId, filePath, type }, 'VOD download queued');
-  return { filePath, jobId, workDir: getTmpDirPath({ tenantId, vodId }) };
+  // Copy MP4 from storage to tmpPath
+  if (result.source === 'mp4') {
+    try {
+      const copyJobId = await queueFileCopy({
+        tenantId,
+        dbId,
+        vodId,
+        platform,
+        sourcePath: filePath,
+        destPath: tmpFilePath,
+      });
+      log.info({ filePath, tmpFilePath, copyJobId }, 'Queued file copy from storage to tmpPath');
+      return { filePath: tmpFilePath, jobId: null, copyJobId, workDir: getTmpDirPath({ tenantId, vodId }) };
+    } catch (err) {
+      log.warn({ error: extractErrorDetails(err).message }, 'Failed to queue file copy to tmpPath');
+    }
+  }
+
+  // Convert HLS segments to MP4 in tmpPath
+  if (result.source === 'hls') {
+    const hlsDirPath = getVodHlsDirPath({ tenantId, vodId });
+    const hlsConvertJobId = await queueHlsConvert({
+      tenantId,
+      dbId,
+      vodId,
+      platform,
+      hlsDirPath,
+      outputMp4Path: tmpFilePath,
+    });
+    log.info({ hlsDirPath, tmpFilePath, hlsConvertJobId }, 'Queued HLS conversion from storage');
+    return { filePath: tmpFilePath, jobId: null, hlsConvertJobId, workDir: getTmpDirPath({ tenantId, vodId }) };
+  }
+
+  return { filePath, jobId: null };
 }
 
 /**
- * Checks if a VOD file needs to be downloaded (missing or duration mismatch).
+ * Checks which source has a valid file and returns the result.
+ * Priority: tmp > mp4 > hls.
  */
-async function checkIfDownloadNeeded(
+async function checkValidSource(
   tenantId: string,
   vodId: string,
   filePath: string,
   dbId: number,
   vodRecord: Pick<SelectableVods, 'duration'>,
   log: AppLogger
-): Promise<boolean> {
+): Promise<DownloadCheckResult> {
   const tmpFilePath = getTmpFilePath({ tenantId, vodId });
 
   const tmpExists = await fileExists(tmpFilePath);
@@ -158,31 +167,46 @@ async function checkIfDownloadNeeded(
       const diff = Math.abs(actualDuration - vodRecord.duration);
       if (diff <= Vod.DURATION_TOLERANCE_SECONDS) {
         log.debug({ path: tmpFilePath }, 'File exists in tmp path with valid duration');
-        return false;
+        return { needed: false, source: 'tmp' };
       }
     }
   }
 
-  const exists = await fileExists(filePath);
-  if (!exists) {
-    log.debug({ filePath }, 'File does not exist');
-    return true;
+  const mp4Exists = await fileExists(filePath);
+  if (mp4Exists) {
+    const meta = await getMetadata(filePath);
+    const actualDuration = meta?.duration;
+    if (actualDuration != null && !Number.isNaN(actualDuration)) {
+      const diff = Math.abs(actualDuration - vodRecord.duration);
+      if (diff <= Vod.DURATION_TOLERANCE_SECONDS) {
+        log.debug({ filePath }, 'MP4 file exists with valid duration');
+        return { needed: false, source: 'mp4' };
+      }
+      log.debug(
+        { dbId, expectedDuration: vodRecord.duration, actualDuration, diff },
+        'Duration mismatch exceeds tolerance'
+      );
+    } else {
+      log.warn({ filePath }, 'Could not determine MP4 file duration');
+    }
+  } else {
+    log.debug({ filePath }, 'MP4 file does not exist');
   }
 
-  const meta = await getMetadata(filePath);
-  const actualDuration = meta?.duration;
-  if (actualDuration == null || Number.isNaN(actualDuration)) {
-    log.warn({ filePath }, 'Could not determine file duration');
-    return true;
+  const hlsDirPath = getVodHlsDirPath({ tenantId, vodId });
+  const m3u8Path = path.join(hlsDirPath, `${vodId}.m3u8`);
+
+  if (await fileExists(m3u8Path)) {
+    const hlsMeta = await getMetadata(m3u8Path);
+    const hlsDuration = hlsMeta?.duration;
+    if (hlsDuration != null && !Number.isNaN(hlsDuration)) {
+      const hlsDiff = Math.abs(hlsDuration - vodRecord.duration);
+      if (hlsDiff <= Vod.DURATION_TOLERANCE_SECONDS) {
+        log.debug({ m3u8Path }, 'HLS segments exist with valid duration');
+        return { needed: false, source: 'hls' };
+      }
+    }
   }
 
-  const expectedDuration = vodRecord.duration;
-  const diff = Math.abs(actualDuration - expectedDuration);
-
-  if (diff > Vod.DURATION_TOLERANCE_SECONDS) {
-    log.debug({ dbId, expectedDuration, actualDuration, diff }, 'Duration mismatch exceeds tolerance');
-    return true;
-  }
-
-  return false;
+  return { needed: true };
 }
