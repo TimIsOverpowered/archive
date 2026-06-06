@@ -730,7 +730,8 @@ export interface FinalizeWorkerAlerts {
     sourcePath: string,
     destPath: string,
     fileSize: number,
-    saveMP4: boolean
+    saveMP4: boolean,
+    saveHLS?: boolean
   ) => RichEmbedData;
   progress: (
     vodId: string,
@@ -746,16 +747,26 @@ export interface FinalizeWorkerAlerts {
     destPath: string,
     fileSize: number,
     elapsedSeconds: number,
-    tmpDirCleaned: boolean
+    tmpDirCleaned: boolean,
+    saveMP4: boolean,
+    saveHLS?: boolean,
+    hlsDestDir?: string
   ) => RichEmbedData;
   error: (vodId: string, platform: Platform, sourcePath: string, destPath: string, errorMsg: string) => RichEmbedData;
 }
 
 export function createFinalizeWorkerAlerts(): FinalizeWorkerAlerts {
   return {
-    init: (vodId, platform, sourceType, sourcePath, destPath, fileSize, saveMP4) => ({
+    init: (vodId, platform, sourceType, sourcePath, destPath, fileSize, saveMP4, saveHLS) => ({
       title: `📦 Finalizing ${sourceType === SOURCE_TYPES.LIVE ? '[Live]' : '[VOD]'} ${vodId}`,
-      description: saveMP4 ? 'Copying file to permanent storage' : 'Skipping MP4 save, cleaning up temp files',
+      description:
+        saveMP4 && saveHLS
+          ? 'Copying files to permanent storage'
+          : saveMP4
+            ? 'Copying file to permanent storage'
+            : saveHLS
+              ? 'Copying HLS files to permanent storage'
+              : 'Skipping MP4 save, cleaning up temp files',
       status: 'warning',
       fields: [
         { name: 'VOD ID', value: vodId, inline: true },
@@ -763,6 +774,7 @@ export function createFinalizeWorkerAlerts(): FinalizeWorkerAlerts {
         { name: 'Type', value: sourceType === SOURCE_TYPES.LIVE ? 'Live' : 'VOD', inline: true },
         { name: 'Size', value: formatBytes(fileSize), inline: true },
         { name: 'Save MP4', value: saveMP4 ? 'Yes' : 'No', inline: true },
+        { name: 'Save HLS', value: saveHLS ? 'Yes' : 'No', inline: true },
         { name: 'Source', value: sourcePath, inline: false },
         { name: 'Destination', value: destPath, inline: false },
       ],
@@ -788,7 +800,7 @@ export function createFinalizeWorkerAlerts(): FinalizeWorkerAlerts {
       };
     },
 
-    complete: (vodId, platform, destPath, fileSize, elapsedSeconds, tmpDirCleaned) => {
+    complete: (vodId, platform, destPath, fileSize, elapsedSeconds, tmpDirCleaned, saveMP4, saveHLS, hlsDestDir) => {
       const avgSpeed = elapsedSeconds > 0 ? fileSize / elapsedSeconds : 0;
 
       const fields: Array<{ name: string; value: string; inline: boolean }> = [
@@ -798,12 +810,29 @@ export function createFinalizeWorkerAlerts(): FinalizeWorkerAlerts {
         { name: 'Time', value: toHHMMSS(elapsedSeconds), inline: true },
         { name: 'Avg Speed', value: `${formatBytes(avgSpeed)}/s`, inline: true },
         { name: 'Temp Cleaned', value: tmpDirCleaned ? 'Yes' : 'No', inline: true },
-        { name: 'Destination', value: destPath, inline: false },
       ];
+
+      if (saveMP4 && destPath) {
+        fields.push({ name: 'Destination', value: destPath, inline: false });
+      }
+      if (saveHLS && hlsDestDir) {
+        fields.push({ name: 'HLS Destination', value: hlsDestDir, inline: false });
+      }
+
+      let description: string;
+      if (saveMP4 && saveHLS) {
+        description = 'Files finalized to permanent storage';
+      } else if (saveMP4) {
+        description = 'MP4 file finalized to permanent storage';
+      } else if (saveHLS) {
+        description = 'HLS files finalized to permanent storage';
+      } else {
+        description = 'Temporary files cleaned up';
+      }
 
       return {
         title: `✅ Finalized ${vodId}`,
-        description: 'File finalized to permanent storage',
+        description,
         status: 'success',
         fields,
         timestamp: new Date().toISOString(),

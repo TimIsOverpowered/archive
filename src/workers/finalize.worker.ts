@@ -109,11 +109,11 @@ const finalizeProcessor = wrapWorkerProcessor<VodFinalizeFileJob, FinalizeProces
     if (ctx.saveMP4 && isAlertsEnabled()) {
       const stat = await fsPromises.stat(ctx.filePath);
       messageId = await initRichAlert(
-        alerts.init(ctx.vodId, ctx.platform, ctx.type, ctx.filePath, destPath, stat.size, ctx.saveMP4)
+        alerts.init(ctx.vodId, ctx.platform, ctx.type, ctx.filePath, destPath, stat.size, ctx.saveMP4, ctx.saveHLS)
       );
     } else if (!ctx.saveMP4 && isAlertsEnabled()) {
       messageId = await initRichAlert(
-        alerts.init(ctx.vodId, ctx.platform, ctx.type, ctx.filePath, destPath, 0, ctx.saveMP4)
+        alerts.init(ctx.vodId, ctx.platform, ctx.type, ctx.filePath, destPath, 0, ctx.saveMP4, ctx.saveHLS)
       );
     }
 
@@ -161,7 +161,17 @@ const finalizeProcessor = wrapWorkerProcessor<VodFinalizeFileJob, FinalizeProces
       if (messageId != null) {
         safeUpdateAlert(
           messageId,
-          alerts.complete(ctx.vodId, ctx.platform, destPath, stat.size, elapsedSeconds, tmpDirCleaned),
+          alerts.complete(
+            ctx.vodId,
+            ctx.platform,
+            destPath,
+            stat.size,
+            elapsedSeconds,
+            tmpDirCleaned,
+            ctx.saveMP4,
+            ctx.saveHLS,
+            hlsDestDir
+          ),
           ctx.log,
           ctx.vodId
         );
@@ -205,7 +215,7 @@ const finalizeProcessor = wrapWorkerProcessor<VodFinalizeFileJob, FinalizeProces
       if (messageId != null) {
         safeUpdateAlert(
           messageId,
-          alerts.complete(ctx.vodId, ctx.platform, destPath, 0, 0, tmpDirCleaned),
+          alerts.complete(ctx.vodId, ctx.platform, destPath, 0, 0, tmpDirCleaned, ctx.saveMP4, ctx.saveHLS, hlsDestDir),
           ctx.log,
           ctx.vodId
         );
@@ -221,7 +231,7 @@ const finalizeProcessor = wrapWorkerProcessor<VodFinalizeFileJob, FinalizeProces
       if (messageId != null) {
         safeUpdateAlert(
           messageId,
-          alerts.complete(ctx.vodId, ctx.platform, destPath, 0, 0, tmpDirCleaned),
+          alerts.complete(ctx.vodId, ctx.platform, destPath, 0, 0, tmpDirCleaned, ctx.saveMP4, ctx.saveHLS, hlsDestDir),
           ctx.log,
           ctx.vodId
         );
