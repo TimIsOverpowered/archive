@@ -129,7 +129,7 @@ async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{
           channelName,
           gameName: chapterName,
           videoTitle: ytTitle,
-          privacyStatus: gamePrivacyStatus as 'public' | 'unlisted' | 'private',
+          privacyStatus: gamePrivacyStatus,
           ...(part != null && totalParts != null && { part: currentPartNum, totalParts }),
         })
       : () => {};
@@ -140,7 +140,7 @@ async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{
     filePath,
     ytTitle,
     youtubeDescription,
-    gamePrivacyStatus as 'public' | 'unlisted' | 'private',
+    gamePrivacyStatus,
     onUploadProgress,
     chapterDuration
   );
