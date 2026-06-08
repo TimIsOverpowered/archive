@@ -29,7 +29,8 @@ CREATE TABLE "vod_uploads" (
     "thumbnail_url" TEXT,
     "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "vod_uploads_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "vod_uploads_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "vod_uploads_vod_id_type_part_key" UNIQUE ("vod_id", "type", "part")
 );
 
 -- CreateTable

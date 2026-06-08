@@ -326,7 +326,8 @@ const createNormalizedSchema = async (client: PoolClient) => {
       "status" "UploadStatus" DEFAULT 'PENDING' NOT NULL,
       "thumbnail_url" TEXT,
       "created_at" TIMESTAMPTZ(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      CONSTRAINT "vod_uploads_pkey" PRIMARY KEY ("id")
+      CONSTRAINT "vod_uploads_pkey" PRIMARY KEY ("id"),
+      CONSTRAINT "vod_uploads_vod_id_type_part_key" UNIQUE ("vod_id", "type", "part")
     );
 
     CREATE TABLE "emotes_new" (
