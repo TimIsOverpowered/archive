@@ -60,16 +60,21 @@ export async function findOrCreateVodRecord(
     .executeTakeFirst()) as SelectableVods;
 
   if (platform === PLATFORMS.TWITCH) {
-    void Promise.allSettled([
-      saveVodChapters({
-        ctx,
-        dbId: vodRecord.id,
-        vodId,
-        finalDurationSeconds: vodRecord.duration,
-        publishUpdate: false,
-      }),
-      fetchAndSaveEmotes(ctx, vodRecord.id, { publishUpdate: false }),
-    ]).finally(() => publishVodUpdate(tenantId, vodRecord.id));
+    void fetchAndSaveEmotes(ctx, vodRecord.id, { publishUpdate: false });
+
+    const chapterCount = await saveVodChapters({
+      ctx,
+      dbId: vodRecord.id,
+      vodId,
+      finalDurationSeconds: vodRecord.duration,
+      publishUpdate: false,
+    });
+
+    try {
+      await publishVodUpdate(tenantId, vodRecord.id);
+    } catch {
+      log.warn({ dbId: vodRecord.id, vodId }, 'Failed to publish VOD update after chapter save');
+    }
 
     void triggerChatDownload({
       tenantId,
@@ -81,6 +86,8 @@ export async function findOrCreateVodRecord(
       duration: Math.round(vodRecord.duration),
       platformUsername,
     });
+
+    log.info({ dbId: vodRecord.id, vodId, chapterCount }, 'Chapters saved synchronously');
   }
 
   log.info({ vodId, platform, duration: vodRecord.duration }, 'VOD record created');

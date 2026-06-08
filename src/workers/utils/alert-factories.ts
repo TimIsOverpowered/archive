@@ -760,11 +760,11 @@ export function createFinalizeWorkerAlerts(): FinalizeWorkerAlerts {
     init: (vodId, platform, sourceType, sourcePath, destPath, fileSize, saveMP4, saveHLS) => ({
       title: `📦 Finalizing ${sourceType === SOURCE_TYPES.LIVE ? '[Live]' : '[VOD]'} ${vodId}`,
       description:
-        saveMP4 && saveHLS
+        saveMP4 === true && saveHLS === true
           ? 'Copying files to permanent storage'
-          : saveMP4
+          : saveMP4 === true
             ? 'Copying file to permanent storage'
-            : saveHLS
+            : saveHLS === true
               ? 'Copying HLS files to permanent storage'
               : 'Skipping MP4 save, cleaning up temp files',
       status: 'warning',
@@ -773,8 +773,8 @@ export function createFinalizeWorkerAlerts(): FinalizeWorkerAlerts {
         { name: 'Platform', value: capitalizePlatform(platform), inline: true },
         { name: 'Type', value: sourceType === SOURCE_TYPES.LIVE ? 'Live' : 'VOD', inline: true },
         { name: 'Size', value: formatBytes(fileSize), inline: true },
-        { name: 'Save MP4', value: saveMP4 ? 'Yes' : 'No', inline: true },
-        { name: 'Save HLS', value: saveHLS ? 'Yes' : 'No', inline: true },
+        { name: 'Save MP4', value: saveMP4 === true ? 'Yes' : 'No', inline: true },
+        { name: 'Save HLS', value: saveHLS === true ? 'Yes' : 'No', inline: true },
         { name: 'Source', value: sourcePath, inline: false },
         { name: 'Destination', value: destPath, inline: false },
       ],
@@ -812,19 +812,19 @@ export function createFinalizeWorkerAlerts(): FinalizeWorkerAlerts {
         { name: 'Temp Cleaned', value: tmpDirCleaned ? 'Yes' : 'No', inline: true },
       ];
 
-      if (saveMP4 && destPath) {
+      if (saveMP4 === true && destPath != null && destPath !== '') {
         fields.push({ name: 'Destination', value: destPath, inline: false });
       }
-      if (saveHLS && hlsDestDir) {
+      if (saveHLS === true && hlsDestDir != null && hlsDestDir !== '') {
         fields.push({ name: 'HLS Destination', value: hlsDestDir, inline: false });
       }
 
       let description: string;
-      if (saveMP4 && saveHLS) {
+      if (saveMP4 === true && saveHLS === true) {
         description = 'Files finalized to permanent storage';
-      } else if (saveMP4) {
+      } else if (saveMP4 === true) {
         description = 'MP4 file finalized to permanent storage';
-      } else if (saveHLS) {
+      } else if (saveHLS === true) {
         description = 'HLS files finalized to permanent storage';
       } else {
         description = 'Temporary files cleaned up';

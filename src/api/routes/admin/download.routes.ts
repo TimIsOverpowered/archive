@@ -1,10 +1,12 @@
 import { FastifyInstance } from 'fastify';
 import { findVodByPlatformId } from '../../../db/queries/vods.js';
+import { saveVodChapters } from '../../../services/twitch/index.js';
 import type { Platform, SourceType, DownloadMethod, UploadMode } from '../../../types/platforms.js';
 import {
   SOURCE_TYPES,
   DOWNLOAD_METHODS,
   UPLOAD_MODES,
+  PLATFORMS,
   PLATFORM_VALUES,
   UPLOAD_MODE_VALUES,
   DOWNLOAD_METHODS_VALUES,
@@ -103,6 +105,24 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
         log,
         skipFinalize: true,
       });
+
+      if (platform === PLATFORMS.TWITCH) {
+        const existingChapters = await tenantCtx.db
+          .selectFrom('chapters')
+          .where('vod_id', '=', dbId)
+          .selectAll()
+          .execute();
+        if (existingChapters.length === 0) {
+          await saveVodChapters({
+            ctx: tenantCtx,
+            dbId,
+            vodId,
+            finalDurationSeconds: vodRecord.duration,
+            publishUpdate: false,
+          });
+        }
+      }
+
       await queueYoutubeUploads({
         ctx: tenantCtx,
         dbId,
