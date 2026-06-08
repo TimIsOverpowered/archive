@@ -89,8 +89,9 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
       ...(skipFinalize !== undefined && { skipFinalize }),
     });
 
+    const tmpFilePath = getTmpFilePath({ tenantId, vodId });
     log.info({ jobId, vodId, filePath, type }, 'VOD download queued');
-    return { filePath, jobId, workDir: getTmpDirPath({ tenantId, vodId }) };
+    return { filePath: tmpFilePath, jobId, workDir: getTmpDirPath({ tenantId, vodId }) };
   }
 
   // If tmpPath is configured, ensure file is available in tmpPath for local processing
