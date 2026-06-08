@@ -21,7 +21,8 @@ interface TwitchConfig {
 
 interface YoutubeConfig {
   description?: string;
-  public?: boolean;
+  vodVisibility?: boolean;
+  gameVisibility?: boolean;
   vodUpload?: boolean;
   perGameUpload?: boolean;
   restrictedGames?: (string | null)[];
@@ -93,7 +94,8 @@ function processYoutube(config: YoutubeConfig | undefined) {
   const youtube: Record<string, unknown> = {};
 
   if (config.description !== undefined) youtube.description = config.description;
-  if (config.public !== undefined) youtube.public = config.public;
+  if (config.vodVisibility !== undefined) youtube.vodVisibility = config.vodVisibility;
+  if (config.gameVisibility !== undefined) youtube.gameVisibility = config.gameVisibility;
   if (config.vodUpload !== undefined) youtube.vodUpload = config.vodUpload;
   if (config.perGameUpload !== undefined) youtube.perGameUpload = config.perGameUpload;
   if (config.restrictedGames !== undefined) youtube.restrictedGames = config.restrictedGames;

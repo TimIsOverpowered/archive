@@ -36,7 +36,8 @@ export function createMockTenantConfig(overrides: MockTenantConfigOverrides = {}
       ...(overrides.twitch ?? {}),
     },
     youtube: {
-      public: false,
+      vodVisibility: false,
+      gameVisibility: false,
       upload: false,
       vodUpload: false,
       liveUpload: false,

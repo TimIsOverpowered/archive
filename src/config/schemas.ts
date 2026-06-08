@@ -78,8 +78,10 @@ function encryptedYoutubeAuth() {
 
 /** YouTube upload configuration for a tenant. */
 export const YoutubeSchema = z.object({
-  /** Make uploads publicly visible (default: true) */
-  public: z.boolean().default(true),
+  /** Make VOD uploads publicly visible (default: true) */
+  vodVisibility: z.boolean().default(true),
+  /** Make game uploads publicly visible (default: true) */
+  gameVisibility: z.boolean().default(true),
   /** Enable YouTube uploads (default: true) */
   upload: z.boolean().default(true),
   /** Upload VODs to YouTube (default: true) */

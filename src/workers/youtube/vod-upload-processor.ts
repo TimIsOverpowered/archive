@@ -53,7 +53,7 @@ export async function processVodUpload(ctx: VodUploadContext): Promise<VodUpload
 
   const channelName = getDisplayName(config);
   const domainName = config.settings?.domainName ?? 'localhost';
-  const privacyStatus = config.youtube?.public === true ? 'public' : 'unlisted';
+  const privacyStatus = config.youtube?.vodVisibility === true ? 'public' : 'unlisted';
   const splitDuration = getEffectiveSplitDuration(config.youtube?.splitDuration);
   const metadata = await getMetadata(filePath);
   if (!metadata) {

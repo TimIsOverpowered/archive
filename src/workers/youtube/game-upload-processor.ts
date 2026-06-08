@@ -107,6 +107,8 @@ async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{
     vodRecord,
   });
 
+  const gamePrivacyStatus = config.youtube?.gameVisibility === true ? 'public' : 'unlisted';
+
   const uploadAlertMessageId = await initRichAlert({
     title: part != null ? `🎮 Game Upload (Part ${currentPartNum}/${totalParts})` : '🎮 Game Upload Started',
     description: `${displayName} - Uploading "${chapterName}" to YouTube`,
@@ -127,7 +129,7 @@ async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{
           channelName,
           gameName: chapterName,
           videoTitle: ytTitle,
-          privacyStatus: 'public',
+          privacyStatus: gamePrivacyStatus as 'public' | 'unlisted' | 'private',
           ...(part != null && totalParts != null && { part: currentPartNum, totalParts }),
         })
       : () => {};
@@ -138,7 +140,7 @@ async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{
     filePath,
     ytTitle,
     youtubeDescription,
-    'public',
+    gamePrivacyStatus as 'public' | 'unlisted' | 'private',
     onUploadProgress,
     chapterDuration
   );

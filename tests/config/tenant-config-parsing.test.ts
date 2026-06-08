@@ -208,7 +208,8 @@ describe('buildTenantConfig parsing logic', () => {
     it('should parse valid YouTube config with all fields', () => {
       const tenant = makeTenant({
         youtube: {
-          public: false,
+          vodVisibility: false,
+          gameVisibility: false,
           upload: false,
           vodUpload: false,
           liveUpload: true,
@@ -222,7 +223,8 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result?.youtube);
-      assert.strictEqual(result.youtube.public, false);
+      assert.strictEqual(result.youtube.vodVisibility, false);
+      assert.strictEqual(result.youtube.gameVisibility, false);
       assert.strictEqual(result.youtube.upload, false);
       assert.strictEqual(result.youtube.vodUpload, false);
       assert.strictEqual(result.youtube.liveUpload, true);
@@ -238,7 +240,8 @@ describe('buildTenantConfig parsing logic', () => {
 
       const result = buildTenantConfig(tenant);
       assert.ok(result?.youtube);
-      assert.strictEqual(result.youtube.public, true);
+      assert.strictEqual(result.youtube.vodVisibility, true);
+      assert.strictEqual(result.youtube.gameVisibility, true);
       assert.strictEqual(result.youtube.upload, true);
       assert.strictEqual(result.youtube.vodUpload, true);
       assert.strictEqual(result.youtube.liveUpload, false);
@@ -342,7 +345,7 @@ describe('buildTenantConfig parsing logic', () => {
 
     it('should build config with only YouTube enabled', () => {
       const tenant = makeTenant({
-        youtube: { public: false, upload: true },
+        youtube: { vodVisibility: false, upload: true },
       });
 
       const result = buildTenantConfig(tenant);
@@ -355,7 +358,7 @@ describe('buildTenantConfig parsing logic', () => {
     it('should build config with all platforms enabled', () => {
       const tenant = makeTenant({
         twitch: { enabled: true, username: 'twitchuser', id: '111' },
-        youtube: { public: false, upload: true },
+        youtube: { vodVisibility: false, upload: true },
         kick: { enabled: true, username: 'kickuser', id: '222' },
       });
 
@@ -467,7 +470,7 @@ describe('buildTenantConfig parsing logic', () => {
       const tenant = makeTenant({
         id: 'full-tenant',
         twitch: { enabled: true, username: 'user', id: '1' },
-        youtube: { public: false, upload: false },
+        youtube: { vodVisibility: false, gameVisibility: false, upload: false },
         kick: { enabled: true, username: 'kuser', id: '2' },
       });
 
@@ -568,7 +571,7 @@ describe('ConfigService update methods', () => {
         createdAt: new Date(),
         database: { url: 'pg://t1' },
         settings: { domainName: 't1.com', timezone: 'UTC', saveHLS: false, saveMP4: true },
-        youtube: { public: true, auth: { old: 'token' } },
+        youtube: { vodVisibility: true, gameVisibility: true, auth: { old: 'token' } },
       } as any,
     ]);
 

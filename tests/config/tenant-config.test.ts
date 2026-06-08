@@ -73,7 +73,7 @@ describe('buildTenantConfig', () => {
 
   it('parses valid YouTube config', () => {
     const tenant = makeTenant({
-      youtube: { public: true, upload: true, splitDuration: 1800 },
+      youtube: { vodVisibility: true, gameVisibility: true, upload: true, splitDuration: 1800 },
     });
     const result = buildTenantConfig(tenant);
     assert.ok(result?.youtube);
@@ -92,7 +92,7 @@ describe('buildTenantConfig', () => {
   it('skips malformed configs safely without throwing', () => {
     const tenant = makeTenant({
       twitch: { enabled: 'not-a-boolean', username: 12345 },
-      youtube: { public: 'yes', splitDuration: 'long' },
+      youtube: { vodVisibility: 'yes', splitDuration: 'long' },
       kick: { enabled: 'true', username: 42 },
     });
 

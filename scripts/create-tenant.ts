@@ -334,7 +334,8 @@ async function main(): Promise<void> {
 
     console.log('\nUpload Behavior:');
     const youtubeDescription = await prompt('Video description template (use {channel} for name)');
-    const youtubePublic = await confirm('Videos public by default');
+    const youtubeVodVisibility = await confirm('VODs public by default');
+    const youtubeGameVisibility = await confirm('Game uploads public by default');
     const youtubeVodUpload = await confirm('Enable VOD uploads');
     const youtubePerGame = await confirm('Per-game upload');
 
@@ -370,7 +371,8 @@ async function main(): Promise<void> {
 
     youtubeData = {
       description: youtubeDescription,
-      public: youtubePublic,
+      vodVisibility: youtubeVodVisibility,
+      gameVisibility: youtubeGameVisibility,
       vodUpload: youtubeVodUpload,
       perGameUpload: youtubePerGame,
       restrictedGames: youtubeRestrictedGames,
@@ -428,7 +430,9 @@ async function main(): Promise<void> {
       console.log('\nYouTube Uploads:');
       console.log(`  ✓ Enabled`);
       console.log(`    - VOD upload: ${youtubeData.vodUpload ? 'yes' : 'no'}`);
+      console.log(`    - VOD visibility: ${youtubeData.vodVisibility ? 'public' : 'unlisted'}`);
       console.log(`    - Per-game upload: ${youtubeData.perGameUpload ? 'yes' : 'no'}`);
+      console.log(`    - Game visibility: ${youtubeData.gameVisibility ? 'public' : 'unlisted'}`);
       if (youtubeData.restrictedGames && youtubeData.restrictedGames.length > 0) {
         console.log(`    - Excluded games: ${youtubeData.restrictedGames.join(', ')}`);
       }
@@ -515,7 +519,8 @@ async function main(): Promise<void> {
     if (youtubeData) {
       tenantData.youtube = {
         description: youtubeData.description,
-        public: youtubeData.public,
+        vodVisibility: youtubeData.vodVisibility,
+        gameVisibility: youtubeData.gameVisibility,
         vodUpload: youtubeData.vodUpload,
         perGameUpload: youtubeData.perGameUpload,
         restrictedGames: youtubeData.restrictedGames,
