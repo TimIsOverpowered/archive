@@ -68,7 +68,7 @@ function toPublicTenant(tenant: SelectableTenants): PublicTenant {
   const social_media: PublicTenant['social_media'] = [];
   const sm = tenant.social_media;
   if (sm != null && typeof sm === 'object' && !Array.isArray(sm)) {
-    for (const [name, url] of Object.entries(sm)) {
+    for (const [name, url] of Object.entries(sm).sort((a, b) => a[0].localeCompare(b[0]))) {
       if (typeof url === 'string' && url !== '') {
         social_media.push({ name, url });
       }
