@@ -96,8 +96,8 @@ export async function createGameUploadJob(
   }
 
   // Skip chapters shorter than 5 minutes
-  if ((chapter.duration ?? 0) < 300) {
-    throw new Error(`Chapter "${chapter.name}" duration (${chapter.duration}s) is less than 5 minutes`);
+  if ((chapter.duration ?? 0) < 600) {
+    throw new Error(`Chapter "${chapter.name}" duration (${chapter.duration}s) is less than 10 minutes`);
   }
 
   const gameCount =
