@@ -76,12 +76,16 @@ function encryptedYoutubeAuth() {
     });
 }
 
+/** YouTube privacy status matching YouTube Data API v3. */
+export const YoutubePrivacyStatusSchema = z.enum(['public', 'unlisted', 'private']);
+export type YoutubePrivacyStatus = z.infer<typeof YoutubePrivacyStatusSchema>;
+
 /** YouTube upload configuration for a tenant. */
 export const YoutubeSchema = z.object({
-  /** Make VOD uploads publicly visible (default: true) */
-  vodVisibility: z.boolean().default(true),
-  /** Make game uploads publicly visible (default: true) */
-  gameVisibility: z.boolean().default(true),
+  /** VOD upload privacy status (default: 'public') */
+  vodVisibility: YoutubePrivacyStatusSchema.default('public'),
+  /** Game upload privacy status (default: 'public') */
+  gameVisibility: YoutubePrivacyStatusSchema.default('public'),
   /** Enable YouTube uploads (default: true) */
   upload: z.boolean().default(true),
   /** Upload VODs to YouTube (default: true) */

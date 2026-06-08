@@ -21,8 +21,8 @@ interface TwitchConfig {
 
 interface YoutubeConfig {
   description?: string;
-  vodVisibility?: boolean;
-  gameVisibility?: boolean;
+  vodVisibility?: 'public' | 'unlisted' | 'private';
+  gameVisibility?: 'public' | 'unlisted' | 'private';
   vodUpload?: boolean;
   perGameUpload?: boolean;
   restrictedGames?: (string | null)[];

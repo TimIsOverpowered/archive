@@ -36,8 +36,8 @@ export function createMockTenantConfig(overrides: MockTenantConfigOverrides = {}
       ...(overrides.twitch ?? {}),
     },
     youtube: {
-      vodVisibility: false,
-      gameVisibility: false,
+      vodVisibility: 'unlisted',
+      gameVisibility: 'unlisted',
       upload: false,
       vodUpload: false,
       liveUpload: false,

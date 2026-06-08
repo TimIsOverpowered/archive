@@ -107,7 +107,7 @@ async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{
     vodRecord,
   });
 
-  const gamePrivacyStatus = config.youtube?.gameVisibility === true ? 'public' : 'unlisted';
+  const gamePrivacyStatus = config.youtube?.gameVisibility ?? 'public';
 
   const uploadAlertMessageId = await initRichAlert({
     title: part != null ? `🎮 Game Upload (Part ${currentPartNum}/${totalParts})` : '🎮 Game Upload Started',

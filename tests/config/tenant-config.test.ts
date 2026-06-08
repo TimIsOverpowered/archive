@@ -73,7 +73,7 @@ describe('buildTenantConfig', () => {
 
   it('parses valid YouTube config', () => {
     const tenant = makeTenant({
-      youtube: { vodVisibility: true, gameVisibility: true, upload: true, splitDuration: 1800 },
+      youtube: { vodVisibility: 'public', gameVisibility: 'public', upload: true, splitDuration: 1800 },
     });
     const result = buildTenantConfig(tenant);
     assert.ok(result?.youtube);

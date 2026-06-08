@@ -334,8 +334,9 @@ async function main(): Promise<void> {
 
     console.log('\nUpload Behavior:');
     const youtubeDescription = await prompt('Video description template (use {channel} for name)');
-    const youtubeVodVisibility = await confirm('VODs public by default');
-    const youtubeGameVisibility = await confirm('Game uploads public by default');
+    const vodVisibilityOptions = '(public, unlisted, private)';
+    const youtubeVodVisibility = (await prompt(`VOD upload privacy ${vodVisibilityOptions}`)) || 'public';
+    const youtubeGameVisibility = (await prompt(`Game upload privacy ${vodVisibilityOptions}`)) || 'public';
     const youtubeVodUpload = await confirm('Enable VOD uploads');
     const youtubePerGame = await confirm('Per-game upload');
 
@@ -430,9 +431,9 @@ async function main(): Promise<void> {
       console.log('\nYouTube Uploads:');
       console.log(`  ✓ Enabled`);
       console.log(`    - VOD upload: ${youtubeData.vodUpload ? 'yes' : 'no'}`);
-      console.log(`    - VOD visibility: ${youtubeData.vodVisibility ? 'public' : 'unlisted'}`);
+      console.log(`    - VOD visibility: ${youtubeData.vodVisibility}`);
       console.log(`    - Per-game upload: ${youtubeData.perGameUpload ? 'yes' : 'no'}`);
-      console.log(`    - Game visibility: ${youtubeData.gameVisibility ? 'public' : 'unlisted'}`);
+      console.log(`    - Game visibility: ${youtubeData.gameVisibility}`);
       if (youtubeData.restrictedGames && youtubeData.restrictedGames.length > 0) {
         console.log(`    - Excluded games: ${youtubeData.restrictedGames.join(', ')}`);
       }
