@@ -62,11 +62,13 @@ export async function downloadSegmentsParallel(
   concurrency: number,
   retryAttempts: number,
   log: AppLogger,
-  onBatchComplete?: (completedCount: number, totalSegments: number) => void
+  onBatchComplete?: (completedCount: number, totalSegments: number) => void,
+  onProgress?: (completedCount: number, totalSegments: number) => void
 ): Promise<void> {
   const limit = pLimit(concurrency);
   let completedCount = 0;
   const totalSegments = segments.length;
+  let lastBucket = -1;
 
   log.debug(
     { count: totalSegments, concurrency, retryAttempts, strategy: strategy.type },
@@ -96,6 +98,13 @@ export async function downloadSegmentsParallel(
 
       if (exists) {
         completedCount++;
+        if (onProgress && totalSegments > 0) {
+          const bucket = Math.floor(((completedCount / totalSegments) * 100) / 25) * 25;
+          if (bucket > lastBucket) {
+            lastBucket = bucket;
+            onProgress(completedCount, totalSegments);
+          }
+        }
         return;
       }
 
@@ -131,6 +140,14 @@ export async function downloadSegmentsParallel(
 
         await fs.promises.rename(tempPath, outputPath);
         completedCount++;
+
+        if (onProgress && totalSegments > 0) {
+          const bucket = Math.floor(((completedCount / totalSegments) * 100) / 25) * 25;
+          if (bucket > lastBucket) {
+            lastBucket = bucket;
+            onProgress(completedCount, totalSegments);
+          }
+        }
 
         log.debug({ uri: segment.uri, current: completedCount, total: totalSegments }, `Segment downloaded`);
       } catch (error: unknown) {

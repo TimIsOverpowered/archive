@@ -315,7 +315,8 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
           concurrency,
           Hls.SEGMENT_RETRY_ATTEMPTS,
           log,
-          (_completedCount) => onProgress?.(downloadedSegments.size, totalDuration)
+          (_completedCount) => onProgress?.(downloadedSegments.size, totalDuration),
+          (batchCompleted) => onProgress?.(downloadedSegments.size + batchCompleted, totalDuration)
         );
 
         for (const seg of result.newSegments) downloadedSegments.add(seg.uri);
@@ -404,7 +405,8 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
     Hls.SEGMENT_CONCURRENCY,
     Hls.SEGMENT_RETRY_ATTEMPTS,
     log,
-    (completedCount) => onProgress?.(completedCount, segmentsToDownload.length)
+    (completedCount) => onProgress?.(completedCount, segmentsToDownload.length),
+    (completedCount, total) => onProgress?.(completedCount, total)
   );
 }
 
