@@ -17,8 +17,6 @@ async function enqueue(job: ChatDownloadJob): Promise<string | null> {
       data: job,
       options: {
         jobId,
-        removeOnComplete: true,
-        removeOnFail: true,
       },
       logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
       successMessage: 'Chat download job enqueued',

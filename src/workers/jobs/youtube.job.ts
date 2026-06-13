@@ -261,8 +261,6 @@ async function enqueueVodUpload(
       data: job,
       options: {
         jobId,
-        removeOnComplete: true,
-        removeOnFail: true,
       },
       logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
       successMessage: 'YouTube VOD upload job enqueued',
@@ -381,8 +379,6 @@ export async function enqueueFinalizeJob(
       },
       options: {
         jobId,
-        removeOnComplete: true,
-        removeOnFail: true,
       },
       logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
       successMessage: 'VOD finalize job enqueued',
@@ -455,8 +451,6 @@ async function enqueueGameUpload(
       data: job,
       options: {
         jobId,
-        removeOnComplete: true,
-        removeOnFail: true,
       },
       logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
       successMessage: 'YouTube game upload job enqueued',
@@ -599,11 +593,11 @@ interface SequentialFlowChild {
   data: Record<string, unknown>;
   opts: {
     jobId: string;
-    removeOnComplete?: boolean | number;
-    removeOnFail?: boolean | number;
+    removeOnComplete?: boolean | number | { count?: number; age?: number };
+    removeOnFail?: boolean | number | { count?: number; age?: number };
     failParentOnFailure?: boolean;
     attempts?: number;
-    backoff?: { type: string; delay: number };
+    backoff?: { type: string; delay?: number } | number;
   };
   children?: Array<SequentialFlowChild | { name: string; queueName: string; opts: { jobId: string } }>;
 }
@@ -649,10 +643,7 @@ function buildSequentialGameChain(
       data,
       opts: {
         jobId,
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 5000 },
-        removeOnComplete: true,
-        removeOnFail: true,
+        ...defaultJobOptions,
         failParentOnFailure: false,
       },
       ...(children != null && children.length > 0 ? { children } : {}),
@@ -675,14 +666,14 @@ function buildCopyChildren(
     children.push({
       name: 'standard_vod_download',
       queueName: getStandardVodQueue().name,
-      opts: { jobId: downloadJobId, failParentOnFailure: false },
+      opts: { jobId: downloadJobId, ...defaultJobOptions, failParentOnFailure: false },
     });
   }
   if (copyJobId != null) {
     children.push({
       name: 'file_copy',
       queueName: getFileCopyQueue().name,
-      opts: { jobId: copyJobId, failParentOnFailure: false },
+      opts: { jobId: copyJobId, ...defaultJobOptions, failParentOnFailure: false },
     });
   }
   return children;

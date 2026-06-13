@@ -15,7 +15,7 @@ import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { enqueueJobWithLogging } from '../jobs/enqueue.js';
 import type { LiveDownloadJob } from '../jobs/types.js';
-import { getLiveDownloadQueue } from '../queues/queue.js';
+import { defaultJobOptions, getLiveDownloadQueue } from '../queues/queue.js';
 import { sendStreamLiveAlert } from './alert-helpers.js';
 
 interface LiveStreamContext {
@@ -490,11 +490,9 @@ async function enqueueLiveHlsDownload(params: {
       } satisfies LiveDownloadJob,
       options: {
         jobId: `${Jobs.LIVE_HLS_JOB_PREFIX}${params.vodId}`,
+        ...defaultJobOptions,
         attempts: 10,
-        backoff: { type: 'exponential' as const, delay: 5000 },
         deduplication: { id: `${Jobs.LIVE_HLS_JOB_PREFIX}${params.vodId}` },
-        removeOnComplete: true,
-        removeOnFail: true,
       },
       logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
       successMessage: 'Live HLS download job enqueued successfully',

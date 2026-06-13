@@ -112,8 +112,9 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
       });
 
       const resultJobId = flow.job.id ?? null;
+      const parentState = await flow.job.getState();
       log.info(
-        { vodId, jobId: resultJobId, part, gameId, chained: true, claimsCount: claims.length },
+        { vodId, jobId: resultJobId, part, gameId, chained: true, claimsCount: claims.length, parentState },
         'DMCA processing job queued (chained to download)'
       );
       return resultJobId;
@@ -137,7 +138,7 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
     if (downloadJobId == null && copyJobId == null) {
       log.error({ jobId, tenantId, error: msg }, 'Failed to enqueue DMCA processing job');
     } else {
-      log.debug({ jobId, tenantId, error: msg }, 'DMCA processing enqueue failed (chained)');
+      log.error({ jobId, tenantId, error: msg }, 'DMCA processing enqueue failed (chained)');
     }
     return null;
   }

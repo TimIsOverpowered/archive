@@ -37,6 +37,8 @@ type JobOpts = NonNullable<QueueOptions['defaultJobOptions']>;
 export const defaultJobOptions: JobOpts = {
   attempts: 3,
   backoff: { type: 'exponential' as const, delay: 5000 },
+  removeOnComplete: true,
+  removeOnFail: true,
 };
 
 function exponentialBackoff(delay: number, attempts: number): JobOpts {

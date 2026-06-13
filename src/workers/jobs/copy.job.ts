@@ -44,8 +44,6 @@ export async function queueFileCopy(options: QueueFileCopyOptions): Promise<stri
           jobId,
           deduplication: { id: jobId },
           ...defaultJobOptions,
-          removeOnComplete: true,
-          removeOnFail: true,
         },
         children: [
           {
@@ -67,8 +65,6 @@ export async function queueFileCopy(options: QueueFileCopyOptions): Promise<stri
         jobId,
         deduplication: { id: jobId },
         ...defaultJobOptions,
-        removeOnComplete: true,
-        removeOnFail: true,
       },
       logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
       successMessage: 'File copy job enqueued',

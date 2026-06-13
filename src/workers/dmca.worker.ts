@@ -4,8 +4,8 @@ import { cleanupTempFiles } from './dmca/dmca.js';
 import { buildDmcaProcessorContext, trimDmcaVideo, processDmcaClaims, queueDmcaUpload } from './dmca.worker.phases.js';
 import type { DmcaProcessorContext } from './dmca.worker.phases.js';
 import type { DmcaProcessingJob, DmcaProcessingResult } from './jobs/types.js';
-import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
 import { safeUpdateAlert } from './utils/alert-factories.js';
+import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
 
 const errorMeta = (ctx: DmcaProcessorContext, job: Job<unknown>) => ({
   vodId: ctx.vodId,
@@ -24,7 +24,12 @@ const dmcaProcessor = wrapWorkerProcessor<DmcaProcessingJob, DmcaProcessorContex
   async (ctx) => {
     if (ctx.blockingClaims.length === 0) {
       ctx.log.info({ vodId: ctx.vodId }, 'No blocking claims for VOD');
-      safeUpdateAlert(ctx.messageId, ctx.alerts.complete(ctx.vodId, 'N/A', [], ctx.platform, ctx.displayName), ctx.log, ctx.vodId);
+      safeUpdateAlert(
+        ctx.messageId,
+        ctx.alerts.complete(ctx.vodId, 'N/A', [], ctx.platform, ctx.displayName),
+        ctx.log,
+        ctx.vodId
+      );
       return { success: true, message: 'No action needed' };
     }
 
@@ -32,7 +37,12 @@ const dmcaProcessor = wrapWorkerProcessor<DmcaProcessingJob, DmcaProcessorContex
     await processDmcaClaims(ctx);
     await queueDmcaUpload(ctx);
 
-    safeUpdateAlert(ctx.messageId, ctx.alerts.complete(ctx.vodId, 'N/A', ctx.claimInfos, ctx.platform, ctx.displayName), ctx.log, ctx.vodId);
+    safeUpdateAlert(
+      ctx.messageId,
+      ctx.alerts.complete(ctx.vodId, 'N/A', ctx.claimInfos, ctx.platform, ctx.displayName),
+      ctx.log,
+      ctx.vodId
+    );
 
     return { success: true, vodId: ctx.vodId };
   },

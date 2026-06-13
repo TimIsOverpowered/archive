@@ -40,8 +40,6 @@ export async function triggerVodDownload(opts: TriggerVodOptions): Promise<strin
       data: job,
       options: {
         jobId,
-        removeOnComplete: true,
-        removeOnFail: true,
       },
       logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
       successMessage: 'VOD download job enqueued',

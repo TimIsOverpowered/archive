@@ -463,8 +463,7 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
         },
         opts: {
           jobId: `finalize_${ctx.vodId}_1_${timestamp}`,
-          removeOnComplete: true,
-          removeOnFail: true,
+          ...defaultJobOptions,
           failParentOnFailure: false,
         },
         children: [
@@ -506,8 +505,7 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
         },
         opts: {
           jobId: `finalize_${ctx.vodId}_1_${timestamp}`,
-          removeOnComplete: true,
-          removeOnFail: true,
+          ...defaultJobOptions,
           failParentOnFailure: false,
         },
         children: [
