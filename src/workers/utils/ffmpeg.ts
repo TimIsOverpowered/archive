@@ -172,6 +172,8 @@ export async function splitVideo(
         'make_zero',
         '-map_metadata',
         '0',
+        '-movflags',
+        '+faststart',
         '-y',
         partFile,
       ];
@@ -428,7 +430,22 @@ export async function muteAudioSections(
   const knownDuration = meta?.duration ?? null;
   const afFilter = filters.join(',');
 
-  const args = ['-v', 'info', '-i', videoPath, '-c:v', 'copy', '-af', afFilter, '-c:a', 'aac', '-y', outputPath];
+  const args = [
+    '-v',
+    'info',
+    '-i',
+    videoPath,
+    '-c:v',
+    'copy',
+    '-af',
+    afFilter,
+    '-c:a',
+    'aac',
+    '-movflags',
+    '+faststart',
+    '-y',
+    outputPath,
+  ];
 
   await runFfmpeg(args, knownDuration, onProgress, onStart);
   return outputPath;
@@ -482,7 +499,7 @@ export async function concatSegments(
   const listPath = outputPath.replace('.mp4', '-concat.txt');
   writeFileSync(listPath, segmentFiles.map((f) => `file '${f}'`).join('\n') + '\n');
 
-  const args: string[] = ['-v', 'info', '-f', 'concat', '-safe', '0', '-i', listPath];
+  const args: string[] = ['-v', 'info', '-f', 'concat', '-safe', '0', '-i', listPath, '-movflags', '+faststart'];
   if (options?.audioFilters != null && options.audioFilters.length > 0) {
     args.push('-c:v', 'copy', '-af', options.audioFilters.join(','), '-c:a', 'aac');
   } else {
