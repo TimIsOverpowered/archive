@@ -158,6 +158,10 @@ export async function splitVideo(
       const args = [
         '-v',
         'info',
+        '-threads',
+        '0',
+        '-thread_queue_size',
+        '1024',
         '-i',
         filePath,
         '-ss',
@@ -214,6 +218,10 @@ export async function trimVideo(
   const args = [
     '-v',
     'info',
+    '-threads',
+    '0',
+    '-thread_queue_size',
+    '1024',
     '-i',
     filePath,
     '-ss',
@@ -387,6 +395,7 @@ export async function generateBlackSegment(
   const pf = pixFmt ?? 'yuv420p';
 
   const args: string[] = [];
+  args.push('-threads', '0');
   args.push('-f', 'lavfi');
   args.push('-i', `color=c=black:s=${width}x${height}:r=${fr}`);
 
@@ -433,6 +442,10 @@ export async function muteAudioSections(
   const args = [
     '-v',
     'info',
+    '-threads',
+    '0',
+    '-thread_queue_size',
+    '1024',
     '-i',
     videoPath,
     '-c:v',
@@ -462,6 +475,10 @@ export async function extractSegment(
   const args = [
     '-v',
     'info',
+    '-threads',
+    '0',
+    '-thread_queue_size',
+    '1024',
     '-i',
     source,
     '-ss',
@@ -499,7 +516,20 @@ export async function concatSegments(
   const listPath = outputPath.replace('.mp4', '-concat.txt');
   writeFileSync(listPath, segmentFiles.map((f) => `file '${f}'`).join('\n') + '\n');
 
-  const args: string[] = ['-v', 'info', '-f', 'concat', '-safe', '0', '-i', listPath];
+  const args: string[] = [
+    '-v',
+    'info',
+    '-threads',
+    '0',
+    '-thread_queue_size',
+    '1024',
+    '-f',
+    'concat',
+    '-safe',
+    '0',
+    '-i',
+    listPath,
+  ];
   if (options?.audioFilters != null && options.audioFilters !== '') {
     args.push('-c:v', 'copy', '-af', options.audioFilters, '-c:a', 'aac');
   } else {
@@ -537,7 +567,21 @@ export async function convertHlsToMp4(source: string, outputPath: string, option
     baseOptions.push('-avoid_negative_ts', 'make_zero', '-fflags', '+genpts');
   }
 
-  const args: string[] = ['-v', 'info', '-i', source, '-c', 'copy', ...baseOptions, '-y', outputPath];
+  const args: string[] = [
+    '-v',
+    'info',
+    '-threads',
+    '0',
+    '-thread_queue_size',
+    '1024',
+    '-i',
+    source,
+    '-c',
+    'copy',
+    ...baseOptions,
+    '-y',
+    outputPath,
+  ];
 
   const ctx = options?.vodId != null ? `VOD ${options.vodId}` : source.substring(0, 40);
   let hlsLogged = false;

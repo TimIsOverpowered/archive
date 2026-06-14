@@ -74,18 +74,22 @@ export interface MuteFilterResult {
 }
 
 export function buildAudioFilters(claims: DMCAClaim[]): string {
-  const betweenExpressions: string[] = [];
+  const muteSections: { startTime: number; endTime: number }[] = [];
 
   for (const claim of claims) {
     if (claim.matchType !== CLAIM_MATCH_TYPE_AUDIO && claim.matchType !== CLAIM_MATCH_TYPE_AUDIOVISUAL) continue;
 
-    const startTime = claim.videoSegment.startMillis / 1000;
-    const endTime = claim.videoSegment.endMillis / 1000;
-
-    betweenExpressions.push(`between(t,${startTime},${endTime})`);
+    muteSections.push({
+      startTime: claim.videoSegment.startMillis / 1000,
+      endTime: claim.videoSegment.endMillis / 1000,
+    });
   }
 
-  if (betweenExpressions.length === 0) return '';
+  if (muteSections.length === 0) return '';
+
+  muteSections.sort((a, b) => a.startTime - b.startTime);
+
+  const betweenExpressions = muteSections.map(({ startTime, endTime }) => `between(t,${startTime},${endTime})`);
 
   return `volume=0:enable='${betweenExpressions.join('+')}'`;
 }
