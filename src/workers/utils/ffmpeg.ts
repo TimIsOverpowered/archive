@@ -421,14 +421,14 @@ export async function generateBlackSegment(
 
 export async function muteAudioSections(
   videoPath: string,
-  filters: string[],
+  filter: string,
   outputPath: string,
   onProgress?: (percent: number) => void,
   onStart?: (cmd: string) => void
 ): Promise<string | null> {
   const meta = await getMetadata(videoPath);
   const knownDuration = meta?.duration ?? null;
-  const afFilter = filters.join(',');
+  const afFilter = filter;
 
   const args = [
     '-v',
@@ -488,7 +488,7 @@ export interface ConcatSegmentsOptions {
   onProgress?: (percent: number) => void;
   onStart?: (cmd: string) => void;
   totalDuration?: number;
-  audioFilters?: string[];
+  audioFilters?: string;
 }
 
 export async function concatSegments(
@@ -499,13 +499,13 @@ export async function concatSegments(
   const listPath = outputPath.replace('.mp4', '-concat.txt');
   writeFileSync(listPath, segmentFiles.map((f) => `file '${f}'`).join('\n') + '\n');
 
-  const args: string[] = ['-v', 'info', '-f', 'concat', '-safe', '0', '-i', listPath, '-movflags', '+faststart'];
-  if (options?.audioFilters != null && options.audioFilters.length > 0) {
-    args.push('-c:v', 'copy', '-af', options.audioFilters.join(','), '-c:a', 'aac');
+  const args: string[] = ['-v', 'info', '-f', 'concat', '-safe', '0', '-i', listPath];
+  if (options?.audioFilters != null && options.audioFilters !== '') {
+    args.push('-c:v', 'copy', '-af', options.audioFilters, '-c:a', 'aac');
   } else {
     args.push('-c', 'copy');
   }
-  args.push('-y', outputPath);
+  args.push('-movflags', '+faststart', '-y', outputPath);
 
   try {
     await runFfmpeg(args, options?.totalDuration ?? null, options?.onProgress, options?.onStart);

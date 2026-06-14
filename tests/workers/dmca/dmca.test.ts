@@ -11,7 +11,7 @@ describe('buildAudioFilters', () => {
       },
     ];
     const result = buildAudioFilters(claims);
-    assert.deepStrictEqual(result, ["volume=0:enable='between(t,1484.25,1653.75)'"]);
+    assert.strictEqual(result, "volume=0:enable='between(t,1484.25,1653.75)'");
   });
 
   it('should build mute filters for AUDIOVISUAL claims', () => {
@@ -22,7 +22,7 @@ describe('buildAudioFilters', () => {
       },
     ];
     const result = buildAudioFilters(claims);
-    assert.deepStrictEqual(result, ["volume=0:enable='between(t,361,429.5)'"]);
+    assert.strictEqual(result, "volume=0:enable='between(t,361,429.5)'");
   });
 
   it('should skip VIDEO claims', () => {
@@ -33,7 +33,7 @@ describe('buildAudioFilters', () => {
       },
     ];
     const result = buildAudioFilters(claims);
-    assert.deepStrictEqual(result, []);
+    assert.strictEqual(result, '');
   });
 
   it('should handle mixed claim types', () => {
@@ -52,9 +52,7 @@ describe('buildAudioFilters', () => {
       },
     ];
     const result = buildAudioFilters(claims);
-    assert.strictEqual(result.length, 2);
-    assert.strictEqual(result[0], "volume=0:enable='between(t,300,500)'");
-    assert.strictEqual(result[1], "volume=0:enable='between(t,600,800)'");
+    assert.strictEqual(result, "volume=0:enable='between(t,300,500)+between(t,600,800)'");
   });
 
   it('should handle zero start time', () => {
@@ -65,12 +63,12 @@ describe('buildAudioFilters', () => {
       },
     ];
     const result = buildAudioFilters(claims);
-    assert.strictEqual(result[0], "volume=0:enable='between(t,0,120)'");
+    assert.strictEqual(result, "volume=0:enable='between(t,0,120)'");
   });
 
   it('should handle empty claims array', () => {
     const result = buildAudioFilters([]);
-    assert.deepStrictEqual(result, []);
+    assert.strictEqual(result, '');
   });
 
   it('should handle large millisecond values', () => {
@@ -81,7 +79,7 @@ describe('buildAudioFilters', () => {
       },
     ];
     const result = buildAudioFilters(claims);
-    assert.strictEqual(result[0], "volume=0:enable='between(t,3600,7200)'");
+    assert.strictEqual(result, "volume=0:enable='between(t,3600,7200)'");
   });
 
   it('should handle zero duration claims', () => {
@@ -92,10 +90,10 @@ describe('buildAudioFilters', () => {
       },
     ];
     const result = buildAudioFilters(claims);
-    assert.strictEqual(result[0], "volume=0:enable='between(t,50,50)'");
+    assert.strictEqual(result, "volume=0:enable='between(t,50,50)'");
   });
 
-  it('should handle multiple claims of same type', () => {
+  it('should chain multiple claims with + operator', () => {
     const claims = [
       {
         matchType: CLAIM_MATCH_TYPES.AUDIO,
@@ -107,9 +105,7 @@ describe('buildAudioFilters', () => {
       },
     ];
     const result = buildAudioFilters(claims);
-    assert.strictEqual(result.length, 2);
-    assert.strictEqual(result[0], "volume=0:enable='between(t,100,200)'");
-    assert.strictEqual(result[1], "volume=0:enable='between(t,300,400)'");
+    assert.strictEqual(result, "volume=0:enable='between(t,100,200)+between(t,300,400)'");
   });
 });
 

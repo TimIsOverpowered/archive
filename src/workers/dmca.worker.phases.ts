@@ -365,7 +365,7 @@ export async function processDmcaClaims(ctx: DmcaProcessorContext): Promise<void
     if (ctx.processedPath !== ctx.filePath) ctx.tempFiles.push(ctx.processedPath);
     ctx.processedPath = blackoutedPath;
     markClaimsCompleted(blackoutClaims);
-    if (muteFilters.length > 0) {
+    if (muteFilters !== '') {
       markClaimsCompleted(muteClaims);
     }
     sendAlert('visual-claims-complete');

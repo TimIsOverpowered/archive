@@ -73,8 +73,8 @@ export interface MuteFilterResult {
   endTime: number;
 }
 
-export function buildAudioFilters(claims: DMCAClaim[]): string[] {
-  const muteSection: string[] = [];
+export function buildAudioFilters(claims: DMCAClaim[]): string {
+  const betweenExpressions: string[] = [];
 
   for (const claim of claims) {
     if (claim.matchType !== CLAIM_MATCH_TYPE_AUDIO && claim.matchType !== CLAIM_MATCH_TYPE_AUDIOVISUAL) continue;
@@ -82,10 +82,12 @@ export function buildAudioFilters(claims: DMCAClaim[]): string[] {
     const startTime = claim.videoSegment.startMillis / 1000;
     const endTime = claim.videoSegment.endMillis / 1000;
 
-    muteSection.push(`volume=0:enable='between(t,${startTime},${endTime})'`);
+    betweenExpressions.push(`between(t,${startTime},${endTime})`);
   }
 
-  return muteSection;
+  if (betweenExpressions.length === 0) return '';
+
+  return `volume=0:enable='${betweenExpressions.join('+')}'`;
 }
 
 export interface BlackoutSection {
@@ -98,7 +100,7 @@ export interface BlackoutProgressOptions {
   onProgress?: (percent: number) => void;
   onStep?: (step: string, current: number, total: number) => void;
   onStart?: (cmd: string) => void;
-  audioFilters?: string[];
+  audioFilters?: string;
 }
 
 /**
