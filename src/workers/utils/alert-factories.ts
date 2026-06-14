@@ -569,6 +569,7 @@ export function createDmcaWorkerAlerts(): DmcaWorkerAlerts {
 
 export interface CopyWorkerAlerts {
   init: (vodId: string, sourcePath: string, destPath: string, fileSize: number) => RichEmbedData;
+  initHlsCopy: (vodId: string, sourcePath: string, destPath: string, segmentCount: number) => RichEmbedData;
   progress: (
     vodId: string,
     percent: number,
@@ -591,6 +592,19 @@ export function createCopyWorkerAlerts(): CopyWorkerAlerts {
       fields: [
         { name: 'VOD ID', value: vodId, inline: true },
         { name: 'Size', value: formatBytes(fileSize), inline: true },
+        { name: 'Source', value: sourcePath, inline: false },
+        { name: 'Destination', value: destPath, inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+    }),
+
+    initHlsCopy: (vodId, sourcePath, destPath, segmentCount) => ({
+      title: `📋 Copying ${vodId}`,
+      description: `Copying ${segmentCount} segments to tmpPath for processing`,
+      status: 'warning',
+      fields: [
+        { name: 'VOD ID', value: vodId, inline: true },
+        { name: 'Segments', value: String(segmentCount), inline: true },
         { name: 'Source', value: sourcePath, inline: false },
         { name: 'Destination', value: destPath, inline: false },
       ],

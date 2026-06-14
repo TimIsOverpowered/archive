@@ -137,35 +137,20 @@ async function copyHlsDirectory(ctx: CopyFileProcessorContext): Promise<CopyFile
   const { job, log, vodId, sourcePath, destPath } = ctx;
   const alerts = createCopyWorkerAlerts();
 
+  const startTime = Date.now();
+  const sourceEntries = await fsPromises.readdir(sourcePath);
+  const segmentCount = sourceEntries.length;
+
   let messageId: string | null = null;
   if (isAlertsEnabled()) {
-    messageId = await initRichAlert(alerts.init(vodId, sourcePath, destPath, 0));
+    messageId = await initRichAlert(alerts.initHlsCopy(vodId, sourcePath, destPath, segmentCount));
   }
 
   await fsPromises.mkdir(destPath, { recursive: true });
 
-  const startTime = Date.now();
-  const totalSize = await getDirSize(sourcePath);
-  let bytesCopied = 0;
-  let lastBucket = -1;
-
   await fsPromises.cp(sourcePath, destPath, { recursive: true, force: true });
 
-  const entries = await fsPromises.readdir(sourcePath);
-  for (const entry of entries) {
-    const stat = await fsPromises.stat(path.join(sourcePath, entry));
-    bytesCopied += stat.size;
-    const percent = Math.min(Math.round((bytesCopied / totalSize) * 100), 100);
-    void job.updateProgress(percent).catch(() => {});
-
-    const bucket = Math.floor(percent / 25) * 25;
-    if (bucket > lastBucket && messageId != null) {
-      lastBucket = bucket;
-      safeUpdateAlert(messageId, alerts.progress(vodId, percent, bytesCopied, totalSize, 0, 0), log, vodId);
-    }
-  }
-
-  log.info({ sourcePath, destPath, totalSize }, 'HLS directory copied to tmp path');
+  log.info({ sourcePath, destPath, segmentCount }, 'HLS directory copied to tmp path');
 
   // Convert HLS to MP4 in-place on local SSD
   const m3u8Path = path.join(destPath, `${vodId}.m3u8`);
@@ -201,25 +186,6 @@ async function copyHlsDirectory(ctx: CopyFileProcessorContext): Promise<CopyFile
   }
 
   return { success: true, filePath: mp4Path };
-}
-
-async function getDirSize(dir: string): Promise<number> {
-  let size = 0;
-  const entries = await fsPromises.readdir(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      size += await getDirSize(fullPath);
-    } else {
-      try {
-        const stat = await fsPromises.stat(fullPath);
-        size += stat.size;
-      } catch {
-        /* ignore */
-      }
-    }
-  }
-  return size;
 }
 
 export default copyFileProcessor;
