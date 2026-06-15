@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated: June 2, 2026**
+**Last updated: June 15, 2026**
 
 ## Overview
 
@@ -65,6 +65,20 @@ Content creators may also revoke this application's access to their YouTube acco
 **[https://myaccount.google.com/permissions](https://myaccount.google.com/permissions)**
 
 Find the application and click "Remove Access." This will immediately invalidate all stored OAuth tokens.
+
+---
+
+## Data Protection and Security
+
+We take the security of Google user data seriously and have implemented the following safeguards:
+
+- **Encryption in transit:** All communication with the YouTube Data API and Google OAuth endpoints occurs exclusively over HTTPS/TLS.
+- **Encryption at rest:** OAuth access tokens and refresh tokens are encrypted before being stored in our PostgreSQL database.
+- **Access controls:** Access to the production database and stored credentials is restricted to the application's backend service and authorized administrators only. No third party has access to this data.
+- **Minimal data retention:** We only store the data necessary to perform uploads on behalf of each creator (see "Data Retention and Deletion" above), and tokens are deleted immediately upon a creator's revocation or deletion request.
+- **Secure infrastructure:** The application and database are hosted on infrastructure with standard security hardening, including firewall rules limiting access to required services only.
+
+These measures are designed to protect the confidentiality, integrity, and availability of Google user data accessed through the YouTube API Services.
 
 ---
 
