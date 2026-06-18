@@ -153,6 +153,8 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
     return defaultShouldRetry(error, attempt);
   };
 
+  const retryAfterHeader = { value: 0 };
+
   try {
     const result = await retryWithBackoff(
       async () => {
@@ -173,6 +175,19 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
         }
 
         const response = await undiciRequest(urlStr, undiciOpts);
+
+        if (response.statusCode === 429) {
+          const rawHeader = response.headers['retry-after'];
+          if (rawHeader != null && rawHeader !== '') {
+            const value = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+            if (value != null && value !== '') {
+              const parsed = parseInt(value, 10);
+              if (!isNaN(parsed)) {
+                retryAfterHeader.value = Math.max(parsed, 1);
+              }
+            }
+          }
+        }
 
         if (response.statusCode < 200 || response.statusCode >= 300) {
           throw new HttpError(
@@ -212,6 +227,14 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
         baseDelayMs: retryOptions?.baseDelayMs ?? Http.DEFAULT_BASE_DELAY_MS,
         maxDelayMs: retryOptions?.maxDelayMs ?? Http.DEFAULT_MAX_DELAY_MS,
         shouldRetry,
+        getDelayOverride: (_error, _attempt) => {
+          if (retryAfterHeader.value > 0) {
+            const override = retryAfterHeader.value * 1000;
+            retryAfterHeader.value = 0;
+            return override;
+          }
+          return null;
+        },
       }
     );
 

@@ -155,6 +155,14 @@ export const Logs = {
 export const DiscordAlert = {
   /** Max characters for embedded field values */
   FIELD_VALUE_TRUNCATE: 500,
+  /** Retry attempts for Discord webhook requests */
+  WEBHOOK_RETRY_ATTEMPTS: 6,
+  /** Base delay for Discord webhook retries (ms) */
+  WEBHOOK_RETRY_BASE_DELAY_MS: 2_000,
+  /** Max delay for Discord webhook retries (ms) */
+  WEBHOOK_RETRY_MAX_DELAY_MS: 30_000,
+  /** Max concurrent in-flight requests per webhook URL */
+  WEBHOOK_CONCURRENCY: 1,
 } as const;
 
 // ── Token Health ─────────────────────────────────────────────────────────────

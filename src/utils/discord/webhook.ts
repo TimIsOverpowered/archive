@@ -1,4 +1,5 @@
 import { getDiscordAlertWebhookUrl } from '../../config/env.js';
+import { DiscordAlert } from '../../constants.js';
 import { extractErrorDetails } from '../error.js';
 import { request } from '../http-client.js';
 import { getLogger } from '../logger.js';
@@ -9,6 +10,48 @@ function getUpdateUrl(webhookUrl: string, messageId: string): string {
   const url = new URL(webhookUrl);
   url.pathname = `${url.pathname}/messages/${messageId}`;
   return url.toString();
+}
+
+type PendingTask = {
+  resolve: () => void;
+  reject: (err: unknown) => void;
+};
+
+const messageQueues = new Map<string, PendingTask[]>();
+
+async function serializeByMessage(messageId: string, fn: () => Promise<void>): Promise<void> {
+  let queue = messageQueues.get(messageId);
+  if (!queue) {
+    queue = [];
+    messageQueues.set(messageId, queue);
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const task = { resolve, reject };
+    if (queue.length === 0) {
+      void (async () => {
+        try {
+          await fn();
+          task.resolve();
+        } catch (err) {
+          task.reject(err);
+        }
+        while (queue.length > 0) {
+          const task = queue.shift();
+          if (!task) continue;
+          try {
+            await fn();
+            task.resolve();
+          } catch (err) {
+            task.reject(err);
+          }
+        }
+        messageQueues.delete(messageId);
+      })();
+    } else {
+      queue.push(task);
+    }
+  });
 }
 
 export async function sendDiscordAlert(message: string): Promise<string | null> {
@@ -89,9 +132,16 @@ export async function updateDiscordEmbed(messageId: string, data: RichEmbedData)
     const updateUrl = getUpdateUrl(webhookUrl, messageId);
     const embed = constructEmbed(data);
 
-    await request(updateUrl, {
-      method: 'PATCH',
-      body: { embeds: [embed] },
+    await serializeByMessage(messageId, async () => {
+      await request(updateUrl, {
+        method: 'PATCH',
+        body: { embeds: [embed] },
+        retryOptions: {
+          attempts: DiscordAlert.WEBHOOK_RETRY_ATTEMPTS,
+          baseDelayMs: DiscordAlert.WEBHOOK_RETRY_BASE_DELAY_MS,
+          maxDelayMs: DiscordAlert.WEBHOOK_RETRY_MAX_DELAY_MS,
+        },
+      });
     });
   } catch (err) {
     getLogger().error(extractErrorDetails(err), 'Failed to update Discord embed');
