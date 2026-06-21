@@ -100,6 +100,22 @@ export interface BlackoutSection {
   endSeconds: number;
 }
 
+export function mergeBlackoutSections(sections: BlackoutSection[]): BlackoutSection[] {
+  if (sections.length === 0) return [];
+  const sorted = [...sections].sort((a, b) => a.startSeconds - b.startSeconds);
+  const merged: BlackoutSection[] = [sorted[0] as BlackoutSection];
+  for (const current of sorted.slice(1)) {
+    const last = merged[merged.length - 1] as BlackoutSection;
+    if (current.startSeconds <= last.endSeconds) {
+      last.endSeconds = Math.max(last.endSeconds, current.endSeconds);
+      last.durationSeconds = last.endSeconds - last.startSeconds;
+    } else {
+      merged.push({ ...current });
+    }
+  }
+  return merged;
+}
+
 export interface BlackoutProgressOptions {
   onProgress?: (percent: number) => void;
   onStep?: (step: string, current: number, total: number) => void;
@@ -129,14 +145,14 @@ export async function blackoutVideoSections(
 
   const totalDuration = meta.duration;
 
-  const sorted = [...sections].sort((a, b) => a.startSeconds - b.startSeconds);
+  const merged = mergeBlackoutSections(sections);
   const tempFiles: string[] = [];
   const segmentFiles: string[] = [];
   let prevEnd = 0;
 
   // Calculate total steps: for each section (extract if gap + black gen) + trailing extract + final concat
   let totalSteps = 0;
-  for (const section of sorted) {
+  for (const section of merged) {
     if (section.startSeconds > prevEnd) totalSteps++;
     totalSteps++;
     prevEnd = section.endSeconds;
@@ -156,7 +172,7 @@ export async function blackoutVideoSections(
 
   try {
     prevEnd = 0;
-    for (const section of sorted) {
+    for (const section of merged) {
       if (section.startSeconds > prevEnd) {
         const dur = section.startSeconds - prevEnd;
         const file = path.join(workDir, `${vodId}-seg-normal-${prevEnd}.ts`);

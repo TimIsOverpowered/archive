@@ -1,6 +1,11 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { buildAudioFilters, CLAIM_MATCH_TYPES, cleanupTempFiles } from '../../../src/workers/dmca/dmca.js';
+import {
+  buildAudioFilters,
+  CLAIM_MATCH_TYPES,
+  cleanupTempFiles,
+  mergeBlackoutSections,
+} from '../../../src/workers/dmca/dmca.js';
 
 describe('buildAudioFilters', () => {
   it('should build mute filters for AUDIO claims', () => {
@@ -122,5 +127,98 @@ describe('cleanupTempFiles', () => {
   it('should handle non-existent files gracefully', async () => {
     const uniquePath = `/tmp/nonexistent-file-${Date.now()}.mp4`;
     await assert.doesNotReject(cleanupTempFiles([uniquePath]));
+  });
+});
+
+describe('mergeBlackoutSections', () => {
+  it('should merge fully overlapping sections', () => {
+    const sections: Array<{ startSeconds: number; durationSeconds: number; endSeconds: number }> = [
+      { startSeconds: 100, durationSeconds: 100, endSeconds: 200 },
+      { startSeconds: 120, durationSeconds: 60, endSeconds: 180 },
+    ];
+    const result = mergeBlackoutSections(sections);
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0]!.startSeconds, 100);
+    assert.strictEqual(result[0]!.endSeconds, 200);
+    assert.strictEqual(result[0]!.durationSeconds, 100);
+  });
+
+  it('should merge partially overlapping sections', () => {
+    const sections: Array<{ startSeconds: number; durationSeconds: number; endSeconds: number }> = [
+      { startSeconds: 100, durationSeconds: 80, endSeconds: 180 },
+      { startSeconds: 150, durationSeconds: 100, endSeconds: 250 },
+    ];
+    const result = mergeBlackoutSections(sections);
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0]!.startSeconds, 100);
+    assert.strictEqual(result[0]!.endSeconds, 250);
+    assert.strictEqual(result[0]!.durationSeconds, 150);
+  });
+
+  it('should merge contiguous sections', () => {
+    const sections: Array<{ startSeconds: number; durationSeconds: number; endSeconds: number }> = [
+      { startSeconds: 100, durationSeconds: 100, endSeconds: 200 },
+      { startSeconds: 200, durationSeconds: 80, endSeconds: 280 },
+    ];
+    const result = mergeBlackoutSections(sections);
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0]!.startSeconds, 100);
+    assert.strictEqual(result[0]!.endSeconds, 280);
+    assert.strictEqual(result[0]!.durationSeconds, 180);
+  });
+
+  it('should leave non-overlapping sections unchanged', () => {
+    const sections: Array<{ startSeconds: number; durationSeconds: number; endSeconds: number }> = [
+      { startSeconds: 100, durationSeconds: 50, endSeconds: 150 },
+      { startSeconds: 200, durationSeconds: 50, endSeconds: 250 },
+    ];
+    const result = mergeBlackoutSections(sections);
+    assert.strictEqual(result.length, 2);
+    assert.strictEqual(result[0]!.startSeconds, 100);
+    assert.strictEqual(result[0]!.endSeconds, 150);
+    assert.strictEqual(result[1]!.startSeconds, 200);
+    assert.strictEqual(result[1]!.endSeconds, 250);
+  });
+
+  it('should handle empty array', () => {
+    const result = mergeBlackoutSections([]);
+    assert.strictEqual(result.length, 0);
+  });
+
+  it('should handle single section', () => {
+    const sections = [{ startSeconds: 100, durationSeconds: 50, endSeconds: 150 }];
+    const result = mergeBlackoutSections(sections);
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0]!.startSeconds, 100);
+    assert.strictEqual(result[0]!.endSeconds, 150);
+  });
+
+  it('should handle reverse-sorted input', () => {
+    const sections: Array<{ startSeconds: number; durationSeconds: number; endSeconds: number }> = [
+      { startSeconds: 200, durationSeconds: 50, endSeconds: 250 },
+      { startSeconds: 100, durationSeconds: 100, endSeconds: 200 },
+    ];
+    const result = mergeBlackoutSections(sections);
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0]!.startSeconds, 100);
+    assert.strictEqual(result[0]!.endSeconds, 250);
+  });
+
+  it('should handle multiple separate groups', () => {
+    const sections: Array<{ startSeconds: number; durationSeconds: number; endSeconds: number }> = [
+      { startSeconds: 100, durationSeconds: 100, endSeconds: 200 },
+      { startSeconds: 150, durationSeconds: 50, endSeconds: 200 },
+      { startSeconds: 300, durationSeconds: 50, endSeconds: 350 },
+      { startSeconds: 320, durationSeconds: 80, endSeconds: 400 },
+      { startSeconds: 500, durationSeconds: 50, endSeconds: 550 },
+    ];
+    const result = mergeBlackoutSections(sections);
+    assert.strictEqual(result.length, 3);
+    assert.strictEqual(result[0]!.startSeconds, 100);
+    assert.strictEqual(result[0]!.endSeconds, 200);
+    assert.strictEqual(result[1]!.startSeconds, 300);
+    assert.strictEqual(result[1]!.endSeconds, 400);
+    assert.strictEqual(result[2]!.startSeconds, 500);
+    assert.strictEqual(result[2]!.endSeconds, 550);
   });
 });
