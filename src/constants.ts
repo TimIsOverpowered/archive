@@ -226,6 +226,16 @@ export const Http = {
   TENANT_STAGGER_MS: 500,
 } as const;
 
+// ── HTTP / Persistent Connection Pools ───────────────────────────────────────
+export const HttpPools = {
+  /** Max persistent connections for Twitch GraphQL API (chapters, comments, tokens) */
+  TWITCH_GQL_MAX_CONNECTIONS: 200,
+  /** Max persistent connections for Twitch Helix REST API + Usher (HLS playlists) */
+  TWITCH_API_MAX_CONNECTIONS: 200,
+  /** Max persistent connections for Discord webhook alerts */
+  DISCORD_MAX_CONNECTIONS: 20,
+} as const;
+
 // ── HTTP / Server ────────────────────────────────────────────────────────────
 export const Server = {
   /** 25MB request body limit */

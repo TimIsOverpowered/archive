@@ -1,5 +1,5 @@
-import { Agent, request as undiciRequest, type Dispatcher } from 'undici';
-import { Http } from '../constants.js';
+import { Agent, Pool, request as undiciRequest, type Dispatcher } from 'undici';
+import { Http, HttpPools } from '../constants.js';
 import { DownloadAbortedError } from './domain-errors.js';
 import { extractErrorDetails } from './error.js';
 import { HttpError } from './http-error.js';
@@ -47,8 +47,34 @@ export const segmentDownloadAgent = new Agent({
   pipelining: Http.SEGMENT_DOWNLOAD_PIPELINING,
 });
 
-/** Default undici agent for general API requests (avoids per-request dispatcher overhead). */
-export const defaultHttpClient = new Agent({ connectTimeout: Http.CONNECT_TIMEOUT_MS });
+/** Persistent pool for Twitch GraphQL API — handles chapters, comments, playback tokens. */
+const twitchGqlPool = new Pool('https://gql.twitch.tv', {
+  connections: HttpPools.TWITCH_GQL_MAX_CONNECTIONS,
+  pipelining: 1,
+});
+
+/** Persistent pool for Twitch Helix REST API + Usher (HLS playlists). */
+const twitchApiPool = new Pool('https://api.twitch.tv', {
+  connections: HttpPools.TWITCH_API_MAX_CONNECTIONS,
+  pipelining: 1,
+});
+
+/** Persistent pool for Discord webhook alerts. */
+const discordPool = new Pool('https://discord.com', {
+  connections: HttpPools.DISCORD_MAX_CONNECTIONS,
+  pipelining: 1,
+});
+
+/** Default undici agent for all other origins (emotes, Cloudflare, id.twitch.tv, etc.). */
+const defaultAgent = new Agent({ connectTimeout: Http.CONNECT_TIMEOUT_MS });
+
+function resolveDispatcher(url: string): Dispatcher {
+  const origin = new URL(url).origin;
+  if (origin === 'https://gql.twitch.tv') return twitchGqlPool;
+  if (origin === 'https://api.twitch.tv' || origin === 'https://usher.ttvnw.net') return twitchApiPool;
+  if (origin === 'https://discord.com') return discordPool;
+  return defaultAgent;
+}
 
 const SENSITIVE_PARAM_PATTERNS = [/^nauthsig$/i, /^nauth$/i, /token/i, /secret/i, /_key$/i];
 
@@ -124,12 +150,12 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
     dispatcher,
   } = options ?? {};
 
-  const effectiveDispatcher = dispatcher ?? defaultHttpClient;
-
-  const actualResponseType = responseType ?? ('json' as R);
-
   const urlStr = url.toString();
   const scrubbedUrl = scrubSensitiveParams(urlStr);
+
+  const effectiveDispatcher = dispatcher ?? resolveDispatcher(urlStr);
+
+  const actualResponseType = responseType ?? ('json' as R);
   const startTime = Date.now();
 
   const { body: preparedBody, headers: finalHeaders } = prepareBodyAndHeaders(body, customHeaders);
