@@ -117,7 +117,7 @@ export async function validateCloudflareRequest(request: {
 
   const cfIp = request.headers['cf-connecting-ip'] as string | undefined;
   if (cfIp == null || cfIp === '') {
-    return true;
+    return false;
   }
 
   const ranges = await getCloudflareIpRanges();
