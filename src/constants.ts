@@ -185,6 +185,7 @@ export const Twitch = {
   TOKEN_URL: 'https://id.twitch.tv/oauth2/token',
   USHER_BASE_URL: 'https://usher.ttvnw.net/vod',
   USHER_V2_BASE_URL: 'https://usher.ttvnw.net/vod/v2',
+  USHER_ORIGIN: 'https://usher.ttvnw.net',
   GQL_CLIENT_ID: 'kimne78kx3ncx6brgo4mv6wki5h1ko',
   BACKUP_GQL_CLIENT_ID: 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
   /** Max user_id query params per /streams request. */
@@ -222,6 +223,8 @@ export const Http = {
   SEGMENT_DOWNLOAD_PIPELINING: 1,
   /** TCP connect timeout for default HTTP agent */
   CONNECT_TIMEOUT_MS: 30_000,
+  /** Keep-alive timeout for persistent connection pools */
+  KEEP_ALIVE_TIMEOUT_MS: 10_000,
   /** Stagger delay between tenant processing at startup */
   TENANT_STAGGER_MS: 500,
 } as const;
@@ -230,8 +233,10 @@ export const Http = {
 export const HttpPools = {
   /** Max persistent connections for Twitch GraphQL API (chapters, comments, tokens) */
   TWITCH_GQL_MAX_CONNECTIONS: 200,
-  /** Max persistent connections for Twitch Helix REST API + Usher (HLS playlists) */
+  /** Max persistent connections for Twitch Helix REST API */
   TWITCH_API_MAX_CONNECTIONS: 200,
+  /** Max persistent connections for Twitch Usher (HLS playlists) */
+  TWITCH_USHER_MAX_CONNECTIONS: 200,
   /** Max persistent connections for Discord webhook alerts */
   DISCORD_MAX_CONNECTIONS: 20,
 } as const;
