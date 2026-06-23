@@ -273,9 +273,8 @@ export async function fetchTwitchPlaylist(
     const hashMatch = firstVariant.uri.match(/(?:https?:\/\/[^/]+)\/([^/]+)\/[^/]+\/index-/);
     const hash = hashMatch?.[1] ?? null;
     const suffix = firstVariant.uri.split('/').pop();
-    bestVariantUrl = domain != null && hash != null && suffix != null
-      ? `${domain}/${hash}/chunked/${suffix}`
-      : firstVariant.uri;
+    bestVariantUrl =
+      domain != null && hash != null && suffix != null ? `${domain}/${hash}/chunked/${suffix}` : firstVariant.uri;
   }
 
   let baseURL: string = '';
