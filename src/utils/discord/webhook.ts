@@ -68,6 +68,7 @@ export async function sendDiscordAlert(message: string): Promise<string | null> 
     const data = await request<{ id?: string }>(`${webhookUrl}?wait=true`, {
       method: 'POST',
       body: { content: message },
+      timeoutMs: DiscordAlert.WEBHOOK_TIMEOUT_MS,
     });
 
     if (data.id != null && data.id !== '') {
@@ -106,6 +107,7 @@ export async function sendRichAlert(data: RichEmbedData): Promise<string | null>
     const responseData = await request<{ id?: string }>(`${webhookUrl}?wait=true`, {
       method: 'POST',
       body: payload,
+      timeoutMs: DiscordAlert.WEBHOOK_TIMEOUT_MS,
     });
 
     if (responseData.id != null && responseData.id !== '') {
@@ -136,6 +138,7 @@ export async function updateDiscordEmbed(messageId: string, data: RichEmbedData)
       await request(updateUrl, {
         method: 'PATCH',
         body: { embeds: [embed] },
+        timeoutMs: DiscordAlert.WEBHOOK_TIMEOUT_MS,
         retryOptions: {
           attempts: DiscordAlert.WEBHOOK_RETRY_ATTEMPTS,
           baseDelayMs: DiscordAlert.WEBHOOK_RETRY_BASE_DELAY_MS,

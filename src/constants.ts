@@ -163,6 +163,8 @@ export const DiscordAlert = {
   WEBHOOK_RETRY_MAX_DELAY_MS: 30_000,
   /** Max concurrent in-flight requests per webhook URL */
   WEBHOOK_CONCURRENCY: 1,
+  /** Discord webhook request timeout */
+  WEBHOOK_TIMEOUT_MS: 30_000,
 } as const;
 
 // ── Token Health ─────────────────────────────────────────────────────────────
@@ -192,6 +194,8 @@ export const Twitch = {
   REDIS_LOCK_KEY: 'twitch:token:refreshing',
   /** Lock TTL in seconds */
   LOCK_TTL: 30,
+  /** Twitch GraphQL request timeout */
+  GQL_TIMEOUT_MS: 30_000,
 } as const;
 
 // ── Emote APIs ───────────────────────────────────────────────────────────────
@@ -215,6 +219,10 @@ export const Http = {
    */
   SEGMENT_DOWNLOAD_MAX_CONNECTIONS: 5000,
   SEGMENT_DOWNLOAD_PIPELINING: 1,
+  /** TCP connect timeout for default HTTP agent */
+  CONNECT_TIMEOUT_MS: 30_000,
+  /** Stagger delay between tenant processing at startup */
+  TENANT_STAGGER_MS: 500,
 } as const;
 
 // ── HTTP / Server ────────────────────────────────────────────────────────────

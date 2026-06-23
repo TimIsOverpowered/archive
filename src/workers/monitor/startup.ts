@@ -1,7 +1,7 @@
 import { configService } from '../../config/tenant-config.js';
 import type { TenantConfig } from '../../config/types.js';
 import { requirePlatformConfig } from '../../config/types.js';
-import { Monitor } from '../../constants.js';
+import { Http, Monitor } from '../../constants.js';
 import { PLATFORMS, PLATFORM_VALUES } from '../../types/platforms.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { getLogger } from '../../utils/logger.js';
@@ -67,8 +67,12 @@ export async function registerAllMonitorRepeatJobs(): Promise<void> {
     await registerTwitchBatchMonitorJob();
   }
 
-  const perTenantJobs = nonTwitchOnlyTenants.map((config) => registerMonitorRepeatJob(config));
-  await Promise.all(perTenantJobs);
+  for (const config of nonTwitchOnlyTenants) {
+    await registerMonitorRepeatJob(config);
+    if (config !== nonTwitchOnlyTenants[nonTwitchOnlyTenants.length - 1]) {
+      await new Promise((r) => setTimeout(r, Http.TENANT_STAGGER_MS));
+    }
+  }
 
   getLogger().info(
     { twitchBatch: twitchTenants.length, perTenant: nonTwitchOnlyTenants.length },

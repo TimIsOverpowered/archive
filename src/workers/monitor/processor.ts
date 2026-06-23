@@ -2,7 +2,7 @@ import { Processor, Job } from 'bullmq';
 import { configService } from '../../config/tenant-config.js';
 import { requirePlatformConfig } from '../../config/types.js';
 import type { TenantConfig } from '../../config/types.js';
-import { Jobs } from '../../constants.js';
+import { Http, Jobs } from '../../constants.js';
 import { findActiveLiveVod } from '../../db/queries/vods.js';
 import { getTwitchStreamStatusBatch, type TwitchStreamStatus } from '../../services/twitch/live.js';
 import { PLATFORMS, PLATFORM_VALUES } from '../../types/platforms.js';
@@ -62,7 +62,10 @@ async function processTwitchBatchJob(job: Job<MonitorJob>): Promise<{ success: t
 
   const streamMap = await getTwitchStreamStatusBatch(userIds);
 
-  for (const { cfg, platformUserId } of twitchEntries) {
+  for (const [index, { cfg, platformUserId }] of twitchEntries.entries()) {
+    if (index > 0) {
+      await new Promise((r) => setTimeout(r, Http.TENANT_STAGGER_MS));
+    }
     await processTenantWithStreamStatus(cfg, streamMap.get(platformUserId) ?? null, liveQueue);
   }
 

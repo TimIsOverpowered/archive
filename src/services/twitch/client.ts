@@ -60,7 +60,7 @@ export function createTwitchGqlClient(
           'Content-Type': 'text/plain;charset=UTF-8',
         },
         body,
-        timeoutMs: 10000,
+        timeoutMs: Twitch.GQL_TIMEOUT_MS,
         logContext: tenantId != null ? { tenantId } : undefined,
         parseReviver: (key: string, value: unknown) => (key === '__typename' ? undefined : value),
       });

@@ -47,6 +47,9 @@ export const segmentDownloadAgent = new Agent({
   pipelining: Http.SEGMENT_DOWNLOAD_PIPELINING,
 });
 
+/** Default undici agent for general API requests (avoids per-request dispatcher overhead). */
+export const defaultHttpClient = new Agent();
+
 const SENSITIVE_PARAM_PATTERNS = [/^nauthsig$/i, /^nauth$/i, /token/i, /secret/i, /_key$/i];
 
 function isSensitiveParam(name: string): boolean {
@@ -121,6 +124,8 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
     dispatcher,
   } = options ?? {};
 
+  const effectiveDispatcher = dispatcher ?? defaultHttpClient;
+
   const actualResponseType = responseType ?? ('json' as R);
 
   const urlStr = url.toString();
@@ -170,9 +175,7 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
         if (preparedBody !== undefined) {
           undiciOpts.body = preparedBody;
         }
-        if (dispatcher !== undefined) {
-          undiciOpts.dispatcher = dispatcher;
-        }
+        undiciOpts.dispatcher = effectiveDispatcher;
 
         const response = await undiciRequest(urlStr, undiciOpts);
 
