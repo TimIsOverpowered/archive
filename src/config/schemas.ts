@@ -223,10 +223,24 @@ export const GameUpsertSchema = z.object({
 export const EmoteUpsertSchema = z.object({
   /** VOD ID (integer) */
   vod_id: z.number(),
-  /** Frazzel emotes (id as string, code as string) */
-  ffz_emotes: z.array(z.object({ id: z.string(), code: z.string() })).default([]),
-  /** BetterTTV emotes (id as string, code as string) */
-  bttv_emotes: z.array(z.object({ id: z.string(), code: z.string() })).default([]),
+  /** FFZ emotes (id as string, code as string) */
+  ffz_emotes: z
+    .array(z.object({ id: z.string(), code: z.string(), width: z.number().optional(), height: z.number().optional() }))
+    .default([]),
+  /** BTTV emotes (id as string, code as string) */
+  bttv_emotes: z
+    .array(z.object({ id: z.string(), code: z.string(), width: z.number().optional(), height: z.number().optional() }))
+    .default([]),
   /** 7TV emotes (id, code from name, optional flags) */
-  seventv_emotes: z.array(z.object({ id: z.string(), code: z.string(), flags: z.number().optional() })).default([]),
+  seventv_emotes: z
+    .array(
+      z.object({
+        id: z.string(),
+        code: z.string(),
+        flags: z.number().optional(),
+        width: z.number().optional(),
+        height: z.number().optional(),
+      })
+    )
+    .default([]),
 });

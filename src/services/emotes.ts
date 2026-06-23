@@ -16,6 +16,20 @@ export interface EmoteData {
   id: string;
   code: string;
   flags?: number;
+  width?: number;
+  height?: number;
+}
+
+function buildEmote(
+  id: string,
+  code: string,
+  opts: { width?: number | undefined; height?: number | undefined; flags?: number | undefined }
+): EmoteData {
+  const result: EmoteData = { id, code };
+  if (opts.flags != null) result.flags = opts.flags;
+  if (opts.width != null) result.width = opts.width;
+  if (opts.height != null) result.height = opts.height;
+  return result;
 }
 
 /** Emotes aggregated for a VOD from all third-party providers. */
@@ -29,6 +43,8 @@ export interface VodEmotes {
 interface FFZEmoticon {
   id: number;
   name: string;
+  width: number;
+  height: number;
 }
 
 interface FFZResponse {
@@ -41,6 +57,8 @@ interface FFZResponse {
 interface BTTVEmote {
   id: string;
   code: string;
+  width?: number;
+  height?: number;
 }
 
 interface BTTVChannelResponse {
@@ -48,10 +66,25 @@ interface BTTVChannelResponse {
   sharedEmotes?: BTTVEmote[];
 }
 
+interface SevenTVEmoteFile {
+  name: string;
+  width: number;
+  height: number;
+}
+
+interface SevenTVEmoteHost {
+  files: SevenTVEmoteFile[];
+}
+
+interface SevenTVEmoteData {
+  host: SevenTVEmoteHost;
+}
+
 interface SevenTVEmote {
   id: string;
   name: string;
   flags: number;
+  data: SevenTVEmoteData;
 }
 
 interface SevenTVResponse {
@@ -99,17 +132,23 @@ export async function fetchAndSaveEmotes(
     ]);
 
     const ffzSetKey = ffzRes.room?.set ?? null;
-    ffzEmotes = (ffzSetKey != null ? (ffzRes.sets?.[ffzSetKey]?.emoticons ?? []) : []).map((e) => ({
-      id: String(e.id),
-      code: e.name,
-    }));
+    ffzEmotes = (ffzSetKey != null ? (ffzRes.sets?.[ffzSetKey]?.emoticons ?? []) : []).map((e) =>
+      buildEmote(String(e.id), e.name, { width: e.width, height: e.height })
+    );
 
     bttvEmotes = [
-      ...(bttvChannelRes.channelEmotes ?? []).map(({ id, code }) => ({ id, code })),
-      ...(bttvChannelRes.sharedEmotes ?? []).map(({ id, code }) => ({ id, code })),
+      ...(bttvChannelRes.channelEmotes ?? []).map(({ id, code, width, height }) =>
+        buildEmote(id, code, { width, height })
+      ),
+      ...(bttvChannelRes.sharedEmotes ?? []).map(({ id, code, width, height }) =>
+        buildEmote(id, code, { width, height })
+      ),
     ];
 
-    sevenTvEmotes = (sevenTvRes.emote_set?.emotes ?? []).map((e) => ({ id: e.id, code: e.name, flags: e.flags }));
+    sevenTvEmotes = (sevenTvRes.emote_set?.emotes ?? []).map((e) => {
+      const baseFile = e.data.host.files.find((f) => f.name.startsWith('1x'));
+      return buildEmote(e.id, e.name, { flags: e.flags, width: baseFile?.width, height: baseFile?.height });
+    });
   } catch (error) {
     getLogger().warn({ error: extractErrorDetails(error).message, vodId }, 'Failed to fetch emote data');
     return;

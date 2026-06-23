@@ -47,6 +47,8 @@ export interface EmoteData {
   id: string;
   code: string;
   flags?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface EmotesTable {
