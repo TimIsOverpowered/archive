@@ -94,7 +94,8 @@ export async function getM3u8(
   }
 ): Promise<string> {
   const codecs = encodeURIComponent('av1,h265,h264');
-  const url = `${Twitch.USHER_BASE_URL}/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=${codecs}&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}`;
+  const p = Math.floor(Math.random() * 9000000) + 1000000;
+  const url = `${Twitch.USHER_V2_BASE_URL}/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=${codecs}&playlist_include_framerate=true&allow_spectre=true&nauthsig=${sig}&nauth=${token}&platform=web&p=${p}&transcode_mode=cbr_v1`;
 
   return request(url, {
     responseType: 'text',

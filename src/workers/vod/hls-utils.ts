@@ -245,11 +245,37 @@ export async function fetchTwitchPlaylist(
     throw new Error('Failed to parse Twitch master playlist');
   }
 
-  const bestVariantUrl = (parsedMaster as HLS.types.MasterPlaylist).variants?.[0]?.uri;
+  const variants = (parsedMaster as HLS.types.MasterPlaylist).variants ?? [];
 
-  if (bestVariantUrl == null || bestVariantUrl === '') {
+  if (variants.length === 0) {
     log.error({ vodId }, 'No variant URL found in master playlist');
     throw new Error('No variant URL found in master playlist');
+  }
+
+  const firstVariant = variants[0];
+  if (firstVariant == null) {
+    log.error({ vodId }, 'No variant URL found in master playlist');
+    throw new Error('No variant URL found in master playlist');
+  }
+
+  let bestVariantUrl: string;
+
+  if (firstVariant.uri.includes('/chunked/')) {
+    bestVariantUrl = firstVariant.uri;
+  } else {
+    const domain = (() => {
+      try {
+        return new URL(firstVariant.uri).origin;
+      } catch {
+        return null;
+      }
+    })();
+    const hashMatch = firstVariant.uri.match(/(?:https?:\/\/[^/]+)\/([^/]+)\/[^/]+\/index-/);
+    const hash = hashMatch?.[1] ?? null;
+    const suffix = firstVariant.uri.split('/').pop();
+    bestVariantUrl = domain != null && hash != null && suffix != null
+      ? `${domain}/${hash}/chunked/${suffix}`
+      : firstVariant.uri;
   }
 
   let baseURL: string = '';

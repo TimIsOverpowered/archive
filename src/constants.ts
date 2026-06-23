@@ -184,6 +184,7 @@ export const Twitch = {
   GQL_URL: 'https://gql.twitch.tv/gql',
   TOKEN_URL: 'https://id.twitch.tv/oauth2/token',
   USHER_BASE_URL: 'https://usher.ttvnw.net/vod',
+  USHER_V2_BASE_URL: 'https://usher.ttvnw.net/vod/v2',
   GQL_CLIENT_ID: 'kimne78kx3ncx6brgo4mv6wki5h1ko',
   BACKUP_GQL_CLIENT_ID: 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
   /** Max user_id query params per /streams request. */

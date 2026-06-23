@@ -90,7 +90,8 @@ async function downloadTwitchVodWithFfmpeg(
     throw new Error(`Failed to get token/sig for ${vodId}`);
   }
 
-  const m3u8Url = `${Twitch.USHER_BASE_URL}/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h264,hevc&playlist_include_framerate=true&nauthsig=${tokenSig.signature}&nauth=${tokenSig.value}`;
+  const p = Math.floor(Math.random() * 9000000) + 1000000;
+  const m3u8Url = `${Twitch.USHER_V2_BASE_URL}/${vodId}.m3u8?allow_source=true&player=mediaplayer&include_unavailable=true&supported_codecs=av1,h264,hevc&playlist_include_framerate=true&nauthsig=${tokenSig.signature}&nauth=${tokenSig.value}&platform=web&p=${p}&transcode_mode=cbr_v1`;
 
   const m3u8Content = await request(m3u8Url, {
     responseType: 'text',
