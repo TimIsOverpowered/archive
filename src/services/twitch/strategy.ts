@@ -14,6 +14,7 @@ import type {
 import { getChapters, saveVodChapters } from './chapters.js';
 import { getTwitchStreamStatus, getLatestTwitchVodObject } from './live.js';
 import { getVodData } from './vod.js';
+import type { VodData } from './vod.js';
 
 export const strategy: PlatformStrategy = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
@@ -40,7 +41,12 @@ export const strategy: PlatformStrategy = {
   async fetchVodMetadata(vodId: string, ctx): Promise<PlatformVodMetadata | null> {
     const { tenantId } = ctx;
 
-    const vodData = await getVodData(vodId, { tenantId });
+    let vodData: VodData;
+    try {
+      vodData = await getVodData(vodId, { tenantId });
+    } catch (err) {
+      return null;
+    }
 
     return {
       id: vodData.id,
