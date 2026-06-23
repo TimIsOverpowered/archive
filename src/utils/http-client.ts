@@ -48,7 +48,7 @@ export const segmentDownloadAgent = new Agent({
 });
 
 /** Default undici agent for general API requests (avoids per-request dispatcher overhead). */
-export const defaultHttpClient = new Agent();
+export const defaultHttpClient = new Agent({ connectTimeout: Http.CONNECT_TIMEOUT_MS });
 
 const SENSITIVE_PARAM_PATTERNS = [/^nauthsig$/i, /^nauth$/i, /token/i, /secret/i, /_key$/i];
 
