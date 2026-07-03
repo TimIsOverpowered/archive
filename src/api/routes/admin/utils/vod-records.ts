@@ -3,9 +3,10 @@ import { findVodByPlatformId } from '../../../../db/queries/vods.js';
 import type { InsertableVods, SelectableVods, UpdateableVods } from '../../../../db/streamer-types.js';
 import { publishVodUpdate } from '../../../../services/cache-invalidator.js';
 import { fetchAndSaveEmotes } from '../../../../services/emotes.js';
-import { getStrategy } from '../../../../services/platforms/index.js';
+import { getStrategy, type PlatformVodMetadata } from '../../../../services/platforms/index.js';
 import { saveVodChapters } from '../../../../services/twitch/index.js';
 import { PLATFORMS } from '../../../../types/platforms.js';
+import { extractErrorDetails } from '../../../../utils/error.js';
 import { type AppLogger } from '../../../../utils/logger.js';
 import { triggerChatDownload } from '../../../../workers/jobs/chat.job.js';
 import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
@@ -126,9 +127,14 @@ export async function refreshVodRecord(
 
   log.info({ vodId, platform }, 'Refreshing VOD metadata from platform');
 
-  const vodMetadata = await strategy.fetchVodMetadata(vodId, ctx);
+  let vodMetadata: PlatformVodMetadata | null = null;
+  try {
+    vodMetadata = await strategy.fetchVodMetadata(vodId, ctx);
+  } catch (error) {
+    log.warn({ vodId, platform, error: extractErrorDetails(error).message }, 'Failed to fetch VOD metadata');
+  }
   if (!vodMetadata) {
-    log.warn({ vodId, platform }, 'Failed to fetch VOD metadata');
+    log.warn({ vodId, platform }, 'No VOD metadata returned from platform');
     return null;
   }
 
