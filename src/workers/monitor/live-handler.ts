@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import type { BaseJobOptions } from 'bullmq';
 import type { Kysely } from 'kysely';
 import { getTmpPath } from '../../config/env.js';
 import type { TenantConfig } from '../../config/types.js';
@@ -10,12 +11,16 @@ import type { StreamerDB, InsertableVods, SelectableVods } from '../../db/stream
 import { publishVodUpdate } from '../../services/cache-invalidator.js';
 import { getStrategy, type PlatformStreamStatus, type PlatformVodMetadata } from '../../services/platforms/index.js';
 import type { TwitchStreamStatus } from '../../services/twitch/live.js';
-import { PLATFORMS, type Platform } from '../../types/platforms.js';
+import { markVodOffline as markVodOfflineService } from '../../services/vod-finalization.js';
+import type { TenantContext } from '../../types/context.js';
+import type { Platform } from '../../types/platforms.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
+import { VodNotFoundError } from '../../utils/domain-errors.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { enqueueJobWithLogging } from '../jobs/enqueue.js';
 import type { LiveDownloadJob } from '../jobs/types.js';
 import { defaultJobOptions, getLiveDownloadQueue } from '../queues/queue.js';
+import { getJobContext } from '../utils/job-context.js';
 import { sendStreamLiveAlert } from './alert-helpers.js';
 
 interface LiveStreamContext {
@@ -195,21 +200,67 @@ async function handleOfflineStream(
     }
   }
 
-  let sourceUrl: string | undefined;
-  if (platform === PLATFORMS.KICK) {
-    try {
-      const vodMetadata = await strategy.fetchVodMetadata(activeLiveVod.platform_vod_id, {
-        tenantId,
-        config,
+  const failedJobs = await liveQueue.getJobs(['failed']);
+  const failedJob = failedJobs.find((j) => j.id === jobId);
+
+  if (failedJob) {
+    const maxAttempts = (failedJob.opts as BaseJobOptions).attempts ?? 3;
+    if (failedJob.attemptsMade >= maxAttempts) {
+      log.info(
+        { vodId: activeLiveVod.platform_vod_id, attemptsMade: failedJob.attemptsMade, maxAttempts },
+        'Job exhausted retries — marking VOD offline'
+      );
+      const { db } = await getJobContext(tenantId);
+      await markVodOfflineService({
+        ctx: { tenantId, config, db } satisfies TenantContext,
+        dbId: activeLiveVod.id,
+        vodId: activeLiveVod.platform_vod_id,
         platform,
       });
-      sourceUrl = vodMetadata?.sourceUrl ?? undefined;
-    } catch (error) {
-      log.warn(
-        { vodId: activeLiveVod.platform_vod_id, err: extractErrorDetails(error).message },
-        'Failed to fetch Kick VOD metadata for re-queue'
-      );
+      return;
     }
+    log.debug(
+      { vodId: activeLiveVod.platform_vod_id, attemptsMade: failedJob.attemptsMade, maxAttempts },
+      'Skipping re-queue — job still has retries remaining'
+    );
+    return;
+  }
+
+  let sourceUrl: string | undefined;
+  try {
+    const vodMetadata = await strategy.fetchVodMetadata(activeLiveVod.platform_vod_id, {
+      tenantId,
+      config,
+      platform,
+    });
+    if (vodMetadata == null) {
+      log.info({ vodId: activeLiveVod.platform_vod_id }, 'VOD no longer exists on platform — marking offline');
+      const { db } = await getJobContext(tenantId);
+      await markVodOfflineService({
+        ctx: { tenantId, config, db } satisfies TenantContext,
+        dbId: activeLiveVod.id,
+        vodId: activeLiveVod.platform_vod_id,
+        platform,
+      });
+      return;
+    }
+    sourceUrl = vodMetadata.sourceUrl ?? undefined;
+  } catch (error) {
+    if (error instanceof VodNotFoundError) {
+      log.info({ vodId: activeLiveVod.platform_vod_id }, 'VOD no longer exists on platform — marking offline');
+      const { db } = await getJobContext(tenantId);
+      await markVodOfflineService({
+        ctx: { tenantId, config, db } satisfies TenantContext,
+        dbId: activeLiveVod.id,
+        vodId: activeLiveVod.platform_vod_id,
+        platform,
+      });
+      return;
+    }
+    log.warn(
+      { vodId: activeLiveVod.platform_vod_id, err: extractErrorDetails(error).message },
+      'Failed to fetch VOD metadata for re-queue'
+    );
   }
 
   log.info(

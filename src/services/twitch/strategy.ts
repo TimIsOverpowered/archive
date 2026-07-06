@@ -44,7 +44,7 @@ export const strategy: PlatformStrategy = {
     let vodData: VodData;
     try {
       vodData = await getVodData(vodId, { tenantId });
-    } catch (err) {
+    } catch (_err) {
       return null;
     }
 

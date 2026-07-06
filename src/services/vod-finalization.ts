@@ -17,6 +17,28 @@ export interface FinalizeVodOptions {
 }
 
 /**
+ * Mark a VOD as offline by setting is_live=false and publishing cache updates.
+ * Used when a stream ends, a job exhausts retries, or a VOD is deleted by the platform.
+ */
+export async function markVodOffline(options: {
+  ctx: TenantContext;
+  dbId: number;
+  vodId: string;
+  platform: Platform;
+}): Promise<void> {
+  const { ctx, dbId, vodId, platform } = options;
+  const log = createAutoLogger(ctx.tenantId);
+
+  await withDbRetry(ctx.tenantId, ctx.config, async (db) => {
+    await db.updateTable('vods').set({ is_live: false }).where('id', '=', dbId).execute();
+  });
+
+  await publishVodUpdate(ctx.tenantId, dbId);
+
+  log.info({ dbId, vodId, platform }, 'VOD marked offline');
+}
+
+/**
  * Finalize a VOD after download: update duration, set is_live=false,
  * run platform-specific chapter finalization, and publish cache update.
  */
