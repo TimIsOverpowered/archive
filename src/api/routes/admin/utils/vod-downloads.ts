@@ -73,6 +73,18 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
   const refreshed = await refreshVodRecord(ctx, vodId, dbId, log);
   const durationCheckRecord = refreshed ?? vodRecord;
 
+  if (type === SOURCE_TYPES.LIVE) {
+    const liveResult = await checkValidSource(tenantId, vodId, filePath, dbId, durationCheckRecord, log);
+
+    if (liveResult.needed) {
+      log.info({ vodId, filePath, type }, 'Live VOD file not found or invalid');
+      return { filePath, jobId: null };
+    }
+
+    log.debug({ filePath, source: liveResult.source }, 'Live VOD file exists with valid duration');
+    return { filePath, jobId: null };
+  }
+
   const result = await checkValidSource(tenantId, vodId, filePath, dbId, durationCheckRecord, log);
 
   if (result.needed) {
