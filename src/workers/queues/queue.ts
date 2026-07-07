@@ -22,7 +22,8 @@ import { getRedisInstance } from '../redis.js';
 export const QUEUE_NAMES = {
   VOD_LIVE: 'vod_live',
   VOD_STANDARD: 'vod_standard',
-  CHAT_DOWNLOAD: 'chat_download',
+  CHAT_DOWNLOAD_TWITCH: 'chat_download_twitch',
+  CHAT_DOWNLOAD_KICK: 'chat_download_kick',
   YOUTUBE_UPLOAD: 'youtube_upload',
   VOD_FINALIZE_FILE: 'vod_finalize_file',
   DMCA_PROCESSING: 'dmca_processing',
@@ -112,8 +113,12 @@ export function getStandardVodQueue(): Queue<StandardVodJob, StandardVodResult, 
   return getQueue(QUEUE_NAMES.VOD_STANDARD, defaultJobOptions);
 }
 
-export function getChatDownloadQueue(): Queue<ChatDownloadJob, ChatDownloadResult, string> {
-  return getQueue(QUEUE_NAMES.CHAT_DOWNLOAD, exponentialBackoff(3000, 5));
+export function getTwitchChatDownloadQueue(): Queue<ChatDownloadJob, ChatDownloadResult, string> {
+  return getQueue(QUEUE_NAMES.CHAT_DOWNLOAD_TWITCH, exponentialBackoff(3000, 5));
+}
+
+export function getKickChatDownloadQueue(): Queue<ChatDownloadJob, ChatDownloadResult, string> {
+  return getQueue(QUEUE_NAMES.CHAT_DOWNLOAD_KICK, exponentialBackoff(3000, 5));
 }
 
 export function getYoutubeUploadQueue(): Queue<YoutubeUploadJob, YoutubeUploadResult, string> {

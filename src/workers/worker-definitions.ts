@@ -61,8 +61,13 @@ const workerDefs = {
     processor: standardVodProcessor,
   } satisfies WorkerDef<StandardVodJob, StandardVodResult>,
 
-  [QUEUE_NAMES.CHAT_DOWNLOAD]: {
-    name: QUEUE_NAMES.CHAT_DOWNLOAD,
+  [QUEUE_NAMES.CHAT_DOWNLOAD_TWITCH]: {
+    name: QUEUE_NAMES.CHAT_DOWNLOAD_TWITCH,
+    processor: chatProcessor,
+  } satisfies WorkerDef<ChatDownloadJob, ChatDownloadResult>,
+
+  [QUEUE_NAMES.CHAT_DOWNLOAD_KICK]: {
+    name: QUEUE_NAMES.CHAT_DOWNLOAD_KICK,
     processor: chatProcessor,
   } satisfies WorkerDef<ChatDownloadJob, ChatDownloadResult>,
 
@@ -102,7 +107,8 @@ export function registerWorkers(
 
   const concurrencyMap: Partial<Record<WorkerName, number>> = {
     [QUEUE_NAMES.VOD_STANDARD]: workerConfig.VOD_STANDARD_CONCURRENCY,
-    [QUEUE_NAMES.CHAT_DOWNLOAD]: 1,
+    [QUEUE_NAMES.CHAT_DOWNLOAD_TWITCH]: 1,
+    [QUEUE_NAMES.CHAT_DOWNLOAD_KICK]: 1,
     [QUEUE_NAMES.YOUTUBE_UPLOAD]: workerConfig.YOUTUBE_UPLOAD_CONCURRENCY,
     [QUEUE_NAMES.VOD_FINALIZE_FILE]: workerConfig.VOD_FINALIZE_FILE_CONCURRENCY,
     [QUEUE_NAMES.MONITOR]: workerConfig.MONITOR_CONCURRENCY,

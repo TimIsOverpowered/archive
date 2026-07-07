@@ -1,8 +1,9 @@
 import { Jobs } from '../../constants.js';
 import type { Platform } from '../../types/platforms.js';
+import { isKickPlatform, isTwitchPlatform } from '../../types/platforms.js';
 import { extractErrorDetails } from '../../utils/error.js';
 import { childLogger } from '../../utils/logger.js';
-import { getChatDownloadQueue } from '../queues/queue.js';
+import { getKickChatDownloadQueue, getTwitchChatDownloadQueue } from '../queues/queue.js';
 import { enqueueJobWithLogging } from './enqueue.js';
 import type { ChatDownloadJob } from './types.js';
 
@@ -11,8 +12,19 @@ const log = childLogger({ module: 'chat-job' });
 async function enqueue(job: ChatDownloadJob): Promise<string | null> {
   const jobId = `${Jobs.CHAT_JOB_PREFIX}${job.vodId}`;
   try {
+    const queue = isKickPlatform(job.platform)
+      ? getKickChatDownloadQueue()
+      : isTwitchPlatform(job.platform)
+        ? getTwitchChatDownloadQueue()
+        : null;
+
+    if (!queue) {
+      log.info({ platform: job.platform }, 'Chat download queue not found for platform');
+      return null;
+    }
+
     const result = await enqueueJobWithLogging({
-      queue: getChatDownloadQueue(),
+      queue,
       jobName: 'chat_download',
       data: job,
       options: {
