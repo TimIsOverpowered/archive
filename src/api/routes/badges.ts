@@ -57,7 +57,9 @@ export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesR
             getGlobalBadges(tenantId).catch(() => null),
           ]);
 
-          return { channel: channelBadges ?? null, global: globalBadges ?? null };
+          const result = { channel: channelBadges ?? null, global: globalBadges ?? null };
+          if (result.channel == null && result.global == null) return null;
+          return result;
         });
 
         return ok(badgesData);
@@ -98,7 +100,8 @@ export default function badgesRoutes(fastify: FastifyInstance, _options: BadgesR
       try {
         const badgesData = await defaultCacheContext.withCache(cacheKey, Cache.BADGES_TTL, async () => {
           const channelBadges = await getKickChannelBadges(tenantId).catch(() => null);
-          return { subscriber: channelBadges ?? null };
+          if (channelBadges == null) return null;
+          return { subscriber: channelBadges };
         });
 
         return ok(badgesData);
