@@ -51,7 +51,7 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
         .orderBy('start', 'desc')
         .executeTakeFirst();
 
-      const clampedTime = Math.max(currentTimeSeconds, lastChapter?.end ?? 0);
+      const clampedTime = lastChapter?.end != null ? Math.max(currentTimeSeconds, lastChapter.end) : 0;
 
       if (lastChapter && lastChapter.game_id === categoryGameId) {
         ChapterUpdateSchema.parse({ end: clampedTime, duration: clampedTime - lastChapter.start });
