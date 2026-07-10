@@ -15,7 +15,6 @@ import { getVodVolatileCacheBatch } from './vod-cache.js';
 
 interface FetchRecentVodsOptions {
   limit?: number | undefined;
-  maxTenants?: number | undefined;
   platform?: Platform | undefined;
   signal?: AbortSignal | undefined;
 }
@@ -62,12 +61,12 @@ function selectVodRelations(eb: ExpressionBuilder<StreamerDB, 'vods'>) {
   ] as const;
 }
 
-async function fetchRecentVodForTenant(
+async function fetchRecentVodsForTenant(
   tenantId: string,
   config: TenantConfig,
   platformFilter?: Platform,
   _signal?: AbortSignal
-): Promise<AllTenantsVod | null> {
+): Promise<AllTenantsVod[]> {
   const db = await ensureClient(tenantId, config);
 
   try {
@@ -83,38 +82,36 @@ async function fetchRecentVodForTenant(
       return eb.and(conditions);
     };
 
-    const result = await db
+    const results = await db
       .selectFrom('vods')
       .selectAll('vods')
       .select((eb) => selectVodRelations(eb))
       .where((eb) => buildWhere(eb))
       .orderBy('vods.created_at', 'desc')
-      .limit(1)
-      .executeTakeFirst();
+      .limit(10)
+      .execute();
 
-    if (!result) return null;
-
-    return {
+    return results.map((r) => ({
       tenantId,
       displayName: config.displayName ?? null,
-      id: result.id,
-      platform_vod_id: result.platform_vod_id,
-      platform: result.platform as Platform,
-      title: result.title,
-      duration: result.duration,
-      platform_stream_id: result.platform_stream_id,
-      created_at: result.created_at,
-      updated_at: result.updated_at,
-      is_live: result.is_live,
-      started_at: result.started_at,
-      vod_uploads: result.vod_uploads as unknown as AllTenantsVod['vod_uploads'],
-      chapters: result.chapters as unknown as AllTenantsVod['chapters'],
-      games: result.games as unknown as AllTenantsVod['games'],
-    };
+      id: r.id,
+      platform_vod_id: r.platform_vod_id,
+      platform: r.platform as Platform,
+      title: r.title,
+      duration: r.duration,
+      platform_stream_id: r.platform_stream_id,
+      created_at: r.created_at,
+      updated_at: r.updated_at,
+      is_live: r.is_live,
+      started_at: r.started_at,
+      vod_uploads: r.vod_uploads,
+      chapters: r.chapters as unknown as AllTenantsVod['chapters'],
+      games: r.games,
+    }));
   } catch (error) {
     const details = extractErrorDetails(error);
     getLogger().debug({ tenantId, error: details.message }, 'Failed to fetch recent VOD for tenant');
-    return null;
+    return [];
   }
 }
 
@@ -125,44 +122,32 @@ async function fetchBatch(
 ): Promise<TenantVodResult[]> {
   const results = await Promise.allSettled(
     tenants.map(async (t) => {
-      const vod = await fetchRecentVodForTenant(t.id, t.config, platformFilter, signal);
-      if (!vod) return null;
-      return { tenantId: t.id, displayName: t.config.displayName ?? null, vod };
+      const vods = await fetchRecentVodsForTenant(t.id, t.config, platformFilter, signal);
+      return vods.map((vod) => ({ tenantId: t.id, displayName: t.config.displayName ?? null, vod }));
     })
   );
 
   return results
-    .filter((r): r is PromiseFulfilledResult<TenantVodResult> => r.status === 'fulfilled' && r.value !== null)
-    .map((r) => r.value);
-}
-
-function chunk<T>(arr: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) {
-    chunks.push(arr.slice(i, i + size));
-  }
-  return chunks;
+    .filter((r): r is PromiseFulfilledResult<TenantVodResult[]> => r.status === 'fulfilled')
+    .flatMap((r) => r.value);
 }
 
 export async function getAllTenantsRecentVods(opts?: FetchRecentVodsOptions): Promise<AllTenantsVod[]> {
   const limit = Math.min(Math.max(opts?.limit ?? 10, 1), 50);
-  const maxTenants = Math.min(Math.max(opts?.maxTenants ?? 50, 1), 200);
   const platformFilter = opts?.platform;
   const signal = opts?.signal;
 
   const allConfigs = configService.getAll();
   const activeConfigs = allConfigs.filter((c) => c.status === 'active');
-  const sorted = activeConfigs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  const limited = sorted.slice(0, maxTenants);
 
-  const tenantEntries = limited.map((c) => ({ id: c.id, config: c }));
-  const concurrency = 20;
-  const batches = chunk(tenantEntries, concurrency);
+  const tenantEntries = activeConfigs.map((c) => ({ id: c.id, config: c }));
 
   const allResults: TenantVodResult[] = [];
+  const concurrency = 20;
 
-  for (const batch of batches) {
+  for (let i = 0; i < tenantEntries.length; i += concurrency) {
     if (signal?.aborted === true) break;
+    const batch = tenantEntries.slice(i, i + concurrency);
     const batchResults = await fetchBatch(batch, platformFilter, signal);
     allResults.push(...batchResults);
   }
@@ -175,8 +160,8 @@ export async function getAllTenantsRecentVods(opts?: FetchRecentVodsOptions): Pr
 
   const volatileMap = new Map<number, { duration: number | null; is_live: boolean }>();
   for (const vod of truncated) {
-    const batch = await getVodVolatileCacheBatch(vod.tenantId, [vod.id]);
-    const vol = batch.get(vod.id);
+    const volBatch = await getVodVolatileCacheBatch(vod.tenantId, [vod.id]);
+    const vol = volBatch.get(vod.id);
     if (vol) {
       volatileMap.set(vod.id, vol);
     }
@@ -193,10 +178,9 @@ export async function getAllTenantsRecentVods(opts?: FetchRecentVodsOptions): Pr
 
 export async function getCachedRecentVods(opts?: FetchRecentVodsOptions): Promise<AllTenantsVod[]> {
   const limit = Math.min(Math.max(opts?.limit ?? 10, 1), 50);
-  const maxTenants = Math.min(Math.max(opts?.maxTenants ?? 50, 1), 200);
   const platformFilter = opts?.platform;
 
-  const cacheKey = swrKeys.vodQuery('allTenants', { limit, maxTenants, platform: platformFilter }, 1, 1);
+  const cacheKey = swrKeys.vodQuery('globalRecentVods', { limit, platform: platformFilter }, 1, 1);
 
   return withStaleWhileRevalidate(
     cacheKey,

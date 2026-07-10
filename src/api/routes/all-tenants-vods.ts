@@ -18,13 +18,6 @@ export default function allTenantsVodsRoutes(fastify: FastifyInstance, _options:
           type: 'object',
           properties: {
             limit: { type: 'integer', minimum: 1, maximum: 50, default: 10, description: 'Number of VODs to return' },
-            maxTenants: {
-              type: 'integer',
-              minimum: 1,
-              maximum: 200,
-              default: 50,
-              description: 'Maximum number of tenants to query',
-            },
             platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Filter by platform' },
           },
         },
@@ -35,13 +28,12 @@ export default function allTenantsVodsRoutes(fastify: FastifyInstance, _options:
       const query = z
         .object({
           limit: z.coerce.number().int().min(1).max(50).default(10),
-          maxTenants: z.coerce.number().int().min(1).max(200).default(50),
           platform: z.enum(PLATFORM_VALUES as [string, ...string[]]).optional(),
         })
         .parse(request.query);
 
       const platform = query.platform as Platform | undefined;
-      const vods = await getCachedRecentVods({ limit: query.limit, maxTenants: query.maxTenants, platform, signal: request.signal });
+      const vods = await getCachedRecentVods({ limit: query.limit, platform, signal: request.signal });
 
       return ok(vods);
     }
