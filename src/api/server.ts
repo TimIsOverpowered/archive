@@ -17,6 +17,7 @@ import configPlugin from './plugins/config.plugin.js';
 import redisPlugin from './plugins/redis.plugin.js';
 import { errorResponse } from './response.js';
 import { authRoutes, tenantsRoutes as adminTenantsRoutes, default as adminRoutes } from './routes/admin/index.js';
+import allTenantsVodsRoutes from './routes/all-tenants-vods.js';
 import badgesRoutes from './routes/badges.js';
 import chaptersRoutes from './routes/chapters.js';
 import gamesRoutes from './routes/games.js';
@@ -156,6 +157,7 @@ export async function buildServer(config: ApiConfig) {
       await instance.register(logsRoutes, { prefix: '' });
       await instance.register(badgesRoutes, { prefix: '' });
       await instance.register(publicTenantsRoutes, { prefix: '' });
+      await instance.register(allTenantsVodsRoutes, { prefix: '' });
     },
     { prefix: '/api/v1' }
   );
