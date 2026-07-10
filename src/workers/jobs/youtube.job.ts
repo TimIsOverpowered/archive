@@ -628,8 +628,7 @@ function buildSequentialGameChain(
 
     // First game depends on base children (download/copy). Each subsequent game depends on the previous.
     const children:
-      | Array<SequentialFlowChild | { name: string; queueName: string; opts: { jobId: string } }>
-      | undefined = isFirst
+      Array<SequentialFlowChild | { name: string; queueName: string; opts: { jobId: string } }> | undefined = isFirst
       ? baseChildren.length > 0
         ? baseChildren
         : undefined

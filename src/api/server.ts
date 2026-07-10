@@ -4,8 +4,9 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
-import Fastify from 'fastify';
+import { LogController } from 'fastify';
 import type { FastifyBaseLogger } from 'fastify';
+import Fastify from 'fastify';
 import type { ApiConfig } from '../config/env.js';
 import { registerTenantConfigSubscriber } from '../config/tenant-config-subscriber.js';
 import { Server } from '../constants.js';
@@ -34,8 +35,8 @@ export async function buildServer(config: ApiConfig) {
     bodyLimit: Server.BODY_LIMIT,
     exposeHeadRoutes: true,
     loggerInstance: logger as unknown as FastifyBaseLogger,
+    logController: new LogController({ disableRequestLogging: true }),
     trustProxy: true,
-    disableRequestLogging: true,
     genReqId: (req) => {
       const header = req.headers['x-request-id'];
       return typeof header === 'string' && header !== '' ? header : randomUUID();

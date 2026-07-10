@@ -131,10 +131,7 @@ export interface YoutubeUploadSkippedResult {
 }
 
 export type YoutubeUploadResult =
-  | YoutubeUploadVodResult
-  | YoutubeUploadGameResult
-  | YoutubeUploadSplitGameResult
-  | YoutubeUploadSkippedResult;
+  YoutubeUploadVodResult | YoutubeUploadGameResult | YoutubeUploadSplitGameResult | YoutubeUploadSkippedResult;
 
 export interface DmcaProcessingSuccessResult {
   success: true;

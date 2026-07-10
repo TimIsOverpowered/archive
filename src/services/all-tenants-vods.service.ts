@@ -152,9 +152,7 @@ export async function getAllTenantsRecentVods(opts?: FetchRecentVodsOptions): Pr
     allResults.push(...batchResults);
   }
 
-  const sortedVods = allResults
-    .map((r) => r.vod)
-    .sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
+  const sortedVods = allResults.map((r) => r.vod).sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
 
   const truncated = sortedVods.slice(0, limit);
 
@@ -182,10 +180,7 @@ export async function getCachedRecentVods(opts?: FetchRecentVodsOptions): Promis
 
   const cacheKey = swrKeys.vodQuery('globalRecentVods', { limit, platform: platformFilter }, 1, 1);
 
-  return withStaleWhileRevalidate(
-    cacheKey,
-    Cache.VOD_LIST_TTL,
-    Cache.VOD_LIST_TTL * CacheSwr.STALE_RATIO,
-    () => getAllTenantsRecentVods(opts)
+  return withStaleWhileRevalidate(cacheKey, Cache.VOD_LIST_TTL, Cache.VOD_LIST_TTL * CacheSwr.STALE_RATIO, () =>
+    getAllTenantsRecentVods(opts)
   );
 }
