@@ -32,7 +32,6 @@ function selectVodRelations(eb: ExpressionBuilder<StreamerDB, 'vods'>) {
         .selectFrom('vod_uploads')
         .select(['id', 'upload_id', 'type', 'duration', 'part', 'status', 'thumbnail_url', 'created_at'])
         .whereRef('vod_uploads.vod_id', '=', 'vods.id')
-        .where('vod_uploads.status', '=', 'COMPLETED')
         .orderBy('vod_uploads.created_at', 'asc')
     ).as('vod_uploads'),
     jsonArrayFrom(
