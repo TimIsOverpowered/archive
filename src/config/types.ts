@@ -21,6 +21,8 @@ export interface TenantConfig extends TenantBase {
   database: DatabaseConfig;
   settings: TenantSettings;
   status: 'active' | 'inactive';
+  profileImageUrl: string | null;
+  cdnEnabled: boolean;
 }
 
 export type PlatformConfig = TwitchConfig | KickConfig | undefined;

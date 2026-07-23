@@ -60,6 +60,8 @@ export function buildTenantConfig(tenant: SelectableTenants): TenantConfig | nul
     database: { name: databaseName },
     settings,
     status: tenant.status ?? 'active',
+    profileImageUrl: tenant.profile_image_url ?? null,
+    cdnEnabled: settings.cdn.enabled,
   };
 
   const twitchConfig = parsePlatformConfig(tenant.id, tenant.twitch, TwitchSchema, 'Twitch');

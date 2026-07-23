@@ -3,6 +3,8 @@ import type { Platform } from './platforms.js';
 export interface AllTenantsVod {
   tenantId: string;
   displayName: string | null;
+  profileImageUrl: string | null;
+  cdnEnabled: boolean;
   id: number;
   platform_vod_id: string | null;
   platform: Platform;

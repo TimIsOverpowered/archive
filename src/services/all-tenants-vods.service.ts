@@ -93,6 +93,8 @@ async function fetchRecentVodsForTenant(
     return results.map((r) => ({
       tenantId,
       displayName: config.displayName ?? null,
+      profileImageUrl: config.profileImageUrl ?? null,
+      cdnEnabled: config.cdnEnabled ?? false,
       id: r.id,
       platform_vod_id: r.platform_vod_id,
       platform: r.platform as Platform,
