@@ -87,8 +87,8 @@ function getKickParsedM3u8(m3u8: string, baseURL: string): string | null {
   }
 }
 
-export async function getVod(channelName: string, vodId: string): Promise<KickVod> {
-  const result = await fetchUrl<KickVod[]>(`${Kick.API_BASE}/api/v2/channels/${channelName}/videos`);
+export async function getVod(channelName: string, vodId: string, sessionId?: string): Promise<KickVod> {
+  const result = await fetchUrl<KickVod[]>(`${Kick.API_BASE}/api/v2/channels/${channelName}/videos`, { sessionId });
 
   if (!result.success) {
     throw new Error('Failed to load Kick videos API after retries');

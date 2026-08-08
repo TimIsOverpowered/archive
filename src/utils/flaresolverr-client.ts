@@ -34,6 +34,7 @@ export type FetchUrlResult<T> = FetchResult<T> | FetchError;
 export interface FetchUrlOptions {
   timeoutMs?: number;
   maxRetries?: number;
+  sessionId?: string | null | undefined;
 }
 
 interface FlareSolverrResponse {
@@ -53,7 +54,8 @@ interface FlareSolverrResponse {
 async function fetchFromFlareSolverr(
   url: string,
   timeoutMs: number,
-  sessionTTL: number
+  sessionTTL: number,
+  sessionId?: string | null
 ): Promise<FetchUrlResult<unknown>> {
   const baseURL = getBaseConfig().FLARESOLVERR_BASE_URL;
 
@@ -64,7 +66,7 @@ async function fetchFromFlareSolverr(
       cmd: 'request.get',
       url,
       maxTimeout: timeoutMs,
-      session: 'archive-session',
+      session: sessionId ?? 'archive-session',
       session_ttl_minutes: Math.ceil(sessionTTL / 60),
     }),
   });
@@ -120,7 +122,7 @@ export async function fetchUrl<T = unknown>(url: string, options?: FetchUrlOptio
 
   try {
     const result = await retryWithBackoff<FetchUrlResult<T>>(
-      () => fetchFromFlareSolverr(url, timeoutMs, sessionTTL) as Promise<FetchUrlResult<T>>,
+      () => fetchFromFlareSolverr(url, timeoutMs, sessionTTL, options?.sessionId) as Promise<FetchUrlResult<T>>,
       { attempts: maxRetries + 1, baseDelayMs: 2000, maxDelayMs: 30_000 }
     );
 

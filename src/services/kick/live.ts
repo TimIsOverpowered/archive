@@ -46,7 +46,7 @@ export interface KickCategoryInfo {
   banner?: KickBannerImage | null;
 }
 
-export async function getKickStreamStatus(username: string): Promise<KickLiveStreamRaw | null> {
+export async function getKickStreamStatus(username: string, sessionId?: string): Promise<KickLiveStreamRaw | null> {
   try {
     const apiUrl = `https://kick.com/api/v2/channels/${username}/livestream`;
 
@@ -55,6 +55,7 @@ export async function getKickStreamStatus(username: string): Promise<KickLiveStr
     const result = await fetchUrl<KickLiveApiResponse>(apiUrl, {
       timeoutMs: Kick.LIVE_API_TIMEOUT_MS,
       maxRetries: 2,
+      sessionId,
     });
 
     if (!result.success) {
@@ -99,7 +100,12 @@ export async function getKickStreamStatus(username: string): Promise<KickLiveStr
   }
 }
 
-export async function getLatestKickVodObject(username: string, expectedStreamId: string): Promise<KickVod | null> {
+export async function getLatestKickVodObject(
+  username: string,
+  expectedStreamId: string,
+  expectedUserId?: string,
+  sessionId?: string
+): Promise<KickVod | null> {
   try {
     const videosUrl = `https://kick.com/api/v2/channels/${username}/videos`;
 
@@ -108,6 +114,7 @@ export async function getLatestKickVodObject(username: string, expectedStreamId:
     const result = await fetchUrl<unknown[]>(videosUrl, {
       timeoutMs: Kick.LIVE_API_TIMEOUT_MS,
       maxRetries: 2,
+      sessionId,
     });
 
     if (!result.success) {
@@ -127,11 +134,13 @@ export async function getLatestKickVodObject(username: string, expectedStreamId:
 
     const vodObject = dataArray.find((v: KickVod) => {
       if (v == null || typeof v !== 'object') return false;
-      return String(v.id) == expectedStreamId;
+      if (String(v.id) != expectedStreamId) return false;
+      if (expectedUserId != null && String(v.channel_id) != expectedUserId) return false;
+      return true;
     });
 
     if (vodObject == null) {
-      getLogger().debug({ username, expectedStreamId }, 'Kick video object not found yet');
+      getLogger().debug({ username, expectedStreamId, expectedUserId }, 'Kick video object not found yet');
       return null;
     }
 

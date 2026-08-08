@@ -182,7 +182,7 @@ async function handleOfflineStream(
   if (!activeLiveVod || activeLiveVod.platform_vod_id == null || activeLiveVod.platform_vod_id === '') return;
 
   const liveQueue = getLiveDownloadQueue();
-  const jobId = `${Jobs.LIVE_HLS_JOB_PREFIX}${activeLiveVod.platform_vod_id}`;
+  const jobId = `${Jobs.LIVE_HLS_JOB_PREFIX}${tenantId}_${activeLiveVod.platform_vod_id}`;
   const queuedJob = await liveQueue.getJob(jobId);
 
   if (queuedJob !== undefined) {
@@ -540,10 +540,10 @@ async function enqueueLiveHlsDownload(params: {
         sourceUrl: params.sourceUrl,
       } satisfies LiveDownloadJob,
       options: {
-        jobId: `${Jobs.LIVE_HLS_JOB_PREFIX}${params.vodId}`,
+        jobId: `${Jobs.LIVE_HLS_JOB_PREFIX}${params.tenantId}_${params.vodId}`,
         ...defaultJobOptions,
         attempts: 10,
-        deduplication: { id: `${Jobs.LIVE_HLS_JOB_PREFIX}${params.vodId}` },
+        deduplication: { id: `${Jobs.LIVE_HLS_JOB_PREFIX}${params.tenantId}_${params.vodId}` },
       },
       logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
       successMessage: 'Live HLS download job enqueued successfully',

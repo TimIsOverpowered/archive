@@ -95,7 +95,7 @@ async function processPerTenantJob(job: Job<MonitorJob>, tenantId: string): Prom
     const activeLiveVod = await findActiveLiveVod(db, platform);
 
     if (activeLiveVod && activeLiveVod.platform_vod_id != null && activeLiveVod.platform_vod_id !== '') {
-      const jobId = `${Jobs.LIVE_HLS_JOB_PREFIX}${activeLiveVod.platform_vod_id}`;
+      const jobId = `${Jobs.LIVE_HLS_JOB_PREFIX}${tenantId}_${activeLiveVod.platform_vod_id}`;
       const queuedJob = await liveQueue.getJob(jobId);
       if (queuedJob !== undefined) {
         const [isActive, isWaiting, isDelayed] = await Promise.all([
@@ -143,7 +143,7 @@ async function processTenantWithStreamStatus(
   const activeLiveVod = await findActiveLiveVod(db, platform);
 
   if (activeLiveVod && activeLiveVod.platform_vod_id != null && activeLiveVod.platform_vod_id !== '') {
-    const jobId = `${Jobs.LIVE_HLS_JOB_PREFIX}${activeLiveVod.platform_vod_id}`;
+    const jobId = `${Jobs.LIVE_HLS_JOB_PREFIX}${tenantId}_${activeLiveVod.platform_vod_id}`;
     const queuedJob = await liveQueue.getJob(jobId);
     if (queuedJob !== undefined) {
       const [isActive, isWaiting, isDelayed] = await Promise.all([
