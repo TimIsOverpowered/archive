@@ -102,6 +102,8 @@ async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{
     domainName: config.settings?.domainName ?? '',
     timezone: config.settings?.timezone ?? 'UTC',
     youtubeDescription: config.youtube?.description,
+    chatDownload: config.settings?.chatDownload,
+    titleTemplate: config.youtube?.titleTemplate,
     gameName: gameTitle ?? chapterName,
     epNumber: gameTitle == null ? epNumber + (currentPartNum - 1) : undefined,
     vodRecord,

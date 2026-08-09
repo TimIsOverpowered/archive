@@ -6,6 +6,8 @@ export const YouTube = {
   REDIRECT_URI: 'https://developers.google.com/oauthplayground',
   /** Default VOD split duration in seconds (max duration) */
   DEFAULT_SPLIT_DURATION: 43_199,
+  /** YouTube title character limit */
+  TITLE_MAX_LENGTH: 100,
 } as const;
 
 // ── VOD / Live Worker ────────────────────────────────────────────────────────

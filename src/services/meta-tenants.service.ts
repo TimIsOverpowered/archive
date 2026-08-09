@@ -209,6 +209,16 @@ export async function updateTenant(
   id: string,
   data: Partial<InsertableTenants>
 ): Promise<SelectableTenants | undefined> {
+  // Merge youtube JSONB to avoid overwriting existing fields
+  if (data.youtube != null) {
+    const existing = await getTenantByIdRaw(id);
+    if (existing?.youtube != null && typeof existing.youtube === 'object' && !Array.isArray(existing.youtube)) {
+      const existingYoutube = existing.youtube as Record<string, unknown>;
+      const incomingYoutube = data.youtube as unknown as Record<string, unknown>;
+      data.youtube = { ...existingYoutube, ...incomingYoutube } as unknown as typeof data.youtube;
+    }
+  }
+
   const encrypted = encryptYoutubeInData(data);
 
   return getMetaClient()

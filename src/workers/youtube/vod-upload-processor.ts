@@ -185,6 +185,8 @@ async function processSplitVodUpload(ctx: SplitVodUploadContext): Promise<VodUpl
       domainName,
       timezone: config.settings?.timezone ?? 'UTC',
       youtubeDescription: config.youtube?.description,
+      chatDownload: config.settings?.chatDownload,
+      titleTemplate: config.youtube?.titleTemplate,
       part: totalParts > 1 ? currentPartNum : undefined,
       type,
     });
@@ -285,6 +287,8 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
     domainName,
     timezone: config.settings?.timezone ?? 'UTC',
     youtubeDescription: config.youtube?.description,
+    chatDownload: config.settings?.chatDownload,
+    titleTemplate: config.youtube?.titleTemplate,
     part: part != null ? parseInt(String(part)) : undefined,
     type,
   });

@@ -8,6 +8,7 @@ describe('buildYoutubeMetadata', () => {
     platform: 'twitch' as const,
     domainName: 'example.com',
     timezone: 'UTC',
+    chatDownload: true,
     type: 'vod' as const,
     vodRecord: {
       id: 42,
@@ -135,5 +136,143 @@ describe('buildYoutubeMetadata', () => {
   it('should capitalize platform name correctly', () => {
     const result = buildYoutubeMetadata({ ...baseOptions, platform: 'twitch' });
     assert.ok(result.title.includes('Twitch'));
+  });
+
+  it('should omit Chat Replay line when chatDownload is false', () => {
+    const result = buildYoutubeMetadata({ ...baseOptions, chatDownload: false });
+    assert.ok(!result.description.includes('Chat Replay'));
+    assert.ok(result.description.startsWith('Stream Title:'));
+  });
+
+  it('should include Chat Replay line when chatDownload is true', () => {
+    const result = buildYoutubeMetadata({ ...baseOptions, chatDownload: true });
+    assert.ok(result.description.startsWith('Chat Replay:'));
+  });
+
+  it('should use structured title by default (empty template)', () => {
+    const result = buildYoutubeMetadata(baseOptions);
+    assert.strictEqual(result.title, 'TestChannel Twitch VOD - JANUARY 15 2024');
+  });
+
+  it('should interpolate stream title template', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      titleTemplate: '{{vodTitle}} - {{date}}',
+    });
+    assert.strictEqual(result.title, 'Epic Stream - JANUARY 15 2024');
+  });
+
+  it('should interpolate full template with all variables', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      titleTemplate: '{{channel}}: {{vodTitle}} - {{date}}',
+    });
+    assert.strictEqual(result.title, 'TestChannel: Epic Stream - JANUARY 15 2024');
+  });
+
+  it('should interpolate LIVE type correctly', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      type: 'live',
+      titleTemplate: '{{channel}} {{platform}} {{type}}VOD - {{date}}',
+    });
+    assert.strictEqual(result.title, 'TestChannel Twitch LIVEVOD - JANUARY 15 2024');
+  });
+
+  it('should interpolate part in template', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      titleTemplate: '{{vodTitle}} {{part}} - {{date}}',
+      part: 3,
+    });
+    assert.strictEqual(result.title, 'Epic Stream PART 3 - JANUARY 15 2024');
+  });
+
+  it('should truncate title from end when exceeding 100 chars', () => {
+    const longTitle = 'A'.repeat(120);
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      titleTemplate: '{{vodTitle}} - {{date}}',
+      vodRecord: { ...baseOptions.vodRecord, title: longTitle },
+    });
+    assert.ok(result.title.length <= 100, `Title length ${result.title.length} should be <= 100`);
+    assert.ok(result.title.endsWith('- JANUARY 15 2024'));
+  });
+
+  it('should truncate structured title when exceeding 100 chars', () => {
+    const longChannel = 'A'.repeat(90);
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      channelName: longChannel,
+    });
+    assert.ok(result.title.length <= 100, `Title length ${result.title.length} should be <= 100`);
+  });
+
+  it('should handle undefined template (same as empty)', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      titleTemplate: undefined,
+    });
+    assert.strictEqual(result.title, 'TestChannel Twitch VOD - JANUARY 15 2024');
+  });
+
+  it('should handle game upload with template (template ignored)', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      titleTemplate: '{{vodTitle}} - {{date}}',
+      gameName: 'Elden Ring',
+      epNumber: 5,
+    });
+    assert.ok(result.title.includes('TestChannel plays Elden Ring'));
+    assert.ok(result.title.includes('EP 5'));
+    assert.ok(!result.title.includes('Epic Stream'));
+  });
+
+  it('should handle empty vodTitle in template', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      titleTemplate: '{{vodTitle}} - {{date}}',
+      vodRecord: { ...baseOptions.vodRecord, title: '' },
+    });
+    assert.strictEqual(result.title, ' - JANUARY 15 2024');
+  });
+
+  it('should truncate {{vodTitle}} not {{channel}} when channel is first in template', () => {
+    const longTitle = 'A'.repeat(80);
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      titleTemplate: '{{channel}}: {{vodTitle}} - {{date}}',
+      channelName: 'Short',
+      vodRecord: { ...baseOptions.vodRecord, title: longTitle },
+    });
+    assert.ok(result.title.length <= 100, `Title length ${result.title.length} should be <= 100`);
+    assert.ok(result.title.startsWith('Short: '));
+    assert.ok(result.title.endsWith('- JANUARY 15 2024'));
+  });
+
+  it('should preserve {{channel}} when truncating with part', () => {
+    const longTitle = 'A'.repeat(90);
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      titleTemplate: '{{channel}} {{vodTitle}} {{part}} - {{date}}',
+      channelName: 'MyChannel',
+      vodRecord: { ...baseOptions.vodRecord, title: longTitle },
+      part: 2,
+    });
+    assert.ok(result.title.length <= 100, `Title length ${result.title.length} should be <= 100`);
+    assert.ok(result.title.startsWith('MyChannel'));
+    assert.ok(result.title.includes('PART 2'));
+    assert.ok(result.title.endsWith('- JANUARY 15 2024'));
+  });
+
+  it('should fallback to first variable when {{vodTitle}} not in template', () => {
+    const longChannel = 'A'.repeat(90);
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      titleTemplate: '{{channel}} - {{date}}',
+      channelName: longChannel,
+    });
+    assert.ok(result.title.length <= 100, `Title length ${result.title.length} should be <= 100`);
+    assert.ok(result.title.endsWith('- JANUARY 15 2024'));
   });
 });
