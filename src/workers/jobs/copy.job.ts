@@ -42,7 +42,6 @@ export async function queueFileCopy(options: QueueFileCopyOptions): Promise<stri
         data: job,
         opts: {
           jobId,
-          deduplication: { id: jobId },
           ...defaultJobOptions,
         },
         children: [

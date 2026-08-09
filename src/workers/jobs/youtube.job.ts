@@ -247,7 +247,6 @@ async function enqueueVodUpload(
         data: job,
         opts: {
           jobId,
-          deduplication: { id: jobId },
           ...defaultJobOptions,
         },
         children,
@@ -437,7 +436,6 @@ async function enqueueGameUpload(
         data: job,
         opts: {
           jobId,
-          deduplication: { id: jobId },
           ...defaultJobOptions,
         },
         children,

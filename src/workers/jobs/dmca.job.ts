@@ -105,7 +105,6 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
         data: job,
         opts: {
           jobId,
-          deduplication: { id: jobId },
           ...defaultJobOptions,
         },
         children,
