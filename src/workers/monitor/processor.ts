@@ -2,11 +2,12 @@ import { Processor, Job } from 'bullmq';
 import { configService } from '../../config/tenant-config.js';
 import { requirePlatformConfig } from '../../config/types.js';
 import type { TenantConfig } from '../../config/types.js';
-import { Http, Jobs } from '../../constants.js';
+import { Http, Jobs, Monitor } from '../../constants.js';
 import { findActiveLiveVod } from '../../db/queries/vods.js';
 import { getTwitchStreamStatusBatch, type TwitchStreamStatus } from '../../services/twitch/live.js';
 import { PLATFORMS, PLATFORM_VALUES } from '../../types/platforms.js';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
+import { jitter } from '../../utils/delay.js';
 import { getLogger } from '../../utils/logger.js';
 import type { MonitorJob, MonitorJobResult } from '../jobs/types.js';
 import { getLiveDownloadQueue } from '../queues/queue.js';
@@ -16,6 +17,15 @@ import { handlePlatformLiveCheck, handlePlatformLiveCheckWithStreamStatus } from
 
 const monitorProcessor: Processor<MonitorJob, MonitorJobResult, string> = async (job: Job<MonitorJob>) => {
   const { tenantId, platform } = job.data;
+
+  const baseInterval =
+    platform === PLATFORMS.TWITCH ? Monitor.TWITCH_BATCH_POLL_INTERVAL_MS : Monitor.TENANT_POLL_INTERVAL_MS;
+
+  const jittered = jitter(baseInterval, Monitor.POLL_JITTER_RANGE);
+  const extraDelay = jittered - baseInterval;
+  if (extraDelay > 0) {
+    await new Promise((r) => setTimeout(r, extraDelay));
+  }
 
   if (platform === PLATFORMS.TWITCH) {
     return await processTwitchBatchJob(job);

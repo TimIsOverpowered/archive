@@ -12,7 +12,11 @@ export async function registerMonitorRepeatJob(config: TenantConfig): Promise<vo
   const jobId = `monitor_${config.id}`;
 
   try {
-    await queue.upsertJobScheduler(jobId, { every: 30_000 }, { name: 'tenant-monitor', data: { tenantId: config.id } });
+    await queue.upsertJobScheduler(
+      jobId,
+      { every: Monitor.TENANT_POLL_INTERVAL_MS },
+      { name: 'tenant-monitor', data: { tenantId: config.id } }
+    );
     getLogger().info({ component: 'monitor', jobId, tenantId: config.id }, 'Registered repeat job');
   } catch (error) {
     const details = extractErrorDetails(error);
@@ -32,7 +36,7 @@ async function registerTwitchBatchMonitorJob(): Promise<void> {
   try {
     await queue.upsertJobScheduler(
       Monitor.TWITCH_BATCH_JOB_ID,
-      { every: 30_000 },
+      { every: Monitor.TWITCH_BATCH_POLL_INTERVAL_MS },
       { name: 'twitch-batch-monitor', data: { platform: PLATFORMS.TWITCH } }
     );
     getLogger().info(

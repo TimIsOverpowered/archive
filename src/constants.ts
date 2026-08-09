@@ -106,8 +106,8 @@ export const Db = {
 
 // ── Kick API ─────────────────────────────────────────────────────────────────
 export const Kick = {
-  API_TIMEOUT_MS: 10_000,
-  LIVE_API_TIMEOUT_MS: 15_000,
+  API_TIMEOUT_MS: 30_000,
+  LIVE_API_TIMEOUT_MS: 30_000,
   API_BASE: 'https://kick.com',
   SUBCATEGORIES_URL: 'https://kick.com/api/v1/subcategories',
   CHAT_BLOCK_DURATION_MS: 5 * 60 * 1000,
@@ -178,6 +178,9 @@ export const Token = {
 // ── Monitor ──────────────────────────────────────────────────────────────────
 export const Monitor = {
   TWITCH_BATCH_JOB_ID: 'monitor_twitch_batch',
+  TENANT_POLL_INTERVAL_MS: 60_000,
+  TWITCH_BATCH_POLL_INTERVAL_MS: 60_000,
+  POLL_JITTER_RANGE: 0.4,
 } as const;
 
 // ── Twitch API ───────────────────────────────────────────────────────────────

@@ -59,7 +59,12 @@ export const strategy: PlatformStrategy<VodCreateData, VodUpdateData> = {
     const cfg = requirePlatformConfig(config, platform);
     if (!cfg) return null;
 
-    const vodObject = await getLatestKickVodObject(cfg.platformUsername, streamId, cfg.platformUserId, `kick-${cfg.platformUserId}`);
+    const vodObject = await getLatestKickVodObject(
+      cfg.platformUsername,
+      streamId,
+      cfg.platformUserId,
+      `kick-${cfg.platformUserId}`
+    );
 
     if (!vodObject) {
       return null;

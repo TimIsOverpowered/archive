@@ -1,7 +1,7 @@
+import { YouTube } from '../../constants.js';
 import type { SelectableVods } from '../../db/streamer-types.js';
 import type { Platform, SourceType } from '../../types/platforms.js';
 import { capitalizePlatform, SOURCE_TYPES } from '../../types/platforms.js';
-import { YouTube } from '../../constants.js';
 import dayjs from '../../utils/dayjs.js';
 
 function sanitizeYoutubeText(text: string): string {
@@ -75,8 +75,20 @@ function truncateByVariable(template: string, vars: Record<string, string>, maxL
 }
 
 export function buildYoutubeMetadata(options: YoutubeMetadataOptions): YoutubeMetadata {
-  const { channelName, platform, vodRecord, domainName, timezone, youtubeDescription, chatDownload, part, type, gameName, epNumber, titleTemplate } =
-    options;
+  const {
+    channelName,
+    platform,
+    vodRecord,
+    domainName,
+    timezone,
+    youtubeDescription,
+    chatDownload,
+    part,
+    type,
+    gameName,
+    epNumber,
+    titleTemplate,
+  } = options;
 
   const dateFormatted = dayjs(vodRecord.created_at).tz(timezone).format('MMMM DD YYYY').toUpperCase();
   const isGameUpload = gameName != null && gameName !== '';

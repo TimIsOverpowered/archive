@@ -211,12 +211,21 @@ export async function updateTenant(
 ): Promise<SelectableTenants | undefined> {
   const existing = await getTenantByIdRaw(id);
 
-  const jsonbFields: Array<'twitch' | 'youtube' | 'kick' | 'settings' | 'social_media'> = ['twitch', 'youtube', 'kick', 'settings', 'social_media'];
+  const jsonbFields: Array<'twitch' | 'youtube' | 'kick' | 'settings' | 'social_media'> = [
+    'twitch',
+    'youtube',
+    'kick',
+    'settings',
+    'social_media',
+  ];
   for (const field of jsonbFields) {
     if (data[field] != null && existing?.[field] != null) {
       const existingRaw = existing[field];
       if (typeof existingRaw === 'object' && !Array.isArray(existingRaw)) {
-        (data as Record<string, unknown>)[field] = { ...(existingRaw as unknown as Record<string, unknown>), ...(data[field] as unknown as Record<string, unknown>) };
+        (data as Record<string, unknown>)[field] = {
+          ...(existingRaw as unknown as Record<string, unknown>),
+          ...(data[field] as unknown as Record<string, unknown>),
+        };
       }
     }
   }
