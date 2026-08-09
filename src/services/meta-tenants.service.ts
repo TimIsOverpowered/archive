@@ -209,13 +209,15 @@ export async function updateTenant(
   id: string,
   data: Partial<InsertableTenants>
 ): Promise<SelectableTenants | undefined> {
-  // Merge youtube JSONB to avoid overwriting existing fields
-  if (data.youtube != null) {
-    const existing = await getTenantByIdRaw(id);
-    if (existing?.youtube != null && typeof existing.youtube === 'object' && !Array.isArray(existing.youtube)) {
-      const existingYoutube = existing.youtube as Record<string, unknown>;
-      const incomingYoutube = data.youtube as unknown as Record<string, unknown>;
-      data.youtube = { ...existingYoutube, ...incomingYoutube } as unknown as typeof data.youtube;
+  const existing = await getTenantByIdRaw(id);
+
+  const jsonbFields: Array<'twitch' | 'youtube' | 'kick' | 'settings' | 'social_media'> = ['twitch', 'youtube', 'kick', 'settings', 'social_media'];
+  for (const field of jsonbFields) {
+    if (data[field] != null && existing?.[field] != null) {
+      const existingRaw = existing[field];
+      if (typeof existingRaw === 'object' && !Array.isArray(existingRaw)) {
+        (data as Record<string, unknown>)[field] = { ...(existingRaw as unknown as Record<string, unknown>), ...(data[field] as unknown as Record<string, unknown>) };
+      }
     }
   }
 
