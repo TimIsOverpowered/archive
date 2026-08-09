@@ -75,7 +75,7 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
 
   const m3u8Path = join(vodDir, `${vodId}.m3u8`);
 
-  const impitSession = platform === PLATFORMS.KICK ? createSession() : null;
+  const impitSession = platform === PLATFORMS.KICK ? createSession(`kick-${options.platformUserId}`) : null;
   if (impitSession) log.info({ vodId }, 'Impit session created');
 
   try {

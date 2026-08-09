@@ -8,13 +8,25 @@ const mockAgentInstances: Array<Record<string, unknown>> = [];
 
 // 2. Register the module mock BEFORE importing the file that uses it
 mock.module('undici', {
-  namedExports: {
+  exports: {
     request: mockUndiciRequest,
     Agent: class MockAgent {
       constructor(opts?: Record<string, unknown>) {
         mockAgentInstances.push(opts ?? {});
       }
     },
+    Pool: class MockPool {
+      constructor(_origin: string, _opts?: Record<string, unknown>) {}
+    },
+    BalancedPool: class MockBalancedPool {
+      constructor(_origin: string, _opts?: Record<string, unknown>) {}
+    },
+    RetryAgent: class MockRetryAgent {
+      constructor(_dispatcher: any) {}
+    },
+    Dispatcher: {},
+    setGlobalDispatcher: () => {},
+    intercept: () => ({}),
   },
 });
 

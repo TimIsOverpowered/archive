@@ -58,8 +58,8 @@ export class KickChatWaterfallClient {
   private logger: AppLogger;
   private isCloudflareBlocked: boolean = false;
 
-  constructor(log?: AppLogger) {
-    this.impitSession = createSession();
+  constructor(channelId: number | string, log?: AppLogger) {
+    this.impitSession = createSession(`kick-chat-${channelId}`);
     this.logger = log ?? childLogger({ module: 'kick-chat-waterfall' });
   }
 

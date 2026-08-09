@@ -47,13 +47,13 @@ async function downloadKickVodWithFfmpeg(
     throw new ConfigNotConfiguredError(`Kick username for ${config.id}`);
   }
 
-  const vodMetadata = await getKickVod(username, vodId);
+  const vodMetadata = await getKickVod(username, vodId, `kick-${config.kick?.id ?? ''}`);
 
   if (vodMetadata?.source == null || vodMetadata?.source === '') {
     throw new Error('VOD source URL not available');
   }
 
-  const m3u8Url = await getKickParsedM3u8ForFfmpeg(vodMetadata.source);
+  const m3u8Url = await getKickParsedM3u8ForFfmpeg(vodMetadata.source, config.kick?.id ?? '');
 
   if (m3u8Url == null || m3u8Url === '') {
     throw new Error('Failed to parse Kick HLS playlist');

@@ -112,8 +112,8 @@ export async function getVod(channelName: string, vodId: string, sessionId?: str
   return video;
 }
 
-export async function getKickParsedM3u8ForFfmpeg(sourceUrl: string): Promise<string | null> {
-  const session = createSession();
+export async function getKickParsedM3u8ForFfmpeg(sourceUrl: string, platformUserId: string): Promise<string | null> {
+  const session = createSession(`kick-${platformUserId}`);
 
   try {
     const m3u8Content = await session.fetchText(sourceUrl);

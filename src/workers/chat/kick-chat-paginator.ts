@@ -12,7 +12,7 @@ export async function* paginateKickChatCommentsParallel(
   startOffsetSeconds: number,
   logger: AppLogger
 ): AsyncGenerator<KickChatMessage[]> {
-  const client = new KickChatWaterfallClient(logger);
+  const client = new KickChatWaterfallClient(channelId, logger);
 
   const CONCURRENCY = Kick.CHAT_FETCH_CONCURRENCY;
   const CHUNK_SIZE = Kick.CHAT_FETCH_CHUNK_SIZE;

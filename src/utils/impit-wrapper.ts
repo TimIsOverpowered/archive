@@ -7,16 +7,21 @@ import { getLogger } from './logger.js';
 import type { RetryOptions } from './retry.js';
 import { retryWithBackoff } from './retry.js';
 
-let impitInstance: Impit | null = null;
+const impitInstances = new Map<string, Impit>();
 
 /**
- * Initialize impit client (singleton pattern)
+ * Get (or lazily create) an Impit client scoped to `key`.
+ * Keying by streamer (platformUserId) means concurrent downloads for
+ * different streamers never share a client, so one streamer's request
+ * volume can't starve or poison another's in-flight requests.
  */
-function getImpit(): Impit {
-  impitInstance ??= new Impit({
-    browser: 'chrome',
-  });
-  return impitInstance;
+function getImpit(key: string): Impit {
+  let instance = impitInstances.get(key);
+  if (!instance) {
+    instance = new Impit({ browser: 'chrome' });
+    impitInstances.set(key, instance);
+  }
+  return instance;
 }
 
 /**
@@ -40,10 +45,14 @@ export class ImpitSession {
     this._defaultUserAgent = userAgent;
   }
 
-  constructor() {
+  constructor(private readonly key: string) {
     this.shouldRetryFn = (error) => {
-      const msg = error instanceof Error ? error.message : String(error);
-      if (msg.includes('deadline exceeded') || msg.includes('request canceled')) {
+      const msg = (error instanceof Error ? error.message : String(error)).toLowerCase();
+      if (
+        msg.includes('deadline exceeded') ||
+        msg.includes('request canceled') ||
+        msg.includes('aborted through abortsignal')
+      ) {
         return true;
       }
       const match = msg.match(/status\s+(\d+)/);
@@ -87,7 +96,7 @@ export class ImpitSession {
   ): Promise<string> {
     if (this.closed) throw new Error('Session is closed');
 
-    const client = getImpit();
+    const client = getImpit(this.key);
 
     getLogger().debug({ url }, 'Impit fetching text');
 
@@ -136,7 +145,7 @@ export class ImpitSession {
   ): Promise<void> {
     if (this.closed) throw new Error('Session is closed');
 
-    const client = getImpit();
+    const client = getImpit(this.key);
 
     getLogger().debug({ url, outputPath }, 'Impit streaming to file');
 
@@ -193,16 +202,16 @@ export class ImpitSession {
 /**
  * Create a new session for persistent connections. Session must be explicitly closed when done.
  */
-export function createSession(): ImpitSession {
-  getLogger().debug('Impit session created');
-  return new ImpitSession();
+export function createSession(key: string): ImpitSession {
+  getLogger().debug({ key }, 'Impit session created');
+  return new ImpitSession(key);
 }
 
 /**
  * Eagerly initialize Impit at startup so the binary is ready before first request.
  */
 export function initImpit(): void {
-  getImpit();
+  getImpit('__init__');
   getLogger().info('Impit initialized');
 }
 
@@ -210,6 +219,6 @@ export function initImpit(): void {
  * Clean up impit client on shutdown (fallback for unclosed sessions)
  */
 export function closeImpit(): Promise<void> {
-  impitInstance = null;
+  impitInstances.clear();
   return Promise.resolve();
 }
