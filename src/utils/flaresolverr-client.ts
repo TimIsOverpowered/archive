@@ -55,6 +55,7 @@ interface FlareSolverrSessionResponse {
   message?: string;
   error?: string;
   data?: { session?: string };
+  session?: string;
 }
 
 async function callFlareSolverr(body: Record<string, unknown>): Promise<FlareSolverrSessionResponse> {
@@ -72,10 +73,11 @@ async function createFlareSolverrSession(): Promise<string> {
   if (result.status === 'error' || result.error != null) {
     throw new Error(result.error ?? result.message ?? 'Failed to create FlareSolverr session');
   }
-  if (result.data?.session == null) {
+  const sessionId = result.session ?? result.data?.session;
+  if (sessionId == null) {
     throw new Error('No session ID returned from FlareSolverr');
   }
-  return result.data.session;
+  return sessionId;
 }
 
 async function destroyFlareSolverrSession(sessionId: string): Promise<void> {
