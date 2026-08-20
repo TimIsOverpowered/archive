@@ -54,19 +54,17 @@ export function createAutoLogger(tenantId?: string | null): AppLogger {
 
   const wrappedLog = Object.create(childLog) as AppLogger;
 
-  const logLevels: (keyof AppLogger)[] = ['info', 'error', 'warn', 'debug', 'trace', 'fatal'];
+  const logLevels = ['info', 'error', 'warn', 'debug', 'trace', 'fatal'] as const;
 
   for (const level of logLevels) {
-    const original = childLog[level];
+    const bound = childLog[level].bind(childLog);
 
-    if (typeof original === 'function') {
-      Object.defineProperty(wrappedLog, level, {
-        value: wrapMethod(original.bind(childLog) as LogFn),
-        enumerable: true,
-        configurable: true,
-        writable: true,
-      });
-    }
+    Object.defineProperty(wrappedLog, level, {
+      value: wrapMethod(bound),
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
   }
 
   return wrappedLog;

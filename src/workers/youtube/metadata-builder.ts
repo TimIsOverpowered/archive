@@ -31,7 +31,7 @@ export interface YoutubeMetadata {
 const TEMPLATE_VAR_RE = /\{\{(\w+)\}\}/g;
 
 function interpolate(template: string, vars: Record<string, string>): string {
-  return template.replace(TEMPLATE_VAR_RE, (_, key) => vars[key] ?? '');
+  return template.replace(TEMPLATE_VAR_RE, (_: string, key: string) => vars[key] ?? '');
 }
 
 function truncateTitle(title: string, maxLength: number): string {
@@ -46,7 +46,7 @@ function truncateByVariable(template: string, vars: Record<string, string>, maxL
   const allMatches = [...template.matchAll(TEMPLATE_VAR_RE)];
   if (allMatches.length === 0) return truncateTitle(rendered, maxLength);
 
-  const firstVar = allMatches[0]![1];
+  const firstVar = allMatches[0]?.[1];
   let varName: string;
   if (!('vodTitle' in vars)) {
     varName = firstVar ?? 'vodTitle';
@@ -62,7 +62,7 @@ function truncateByVariable(template: string, vars: Record<string, string>, maxL
   const varValue = vars[varName];
   if (varValue == null) return truncateTitle(rendered, maxLength);
 
-  const templateWithOthers = template.replace(TEMPLATE_VAR_RE, (_, k) => (k === varName ? '' : (vars[k] ?? '')));
+  const templateWithOthers = template.replace(TEMPLATE_VAR_RE, (_: string, k: string) => (k === varName ? '' : (vars[k] ?? '')));
   const varBudget = maxLength - templateWithOthers.length;
 
   if (varBudget <= 0) {
