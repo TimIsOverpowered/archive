@@ -1,7 +1,9 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, mock } from 'node:test';
+import { configService } from '../../src/config/tenant-config.js';
 import { prepareVodDirectory, runPostProcessing, sendCompletionAlert } from '../../src/workers/live.worker.phases.js';
 import type { LivePhaseResult, LiveProcessorContext } from '../../src/workers/live.worker.phases.js';
+import { createMockTenantConfig } from '../helpers/worker-test-setup.js';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
@@ -22,6 +24,10 @@ function setupBaseEnv(): void {
 }
 
 setupBaseEnv();
+
+// The real triggerChatDownload (chat.job.js, not mockable here) resolves
+// tenant settings via configService — seed the cache so it never hits the DB.
+configService.seed([createMockTenantConfig({ id: 'test-tenant' })]);
 
 // Hoisted mocks for modules that are direct dependencies of the phase file.
 // Note: mock.module() hoisting does not apply to transitive dependencies

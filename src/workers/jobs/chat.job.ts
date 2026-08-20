@@ -1,3 +1,4 @@
+import { configService } from '../../config/tenant-config.js';
 import { Jobs } from '../../constants.js';
 import type { Platform } from '../../types/platforms.js';
 import { isKickPlatform, isTwitchPlatform } from '../../types/platforms.js';
@@ -57,6 +58,15 @@ export interface TriggerChatOptions {
 }
 
 export async function triggerChatDownload(opts: TriggerChatOptions): Promise<string | null> {
+  const config = await configService.get(opts.tenantId);
+  if (config?.settings?.chatDownload === false) {
+    log.info(
+      { tenantId: opts.tenantId, vodId: opts.vodId, platform: opts.platform },
+      'Chat download disabled by tenant settings — skipping'
+    );
+    return null;
+  }
+
   return enqueue({
     tenantId: opts.tenantId,
     displayName: opts.displayName,

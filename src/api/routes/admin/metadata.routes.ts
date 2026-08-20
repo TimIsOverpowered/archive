@@ -187,7 +187,12 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
         forceRerun,
       });
 
-      return ok({ message: `Queueing chat job ${vodId}`, vodId, platform, jobId });
+      return ok({
+        message: jobId != null ? `Queueing chat job ${vodId}` : `Chat download not queued for ${vodId}`,
+        vodId,
+        platform,
+        jobId,
+      });
     }
   );
 
