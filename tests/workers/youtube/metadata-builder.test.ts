@@ -308,6 +308,31 @@ describe('buildYoutubeMetadata', () => {
     assert.ok(result.title.endsWith('- JANUARY 15 2024'));
   });
 
+  it('should truncate {{vodTitle}} before {{game}} when both are present in game title template', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      gameName: 'Elden Ring',
+      gameTitleTemplate: '{{channel}} plays {{game}}: {{vodTitle}} - {{date}}',
+      vodRecord: { ...baseOptions.vodRecord, title: 'V'.repeat(120) },
+    });
+    assert.ok(result.title.length <= 100, `Title length ${result.title.length} should be <= 100`);
+    assert.ok(result.title.startsWith('TestChannel plays Elden Ring: '));
+    assert.ok(result.title.includes('Elden Ring'));
+    assert.ok(result.title.endsWith(' - JANUARY 15 2024'));
+  });
+
+  it('should truncate {{vodTitle}} not {{channel}} when {{game}} is absent from game title template', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      gameName: 'Elden Ring',
+      gameTitleTemplate: '{{channel}}: {{vodTitle}} - {{date}}',
+      vodRecord: { ...baseOptions.vodRecord, title: 'V'.repeat(120) },
+    });
+    assert.ok(result.title.length <= 100, `Title length ${result.title.length} should be <= 100`);
+    assert.ok(result.title.startsWith('TestChannel: '));
+    assert.ok(result.title.endsWith(' - JANUARY 15 2024'));
+  });
+
   it('should render {{segmentPart}} as "Part N" in game title template', () => {
     const result = buildYoutubeMetadata({
       ...baseOptions,

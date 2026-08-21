@@ -45,7 +45,7 @@ function truncateByVariable(
   template: string,
   vars: Record<string, string>,
   maxLength: number,
-  primaryVar = 'vodTitle'
+  priorityVars: string[] = ['vodTitle']
 ): string {
   const rendered = interpolate(template, vars);
   if (rendered.length <= maxLength) return rendered;
@@ -54,20 +54,18 @@ function truncateByVariable(
   if (allMatches.length === 0) return truncateTitle(rendered, maxLength);
 
   const firstVar = allMatches[0]?.[1];
-  let varName: string;
-  if (!(primaryVar in vars)) {
-    varName = firstVar ?? primaryVar;
-  } else {
-    const primaryMatch = allMatches.find((m) => m[1] === primaryVar);
-    if (primaryMatch) {
-      varName = primaryVar;
-    } else {
-      varName = firstVar ?? primaryVar;
+  const templateVars = new Set(allMatches.map((m) => m[1]));
+  let varName = firstVar;
+
+  for (const candidate of priorityVars) {
+    if (templateVars.has(candidate) && candidate in vars) {
+      varName = candidate;
+      break;
     }
   }
 
-  const varValue = vars[varName];
-  if (varValue == null) return truncateTitle(rendered, maxLength);
+  const varValue = varName != null ? vars[varName] : undefined;
+  if (varName == null || varValue == null) return truncateTitle(rendered, maxLength);
 
   const templateWithOthers = template.replace(TEMPLATE_VAR_RE, (_: string, k: string) =>
     k === varName ? '' : (vars[k] ?? '')
@@ -175,7 +173,7 @@ export function buildYoutubeMetadata(options: YoutubeMetadataOptions): YoutubeMe
 
   if (isGameUpload) {
     if (gameTitleTemplate != null && gameTitleTemplate !== '') {
-      title = truncateByVariable(gameTitleTemplate, vars, YouTube.TITLE_MAX_LENGTH, 'game');
+      title = truncateByVariable(gameTitleTemplate, vars, YouTube.TITLE_MAX_LENGTH, ['vodTitle', 'game']);
     } else {
       title = `${channelName} plays ${gameName} ${epNumber != null ? `EP ${epNumber}` : ''} - ${dateFormatted}`;
     }
