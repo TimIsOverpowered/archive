@@ -13,7 +13,7 @@ import type { AppLogger } from '../../utils/logger.js';
 import { deleteFileIfExists } from '../../utils/path.js';
 import { safeUpdateAlert } from '../utils/alert-factories.js';
 import { trimVideo, splitVideo, getMetadata } from '../utils/ffmpeg.js';
-import { buildYoutubeMetadata } from './metadata-builder.js';
+import { buildYoutubeMetadata, computeGameSegmentPart } from './metadata-builder.js';
 import { createYoutubeUploadProgressHandler } from './youtube-upload-progress.js';
 
 export interface GameUploadContext {
@@ -99,6 +99,14 @@ async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{
   const vodRecord = await db.selectFrom('vods').selectAll().where('id', '=', dbId).executeTakeFirst();
   if (!vodRecord) throw new Error(`VOD not found for dbId ${dbId}`);
 
+  const chapters = await db
+    .selectFrom('chapters')
+    .select(['name', 'start', 'duration'])
+    .where('vod_id', '=', dbId)
+    .orderBy('start', 'asc')
+    .execute();
+  const segmentPart = computeGameSegmentPart(chapters, chapterStart, currentPartNum, YouTube.MAX_DURATION);
+
   const { title: ytTitle, description: youtubeDescription } = buildYoutubeMetadata({
     channelName,
     platform,
@@ -112,6 +120,7 @@ async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{
     epNumber: gameTitle == null ? epNumber + (currentPartNum - 1) : undefined,
     part,
     type: sourceType,
+    segmentPart,
     vodRecord,
   });
 

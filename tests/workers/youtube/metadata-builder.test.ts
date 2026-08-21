@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { buildYoutubeMetadata } from '../../../src/workers/youtube/metadata-builder.js';
+import { buildYoutubeMetadata, computeGameSegmentPart } from '../../../src/workers/youtube/metadata-builder.js';
 
 describe('buildYoutubeMetadata', () => {
   const baseOptions = {
@@ -308,6 +308,36 @@ describe('buildYoutubeMetadata', () => {
     assert.ok(result.title.endsWith('- JANUARY 15 2024'));
   });
 
+  it('should render {{segmentPart}} as "Part N" in game title template', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      gameName: 'IRL',
+      gameTitleTemplate: '{{game}} {{segmentPart}} - {{date}}',
+      segmentPart: 3,
+    });
+    assert.strictEqual(result.title, 'IRL Part 3 - JANUARY 15 2024');
+  });
+
+  it('should render {{segmentPart}} as empty when null', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      gameName: 'Slots',
+      gameTitleTemplate: '{{game}} - {{date}} {{segmentPart}}',
+      segmentPart: null,
+    });
+    assert.ok(!result.title.includes('Part'));
+    assert.ok(result.title.startsWith('Slots - JANUARY 15 2024'));
+  });
+
+  it('should ignore segmentPart when using the default game title (no template)', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      gameName: 'IRL',
+      segmentPart: 2,
+    });
+    assert.ok(!result.title.includes('Part'));
+  });
+
   it('should handle empty vodTitle in template', () => {
     const result = buildYoutubeMetadata({
       ...baseOptions,
@@ -354,5 +384,58 @@ describe('buildYoutubeMetadata', () => {
     });
     assert.ok(result.title.length <= 100, `Title length ${result.title.length} should be <= 100`);
     assert.ok(result.title.endsWith('- JANUARY 15 2024'));
+  });
+});
+
+describe('computeGameSegmentPart', () => {
+  const MAX = 43199;
+
+  it('returns null when there are no chapters', () => {
+    assert.strictEqual(computeGameSegmentPart([], 0, 1, MAX), null);
+  });
+
+  it('returns null for a unique, non-split game', () => {
+    const chapters = [{ name: 'Slots', start: 0, duration: 3600 }];
+    assert.strictEqual(computeGameSegmentPart(chapters, 0, 1, MAX), null);
+  });
+
+  it('numbers split parts of a single-occurrence game', () => {
+    const chapters = [{ name: 'IRL', start: 0, duration: 43200 }]; // 12h+ -> 2 segments
+    assert.strictEqual(computeGameSegmentPart(chapters, 0, 1, MAX), 1);
+    assert.strictEqual(computeGameSegmentPart(chapters, 21600, 2, MAX), 2);
+  });
+
+  it('counts game occurrences while skipping a unique game in between', () => {
+    const chapters = [
+      { name: 'IRL', start: 0, duration: 43200 }, // 2 segments
+      { name: 'Slots', start: 43200, duration: 10800 }, // 1 segment (skipped)
+      { name: 'IRL', start: 54000, duration: 10800 }, // 1 segment
+    ];
+    assert.strictEqual(computeGameSegmentPart(chapters, 0, 1, MAX), 1);
+    assert.strictEqual(computeGameSegmentPart(chapters, 21600, 2, MAX), 2);
+    assert.strictEqual(computeGameSegmentPart(chapters, 43200, 1, MAX), null);
+    assert.strictEqual(computeGameSegmentPart(chapters, 54000, 1, MAX), 3);
+  });
+
+  it('continues the counter globally across distinct repeating games', () => {
+    const chapters = [
+      { name: 'IRL', start: 0, duration: 3600 },
+      { name: 'IRL', start: 3600, duration: 3600 },
+      { name: 'Poker', start: 7200, duration: 3600 },
+      { name: 'Poker', start: 10800, duration: 3600 },
+    ];
+    assert.strictEqual(computeGameSegmentPart(chapters, 0, 1, MAX), 1);
+    assert.strictEqual(computeGameSegmentPart(chapters, 3600, 1, MAX), 2);
+    assert.strictEqual(computeGameSegmentPart(chapters, 7200, 1, MAX), 3);
+    assert.strictEqual(computeGameSegmentPart(chapters, 10800, 1, MAX), 4);
+  });
+
+  it('treats null chapter names as their own group', () => {
+    const chapters = [
+      { name: null, start: 0, duration: 3600 },
+      { name: null, start: 3600, duration: 3600 },
+    ];
+    assert.strictEqual(computeGameSegmentPart(chapters, 0, 1, MAX), 1);
+    assert.strictEqual(computeGameSegmentPart(chapters, 3600, 1, MAX), 2);
   });
 });
