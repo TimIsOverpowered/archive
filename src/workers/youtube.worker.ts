@@ -39,6 +39,7 @@ interface YoutubeProcessorContext {
   platform?: Platform | undefined;
   epNumber?: number | undefined;
   gameTitle?: string | undefined;
+  sourceType?: SourceType | undefined;
   workDir?: string | undefined;
   skipFinalize?: boolean | undefined;
   streamId?: string | undefined;
@@ -101,6 +102,7 @@ const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeP
       platform,
       epNumber,
       gameTitle,
+      sourceType,
       workDir,
     } = job.data;
     return {
@@ -114,6 +116,7 @@ const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeP
       platform,
       epNumber,
       gameTitle,
+      sourceType,
       workDir,
     };
   }
@@ -189,6 +192,7 @@ const youtubeProcessor = wrapWorkerProcessor<YoutubeUploadJob, YoutubeProcessorC
         platform: ctx.platform as Platform,
         epNumber: ctx.epNumber as number,
         gameTitle: ctx.gameTitle,
+        sourceType: ctx.sourceType,
         db: ctx.db,
         config: ctx.config,
         log: ctx.log,

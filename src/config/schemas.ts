@@ -104,6 +104,8 @@ export const YoutubeSchema = z.object({
   description: z.string().default(''),
   /** Custom YouTube title template using {{variables}} (empty = structured format) */
   titleTemplate: z.string().default(''),
+  /** Custom game upload title template using {{variables}} (empty = structured format) */
+  gameTitleTemplate: z.string().default(''),
   /** Decrypted YouTube API auth object (decrypted at parse time) */
   auth: encryptedYoutubeAuth().optional(),
   /** Encrypted YouTube API key (decrypted at parse time) */

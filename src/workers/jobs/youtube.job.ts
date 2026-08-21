@@ -70,7 +70,12 @@ export async function createGameUploadJob(
   filePath: string | undefined,
   platform: Platform,
   chapter: SelectableChapters,
-  options?: { gameTitle?: string | undefined; localEpOffset?: number; gameCount?: number }
+  options?: {
+    gameTitle?: string | undefined;
+    localEpOffset?: number;
+    gameCount?: number;
+    sourceType?: SourceType | undefined;
+  }
 ): Promise<YoutubeGameUploadJob> {
   const { config, tenantId } = ctx;
   if (config.youtube?.upload === false) {
@@ -130,6 +135,7 @@ export async function createGameUploadJob(
     chapterImage: chapter.image ?? null,
     epNumber,
     gameTitle: options?.gameTitle,
+    sourceType: options?.sourceType,
   };
 }
 
@@ -141,7 +147,8 @@ async function createGameUploadJobsForVod(
   vodId: string,
   filePath: string | undefined,
   platform: Platform,
-  workDir?: string
+  workDir: string | undefined,
+  sourceType: SourceType
 ): Promise<YoutubeGameUploadJob[]> {
   const { config, tenantId } = ctx;
   if (config.youtube?.perGameUpload !== true) {
@@ -188,6 +195,7 @@ async function createGameUploadJobsForVod(
       const job = await createGameUploadJob(ctx, dbId, vodId, filePath, platform, chapter, {
         localEpOffset: localOffset,
         gameCount: chapter.name != null ? (countMap.get(chapter.name) ?? 0) : 0,
+        sourceType,
       });
       localGameCounts.set(gameKey, localOffset + 1);
       jobs.push({ ...job, workDir });
@@ -516,6 +524,7 @@ export async function queueYoutubeGameUploadByGame(
   filePath: string | undefined,
   platform: Platform,
   game: SelectableGames,
+  sourceType: SourceType,
   downloadJobId?: string,
   workDir?: string,
   copyJobId?: string
@@ -540,6 +549,7 @@ export async function queueYoutubeGameUploadByGame(
       },
       {
         gameTitle: game.title ?? undefined,
+        sourceType,
       }
     );
   } catch (error) {
@@ -716,7 +726,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
   // ALL mode: finalize <- vod_upload <- game_0 <- ... <- game_N, with game_0 -> copy/download
   if (uploadMode === UPLOAD_MODES.ALL && gameUploadEnabled && vodUploadEnabled) {
     try {
-      const gameJobs = await createGameUploadJobsForVod(ctx, dbId, vodId, activeFilePath, platform, workDir);
+      const gameJobs = await createGameUploadJobsForVod(ctx, dbId, vodId, activeFilePath, platform, workDir, type);
       const gameJobIds: string[] = [];
 
       for (const job of gameJobs) {
@@ -767,7 +777,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
     // Game Uploads only (GAMES or ALL without VOD): finalize <- game_0 <- ... <- game_N, with game_0 -> copy/download
     if ((uploadMode === UPLOAD_MODES.GAMES || uploadMode === UPLOAD_MODES.ALL) && gameUploadEnabled) {
       try {
-        const gameJobs = await createGameUploadJobsForVod(ctx, dbId, vodId, activeFilePath, platform, workDir);
+        const gameJobs = await createGameUploadJobsForVod(ctx, dbId, vodId, activeFilePath, platform, workDir, type);
         const gameJobIds: string[] = [];
 
         for (const job of gameJobs) {

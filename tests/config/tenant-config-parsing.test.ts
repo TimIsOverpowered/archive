@@ -218,6 +218,7 @@ describe('buildTenantConfig parsing logic', () => {
           perGameUpload: true,
           restrictedGames: ['Game A', 'Game B'],
           description: 'My stream VODs',
+          gameTitleTemplate: 'Gameplay: {{game}} - {{date}}',
         },
       });
 
@@ -233,6 +234,7 @@ describe('buildTenantConfig parsing logic', () => {
       assert.strictEqual(result.youtube.perGameUpload, true);
       assert.deepStrictEqual(result.youtube.restrictedGames, ['Game A', 'Game B']);
       assert.strictEqual(result.youtube.description, 'My stream VODs');
+      assert.strictEqual(result.youtube.gameTitleTemplate, 'Gameplay: {{game}} - {{date}}');
     });
 
     it('should apply YouTube defaults', () => {
@@ -248,6 +250,7 @@ describe('buildTenantConfig parsing logic', () => {
       assert.strictEqual(result.youtube.multiTrack, false);
       assert.deepStrictEqual(result.youtube.restrictedGames, []);
       assert.strictEqual(result.youtube.description, '');
+      assert.strictEqual(result.youtube.gameTitleTemplate, '');
     });
 
     it('should return undefined when youtube is null', () => {

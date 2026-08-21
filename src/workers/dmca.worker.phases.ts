@@ -442,6 +442,7 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
         },
         {
           gameTitle: game.title ?? undefined,
+          sourceType: ctx.type,
         }
       );
 

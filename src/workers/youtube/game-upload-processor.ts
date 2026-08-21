@@ -6,7 +6,7 @@ import { YouTube } from '../../constants.js';
 import type { StreamerDB } from '../../db/streamer-types.js';
 import { publishGameUpdate, publishVodUpdate } from '../../services/cache-invalidator.js';
 import { uploadVideo } from '../../services/youtube/index.js';
-import type { Platform } from '../../types/platforms.js';
+import type { Platform, SourceType } from '../../types/platforms.js';
 import { initRichAlert, createProgressBar } from '../../utils/discord-alerts.js';
 import { toHHMMSS } from '../../utils/formatting.js';
 import type { AppLogger } from '../../utils/logger.js';
@@ -30,6 +30,7 @@ export interface GameUploadContext {
   platform: Platform;
   epNumber: number;
   gameTitle?: string | undefined;
+  sourceType?: SourceType | undefined;
   displayName: string;
   db: Kysely<StreamerDB>;
   config: TenantConfig;
@@ -50,6 +51,7 @@ export interface GameUploadAndUpsertParams {
   platform: Platform;
   epNumber: number;
   gameTitle?: string | undefined;
+  sourceType?: SourceType | undefined;
   displayName: string;
   part?: number | undefined;
   totalParts?: number | undefined;
@@ -82,6 +84,7 @@ async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{
     platform,
     epNumber,
     gameTitle,
+    sourceType,
     displayName,
     part,
     totalParts,
@@ -104,8 +107,11 @@ async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{
     youtubeDescription: config.youtube?.description,
     chatDownload: config.settings?.chatDownload,
     titleTemplate: config.youtube?.titleTemplate,
+    gameTitleTemplate: config.youtube?.gameTitleTemplate,
     gameName: gameTitle ?? chapterName,
     epNumber: gameTitle == null ? epNumber + (currentPartNum - 1) : undefined,
+    part,
+    type: sourceType,
     vodRecord,
   });
 
@@ -297,6 +303,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     platform,
     epNumber,
     gameTitle,
+    sourceType,
     displayName,
     db,
     chapterName: gameName,
@@ -318,6 +325,7 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     platform,
     epNumber,
     gameTitle,
+    sourceType,
     displayName,
     db,
     config,
@@ -342,6 +350,7 @@ async function processSplitGameUpload(
     chapterName,
     epNumber,
     gameTitle,
+    sourceType,
     displayName,
     config,
     db,
@@ -422,6 +431,7 @@ async function processSplitGameUpload(
       platform,
       epNumber,
       gameTitle,
+      sourceType,
       displayName,
       part: currentPartNum,
       totalParts,

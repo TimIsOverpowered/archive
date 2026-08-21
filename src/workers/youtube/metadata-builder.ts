@@ -16,10 +16,11 @@ export interface YoutubeMetadataOptions {
   youtubeDescription?: string | undefined;
   chatDownload?: boolean | undefined;
   part?: number | undefined;
-  type?: SourceType;
+  type?: SourceType | undefined;
   gameName?: string | undefined;
   epNumber?: number | undefined;
   titleTemplate?: string | undefined;
+  gameTitleTemplate?: string | undefined;
   vodRecord: Pick<SelectableVods, 'id' | 'title' | 'created_at'>;
 }
 
@@ -39,7 +40,12 @@ function truncateTitle(title: string, maxLength: number): string {
   return title.slice(0, maxLength);
 }
 
-function truncateByVariable(template: string, vars: Record<string, string>, maxLength: number): string {
+function truncateByVariable(
+  template: string,
+  vars: Record<string, string>,
+  maxLength: number,
+  primaryVar = 'vodTitle'
+): string {
   const rendered = interpolate(template, vars);
   if (rendered.length <= maxLength) return rendered;
 
@@ -48,14 +54,14 @@ function truncateByVariable(template: string, vars: Record<string, string>, maxL
 
   const firstVar = allMatches[0]?.[1];
   let varName: string;
-  if (!('vodTitle' in vars)) {
-    varName = firstVar ?? 'vodTitle';
+  if (!(primaryVar in vars)) {
+    varName = firstVar ?? primaryVar;
   } else {
-    const vodTitleMatch = allMatches.find((m) => m[1] === 'vodTitle');
-    if (vodTitleMatch) {
-      varName = 'vodTitle';
+    const primaryMatch = allMatches.find((m) => m[1] === primaryVar);
+    if (primaryMatch) {
+      varName = primaryVar;
     } else {
-      varName = firstVar ?? 'vodTitle';
+      varName = firstVar ?? primaryVar;
     }
   }
 
@@ -90,29 +96,36 @@ export function buildYoutubeMetadata(options: YoutubeMetadataOptions): YoutubeMe
     gameName,
     epNumber,
     titleTemplate,
+    gameTitleTemplate,
   } = options;
 
   const dateFormatted = dayjs(vodRecord.created_at).tz(timezone).format('MMMM DD YYYY').toUpperCase();
   const isGameUpload = gameName != null && gameName !== '';
 
+  const platformName = capitalizePlatform(platform);
+  const liveOrEmpty = type === SOURCE_TYPES.LIVE ? 'LIVE ' : '';
+  const vars = {
+    channel: channelName,
+    platform: platformName,
+    type: liveOrEmpty.trim(),
+    vodTitle: vodRecord.title ?? '',
+    date: dateFormatted,
+    part: part != null && part > 0 ? `PART ${part}` : '',
+    game: isGameUpload ? (gameName ?? '') : '',
+    ep: epNumber != null ? `EP ${epNumber}` : '',
+  };
+
   let title: string;
   const replayPath = isGameUpload ? `/games/${vodRecord.id}` : `/youtube/${vodRecord.id}`;
 
   if (isGameUpload) {
-    title = `${channelName} plays ${gameName} ${epNumber != null ? `EP ${epNumber}` : ''} - ${dateFormatted}`;
+    if (gameTitleTemplate != null && gameTitleTemplate !== '') {
+      title = truncateByVariable(gameTitleTemplate, vars, YouTube.TITLE_MAX_LENGTH, 'game');
+    } else {
+      title = `${channelName} plays ${gameName} ${epNumber != null ? `EP ${epNumber}` : ''} - ${dateFormatted}`;
+    }
   } else {
-    const platformName = capitalizePlatform(platform);
-    const liveOrEmpty = type === SOURCE_TYPES.LIVE ? 'LIVE ' : '';
-
     if (titleTemplate != null && titleTemplate !== '') {
-      const vars = {
-        channel: channelName,
-        platform: platformName,
-        type: liveOrEmpty.trim(),
-        vodTitle: vodRecord.title ?? '',
-        date: dateFormatted,
-        part: part != null && part > 0 ? `PART ${part}` : '',
-      };
       title = truncateByVariable(titleTemplate, vars, YouTube.TITLE_MAX_LENGTH);
     } else {
       const baseTitle = `${channelName} ${platformName} ${liveOrEmpty}VOD - ${dateFormatted}`;

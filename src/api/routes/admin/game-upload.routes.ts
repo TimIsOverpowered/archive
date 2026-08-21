@@ -83,6 +83,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
           filePath,
           platform,
           game,
+          type,
           jobId ?? undefined,
           workDir,
           copyJobId
@@ -141,6 +142,7 @@ export default function gameUploadRoutes(fastify: FastifyInstance, _options: Rec
           filePath,
           platform,
           gameLike,
+          type,
           jobId ?? undefined,
           workDir,
           copyJobId

@@ -228,6 +228,86 @@ describe('buildYoutubeMetadata', () => {
     assert.ok(!result.title.includes('Epic Stream'));
   });
 
+  it('should use default game title when gameTitleTemplate is undefined', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      gameName: 'Elden Ring',
+      epNumber: 5,
+    });
+    assert.strictEqual(result.title, 'TestChannel plays Elden Ring EP 5 - JANUARY 15 2024');
+  });
+
+  it('should use default game title when gameTitleTemplate is empty', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      gameName: 'Elden Ring',
+      epNumber: 5,
+      gameTitleTemplate: '',
+    });
+    assert.strictEqual(result.title, 'TestChannel plays Elden Ring EP 5 - JANUARY 15 2024');
+  });
+
+  it('should interpolate game title template with game and ep', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      gameName: 'Elden Ring',
+      epNumber: 5,
+      gameTitleTemplate: '{{channel}} plays {{game}} {{ep}} - {{date}}',
+    });
+    assert.strictEqual(result.title, 'TestChannel plays Elden Ring EP 5 - JANUARY 15 2024');
+  });
+
+  it('should interpolate game title template with platform and type', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      type: 'live',
+      gameName: 'Elden Ring',
+      gameTitleTemplate: '{{channel}} {{platform}} {{type}} {{game}} - {{date}}',
+    });
+    assert.strictEqual(result.title, 'TestChannel Twitch LIVE Elden Ring - JANUARY 15 2024');
+  });
+
+  it('should interpolate part in game title template', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      gameName: 'Elden Ring',
+      gameTitleTemplate: '{{game}} {{part}} - {{date}}',
+      part: 2,
+    });
+    assert.strictEqual(result.title, 'Elden Ring PART 2 - JANUARY 15 2024');
+  });
+
+  it('should support vodTitle variable in game title template', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      gameName: 'Elden Ring',
+      gameTitleTemplate: '{{vodTitle}} - {{game}}',
+    });
+    assert.strictEqual(result.title, 'Epic Stream - Elden Ring');
+  });
+
+  it('should not include stream title in game title template unless referenced', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      gameName: 'Elden Ring',
+      gameTitleTemplate: '{{game}} - {{date}}',
+    });
+    assert.strictEqual(result.title, 'Elden Ring - JANUARY 15 2024');
+    assert.ok(!result.title.includes('Epic Stream'));
+  });
+
+  it('should truncate {{game}} not {{channel}} when truncating game title template', () => {
+    const longGame = 'G'.repeat(120);
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      gameName: longGame,
+      gameTitleTemplate: '{{channel}} plays {{game}} - {{date}}',
+    });
+    assert.ok(result.title.length <= 100, `Title length ${result.title.length} should be <= 100`);
+    assert.ok(result.title.startsWith('TestChannel plays '));
+    assert.ok(result.title.endsWith('- JANUARY 15 2024'));
+  });
+
   it('should handle empty vodTitle in template', () => {
     const result = buildYoutubeMetadata({
       ...baseOptions,
