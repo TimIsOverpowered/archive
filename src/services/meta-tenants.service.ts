@@ -204,6 +204,26 @@ export async function createTenant(data: InsertableTenants): Promise<SelectableT
     .executeTakeFirstOrThrow();
 }
 
+/**
+ * Merge an incoming (plaintext) youtube payload with the existing (already-encrypted)
+ * row. Only the auth/apiKey sub-keys the client actually supplied are encrypted;
+ * carried-over encrypted values are left untouched so they are never re-encrypted.
+ * Returns the merged value as a JSON string for the jsonb column.
+ */
+function mergeYoutube(existing: Record<string, unknown> | null, incoming: Record<string, unknown>): string {
+  const merged: Record<string, unknown> = { ...(existing ?? {}), ...incoming };
+
+  if (incoming.auth != null && typeof incoming.auth === 'object' && !Array.isArray(incoming.auth)) {
+    merged.auth = encryptObject(incoming.auth);
+  }
+
+  if (typeof incoming.apiKey === 'string' && incoming.apiKey !== '') {
+    merged.apiKey = encryptScalar(incoming.apiKey);
+  }
+
+  return JSON.stringify(merged);
+}
+
 /** Update an existing tenant record by ID. */
 export async function updateTenant(
   id: string,
@@ -211,9 +231,17 @@ export async function updateTenant(
 ): Promise<SelectableTenants | undefined> {
   const existing = await getTenantByIdRaw(id);
 
-  const jsonbFields: Array<'twitch' | 'youtube' | 'kick' | 'settings' | 'social_media'> = [
+  const incomingYoutube = data.youtube;
+  if (incomingYoutube != null && typeof incomingYoutube === 'object' && !Array.isArray(incomingYoutube)) {
+    const existingYoutube =
+      existing?.youtube != null && typeof existing.youtube === 'object' && !Array.isArray(existing.youtube)
+        ? existing.youtube
+        : null;
+    (data as Record<string, unknown>).youtube = mergeYoutube(existingYoutube, incomingYoutube);
+  }
+
+  const jsonbFields: Array<'twitch' | 'kick' | 'settings' | 'social_media'> = [
     'twitch',
-    'youtube',
     'kick',
     'settings',
     'social_media',
@@ -230,11 +258,9 @@ export async function updateTenant(
     }
   }
 
-  const encrypted = encryptYoutubeInData(data);
-
   return getMetaClient()
     .updateTable('tenants')
-    .set({ ...encrypted, updated_at: new Date() } as UpdateableTenants)
+    .set({ ...data, updated_at: new Date() } as UpdateableTenants)
     .where('id', '=', id)
     .returning(tenantColumns)
     .executeTakeFirst();

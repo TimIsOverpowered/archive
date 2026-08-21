@@ -1,6 +1,8 @@
 import { FastifyInstance } from 'fastify';
 import { getApiConfig } from '../../../config/env.js';
+import { configService } from '../../../config/tenant-config.js';
 import type { InsertableTenants } from '../../../db/meta-types.js';
+import { invalidateTenantListCache } from '../../../services/cache-tags.js';
 import {
   createTenant,
   getTenantById,
@@ -9,22 +11,16 @@ import {
   deleteTenant,
 } from '../../../services/meta-tenants.service.js';
 import { getTenantStats } from '../../../services/tenants.service.js';
-import { CacheKeys, simpleKeys } from '../../../utils/cache-keys.js';
+import { simpleKeys } from '../../../utils/cache-keys.js';
 import { defaultCacheContext } from '../../../utils/cache.js';
 import { notFound } from '../../../utils/http-error.js';
-import { RedisService } from '../../../utils/redis-service.js';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
 import { tenantMiddleware, requireTenant } from '../../middleware/tenant-platform.js';
 import { ok } from '../../response.js';
 
-function invalidatePublicTenantCache(tenantId: string): void {
-  defaultCacheContext.invalidateKey(simpleKeys.tenantList(1, 20, {}));
+async function invalidatePublicTenantCache(tenantId: string): Promise<void> {
   defaultCacheContext.invalidateKey(simpleKeys.tenantDetail(tenantId));
-
-  const client = RedisService.getActiveClient();
-  if (client) {
-    void client.unlink(CacheKeys.tenantList(1, 20, {}), CacheKeys.tenantDetail(tenantId)).catch(() => {});
-  }
+  await invalidateTenantListCache();
 }
 
 export default function tenantsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
@@ -100,7 +96,8 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
     },
     async (request) => {
       const tenant = await createTenant(request.body);
-      invalidatePublicTenantCache(tenant.id);
+      await invalidatePublicTenantCache(tenant.id);
+      await configService.reloadTenant(tenant.id);
       return ok(tenant);
     }
   );
@@ -143,7 +140,8 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
         notFound(`Tenant ${request.params.id} not found`);
       }
 
-      invalidatePublicTenantCache(tenant.id);
+      await invalidatePublicTenantCache(tenant.id);
+      await configService.reloadTenant(tenant.id);
       return ok(tenant);
     }
   );
@@ -164,8 +162,10 @@ export default function tenantsRoutes(fastify: FastifyInstance, _options: Record
       onRequest: [adminApiKeyMiddleware],
     },
     async (request) => {
-      invalidatePublicTenantCache(request.params.id);
+      await invalidatePublicTenantCache(request.params.id);
       await deleteTenant(request.params.id);
+      await configService.reloadTenant(request.params.id, { publish: false });
+      configService.publishConfigChanged(request.params.id);
       return ok({ message: `Tenant ${request.params.id} deleted` });
     }
   );

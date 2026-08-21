@@ -235,3 +235,31 @@ export async function invalidateGameTags(tenantId: string): Promise<void> {
     }
   }
 }
+
+/**
+ * Invalidate all cached tenant list and detail queries using Redis SCAN.
+ * Clears every `simple:tenants:*` key (all list pages, search variants, and
+ * per-tenant detail entries) so public tenant endpoints reflect updates immediately.
+ */
+export async function invalidateTenantListCache(): Promise<void> {
+  const client = RedisService.getActiveClient();
+  if (!client) return;
+
+  try {
+    let cursor = '0';
+    do {
+      const result = await client.scan(cursor, 'MATCH', 'simple:tenants:*', 'COUNT', RedisBatch.SCAN_COUNT);
+      cursor = result[0];
+      const keys = result[1];
+
+      if (keys.length > 0) {
+        await client.unlink(...keys);
+        for (const k of keys) {
+          defaultCacheContext.invalidateKey(k);
+        }
+      }
+    } while (cursor !== '0');
+  } catch (error) {
+    getLogger().warn({ err: extractErrorDetails(error) }, 'Tenant list cache invalidation failed');
+  }
+}
