@@ -62,7 +62,9 @@ function truncateByVariable(template: string, vars: Record<string, string>, maxL
   const varValue = vars[varName];
   if (varValue == null) return truncateTitle(rendered, maxLength);
 
-  const templateWithOthers = template.replace(TEMPLATE_VAR_RE, (_: string, k: string) => (k === varName ? '' : (vars[k] ?? '')));
+  const templateWithOthers = template.replace(TEMPLATE_VAR_RE, (_: string, k: string) =>
+    k === varName ? '' : (vars[k] ?? '')
+  );
   const varBudget = maxLength - templateWithOthers.length;
 
   if (varBudget <= 0) {
