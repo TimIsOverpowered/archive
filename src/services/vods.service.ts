@@ -56,6 +56,7 @@ function selectVodRelations(eb: ExpressionBuilder<StreamerDB, 'vods'>) {
         .selectFrom('chapters')
         .select(['name', 'image', 'start', 'duration', 'end'])
         .whereRef('chapters.vod_id', '=', 'vods.id')
+        .orderBy('chapters.start', 'asc')
     ).as('chapters'),
     jsonArrayFrom(
       eb
@@ -74,6 +75,7 @@ function selectVodRelations(eb: ExpressionBuilder<StreamerDB, 'vods'>) {
           'chapter_image',
         ])
         .whereRef('games.vod_id', '=', 'vods.id')
+        .orderBy('games.start', 'asc')
     ).as('games'),
   ] as const;
 }

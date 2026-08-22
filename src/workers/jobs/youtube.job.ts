@@ -95,14 +95,19 @@ export async function createGameUploadJob(
     throw new VodNotFoundError(dbId, 'youtube job');
   }
 
+  // Defensive clamp: chapter offsets must never exceed the actual VOD duration
+  const rawEnd = chapter.end ?? chapter.start + (chapter.duration ?? 0);
+  const clampedEnd = Math.min(rawEnd, vodRecord.duration);
+  const clampedDuration = clampedEnd - chapter.start;
+
   // Check restricted games
   if (config.youtube?.restrictedGames != null && config.youtube.restrictedGames.includes(chapter.name)) {
     throw new RestrictedGameError(chapter.name ?? '');
   }
 
   // Skip chapters shorter than 5 minutes
-  if ((chapter.duration ?? 0) < 600) {
-    throw new Error(`Chapter "${chapter.name}" duration (${chapter.duration}s) is less than 10 minutes`);
+  if (clampedDuration < 600) {
+    throw new Error(`Chapter "${chapter.name}" duration (${clampedDuration}s) is less than 10 minutes`);
   }
 
   const gameCount =
@@ -129,8 +134,8 @@ export async function createGameUploadJob(
     chapterId: chapter.id,
     chapterName: chapter.name ?? '',
     chapterStart: chapter.start,
-    chapterDuration: chapter.duration,
-    chapterEnd: chapter.end ?? 0,
+    chapterDuration: clampedDuration,
+    chapterEnd: clampedEnd,
     chapterGameId: chapter.game_id ?? '',
     chapterImage: chapter.image ?? null,
     epNumber,

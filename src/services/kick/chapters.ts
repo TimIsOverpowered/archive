@@ -1,4 +1,3 @@
-import dayjs from 'dayjs';
 import { ChapterCreateSchema, ChapterUpdateSchema } from '../../config/schemas.js';
 import { withDbRetry } from '../../db/streamer-client.js';
 import { TenantContext } from '../../types/context.js';
@@ -10,7 +9,16 @@ import { getKickStreamStatus } from './live.js';
 
 const log = childLogger({ module: 'kick-chapters' });
 
-export async function updateChapterDuringDownload(ctx: TenantContext, dbId: number, vodId: string): Promise<void> {
+/**
+ * Update chapter boundaries during a live download.
+ * @param currentTimeSeconds - Media position (seconds) of downloaded segments, NOT wall-clock elapsed time.
+ */
+export async function updateChapterDuringDownload(
+  ctx: TenantContext,
+  dbId: number,
+  vodId: string,
+  currentTimeSeconds: number
+): Promise<void> {
   try {
     const { config } = ctx;
     const username = config.kick?.username;
@@ -25,8 +33,7 @@ export async function updateChapterDuringDownload(ctx: TenantContext, dbId: numb
       return;
     }
 
-    const { category, created_at } = streamData;
-    const currentTimeSeconds = dayjs().diff(created_at, 'second');
+    const { category } = streamData;
 
     const categoryGameId = String(category.id);
     let bannerImage: string | null = null;
@@ -203,6 +210,30 @@ export async function finalizeKickChapters(
             log.info(
               { vodId, chapterId: lastChapter.id, finalDuration: duration },
               'Finalized last chapter (clock skew fix)'
+            );
+          }
+        } else if (lastChapter && lastChapter.end != null && lastChapter.end > finalDurationSeconds) {
+          const duration = finalDurationSeconds - lastChapter.start;
+          if (duration <= 0) {
+            log.warn(
+              { vodId, chapterStart: lastChapter.start, finalDuration: finalDurationSeconds },
+              'Last chapter start exceeds final duration'
+            );
+          } else {
+            ChapterUpdateSchema.parse({ duration, end: finalDurationSeconds });
+            await db
+              .updateTable('chapters')
+              .set({
+                duration,
+                end: finalDurationSeconds,
+              })
+              .where('id', '=', lastChapter.id)
+              .execute();
+
+            finalizedChapterId = lastChapter.id;
+            log.info(
+              { vodId, chapterId: lastChapter.id, overshotEnd: lastChapter.end, finalDuration: finalDurationSeconds },
+              'Clamped last chapter end to final duration'
             );
           }
         } else {

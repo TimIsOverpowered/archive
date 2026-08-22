@@ -253,6 +253,11 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
     await readdir(ctx.vodDir).then((files) => files.filter((f) => f.endsWith('.ts') || f.endsWith('.mp4')))
   );
 
+  // Media position (sum of downloaded segment durations), used for chapter boundaries.
+  // Deliberately NOT wall-clock time, which drifts with clock skew.
+  let mediaTimeSeconds = 0;
+  let pendingChapterUpdate: Promise<void> | null = null;
+
   let streamEnded = false;
   while (!streamEnded) {
     try {
@@ -273,6 +278,15 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
       const { variantM3u8String, baseURL } = playlist;
       const parsed = HLS.parse(variantM3u8String) as HLS.types.MediaPlaylist;
       const segments = parsed.segments ?? [];
+
+      // Seed media position for resumed downloads (segments already on disk)
+      if (mediaTimeSeconds === 0) {
+        const durationMap = new Map<string, number>(segments.map((seg) => [seg.uri, seg.duration ?? 0]));
+        for (const uri of downloadedSegments) {
+          const d = durationMap.get(uri);
+          if (d != null) mediaTimeSeconds += d;
+        }
+      }
 
       await writeFile(ctx.m3u8Path, variantM3u8String);
 
@@ -319,13 +333,21 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
           (batchCompleted) => onProgress?.(downloadedSegments.size + batchCompleted, totalDuration)
         );
 
-        for (const seg of result.newSegments) downloadedSegments.add(seg.uri);
+        for (const seg of result.newSegments) {
+          downloadedSegments.add(seg.uri);
+          mediaTimeSeconds += seg.duration ?? 0;
+        }
       }
 
       consecutiveErrors = 0;
 
       if (platform === PLATFORMS.KICK) {
-        updateChapterDuringDownload(ctx.ctx, ctx.dbId, vodId).catch((err) => {
+        pendingChapterUpdate = updateChapterDuringDownload(
+          ctx.ctx,
+          ctx.dbId,
+          vodId,
+          Math.floor(mediaTimeSeconds)
+        ).catch((err) => {
           log.warn(extractErrorDetails(err), 'chapter update failed');
         });
       }
@@ -347,6 +369,11 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
         throw new Error(`Live HLS polling failed after ${consecutiveErrors} consecutive errors`);
       }
     }
+  }
+
+  // Await the last in-flight chapter update so it can't race with finalization
+  if (pendingChapterUpdate != null) {
+    await pendingChapterUpdate;
   }
 }
 
