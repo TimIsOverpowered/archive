@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import { loadApiConfig, getApiConfig, resetEnvConfig } from '../../src/config/env.js';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { getApiConfig, loadApiConfig, resetEnvConfig } from '../../src/config/env.ts';
 
 describe('API Config Loader', () => {
   let originalEnv: NodeJS.ProcessEnv;
@@ -11,7 +11,7 @@ describe('API Config Loader', () => {
   });
 
   const setupBaseEnv = () => {
-    Object.keys(process.env).forEach((key) => delete process.env[key]);
+    for (const key of Object.keys(process.env)) delete process.env[key];
     process.env.REDIS_URL = 'redis://localhost';
     process.env.META_DATABASE_URL = 'postgresql://meta';
     process.env.PGBOUNCER_URL = 'postgresql://bouncer';

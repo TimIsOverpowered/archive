@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, mock } from 'node:test';
-import { setupBaseEnv, createMockTenantConfig } from '../helpers/worker-test-setup.js';
+import { beforeEach, describe, it, mock } from 'node:test';
+import { createMockTenantConfig, setupBaseEnv } from '../helpers/worker-test-setup.ts';
 
 setupBaseEnv();
 
@@ -40,8 +40,8 @@ mock.module('../../src/workers/queues/queue.js', {
 });
 
 // System Under Test — dynamically imported AFTER mock.module registrations.
-const { triggerChatDownload } = await import('../../src/workers/jobs/chat.job.js');
-const { configService } = await import('../../src/config/tenant-config.js');
+const { triggerChatDownload } = await import('../../src/workers/jobs/chat.job.ts');
+const { configService } = await import('../../src/config/tenant-config.ts');
 
 const baseOpts = {
   tenantId: 'test-tenant',

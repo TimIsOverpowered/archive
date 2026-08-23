@@ -1,8 +1,8 @@
 import type { ExpressionBuilder } from 'kysely';
-import { YouTube } from '../constants.js';
-import { getMetaClient } from '../db/meta-client.js';
-import type { InsertableTenants, MetaDB, SelectableTenants, UpdateableTenants } from '../db/meta-types.js';
-import { encryptObject, encryptScalar } from '../utils/encryption.js';
+import { YouTube } from '../constants.ts';
+import { getMetaClient } from '../db/meta-client.ts';
+import type { InsertableTenants, MetaDB, SelectableTenants, UpdateableTenants } from '../db/meta-types.ts';
+import { encryptObject, encryptScalar } from '../utils/encryption.ts';
 
 const tenantColumns = [
   'id',

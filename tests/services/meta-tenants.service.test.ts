@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, afterEach, mock } from 'node:test';
-import type { SelectableTenants } from '../../src/db/meta-types.js';
-import { encryptObject, decryptObject, encryptScalar, decryptScalar } from '../../src/utils/encryption.js';
+import { afterEach, describe, it, mock } from 'node:test';
+import type { SelectableTenants } from '../../src/db/meta-types.ts';
+import { decryptObject, decryptScalar, encryptObject, encryptScalar } from '../../src/utils/encryption.ts';
 
 // Hoisted mock for the meta client (covers both the internal getTenantByIdRaw read
 // and the updateTenant write, since both call getMetaClient()).
@@ -13,7 +13,7 @@ mock.module('../../src/db/meta-client.js', {
   },
 });
 
-const { updateTenant } = await import('../../src/services/meta-tenants.service.js');
+const { updateTenant } = await import('../../src/services/meta-tenants.service.ts');
 
 function makeTenant(overrides: Partial<SelectableTenants> = {}): SelectableTenants {
   return {

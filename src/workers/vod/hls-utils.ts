@@ -3,15 +3,15 @@ import pathMod from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import HLS from 'hls-parser';
 import pLimit from 'p-limit';
-import { getVodTokenSig, getM3u8 as getTwitchM3u8 } from '../../services/twitch/index.js';
-import { PLATFORMS } from '../../types/platforms.js';
-import { jitter, sleep } from '../../utils/delay.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { request, segmentDownloadAgent } from '../../utils/http-client.js';
-import { createSession, type ImpitSession } from '../../utils/impit-wrapper.js';
-import type { AppLogger } from '../../utils/logger.js';
-import { fileExists } from '../../utils/path.js';
-import type { RetryOptions } from '../../utils/retry.js';
+import { getM3u8 as getTwitchM3u8, getVodTokenSig } from '../../services/twitch/index.ts';
+import { PLATFORMS } from '../../types/platforms.ts';
+import { jitter, sleep } from '../../utils/delay.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { request, segmentDownloadAgent } from '../../utils/http-client.ts';
+import { createSession, type ImpitSession } from '../../utils/impit-wrapper.ts';
+import type { AppLogger } from '../../utils/logger.ts';
+import { fileExists } from '../../utils/path.ts';
+import type { RetryOptions } from '../../utils/retry.ts';
 
 export type DownloadStrategy =
   | { type: 'fetch'; signal?: AbortSignal; abort: () => void }
@@ -92,7 +92,7 @@ export async function downloadSegmentsParallel(
       }
 
       const outputPath = pathMod.join(vodDir, segment.uri);
-      const tempPath = outputPath + '.tmp';
+      const tempPath = `${outputPath}.tmp`;
 
       const exists = await fileExists(outputPath);
 

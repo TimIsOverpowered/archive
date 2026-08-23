@@ -1,12 +1,12 @@
-import type { TenantConfig } from '../../config/types.js';
-import { Twitch } from '../../constants.js';
-import { getVod as getKickVod, getKickParsedM3u8ForFfmpeg } from '../../services/kick/index.js';
-import { getVodTokenSig } from '../../services/twitch/index.js';
-import { PLATFORMS, type Platform } from '../../types/platforms.js';
-import { ConfigNotConfiguredError } from '../../utils/domain-errors.js';
-import { request } from '../../utils/http-client.js';
-import type { AppLogger } from '../../utils/logger.js';
-import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
+import type { TenantConfig } from '../../config/types.ts';
+import { Twitch } from '../../constants.ts';
+import { getKickParsedM3u8ForFfmpeg, getVod as getKickVod } from '../../services/kick/index.ts';
+import { getVodTokenSig } from '../../services/twitch/index.ts';
+import { PLATFORMS, type Platform } from '../../types/platforms.ts';
+import { ConfigNotConfiguredError } from '../../utils/domain-errors.ts';
+import { request } from '../../utils/http-client.ts';
+import type { AppLogger } from '../../utils/logger.ts';
+import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.ts';
 
 export interface VodDownloadResult {
   finalPath: string;

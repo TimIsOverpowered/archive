@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import vodProcessor from '../../src/workers/vod.worker.js';
-import { setupBaseEnv, setupWorkerMocks, teardownWorkerMocks } from '../helpers/worker-test-setup.js';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import vodProcessor from '../../src/workers/vod.worker.ts';
+import { setupBaseEnv, setupWorkerMocks, teardownWorkerMocks } from '../helpers/worker-test-setup.ts';
 
 setupBaseEnv('/tmp/test-vods');
 

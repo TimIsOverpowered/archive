@@ -1,7 +1,7 @@
 import fp from 'fastify-plugin';
-import { configService } from '../../config/tenant-config.js';
-import { closeMetaClient } from '../../db/meta-client.js';
-import { getLogger } from '../../utils/logger.js';
+import { configService } from '../../config/tenant-config.ts';
+import { closeMetaClient } from '../../db/meta-client.ts';
+import { getLogger } from '../../utils/logger.ts';
 
 const configPlugin = fp(async (fastify) => {
   getLogger().info('Loading streamer configurations from meta database');

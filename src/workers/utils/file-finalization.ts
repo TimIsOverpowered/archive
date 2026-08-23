@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
-import { extractErrorDetails } from '../../utils/error.js';
-import type { AppLogger } from '../../utils/logger.js';
+import { extractErrorDetails } from '../../utils/error.ts';
+import type { AppLogger } from '../../utils/logger.ts';
 
 const CHUNK_SIZE = 1024 * 1024;
 

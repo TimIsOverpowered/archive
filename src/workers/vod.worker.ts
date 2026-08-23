@@ -1,9 +1,9 @@
 import type { Job } from 'bullmq';
-import { updateAlert } from '../utils/discord-alerts.js';
-import type { StandardVodJob, StandardVodResult } from './jobs/types.js';
-import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
-import { buildVodProcessorContext, runVodDownload, sendVodCompletion } from './vod.worker.phases.js';
-import type { VodProcessorContext } from './vod.worker.phases.js';
+import { updateAlert } from '../utils/discord-alerts.ts';
+import type { StandardVodJob, StandardVodResult } from './jobs/types.ts';
+import { wrapWorkerProcessor } from './utils/worker-wrapper.ts';
+import type { VodProcessorContext } from './vod.worker.phases.ts';
+import { buildVodProcessorContext, runVodDownload, sendVodCompletion } from './vod.worker.phases.ts';
 
 const errorMeta = (ctx: VodProcessorContext) => ({
   vodId: ctx.vodId,

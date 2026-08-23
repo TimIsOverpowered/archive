@@ -1,10 +1,10 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { RateLimiterRedis, RateLimiterMemory, RateLimiterRes } from 'rate-limiter-flexible';
-import { validateCloudflareRequest } from '../../utils/cloudflare-ip-validator.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { getLogger } from '../../utils/logger.js';
-import { errorResponse } from '../response.js';
-import { getClientIp } from './ip.js';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import { type RateLimiterMemory, type RateLimiterRedis, RateLimiterRes } from 'rate-limiter-flexible';
+import { validateCloudflareRequest } from '../../utils/cloudflare-ip-validator.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { getLogger } from '../../utils/logger.ts';
+import { errorResponse } from '../response.ts';
+import { getClientIp } from './ip.ts';
 
 type RateLimiter = RateLimiterRedis | RateLimiterMemory;
 

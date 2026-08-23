@@ -1,22 +1,22 @@
-import { FastifyInstance } from 'fastify';
-import { getApiConfig } from '../../../config/env.js';
-import { configService } from '../../../config/tenant-config.js';
-import type { InsertableTenants } from '../../../db/meta-types.js';
-import { invalidateTenantListCache } from '../../../services/cache-tags.js';
+import type { FastifyInstance } from 'fastify';
+import { getApiConfig } from '../../../config/env.ts';
+import { configService } from '../../../config/tenant-config.ts';
+import type { InsertableTenants } from '../../../db/meta-types.ts';
+import { invalidateTenantListCache } from '../../../services/cache-tags.ts';
 import {
   createTenant,
-  getTenantById,
-  getAllTenants,
-  updateTenant,
   deleteTenant,
-} from '../../../services/meta-tenants.service.js';
-import { getTenantStats } from '../../../services/tenants.service.js';
-import { simpleKeys } from '../../../utils/cache-keys.js';
-import { defaultCacheContext } from '../../../utils/cache.js';
-import { notFound } from '../../../utils/http-error.js';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import { tenantMiddleware, requireTenant } from '../../middleware/tenant-platform.js';
-import { ok } from '../../response.js';
+  getAllTenants,
+  getTenantById,
+  updateTenant,
+} from '../../../services/meta-tenants.service.ts';
+import { getTenantStats } from '../../../services/tenants.service.ts';
+import { defaultCacheContext } from '../../../utils/cache.ts';
+import { simpleKeys } from '../../../utils/cache-keys.ts';
+import { notFound } from '../../../utils/http-error.ts';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.ts';
+import { requireTenant, tenantMiddleware } from '../../middleware/tenant-platform.ts';
+import { ok } from '../../response.ts';
 
 async function invalidatePublicTenantCache(tenantId: string): Promise<void> {
   defaultCacheContext.invalidateKey(simpleKeys.tenantDetail(tenantId));

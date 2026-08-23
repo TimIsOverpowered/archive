@@ -1,17 +1,17 @@
 import type { Expression, ExpressionBuilder, SqlBool } from 'kysely';
 import { jsonArrayFrom } from 'kysely/helpers/postgres';
-import { configService } from '../config/tenant-config.js';
-import type { TenantConfig } from '../config/types.js';
-import { Cache, CacheSwr } from '../constants.js';
-import { ensureClient } from '../db/streamer-client.js';
-import type { StreamerDB } from '../db/streamer-types.js';
-import type { AllTenantsVod } from '../types/all-tenants-vods.js';
-import type { Platform } from '../types/platforms.js';
-import { swrKeys } from '../utils/cache-keys.js';
-import { withStaleWhileRevalidate } from '../utils/cache.js';
-import { extractErrorDetails } from '../utils/error.js';
-import { getLogger } from '../utils/logger.js';
-import { getVodVolatileCacheBatch } from './vod-cache.js';
+import { configService } from '../config/tenant-config.ts';
+import type { TenantConfig } from '../config/types.ts';
+import { Cache, CacheSwr } from '../constants.ts';
+import { ensureClient } from '../db/streamer-client.ts';
+import type { StreamerDB } from '../db/streamer-types.ts';
+import type { AllTenantsVod } from '../types/all-tenants-vods.ts';
+import type { Platform } from '../types/platforms.ts';
+import { withStaleWhileRevalidate } from '../utils/cache.ts';
+import { swrKeys } from '../utils/cache-keys.ts';
+import { extractErrorDetails } from '../utils/error.ts';
+import { getLogger } from '../utils/logger.ts';
+import { getVodVolatileCacheBatch } from './vod-cache.ts';
 
 interface FetchRecentVodsOptions {
   limit?: number | undefined;

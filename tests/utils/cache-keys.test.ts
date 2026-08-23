@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { CacheKeys, swrKeys, simpleKeys } from '../../src/utils/cache-keys.js';
+import { CacheKeys, simpleKeys, swrKeys } from '../../src/utils/cache-keys.ts';
 
 describe('CacheKeys', () => {
   describe('vodStatic', () => {

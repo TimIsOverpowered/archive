@@ -1,5 +1,5 @@
-import type { Platform, SourceType, UploadType, DownloadMethod } from '../../types/platforms.js';
-import type { DMCAClaim } from '../dmca/dmca.js';
+import type { DownloadMethod, Platform, SourceType, UploadType } from '../../types/platforms.ts';
+import type { DMCAClaim } from '../dmca/dmca.ts';
 
 export interface BaseJobData {
   tenantId: string;
@@ -131,7 +131,10 @@ export interface YoutubeUploadSkippedResult {
 }
 
 export type YoutubeUploadResult =
-  YoutubeUploadVodResult | YoutubeUploadGameResult | YoutubeUploadSplitGameResult | YoutubeUploadSkippedResult;
+  | YoutubeUploadVodResult
+  | YoutubeUploadGameResult
+  | YoutubeUploadSplitGameResult
+  | YoutubeUploadSkippedResult;
 
 export interface DmcaProcessingSuccessResult {
   success: true;

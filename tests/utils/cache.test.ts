@@ -1,15 +1,15 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import { resetEnvConfig } from '../../src/config/env.js';
-import { simpleKeys, swrKeys } from '../../src/utils/cache-keys.js';
-import { withCache, withStaleWhileRevalidate, CacheContext } from '../../src/utils/cache.js';
-import { CacheBackoffError } from '../../src/utils/domain-errors.js';
-import { RedisService } from '../../src/utils/redis-service.js';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { resetEnvConfig } from '../../src/config/env.ts';
+import { CacheContext, withCache, withStaleWhileRevalidate } from '../../src/utils/cache.ts';
+import { simpleKeys, swrKeys } from '../../src/utils/cache-keys.ts';
+import { CacheBackoffError } from '../../src/utils/domain-errors.ts';
+import { RedisService } from '../../src/utils/redis-service.ts';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 function setupBaseEnv(): void {
-  Object.keys(process.env).forEach((key) => delete process.env[key]);
+  for (const key of Object.keys(process.env)) delete process.env[key];
   process.env.REDIS_URL = 'redis://localhost';
   process.env.META_DATABASE_URL = 'postgresql://meta';
   process.env.PGBOUNCER_URL = 'postgresql://bouncer';
@@ -230,6 +230,7 @@ describe('withCache', () => {
         assert.ok(gotBackoff, 'Should be suppressed during backoff window');
 
         // Manually clear backoff to simulate TTL expiry or recovery
+        // biome-ignore lint/complexity/useLiteralKeys: 'fetchFailures' is private, bracket access is intentional in tests
         ctx['fetchFailures'].delete(key);
 
         const successFetcher = async () => {

@@ -1,15 +1,15 @@
-import { getDisplayName, requirePlatformConfig } from '../../../../config/types.js';
-import { findVodByPlatformId } from '../../../../db/queries/vods.js';
-import type { InsertableVods, SelectableVods, UpdateableVods } from '../../../../db/streamer-types.js';
-import { publishVodUpdate } from '../../../../services/cache-invalidator.js';
-import { fetchAndSaveEmotes } from '../../../../services/emotes.js';
-import { getStrategy, type PlatformVodMetadata } from '../../../../services/platforms/index.js';
-import { saveVodChapters } from '../../../../services/twitch/index.js';
-import { PLATFORMS } from '../../../../types/platforms.js';
-import { extractErrorDetails } from '../../../../utils/error.js';
-import { type AppLogger } from '../../../../utils/logger.js';
-import { triggerChatDownload } from '../../../../workers/jobs/chat.job.js';
-import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
+import { getDisplayName, requirePlatformConfig } from '../../../../config/types.ts';
+import { findVodByPlatformId } from '../../../../db/queries/vods.ts';
+import type { InsertableVods, SelectableVods, UpdateableVods } from '../../../../db/streamer-types.ts';
+import { publishVodUpdate } from '../../../../services/cache-invalidator.ts';
+import { fetchAndSaveEmotes } from '../../../../services/emotes.ts';
+import { getStrategy, type PlatformVodMetadata } from '../../../../services/platforms/index.ts';
+import { saveVodChapters } from '../../../../services/twitch/index.ts';
+import { PLATFORMS } from '../../../../types/platforms.ts';
+import { extractErrorDetails } from '../../../../utils/error.ts';
+import type { AppLogger } from '../../../../utils/logger.ts';
+import { triggerChatDownload } from '../../../../workers/jobs/chat.job.ts';
+import type { TenantPlatformContext } from '../../../middleware/tenant-platform.ts';
 
 /**
  * Finds an existing VOD record or creates one from platform API metadata.

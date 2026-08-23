@@ -1,15 +1,15 @@
 import assert from 'node:assert';
-import { describe, it, beforeEach, afterEach, mock } from 'node:test';
-import type { TenantConfig } from '../../src/config/types.js';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import type { TenantConfig } from '../../src/config/types.ts';
 import {
-  poolManager,
-  withDbRetry,
-  resetClientManager,
   createClient,
   ensureClient,
-} from '../../src/db/streamer-client.js';
-import { isConnectionError } from '../../src/db/utils/errors.js';
-import { createMockTenantConfig } from '../helpers/worker-test-setup.js';
+  poolManager,
+  resetClientManager,
+  withDbRetry,
+} from '../../src/db/streamer-client.ts';
+import { isConnectionError } from '../../src/db/utils/errors.ts';
+import { createMockTenantConfig } from '../helpers/worker-test-setup.ts';
 
 process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.META_DATABASE_URL = 'postgresql://localhost/test';

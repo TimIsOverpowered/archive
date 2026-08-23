@@ -2,13 +2,13 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import type { Job } from 'bullmq';
-import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { initRichAlert, isAlertsEnabled } from '../utils/discord-alerts.js';
-import type { AppLogger } from '../utils/logger.js';
-import type { CopyFileJob, CopyFileResult } from './jobs/types.js';
-import { createCopyWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
-import { convertHlsToMp4, detectFmp4FromPlaylist } from './utils/ffmpeg.js';
-import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
+import { createAutoLogger } from '../utils/auto-tenant-logger.ts';
+import { initRichAlert, isAlertsEnabled } from '../utils/discord-alerts.ts';
+import type { AppLogger } from '../utils/logger.ts';
+import type { CopyFileJob, CopyFileResult } from './jobs/types.ts';
+import { createCopyWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.ts';
+import { convertHlsToMp4, detectFmp4FromPlaylist } from './utils/ffmpeg.ts';
+import { wrapWorkerProcessor } from './utils/worker-wrapper.ts';
 
 interface CopyFileProcessorContext {
   job: Job<CopyFileJob>;

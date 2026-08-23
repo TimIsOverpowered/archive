@@ -1,20 +1,20 @@
-import { requirePlatformConfig } from '../../config/types.js';
-import { PLATFORMS } from '../../types/platforms.js';
-import { createErrorContext } from '../../utils/error.js';
-import { parseTwitchDuration } from '../../utils/formatting.js';
-import { getLogger } from '../../utils/logger.js';
-import { retryWithBackoff } from '../../utils/retry.js';
+import { requirePlatformConfig } from '../../config/types.ts';
+import { PLATFORMS } from '../../types/platforms.ts';
+import { createErrorContext } from '../../utils/error.ts';
+import { parseTwitchDuration } from '../../utils/formatting.ts';
+import { getLogger } from '../../utils/logger.ts';
+import { retryWithBackoff } from '../../utils/retry.ts';
 import type {
   PlatformStrategy,
   PlatformStreamStatus,
   PlatformVodMetadata,
   VodCreateData,
   VodUpdateData,
-} from '../platforms/strategy.js';
-import { getChapters, saveVodChapters } from './chapters.js';
-import { getTwitchStreamStatus, getLatestTwitchVodObject } from './live.js';
-import { getVodData } from './vod.js';
-import type { VodData } from './vod.js';
+} from '../platforms/strategy.ts';
+import { getChapters, saveVodChapters } from './chapters.ts';
+import { getLatestTwitchVodObject, getTwitchStreamStatus } from './live.ts';
+import type { VodData } from './vod.ts';
+import { getVodData } from './vod.ts';
 
 export const strategy: PlatformStrategy = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {

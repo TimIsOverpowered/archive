@@ -1,6 +1,6 @@
-import { FastifyRequest } from 'fastify';
-import { getHealthToken } from '../../config/env.js';
-import { unauthorized } from '../../utils/http-error.js';
+import type { FastifyRequest } from 'fastify';
+import { getHealthToken } from '../../config/env.ts';
+import { unauthorized } from '../../utils/http-error.ts';
 
 /** Constant-time string comparison to prevent timing attacks. */
 function timingSafeEqual(a: string, b: string): boolean {

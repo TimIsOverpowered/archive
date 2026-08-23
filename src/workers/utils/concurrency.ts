@@ -1,4 +1,4 @@
-import type { TenantConfig } from '../../config/types.js';
+import type { TenantConfig } from '../../config/types.ts';
 
 export function calcLiveConcurrency(configs: TenantConfig[], headroom: number, minConcurrency: number): number {
   const active = configs.filter(

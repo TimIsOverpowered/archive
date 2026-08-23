@@ -1,9 +1,9 @@
 import { Redis } from 'ioredis';
-import { RateLimiterRedis, RateLimiterMemory } from 'rate-limiter-flexible';
-import { getBaseConfig } from '../config/env.js';
-import { clearAllConnectionFailures } from './cache-state.js';
-import { extractErrorDetails } from './error.js';
-import { getLogger } from './logger.js';
+import { RateLimiterMemory, RateLimiterRedis } from 'rate-limiter-flexible';
+import { getBaseConfig } from '../config/env.ts';
+import { clearAllConnectionFailures } from './cache-state.ts';
+import { extractErrorDetails } from './error.ts';
+import { getLogger } from './logger.ts';
 
 /** Configuration for a rate limiter instance. */
 export interface RateLimiterConfig {
@@ -40,7 +40,7 @@ export class RedisService {
   private static _readyPromise: Promise<void> | null = null;
 
   static get ready(): Promise<void> | null {
-    return this._readyPromise;
+    return RedisService._readyPromise;
   }
 
   private constructor() {
@@ -48,39 +48,39 @@ export class RedisService {
   }
 
   static get instance(): RedisService | null {
-    return this._instance;
+    return RedisService._instance;
   }
 
   static init(options: RedisServiceOptions): RedisService {
-    if (this._instance) {
+    if (RedisService._instance) {
       getLogger().warn('RedisService.init() called on already-initialized instance — ignoring');
-      return this._instance;
+      return RedisService._instance;
     }
-    this._instance = new RedisService();
-    this._instance._options = options;
-    return this._instance;
+    RedisService._instance = new RedisService();
+    RedisService._instance._options = options;
+    return RedisService._instance;
   }
 
   static getClient(): Redis {
-    if (!this._instance?.client) {
+    if (!RedisService._instance?.client) {
       throw new Error('RedisService not initialized. Call RedisService.init() first.');
     }
-    return this._instance.client;
+    return RedisService._instance.client;
   }
 
   static getActiveClient(): Redis | null {
-    return this._instance?.client ?? null;
+    return RedisService._instance?.client ?? null;
   }
 
   static getLimiter(key: string): RateLimiterRedis | RateLimiterMemory | null {
-    if (!this._instance) return null;
-    const entry = this._instance.limiters.get(key);
+    if (!RedisService._instance) return null;
+    const entry = RedisService._instance.limiters.get(key);
     if (!entry) return null;
     return entry.limiter;
   }
 
   static requireLimiter(key: string): RateLimiterRedis | RateLimiterMemory {
-    const limiter = this.getLimiter(key);
+    const limiter = RedisService.getLimiter(key);
     if (!limiter) {
       throw new Error(
         `Rate limiter '${key}' not initialized. Ensure RedisService.init() was called with this key in rateLimiters config.`
@@ -90,38 +90,38 @@ export class RedisService {
   }
 
   static getStatus(): { status: string; connected: boolean } {
-    if (!this._instance?.client) {
+    if (!RedisService._instance?.client) {
       return { status: 'not-initialized', connected: false };
     }
     return {
-      status: this._instance.client.status,
-      connected: this._instance.client.status === 'ready',
+      status: RedisService._instance.client.status,
+      connected: RedisService._instance.client.status === 'ready',
     };
   }
 
   static isReady(): boolean {
-    return this._instance?.client?.status === 'ready';
+    return RedisService._instance?.client?.status === 'ready';
   }
 
   static isLimiterFallback(key: string): boolean {
-    if (!this._instance) return false;
-    const entry = this._instance.limiters.get(key);
+    if (!RedisService._instance) return false;
+    const entry = RedisService._instance.limiters.get(key);
     return entry?.isFallback ?? false;
   }
 
   static close(): Promise<void> {
-    if (!this._instance) return Promise.resolve();
-    const instance = this._instance;
-    this._instance = null;
+    if (!RedisService._instance) return Promise.resolve();
+    const instance = RedisService._instance;
+    RedisService._instance = null;
     RedisService._readyPromise = null;
     return instance.close();
   }
 
   static reset(): void {
-    if (this._instance) {
-      this._instance.limiters.clear();
+    if (RedisService._instance) {
+      RedisService._instance.limiters.clear();
     }
-    this._instance = null;
+    RedisService._instance = null;
     RedisService._readyPromise = null;
   }
 

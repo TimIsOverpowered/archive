@@ -1,16 +1,16 @@
-import { sql } from 'kysely';
 import type { Expression, ExpressionBuilder, SqlBool } from 'kysely';
+import { sql } from 'kysely';
 import type { ReadonlyKysely } from 'kysely/readonly';
 import { z } from 'zod';
-import { Cache, CacheSwr } from '../constants.js';
-import { buildPagination } from '../db/queries/builders.js';
-import type { DBClient, StreamerDB } from '../db/streamer-types.js';
-import type { GameNeighbor, GameResponse } from '../types/games.js';
-import { PLATFORM_VALUES } from '../types/platforms.js';
-import type { SWRKey } from '../utils/cache-keys.js';
-import { swrKeys } from '../utils/cache-keys.js';
-import { withStaleWhileRevalidate } from '../utils/cache.js';
-import { buildFtsQuery } from './vods.service.js';
+import { Cache, CacheSwr } from '../constants.ts';
+import { buildPagination } from '../db/queries/builders.ts';
+import type { DBClient, StreamerDB } from '../db/streamer-types.ts';
+import type { GameNeighbor, GameResponse } from '../types/games.ts';
+import { PLATFORM_VALUES } from '../types/platforms.ts';
+import { withStaleWhileRevalidate } from '../utils/cache.ts';
+import type { SWRKey } from '../utils/cache-keys.ts';
+import { swrKeys } from '../utils/cache-keys.ts';
+import { buildFtsQuery } from './vods.service.ts';
 
 /** Zod schema for validating games list query parameters. */
 export const GameQuerySchema = z.object({

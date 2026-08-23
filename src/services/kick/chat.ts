@@ -1,8 +1,8 @@
-import { Kick } from '../../constants.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { fetchUrl } from '../../utils/flaresolverr-client.js';
-import { createSession, type ImpitSession } from '../../utils/impit-wrapper.js';
-import { childLogger, type AppLogger } from '../../utils/logger.js';
+import { Kick } from '../../constants.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { fetchUrl } from '../../utils/flaresolverr-client.ts';
+import { createSession, type ImpitSession } from '../../utils/impit-wrapper.ts';
+import { type AppLogger, childLogger } from '../../utils/logger.ts';
 
 export interface KickMessageSenderIdentity {
   color?: string;

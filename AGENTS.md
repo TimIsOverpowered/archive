@@ -46,13 +46,13 @@ Skip context7 for:
 
 - pg, ioredis, redis (stable APIs)
 - bcrypt, dayjs, qs, helmet (stable)
-- TypeScript, ESLint, Prettier config
+- TypeScript, Biome config
 - General Node.js/Fastify patterns you're confident about
 
 ## After every file edit
 
 - Run `npx tsc --noEmit` to typecheck
-- Run `npm run lint` to see any eslint issues
+- Run `npm run lint` to see any lint issues
 - Run `npm test` to see if tests succeed or fail
 - Run `npm run format` to fix formatting issues
 - Do not move on to the next task until both pass

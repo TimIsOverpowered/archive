@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, before, after, beforeEach, afterEach, mock } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 
 // Mock the admin API key middleware so requests are not rejected during tests.
 mock.module('../../../../src/api/middleware/admin-api-key.js', {
@@ -30,9 +30,9 @@ mock.module('../../../../src/services/meta-tenants.service.js', {
   },
 });
 
-const { default: tenantsRoutes } = await import('../../../../src/api/routes/admin/tenants.routes.js');
-const { configService } = await import('../../../../src/config/tenant-config.js');
-const { buildTestServer } = await import('../../../helpers/build-test-server.js');
+const { default: tenantsRoutes } = await import('../../../../src/api/routes/admin/tenants.routes.ts');
+const { configService } = await import('../../../../src/config/tenant-config.ts');
+const { buildTestServer } = await import('../../../helpers/build-test-server.ts');
 
 describe('admin tenants routes: config cache invalidation', () => {
   let server: any;

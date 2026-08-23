@@ -1,17 +1,17 @@
-import { RedisBatch } from '../constants.js';
-import { isConnectionError } from '../db/utils/errors.js';
-import { CacheKeys, simpleKeys, swrKeys } from '../utils/cache-keys.js';
-import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.js';
-import { defaultCacheContext } from '../utils/cache.js';
-import { extractErrorDetails } from '../utils/error.js';
-import { getLogger } from '../utils/logger.js';
-import { RedisService } from '../utils/redis-service.js';
+import { RedisBatch } from '../constants.ts';
+import { isConnectionError } from '../db/utils/errors.ts';
+import { defaultCacheContext } from '../utils/cache.ts';
+import { CacheKeys, simpleKeys, swrKeys } from '../utils/cache-keys.ts';
+import { isConnectionFailed, markConnectionFailed, markConnectionRestored } from '../utils/cache-state.ts';
+import { extractErrorDetails } from '../utils/error.ts';
+import { getLogger } from '../utils/logger.ts';
+import { RedisService } from '../utils/redis-service.ts';
 import {
-  invalidateVodTags,
-  invalidateVodQueries,
   invalidateChapterQueries,
+  invalidateVodQueries,
+  invalidateVodTags,
   invalidateVodVolatileCache,
-} from './cache-tags.js';
+} from './cache-tags.ts';
 
 export { invalidateVodVolatileCache };
 

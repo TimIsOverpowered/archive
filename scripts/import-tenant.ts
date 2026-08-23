@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 import 'dotenv/config';
-import * as fs from 'fs';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
-import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
-import type { InsertableTenants } from '../src/db/meta-types.js';
-import { getTenantById, createTenant } from '../src/services/meta-tenants.service.js';
-import { encryptObject, encryptScalar } from '../src/utils/encryption.js';
-import { extractErrorDetails } from '../src/utils/error.js';
-import { prompt, closeStdin } from './stdin.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { closeMetaClient, initMetaClient } from '../src/db/meta-client.ts';
+import type { InsertableTenants } from '../src/db/meta-types.ts';
+import { createTenant, getTenantById } from '../src/services/meta-tenants.service.ts';
+import { encryptObject, encryptScalar } from '../src/utils/encryption.ts';
+import { extractErrorDetails } from '../src/utils/error.ts';
+import { closeStdin, prompt } from './stdin.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

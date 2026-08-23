@@ -1,6 +1,6 @@
-import { Twitch } from '../../constants.js';
-import { retryWithBackoff } from '../../utils/retry.js';
-import { createTwitchGqlClient } from './client.js';
+import { Twitch } from '../../constants.ts';
+import { retryWithBackoff } from '../../utils/retry.ts';
+import { createTwitchGqlClient } from './client.ts';
 
 function getTwitchGqlClient(tenantId?: string) {
   return createTwitchGqlClient(tenantId);

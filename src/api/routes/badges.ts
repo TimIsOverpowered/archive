@@ -1,15 +1,15 @@
 import type { FastifyInstance } from 'fastify';
-import { configService } from '../../config/tenant-config.js';
-import { Cache } from '../../constants.js';
-import { getKickChannelBadges } from '../../services/kick/index.js';
-import { getChannelBadges, getGlobalBadges } from '../../services/twitch/index.js';
-import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { simpleKeys } from '../../utils/cache-keys.js';
-import { defaultCacheContext } from '../../utils/cache.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { notFound } from '../../utils/http-error.js';
-import createRateLimitMiddleware from '../middleware/rate-limit.js';
-import { errorResponse, ok } from '../response.js';
+import { configService } from '../../config/tenant-config.ts';
+import { Cache } from '../../constants.ts';
+import { getKickChannelBadges } from '../../services/kick/index.ts';
+import { getChannelBadges, getGlobalBadges } from '../../services/twitch/index.ts';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.ts';
+import { defaultCacheContext } from '../../utils/cache.ts';
+import { simpleKeys } from '../../utils/cache-keys.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { notFound } from '../../utils/http-error.ts';
+import createRateLimitMiddleware from '../middleware/rate-limit.ts';
+import { errorResponse, ok } from '../response.ts';
 
 /** Options for registering the badges routes plugin. */
 interface BadgesRoutesOptions {

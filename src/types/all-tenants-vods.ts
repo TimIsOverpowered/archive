@@ -1,4 +1,4 @@
-import type { Platform } from './platforms.js';
+import type { Platform } from './platforms.ts';
 
 export interface AllTenantsVod {
   tenantId: string;

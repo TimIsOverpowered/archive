@@ -1,12 +1,12 @@
 import { google } from 'googleapis';
-import { getWorkersConfig } from '../../config/env.js';
-import type { YoutubeAuthObject } from '../../config/schemas.js';
-import { configService } from '../../config/tenant-config.js';
-import { getMetaClient } from '../../db/meta-client.js';
-import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { ConfigNotConfiguredError } from '../../utils/domain-errors.js';
-import { encryptObject, encryptScalar } from '../../utils/encryption.js';
-import { extractErrorDetails } from '../../utils/error.js';
+import { getWorkersConfig } from '../../config/env.ts';
+import type { YoutubeAuthObject } from '../../config/schemas.ts';
+import { configService } from '../../config/tenant-config.ts';
+import { getMetaClient } from '../../db/meta-client.ts';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.ts';
+import { ConfigNotConfiguredError } from '../../utils/domain-errors.ts';
+import { encryptObject, encryptScalar } from '../../utils/encryption.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
 
 const REDIRECT_URI = 'https://developers.google.com/oauthplayground';
 
@@ -154,4 +154,4 @@ export async function getYoutubeAuth(tenantId: string): Promise<{
   };
 }
 
-export { updateYoutubeTokenInDb, REDIRECT_URI };
+export { REDIRECT_URI, updateYoutubeTokenInDb };

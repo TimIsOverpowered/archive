@@ -1,9 +1,9 @@
-import { FastifyRequest } from 'fastify';
+import type { FastifyRequest } from 'fastify';
 import type { Kysely } from 'kysely';
-import { Routing } from '../constants.js';
-import type { StreamerDB } from '../db/streamer-types.js';
-import { resolveVodIdByPlatformVodId } from '../services/vods.service.js';
-import { notFound } from '../utils/http-error.js';
+import { Routing } from '../constants.ts';
+import type { StreamerDB } from '../db/streamer-types.ts';
+import { resolveVodIdByPlatformVodId } from '../services/vods.service.ts';
+import { notFound } from '../utils/http-error.ts';
 
 /**
  * Creates an AbortController that aborts when the underlying HTTP request closes.
@@ -32,7 +32,7 @@ export async function resolveVodDbId(
   notFoundMessage = 'VOD not found'
 ): Promise<number> {
   const parsedAsInt = parseInt(rawVodId, 10);
-  const isStrictInt = !isNaN(parsedAsInt) && String(parsedAsInt) === rawVodId;
+  const isStrictInt = !Number.isNaN(parsedAsInt) && String(parsedAsInt) === rawVodId;
 
   if (isStrictInt && parsedAsInt < Routing.LEGACY_ID_THRESHOLD) {
     return parsedAsInt;

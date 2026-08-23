@@ -1,12 +1,12 @@
 import type {
   ColumnType,
   Generated,
+  Insertable,
   JSONColumnType,
   Kysely,
   Selectable,
-  Insertable,
-  Updateable,
   Transaction,
+  Updateable,
 } from 'kysely';
 
 export interface StreamerDB {

@@ -1,5 +1,5 @@
-import { extractErrorDetails } from './error.js';
-import { getLogger } from './logger.js';
+import { extractErrorDetails } from './error.ts';
+import { getLogger } from './logger.ts';
 
 export function registerProcessErrorHandlers(): void {
   process.on('unhandledRejection', (reason) => {

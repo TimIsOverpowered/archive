@@ -1,9 +1,9 @@
 import { LRUCache } from 'lru-cache';
-import { configService } from '../../config/tenant-config.js';
-import { Kick } from '../../constants.js';
-import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { fetchUrl } from '../../utils/flaresolverr-client.js';
+import { configService } from '../../config/tenant-config.ts';
+import { Kick } from '../../constants.ts';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { fetchUrl } from '../../utils/flaresolverr-client.ts';
 
 const log = createAutoLogger('kick-badges');
 

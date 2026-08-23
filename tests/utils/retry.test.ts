@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { retryWithBackoff } from '../../src/utils/retry.js';
+import { retryWithBackoff } from '../../src/utils/retry.ts';
 
 describe('Retry with Backoff', () => {
   describe('successful operation', () => {

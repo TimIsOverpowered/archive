@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
-import { getEncryptionKeyBuffer } from '../config/env.js';
-import { Encryption } from '../constants.js';
+import { getEncryptionKeyBuffer } from '../config/env.ts';
+import { Encryption } from '../constants.ts';
 
 const ALGORITHM = 'aes-256-gcm';
 

@@ -1,10 +1,10 @@
-import { Jobs } from '../../constants.js';
-import type { Platform } from '../../types/platforms.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { childLogger } from '../../utils/logger.js';
-import { defaultJobOptions, getFileCopyQueue, getFlowProducer, getStandardVodQueue } from '../queues/queue.js';
-import { enqueueJobWithLogging } from './enqueue.js';
-import type { CopyFileJob } from './types.js';
+import { Jobs } from '../../constants.ts';
+import type { Platform } from '../../types/platforms.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { childLogger } from '../../utils/logger.ts';
+import { defaultJobOptions, getFileCopyQueue, getFlowProducer, getStandardVodQueue } from '../queues/queue.ts';
+import { enqueueJobWithLogging } from './enqueue.ts';
+import type { CopyFileJob } from './types.ts';
 
 const log = childLogger({ module: 'copy-job' });
 

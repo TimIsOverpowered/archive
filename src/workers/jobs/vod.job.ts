@@ -1,10 +1,10 @@
-import { Jobs } from '../../constants.js';
-import type { Platform, DownloadMethod } from '../../types/platforms.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { childLogger } from '../../utils/logger.js';
-import { getStandardVodQueue } from '../queues/queue.js';
-import { enqueueJobWithLogging } from './enqueue.js';
-import type { StandardVodJob } from './types.js';
+import { Jobs } from '../../constants.ts';
+import type { DownloadMethod, Platform } from '../../types/platforms.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { childLogger } from '../../utils/logger.ts';
+import { getStandardVodQueue } from '../queues/queue.ts';
+import { enqueueJobWithLogging } from './enqueue.ts';
+import type { StandardVodJob } from './types.ts';
 
 const log = childLogger({ module: 'vod-job' });
 

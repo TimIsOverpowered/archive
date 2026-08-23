@@ -1,5 +1,5 @@
-import { createRedisSubscriber } from '../utils/redis-subscriber.js';
-import { configService } from './tenant-config.js';
+import { createRedisSubscriber } from '../utils/redis-subscriber.ts';
+import { configService } from './tenant-config.ts';
 
 const CONFIG_CHANNEL = 'cache:tenant';
 

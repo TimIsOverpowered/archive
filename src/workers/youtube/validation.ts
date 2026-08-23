@@ -1,4 +1,4 @@
-import { YouTube } from '../../constants.js';
+import { YouTube } from '../../constants.ts';
 
 /**
  * Validates and returns effective YouTube split duration.

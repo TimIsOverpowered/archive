@@ -1,20 +1,20 @@
 import type { Job } from 'bullmq';
 import type { Kysely } from 'kysely';
-import { getDisplayName, TenantConfig } from '../config/types.js';
-import type { StreamerDB } from '../db/streamer-types.js';
-import { publishVodUpdate } from '../services/cache-invalidator.js';
-import { saveUploadResult, markUploadFailed } from '../services/youtube/upload.js';
-import type { Platform, SourceType, UploadType } from '../types/platforms.js';
-import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { resetFailures } from '../utils/discord-alerts.js';
-import { ConfigNotConfiguredError } from '../utils/domain-errors.js';
-import type { AppLogger } from '../utils/logger.js';
-import type { YoutubeUploadJob, YoutubeUploadResult } from './jobs/types.js';
-import { getJobContext } from './utils/job-context.js';
-import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
-import { processGameUpload } from './youtube/game-upload-processor.js';
-import { getEffectiveSplitDuration } from './youtube/validation.js';
-import { processVodUpload, linkVodPartsAfterDelay } from './youtube/vod-upload-processor.js';
+import { getDisplayName, type TenantConfig } from '../config/types.ts';
+import type { StreamerDB } from '../db/streamer-types.ts';
+import { publishVodUpdate } from '../services/cache-invalidator.ts';
+import { markUploadFailed, saveUploadResult } from '../services/youtube/upload.ts';
+import type { Platform, SourceType, UploadType } from '../types/platforms.ts';
+import { createAutoLogger } from '../utils/auto-tenant-logger.ts';
+import { resetFailures } from '../utils/discord-alerts.ts';
+import { ConfigNotConfiguredError } from '../utils/domain-errors.ts';
+import type { AppLogger } from '../utils/logger.ts';
+import type { YoutubeUploadJob, YoutubeUploadResult } from './jobs/types.ts';
+import { getJobContext } from './utils/job-context.ts';
+import { wrapWorkerProcessor } from './utils/worker-wrapper.ts';
+import { processGameUpload } from './youtube/game-upload-processor.ts';
+import { getEffectiveSplitDuration } from './youtube/validation.ts';
+import { linkVodPartsAfterDelay, processVodUpload } from './youtube/vod-upload-processor.ts';
 
 interface YoutubeProcessorContext {
   log: AppLogger;

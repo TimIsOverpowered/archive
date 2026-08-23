@@ -1,17 +1,17 @@
-import { requirePlatformConfig } from '../../config/types.js';
-import { PLATFORMS } from '../../types/platforms.js';
-import { toUtcDate, toUtcISO } from '../../utils/datetime.js';
-import { createErrorContext } from '../../utils/error.js';
-import { getLogger } from '../../utils/logger.js';
-import { retryWithBackoff } from '../../utils/retry.js';
+import { requirePlatformConfig } from '../../config/types.ts';
+import { PLATFORMS } from '../../types/platforms.ts';
+import { toUtcDate, toUtcISO } from '../../utils/datetime.ts';
+import { createErrorContext } from '../../utils/error.ts';
+import { getLogger } from '../../utils/logger.ts';
+import { retryWithBackoff } from '../../utils/retry.ts';
 import type {
   PlatformStrategy,
   PlatformStreamStatus,
   PlatformVodMetadata,
   VodCreateData,
   VodUpdateData,
-} from '../platforms/strategy.js';
-import { getKickStreamStatus, getLatestKickVodObject, getVod, finalizeKickChapters } from './index.js';
+} from '../platforms/strategy.ts';
+import { finalizeKickChapters, getKickStreamStatus, getLatestKickVodObject, getVod } from './index.ts';
 export const strategy: PlatformStrategy<VodCreateData, VodUpdateData> = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
     const { config, platform } = ctx;

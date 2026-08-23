@@ -1,8 +1,8 @@
 import { LRUCache } from 'lru-cache';
-import { getBaseConfig } from '../config/env.js';
-import { Flaresolverr } from '../constants.js';
-import { extractErrorDetails } from './error.js';
-import { getLogger } from './logger.js';
+import { getBaseConfig } from '../config/env.ts';
+import { Flaresolverr } from '../constants.ts';
+import { extractErrorDetails } from './error.ts';
+import { getLogger } from './logger.ts';
 
 interface FlareSolverrStatusResponse {
   status: string;

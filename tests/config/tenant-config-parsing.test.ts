@@ -1,8 +1,8 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach, mock } from 'node:test';
-import { SettingsSchema, TwitchSchema, YoutubeSchema, KickSchema } from '../../src/config/schemas.js';
-import type { SelectableTenants } from '../../src/db/meta-types.js';
-import { RedisService } from '../../src/utils/redis-service.js';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { KickSchema, SettingsSchema, TwitchSchema, YoutubeSchema } from '../../src/config/schemas.ts';
+import type { SelectableTenants } from '../../src/db/meta-types.ts';
+import { RedisService } from '../../src/utils/redis-service.ts';
 
 // Hoist mock functions so we can alter their implementations in specific tests
 const mockGetAllTenants = mock.fn<() => Promise<SelectableTenants[]>>(async () => []);
@@ -24,12 +24,12 @@ mock.module('../../src/db/meta-client.js', {
   },
 });
 
-const { buildTenantConfig, configService } = await import('../../src/config/tenant-config.js');
+const { buildTenantConfig, configService } = await import('../../src/config/tenant-config.ts');
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 function setupBaseEnv(): void {
-  Object.keys(process.env).forEach((key) => delete process.env[key]);
+  for (const key of Object.keys(process.env)) delete process.env[key];
   process.env.REDIS_URL = 'redis://localhost';
   process.env.META_DATABASE_URL = 'postgresql://meta';
   process.env.PGBOUNCER_URL = 'postgresql://bouncer';

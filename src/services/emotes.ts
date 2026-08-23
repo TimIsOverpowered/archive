@@ -1,15 +1,15 @@
-import { EmoteUpsertSchema } from '../config/schemas.js';
-import { Cache, Emote } from '../constants.js';
-import { withDbRetry } from '../db/streamer-client.js';
-import type { DBClient } from '../db/streamer-types.js';
-import { TenantContext } from '../types/context.js';
-import { simpleKeys } from '../utils/cache-keys.js';
-import { defaultCacheContext } from '../utils/cache.js';
-import { extractErrorDetails } from '../utils/error.js';
-import { safeRequest } from '../utils/http-client.js';
-import { getLogger } from '../utils/logger.js';
-import { publishVodUpdate } from './cache-invalidator.js';
-import { invalidateEmoteCache } from './vod-cache.js';
+import { EmoteUpsertSchema } from '../config/schemas.ts';
+import { Cache, Emote } from '../constants.ts';
+import { withDbRetry } from '../db/streamer-client.ts';
+import type { DBClient } from '../db/streamer-types.ts';
+import type { TenantContext } from '../types/context.ts';
+import { defaultCacheContext } from '../utils/cache.ts';
+import { simpleKeys } from '../utils/cache-keys.ts';
+import { extractErrorDetails } from '../utils/error.ts';
+import { safeRequest } from '../utils/http-client.ts';
+import { getLogger } from '../utils/logger.ts';
+import { publishVodUpdate } from './cache-invalidator.ts';
+import { invalidateEmoteCache } from './vod-cache.ts';
 
 /** Single emote from a third-party provider (FFZ, BTTV, 7TV). */
 export interface EmoteData {

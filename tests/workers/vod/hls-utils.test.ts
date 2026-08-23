@@ -1,7 +1,7 @@
-import fsPromises from 'fs/promises';
 import { strict as assert } from 'node:assert';
+import fsPromises from 'node:fs/promises';
 import { describe, it } from 'node:test';
-import { cleanupOrphanedTmpFiles } from '../../../src/workers/vod/hls-utils.js';
+import { cleanupOrphanedTmpFiles } from '../../../src/workers/vod/hls-utils.ts';
 
 describe('cleanupOrphanedTmpFiles', () => {
   it('should not throw when directory is empty', async () => {

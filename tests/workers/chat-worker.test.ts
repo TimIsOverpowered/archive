@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import chatProcessor from '../../src/workers/chat.worker.js';
+import chatProcessor from '../../src/workers/chat.worker.ts';
 
 describe('Chat Worker', () => {
   it('should process Kick platform (fails without tenant)', async () => {

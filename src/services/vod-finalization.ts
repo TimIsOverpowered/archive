@@ -1,11 +1,11 @@
 import { treeifyError } from 'zod';
-import { VodUpdateSchema } from '../config/schemas.js';
-import { withDbRetry } from '../db/streamer-client.js';
-import { TenantContext } from '../types/context.js';
-import { Platform } from '../types/platforms.js';
-import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { publishVodDurationUpdate, publishVodUpdate } from './cache-invalidator.js';
-import { getStrategy } from './platforms/strategy.js';
+import { VodUpdateSchema } from '../config/schemas.ts';
+import { withDbRetry } from '../db/streamer-client.ts';
+import type { TenantContext } from '../types/context.ts';
+import type { Platform } from '../types/platforms.ts';
+import { createAutoLogger } from '../utils/auto-tenant-logger.ts';
+import { publishVodDurationUpdate, publishVodUpdate } from './cache-invalidator.ts';
+import { getStrategy } from './platforms/strategy.ts';
 
 /** Options for finalizing a VOD after download completes. */
 export interface FinalizeVodOptions {

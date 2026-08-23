@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, mock } from 'node:test';
-import { resetEnvConfig } from '../../../../../src/config/env.js';
-import { SOURCE_TYPES } from '../../../../../src/types/platforms.js';
+import { beforeEach, describe, it, mock } from 'node:test';
+import { resetEnvConfig } from '../../../../../src/config/env.ts';
+import { SOURCE_TYPES } from '../../../../../src/types/platforms.ts';
 
 // Storage path env (tests/setup.ts also sets these); kept here for self-containment.
 process.env.TMP_PATH = '/tmp/test-tmp';
@@ -75,7 +75,7 @@ mock.module('../../../../../src/api/middleware/tenant-platform.js', {
 });
 
 // System Under Test — dynamically imported AFTER mock.module registrations.
-const { ensureVodDownload } = await import('../../../../../src/api/routes/admin/utils/vod-downloads.js');
+const { ensureVodDownload } = await import('../../../../../src/api/routes/admin/utils/vod-downloads.ts');
 
 const ctx: any = { tenantId: 'tenant-1', platform: 'twitch', db: {}, config: {} };
 const log: any = { info: () => {}, debug: () => {}, warn: () => {}, error: () => {} };

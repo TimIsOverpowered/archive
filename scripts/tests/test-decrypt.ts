@@ -9,9 +9,9 @@
 
 import 'dotenv/config';
 import { program } from 'commander';
-import { initMetaClient, closeMetaClient } from '../../src/db/meta-client.js';
-import { getTenantById, getAllTenants } from '../../src/services/meta-tenants.service.js';
-import { decryptScalar, decryptObject } from '../../src/utils/encryption.js';
+import { closeMetaClient, initMetaClient } from '../../src/db/meta-client.ts';
+import { getAllTenants, getTenantById } from '../../src/services/meta-tenants.service.ts';
+import { decryptObject, decryptScalar } from '../../src/utils/encryption.ts';
 
 interface DecryptionResult {
   raw: string | null;
@@ -25,7 +25,7 @@ async function decryptField(value: string | null): Promise<DecryptionResult> {
 
   try {
     // Try to parse as JSON first (some fields might be stored unencrypted for debugging)
-    let parsedValue;
+    let parsedValue: unknown;
     try {
       parsedValue = JSON.parse(value);
     } catch {
@@ -176,7 +176,7 @@ async function main(): Promise<void> {
     }
 
     // Display header with warning
-    console.log('\n' + '='.repeat(70));
+    console.log(`\n${'='.repeat(70)}`);
     console.warn('⚠️  DANGEROUS: This displays decrypted secrets! ⚠️');
     console.log('='.repeat(70));
     console.log(`\nTenant ID: ${tenant.id}`);

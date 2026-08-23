@@ -2,9 +2,9 @@
  * Global TypeScript type declarations for shared state across modules.
  */
 import type { Redis } from 'ioredis';
-import type { RateLimiterRedis, RateLimiterMemory } from 'rate-limiter-flexible';
-import type { AdminContext } from '../api/middleware/admin-api-key.js';
-import type { TenantContext } from './context.js';
+import type { RateLimiterMemory, RateLimiterRedis } from 'rate-limiter-flexible';
+import type { AdminContext } from '../api/middleware/admin-api-key.ts';
+import type { TenantContext } from './context.ts';
 
 type RateLimiter = RateLimiterRedis | RateLimiterMemory;
 

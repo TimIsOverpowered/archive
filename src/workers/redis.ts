@@ -1,5 +1,5 @@
-import { getWorkersConfig } from '../config/env.js';
-import { RedisService } from '../utils/redis-service.js';
+import { getWorkersConfig } from '../config/env.ts';
+import { RedisService } from '../utils/redis-service.ts';
 
 let initPromise: Promise<void> | null = null;
 
@@ -9,7 +9,7 @@ export function getRedisInstance() {
 
 export async function initWorkersRedis(): Promise<void> {
   if (RedisService.instance) return;
-  if (initPromise) return initPromise;
+  if (initPromise !== null) return initPromise;
 
   initPromise = (async () => {
     const url = getWorkersConfig().REDIS_URL;

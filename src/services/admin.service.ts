@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcrypt';
-import { getMetaClient } from '../db/meta-client.js';
-import type { SelectableAdmins, InsertableAdmins, UpdateableAdmins } from '../db/meta-types.js';
+import { getMetaClient } from '../db/meta-client.ts';
+import type { InsertableAdmins, SelectableAdmins, UpdateableAdmins } from '../db/meta-types.ts';
 
 const adminSelect = ['id', 'username', 'created_at'] as const;
 const adminAuthSelect = [...adminSelect, 'api_key_hash'] as const;

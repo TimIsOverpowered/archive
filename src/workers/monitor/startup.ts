@@ -1,11 +1,11 @@
-import { configService } from '../../config/tenant-config.js';
-import type { TenantConfig } from '../../config/types.js';
-import { requirePlatformConfig } from '../../config/types.js';
-import { Http, Monitor } from '../../constants.js';
-import { PLATFORMS, PLATFORM_VALUES } from '../../types/platforms.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { getLogger } from '../../utils/logger.js';
-import { getMonitorQueue } from '../queues/queue.js';
+import { configService } from '../../config/tenant-config.ts';
+import type { TenantConfig } from '../../config/types.ts';
+import { requirePlatformConfig } from '../../config/types.ts';
+import { Http, Monitor } from '../../constants.ts';
+import { PLATFORM_VALUES, PLATFORMS } from '../../types/platforms.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { getLogger } from '../../utils/logger.ts';
+import { getMonitorQueue } from '../queues/queue.ts';
 
 export async function registerMonitorRepeatJob(config: TenantConfig): Promise<void> {
   const queue = getMonitorQueue();

@@ -1,8 +1,7 @@
-import { Platform } from '../types/platforms.js';
-import type { TwitchConfig, YouTubeConfig, KickConfig, TenantSettings } from './schemas.js';
+import type { Platform } from '../types/platforms.ts';
+import type { KickConfig, TenantSettings, TwitchConfig, YouTubeConfig } from './schemas.ts';
 
-export type { TwitchConfig, YouTubeConfig, KickConfig, TenantSettings } from './schemas.js';
-export type { TenantCdn } from './schemas.js';
+export type { KickConfig, TenantCdn, TenantSettings, TwitchConfig, YouTubeConfig } from './schemas.ts';
 
 export interface TenantBase {
   id: string;

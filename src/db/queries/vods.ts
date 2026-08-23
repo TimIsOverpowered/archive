@@ -1,6 +1,6 @@
 import type { Kysely } from 'kysely';
-import type { Platform } from '../../types/platforms.js';
-import type { StreamerDB, SelectableVods } from '../streamer-types.js';
+import type { Platform } from '../../types/platforms.ts';
+import type { SelectableVods, StreamerDB } from '../streamer-types.ts';
 
 type VodByIdResult = Pick<
   SelectableVods,

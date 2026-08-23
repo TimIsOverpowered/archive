@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { ChapterLibraryQuerySchema } from '../../src/services/chapters.service.js';
-import { GameLibraryQuerySchema, GameQuerySchema } from '../../src/services/games.service.js';
+import { ChapterLibraryQuerySchema } from '../../src/services/chapters.service.ts';
+import { GameLibraryQuerySchema, GameQuerySchema } from '../../src/services/games.service.ts';
 
 describe('ChaptersService: ChapterLibraryQuerySchema', () => {
   it('should parse valid query with defaults', () => {

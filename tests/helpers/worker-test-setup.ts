@@ -1,15 +1,15 @@
 import { mock } from 'node:test';
-import { resetEnvConfig } from '../../src/config/env.js';
+import { resetEnvConfig } from '../../src/config/env.ts';
 import type {
+  DatabaseConfig,
+  KickConfig,
   TenantConfig,
+  TenantSettings,
   TwitchConfig,
   YouTubeConfig,
-  KickConfig,
-  TenantSettings,
-  DatabaseConfig,
-} from '../../src/config/types.js';
-import { poolManager, resetClientManager } from '../../src/db/streamer-client.js';
-import { RedisService } from '../../src/utils/redis-service.js';
+} from '../../src/config/types.ts';
+import { poolManager, resetClientManager } from '../../src/db/streamer-client.ts';
+import { RedisService } from '../../src/utils/redis-service.ts';
 
 export interface MockTenantConfigOverrides {
   id?: string;
@@ -82,7 +82,7 @@ export function createMockTenantConfig(overrides: MockTenantConfigOverrides = {}
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 export function setupBaseEnv(vodPath?: string): void {
-  Object.keys(process.env).forEach((key) => delete process.env[key]);
+  for (const key of Object.keys(process.env)) delete process.env[key];
   process.env.REDIS_URL = 'redis://localhost';
   process.env.META_DATABASE_URL = 'postgresql://meta';
   process.env.PGBOUNCER_URL = 'postgresql://bouncer';

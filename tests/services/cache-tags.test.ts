@@ -1,10 +1,10 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import { resetEnvConfig } from '../../src/config/env.js';
-import { Cache } from '../../src/constants.js';
-import { registerVodTags, invalidateTenantListCache } from '../../src/services/cache-tags.js';
-import { markConnectionFailed, markConnectionRestored, cacheStateBreaker } from '../../src/utils/cache-state.js';
-import { RedisService } from '../../src/utils/redis-service.js';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { resetEnvConfig } from '../../src/config/env.ts';
+import { Cache } from '../../src/constants.ts';
+import { invalidateTenantListCache, registerVodTags } from '../../src/services/cache-tags.ts';
+import { cacheStateBreaker, markConnectionFailed, markConnectionRestored } from '../../src/utils/cache-state.ts';
+import { RedisService } from '../../src/utils/redis-service.ts';
 
 describe('CacheTags: registerVodTags', () => {
   let mockClient: any;

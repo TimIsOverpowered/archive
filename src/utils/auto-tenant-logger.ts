@@ -1,7 +1,7 @@
 import type { LogFn } from 'pino';
-import { configService } from '../config/tenant-config.js';
-import { type AppLogger, getLogger } from './logger.js';
-import { asJsonObject } from './object.js';
+import { configService } from '../config/tenant-config.ts';
+import { type AppLogger, getLogger } from './logger.ts';
+import { asJsonObject } from './object.ts';
 
 type WrappedLogFn = (msg: string | Record<string, unknown>, ...args: unknown[]) => void;
 

@@ -1,27 +1,27 @@
 import fs from 'node:fs/promises';
 import type { BaseJobOptions } from 'bullmq';
 import type { Kysely } from 'kysely';
-import { getTmpPath } from '../../config/env.js';
-import type { TenantConfig } from '../../config/types.js';
-import { requirePlatformConfig } from '../../config/types.js';
-import { Jobs } from '../../constants.js';
-import type { ActiveLiveVodResult } from '../../db/queries/vods.js';
-import { findVodByStreamId, findVodByPlatformId } from '../../db/queries/vods.js';
-import type { StreamerDB, InsertableVods, SelectableVods } from '../../db/streamer-types.js';
-import { publishVodUpdate } from '../../services/cache-invalidator.js';
-import { getStrategy, type PlatformStreamStatus, type PlatformVodMetadata } from '../../services/platforms/index.js';
-import type { TwitchStreamStatus } from '../../services/twitch/live.js';
-import { markVodOffline as markVodOfflineService } from '../../services/vod-finalization.js';
-import type { TenantContext } from '../../types/context.js';
-import type { Platform } from '../../types/platforms.js';
-import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { VodNotFoundError } from '../../utils/domain-errors.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { enqueueJobWithLogging } from '../jobs/enqueue.js';
-import type { LiveDownloadJob } from '../jobs/types.js';
-import { defaultJobOptions, getLiveDownloadQueue } from '../queues/queue.js';
-import { getJobContext } from '../utils/job-context.js';
-import { sendStreamLiveAlert } from './alert-helpers.js';
+import { getTmpPath } from '../../config/env.ts';
+import type { TenantConfig } from '../../config/types.ts';
+import { requirePlatformConfig } from '../../config/types.ts';
+import { Jobs } from '../../constants.ts';
+import type { ActiveLiveVodResult } from '../../db/queries/vods.ts';
+import { findVodByPlatformId, findVodByStreamId } from '../../db/queries/vods.ts';
+import type { InsertableVods, SelectableVods, StreamerDB } from '../../db/streamer-types.ts';
+import { publishVodUpdate } from '../../services/cache-invalidator.ts';
+import { getStrategy, type PlatformStreamStatus, type PlatformVodMetadata } from '../../services/platforms/index.ts';
+import type { TwitchStreamStatus } from '../../services/twitch/live.ts';
+import { markVodOffline as markVodOfflineService } from '../../services/vod-finalization.ts';
+import type { TenantContext } from '../../types/context.ts';
+import type { Platform } from '../../types/platforms.ts';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.ts';
+import { VodNotFoundError } from '../../utils/domain-errors.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { enqueueJobWithLogging } from '../jobs/enqueue.ts';
+import type { LiveDownloadJob } from '../jobs/types.ts';
+import { defaultJobOptions, getLiveDownloadQueue } from '../queues/queue.ts';
+import { getJobContext } from '../utils/job-context.ts';
+import { sendStreamLiveAlert } from './alert-helpers.ts';
 
 interface LiveStreamContext {
   db: Kysely<StreamerDB>;
@@ -131,7 +131,7 @@ export async function handlePlatformLiveCheckWithStreamStatus(
   }
   const { platformUserId, platformUsername } = platformInfo;
 
-  if (!twitchStatus || twitchStatus.type !== 'live') {
+  if (twitchStatus?.type !== 'live') {
     await handleOfflineStream(
       tenantId,
       platform,

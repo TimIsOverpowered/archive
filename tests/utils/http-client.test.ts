@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach, mock } from 'node:test';
-import { HttpError } from '../../src/utils/http-error.js';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { HttpError } from '../../src/utils/http-error.ts';
 
 // 1. Create the mock function first
 const mockUndiciRequest = mock.fn<(...args: any[]) => Promise<any>>();
@@ -15,15 +15,9 @@ mock.module('undici', {
         mockAgentInstances.push(opts ?? {});
       }
     },
-    Pool: class MockPool {
-      constructor(_origin: string, _opts?: Record<string, unknown>) {}
-    },
-    BalancedPool: class MockBalancedPool {
-      constructor(_origin: string, _opts?: Record<string, unknown>) {}
-    },
-    RetryAgent: class MockRetryAgent {
-      constructor(_dispatcher: any) {}
-    },
+    Pool: class MockPool {},
+    BalancedPool: class MockBalancedPool {},
+    RetryAgent: class MockRetryAgent {},
     Dispatcher: {},
     setGlobalDispatcher: () => {},
     intercept: () => ({}),
@@ -31,7 +25,7 @@ mock.module('undici', {
 });
 
 // 3. Dynamically import the system-under-test AFTER the mock is registered
-const { request } = await import('../../src/utils/http-client.js');
+const { request } = await import('../../src/utils/http-client.ts');
 
 describe('HTTP Client', () => {
   const originalSetTimeout = global.setTimeout;

@@ -1,15 +1,15 @@
-import { FastifyInstance } from 'fastify';
-import type { SourceType, DownloadMethod } from '../../../types/platforms.js';
-import { DOWNLOAD_METHODS, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES } from '../../../types/platforms.js';
-import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { badRequest } from '../../../utils/http-error.js';
-import { queueYoutubeGameUploadByGame } from '../../../workers/jobs/youtube.job.js';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import { tenantMiddleware, requireTenant } from '../../middleware/tenant-platform.js';
-import { ok } from '../../response.js';
-import { resolveGameWithContext, resolveChapterWithContext } from './utils/game-context.js';
-import { ensureVodDownload } from './utils/vod-downloads.js';
-import { buildVodJobResponse } from './utils/vod-job-response.js';
+import type { FastifyInstance } from 'fastify';
+import type { DownloadMethod, SourceType } from '../../../types/platforms.ts';
+import { DOWNLOAD_METHODS, DOWNLOAD_METHODS_VALUES, SOURCE_TYPES } from '../../../types/platforms.ts';
+import { createAutoLogger } from '../../../utils/auto-tenant-logger.ts';
+import { badRequest } from '../../../utils/http-error.ts';
+import { queueYoutubeGameUploadByGame } from '../../../workers/jobs/youtube.job.ts';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.ts';
+import { requireTenant, tenantMiddleware } from '../../middleware/tenant-platform.ts';
+import { ok } from '../../response.ts';
+import { resolveChapterWithContext, resolveGameWithContext } from './utils/game-context.ts';
+import { ensureVodDownload } from './utils/vod-downloads.ts';
+import { buildVodJobResponse } from './utils/vod-job-response.ts';
 
 interface ReUploadGameParams {
   tenantId: string;

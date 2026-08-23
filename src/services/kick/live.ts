@@ -1,8 +1,8 @@
-import { Kick } from '../../constants.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { fetchUrl } from '../../utils/flaresolverr-client.js';
-import { getLogger } from '../../utils/logger.js';
-import { KickVod } from './vod.js';
+import { Kick } from '../../constants.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { fetchUrl } from '../../utils/flaresolverr-client.ts';
+import { getLogger } from '../../utils/logger.ts';
+import type { KickVod } from './vod.ts';
 
 export interface KickCategoryRaw {
   id: number;
@@ -134,8 +134,8 @@ export async function getLatestKickVodObject(
 
     const vodObject = dataArray.find((v: KickVod) => {
       if (v == null || typeof v !== 'object') return false;
-      if (String(v.id) != expectedStreamId) return false;
-      if (expectedUserId != null && String(v.channel_id) != expectedUserId) return false;
+      if (String(v.id) !== expectedStreamId) return false;
+      if (expectedUserId != null && String(v.channel_id) !== expectedUserId) return false;
       return true;
     });
 

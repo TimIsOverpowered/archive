@@ -1,4 +1,4 @@
-import type { DMCAClaim } from '../../../../workers/dmca/dmca.js';
+import type { DMCAClaim } from '../../../../workers/dmca/dmca.ts';
 
 interface NewDmcaClaimInput {
   matchType: string;
@@ -15,14 +15,16 @@ interface NewDmcaClaimInput {
 export function parseDmcaClaims(claims: NewDmcaClaimInput[] | string): DMCAClaim[] {
   const arr: NewDmcaClaimInput[] = Array.isArray(claims) ? claims : (JSON.parse(claims) as NewDmcaClaimInput[]);
 
-  return arr.map((claim): DMCAClaim => ({
-    matchType: claim.matchType as DMCAClaim['matchType'],
-    videoSegment: {
-      startMillis: Number(claim.videoSegment.startMillis),
-      endMillis: Number(claim.videoSegment.endMillis),
-    },
-    ...(claim.claimId != null && { claimId: claim.claimId }),
-    ...(claim.assetId != null && { assetId: claim.assetId }),
-    ...(claim.asset != null && { asset: claim.asset }),
-  }));
+  return arr.map(
+    (claim): DMCAClaim => ({
+      matchType: claim.matchType as DMCAClaim['matchType'],
+      videoSegment: {
+        startMillis: Number(claim.videoSegment.startMillis),
+        endMillis: Number(claim.videoSegment.endMillis),
+      },
+      ...(claim.claimId != null && { claimId: claim.claimId }),
+      ...(claim.assetId != null && { assetId: claim.assetId }),
+      ...(claim.asset != null && { asset: claim.asset }),
+    })
+  );
 }

@@ -1,28 +1,28 @@
-import { FastifyInstance } from 'fastify';
-import { findVodByPlatformId } from '../../../db/queries/vods.js';
-import type { Platform, SourceType, DownloadMethod } from '../../../types/platforms.js';
+import type { FastifyInstance } from 'fastify';
+import { findVodByPlatformId } from '../../../db/queries/vods.ts';
+import type { DownloadMethod, Platform, SourceType } from '../../../types/platforms.ts';
 import {
+  DOWNLOAD_METHODS,
+  DOWNLOAD_METHODS_VALUES,
   PLATFORM_VALUES,
   SOURCE_TYPES,
   SOURCE_TYPES_VALUES,
-  DOWNLOAD_METHODS_VALUES,
-  DOWNLOAD_METHODS,
-} from '../../../types/platforms.js';
-import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { notFound, internalServerError } from '../../../utils/http-error.js';
-import { getTmpDirPath } from '../../../utils/path.js';
-import { queueDmcaProcessing } from '../../../workers/jobs/dmca.job.js';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
+} from '../../../types/platforms.ts';
+import { createAutoLogger } from '../../../utils/auto-tenant-logger.ts';
+import { internalServerError, notFound } from '../../../utils/http-error.ts';
+import { getTmpDirPath } from '../../../utils/path.ts';
+import { queueDmcaProcessing } from '../../../workers/jobs/dmca.job.ts';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.ts';
 import {
-  tenantMiddleware,
-  platformValidationMiddleware,
   asTenantPlatformContext,
+  platformValidationMiddleware,
   requireTenant,
-} from '../../middleware/tenant-platform.js';
-import { parseDmcaClaims } from './utils/dmca.js';
-import { resolveGameWithContext } from './utils/game-context.js';
-import { ensureVodDownload } from './utils/vod-downloads.js';
-import { buildVodJobResponse } from './utils/vod-job-response.js';
+  tenantMiddleware,
+} from '../../middleware/tenant-platform.ts';
+import { parseDmcaClaims } from './utils/dmca.ts';
+import { resolveGameWithContext } from './utils/game-context.ts';
+import { ensureVodDownload } from './utils/vod-downloads.ts';
+import { buildVodJobResponse } from './utils/vod-job-response.ts';
 
 /** DMCA claim entry with new format. */
 interface DmcaClaimInput {

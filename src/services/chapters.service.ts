@@ -1,12 +1,12 @@
 import { sql } from 'kysely';
 import type { ReadonlyKysely } from 'kysely/readonly';
 import { z } from 'zod';
-import { Cache, CacheSwr } from '../constants.js';
-import { buildPagination } from '../db/queries/builders.js';
-import type { StreamerDB } from '../db/streamer-types.js';
-import type { SWRKey } from '../utils/cache-keys.js';
-import { swrKeys } from '../utils/cache-keys.js';
-import { withStaleWhileRevalidate } from '../utils/cache.js';
+import { Cache, CacheSwr } from '../constants.ts';
+import { buildPagination } from '../db/queries/builders.ts';
+import type { StreamerDB } from '../db/streamer-types.ts';
+import { withStaleWhileRevalidate } from '../utils/cache.ts';
+import type { SWRKey } from '../utils/cache-keys.ts';
+import { swrKeys } from '../utils/cache-keys.ts';
 
 /** Zod schema for validating chapters library query parameters. */
 export const ChapterLibraryQuerySchema = z.object({

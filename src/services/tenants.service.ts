@@ -1,15 +1,15 @@
 import dayjs from 'dayjs';
-import { sql } from 'kysely';
 import type { ExpressionBuilder, Kysely } from 'kysely';
-import { configService } from '../config/tenant-config.js';
-import type { TenantConfig } from '../config/types.js';
-import type { StreamerDB } from '../db/streamer-types.js';
-import { PLATFORMS } from '../types/platforms.js';
-import { simpleKeys } from '../utils/cache-keys.js';
-import { withCache } from '../utils/cache.js';
-import { TenantNotFoundError } from '../utils/domain-errors.js';
-import { toPercentage } from '../utils/formatting.js';
-import { getLogger } from '../utils/logger.js';
+import { sql } from 'kysely';
+import { configService } from '../config/tenant-config.ts';
+import type { TenantConfig } from '../config/types.ts';
+import type { StreamerDB } from '../db/streamer-types.ts';
+import { PLATFORMS } from '../types/platforms.ts';
+import { withCache } from '../utils/cache.ts';
+import { simpleKeys } from '../utils/cache-keys.ts';
+import { TenantNotFoundError } from '../utils/domain-errors.ts';
+import { toPercentage } from '../utils/formatting.ts';
+import { getLogger } from '../utils/logger.ts';
 
 /** Return the list of enabled platform names for a tenant config. */
 function getEnabledPlatforms(config: Pick<TenantConfig, 'twitch' | 'kick'>): string[] {

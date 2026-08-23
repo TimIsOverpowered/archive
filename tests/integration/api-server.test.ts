@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, before, after } from 'node:test';
+import { after, before, describe, it } from 'node:test';
 import type { FastifyInstance } from 'fastify';
-import { buildTestServer } from '../helpers/build-test-server.js';
+import { buildTestServer } from '../helpers/build-test-server.ts';
 
 describe('Integration: API Server', () => {
   let server: FastifyInstance;

@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { YouTube } from '../../../src/constants.js';
-import { getEffectiveSplitDuration } from '../../../src/workers/youtube/validation.js';
+import { YouTube } from '../../../src/constants.ts';
+import { getEffectiveSplitDuration } from '../../../src/workers/youtube/validation.ts';
 
 describe('getEffectiveSplitDuration', () => {
   it('should return YouTube.MAX_DURATION when configuredDuration is null', () => {

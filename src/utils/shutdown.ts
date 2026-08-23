@@ -1,5 +1,5 @@
-import { Server } from '../constants.js';
-import { getLogger } from './logger.js';
+import { Server } from '../constants.ts';
+import { getLogger } from './logger.ts';
 
 export interface ShutdownResource {
   name: string;

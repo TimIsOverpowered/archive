@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { strategy } from '../../../src/services/kick/strategy.js';
-import { registerStrategy, getStrategy } from '../../../src/services/platforms/strategy.js';
+import { strategy } from '../../../src/services/kick/strategy.ts';
+import { getStrategy, registerStrategy } from '../../../src/services/platforms/strategy.ts';
 
 describe('Kick Strategy: createVodData', () => {
   it('should create correct VodCreateData from platform metadata', () => {

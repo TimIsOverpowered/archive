@@ -1,9 +1,9 @@
 import { LRUCache } from 'lru-cache';
-import { Kick } from '../../constants.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { fetchUrl } from '../../utils/flaresolverr-client.js';
-import { childLogger } from '../../utils/logger.js';
-import { KickCategoryInfo } from './live.js';
+import { Kick } from '../../constants.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { fetchUrl } from '../../utils/flaresolverr-client.ts';
+import { childLogger } from '../../utils/logger.ts';
+import type { KickCategoryInfo } from './live.ts';
 
 const log = childLogger({ module: 'kick-category' });
 

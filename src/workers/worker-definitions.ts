@@ -1,36 +1,36 @@
-import { Processor } from 'bullmq';
+import type { Processor } from 'bullmq';
 import type { Redis } from 'ioredis';
-import { getWorkersConfig } from '../config/env.js';
-import type { TenantConfig } from '../config/types.js';
-import chatProcessor from './chat.worker.js';
-import copyFileProcessor from './copy.worker.js';
-import { createWorker, workerRegistry } from './create-worker.js';
-import dmcaProcessor from './dmca.worker.js';
-import finalizeProcessor from './finalize.worker.js';
+import { getWorkersConfig } from '../config/env.ts';
+import type { TenantConfig } from '../config/types.ts';
+import chatProcessor from './chat.worker.ts';
+import copyFileProcessor from './copy.worker.ts';
+import { createWorker, workerRegistry } from './create-worker.ts';
+import dmcaProcessor from './dmca.worker.ts';
+import finalizeProcessor from './finalize.worker.ts';
 import type {
-  LiveDownloadJob,
-  StandardVodJob,
   ChatDownloadJob,
-  YoutubeUploadJob,
-  VodFinalizeFileJob,
-  DmcaProcessingJob,
-  MonitorJob,
+  ChatDownloadResult,
   CopyFileJob,
   CopyFileResult,
-  LiveDownloadResult,
-  StandardVodResult,
-  ChatDownloadResult,
-  YoutubeUploadResult,
-  VodFinalizeFileResult,
+  DmcaProcessingJob,
   DmcaProcessingResult,
+  LiveDownloadJob,
+  LiveDownloadResult,
+  MonitorJob,
   MonitorJobResult,
-} from './jobs/types.js';
-import liveProcessor from './live.worker.js';
-import monitorProcessor from './monitor/processor.js';
-import { QUEUE_NAMES, WorkerName } from './queues/queue.js';
-import { calcLiveConcurrency } from './utils/concurrency.js';
-import standardVodProcessor from './vod.worker.js';
-import youtubeProcessor from './youtube.worker.js';
+  StandardVodJob,
+  StandardVodResult,
+  VodFinalizeFileJob,
+  VodFinalizeFileResult,
+  YoutubeUploadJob,
+  YoutubeUploadResult,
+} from './jobs/types.ts';
+import liveProcessor from './live.worker.ts';
+import monitorProcessor from './monitor/processor.ts';
+import { QUEUE_NAMES, type WorkerName } from './queues/queue.ts';
+import { calcLiveConcurrency } from './utils/concurrency.ts';
+import standardVodProcessor from './vod.worker.ts';
+import youtubeProcessor from './youtube.worker.ts';
 
 export type AllJobData =
   | LiveDownloadJob

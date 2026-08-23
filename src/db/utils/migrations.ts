@@ -1,8 +1,8 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import { resolve, join } from 'node:path';
-import { sql, type Kysely } from 'kysely';
-import { getLogger } from '../../utils/logger.js';
-import type { MetaDB } from '../meta-types.js';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { type Kysely, sql } from 'kysely';
+import { getLogger } from '../../utils/logger.ts';
+import type { MetaDB } from '../meta-types.ts';
 
 const MIGRATIONS_DIR = resolve(import.meta.dirname, '..', '..', 'scripts', 'migrations');
 

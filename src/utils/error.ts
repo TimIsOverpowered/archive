@@ -3,8 +3,8 @@
  */
 
 import { ZodError } from 'zod';
-import { DomainError } from './domain-errors.js';
-import { HttpError } from './http-error.js';
+import { DomainError } from './domain-errors.ts';
+import { HttpError } from './http-error.ts';
 
 export interface ErrorDetails {
   message: string;

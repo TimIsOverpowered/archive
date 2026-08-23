@@ -1,11 +1,11 @@
 import { Kysely, PostgresDialect, SafeNullComparisonPlugin } from 'kysely';
 import { Pool } from 'pg';
-import { getBaseConfig } from '../config/env.js';
-import { Db } from '../constants.js';
-import { extractDatabaseName } from '../utils/formatting.js';
-import { getLogger } from '../utils/logger.js';
-import type { MetaDB } from './meta-types.js';
-import { buildPgBouncerUrl } from './utils/pg-bouncer.js';
+import { getBaseConfig } from '../config/env.ts';
+import { Db } from '../constants.ts';
+import { extractDatabaseName } from '../utils/formatting.ts';
+import { getLogger } from '../utils/logger.ts';
+import type { MetaDB } from './meta-types.ts';
+import { buildPgBouncerUrl } from './utils/pg-bouncer.ts';
 
 // Double-cast pattern: globalThis is `object`-typed, so we cast through `unknown` first
 // to avoid type conflicts. This enables sharing the Kysely instance across hot-reload

@@ -1,5 +1,5 @@
-import { Queue, JobsOptions, type JobState } from 'bullmq';
-import { getLogger } from '../../utils/logger.js';
+import type { JobState, JobsOptions, Queue } from 'bullmq';
+import { getLogger } from '../../utils/logger.ts';
 
 export interface JobLogger {
   info: (context: Record<string, unknown>, message: string) => void;

@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { extractEdges, extractMessageData } from '../../../src/workers/chat/chat-helpers.js';
+import { extractEdges, extractMessageData } from '../../../src/workers/chat/chat-helpers.ts';
 
 describe('extractEdges', () => {
   it('should return edges array from a valid comments connection', () => {

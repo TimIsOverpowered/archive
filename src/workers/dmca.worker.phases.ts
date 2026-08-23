@@ -1,29 +1,29 @@
-import { Job } from 'bullmq';
-import { Jobs, DiscordAlert, YouTube } from '../constants.js';
-import type { SelectableGames } from '../db/streamer-types.js';
-import type { SourceType } from '../types/platforms.js';
-import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { initRichAlert, createProgressBar } from '../utils/discord-alerts.js';
-import { ConfigNotConfiguredError, FileNotFound } from '../utils/domain-errors.js';
-import { extractErrorDetails } from '../utils/error.js';
-import { toHHMMSS } from '../utils/formatting.js';
-import { fileExists, getTmpDirPath } from '../utils/path.js';
+import type { Job } from 'bullmq';
+import { DiscordAlert, Jobs, YouTube } from '../constants.ts';
+import type { SelectableGames } from '../db/streamer-types.ts';
+import type { SourceType } from '../types/platforms.ts';
+import { createAutoLogger } from '../utils/auto-tenant-logger.ts';
+import { createProgressBar, initRichAlert } from '../utils/discord-alerts.ts';
+import { ConfigNotConfiguredError, FileNotFound } from '../utils/domain-errors.ts';
+import { extractErrorDetails } from '../utils/error.ts';
+import { toHHMMSS } from '../utils/formatting.ts';
+import { fileExists, getTmpDirPath } from '../utils/path.ts';
+import type { DMCAClaim } from './dmca/dmca.ts';
 import {
-  buildAudioFilters,
-  muteAudioSections,
+  type BlackoutSection,
   blackoutVideoSections,
-  BlackoutSection,
+  buildAudioFilters,
   CLAIM_MATCH_TYPES,
-} from './dmca/dmca.js';
-import type { DMCAClaim } from './dmca/dmca.js';
-import type { DmcaProcessingJob } from './jobs/types.js';
-import { createGameUploadJob } from './jobs/youtube.job.js';
-import { defaultJobOptions, getFlowProducer, getYoutubeUploadQueue, getVodFinalizeFileQueue } from './queues/queue.js';
-import type { BaseWorkerContext } from './types.js';
-import { createDmcaWorkerAlerts, DmcaClaimInfo, safeUpdateAlert } from './utils/alert-factories.js';
-import type { DmcaWorkerAlerts } from './utils/alert-factories.js';
-import { trimVideo } from './utils/ffmpeg.js';
-import { getJobContext } from './utils/job-context.js';
+  muteAudioSections,
+} from './dmca/dmca.ts';
+import type { DmcaProcessingJob } from './jobs/types.ts';
+import { createGameUploadJob } from './jobs/youtube.job.ts';
+import { defaultJobOptions, getFlowProducer, getVodFinalizeFileQueue, getYoutubeUploadQueue } from './queues/queue.ts';
+import type { BaseWorkerContext } from './types.ts';
+import type { DmcaWorkerAlerts } from './utils/alert-factories.ts';
+import { createDmcaWorkerAlerts, type DmcaClaimInfo, safeUpdateAlert } from './utils/alert-factories.ts';
+import { trimVideo } from './utils/ffmpeg.ts';
+import { getJobContext } from './utils/job-context.ts';
 
 export interface DmcaProcessorContext extends BaseWorkerContext {
   job: Job<DmcaProcessingJob>;

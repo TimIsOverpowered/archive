@@ -1,10 +1,10 @@
-import { withDbRetry } from '../../db/streamer-client.js';
-import { publishVodDurationUpdate } from '../../services/cache-invalidator.js';
-import type { TenantContext } from '../../types/context.js';
-import { PLATFORMS, type Platform } from '../../types/platforms.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { childLogger, getLogger } from '../../utils/logger.js';
-import { getMetadata } from '../utils/ffmpeg.js';
+import { withDbRetry } from '../../db/streamer-client.ts';
+import { publishVodDurationUpdate } from '../../services/cache-invalidator.ts';
+import type { TenantContext } from '../../types/context.ts';
+import { PLATFORMS, type Platform } from '../../types/platforms.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { childLogger, getLogger } from '../../utils/logger.ts';
+import { getMetadata } from '../utils/ffmpeg.ts';
 
 const log = childLogger({ module: 'duration-updater' });
 

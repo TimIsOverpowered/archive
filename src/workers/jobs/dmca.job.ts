@@ -1,17 +1,17 @@
-import { Jobs } from '../../constants.js';
-import type { Platform, SourceType } from '../../types/platforms.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { childLogger } from '../../utils/logger.js';
-import type { DMCAClaim } from '../dmca/dmca.js';
+import { Jobs } from '../../constants.ts';
+import type { Platform, SourceType } from '../../types/platforms.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { childLogger } from '../../utils/logger.ts';
+import type { DMCAClaim } from '../dmca/dmca.ts';
 import {
   defaultJobOptions,
   getDmcaProcessingQueue,
   getFileCopyQueue,
   getFlowProducer,
   getStandardVodQueue,
-} from '../queues/queue.js';
-import { enqueueJobWithLogging } from './enqueue.js';
-import type { DmcaProcessingJob } from './types.js';
+} from '../queues/queue.ts';
+import { enqueueJobWithLogging } from './enqueue.ts';
+import type { DmcaProcessingJob } from './types.ts';
 
 const log = childLogger({ module: 'dmca-job' });
 

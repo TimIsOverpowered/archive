@@ -2,9 +2,9 @@
 import 'dotenv/config';
 import pg, { type Pool, type PoolClient } from 'pg';
 import { parse as parseConnStr } from 'pg-connection-string';
-import { initMetaClient, getMetaClient, closeMetaClient } from '../src/db/meta-client.js';
-import { extractErrorDetails } from '../src/utils/error.js';
-import { prompt, confirm } from './stdin.js';
+import { closeMetaClient, getMetaClient, initMetaClient } from '../src/db/meta-client.ts';
+import { extractErrorDetails } from '../src/utils/error.ts';
+import { confirm, prompt } from './stdin.ts';
 
 const META_DB_URL = process.env.META_DATABASE_URL;
 if (!META_DB_URL) {
@@ -451,16 +451,16 @@ const main = async () => {
   let chatWorkers = 8;
   let chatBatchSize = 100000;
   const workersAnswer = await prompt(`Number of chat migration workers? [${chatWorkers}]`);
-  if (workersAnswer && workersAnswer.trim()) {
+  if (workersAnswer?.trim()) {
     const parsed = parseInt(workersAnswer, 10);
-    if (!isNaN(parsed) && parsed >= 1) {
+    if (!Number.isNaN(parsed) && parsed >= 1) {
       chatWorkers = parsed;
     }
   }
   const batchSizeAnswer = await prompt(`Chat migration batch size? [${chatBatchSize}}]`);
-  if (batchSizeAnswer && batchSizeAnswer.trim()) {
+  if (batchSizeAnswer?.trim()) {
     const parsed = parseInt(batchSizeAnswer, 10);
-    if (!isNaN(parsed) && parsed >= 10000 && parsed <= 500000) {
+    if (!Number.isNaN(parsed) && parsed >= 10000 && parsed <= 500000) {
       chatBatchSize = parsed;
     }
   }
@@ -654,12 +654,12 @@ const main = async () => {
 
               if (isLegacyChapters) {
                 start = parseDuration(String(chapter.duration || '00:00:00'));
-                if (isNaN(start)) start = 0;
+                if (Number.isNaN(start)) start = 0;
                 let nextStart =
                   i + 1 < vod.chapters.length
                     ? parseDuration(String(vod.chapters[i + 1].duration || '00:00:00'))
                     : duration;
-                if (isNaN(nextStart)) nextStart = duration;
+                if (Number.isNaN(nextStart)) nextStart = duration;
                 chapterDuration = Math.max(0, nextStart - start);
                 end = start + chapterDuration;
               } else {

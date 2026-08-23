@@ -1,6 +1,6 @@
-import Fastify, { FastifyInstance } from 'fastify';
-import { errorResponse } from '../../src/api/response.js';
-import { formatErrorResponse } from '../../src/utils/error.js';
+import Fastify, { type FastifyInstance } from 'fastify';
+import { errorResponse } from '../../src/api/response.ts';
+import { formatErrorResponse } from '../../src/utils/error.ts';
 
 export interface TestServer {
   server: FastifyInstance;

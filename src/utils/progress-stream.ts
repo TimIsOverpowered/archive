@@ -1,4 +1,4 @@
-import stream, { TransformCallback } from 'node:stream';
+import stream, { type TransformCallback } from 'node:stream';
 
 export interface UploadProgressData {
   percent: number;

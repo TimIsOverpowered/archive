@@ -1,15 +1,15 @@
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { ReadonlyKysely } from 'kysely/readonly';
 import { z } from 'zod';
-import type { StreamerDB } from '../../db/streamer-types.js';
-import { getEmotesByVodId } from '../../services/emotes.js';
-import { getVods, getVodById, getVodByPlatformId, VodQuerySchema } from '../../services/vods.service.js';
-import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
-import { notFound } from '../../utils/http-error.js';
-import createRateLimitMiddleware from '../middleware/rate-limit.js';
-import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
-import { ok, okPaginated } from '../response.js';
-import { createRequestController, resolveVodDbId } from '../route-helpers.js';
+import type { StreamerDB } from '../../db/streamer-types.ts';
+import { getEmotesByVodId } from '../../services/emotes.ts';
+import { getVodById, getVodByPlatformId, getVods, VodQuerySchema } from '../../services/vods.service.ts';
+import { PLATFORM_VALUES, type Platform } from '../../types/platforms.ts';
+import { notFound } from '../../utils/http-error.ts';
+import createRateLimitMiddleware from '../middleware/rate-limit.ts';
+import { requireTenant, tenantMiddleware } from '../middleware/tenant-platform.ts';
+import { ok, okPaginated } from '../response.ts';
+import { createRequestController, resolveVodDbId } from '../route-helpers.ts';
 
 const VodIdParamSchema = z.string().min(1).max(100);
 

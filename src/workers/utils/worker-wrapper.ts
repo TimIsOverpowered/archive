@@ -1,9 +1,9 @@
 import type { Job, Processor } from 'bullmq';
-import { extractErrorDetails } from '../../utils/error.js';
-import type { AppLogger } from '../../utils/logger.js';
-import { getLogger } from '../../utils/logger.js';
-import { handleWorkerError } from './error-handler.js';
-import type { WorkerErrorContext } from './error-handler.js';
+import { extractErrorDetails } from '../../utils/error.ts';
+import type { AppLogger } from '../../utils/logger.ts';
+import { getLogger } from '../../utils/logger.ts';
+import type { WorkerErrorContext } from './error-handler.ts';
+import { handleWorkerError } from './error-handler.ts';
 
 export interface WrapWorkerProcessorOptions<TCtx> {
   errorMeta: (ctx: TCtx, job: Job) => WorkerErrorContext;

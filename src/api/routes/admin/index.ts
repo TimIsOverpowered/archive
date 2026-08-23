@@ -1,11 +1,11 @@
-import { FastifyInstance } from 'fastify';
-import dmcaProcessingRoutes from './dmca.routes.js';
-import downloadJobsRoutes from './download.routes.js';
-import gameUploadRoutes from './game-upload.routes.js';
-import liveCallbackRoutes from './live-callback.routes.js';
-import metadataFetchingRoutes from './metadata.routes.js';
-import vodManagementRoutes from './vod-management.routes.js';
-import youtubeUploadRoutes from './youtube-upload.routes.js';
+import type { FastifyInstance } from 'fastify';
+import dmcaProcessingRoutes from './dmca.routes.ts';
+import downloadJobsRoutes from './download.routes.ts';
+import gameUploadRoutes from './game-upload.routes.ts';
+import liveCallbackRoutes from './live-callback.routes.ts';
+import metadataFetchingRoutes from './metadata.routes.ts';
+import vodManagementRoutes from './vod-management.routes.ts';
+import youtubeUploadRoutes from './youtube-upload.routes.ts';
 
 /** Options for registering the admin routes plugin. */
 interface AdminRoutesOptions {
@@ -31,5 +31,5 @@ export default async function adminRoutes(fastify: FastifyInstance, _options: Ad
   await fastify.register(liveCallbackRoutes);
 }
 
-export { default as authRoutes } from './auth.routes.js';
-export { default as tenantsRoutes } from './tenants.routes.js';
+export { default as authRoutes } from './auth.routes.ts';
+export { default as tenantsRoutes } from './tenants.routes.ts';

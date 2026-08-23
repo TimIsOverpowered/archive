@@ -1,15 +1,15 @@
 import { LRUCache } from 'lru-cache';
 import type { ZodType } from 'zod';
-import { ConfigCache } from '../constants.js';
-import { initMetaClient } from '../db/meta-client.js';
-import type { SelectableTenants } from '../db/meta-types.js';
-import { getAllTenantsRaw, getTenantByIdRaw } from '../services/meta-tenants.service.js';
-import { extractErrorDetails } from '../utils/error.js';
-import { getLogger } from '../utils/logger.js';
-import { asJsonObject } from '../utils/object.js';
-import { RedisService } from '../utils/redis-service.js';
-import { SettingsSchema, YoutubeSchema, TwitchSchema, KickSchema, type YoutubeAuthObject } from './schemas.js';
-import { TenantConfig } from './types.js';
+import { ConfigCache } from '../constants.ts';
+import { initMetaClient } from '../db/meta-client.ts';
+import type { SelectableTenants } from '../db/meta-types.ts';
+import { getAllTenantsRaw, getTenantByIdRaw } from '../services/meta-tenants.service.ts';
+import { extractErrorDetails } from '../utils/error.ts';
+import { getLogger } from '../utils/logger.ts';
+import { asJsonObject } from '../utils/object.ts';
+import { RedisService } from '../utils/redis-service.ts';
+import { KickSchema, SettingsSchema, TwitchSchema, type YoutubeAuthObject, YoutubeSchema } from './schemas.ts';
+import type { TenantConfig } from './types.ts';
 
 function parsePlatformConfig<T>(
   tenantId: string,
@@ -171,7 +171,7 @@ export class ConfigService {
    */
   updateYoutubeAuth(tenantId: string, auth: YoutubeAuthObject): void {
     const config = this.cache.get(tenantId);
-    if (!config || !config.youtube) return;
+    if (!config?.youtube) return;
     const updated = { ...config, youtube: { ...config.youtube, auth } };
     this.cache.set(tenantId, updated);
     this.publishConfigChanged(tenantId);

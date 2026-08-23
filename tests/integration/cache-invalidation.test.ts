@@ -1,13 +1,13 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import type { Redis } from 'ioredis';
 import RedisMock from 'ioredis-mock';
-import { Cache } from '../../src/constants.js';
-import { publishVodUpdate, handleCacheEvent } from '../../src/services/cache-invalidator.js';
-import { setVodVolatileCache } from '../../src/services/vod-cache.js';
-import { CacheKeys, swrKeys } from '../../src/utils/cache-keys.js';
-import { RedisService } from '../../src/utils/redis-service.js';
-import { createRedisSubscriber } from '../../src/utils/redis-subscriber.js';
+import { Cache } from '../../src/constants.ts';
+import { handleCacheEvent, publishVodUpdate } from '../../src/services/cache-invalidator.ts';
+import { setVodVolatileCache } from '../../src/services/vod-cache.ts';
+import { CacheKeys, swrKeys } from '../../src/utils/cache-keys.ts';
+import { RedisService } from '../../src/utils/redis-service.ts';
+import { createRedisSubscriber } from '../../src/utils/redis-subscriber.ts';
 
 const CACHE_CHANNEL = 'cache:vod';
 

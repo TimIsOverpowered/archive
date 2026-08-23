@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import adminApiKeyMiddleware from '../../../src/api/middleware/admin-api-key.js';
+import adminApiKeyMiddleware from '../../../src/api/middleware/admin-api-key.ts';
 
 function createMockReply(): any {
   let sentStatus = 200;

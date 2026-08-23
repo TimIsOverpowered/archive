@@ -1,9 +1,9 @@
-import { Twitch } from '../../constants.js';
-import { VodNotFoundError } from '../../utils/domain-errors.js';
-import { request } from '../../utils/http-client.js';
-import { retryWithBackoff } from '../../utils/retry.js';
-import { getTwitchClient } from './auth.js';
-import { createTwitchGqlClient } from './client.js';
+import { Twitch } from '../../constants.ts';
+import { VodNotFoundError } from '../../utils/domain-errors.ts';
+import { request } from '../../utils/http-client.ts';
+import { retryWithBackoff } from '../../utils/retry.ts';
+import { getTwitchClient } from './auth.ts';
+import { createTwitchGqlClient } from './client.ts';
 
 export interface VodData {
   id: string;

@@ -1,20 +1,20 @@
 import type { FastifyInstance } from 'fastify';
-import { getPlatformConfig, getDisplayName } from '../../../config/types.js';
-import { findVodByPlatformId } from '../../../db/queries/vods.js';
-import { fetchAndSaveEmotes } from '../../../services/emotes.js';
-import { saveVodChapters } from '../../../services/twitch/index.js';
-import type { Platform } from '../../../types/platforms.js';
-import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.js';
-import { notFound, badRequest } from '../../../utils/http-error.js';
-import { triggerChatDownload } from '../../../workers/jobs/chat.job.js';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
+import { getDisplayName, getPlatformConfig } from '../../../config/types.ts';
+import { findVodByPlatformId } from '../../../db/queries/vods.ts';
+import { fetchAndSaveEmotes } from '../../../services/emotes.ts';
+import { saveVodChapters } from '../../../services/twitch/index.ts';
+import type { Platform } from '../../../types/platforms.ts';
+import { PLATFORM_VALUES, PLATFORMS } from '../../../types/platforms.ts';
+import { badRequest, notFound } from '../../../utils/http-error.ts';
+import { triggerChatDownload } from '../../../workers/jobs/chat.job.ts';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.ts';
 import {
-  tenantMiddleware,
-  platformValidationMiddleware,
   asTenantPlatformContext,
+  platformValidationMiddleware,
   requireTenant,
-} from '../../middleware/tenant-platform.js';
-import { ok } from '../../response.js';
+  tenantMiddleware,
+} from '../../middleware/tenant-platform.ts';
+import { ok } from '../../response.ts';
 
 /** Route params shared by metadata endpoints. */
 type RouteParams = { tenantId: string };
@@ -76,7 +76,7 @@ export default function metadataFetchingRoutes(fastify: FastifyInstance, _option
       }
 
       const durationSeconds =
-        vodRecord.duration != null && vodRecord.duration > 0 ? parseInt(vodRecord.duration.toString()) : 0;
+        vodRecord.duration != null && vodRecord.duration > 0 ? parseInt(vodRecord.duration.toString(), 10) : 0;
       const savedCount = await saveVodChapters({
         ctx: tenantCtx,
         dbId: vodRecord.id,

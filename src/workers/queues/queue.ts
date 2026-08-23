@@ -1,23 +1,23 @@
-import { Queue, QueueOptions, FlowProducer, ConnectionOptions } from 'bullmq';
+import { type ConnectionOptions, FlowProducer, Queue, type QueueOptions } from 'bullmq';
 import type {
-  LiveDownloadJob,
-  LiveDownloadResult,
-  StandardVodJob,
-  StandardVodResult,
   ChatDownloadJob,
   ChatDownloadResult,
-  YoutubeUploadJob,
-  YoutubeUploadResult,
-  VodFinalizeFileJob,
-  VodFinalizeFileResult,
-  DmcaProcessingJob,
-  DmcaProcessingResult,
-  MonitorJob,
-  MonitorJobResult,
   CopyFileJob,
   CopyFileResult,
-} from '../jobs/types.js';
-import { getRedisInstance } from '../redis.js';
+  DmcaProcessingJob,
+  DmcaProcessingResult,
+  LiveDownloadJob,
+  LiveDownloadResult,
+  MonitorJob,
+  MonitorJobResult,
+  StandardVodJob,
+  StandardVodResult,
+  VodFinalizeFileJob,
+  VodFinalizeFileResult,
+  YoutubeUploadJob,
+  YoutubeUploadResult,
+} from '../jobs/types.ts';
+import { getRedisInstance } from '../redis.ts';
 
 export const QUEUE_NAMES = {
   VOD_LIVE: 'vod_live',

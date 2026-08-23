@@ -1,8 +1,8 @@
 import type { Kysely } from 'kysely';
-import type { TenantConfig } from '../config/types.js';
-import type { StreamerDB } from '../db/streamer-types.js';
-import type { Platform } from '../types/platforms.js';
-import type { AppLogger } from '../utils/logger.js';
+import type { TenantConfig } from '../config/types.ts';
+import type { StreamerDB } from '../db/streamer-types.ts';
+import type { Platform } from '../types/platforms.ts';
+import type { AppLogger } from '../utils/logger.ts';
 
 export interface BaseWorkerContext {
   config: TenantConfig;

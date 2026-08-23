@@ -1,9 +1,9 @@
 import dayjs from 'dayjs';
 import pLimit from 'p-limit';
-import { Kick } from '../../constants.js';
-import { KickChatWaterfallClient, type KickChatMessage } from '../../services/kick/chat.js';
-import { sleep } from '../../utils/delay.js';
-import type { AppLogger } from '../../utils/logger.js';
+import { Kick } from '../../constants.ts';
+import { type KickChatMessage, KickChatWaterfallClient } from '../../services/kick/chat.ts';
+import { sleep } from '../../utils/delay.ts';
+import type { AppLogger } from '../../utils/logger.ts';
 
 export async function* paginateKickChatCommentsParallel(
   channelId: number | string,

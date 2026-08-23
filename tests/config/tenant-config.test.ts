@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach, mock } from 'node:test';
-import type { SelectableTenants } from '../../src/db/meta-types.js';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import type { SelectableTenants } from '../../src/db/meta-types.ts';
 
 // 1. Setup Hoisted Mocks
 const mockGetAllTenants = mock.fn<() => Promise<SelectableTenants[]>>(async () => []);
@@ -22,7 +22,7 @@ mock.module('../../src/db/meta-client.js', {
 });
 
 // 2. Dynamically import the System Under Test AFTER mocks are registered
-const { buildTenantConfig, configService } = await import('../../src/config/tenant-config.js');
+const { buildTenantConfig, configService } = await import('../../src/config/tenant-config.ts');
 
 function makeTenant(overrides: Partial<SelectableTenants> = {}): SelectableTenants {
   return {

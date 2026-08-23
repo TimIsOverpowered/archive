@@ -31,7 +31,7 @@ export async function retryWithBackoff<T>(fn: () => Promise<T>, options: RetryOp
       if (override != null && override > 0) {
         delay = override;
       } else {
-        delay = Math.min(baseDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
+        delay = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs);
         if (jitter) delay = delay * (0.5 + Math.random() * 0.5);
       }
       await new Promise((resolve) => setTimeout(resolve, delay));

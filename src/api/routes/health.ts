@@ -1,19 +1,19 @@
-import { Queue, ConnectionOptions } from 'bullmq';
-import { FastifyInstance } from 'fastify';
+import { type ConnectionOptions, Queue } from 'bullmq';
+import type { FastifyInstance } from 'fastify';
 import { sql } from 'kysely';
-import { getBaseConfig } from '../../config/env.js';
-import { configService } from '../../config/tenant-config.js';
-import { Server } from '../../constants.js';
-import { getClient } from '../../db/streamer-client.js';
-import { defaultCacheContext } from '../../utils/cache.js';
-import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator.js';
-import { checkFlareSolverrHealth } from '../../utils/flaresolverr-health.js';
-import { RedisService } from '../../utils/redis-service.js';
-import { QUEUE_NAMES } from '../../workers/queues/queue.js';
-import { getRedisInstance } from '../../workers/redis.js';
-import type { AllJobData } from '../../workers/worker-definitions.js';
-import healthCheckMiddleware from '../middleware/health-check.js';
-import { ok } from '../response.js';
+import { getBaseConfig } from '../../config/env.ts';
+import { configService } from '../../config/tenant-config.ts';
+import { Server } from '../../constants.ts';
+import { getClient } from '../../db/streamer-client.ts';
+import { defaultCacheContext } from '../../utils/cache.ts';
+import { getCachedRangeInfo } from '../../utils/cloudflare-ip-validator.ts';
+import { checkFlareSolverrHealth } from '../../utils/flaresolverr-health.ts';
+import { RedisService } from '../../utils/redis-service.ts';
+import { QUEUE_NAMES } from '../../workers/queues/queue.ts';
+import { getRedisInstance } from '../../workers/redis.ts';
+import type { AllJobData } from '../../workers/worker-definitions.ts';
+import healthCheckMiddleware from '../middleware/health-check.ts';
+import { ok } from '../response.ts';
 
 /** Options for registering the health routes plugin. */
 interface HealthRouteOptions {

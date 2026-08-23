@@ -1,10 +1,10 @@
-import { Agent, Pool, request as undiciRequest, type Dispatcher } from 'undici';
-import { Http, HttpPools, Twitch } from '../constants.js';
-import { DownloadAbortedError } from './domain-errors.js';
-import { extractErrorDetails } from './error.js';
-import { HttpError } from './http-error.js';
-import { getLogger } from './logger.js';
-import { retryWithBackoff } from './retry.js';
+import { Agent, type Dispatcher, Pool, request as undiciRequest } from 'undici';
+import { Http, HttpPools, Twitch } from '../constants.ts';
+import { DownloadAbortedError } from './domain-errors.ts';
+import { extractErrorDetails } from './error.ts';
+import { HttpError } from './http-error.ts';
+import { getLogger } from './logger.ts';
+import { retryWithBackoff } from './retry.ts';
 
 /** Supported HTTP response types for request/safeRequest functions. */
 export type ResponseType = 'json' | 'text' | 'blob' | 'arrayBuffer' | 'response';
@@ -226,7 +226,7 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
             const value = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
             if (value != null && value !== '') {
               const parsed = parseInt(value, 10);
-              if (!isNaN(parsed)) {
+              if (!Number.isNaN(parsed)) {
                 retryAfterHeader.value = Math.max(parsed, 1);
               }
             }

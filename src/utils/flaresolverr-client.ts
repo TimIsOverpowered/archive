@@ -1,8 +1,8 @@
 import * as cheerio from 'cheerio';
-import { getBaseConfig } from '../config/env.js';
-import { Flaresolverr } from '../constants.js';
-import { extractErrorDetails } from './error.js';
-import { childLogger } from './logger.js';
+import { getBaseConfig } from '../config/env.ts';
+import { Flaresolverr } from '../constants.ts';
+import { extractErrorDetails } from './error.ts';
+import { childLogger } from './logger.ts';
 
 const log = childLogger({ module: 'flaresolverr-client' });
 

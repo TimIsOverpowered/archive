@@ -15,6 +15,7 @@
     "declarationMap": true,
     "sourceMap": true,
     "moduleResolution": "nodenext",
+    "rewriteRelativeImportExtensions": true,
     "allowSyntheticDefaultImports": true,
     "noImplicitAny": true,
     "strictNullChecks": true,

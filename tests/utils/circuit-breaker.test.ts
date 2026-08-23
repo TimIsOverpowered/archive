@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import { CircuitBreaker } from '../../src/utils/circuit-breaker.js';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { CircuitBreaker } from '../../src/utils/circuit-breaker.ts';
 
 describe('Circuit Breaker', () => {
   let breaker: CircuitBreaker;

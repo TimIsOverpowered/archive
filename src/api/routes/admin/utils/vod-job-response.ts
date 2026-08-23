@@ -1,4 +1,4 @@
-import { ok } from '../../../response.js';
+import { ok } from '../../../response.ts';
 
 /** Options for building a conditional VOD job response. */
 export interface BuildVodJobResponseOptions {

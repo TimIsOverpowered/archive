@@ -1,9 +1,9 @@
 import { LRUCache } from 'lru-cache';
-import { configService } from '../../config/tenant-config.js';
-import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { HttpError } from '../../utils/http-error.js';
-import { getTwitchClient } from './auth.js';
+import { configService } from '../../config/tenant-config.ts';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { HttpError } from '../../utils/http-error.ts';
+import { getTwitchClient } from './auth.ts';
 
 const log = createAutoLogger('twitch-badges');
 

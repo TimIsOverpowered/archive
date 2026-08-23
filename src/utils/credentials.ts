@@ -1,4 +1,4 @@
-import { getBaseConfig } from '../config/env.js';
+import { getBaseConfig } from '../config/env.ts';
 
 /**
  * Get the shared Twitch app credentials from environment variables.

@@ -1,13 +1,13 @@
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { Cache } from '../../constants.js';
-import { buildPagination } from '../../db/queries/builders.js';
-import { getAllPublicTenantsPaginated, getPublicTenantById } from '../../services/meta-tenants.service.js';
-import { simpleKeys } from '../../utils/cache-keys.js';
-import { defaultCacheContext } from '../../utils/cache.js';
-import { notFound } from '../../utils/http-error.js';
-import createRateLimitMiddleware from '../middleware/rate-limit.js';
-import { ok, okPaginated } from '../response.js';
+import { Cache } from '../../constants.ts';
+import { buildPagination } from '../../db/queries/builders.ts';
+import { getAllPublicTenantsPaginated, getPublicTenantById } from '../../services/meta-tenants.service.ts';
+import { defaultCacheContext } from '../../utils/cache.ts';
+import { simpleKeys } from '../../utils/cache-keys.ts';
+import { notFound } from '../../utils/http-error.ts';
+import createRateLimitMiddleware from '../middleware/rate-limit.ts';
+import { ok, okPaginated } from '../response.ts';
 
 export default function tenantsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.publicRateLimiter });

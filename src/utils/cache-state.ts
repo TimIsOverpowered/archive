@@ -1,4 +1,4 @@
-import { CircuitBreaker } from './circuit-breaker.js';
+import { CircuitBreaker } from './circuit-breaker.ts';
 
 const CACHE_STATE_KEY = '__cache_connection__';
 const cacheKey = (tenantId: string) => `${CACHE_STATE_KEY}:${tenantId}` as const;

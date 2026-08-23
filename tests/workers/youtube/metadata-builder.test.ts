@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { buildYoutubeMetadata, computeGameSegmentPart } from '../../../src/workers/youtube/metadata-builder.js';
+import { buildYoutubeMetadata, computeGameSegmentPart } from '../../../src/workers/youtube/metadata-builder.ts';
 
 describe('buildYoutubeMetadata', () => {
   const baseOptions = {

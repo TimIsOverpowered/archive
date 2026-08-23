@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 import 'dotenv/config';
 import { program } from 'commander';
-import { configService } from '../../src/config/tenant-config.js';
-import { initMetaClient, closeMetaClient } from '../../src/db/meta-client.js';
-import { getAllTenants, getTenantById } from '../../src/services/meta-tenants.service.js';
-import { createYoutubeClient } from '../../src/services/youtube/client.js';
-import { decryptScalar, decryptObject } from '../../src/utils/encryption.js';
-import { extractErrorDetails } from '../../src/utils/error.js';
-import { humanizeDuration } from '../../src/utils/formatting.js';
+import { configService } from '../../src/config/tenant-config.ts';
+import { closeMetaClient, initMetaClient } from '../../src/db/meta-client.ts';
+import { getAllTenants, getTenantById } from '../../src/services/meta-tenants.service.ts';
+import { createYoutubeClient } from '../../src/services/youtube/client.ts';
+import { decryptObject, decryptScalar } from '../../src/utils/encryption.ts';
+import { extractErrorDetails } from '../../src/utils/error.ts';
+import { humanizeDuration } from '../../src/utils/formatting.ts';
 
 interface YoutubeAuth {
   access_token?: string;
@@ -69,7 +69,7 @@ program
       // YouTube auth is stored in youtube.auth (encrypted string inside JSON object)
       const youtubeConfig = tenantWithYoutube.youtube as any;
 
-      if (!youtubeConfig || !youtubeConfig.auth) {
+      if (!youtubeConfig?.auth) {
         console.error('YouTube credentials not found. Run scripts/auth-youtube.ts first.');
         process.exit(1);
       }

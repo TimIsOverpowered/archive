@@ -1,4 +1,4 @@
-import dayjs from './dayjs.js';
+import dayjs from './dayjs.ts';
 
 /** Format seconds as HH:mm:ss string. */
 export function toHHMMSS(seconds: number): string {

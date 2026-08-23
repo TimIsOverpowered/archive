@@ -1,6 +1,6 @@
-import { extractErrorDetails } from '../../utils/error.js';
-import { getLogger } from '../../utils/logger.js';
-import { registerAllMonitorRepeatJobs } from './startup.js';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { getLogger } from '../../utils/logger.ts';
+import { registerAllMonitorRepeatJobs } from './startup.ts';
 
 export async function startMonitorService(): Promise<void> {
   getLogger().info({ component: 'monitor' }, 'Starting Archive Monitor Service...');

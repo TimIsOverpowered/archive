@@ -1,14 +1,14 @@
 import { Kysely, PostgresDialect, SafeNullComparisonPlugin } from 'kysely';
 import { Pool } from 'pg';
-import { getBaseConfig } from '../config/env.js';
-import { TenantConfig } from '../config/types.js';
-import { Db } from '../constants.js';
-import { sleep } from '../utils/delay.js';
-import { extractErrorDetails } from '../utils/error.js';
-import { getLogger } from '../utils/logger.js';
-import type { StreamerDB } from './streamer-types.js';
-import { isConnectionError } from './utils/errors.js';
-import { buildPgBouncerUrl } from './utils/pg-bouncer.js';
+import { getBaseConfig } from '../config/env.ts';
+import type { TenantConfig } from '../config/types.ts';
+import { Db } from '../constants.ts';
+import { sleep } from '../utils/delay.ts';
+import { extractErrorDetails } from '../utils/error.ts';
+import { getLogger } from '../utils/logger.ts';
+import type { StreamerDB } from './streamer-types.ts';
+import { isConnectionError } from './utils/errors.ts';
+import { buildPgBouncerUrl } from './utils/pg-bouncer.ts';
 
 interface PgPoolEntry {
   pool: InstanceType<typeof Pool>;

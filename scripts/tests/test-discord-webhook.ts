@@ -2,7 +2,7 @@
 import 'dotenv/config';
 
 const colors = { green: '\x1b[32m', yellow: '\x1b[33m', red: '\x1b[31m', cyan: '\x1b[36m', reset: '\x1b[0m' };
-console.log(colors.green + '✅ Loaded .env\n' + colors.reset);
+console.log(`${colors.green}✅ Loaded .env\n${colors.reset}`);
 
 const url = process.env.DISCORD_ALERT_WEBHOOK_URL;
 if (!url || !/^https:\/\/discord\.com\/api\/webhooks\/\d+/.test(url)) {
@@ -20,7 +20,7 @@ console.log(
 const enabled = process.env.DISCORD_ALERTS_ENABLED !== 'false';
 console.log(
   enabled
-    ? colors.green + '✅ Alerts enabled\n' + colors.reset
+    ? `${colors.green}✅ Alerts enabled\n${colors.reset}`
     : '\n⚠️  DISCORD_ALERTS_ENABLED=false - alerts disabled\n'
 );
 
@@ -37,7 +37,7 @@ async function post(msg: string) {
 
     if (!response.ok) throw new Error(`Status ${response.status}`);
 
-    console.log(colors.green + '✅ Sent! ' + colors.reset);
+    console.log(`${colors.green}✅ Sent! ${colors.reset}`);
   } catch (e: any) {
     console.error('\n❌ Failed:', e.message || String(e.code), '\n');
     return;
@@ -68,7 +68,7 @@ async function embed() {
 
     if (!response.ok) throw new Error(`Status ${response.status}`);
 
-    console.log(colors.green + '✅ Embed sent! ' + colors.reset + '\n');
+    console.log(`${colors.green}✅ Embed sent! ${colors.reset}\n`);
   } catch (_e) {
     console.error('\n❌ Failed\n');
   }
@@ -76,6 +76,4 @@ async function embed() {
 
 await embed();
 
-console.log(
-  '='.repeat(65) + '\n' + colors.cyan + 'All automated tests complete!' + colors.green + ' ✅' + colors.reset
-);
+console.log(`${'='.repeat(65)}\n${colors.cyan}All automated tests complete!${colors.green} ✅${colors.reset}`);

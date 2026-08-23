@@ -1,8 +1,8 @@
-import { configService } from '../../config/tenant-config.js';
-import type { TenantConfig } from '../../config/types.js';
-import { ensureClient } from '../../db/streamer-client.js';
-import type { StreamerDB } from '../../db/streamer-types.js';
-import { TenantNotFoundError } from '../../utils/domain-errors.js';
+import { configService } from '../../config/tenant-config.ts';
+import type { TenantConfig } from '../../config/types.ts';
+import { ensureClient } from '../../db/streamer-client.ts';
+import type { StreamerDB } from '../../db/streamer-types.ts';
+import { TenantNotFoundError } from '../../utils/domain-errors.ts';
 
 export interface JobContext {
   config: TenantConfig;

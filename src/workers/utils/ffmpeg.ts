@@ -3,11 +3,11 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import HLS from 'hls-parser';
-import { extractErrorDetails } from '../../utils/error.js';
-import { parseTimecode } from '../../utils/formatting.js';
-import type { AppLogger } from '../../utils/logger.js';
-import { childLogger } from '../../utils/logger.js';
-import { deleteFileIfExists, fileExists } from '../../utils/path.js';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { parseTimecode } from '../../utils/formatting.ts';
+import type { AppLogger } from '../../utils/logger.ts';
+import { childLogger } from '../../utils/logger.ts';
+import { deleteFileIfExists, fileExists } from '../../utils/path.ts';
 
 const logger = childLogger({ module: 'ffmpeg' });
 
@@ -514,7 +514,7 @@ export async function concatSegments(
   options?: ConcatSegmentsOptions
 ): Promise<string | null> {
   const listPath = outputPath.replace('.mp4', '-concat.txt');
-  writeFileSync(listPath, segmentFiles.map((f) => `file '${f}'`).join('\n') + '\n');
+  writeFileSync(listPath, `${segmentFiles.map((f) => `file '${f}'`).join('\n')}\n`);
 
   const args: string[] = [
     '-v',

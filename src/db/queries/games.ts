@@ -1,5 +1,5 @@
 import type { Kysely } from 'kysely';
-import type { StreamerDB, SelectableGames } from '../streamer-types.js';
+import type { SelectableGames, StreamerDB } from '../streamer-types.ts';
 
 type GameByIdResult = Pick<SelectableGames, 'id' | 'vod_id' | 'start' | 'duration' | 'end'>;
 

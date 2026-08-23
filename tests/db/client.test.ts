@@ -1,11 +1,11 @@
 import { strict as assert } from 'node:assert';
 import { EventEmitter } from 'node:events';
-import { describe, it, beforeEach, afterEach, mock } from 'node:test';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import type { Pool } from 'pg';
-import { resetEnvConfig } from '../../src/config/env.js';
-import { TenantConfig } from '../../src/config/types.js';
-import { stopClientCleanup, createPoolManager } from '../../src/db/streamer-client.js';
-import { createMockTenantConfig } from '../helpers/worker-test-setup.js';
+import { resetEnvConfig } from '../../src/config/env.ts';
+import type { TenantConfig } from '../../src/config/types.ts';
+import { createPoolManager, stopClientCleanup } from '../../src/db/streamer-client.ts';
+import { createMockTenantConfig } from '../helpers/worker-test-setup.ts';
 
 process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.META_DATABASE_URL = 'postgresql://localhost/test';
@@ -199,6 +199,7 @@ describe('DB Client Manager', () => {
       const originalNow = Date.now;
       const oldTime = originalNow() - 31 * 60 * 1000;
 
+      // biome-ignore lint/complexity/useLiteralKeys: 'pools' is private, bracket access is intentional in tests
       const entry = pm['pools'].get('tenant-idle') as { lastAccessedAt: number };
       entry.lastAccessedAt = oldTime;
 

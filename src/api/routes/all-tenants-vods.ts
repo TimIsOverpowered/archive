@@ -1,9 +1,9 @@
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { getCachedRecentVods } from '../../services/all-tenants-vods.service.js';
-import { PLATFORM_VALUES, type Platform } from '../../types/platforms.js';
-import createRateLimitMiddleware from '../middleware/rate-limit.js';
-import { ok } from '../response.js';
+import { getCachedRecentVods } from '../../services/all-tenants-vods.service.ts';
+import { PLATFORM_VALUES, type Platform } from '../../types/platforms.ts';
+import createRateLimitMiddleware from '../middleware/rate-limit.ts';
+import { ok } from '../response.ts';
 
 export default function allTenantsVodsRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.publicRateLimiter });

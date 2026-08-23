@@ -1,23 +1,23 @@
-import { FastifyInstance } from 'fastify';
-import { VodCreateSchema } from '../../../config/schemas.js';
-import { findVodByPlatformId } from '../../../db/queries/vods.js';
-import type { SelectableVods } from '../../../db/streamer-types.js';
-import { invalidateVodVolatileCache } from '../../../services/cache-tags.js';
-import { getStrategy } from '../../../services/platforms/index.js';
-import { invalidateVodStaticCache } from '../../../services/vod-cache.js';
-import { PLATFORM_VALUES } from '../../../types/platforms.js';
-import { createAutoLogger } from '../../../utils/auto-tenant-logger.js';
-import { notFound, badRequest } from '../../../utils/http-error.js';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
+import type { FastifyInstance } from 'fastify';
+import { VodCreateSchema } from '../../../config/schemas.ts';
+import { findVodByPlatformId } from '../../../db/queries/vods.ts';
+import type { SelectableVods } from '../../../db/streamer-types.ts';
+import { invalidateVodVolatileCache } from '../../../services/cache-tags.ts';
+import { getStrategy } from '../../../services/platforms/index.ts';
+import { invalidateVodStaticCache } from '../../../services/vod-cache.ts';
+import { PLATFORM_VALUES } from '../../../types/platforms.ts';
+import { createAutoLogger } from '../../../utils/auto-tenant-logger.ts';
+import { badRequest, notFound } from '../../../utils/http-error.ts';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.ts';
 import {
-  tenantMiddleware,
-  platformValidationMiddleware,
   asTenantPlatformContext,
+  platformValidationMiddleware,
   requireTenant,
-} from '../../middleware/tenant-platform.js';
-import { ok } from '../../response.js';
-import type { CreateVodParams, DeleteVodParams, CreateVodBody, DeleteVodBody } from './types.js';
-import { findOrCreateVodRecord } from './utils/vod-records.js';
+  tenantMiddleware,
+} from '../../middleware/tenant-platform.ts';
+import { ok } from '../../response.ts';
+import type { CreateVodBody, CreateVodParams, DeleteVodBody, DeleteVodParams } from './types.ts';
+import { findOrCreateVodRecord } from './utils/vod-records.ts';
 
 /**
  * Register VOD management routes: stats, create VOD, delete VOD.

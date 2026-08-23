@@ -1,11 +1,11 @@
-import { ChapterCreateSchema, ChapterUpdateSchema } from '../../config/schemas.js';
-import { withDbRetry } from '../../db/streamer-client.js';
-import { TenantContext } from '../../types/context.js';
-import { extractErrorDetails, createErrorContext } from '../../utils/error.js';
-import { childLogger } from '../../utils/logger.js';
-import { publishVodUpdate } from '../cache-invalidator.js';
-import { getKickCategoryInfo } from './category.js';
-import { getKickStreamStatus } from './live.js';
+import { ChapterCreateSchema, ChapterUpdateSchema } from '../../config/schemas.ts';
+import { withDbRetry } from '../../db/streamer-client.ts';
+import type { TenantContext } from '../../types/context.ts';
+import { createErrorContext, extractErrorDetails } from '../../utils/error.ts';
+import { childLogger } from '../../utils/logger.ts';
+import { publishVodUpdate } from '../cache-invalidator.ts';
+import { getKickCategoryInfo } from './category.ts';
+import { getKickStreamStatus } from './live.ts';
 
 const log = childLogger({ module: 'kick-chapters' });
 
@@ -28,7 +28,7 @@ export async function updateChapterDuringDownload(
     }
 
     const streamData = await getKickStreamStatus(username);
-    if (!streamData || !streamData.category) {
+    if (!streamData?.category) {
       log.debug({ dbId, vodId }, 'No active stream or category data');
       return;
     }

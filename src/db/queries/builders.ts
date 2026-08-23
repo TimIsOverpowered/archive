@@ -1,4 +1,4 @@
-import { Cache } from '../../constants.js';
+import { Cache } from '../../constants.ts';
 
 export interface PaginationOptions {
   page?: number;

@@ -1,10 +1,10 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach, mock } from 'node:test';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import type { Redis } from 'ioredis';
 import RedisMock from 'ioredis-mock';
-import { registerTenantConfigSubscriberWorker } from '../../src/config/tenant-config-subscriber.js';
-import { configService } from '../../src/config/tenant-config.js';
-import { RedisService } from '../../src/utils/redis-service.js';
+import { configService } from '../../src/config/tenant-config.ts';
+import { registerTenantConfigSubscriberWorker } from '../../src/config/tenant-config-subscriber.ts';
+import { RedisService } from '../../src/utils/redis-service.ts';
 
 const CONFIG_CHANNEL = 'cache:tenant';
 

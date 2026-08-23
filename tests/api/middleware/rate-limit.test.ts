@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
-import createRateLimitMiddleware from '../../../src/api/middleware/rate-limit.js';
+import createRateLimitMiddleware from '../../../src/api/middleware/rate-limit.ts';
 
 // Required for getBaseConfig() calls in cloudflare-ip-validator and rate-limit middleware
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
@@ -35,7 +35,7 @@ function createMockReply(): any {
       headers[key] = value;
       return this;
     },
-    status: function (code: number) {
+    status: (code: number) => {
       statusCode.value = code;
       return {
         send: function (body: any) {

@@ -1,7 +1,7 @@
-import { getBaseConfig } from '../config/env.js';
-import { refreshCloudflareRanges } from '../utils/cloudflare-ip-validator.js';
-import { extractErrorDetails } from '../utils/error.js';
-import { getLogger } from '../utils/logger.js';
+import { getBaseConfig } from '../config/env.ts';
+import { refreshCloudflareRanges } from '../utils/cloudflare-ip-validator.ts';
+import { extractErrorDetails } from '../utils/error.ts';
+import { getLogger } from '../utils/logger.ts';
 
 /**
  * Daily cron job to refresh Cloudflare IP ranges

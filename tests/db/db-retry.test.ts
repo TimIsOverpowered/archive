@@ -2,10 +2,10 @@ import { strict as assert } from 'node:assert';
 import { EventEmitter } from 'node:events';
 import { describe, it, mock } from 'node:test';
 import type { Pool } from 'pg';
-import { resetEnvConfig } from '../../src/config/env.js';
-import { createPoolManager } from '../../src/db/streamer-client.js';
-import { isConnectionError } from '../../src/db/utils/errors.js';
-import { createMockTenantConfig } from '../helpers/worker-test-setup.js';
+import { resetEnvConfig } from '../../src/config/env.ts';
+import { createPoolManager } from '../../src/db/streamer-client.ts';
+import { isConnectionError } from '../../src/db/utils/errors.ts';
+import { createMockTenantConfig } from '../helpers/worker-test-setup.ts';
 
 process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.META_DATABASE_URL = 'postgresql://localhost/test';
@@ -105,7 +105,7 @@ describe('withDbRetry integration', () => {
 
     resetEnvConfig();
 
-    const { withDbRetry } = await import('../../src/db/streamer-client.js');
+    const { withDbRetry } = await import('../../src/db/streamer-client.ts');
 
     const result = await withDbRetry('tenant-integration-1', config, async (db) => {
       return { success: true, dbReceived: db !== null };
@@ -134,7 +134,7 @@ describe('withDbRetry integration', () => {
 
     resetEnvConfig();
 
-    const { withDbRetry } = await import('../../src/db/streamer-client.js');
+    const { withDbRetry } = await import('../../src/db/streamer-client.ts');
 
     await withDbRetry('tenant-integration-2', config, async (db) => {
       receivedDb = db;
@@ -163,7 +163,7 @@ describe('withDbRetry integration', () => {
 
     resetEnvConfig();
 
-    const { withDbRetry } = await import('../../src/db/streamer-client.js');
+    const { withDbRetry } = await import('../../src/db/streamer-client.ts');
 
     const result = await withDbRetry('tenant-integration-3', config, async () => expectedData);
 
@@ -188,7 +188,7 @@ describe('withDbRetry integration', () => {
 
     resetEnvConfig();
 
-    const { withDbRetry } = await import('../../src/db/streamer-client.js');
+    const { withDbRetry } = await import('../../src/db/streamer-client.ts');
 
     let errorThrown: Error | null = null;
     try {

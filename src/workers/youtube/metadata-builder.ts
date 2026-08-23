@@ -1,8 +1,8 @@
-import { YouTube } from '../../constants.js';
-import type { SelectableVods } from '../../db/streamer-types.js';
-import type { Platform, SourceType } from '../../types/platforms.js';
-import { capitalizePlatform, SOURCE_TYPES } from '../../types/platforms.js';
-import dayjs from '../../utils/dayjs.js';
+import { YouTube } from '../../constants.ts';
+import type { SelectableVods } from '../../db/streamer-types.ts';
+import type { Platform, SourceType } from '../../types/platforms.ts';
+import { capitalizePlatform, SOURCE_TYPES } from '../../types/platforms.ts';
+import dayjs from '../../utils/dayjs.ts';
 
 function sanitizeYoutubeText(text: string): string {
   return text.replace(/[<>]/g, '');

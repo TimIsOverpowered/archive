@@ -1,10 +1,10 @@
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { ReadonlyKysely } from 'kysely/readonly';
-import type { StreamerDB } from '../../db/streamer-types.js';
-import { getChaptersLibrary, ChapterLibraryQuerySchema } from '../../services/chapters.service.js';
-import createRateLimitMiddleware from '../middleware/rate-limit.js';
-import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
-import { okPaginated } from '../response.js';
+import type { StreamerDB } from '../../db/streamer-types.ts';
+import { ChapterLibraryQuerySchema, getChaptersLibrary } from '../../services/chapters.service.ts';
+import createRateLimitMiddleware from '../middleware/rate-limit.ts';
+import { requireTenant, tenantMiddleware } from '../middleware/tenant-platform.ts';
+import { okPaginated } from '../response.ts';
 
 /** Options for registering the chapters routes plugin. */
 interface ChaptersRoutesOptions {

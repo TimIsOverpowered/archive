@@ -1,18 +1,18 @@
-import { sql } from 'kysely';
 import type { Expression, ExpressionBuilder, SqlBool } from 'kysely';
+import { sql } from 'kysely';
 import { jsonArrayFrom } from 'kysely/helpers/postgres';
 import type { ReadonlyKysely } from 'kysely/readonly';
 import { z } from 'zod';
-import { Cache, CacheSwr, Fts } from '../constants.js';
-import { buildPagination } from '../db/queries/builders.js';
-import type { StreamerDB, DBClient } from '../db/streamer-types.js';
-import { Platform, PLATFORM_VALUES } from '../types/platforms.js';
-import type { VodNeighbor, VodResponse } from '../types/vods.js';
-import type { SWRKey } from '../utils/cache-keys.js';
-import { swrKeys } from '../utils/cache-keys.js';
-import { withStaleWhileRevalidate } from '../utils/cache.js';
-import { registerVodTags } from './cache-tags.js';
-import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.js';
+import { Cache, CacheSwr, Fts } from '../constants.ts';
+import { buildPagination } from '../db/queries/builders.ts';
+import type { DBClient, StreamerDB } from '../db/streamer-types.ts';
+import { PLATFORM_VALUES, type Platform } from '../types/platforms.ts';
+import type { VodNeighbor, VodResponse } from '../types/vods.ts';
+import { withStaleWhileRevalidate } from '../utils/cache.ts';
+import type { SWRKey } from '../utils/cache-keys.ts';
+import { swrKeys } from '../utils/cache-keys.ts';
+import { registerVodTags } from './cache-tags.ts';
+import { getVodVolatileCache, getVodVolatileCacheBatch } from './vod-cache.ts';
 
 const FtsSpecialChars = /[&|()@:"\\:!<>]/g;
 

@@ -1,8 +1,8 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { flushChatBatch } from '../../../src/workers/chat/chat-batch-processor.js';
-import type { FlushBatchOptions, FlushBatchResult } from '../../../src/workers/chat/chat-batch-processor.js';
-import type { ChatMessageCreateInput } from '../../../src/workers/chat/chat-types.js';
+import type { FlushBatchOptions, FlushBatchResult } from '../../../src/workers/chat/chat-batch-processor.ts';
+import { flushChatBatch } from '../../../src/workers/chat/chat-batch-processor.ts';
+import type { ChatMessageCreateInput } from '../../../src/workers/chat/chat-types.ts';
 
 function createMockDb(): any {
   const insertCalls: any[] = [];

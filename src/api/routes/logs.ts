@@ -1,13 +1,13 @@
-import { FastifyInstance, FastifySchema } from 'fastify';
+import type { FastifyInstance, FastifySchema } from 'fastify';
 import type { ReadonlyKysely } from 'kysely/readonly';
 import { z } from 'zod';
-import type { StreamerDB } from '../../db/streamer-types.js';
-import { getLogsByOffset, getLogsByCursor } from '../../services/logs.service.js';
-import { badRequest } from '../../utils/http-error.js';
-import createRateLimitMiddleware from '../middleware/rate-limit.js';
-import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
-import { ok } from '../response.js';
-import { createRequestController, resolveVodDbId } from '../route-helpers.js';
+import type { StreamerDB } from '../../db/streamer-types.ts';
+import { getLogsByCursor, getLogsByOffset } from '../../services/logs.service.ts';
+import { badRequest } from '../../utils/http-error.ts';
+import createRateLimitMiddleware from '../middleware/rate-limit.ts';
+import { requireTenant, tenantMiddleware } from '../middleware/tenant-platform.ts';
+import { ok } from '../response.ts';
+import { createRequestController, resolveVodDbId } from '../route-helpers.ts';
 
 const LogsQuerySchema = z.object({
   content_offset_seconds: z.number().nonnegative().optional(),
@@ -82,13 +82,13 @@ export default function logsRoutes(fastify: FastifyInstance, _options: LogsRoute
           badRequest('Missing required query parameter: content_offset_seconds or cursor');
         }
 
-        let result;
+        let result: Awaited<ReturnType<typeof getLogsByOffset>>;
 
         if (cursor != null) {
           result = await getLogsByCursor(db as unknown as ReadonlyKysely<StreamerDB>, tenantId, actualDbId, cursor, {
             signal: controller.signal,
           });
-        } else if (content_offset_seconds !== undefined && !isNaN(content_offset_seconds)) {
+        } else if (content_offset_seconds !== undefined && !Number.isNaN(content_offset_seconds)) {
           result = await getLogsByOffset(
             db as unknown as ReadonlyKysely<StreamerDB>,
             tenantId,

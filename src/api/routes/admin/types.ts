@@ -1,4 +1,4 @@
-import type { Platform, SourceType } from '../../../types/platforms.js';
+import type { Platform, SourceType } from '../../../types/platforms.ts';
 
 /** Params containing tenant ID. */
 export interface TenantParams {

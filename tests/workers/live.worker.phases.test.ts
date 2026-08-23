@@ -1,14 +1,14 @@
 import { strict as assert } from 'node:assert';
 import { describe, it, mock } from 'node:test';
-import { configService } from '../../src/config/tenant-config.js';
-import { prepareVodDirectory, runPostProcessing, sendCompletionAlert } from '../../src/workers/live.worker.phases.js';
-import type { LivePhaseResult, LiveProcessorContext } from '../../src/workers/live.worker.phases.js';
-import { createMockTenantConfig } from '../helpers/worker-test-setup.js';
+import { configService } from '../../src/config/tenant-config.ts';
+import type { LivePhaseResult, LiveProcessorContext } from '../../src/workers/live.worker.phases.ts';
+import { prepareVodDirectory, runPostProcessing, sendCompletionAlert } from '../../src/workers/live.worker.phases.ts';
+import { createMockTenantConfig } from '../helpers/worker-test-setup.ts';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 function setupBaseEnv(): void {
-  Object.keys(process.env).forEach((key) => delete process.env[key]);
+  for (const key of Object.keys(process.env)) delete process.env[key];
   process.env.REDIS_URL = 'redis://localhost';
   process.env.META_DATABASE_URL = 'postgresql://meta';
   process.env.PGBOUNCER_URL = 'postgresql://bouncer';

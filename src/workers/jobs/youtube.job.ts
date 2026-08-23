@@ -1,29 +1,29 @@
-import { getPlatformConfig } from '../../config/types.js';
-import { Jobs } from '../../constants.js';
-import { findVodById } from '../../db/queries/vods.js';
-import { withDbRetry } from '../../db/streamer-client.js';
-import { SelectableChapters, SelectableGames } from '../../db/streamer-types.js';
-import { TenantContext } from '../../types/context.js';
-import type { Platform, SourceType, UploadMode } from '../../types/platforms.js';
-import { UPLOAD_MODES } from '../../types/platforms.js';
+import { getPlatformConfig } from '../../config/types.ts';
+import { Jobs } from '../../constants.ts';
+import { findVodById } from '../../db/queries/vods.ts';
+import { withDbRetry } from '../../db/streamer-client.ts';
+import type { SelectableChapters, SelectableGames } from '../../db/streamer-types.ts';
+import type { TenantContext } from '../../types/context.ts';
+import type { Platform, SourceType, UploadMode } from '../../types/platforms.ts';
+import { UPLOAD_MODES } from '../../types/platforms.ts';
 import {
   ConfigNotConfiguredError,
   PlatformNotMainSourceError,
   RestrictedGameError,
   VodNotFoundError,
-} from '../../utils/domain-errors.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { childLogger } from '../../utils/logger.js';
+} from '../../utils/domain-errors.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { childLogger } from '../../utils/logger.ts';
 import {
   defaultJobOptions,
-  getFlowProducer,
   getFileCopyQueue,
+  getFlowProducer,
   getStandardVodQueue,
-  getYoutubeUploadQueue,
   getVodFinalizeFileQueue,
-} from '../queues/queue.js';
-import { enqueueJobWithLogging } from './enqueue.js';
-import type { YoutubeVodUploadJob, YoutubeGameUploadJob } from './types.js';
+  getYoutubeUploadQueue,
+} from '../queues/queue.ts';
+import { enqueueJobWithLogging } from './enqueue.ts';
+import type { YoutubeGameUploadJob, YoutubeVodUploadJob } from './types.ts';
 
 const log = childLogger({ module: 'youtube-job' });
 
@@ -101,7 +101,7 @@ export async function createGameUploadJob(
   const clampedDuration = clampedEnd - chapter.start;
 
   // Check restricted games
-  if (config.youtube?.restrictedGames != null && config.youtube.restrictedGames.includes(chapter.name)) {
+  if (config.youtube?.restrictedGames?.includes(chapter.name)) {
     throw new RestrictedGameError(chapter.name ?? '');
   }
 
@@ -160,7 +160,7 @@ async function createGameUploadJobsForVod(
     return [];
   }
 
-  if (config.youtube?.upload == false) {
+  if (config.youtube?.upload === false) {
     throw new ConfigNotConfiguredError(`YouTube upload for tenant ${tenantId}`);
   }
 
@@ -641,7 +641,8 @@ function buildSequentialGameChain(
 
     // First game depends on base children (download/copy). Each subsequent game depends on the previous.
     const children:
-      Array<SequentialFlowChild | { name: string; queueName: string; opts: { jobId: string } }> | undefined = isFirst
+      | Array<SequentialFlowChild | { name: string; queueName: string; opts: { jobId: string } }>
+      | undefined = isFirst
       ? baseChildren.length > 0
         ? baseChildren
         : undefined

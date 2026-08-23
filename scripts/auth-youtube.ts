@@ -1,15 +1,15 @@
 import 'dotenv/config';
-import crypto from 'crypto';
-import http from 'http';
+import crypto from 'node:crypto';
+import http from 'node:http';
 import { program } from 'commander';
 import open from 'open';
 import { z } from 'zod';
-import { YoutubeAuthSchema, YoutubeAuthObject, YoutubeSchema } from '../src/config/schemas.js';
-import { initMetaClient } from '../src/db/meta-client.js';
-import { getTenantById, updateTenant } from '../src/services/meta-tenants.service.js';
-import { encryptObject, decryptObject } from '../src/utils/encryption.js';
-import { extractErrorDetails } from '../src/utils/error.js';
-import { prompt, closeStdin } from './stdin.js';
+import { type YoutubeAuthObject, YoutubeAuthSchema, type YoutubeSchema } from '../src/config/schemas.ts';
+import { initMetaClient } from '../src/db/meta-client.ts';
+import { getTenantById, updateTenant } from '../src/services/meta-tenants.service.ts';
+import { decryptObject, encryptObject } from '../src/utils/encryption.ts';
+import { extractErrorDetails } from '../src/utils/error.ts';
+import { closeStdin, prompt } from './stdin.ts';
 
 const clientId = process.env.YOUTUBE_CLIENT_ID;
 const clientSecret = process.env.YOUTUBE_CLIENT_SECRET;
@@ -88,7 +88,7 @@ function showManualPasteInstructions(authUrl: string, tenantId: string): void {
   console.log('Step 1 - Open URL on any device with browser access:');
   console.log('───────────────────────────────\n');
 
-  console.log(authUrl + '\n');
+  console.log(`${authUrl}\n`);
 
   console.log('\nStep 2 - Get the callback URL or authorization code after authorizing:');
   console.log('───────────────────────────────\n');
@@ -172,7 +172,7 @@ async function startOAuthFlow(tenantId: string): Promise<void> {
 
 function startCallbackServer(streamerId: string, expectedState: string): void {
   callbackServer = http.createServer(async (req, res) => {
-    if (!req.url || !req.url.startsWith('/callback')) {
+    if (!req.url?.startsWith('/callback')) {
       const isRoot = req.url === '/';
 
       if (isRoot) {
@@ -318,7 +318,7 @@ async function completeOAuth(streamerId: string, expectedState: string, urlOrCod
       `(value: "${tokenData.refresh_token}" - ${typeof tokenData.refresh_token})`
     );
     console.log('expires_in:', tokenData.expiresIn || tokenData.expires_in);
-    console.log('scope:', tokenData.scope?.substring(0, 100) + '...');
+    console.log('scope:', `${tokenData.scope?.substring(0, 100)}...`);
 
     // Convert Google's relative expiry to absolute timestamp for consistency across all components (Option A per user choice)
     const expiresInSeconds =

@@ -2,10 +2,10 @@ import fs from 'node:fs';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { Impit } from 'impit';
-import { Http } from '../constants.js';
-import { getLogger } from './logger.js';
-import type { RetryOptions } from './retry.js';
-import { retryWithBackoff } from './retry.js';
+import { Http } from '../constants.ts';
+import { getLogger } from './logger.ts';
+import type { RetryOptions } from './retry.ts';
+import { retryWithBackoff } from './retry.ts';
 
 const impitInstances = new Map<string, Impit>();
 

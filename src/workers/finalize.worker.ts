@@ -1,21 +1,21 @@
 import fsPromises from 'node:fs/promises';
 import type { Job } from 'bullmq';
 import type { Kysely } from 'kysely';
-import { TenantConfig } from '../config/types.js';
-import type { StreamerDB } from '../db/streamer-types.js';
-import type { Platform, SourceType } from '../types/platforms.js';
-import { SOURCE_TYPES } from '../types/platforms.js';
-import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { initRichAlert, isAlertsEnabled } from '../utils/discord-alerts.js';
-import { ConfigNotConfiguredError } from '../utils/domain-errors.js';
-import { extractErrorDetails } from '../utils/error.js';
-import type { AppLogger } from '../utils/logger.js';
-import { getLiveFilePath, getVodFilePath, getVodHlsDirPath } from '../utils/path.js';
-import type { VodFinalizeFileJob, VodFinalizeFileResult } from './jobs/types.js';
-import { createFinalizeWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
-import { finalizeFile } from './utils/file-finalization.js';
-import { getJobContext } from './utils/job-context.js';
-import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
+import type { TenantConfig } from '../config/types.ts';
+import type { StreamerDB } from '../db/streamer-types.ts';
+import type { Platform, SourceType } from '../types/platforms.ts';
+import { SOURCE_TYPES } from '../types/platforms.ts';
+import { createAutoLogger } from '../utils/auto-tenant-logger.ts';
+import { initRichAlert, isAlertsEnabled } from '../utils/discord-alerts.ts';
+import { ConfigNotConfiguredError } from '../utils/domain-errors.ts';
+import { extractErrorDetails } from '../utils/error.ts';
+import type { AppLogger } from '../utils/logger.ts';
+import { getLiveFilePath, getVodFilePath, getVodHlsDirPath } from '../utils/path.ts';
+import type { VodFinalizeFileJob, VodFinalizeFileResult } from './jobs/types.ts';
+import { createFinalizeWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.ts';
+import { finalizeFile } from './utils/file-finalization.ts';
+import { getJobContext } from './utils/job-context.ts';
+import { wrapWorkerProcessor } from './utils/worker-wrapper.ts';
 
 interface FinalizeProcessorContext {
   log: AppLogger;

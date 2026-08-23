@@ -1,9 +1,9 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import { Job } from 'bullmq';
-import type { LiveDownloadJob } from '../../src/workers/jobs/types.js';
-import liveProcessor from '../../src/workers/live.worker.js';
-import { setupBaseEnv, setupWorkerMocks, teardownWorkerMocks } from '../helpers/worker-test-setup.js';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import type { Job } from 'bullmq';
+import type { LiveDownloadJob } from '../../src/workers/jobs/types.ts';
+import liveProcessor from '../../src/workers/live.worker.ts';
+import { setupBaseEnv, setupWorkerMocks, teardownWorkerMocks } from '../helpers/worker-test-setup.ts';
 
 setupBaseEnv('/tmp/test-vods');
 

@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { registerStrategy, getStrategy } from '../../../src/services/platforms/strategy.js';
-import { strategy } from '../../../src/services/twitch/strategy.js';
+import { getStrategy, registerStrategy } from '../../../src/services/platforms/strategy.ts';
+import { strategy } from '../../../src/services/twitch/strategy.ts';
 
 describe('Twitch Strategy: createVodData', () => {
   it('should create correct VodCreateData from platform metadata', () => {

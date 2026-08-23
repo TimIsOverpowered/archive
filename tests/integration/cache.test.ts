@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach } from 'node:test';
+import { beforeEach, describe, it } from 'node:test';
 import type { Redis } from 'ioredis';
 import RedisMock from 'ioredis-mock';
 

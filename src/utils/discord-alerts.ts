@@ -1,12 +1,12 @@
 // Context & config
-export { isAlertsEnabled } from './discord/context.js';
+export { isAlertsEnabled } from './discord/context.ts';
 
 // Embed types & helpers
-export type { AlertStatus, RichEmbedData } from './discord/embed.js';
-export { constructEmbed, createProgressBar } from './discord/embed.js';
+export type { AlertStatus, RichEmbedData } from './discord/embed.ts';
+export { constructEmbed, createProgressBar } from './discord/embed.ts';
 
 // Failure tracking
-export { trackFailure, resetFailures } from './discord/failures.js';
+export { resetFailures, trackFailure } from './discord/failures.ts';
 
 // Webhook operations
-export { sendDiscordAlert, sendRichAlert, updateDiscordEmbed, initRichAlert, updateAlert } from './discord/webhook.js';
+export { initRichAlert, sendDiscordAlert, sendRichAlert, updateAlert, updateDiscordEmbed } from './discord/webhook.ts';

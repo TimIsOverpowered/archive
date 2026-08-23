@@ -1,27 +1,27 @@
 import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import HLS from 'hls-parser';
-import { Hls } from '../../constants.js';
-import { updateChapterDuringDownload } from '../../services/kick/index.js';
-import { TenantContext } from '../../types/context.js';
-import { PLATFORMS, type Platform } from '../../types/platforms.js';
-import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { sleep, getRetryDelay } from '../../utils/delay.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { HttpError } from '../../utils/http-error.js';
-import { createSession, type ImpitSession } from '../../utils/impit-wrapper.js';
-import type { AppLogger } from '../../utils/logger.js';
-import { getTmpDirPath, getTmpFilePath } from '../../utils/path.js';
-import { createVodWorkerAlerts, safeUpdateAlert } from '../utils/alert-factories.js';
-import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.js';
-import { updateVodDurationDuringDownload } from './duration-updater.js';
+import { Hls } from '../../constants.ts';
+import { updateChapterDuringDownload } from '../../services/kick/index.ts';
+import type { TenantContext } from '../../types/context.ts';
+import { PLATFORMS, type Platform } from '../../types/platforms.ts';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.ts';
+import { getRetryDelay, sleep } from '../../utils/delay.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { HttpError } from '../../utils/http-error.ts';
+import { createSession, type ImpitSession } from '../../utils/impit-wrapper.ts';
+import type { AppLogger } from '../../utils/logger.ts';
+import { getTmpDirPath, getTmpFilePath } from '../../utils/path.ts';
+import { createVodWorkerAlerts, safeUpdateAlert } from '../utils/alert-factories.ts';
+import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.ts';
+import { updateVodDurationDuringDownload } from './duration-updater.ts';
 import {
   downloadSegmentsParallel,
+  type FetchPlaylistResult,
   fetchKickPlaylist,
   fetchTwitchPlaylist,
-  type FetchPlaylistResult,
   resolveDownloadStrategy,
-} from './hls-utils.js';
+} from './hls-utils.ts';
 
 export interface HlsDownloadOptions {
   ctx: TenantContext;

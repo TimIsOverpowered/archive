@@ -1,13 +1,13 @@
 import type { FastifyInstance } from 'fastify';
-import { Cache } from '../constants.js';
-import { simpleKeys } from '../utils/cache-keys.js';
-import { defaultCacheContext } from '../utils/cache.js';
-import { extractErrorDetails } from '../utils/error.js';
-import { getLogger } from '../utils/logger.js';
-import { RedisService } from '../utils/redis-service.js';
-import { createRedisSubscriber } from '../utils/redis-subscriber.js';
-import { invalidateGameTags, invalidateVodVolatileCache } from './cache-tags.js';
-import { setVodVolatileCache, invalidateVodStaticCache } from './vod-cache.js';
+import { Cache } from '../constants.ts';
+import { defaultCacheContext } from '../utils/cache.ts';
+import { simpleKeys } from '../utils/cache-keys.ts';
+import { extractErrorDetails } from '../utils/error.ts';
+import { getLogger } from '../utils/logger.ts';
+import { RedisService } from '../utils/redis-service.ts';
+import { createRedisSubscriber } from '../utils/redis-subscriber.ts';
+import { invalidateGameTags, invalidateVodVolatileCache } from './cache-tags.ts';
+import { invalidateVodStaticCache, setVodVolatileCache } from './vod-cache.ts';
 
 const CACHE_CHANNEL = 'cache:vod';
 const GAME_CACHE_CHANNEL = 'cache:game';

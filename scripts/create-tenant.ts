@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 
 import 'dotenv/config';
-import * as fs from 'fs';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 import { parse } from 'pg-connection-string';
-import { initMetaClient, closeMetaClient } from '../src/db/meta-client.js';
-import type { InsertableTenants } from '../src/db/meta-types.js';
-import { getTenantById, createTenant, deleteTenant } from '../src/services/meta-tenants.service.js';
-import { validateEncryptionKey } from '../src/utils/encryption.js';
-import { extractErrorDetails } from '../src/utils/error.js';
-import { prompt, confirm, closeStdin } from './stdin.js';
+import { closeMetaClient, initMetaClient } from '../src/db/meta-client.ts';
+import type { InsertableTenants } from '../src/db/meta-types.ts';
+import { createTenant, deleteTenant, getTenantById } from '../src/services/meta-tenants.service.ts';
+import { validateEncryptionKey } from '../src/utils/encryption.ts';
+import { extractErrorDetails } from '../src/utils/error.ts';
+import { closeStdin, confirm, prompt } from './stdin.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -349,7 +349,7 @@ async function main(): Promise<void> {
     }
 
     const splitDurationStr = await prompt('Max VOD split duration (seconds, min: 10800/3hrs, max: 43199/12hrs)');
-    let youtubeSplitDuration = parseInt(splitDurationStr) || 10800;
+    let youtubeSplitDuration = parseInt(splitDurationStr, 10) || 10800;
 
     // Validate YouTube's limits: minimum 3 hours (10800s), maximum ~12 hours (43199s)
     if (youtubeSplitDuration < 10800) {
@@ -404,7 +404,7 @@ async function main(): Promise<void> {
     }
 
     // Phase 6: Summary & Confirmation
-    console.log('\n' + '='.repeat(50));
+    console.log(`\n${'='.repeat(50)}`);
     console.log('TENANT CREATION SUMMARY');
     console.log('='.repeat(50));
 

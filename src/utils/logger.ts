@@ -1,6 +1,6 @@
-import pino from 'pino';
 import type { SerializedRequest, SerializedResponse } from 'pino';
-import { getTenantId, getDisplayName } from './async-context.js';
+import pino from 'pino';
+import { getDisplayName, getTenantId } from './async-context.ts';
 
 export type AppLogger = pino.Logger<'metric'>;
 

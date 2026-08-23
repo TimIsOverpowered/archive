@@ -1,20 +1,20 @@
 import type { Kysely } from 'kysely';
-import { GameUpsertSchema } from '../../config/schemas.js';
-import type { TenantConfig } from '../../config/types.js';
-import { getDisplayName } from '../../config/types.js';
-import { YouTube } from '../../constants.js';
-import type { StreamerDB } from '../../db/streamer-types.js';
-import { publishGameUpdate, publishVodUpdate } from '../../services/cache-invalidator.js';
-import { uploadVideo } from '../../services/youtube/index.js';
-import type { Platform, SourceType } from '../../types/platforms.js';
-import { initRichAlert, createProgressBar } from '../../utils/discord-alerts.js';
-import { toHHMMSS } from '../../utils/formatting.js';
-import type { AppLogger } from '../../utils/logger.js';
-import { deleteFileIfExists } from '../../utils/path.js';
-import { safeUpdateAlert } from '../utils/alert-factories.js';
-import { trimVideo, splitVideo, getMetadata } from '../utils/ffmpeg.js';
-import { buildYoutubeMetadata, computeGameSegmentPart } from './metadata-builder.js';
-import { createYoutubeUploadProgressHandler } from './youtube-upload-progress.js';
+import { GameUpsertSchema } from '../../config/schemas.ts';
+import type { TenantConfig } from '../../config/types.ts';
+import { getDisplayName } from '../../config/types.ts';
+import { YouTube } from '../../constants.ts';
+import type { StreamerDB } from '../../db/streamer-types.ts';
+import { publishGameUpdate, publishVodUpdate } from '../../services/cache-invalidator.ts';
+import { uploadVideo } from '../../services/youtube/index.ts';
+import type { Platform, SourceType } from '../../types/platforms.ts';
+import { createProgressBar, initRichAlert } from '../../utils/discord-alerts.ts';
+import { toHHMMSS } from '../../utils/formatting.ts';
+import type { AppLogger } from '../../utils/logger.ts';
+import { deleteFileIfExists } from '../../utils/path.ts';
+import { safeUpdateAlert } from '../utils/alert-factories.ts';
+import { getMetadata, splitVideo, trimVideo } from '../utils/ffmpeg.ts';
+import { buildYoutubeMetadata, computeGameSegmentPart } from './metadata-builder.ts';
+import { createYoutubeUploadProgressHandler } from './youtube-upload-progress.ts';
 
 export interface GameUploadContext {
   tenantId: string;

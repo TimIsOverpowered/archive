@@ -5,7 +5,7 @@ import {
   CLAIM_MATCH_TYPES,
   cleanupTempFiles,
   mergeBlackoutSections,
-} from '../../../src/workers/dmca/dmca.js';
+} from '../../../src/workers/dmca/dmca.ts';
 
 describe('buildAudioFilters', () => {
   it('should build mute filters for AUDIO claims', () => {

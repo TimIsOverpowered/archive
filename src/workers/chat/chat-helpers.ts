@@ -1,12 +1,12 @@
 import type { Kysely } from 'kysely';
-import type { StreamerDB } from '../../db/streamer-types.js';
+import type { StreamerDB } from '../../db/streamer-types.ts';
 import type {
   TwitchChatEdge,
   TwitchChatMessageNode,
   TwitchCommentsConnection,
   TwitchEmoteFragment,
   TwitchUserBadgesArray,
-} from '../../services/twitch/index.js';
+} from '../../services/twitch/index.ts';
 
 /**
  * Extracts edges from GraphQL pagination response.
@@ -67,7 +67,7 @@ export function extractMessageData(node: TwitchChatMessageNode | null | undefine
   message: TwitchEmoteFragment[];
   userBadges?: TwitchUserBadgesArray | undefined;
 } {
-  if (!node || !node.message) {
+  if (!node?.message) {
     return { message: [], userBadges: undefined };
   }
 
@@ -93,9 +93,9 @@ export function parseKickContent(content: string | null | undefined): ChatFragme
   const emoteRegex = /\[emote:(\d+):([^\]]+)\]/g;
 
   let lastIndex = 0;
-  let match;
+  let match: RegExpExecArray | null = emoteRegex.exec(content);
 
-  while ((match = emoteRegex.exec(content)) !== null) {
+  while (match !== null) {
     if (match.index > lastIndex) {
       fragments.push({ text: content.slice(lastIndex, match.index), emote: null });
     }
@@ -106,6 +106,7 @@ export function parseKickContent(content: string | null | undefined): ChatFragme
     });
 
     lastIndex = emoteRegex.lastIndex;
+    match = emoteRegex.exec(content);
   }
 
   if (lastIndex < content.length) {

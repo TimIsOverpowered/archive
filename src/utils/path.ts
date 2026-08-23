@@ -1,9 +1,9 @@
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
-import { getTmpPath, getVodPath, getLivePath } from '../config/env.js';
-import { ConfigNotConfiguredError } from './domain-errors.js';
-import { extractErrorDetails } from './error.js';
-import { childLogger } from './logger.js';
+import { getLivePath, getTmpPath, getVodPath } from '../config/env.ts';
+import { ConfigNotConfiguredError } from './domain-errors.ts';
+import { extractErrorDetails } from './error.ts';
+import { childLogger } from './logger.ts';
 
 const log = childLogger({ module: 'path' });
 

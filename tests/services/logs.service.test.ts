@@ -1,15 +1,15 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach, mock } from 'node:test';
-import { resetEnvConfig } from '../../src/config/env.js';
-import { resetClientManager } from '../../src/db/streamer-client.js';
-import { getLogsByOffset, getLogsByCursor } from '../../src/services/logs.service.js';
-import { defaultCacheContext } from '../../src/utils/cache.js';
-import { RedisService } from '../../src/utils/redis-service.js';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { resetEnvConfig } from '../../src/config/env.ts';
+import { resetClientManager } from '../../src/db/streamer-client.ts';
+import { getLogsByCursor, getLogsByOffset } from '../../src/services/logs.service.ts';
+import { defaultCacheContext } from '../../src/utils/cache.ts';
+import { RedisService } from '../../src/utils/redis-service.ts';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 function setupBaseEnv(): void {
-  Object.keys(process.env).forEach((key) => delete process.env[key]);
+  for (const key of Object.keys(process.env)) delete process.env[key];
   process.env.REDIS_URL = 'redis://localhost';
   process.env.META_DATABASE_URL = 'postgresql://meta';
   process.env.PGBOUNCER_URL = 'postgresql://bouncer';
@@ -451,7 +451,7 @@ describe('LogsService: getLogsByOffset', () => {
         user_badges: [],
       },
     ];
-    const { compressData } = await import('../../src/utils/compression.js');
+    const { compressData } = await import('../../src/utils/compression.ts');
     const compressed = await compressData(cachedComments);
 
     const isolatedClient = {
@@ -708,7 +708,7 @@ describe('LogsService: getLogsByCursor', () => {
         user_badges: [],
       },
     ];
-    const { compressData } = await import('../../src/utils/compression.js');
+    const { compressData } = await import('../../src/utils/compression.ts');
     const compressed = await compressData(cachedComments);
 
     let cacheCallCount = 0;

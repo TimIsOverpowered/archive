@@ -1,9 +1,9 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { registerStrategy, getStrategy } from '../../../src/services/platforms/strategy.js';
-import type { PlatformStrategy } from '../../../src/services/platforms/strategy.js';
-import type { Platform } from '../../../src/types/platforms.js';
-import { PLATFORMS } from '../../../src/types/platforms.js';
+import type { PlatformStrategy } from '../../../src/services/platforms/strategy.ts';
+import { getStrategy, registerStrategy } from '../../../src/services/platforms/strategy.ts';
+import type { Platform } from '../../../src/types/platforms.ts';
+import { PLATFORMS } from '../../../src/types/platforms.ts';
 
 function createMockStrategy(vodId: string): PlatformStrategy {
   return {

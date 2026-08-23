@@ -1,7 +1,7 @@
-import { capitalizePlatform, type Platform } from '../../types/platforms.js';
-import { sendRichAlert } from '../../utils/discord-alerts.js';
-import { createErrorContext } from '../../utils/error.js';
-import { getLogger } from '../../utils/logger.js';
+import { capitalizePlatform, type Platform } from '../../types/platforms.ts';
+import { sendRichAlert } from '../../utils/discord-alerts.ts';
+import { createErrorContext } from '../../utils/error.ts';
+import { getLogger } from '../../utils/logger.ts';
 
 export async function sendStreamLiveAlert(
   platform: Platform,

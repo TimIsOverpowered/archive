@@ -1,22 +1,22 @@
 import type { Kysely } from 'kysely';
-import type { TenantConfig } from '../../config/types.js';
-import { getDisplayName } from '../../config/types.js';
-import { findVodById } from '../../db/queries/vods.js';
-import type { StreamerDB, SelectableVods } from '../../db/streamer-types.js';
-import { uploadVideo, saveChaptersAndLinkParts } from '../../services/youtube/index.js';
-import type { SourceType, Platform } from '../../types/platforms.js';
-import { UPLOAD_TYPES } from '../../types/platforms.js';
-import { initRichAlert, createProgressBar } from '../../utils/discord-alerts.js';
-import { VodNotFoundError } from '../../utils/domain-errors.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { toHHMMSS } from '../../utils/formatting.js';
-import type { AppLogger } from '../../utils/logger.js';
-import { deleteFileIfExists } from '../../utils/path.js';
-import { safeUpdateAlert } from '../utils/alert-factories.js';
-import { splitVideo, getMetadata } from '../utils/ffmpeg.js';
-import { buildYoutubeMetadata } from './metadata-builder.js';
-import { getEffectiveSplitDuration } from './validation.js';
-import { createYoutubeUploadProgressHandler } from './youtube-upload-progress.js';
+import type { TenantConfig } from '../../config/types.ts';
+import { getDisplayName } from '../../config/types.ts';
+import { findVodById } from '../../db/queries/vods.ts';
+import type { SelectableVods, StreamerDB } from '../../db/streamer-types.ts';
+import { saveChaptersAndLinkParts, uploadVideo } from '../../services/youtube/index.ts';
+import type { Platform, SourceType } from '../../types/platforms.ts';
+import { UPLOAD_TYPES } from '../../types/platforms.ts';
+import { createProgressBar, initRichAlert } from '../../utils/discord-alerts.ts';
+import { VodNotFoundError } from '../../utils/domain-errors.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { toHHMMSS } from '../../utils/formatting.ts';
+import type { AppLogger } from '../../utils/logger.ts';
+import { deleteFileIfExists } from '../../utils/path.ts';
+import { safeUpdateAlert } from '../utils/alert-factories.ts';
+import { getMetadata, splitVideo } from '../utils/ffmpeg.ts';
+import { buildYoutubeMetadata } from './metadata-builder.ts';
+import { getEffectiveSplitDuration } from './validation.ts';
+import { createYoutubeUploadProgressHandler } from './youtube-upload-progress.ts';
 
 export interface VodUploadContext {
   tenantId: string;
@@ -289,7 +289,7 @@ async function processSingleVodUpload(ctx: SingleVodUploadContext): Promise<VodU
     youtubeDescription: config.youtube?.description,
     chatDownload: config.settings?.chatDownload,
     titleTemplate: config.youtube?.titleTemplate,
-    part: part != null ? parseInt(String(part)) : undefined,
+    part: part != null ? parseInt(String(part), 10) : undefined,
     type,
   });
 

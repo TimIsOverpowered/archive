@@ -18,14 +18,14 @@
  */
 import type { Redis } from 'ioredis';
 import { LRUCache } from 'lru-cache';
-import { CacheSwr, CacheInflight } from '../constants.js';
-import { getLogger } from '../utils/logger.js';
-import { RedisService } from '../utils/redis-service.js';
-import type { SWRKey, SimpleKey } from './cache-keys.js';
-import { compressData, decompressData } from './compression.js';
-import { CacheBackoffError } from './domain-errors.js';
-import { extractErrorDetails } from './error.js';
-import { retryWithBackoff } from './retry.js';
+import { CacheInflight, CacheSwr } from '../constants.ts';
+import { getLogger } from '../utils/logger.ts';
+import { RedisService } from '../utils/redis-service.ts';
+import type { SimpleKey, SWRKey } from './cache-keys.ts';
+import { compressData, decompressData } from './compression.ts';
+import { CacheBackoffError } from './domain-errors.ts';
+import { extractErrorDetails } from './error.ts';
+import { retryWithBackoff } from './retry.ts';
 
 /** Metrics for Redis cache hit/miss/error tracking. */
 export interface CacheMetrics {
@@ -116,7 +116,7 @@ export class CacheContext {
     if (!client) return fetcher();
 
     const existing = this.inflight.get(key) as Promise<T> | undefined;
-    if (existing) return existing;
+    if (existing != null) return existing;
 
     try {
       const cached = await client.getBuffer(key);
@@ -139,7 +139,7 @@ export class CacheContext {
 
     // Second inflight check: another call may have started during the await above
     const inflight = this.inflight.get(key) as Promise<T> | undefined;
-    if (inflight) return inflight;
+    if (inflight != null) return inflight;
 
     // Backoff gate: suppress thundering herd after a fetch failure
     if (this.fetchFailures.has(key)) {

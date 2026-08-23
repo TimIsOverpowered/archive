@@ -1,11 +1,11 @@
-import { Token, Twitch } from '../../constants.js';
-import { getTwitchAppCredentials } from '../../utils/credentials.js';
-import { sendDiscordAlert, trackFailure, resetFailures } from '../../utils/discord-alerts.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { request } from '../../utils/http-client.js';
-import { childLogger } from '../../utils/logger.js';
-import { RedisService } from '../../utils/redis-service.js';
-import { createTwitchClient, type TwitchClient } from './client.js';
+import { Token, Twitch } from '../../constants.ts';
+import { getTwitchAppCredentials } from '../../utils/credentials.ts';
+import { resetFailures, sendDiscordAlert, trackFailure } from '../../utils/discord-alerts.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { request } from '../../utils/http-client.ts';
+import { childLogger } from '../../utils/logger.ts';
+import { RedisService } from '../../utils/redis-service.ts';
+import { createTwitchClient, type TwitchClient } from './client.ts';
 
 const log = childLogger({ module: 'twitch-auth' });
 

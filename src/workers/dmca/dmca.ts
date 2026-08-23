@@ -1,16 +1,17 @@
 import path from 'node:path';
-import { extractErrorDetails } from '../../utils/error.js';
-import { toHHMMSS } from '../../utils/formatting.js';
-import { childLogger } from '../../utils/logger.js';
-import { deleteFileIfExists } from '../../utils/path.js';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { toHHMMSS } from '../../utils/formatting.ts';
+import { childLogger } from '../../utils/logger.ts';
+import { deleteFileIfExists } from '../../utils/path.ts';
 import {
+  type ConcatSegmentsOptions,
   concatSegments,
   extractSegment,
   generateBlackSegment,
   getMetadata,
-  type ConcatSegmentsOptions,
-} from '../utils/ffmpeg.js';
-export { muteAudioSections } from '../utils/ffmpeg.js';
+} from '../utils/ffmpeg.ts';
+
+export { muteAudioSections } from '../utils/ffmpeg.ts';
 
 const log = childLogger({ module: 'dmca' });
 

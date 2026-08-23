@@ -1,11 +1,11 @@
 import type { Kysely } from 'kysely';
-import { findVodById } from '../../../../db/queries/vods.js';
-import type { SelectableChapters, SelectableGames, StreamerDB } from '../../../../db/streamer-types.js';
-import type { TenantContext } from '../../../../types/context.js';
-import type { Platform } from '../../../../types/platforms.js';
-import { ChapterNotFoundError, GameNotFoundError } from '../../../../utils/domain-errors.js';
-import { notFound, badRequest } from '../../../../utils/http-error.js';
-import type { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
+import { findVodById } from '../../../../db/queries/vods.ts';
+import type { SelectableChapters, SelectableGames, StreamerDB } from '../../../../db/streamer-types.ts';
+import type { TenantContext } from '../../../../types/context.ts';
+import type { Platform } from '../../../../types/platforms.ts';
+import { ChapterNotFoundError, GameNotFoundError } from '../../../../utils/domain-errors.ts';
+import { badRequest, notFound } from '../../../../utils/http-error.ts';
+import type { TenantPlatformContext } from '../../../middleware/tenant-platform.ts';
 
 /** Resolved game with its associated VOD and platform context. */
 export interface ResolvedGameContext {

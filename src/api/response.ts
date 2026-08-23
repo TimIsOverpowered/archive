@@ -1,4 +1,4 @@
-import type { ApiResponse, ApiErrorResponse, PaginatedMeta } from '../types/api.js';
+import type { ApiErrorResponse, ApiResponse, PaginatedMeta } from '../types/api.ts';
 
 /** Wraps a value in a success response envelope. */
 export function ok<T>(data: T): ApiResponse<T> {

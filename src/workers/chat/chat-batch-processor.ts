@@ -1,9 +1,9 @@
 import type { Kysely } from 'kysely';
-import { Chat } from '../../constants.js';
-import type { StreamerDB, InsertableChatMessages } from '../../db/streamer-types.js';
-import type { AppLogger } from '../../utils/logger.js';
-import { retryWithBackoff } from '../../utils/retry.js';
-import type { ChatMessageCreateInput } from './chat-types.js';
+import { Chat } from '../../constants.ts';
+import type { InsertableChatMessages, StreamerDB } from '../../db/streamer-types.ts';
+import type { AppLogger } from '../../utils/logger.ts';
+import { retryWithBackoff } from '../../utils/retry.ts';
+import type { ChatMessageCreateInput } from './chat-types.ts';
 
 export interface FlushBatchResult {
   totalMessages: number;

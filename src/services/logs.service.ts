@@ -1,10 +1,10 @@
 import type { ReadonlyKysely } from 'kysely/readonly';
-import { Cache, Logs } from '../constants.js';
-import type { StreamerDB, SelectableChatMessages } from '../db/streamer-types.js';
-import { simpleKeys } from '../utils/cache-keys.js';
-import { defaultCacheContext } from '../utils/cache.js';
-import { VodNotFoundError } from '../utils/domain-errors.js';
-import { badRequest } from '../utils/http-error.js';
+import { Cache, Logs } from '../constants.ts';
+import type { SelectableChatMessages, StreamerDB } from '../db/streamer-types.ts';
+import { defaultCacheContext } from '../utils/cache.ts';
+import { simpleKeys } from '../utils/cache-keys.ts';
+import { VodNotFoundError } from '../utils/domain-errors.ts';
+import { badRequest } from '../utils/http-error.ts';
 
 interface CursorPayload {
   offset: number;

@@ -1,13 +1,13 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import { resetEnvConfig } from '../../src/config/env.js';
-import { publishVodUpdate, publishVodDurationUpdate, publishGameUpdate } from '../../src/services/cache-invalidator.js';
-import { RedisService } from '../../src/utils/redis-service.js';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { resetEnvConfig } from '../../src/config/env.ts';
+import { publishGameUpdate, publishVodDurationUpdate, publishVodUpdate } from '../../src/services/cache-invalidator.ts';
+import { RedisService } from '../../src/utils/redis-service.ts';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 function setupBaseEnv(): void {
-  Object.keys(process.env).forEach((key) => delete process.env[key]);
+  for (const key of Object.keys(process.env)) delete process.env[key];
   process.env.REDIS_URL = 'redis://localhost';
   process.env.META_DATABASE_URL = 'postgresql://meta';
   process.env.PGBOUNCER_URL = 'postgresql://bouncer';

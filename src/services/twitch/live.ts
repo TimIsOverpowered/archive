@@ -1,10 +1,10 @@
-import { Twitch } from '../../constants.js';
-import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { getTwitchAppCredentials } from '../../utils/credentials.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { request } from '../../utils/http-client.js';
-import { getAppAccessToken } from './auth.js';
-import type { VodData } from './vod.js';
+import { Twitch } from '../../constants.ts';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.ts';
+import { getTwitchAppCredentials } from '../../utils/credentials.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { request } from '../../utils/http-client.ts';
+import { getAppAccessToken } from './auth.ts';
+import type { VodData } from './vod.ts';
 
 const log = createAutoLogger('twitch-live');
 

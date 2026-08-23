@@ -2,21 +2,21 @@ import type { Stats as FsStats } from 'node:fs';
 import fs from 'node:fs/promises';
 import * as pathModule from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { findVodByStreamId } from '../../../db/queries/vods.js';
-import { saveVodChapters } from '../../../services/twitch/index.js';
-import type { Platform } from '../../../types/platforms.js';
-import { PLATFORM_VALUES, PLATFORMS, SOURCE_TYPES } from '../../../types/platforms.js';
-import { badRequest, forbidden, notFound } from '../../../utils/http-error.js';
-import { fileExists, sanitizePathForLog } from '../../../utils/path.js';
-import { enqueueFinalizeJob, queueYoutubeUploads } from '../../../workers/jobs/youtube.job.js';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
+import { findVodByStreamId } from '../../../db/queries/vods.ts';
+import { saveVodChapters } from '../../../services/twitch/index.ts';
+import type { Platform } from '../../../types/platforms.ts';
+import { PLATFORM_VALUES, PLATFORMS, SOURCE_TYPES } from '../../../types/platforms.ts';
+import { badRequest, forbidden, notFound } from '../../../utils/http-error.ts';
+import { fileExists, sanitizePathForLog } from '../../../utils/path.ts';
+import { enqueueFinalizeJob, queueYoutubeUploads } from '../../../workers/jobs/youtube.job.ts';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.ts';
 import {
-  tenantMiddleware,
-  platformValidationMiddleware,
   asTenantPlatformContext,
+  platformValidationMiddleware,
   requireTenant,
-} from '../../middleware/tenant-platform.js';
-import { ok } from '../../response.js';
+  tenantMiddleware,
+} from '../../middleware/tenant-platform.ts';
+import { ok } from '../../response.ts';
 
 /** Body of the live callback from external recorder. */
 interface LiveCallbackBody {

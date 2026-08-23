@@ -1,9 +1,9 @@
 import ipaddr from 'ipaddr.js';
-import { getBaseConfig } from '../config/env.js';
-import { Cloudflare } from '../constants.js';
-import { RedisService } from '../utils/redis-service.js';
-import { request } from './http-client.js';
-import { getLogger } from './logger.js';
+import { getBaseConfig } from '../config/env.ts';
+import { Cloudflare } from '../constants.ts';
+import { RedisService } from '../utils/redis-service.ts';
+import { request } from './http-client.ts';
+import { getLogger } from './logger.ts';
 
 const CF_IP_RANGES_KEY = 'cloudflare:ip_ranges';
 const CF_IP_V4_URL = 'https://www.cloudflare.com/ips-v4';

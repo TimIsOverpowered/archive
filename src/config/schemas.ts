@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { YouTube } from '../constants.js';
-import { decryptObject, decryptScalar } from '../utils/encryption.js';
+import { YouTube } from '../constants.ts';
+import { decryptObject, decryptScalar } from '../utils/encryption.ts';
 
 /**
  * Zod schema for an encrypted string field.

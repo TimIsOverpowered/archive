@@ -1,10 +1,10 @@
-import { getDiscordAlertWebhookUrl } from '../../config/env.js';
-import { DiscordAlert } from '../../constants.js';
-import { extractErrorDetails } from '../error.js';
-import { request } from '../http-client.js';
-import { getLogger } from '../logger.js';
-import { isAlertsEnabled } from './context.js';
-import { constructEmbed, RichEmbedData } from './embed.js';
+import { getDiscordAlertWebhookUrl } from '../../config/env.ts';
+import { DiscordAlert } from '../../constants.ts';
+import { extractErrorDetails } from '../error.ts';
+import { request } from '../http-client.ts';
+import { getLogger } from '../logger.ts';
+import { isAlertsEnabled } from './context.ts';
+import { constructEmbed, type RichEmbedData } from './embed.ts';
 
 function getUpdateUrl(webhookUrl: string, messageId: string): string {
   const url = new URL(webhookUrl);

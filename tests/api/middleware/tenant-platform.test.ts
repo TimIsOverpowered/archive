@@ -1,12 +1,12 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import {
-  tenantMiddleware,
-  platformValidationMiddleware,
   asTenantPlatformContext,
-} from '../../../src/api/middleware/tenant-platform.js';
-import { PLATFORMS } from '../../../src/types/platforms.js';
-import { HttpError } from '../../../src/utils/http-error.js';
+  platformValidationMiddleware,
+  tenantMiddleware,
+} from '../../../src/api/middleware/tenant-platform.ts';
+import { PLATFORMS } from '../../../src/types/platforms.ts';
+import { HttpError } from '../../../src/utils/http-error.ts';
 
 function makeMockTenantConfig(overrides: Record<string, any> = {}): any {
   return {

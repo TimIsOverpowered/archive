@@ -1,24 +1,24 @@
-import { Job } from 'bullmq';
+import type { Job } from 'bullmq';
 import dayjs from 'dayjs';
 import type { Kysely } from 'kysely';
-import { getDisplayName, type TenantConfig } from '../config/types.js';
-import { Chat } from '../constants.js';
-import type { StreamerDB } from '../db/streamer-types.js';
-import { fetchComments, fetchNextComments, type TwitchVideoCommentResponse } from '../services/twitch/index.js';
-import { invalidateChatCache } from '../services/vod-cache.js';
-import { type Platform } from '../types/platforms.js';
-import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { sleep, jitter } from '../utils/delay.js';
-import { resetFailures, initRichAlert } from '../utils/discord-alerts.js';
-import type { AppLogger } from '../utils/logger.js';
-import { flushChatBatch } from './chat/chat-batch-processor.js';
-import { extractEdges, calculateResumeOffset, extractMessageData, parseKickContent } from './chat/chat-helpers.js';
-import type { ChatMessageCreateInput } from './chat/chat-types.js';
-import { paginateKickChatCommentsParallel } from './chat/kick-chat-paginator.js';
-import type { ChatDownloadJob, ChatDownloadResult } from './jobs/types.js';
-import { createChatWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.js';
-import type { ChatWorkerAlerts } from './utils/alert-factories.js';
-import { getJobContext } from './utils/job-context.js';
+import { getDisplayName, type TenantConfig } from '../config/types.ts';
+import { Chat } from '../constants.ts';
+import type { StreamerDB } from '../db/streamer-types.ts';
+import { fetchComments, fetchNextComments, type TwitchVideoCommentResponse } from '../services/twitch/index.ts';
+import { invalidateChatCache } from '../services/vod-cache.ts';
+import type { Platform } from '../types/platforms.ts';
+import { createAutoLogger } from '../utils/auto-tenant-logger.ts';
+import { jitter, sleep } from '../utils/delay.ts';
+import { initRichAlert, resetFailures } from '../utils/discord-alerts.ts';
+import type { AppLogger } from '../utils/logger.ts';
+import { flushChatBatch } from './chat/chat-batch-processor.ts';
+import { calculateResumeOffset, extractEdges, extractMessageData, parseKickContent } from './chat/chat-helpers.ts';
+import type { ChatMessageCreateInput } from './chat/chat-types.ts';
+import { paginateKickChatCommentsParallel } from './chat/kick-chat-paginator.ts';
+import type { ChatDownloadJob, ChatDownloadResult } from './jobs/types.ts';
+import type { ChatWorkerAlerts } from './utils/alert-factories.ts';
+import { createChatWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.ts';
+import { getJobContext } from './utils/job-context.ts';
 
 /**
  * Context for chat download processing.

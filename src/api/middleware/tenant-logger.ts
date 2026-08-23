@@ -1,6 +1,6 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { configService } from '../../config/tenant-config.js';
-import { enterTenantContext, exitTenantContext, TenantContextData } from '../../utils/async-context.js';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import { configService } from '../../config/tenant-config.ts';
+import { enterTenantContext, exitTenantContext, type TenantContextData } from '../../utils/async-context.ts';
 
 /**
  * Simple middleware that sets tenant context in async-local storage.

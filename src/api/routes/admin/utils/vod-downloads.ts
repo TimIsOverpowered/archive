@@ -1,27 +1,27 @@
 import path from 'node:path';
-import { getTmpPath } from '../../../../config/env.js';
-import { requirePlatformConfig } from '../../../../config/types.js';
-import { Vod } from '../../../../constants.js';
-import { findVodById } from '../../../../db/queries/vods.js';
-import type { SelectableVods } from '../../../../db/streamer-types.js';
-import type { SourceType, DownloadMethod } from '../../../../types/platforms.js';
-import { DOWNLOAD_METHODS, SOURCE_TYPES } from '../../../../types/platforms.js';
-import { PlatformNotConfiguredError, VodNotFoundError } from '../../../../utils/domain-errors.js';
-import { extractErrorDetails } from '../../../../utils/error.js';
-import { type AppLogger } from '../../../../utils/logger.js';
+import { getTmpPath } from '../../../../config/env.ts';
+import { requirePlatformConfig } from '../../../../config/types.ts';
+import { Vod } from '../../../../constants.ts';
+import { findVodById } from '../../../../db/queries/vods.ts';
+import type { SelectableVods } from '../../../../db/streamer-types.ts';
+import type { DownloadMethod, SourceType } from '../../../../types/platforms.ts';
+import { DOWNLOAD_METHODS, SOURCE_TYPES } from '../../../../types/platforms.ts';
+import { PlatformNotConfiguredError, VodNotFoundError } from '../../../../utils/domain-errors.ts';
+import { extractErrorDetails } from '../../../../utils/error.ts';
+import type { AppLogger } from '../../../../utils/logger.ts';
 import {
-  getTmpFilePath,
+  fileExists,
+  getLiveFilePath,
   getTmpDirPath,
+  getTmpFilePath,
   getVodFilePath,
   getVodHlsDirPath,
-  getLiveFilePath,
-  fileExists,
-} from '../../../../utils/path.js';
-import { queueFileCopy } from '../../../../workers/jobs/copy.job.js';
-import { triggerVodDownload } from '../../../../workers/jobs/vod.job.js';
-import { getMetadata } from '../../../../workers/utils/ffmpeg.js';
-import { TenantPlatformContext } from '../../../middleware/tenant-platform.js';
-import { refreshVodRecord } from './vod-records.js';
+} from '../../../../utils/path.ts';
+import { queueFileCopy } from '../../../../workers/jobs/copy.job.ts';
+import { triggerVodDownload } from '../../../../workers/jobs/vod.job.ts';
+import { getMetadata } from '../../../../workers/utils/ffmpeg.ts';
+import type { TenantPlatformContext } from '../../../middleware/tenant-platform.ts';
+import { refreshVodRecord } from './vod-records.ts';
 
 export interface EnsureVodDownloadOptions {
   ctx: TenantPlatformContext;

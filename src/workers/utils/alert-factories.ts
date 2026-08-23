@@ -3,13 +3,13 @@
  * Each factory provides init, progress, complete, and error alert builders.
  */
 
-import { capitalizePlatform, Platform, SOURCE_TYPES } from '../../types/platforms.js';
-import { createProgressBar, updateAlert } from '../../utils/discord-alerts.js';
-import type { RichEmbedData } from '../../utils/discord-alerts.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { formatBytes, toHHMMSS } from '../../utils/formatting.js';
-import type { AppLogger } from '../../utils/logger.js';
-import type { LiveCompletionData } from '../types.js';
+import { capitalizePlatform, type Platform, SOURCE_TYPES } from '../../types/platforms.ts';
+import type { RichEmbedData } from '../../utils/discord-alerts.ts';
+import { createProgressBar, updateAlert } from '../../utils/discord-alerts.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { formatBytes, toHHMMSS } from '../../utils/formatting.ts';
+import type { AppLogger } from '../../utils/logger.ts';
+import type { LiveCompletionData } from '../types.ts';
 
 /**
  * Safely updates a Discord alert, logging any errors without throwing.
@@ -472,7 +472,7 @@ function formatClaimList(
 
     if (isCompleted) {
       prefix = '✅';
-    } else if (currentStep != null && currentStep.includes(String(i))) {
+    } else if (currentStep?.includes(String(i))) {
       prefix = '🔄';
       suffix = stepProgress != null ? ` (${stepProgress}%)` : '';
     }

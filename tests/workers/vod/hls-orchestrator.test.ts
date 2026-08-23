@@ -1,15 +1,15 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach, mock } from 'node:test';
-import HLS from 'hls-parser';
-import { Hls } from '../../../src/constants.js';
-import { PLATFORMS } from '../../../src/types/platforms.js';
-import { DownloadAbortedError } from '../../../src/utils/domain-errors.js';
-import type { ImpitSession } from '../../../src/utils/impit-wrapper.js';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import type HLS from 'hls-parser';
+import { Hls } from '../../../src/constants.ts';
+import { PLATFORMS } from '../../../src/types/platforms.ts';
+import { DownloadAbortedError } from '../../../src/utils/domain-errors.ts';
+import type { ImpitSession } from '../../../src/utils/impit-wrapper.ts';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 function setupBaseEnv(): void {
-  Object.keys(process.env).forEach((key) => delete process.env[key]);
+  for (const key of Object.keys(process.env)) delete process.env[key];
   process.env.REDIS_URL = 'redis://localhost';
   process.env.META_DATABASE_URL = 'postgresql://meta';
   process.env.PGBOUNCER_URL = 'postgresql://bouncer';
@@ -144,8 +144,9 @@ mock.module('../../../src/utils/auto-tenant-logger.js', {
 // ============================================================================
 // System Under Test — Dynamically imported AFTER mock.module registrations
 // ============================================================================
-const { downloadHlsStream, filterNewSegments, fetchPlaylist } =
-  await import('../../../src/workers/vod/hls-orchestrator.js');
+const { downloadHlsStream, filterNewSegments, fetchPlaylist } = await import(
+  '../../../src/workers/vod/hls-orchestrator.ts'
+);
 
 // ============================================================================
 // filterNewSegments — pure function unit tests

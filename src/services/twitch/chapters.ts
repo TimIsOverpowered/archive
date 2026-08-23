@@ -1,13 +1,13 @@
 import { LRUCache } from 'lru-cache';
-import { ChapterCreateSchema } from '../../config/schemas.js';
-import { Twitch } from '../../constants.js';
-import { withDbRetry } from '../../db/streamer-client.js';
-import { TenantContext } from '../../types/context.js';
-import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { publishVodUpdate } from '../cache-invalidator.js';
-import { getTwitchClient } from './auth.js';
-import { createTwitchGqlClient } from './client.js';
+import { ChapterCreateSchema } from '../../config/schemas.ts';
+import { Twitch } from '../../constants.ts';
+import { withDbRetry } from '../../db/streamer-client.ts';
+import type { TenantContext } from '../../types/context.ts';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { publishVodUpdate } from '../cache-invalidator.ts';
+import { getTwitchClient } from './auth.ts';
+import { createTwitchGqlClient } from './client.ts';
 
 const gameDataCache = new LRUCache<string, Record<string, unknown>>({
   max: 1000,

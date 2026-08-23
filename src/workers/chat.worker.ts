@@ -1,22 +1,22 @@
 import type { Job, Processor } from 'bullmq';
-import { invalidateChatCache } from '../services/vod-cache.js';
-import { isKickPlatform, isTwitchPlatform } from '../types/platforms.js';
-import { createAutoLogger } from '../utils/auto-tenant-logger.js';
-import { updateAlert } from '../utils/discord-alerts.js';
-import { extractErrorDetails } from '../utils/error.js';
+import { invalidateChatCache } from '../services/vod-cache.ts';
+import { isKickPlatform, isTwitchPlatform } from '../types/platforms.ts';
+import { createAutoLogger } from '../utils/auto-tenant-logger.ts';
+import { updateAlert } from '../utils/discord-alerts.ts';
+import { extractErrorDetails } from '../utils/error.ts';
+import type { ChatProcessorContext } from './chat.worker.phases.ts';
 import {
   buildChatProcessorContext,
-  checkChatCompletion,
-  downloadChatMessages,
-  sendChatCompletionAlert,
   buildKickProcessorContext,
-  downloadKickChat,
-  sendKickChatCompletionAlert,
+  checkChatCompletion,
   checkKickCompletion,
-} from './chat.worker.phases.js';
-import type { ChatProcessorContext } from './chat.worker.phases.js';
-import type { ChatDownloadJob, ChatDownloadResult } from './jobs/types.js';
-import { wrapWorkerProcessor } from './utils/worker-wrapper.js';
+  downloadChatMessages,
+  downloadKickChat,
+  sendChatCompletionAlert,
+  sendKickChatCompletionAlert,
+} from './chat.worker.phases.ts';
+import type { ChatDownloadJob, ChatDownloadResult } from './jobs/types.ts';
+import { wrapWorkerProcessor } from './utils/worker-wrapper.ts';
 
 const errorMeta = (ctx: ChatProcessorContext) => ({
   vodId: ctx.vodId,

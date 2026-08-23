@@ -1,7 +1,7 @@
 import type { Redis } from 'ioredis';
-import { extractErrorDetails } from './error.js';
-import { getLogger } from './logger.js';
-import { RedisService } from './redis-service.js';
+import { extractErrorDetails } from './error.ts';
+import { getLogger } from './logger.ts';
+import { RedisService } from './redis-service.ts';
 
 export interface RedisSubscriberOptions<TEvent> {
   channel: string;

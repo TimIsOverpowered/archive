@@ -1,10 +1,12 @@
-import { FastifyRequest } from 'fastify';
-import { configService } from '../../config/tenant-config.js';
-import { ensureClient } from '../../db/streamer-client.js';
-import type { TenantContext } from '../../types/context.js';
-import { isValidPlatform, type Platform } from '../../types/platforms.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { notFound, badRequest, serviceUnavailable, internalServerError } from '../../utils/http-error.js';
+import type { FastifyRequest } from 'fastify';
+import type { Kysely } from 'kysely';
+import { configService } from '../../config/tenant-config.ts';
+import { ensureClient } from '../../db/streamer-client.ts';
+import type { StreamerDB } from '../../db/streamer-types.ts';
+import type { TenantContext } from '../../types/context.ts';
+import { isValidPlatform, type Platform } from '../../types/platforms.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { badRequest, internalServerError, notFound, serviceUnavailable } from '../../utils/http-error.ts';
 
 export interface TenantPlatformContext extends TenantContext {
   platform: Platform;
@@ -56,7 +58,7 @@ export async function tenantMiddleware(request: FastifyRequest) {
     notFound('Tenant not found');
   }
 
-  let client;
+  let client: Kysely<StreamerDB>;
   try {
     client = await ensureClient(tenantId, config);
   } catch (err) {
@@ -79,7 +81,7 @@ export async function tenantMiddleware(request: FastifyRequest) {
  * Must be used after tenantMiddleware (expects request.tenant to exist)
  * Register in preValidation hook
  */
-// eslint-disable-next-line @typescript-eslint/require-await -- Fastify preValidation hooks must match the async nature of onRequest hooks (tenantMiddleware is async), otherwise hook chain sequencing breaks and routes fail.
+// Intentionally async: Fastify preValidation hooks must match the async nature of onRequest hooks (tenantMiddleware is async), otherwise hook chain sequencing breaks and routes fail.
 export async function platformValidationMiddleware(request: FastifyRequest) {
   const rawPlatform = (request.body as { platform?: string }).platform;
   if (rawPlatform == null || rawPlatform === '') {

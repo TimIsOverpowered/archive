@@ -1,19 +1,19 @@
-import { Processor, Job } from 'bullmq';
-import { configService } from '../../config/tenant-config.js';
-import { requirePlatformConfig } from '../../config/types.js';
-import type { TenantConfig } from '../../config/types.js';
-import { Http, Jobs, Monitor } from '../../constants.js';
-import { findActiveLiveVod } from '../../db/queries/vods.js';
-import { getTwitchStreamStatusBatch, type TwitchStreamStatus } from '../../services/twitch/live.js';
-import { PLATFORMS, PLATFORM_VALUES } from '../../types/platforms.js';
-import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { jitter } from '../../utils/delay.js';
-import { getLogger } from '../../utils/logger.js';
-import type { MonitorJob, MonitorJobResult } from '../jobs/types.js';
-import { getLiveDownloadQueue } from '../queues/queue.js';
-import { handleWorkerError } from '../utils/error-handler.js';
-import { getJobContext } from '../utils/job-context.js';
-import { handlePlatformLiveCheck, handlePlatformLiveCheckWithStreamStatus } from './live-handler.js';
+import type { Job, Processor } from 'bullmq';
+import { configService } from '../../config/tenant-config.ts';
+import type { TenantConfig } from '../../config/types.ts';
+import { requirePlatformConfig } from '../../config/types.ts';
+import { Http, Jobs, Monitor } from '../../constants.ts';
+import { findActiveLiveVod } from '../../db/queries/vods.ts';
+import { getTwitchStreamStatusBatch, type TwitchStreamStatus } from '../../services/twitch/live.ts';
+import { PLATFORM_VALUES, PLATFORMS } from '../../types/platforms.ts';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.ts';
+import { jitter } from '../../utils/delay.ts';
+import { getLogger } from '../../utils/logger.ts';
+import type { MonitorJob, MonitorJobResult } from '../jobs/types.ts';
+import { getLiveDownloadQueue } from '../queues/queue.ts';
+import { handleWorkerError } from '../utils/error-handler.ts';
+import { getJobContext } from '../utils/job-context.ts';
+import { handlePlatformLiveCheck, handlePlatformLiveCheckWithStreamStatus } from './live-handler.ts';
 
 const monitorProcessor: Processor<MonitorJob, MonitorJobResult, string> = async (job: Job<MonitorJob>) => {
   const { tenantId, platform } = job.data;

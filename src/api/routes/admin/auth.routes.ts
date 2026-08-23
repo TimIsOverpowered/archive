@@ -1,8 +1,8 @@
-import { FastifyInstance } from 'fastify';
-import type { AdminContext } from '../../middleware/admin-api-key.js';
-import adminApiKeyMiddleware from '../../middleware/admin-api-key.js';
-import createRateLimitMiddleware from '../../middleware/rate-limit.js';
-import { ok } from '../../response.js';
+import type { FastifyInstance } from 'fastify';
+import type { AdminContext } from '../../middleware/admin-api-key.ts';
+import adminApiKeyMiddleware from '../../middleware/admin-api-key.ts';
+import createRateLimitMiddleware from '../../middleware/rate-limit.ts';
+import { ok } from '../../response.ts';
 
 export default function authRoutes(fastify: FastifyInstance, _options: Record<string, unknown>) {
   const rateLimitMiddleware = createRateLimitMiddleware({ limiter: fastify.adminRateLimiter });

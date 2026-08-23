@@ -1,7 +1,7 @@
-import { google } from 'googleapis';
 import type { youtube_v3 } from 'googleapis';
-import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { getYoutubeAuth, REDIRECT_URI, updateYoutubeTokenInDb } from './auth.js';
+import { google } from 'googleapis';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.ts';
+import { getYoutubeAuth, REDIRECT_URI, updateYoutubeTokenInDb } from './auth.ts';
 
 export async function createYoutubeClient(tenantId: string): Promise<youtube_v3.Youtube> {
   const logger = createAutoLogger('youtube-auth');

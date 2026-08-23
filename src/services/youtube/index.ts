@@ -1,10 +1,7 @@
-export { getYoutubeAuth, updateYoutubeTokenInDb, REDIRECT_URI } from './auth.js';
-export type { YoutubeAuthObject } from '../../config/schemas.js';
-
-export { createYoutubeClient } from './client.js';
-export type { YoutubeClient } from './client.js';
-
-export { uploadVideo } from './upload.js';
-export type { UploadProgressCallbackData, YoutubeUploadProgress } from './upload.js';
-
-export { saveChaptersAndLinkParts } from './metadata.js';
+export type { YoutubeAuthObject } from '../../config/schemas.ts';
+export { getYoutubeAuth, REDIRECT_URI, updateYoutubeTokenInDb } from './auth.ts';
+export type { YoutubeClient } from './client.ts';
+export { createYoutubeClient } from './client.ts';
+export { saveChaptersAndLinkParts } from './metadata.ts';
+export type { UploadProgressCallbackData, YoutubeUploadProgress } from './upload.ts';
+export { uploadVideo } from './upload.ts';

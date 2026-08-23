@@ -1,12 +1,12 @@
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import type { Kysely } from 'kysely';
-import { YouTube } from '../../constants.js';
-import type { StreamerDB } from '../../db/streamer-types.js';
-import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { ProgressStream } from '../../utils/progress-stream.js';
-import { createYoutubeClient } from './client.js';
+import { YouTube } from '../../constants.ts';
+import type { StreamerDB } from '../../db/streamer-types.ts';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { ProgressStream } from '../../utils/progress-stream.ts';
+import { createYoutubeClient } from './client.ts';
 
 export interface UploadedVideo {
   id: string;

@@ -1,10 +1,10 @@
 import HLS from 'hls-parser';
-import { Kick } from '../../constants.js';
-import { VodNotFoundError } from '../../utils/domain-errors.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { fetchUrl } from '../../utils/flaresolverr-client.js';
-import { createSession } from '../../utils/impit-wrapper.js';
-import { childLogger } from '../../utils/logger.js';
+import { Kick } from '../../constants.ts';
+import { VodNotFoundError } from '../../utils/domain-errors.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { fetchUrl } from '../../utils/flaresolverr-client.ts';
+import { createSession } from '../../utils/impit-wrapper.ts';
+import { childLogger } from '../../utils/logger.ts';
 
 const log = childLogger({ module: 'kick-vod' });
 

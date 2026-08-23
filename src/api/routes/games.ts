@@ -1,20 +1,20 @@
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { ReadonlyKysely } from 'kysely/readonly';
 import { z } from 'zod';
-import { Db } from '../../constants.js';
-import type { StreamerDB } from '../../db/streamer-types.js';
+import { Db } from '../../constants.ts';
+import type { StreamerDB } from '../../db/streamer-types.ts';
 import {
-  getGames,
-  getGameById,
-  getGamesLibrary,
-  GameQuerySchema,
   GameLibraryQuerySchema,
-} from '../../services/games.service.js';
-import { PLATFORM_VALUES } from '../../types/platforms.js';
-import { notFound } from '../../utils/http-error.js';
-import createRateLimitMiddleware from '../middleware/rate-limit.js';
-import { tenantMiddleware, requireTenant } from '../middleware/tenant-platform.js';
-import { ok, okPaginated } from '../response.js';
+  GameQuerySchema,
+  getGameById,
+  getGames,
+  getGamesLibrary,
+} from '../../services/games.service.ts';
+import { PLATFORM_VALUES } from '../../types/platforms.ts';
+import { notFound } from '../../utils/http-error.ts';
+import createRateLimitMiddleware from '../middleware/rate-limit.ts';
+import { requireTenant, tenantMiddleware } from '../middleware/tenant-platform.ts';
+import { ok, okPaginated } from '../response.ts';
 
 const GameIdParamSchema = z.coerce.number().int().min(0).max(Db.INT32_MAX);
 

@@ -1,12 +1,12 @@
-import { configService } from '../../config/tenant-config.js';
-import { Jobs } from '../../constants.js';
-import type { Platform } from '../../types/platforms.js';
-import { isKickPlatform, isTwitchPlatform } from '../../types/platforms.js';
-import { extractErrorDetails } from '../../utils/error.js';
-import { childLogger } from '../../utils/logger.js';
-import { getKickChatDownloadQueue, getTwitchChatDownloadQueue } from '../queues/queue.js';
-import { enqueueJobWithLogging } from './enqueue.js';
-import type { ChatDownloadJob } from './types.js';
+import { configService } from '../../config/tenant-config.ts';
+import { Jobs } from '../../constants.ts';
+import type { Platform } from '../../types/platforms.ts';
+import { isKickPlatform, isTwitchPlatform } from '../../types/platforms.ts';
+import { extractErrorDetails } from '../../utils/error.ts';
+import { childLogger } from '../../utils/logger.ts';
+import { getKickChatDownloadQueue, getTwitchChatDownloadQueue } from '../queues/queue.ts';
+import { enqueueJobWithLogging } from './enqueue.ts';
+import type { ChatDownloadJob } from './types.ts';
 
 const log = childLogger({ module: 'chat-job' });
 

@@ -72,7 +72,7 @@ export function constructEmbed(data: RichEmbedData): DiscordEmbed {
 }
 
 export function createProgressBar(percent: number): string {
-  return createProgressBarInternal(percent) + ` ${percent}%`;
+  return `${createProgressBarInternal(percent)} ${percent}%`;
 }
 
 function createProgressBarInternal(percent: number): string {

@@ -1,4 +1,4 @@
-import { getLogger } from '../../utils/logger.js';
+import { getLogger } from '../../utils/logger.ts';
 
 const PG_CONNECTION_ERROR_CODES = new Set([
   // Class 08: Connection Exception

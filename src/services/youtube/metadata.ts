@@ -1,8 +1,8 @@
 import type { Kysely } from 'kysely';
-import type { StreamerDB, SelectableChapters } from '../../db/streamer-types.js';
-import { createAutoLogger } from '../../utils/auto-tenant-logger.js';
-import dayjs from '../../utils/dayjs.js';
-import { createYoutubeClient } from './client.js';
+import type { SelectableChapters, StreamerDB } from '../../db/streamer-types.ts';
+import { createAutoLogger } from '../../utils/auto-tenant-logger.ts';
+import dayjs from '../../utils/dayjs.ts';
+import { createYoutubeClient } from './client.ts';
 
 export async function saveChaptersAndLinkParts(
   tenantId: string,
@@ -51,7 +51,7 @@ export async function saveChaptersAndLinkParts(
     if (hasChapters) {
       const chapterTimestamps = buildChapterTimestampsForPart(chapters, partNum, splitDuration);
       if (chapterTimestamps != null && chapterTimestamps !== '') {
-        newDescription += '\n\n' + chapterTimestamps;
+        newDescription += `\n\n${chapterTimestamps}`;
         videosWithChapters++;
       }
     }
@@ -59,7 +59,7 @@ export async function saveChaptersAndLinkParts(
     if (needsLinking) {
       const navLinks = buildPartNavigationLinks(sortedParts, videoId);
       if (navLinks != null && navLinks !== '') {
-        newDescription = navLinks + '\n' + newDescription;
+        newDescription = `${navLinks}\n${newDescription}`;
         videosWithLinks++;
       }
     }

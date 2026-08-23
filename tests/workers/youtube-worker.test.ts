@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert';
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+
 // Must set env vars BEFORE any source imports (youtube auth calls getWorkersConfig at module load)
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 process.env.REDIS_URL = 'redis://localhost';
@@ -13,13 +14,14 @@ process.env.TWITCH_CLIENT_ID = 'test-twitch-client-id';
 process.env.TWITCH_CLIENT_SECRET = 'test-twitch-client-secret';
 process.env.YOUTUBE_CLIENT_ID = 'test-youtube-client-id';
 process.env.YOUTUBE_CLIENT_SECRET = 'test-youtube-client-secret';
-import youtubeProcessor from '../../src/workers/youtube.worker.js';
+
+import youtubeProcessor from '../../src/workers/youtube.worker.ts';
 import {
   buildMockDb,
   setupBaseEnv,
   setupWorkerMocksWithDb,
   teardownWorkerMocks,
-} from '../helpers/worker-test-setup.js';
+} from '../helpers/worker-test-setup.ts';
 
 setupBaseEnv();
 
