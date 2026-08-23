@@ -442,7 +442,7 @@ describe('computeGameSegmentPart', () => {
     assert.strictEqual(computeGameSegmentPart(chapters, 54000, 1, MAX), 3);
   });
 
-  it('continues the counter globally across distinct repeating games', () => {
+  it('numbers parts independently per game name', () => {
     const chapters = [
       { name: 'IRL', start: 0, duration: 3600 },
       { name: 'IRL', start: 3600, duration: 3600 },
@@ -451,8 +451,8 @@ describe('computeGameSegmentPart', () => {
     ];
     assert.strictEqual(computeGameSegmentPart(chapters, 0, 1, MAX), 1);
     assert.strictEqual(computeGameSegmentPart(chapters, 3600, 1, MAX), 2);
-    assert.strictEqual(computeGameSegmentPart(chapters, 7200, 1, MAX), 3);
-    assert.strictEqual(computeGameSegmentPart(chapters, 10800, 1, MAX), 4);
+    assert.strictEqual(computeGameSegmentPart(chapters, 7200, 1, MAX), 1);
+    assert.strictEqual(computeGameSegmentPart(chapters, 10800, 1, MAX), 2);
   });
 
   it('treats null chapter names as their own group', () => {

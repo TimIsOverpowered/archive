@@ -105,7 +105,9 @@ async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{
     .where('vod_id', '=', dbId)
     .orderBy('start', 'asc')
     .execute();
-  const segmentPart = computeGameSegmentPart(chapters, chapterStart, currentPartNum, YouTube.MAX_DURATION);
+  const restricted = config.youtube?.restrictedGames ?? [];
+  const uploadable = chapters.filter((c) => (c.name == null || !restricted.includes(c.name)) && c.duration >= 600);
+  const segmentPart = computeGameSegmentPart(uploadable, chapterStart, currentPartNum, YouTube.MAX_DURATION);
 
   const { title: ytTitle, description: youtubeDescription } = buildYoutubeMetadata({
     channelName,

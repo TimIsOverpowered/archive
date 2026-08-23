@@ -127,7 +127,7 @@ export function computeGameSegmentPart(
   let before = 0;
   for (const c of sorted) {
     if (c.start >= current.start) break;
-    if ((totalsByName.get(c.name ?? '') ?? 0) > 1) before += segmentCount(c);
+    if (c.name === current.name) before += segmentCount(c);
   }
 
   return before + (part - 1) + 1;
