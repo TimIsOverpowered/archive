@@ -192,10 +192,20 @@ export function buildYoutubeMetadata(options: YoutubeMetadataOptions): YoutubeMe
   }
 
   const sanitizedTitle = vodRecord.title != null && vodRecord.title !== '' ? sanitizeYoutubeText(vodRecord.title) : '';
-  const sanitizedDesc =
-    youtubeDescription != null && youtubeDescription !== '' ? sanitizeYoutubeText(youtubeDescription) : '';
-  const chatLine = (chatDownload ?? true) ? `Chat Replay: https://${domainName}${replayPath}\n` : '';
-  const description = `${chatLine}Stream Title: ${sanitizedTitle}\n${sanitizedDesc}`;
+  const chatUrl = (chatDownload ?? true) ? `https://${domainName}${replayPath}` : '';
+
+  let description: string;
+  if (youtubeDescription != null && youtubeDescription !== '') {
+    const descVars: Record<string, string> = {
+      ...vars,
+      vodTitle: sanitizedTitle,
+      chatReplay: chatUrl,
+    };
+    description = interpolate(youtubeDescription, descVars);
+  } else {
+    const chatLine = chatUrl !== '' ? `Chat Replay: ${chatUrl}\n` : '';
+    description = `${chatLine}Stream Title: ${sanitizedTitle}\n`;
+  }
 
   return { title, description };
 }

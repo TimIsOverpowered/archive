@@ -89,12 +89,12 @@ describe('buildYoutubeMetadata', () => {
     assert.ok(result.description.includes('Stream Title: '));
   });
 
-  it('should include youtubeDescription when provided', () => {
+  it('should use description as a template (plain text passes through)', () => {
     const result = buildYoutubeMetadata({
       ...baseOptions,
       youtubeDescription: 'Custom description here',
     });
-    assert.ok(result.description.includes('Custom description here'));
+    assert.strictEqual(result.description, 'Custom description here');
   });
 
   it('should not include extra whitespace for missing youtubeDescription', () => {
@@ -124,13 +124,63 @@ describe('buildYoutubeMetadata', () => {
     assert.strictEqual(lines[2], '');
   });
 
-  it('should handle youtubeDescription with newlines', () => {
+  it('should handle description template with newlines', () => {
     const result = buildYoutubeMetadata({
       ...baseOptions,
       youtubeDescription: 'Line 1\nLine 2',
     });
-    assert.ok(result.description.includes('Line 1'));
-    assert.ok(result.description.includes('Line 2'));
+    assert.strictEqual(result.description, 'Line 1\nLine 2');
+  });
+
+  it('should interpolate description template variables', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      youtubeDescription: 'Chat Replay: {{chatReplay}}\nStream Title: {{vodTitle}}\n{{channel}} - {{date}}',
+    });
+    assert.strictEqual(
+      result.description,
+      'Chat Replay: https://example.com/youtube/42\nStream Title: Epic Stream\nTestChannel - JANUARY 15 2024'
+    );
+  });
+
+  it('should render {{chatReplay}} as empty when chatDownload is false', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      chatDownload: false,
+      youtubeDescription: 'Chat Replay: {{chatReplay}}',
+    });
+    assert.strictEqual(result.description, 'Chat Replay: ');
+  });
+
+  it('should use the games replay path in description template for game uploads', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      gameName: 'Elden Ring',
+      youtubeDescription: '{{chatReplay}}',
+    });
+    assert.strictEqual(result.description, 'https://example.com/games/42');
+  });
+
+  it('should strip angled brackets from {{vodTitle}} in description template', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      vodRecord: { ...baseOptions.vodRecord, title: 'Stream <<< hype >>> here' },
+      youtubeDescription: '{{vodTitle}}',
+    });
+    assert.strictEqual(result.description, 'Stream  hype  here');
+  });
+
+  it('should expose all shared variables in description template', () => {
+    const result = buildYoutubeMetadata({
+      ...baseOptions,
+      type: 'live',
+      part: 2,
+      gameName: 'Elden Ring',
+      epNumber: 5,
+      segmentPart: 3,
+      youtubeDescription: '{{channel}} {{platform}} {{type}} {{date}} {{part}} {{game}} {{ep}} {{segmentPart}}',
+    });
+    assert.strictEqual(result.description, 'TestChannel Twitch LIVE JANUARY 15 2024 PART 2 Elden Ring EP 5 Part 3');
   });
 
   it('should capitalize platform name correctly', () => {

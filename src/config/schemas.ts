@@ -100,7 +100,7 @@ export const YoutubeSchema = z.object({
   perGameUpload: z.boolean().default(false),
   /** List of restricted game names for per-game upload filtering */
   restrictedGames: z.array(z.string().nullable()).default([]),
-  /** Custom upload description template */
+  /** Custom YouTube description template using {{variables}} (empty = default format) */
   description: z.string().default(''),
   /** Custom YouTube title template using {{variables}} (empty = structured format) */
   titleTemplate: z.string().default(''),
