@@ -69,6 +69,12 @@ export interface VodFinalizeFileJob extends BaseJobData {
   saveMP4: boolean;
   saveHLS?: boolean;
   streamId?: string | undefined;
+  /**
+   * When true, the work dir was populated by copying an existing file from
+   * storage (not a fresh download). Finalization must skip copying files back
+   * to storage and only clean up the work dir.
+   */
+  copiedFromStorage?: boolean | undefined;
 }
 
 export interface VodFinalizeFileResult {
@@ -86,6 +92,7 @@ export interface DmcaProcessingJob extends BaseJobData {
   workDir?: string | undefined;
   skipFinalize?: boolean | undefined;
   streamId?: string | undefined;
+  copiedFromStorage?: boolean | undefined;
 }
 
 export interface MonitorJob {

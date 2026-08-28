@@ -43,6 +43,7 @@ export interface DmcaProcessorContext extends BaseWorkerContext {
   tempFiles: string[];
   completedClaimIds: string[];
   streamId?: string | undefined;
+  copiedFromStorage: boolean;
 }
 
 export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Promise<DmcaProcessorContext> {
@@ -59,6 +60,7 @@ export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Pr
     gameDuration,
     type,
     streamId,
+    copiedFromStorage,
   } = job.data;
   const isGameUpload = gameId != null && gameStart != null && gameDuration != null;
   const log = createAutoLogger(String(tenantId));
@@ -158,6 +160,7 @@ export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Pr
     tempFiles: [],
     completedClaimIds: [],
     streamId,
+    copiedFromStorage: copiedFromStorage ?? false,
   };
 }
 
@@ -461,6 +464,7 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
           saveMP4: ctx.config.settings.saveMP4 ?? false,
           saveHLS: ctx.config.settings.saveHLS ?? false,
           streamId: ctx.streamId,
+          copiedFromStorage: ctx.copiedFromStorage,
         },
         opts: {
           jobId: `finalize_${ctx.vodId}_1_${timestamp}`,
@@ -503,6 +507,7 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
           saveMP4: ctx.config.settings.saveMP4 ?? false,
           saveHLS: ctx.config.settings.saveHLS ?? false,
           streamId: ctx.streamId,
+          copiedFromStorage: ctx.copiedFromStorage,
         },
         opts: {
           jobId: `finalize_${ctx.vodId}_1_${timestamp}`,

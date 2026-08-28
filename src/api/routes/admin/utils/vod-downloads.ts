@@ -38,6 +38,12 @@ export interface EnsureVodDownloadResponse {
   jobId: string | null;
   copyJobId?: string | undefined;
   workDir?: string | undefined;
+  /**
+   * True when the work dir was populated by copying an existing file from
+   * storage (rather than a fresh download). Finalization must skip writing
+   * files back to storage in this case.
+   */
+  copiedFromStorage?: boolean | undefined;
 }
 
 type DownloadCheckResult =
@@ -125,7 +131,13 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
         destPath: tmpFilePath,
       });
       log.info({ filePath, tmpFilePath, copyJobId }, 'Queued file copy from storage to tmpPath');
-      return { filePath: tmpFilePath, jobId: null, copyJobId, workDir: getTmpDirPath({ tenantId, vodId }) };
+      return {
+        filePath: tmpFilePath,
+        jobId: null,
+        copyJobId,
+        workDir: getTmpDirPath({ tenantId, vodId }),
+        copiedFromStorage: true,
+      };
     } catch (err) {
       log.warn({ error: extractErrorDetails(err).message }, 'Failed to queue file copy to tmpPath');
     }
@@ -145,7 +157,13 @@ export async function ensureVodDownload(options: EnsureVodDownloadOptions): Prom
       isHlsCopy: true,
     });
     log.info({ hlsDirPath, tmpDirPath, copyJobId }, 'Queued HLS copy + conversion from storage');
-    return { filePath: tmpFilePath, jobId: null, copyJobId, workDir: getTmpDirPath({ tenantId, vodId }) };
+    return {
+      filePath: tmpFilePath,
+      jobId: null,
+      copyJobId,
+      workDir: getTmpDirPath({ tenantId, vodId }),
+      copiedFromStorage: true,
+    };
   }
 
   return { filePath, jobId: null };

@@ -1,4 +1,5 @@
 import { strict as assert } from 'node:assert';
+import path from 'node:path';
 import { beforeEach, describe, it, mock } from 'node:test';
 import { resetEnvConfig } from '../../../../../src/config/env.ts';
 import { SOURCE_TYPES } from '../../../../../src/types/platforms.ts';
@@ -14,6 +15,7 @@ const VOD_STORAGE = '/tmp/test-vods/tenant-1/vod-123/vod-123.mp4';
 const TMP_FILE = '/tmp/test-tmp/tenant-1/vod-123/vod-123.mp4';
 const TMP_DIR = '/tmp/test-tmp/tenant-1/vod-123';
 const VOD_HLS_DIR = '/tmp/test-vods/tenant-1/vod-123/hls';
+const VOD_HLS_M3U8 = path.join(VOD_HLS_DIR, 'vod-123.m3u8');
 
 // Mock state
 let existingPaths = new Set<string>();
@@ -97,6 +99,7 @@ describe('ensureVodDownload (live)', () => {
     assert.strictEqual(res.filePath, TMP_FILE);
     assert.strictEqual(res.copyJobId, 'copy-job-1');
     assert.strictEqual(res.workDir, TMP_DIR);
+    assert.strictEqual(res.copiedFromStorage, true);
     assert.strictEqual(copyCalls.length, 1);
     assert.strictEqual(copyCalls[0].sourcePath, LIVE_STORAGE);
     assert.strictEqual(copyCalls[0].destPath, TMP_FILE);
@@ -112,6 +115,7 @@ describe('ensureVodDownload (live)', () => {
     assert.strictEqual(res.filePath, TMP_FILE);
     assert.strictEqual(res.copyJobId, undefined);
     assert.strictEqual(res.workDir, TMP_DIR);
+    assert.strictEqual(res.copiedFromStorage, undefined);
     assert.strictEqual(copyCalls.length, 0);
     assert.strictEqual(downloadCalls.length, 0);
   });
@@ -138,8 +142,37 @@ describe('ensureVodDownload (live)', () => {
     assert.strictEqual(res.filePath, TMP_FILE);
     assert.strictEqual(res.copyJobId, 'copy-job-1');
     assert.strictEqual(res.workDir, TMP_DIR);
+    assert.strictEqual(res.copiedFromStorage, true);
     assert.strictEqual(copyCalls.length, 1);
     assert.strictEqual(copyCalls[0].sourcePath, VOD_STORAGE);
     assert.strictEqual(downloadCalls.length, 0);
+  });
+
+  it('flags copiedFromStorage when copying an existing HLS directory from storage', async () => {
+    existingPaths = new Set([VOD_HLS_M3U8]);
+
+    const res = await ensureVodDownload({ ctx, dbId: 42, vodId: 'vod-123', type: SOURCE_TYPES.VOD, log });
+
+    assert.strictEqual(res.jobId, null);
+    assert.strictEqual(res.copyJobId, 'copy-job-1');
+    assert.strictEqual(res.workDir, TMP_DIR);
+    assert.strictEqual(res.copiedFromStorage, true);
+    assert.strictEqual(copyCalls.length, 1);
+    assert.strictEqual(copyCalls[0].isHlsCopy, true);
+    assert.strictEqual(copyCalls[0].sourcePath, VOD_HLS_DIR);
+    assert.strictEqual(downloadCalls.length, 0);
+  });
+
+  it('leaves copiedFromStorage unset when a fresh download is queued', async () => {
+    existingPaths = new Set<string>();
+
+    const res = await ensureVodDownload({ ctx, dbId: 42, vodId: 'vod-123', type: SOURCE_TYPES.VOD, log });
+
+    assert.strictEqual(res.jobId, 'download-job-1');
+    assert.strictEqual(res.copyJobId, undefined);
+    assert.strictEqual(res.workDir, TMP_DIR);
+    assert.strictEqual(res.copiedFromStorage, undefined);
+    assert.strictEqual(copyCalls.length, 0);
+    assert.strictEqual(downloadCalls.length, 1);
   });
 });

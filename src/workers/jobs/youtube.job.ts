@@ -305,6 +305,7 @@ function createFinalizeData(
     saveMP4?: boolean | undefined;
     saveHLS?: boolean | undefined;
     streamId?: string | undefined;
+    copiedFromStorage?: boolean | undefined;
   }
 ) {
   return {
@@ -318,6 +319,7 @@ function createFinalizeData(
     saveMP4: options?.saveMP4 ?? ctx.config.settings.saveMP4 ?? false,
     saveHLS: options?.saveHLS ?? ctx.config.settings.saveHLS ?? false,
     streamId: options?.streamId,
+    ...(options?.copiedFromStorage != null && { copiedFromStorage: options.copiedFromStorage }),
   };
 }
 
@@ -588,6 +590,8 @@ export interface QueueYoutubeUploadsOptions {
   type: SourceType;
   workDir?: string | undefined;
   streamId?: string | undefined;
+  /** True when the work dir was populated by copying from existing storage (finalization skips write-back). */
+  copiedFromStorage?: boolean | undefined;
   /** Force upload regardless of vodUpload config. Admin routes use this to bypass VOD upload gating. */
   forceUpload?: boolean;
 }
@@ -711,6 +715,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
     dmcaProcessed,
     workDir,
     streamId,
+    copiedFromStorage,
   } = options;
   const { config } = ctx;
   const saveHls = config.settings.saveHLS ?? false;
@@ -758,7 +763,12 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
       const flow = await getFlowProducer().add({
         name: 'vod_finalize_file',
         queueName: finalizeQueue.name,
-        data: createFinalizeData(ctx, dbId, vodId, type, filePath, platform, { workDir, saveHLS: saveHls, streamId }),
+        data: createFinalizeData(ctx, dbId, vodId, type, filePath, platform, {
+          workDir,
+          saveHLS: saveHls,
+          streamId,
+          copiedFromStorage,
+        }),
         opts: { jobId: finalizeJobId, ...defaultJobOptions, failParentOnFailure: false },
         children: [vodChild],
       });
@@ -806,6 +816,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
             workDir,
             saveHLS: saveHls,
             streamId,
+            copiedFromStorage,
           }),
           opts: { jobId: finalizeJobId, ...defaultJobOptions, failParentOnFailure: false },
           children: flowChildren,
@@ -852,7 +863,12 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
         const flow = await getFlowProducer().add({
           name: 'vod_finalize_file',
           queueName: finalizeQueue.name,
-          data: createFinalizeData(ctx, dbId, vodId, type, filePath, platform, { workDir, saveHLS: saveHls, streamId }),
+          data: createFinalizeData(ctx, dbId, vodId, type, filePath, platform, {
+            workDir,
+            saveHLS: saveHls,
+            streamId,
+            copiedFromStorage,
+          }),
           opts: { jobId: finalizeJobId, ...defaultJobOptions, failParentOnFailure: false },
           children: [vodChild],
         });

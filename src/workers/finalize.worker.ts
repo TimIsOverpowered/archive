@@ -32,6 +32,7 @@ interface FinalizeProcessorContext {
   saveMP4: boolean;
   saveHLS: boolean;
   streamId?: string | undefined;
+  copiedFromStorage: boolean;
 }
 
 const buildFinalizeContext = async (job: Job<VodFinalizeFileJob>): Promise<FinalizeProcessorContext> => {
@@ -79,6 +80,7 @@ const buildFinalizeContext = async (job: Job<VodFinalizeFileJob>): Promise<Final
     saveMP4: job.data.saveMP4,
     saveHLS: job.data.saveHLS ?? config.settings.saveHLS ?? false,
     streamId: job.data.streamId,
+    copiedFromStorage: job.data.copiedFromStorage ?? false,
   };
 };
 
@@ -98,28 +100,35 @@ const finalizeProcessor = wrapWorkerProcessor<VodFinalizeFileJob, FinalizeProces
         ? getLiveFilePath({ tenantId: ctx.tenantId, streamId: ctx.streamId ?? '' })
         : getVodFilePath({ tenantId: ctx.tenantId, vodId: ctx.vodId });
 
+    // When the work dir was populated by copying an existing file from storage,
+    // the canonical media is already present (and was never removed). We skip
+    // writing anything back to storage and only clean up the work dir.
+    const fromStorage = ctx.copiedFromStorage === true;
+    const doMp4 = !fromStorage && (ctx.saveMP4 || ctx.type === SOURCE_TYPES.LIVE);
+    const doHls = !fromStorage && ctx.saveHLS;
+
     const hlsDestDir =
-      ctx.saveHLS && ctx.type === SOURCE_TYPES.VOD
+      doHls && ctx.type === SOURCE_TYPES.VOD
         ? getVodHlsDirPath({ tenantId: ctx.tenantId, vodId: ctx.vodId })
         : undefined;
 
     const alerts = createFinalizeWorkerAlerts();
     let messageId: string | null = null;
 
-    if (ctx.saveMP4 && isAlertsEnabled()) {
+    if (doMp4 && isAlertsEnabled()) {
       const stat = await fsPromises.stat(ctx.filePath);
       messageId = await initRichAlert(
-        alerts.init(ctx.vodId, ctx.platform, ctx.type, ctx.filePath, destPath, stat.size, ctx.saveMP4, ctx.saveHLS)
+        alerts.init(ctx.vodId, ctx.platform, ctx.type, ctx.filePath, destPath, stat.size, doMp4, doHls)
       );
-    } else if (!ctx.saveMP4 && isAlertsEnabled()) {
+    } else if (!doMp4 && isAlertsEnabled()) {
       messageId = await initRichAlert(
-        alerts.init(ctx.vodId, ctx.platform, ctx.type, ctx.filePath, destPath, 0, ctx.saveMP4, ctx.saveHLS)
+        alerts.init(ctx.vodId, ctx.platform, ctx.type, ctx.filePath, destPath, 0, doMp4, doHls)
       );
     }
 
     let tmpDirCleaned = false;
 
-    if (ctx.saveMP4 || ctx.type === SOURCE_TYPES.LIVE) {
+    if (doMp4) {
       let lastBucket = -1;
       const startTime = Date.now();
 
@@ -128,9 +137,9 @@ const finalizeProcessor = wrapWorkerProcessor<VodFinalizeFileJob, FinalizeProces
         destPath,
         ...(ctx.workDir != null && { tmpDir: ctx.workDir }),
         saveMP4: true,
-        saveHLS: ctx.saveHLS,
+        saveHLS: doHls,
         ...(hlsDestDir != null && { hlsDestDir }),
-        ...(ctx.saveHLS && { excludedPath: ctx.filePath }),
+        ...(doHls && { excludedPath: ctx.filePath }),
         log: ctx.log,
         onProgress: (bytesCopied, totalBytes) => {
           if (messageId == null) return;
@@ -168,15 +177,15 @@ const finalizeProcessor = wrapWorkerProcessor<VodFinalizeFileJob, FinalizeProces
             stat.size,
             elapsedSeconds,
             tmpDirCleaned,
-            ctx.saveMP4,
-            ctx.saveHLS,
+            doMp4,
+            doHls,
             hlsDestDir
           ),
           ctx.log,
           ctx.vodId
         );
       }
-    } else if (ctx.saveHLS) {
+    } else if (doHls) {
       let lastBucket = -1;
       const startTime = Date.now();
 
@@ -215,7 +224,7 @@ const finalizeProcessor = wrapWorkerProcessor<VodFinalizeFileJob, FinalizeProces
       if (messageId != null) {
         safeUpdateAlert(
           messageId,
-          alerts.complete(ctx.vodId, ctx.platform, destPath, 0, 0, tmpDirCleaned, ctx.saveMP4, ctx.saveHLS, hlsDestDir),
+          alerts.complete(ctx.vodId, ctx.platform, destPath, 0, 0, tmpDirCleaned, doMp4, doHls, hlsDestDir),
           ctx.log,
           ctx.vodId
         );
@@ -231,7 +240,7 @@ const finalizeProcessor = wrapWorkerProcessor<VodFinalizeFileJob, FinalizeProces
       if (messageId != null) {
         safeUpdateAlert(
           messageId,
-          alerts.complete(ctx.vodId, ctx.platform, destPath, 0, 0, tmpDirCleaned, ctx.saveMP4, ctx.saveHLS, hlsDestDir),
+          alerts.complete(ctx.vodId, ctx.platform, destPath, 0, 0, tmpDirCleaned, doMp4, doHls, hlsDestDir),
           ctx.log,
           ctx.vodId
         );

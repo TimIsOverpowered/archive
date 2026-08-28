@@ -96,7 +96,7 @@ export default function youtubeUploadRoutes(fastify: FastifyInstance, _options: 
       const dbId = vodRecord.id;
 
       // Ensure vod download
-      const { jobId, filePath, copyJobId, workDir } = await ensureVodDownload({
+      const { jobId, filePath, copyJobId, workDir, copiedFromStorage } = await ensureVodDownload({
         ctx: tenantCtx,
         dbId,
         vodId,
@@ -119,6 +119,7 @@ export default function youtubeUploadRoutes(fastify: FastifyInstance, _options: 
         type,
         workDir,
         forceUpload: true,
+        copiedFromStorage,
       });
 
       return buildVodJobResponse({

@@ -96,7 +96,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
 
       const dbId = vodRecord.id;
 
-      const { jobId, filePath, copyJobId, workDir } = await ensureVodDownload({
+      const { jobId, filePath, copyJobId, workDir, copiedFromStorage } = await ensureVodDownload({
         ctx: tenantCtx,
         dbId,
         vodId,
@@ -135,6 +135,7 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
         type,
         workDir,
         forceUpload: true,
+        copiedFromStorage,
       });
       return buildVodJobResponse({
         hasDownload: jobId != null,

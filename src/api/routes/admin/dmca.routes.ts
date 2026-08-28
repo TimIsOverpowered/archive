@@ -108,6 +108,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         jobId: downloadJobId,
         filePath,
         copyJobId,
+        copiedFromStorage,
       } = await ensureVodDownload({
         ctx: asTenantPlatformContext(requireTenant(request)),
         dbId: vodRecord.id,
@@ -136,6 +137,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         workDir: getTmpDirPath({ tenantId, vodId }),
         skipFinalize: true, // DMCA worker will handle finalization
         streamId: vodRecord.platform_stream_id ?? undefined,
+        copiedFromStorage,
       });
 
       if (dmcaJobId == null) {
@@ -204,7 +206,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
       const type: SourceType = SOURCE_TYPES.VOD;
 
       // Ensure VOD file is downloaded and valid
-      const { jobId, filePath, copyJobId } = await ensureVodDownload({
+      const { jobId, filePath, copyJobId, copiedFromStorage } = await ensureVodDownload({
         ctx: tenantPlatformCtx,
         dbId,
         vodId,
@@ -232,6 +234,7 @@ export default function dmcaProcessingRoutes(fastify: FastifyInstance, _options:
         copyJobId,
         ...(jobId == null && copyJobId == null && { filePath }),
         workDir: getTmpDirPath({ tenantId, vodId }),
+        copiedFromStorage,
       });
 
       if (dmcaJobId == null) {
