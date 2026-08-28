@@ -36,7 +36,7 @@ export type WorkerName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 type JobOpts = NonNullable<QueueOptions['defaultJobOptions']>;
 
 export const defaultJobOptions: JobOpts = {
-  attempts: 3,
+  attempts: 5,
   backoff: { type: 'exponential' as const, delay: 5000 },
   removeOnComplete: true,
   removeOnFail: true,
@@ -122,11 +122,11 @@ export function getKickChatDownloadQueue(): Queue<ChatDownloadJob, ChatDownloadR
 }
 
 export function getYoutubeUploadQueue(): Queue<YoutubeUploadJob, YoutubeUploadResult, string> {
-  return getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD, exponentialBackoff(10_000, 3));
+  return getQueue(QUEUE_NAMES.YOUTUBE_UPLOAD, exponentialBackoff(10_000, 5));
 }
 
 export function getVodFinalizeFileQueue(): Queue<VodFinalizeFileJob, VodFinalizeFileResult, string> {
-  return getQueue(QUEUE_NAMES.VOD_FINALIZE_FILE, exponentialBackoff(5_000, 3));
+  return getQueue(QUEUE_NAMES.VOD_FINALIZE_FILE, exponentialBackoff(5_000, 5));
 }
 
 export function getDmcaProcessingQueue(): Queue<DmcaProcessingJob, DmcaProcessingResult, string> {
@@ -138,7 +138,7 @@ export function getMonitorQueue(): Queue<MonitorJob, MonitorJobResult, string> {
 }
 
 export function getFileCopyQueue(): Queue<CopyFileJob, CopyFileResult, string> {
-  return getQueue(QUEUE_NAMES.FILE_COPY, exponentialBackoff(5_000, 3));
+  return getQueue(QUEUE_NAMES.FILE_COPY, exponentialBackoff(5_000, 5));
 }
 
 export async function closeQueues(): Promise<void> {
