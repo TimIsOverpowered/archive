@@ -12,6 +12,7 @@ import type { AppLogger } from '../utils/logger.ts';
 import type { YoutubeUploadJob, YoutubeUploadResult } from './jobs/types.ts';
 import { getJobContext } from './utils/job-context.ts';
 import { wrapWorkerProcessor } from './utils/worker-wrapper.ts';
+import { reapWorkDir } from './utils/workdir.ts';
 import { processGameUpload } from './youtube/game-upload-processor.ts';
 import { getEffectiveSplitDuration } from './youtube/validation.ts';
 import { linkVodPartsAfterDelay, processVodUpload } from './youtube/vod-upload-processor.ts';
@@ -205,7 +206,15 @@ const youtubeProcessor = wrapWorkerProcessor<YoutubeUploadJob, YoutubeProcessorC
       return result;
     }
   },
-  { errorMeta, errorAlert }
+  {
+    errorMeta,
+    errorAlert,
+    finally: async (ctx, _job, outcome) => {
+      if (outcome.failed && !outcome.willRetry) {
+        await reapWorkDir(ctx.workDir, ctx.log);
+      }
+    },
+  }
 );
 
 export default youtubeProcessor;

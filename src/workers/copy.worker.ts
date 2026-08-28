@@ -4,11 +4,13 @@ import path from 'node:path';
 import type { Job } from 'bullmq';
 import { createAutoLogger } from '../utils/auto-tenant-logger.ts';
 import { initRichAlert, isAlertsEnabled } from '../utils/discord-alerts.ts';
+import { getTmpDirPath } from '../utils/path.ts';
 import type { AppLogger } from '../utils/logger.ts';
 import type { CopyFileJob, CopyFileResult } from './jobs/types.ts';
 import { createCopyWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.ts';
 import { convertHlsToMp4, detectFmp4FromPlaylist } from './utils/ffmpeg.ts';
 import { wrapWorkerProcessor } from './utils/worker-wrapper.ts';
+import { reapWorkDir } from './utils/workdir.ts';
 
 interface CopyFileProcessorContext {
   job: Job<CopyFileJob>;
@@ -65,6 +67,11 @@ const copyFileProcessor = wrapWorkerProcessor<CopyFileJob, CopyFileProcessorCont
         void initRichAlert(alerts.error(ctx.vodId, 0, 0, errorMsg)).catch(() => {});
       }
       return Promise.resolve();
+    },
+    finally: async (ctx, _job, outcome) => {
+      if (outcome.failed && !outcome.willRetry) {
+        await reapWorkDir(getTmpDirPath({ tenantId: ctx.tenantId, vodId: ctx.vodId }), ctx.log);
+      }
     },
   }
 );

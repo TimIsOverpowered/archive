@@ -16,6 +16,7 @@ import { createFinalizeWorkerAlerts, safeUpdateAlert } from './utils/alert-facto
 import { finalizeFile } from './utils/file-finalization.ts';
 import { getJobContext } from './utils/job-context.ts';
 import { wrapWorkerProcessor } from './utils/worker-wrapper.ts';
+import { reapWorkDir } from './utils/workdir.ts';
 
 interface FinalizeProcessorContext {
   log: AppLogger;
@@ -264,6 +265,11 @@ const finalizeProcessor = wrapWorkerProcessor<VodFinalizeFileJob, FinalizeProces
         void initRichAlert(alerts.error(ctx.vodId, ctx.platform, ctx.filePath, destPath, errorMsg)).catch(() => {});
       }
       return Promise.resolve();
+    },
+    finally: async (ctx, _job, outcome) => {
+      if (outcome.failed && !outcome.willRetry) {
+        await reapWorkDir(ctx.workDir, ctx.log);
+      }
     },
   }
 );
