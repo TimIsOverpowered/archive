@@ -104,7 +104,7 @@ const finalizeProcessor = wrapWorkerProcessor<VodFinalizeFileJob, FinalizeProces
     // the canonical media is already present (and was never removed). We skip
     // writing anything back to storage and only clean up the work dir.
     const fromStorage = ctx.copiedFromStorage === true;
-    const doMp4 = !fromStorage && (ctx.saveMP4 || ctx.type === SOURCE_TYPES.LIVE);
+    const doMp4 = !fromStorage && ctx.saveMP4;
     const doHls = !fromStorage && ctx.saveHLS;
 
     const hlsDestDir =
