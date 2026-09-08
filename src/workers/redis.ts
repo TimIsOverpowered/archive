@@ -1,4 +1,5 @@
 import { getWorkersConfig } from '../config/env.ts';
+import { Kick } from '../constants.ts';
 import { RedisService } from '../utils/redis-service.ts';
 
 let initPromise: Promise<void> | null = null;
@@ -13,7 +14,17 @@ export async function initWorkersRedis(): Promise<void> {
 
   initPromise = (async () => {
     const url = getWorkersConfig().REDIS_URL;
-    await RedisService.init({ url, maxRetriesPerRequest: null }).connect();
+    await RedisService.init({
+      url,
+      maxRetriesPerRequest: null,
+      rateLimiters: [
+        {
+          keyPrefix: 'rate:kick:chat',
+          points: Kick.CHAT_FETCH_LIMIT_POINTS,
+          duration: Kick.CHAT_FETCH_LIMIT_DURATION_S,
+        },
+      ],
+    }).connect();
   })();
 
   return initPromise;

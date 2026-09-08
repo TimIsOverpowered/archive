@@ -3,9 +3,22 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { Impit } from 'impit';
 import { Http } from '../constants.ts';
+import { RateLimitedError } from './domain-errors.ts';
 import { getLogger } from './logger.ts';
 import type { RetryOptions } from './retry.ts';
 import { retryWithBackoff } from './retry.ts';
+
+/** Parse a Retry-After header value (seconds or HTTP date) into milliseconds, or undefined. */
+function parseRetryAfterMs(raw: string | null): number | undefined {
+  if (raw == null || raw.trim() === '') return undefined;
+  const seconds = parseInt(raw, 10);
+  if (!Number.isNaN(seconds) && String(seconds) === raw.trim()) {
+    return Math.max(seconds, 1) * 1000;
+  }
+  const dateMs = Date.parse(raw);
+  if (Number.isNaN(dateMs)) return undefined;
+  return Math.max(dateMs - Date.now(), 1000);
+}
 
 const impitInstances = new Map<string, Impit>();
 
@@ -118,6 +131,13 @@ export class ImpitSession {
         ...(Object.keys(headers).length > 0 && { headers }),
         ...(this._defaultCookies != null && { cookies: this._defaultCookies }),
       });
+
+      if (response.status === 429) {
+        throw new RateLimitedError(
+          `Impit request rate limited with status 429`,
+          parseRetryAfterMs(response.headers.get('retry-after'))
+        );
+      }
 
       if (response.status < 200 || response.status >= 300) {
         throw new Error(`Impit request failed with status ${response.status}`);

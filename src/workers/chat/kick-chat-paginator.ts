@@ -2,8 +2,98 @@ import dayjs from 'dayjs';
 import pLimit from 'p-limit';
 import { Kick } from '../../constants.ts';
 import { type KickChatMessage, KickChatWaterfallClient } from '../../services/kick/chat.ts';
-import { sleep } from '../../utils/delay.ts';
+import { jitter, sleep } from '../../utils/delay.ts';
+import { RateLimitedError } from '../../utils/domain-errors.ts';
 import type { AppLogger } from '../../utils/logger.ts';
+import { RedisService } from '../../utils/redis-service.ts';
+
+const KICK_CHAT_LIMITER_KEY = 'rate:kick:chat';
+
+/**
+ * Process-wide throttle for Kick chat fetches. When any bucket gets a 429, a shared
+ * "quiet until" instant is set so every in-flight task waits before its next
+ * request — preventing a simultaneous burst of requests from re-triggering the
+ * rate limit (thundering herd).
+ */
+let throttleUntil = 0;
+
+/** Reset the shared throttle window (test-only). */
+export function resetKickChatThrottleForTests(): void {
+  throttleUntil = 0;
+}
+
+function isRateLimitedError(err: unknown): boolean {
+  if (err instanceof RateLimitedError) return true;
+  // The FlareSolverr fallback surfaces 429s as plain errors ("FlareSolverr failed: HTTP 429").
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes('429');
+}
+
+/** Backoff delay for a given 429 attempt, honoring Retry-After when it exceeds the backoff. */
+function rateLimitDelayMs(err: unknown, attempt: number): number {
+  const backoff = Math.min(Kick.CHAT_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1), Kick.CHAT_RETRY_MAX_DELAY_MS);
+  const retryAfterMs = err instanceof RateLimitedError ? err.retryAfterMs : undefined;
+  if (retryAfterMs != null && retryAfterMs > 0) {
+    return Math.max(retryAfterMs, backoff);
+  }
+  return jitter(backoff);
+}
+
+async function awaitThrottleWindow(log: AppLogger): Promise<void> {
+  const waitMs = throttleUntil - Date.now();
+  if (waitMs <= 0) return;
+  log.debug({ waitMs: Math.ceil(waitMs) }, 'Waiting for shared Kick rate-limit throttle window to clear');
+  await sleep(waitMs);
+}
+
+async function acquireRequestSlot(): Promise<void> {
+  const limiter = RedisService.getLimiter(KICK_CHAT_LIMITER_KEY);
+  if (limiter == null) return;
+  // consume() waits until a point from the global budget (shared across all worker
+  // instances via Redis) is available.
+  await limiter.consume(KICK_CHAT_LIMITER_KEY);
+}
+
+/** Thrown when a bucket exhausts all 429 retries; propagates to fail the job so it can be resumed. */
+class BucketRetriesExhaustedError extends Error {
+  constructor(offset: number, cause: string) {
+    super(`Kick chat rate limited at offset ${offset} after ${Kick.CHAT_RETRY_MAX_ATTEMPTS} attempts: ${cause}`);
+    this.name = 'BucketRetriesExhaustedError';
+  }
+}
+
+async function fetchBucketWithRetry(
+  client: KickChatWaterfallClient,
+  channelId: number | string,
+  offset: number,
+  fetchTime: string,
+  log: AppLogger
+): Promise<KickChatMessage[]> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= Kick.CHAT_RETRY_MAX_ATTEMPTS; attempt++) {
+    await awaitThrottleWindow(log);
+    await acquireRequestSlot();
+
+    try {
+      const rawPage = await client.fetchPage(channelId, fetchTime);
+      return rawPage?.data?.messages ?? [];
+    } catch (err: unknown) {
+      if (!isRateLimitedError(err)) {
+        throw err;
+      }
+
+      lastError = err;
+      const delayMs = rateLimitDelayMs(err, attempt);
+      throttleUntil = Math.max(throttleUntil, Date.now() + delayMs);
+      log.warn({ offset, attempt, delayMs }, 'Kick chat fetch hit 429 rate limit — backing off');
+      await sleep(throttleUntil - Date.now());
+    }
+  }
+
+  const cause = lastError instanceof Error ? lastError.message : String(lastError);
+  throw new BucketRetriesExhaustedError(offset, cause);
+}
 
 export async function* paginateKickChatCommentsParallel(
   channelId: number | string,
@@ -17,7 +107,6 @@ export async function* paginateKickChatCommentsParallel(
   const CONCURRENCY = Kick.CHAT_FETCH_CONCURRENCY;
   const CHUNK_SIZE = Kick.CHAT_FETCH_CHUNK_SIZE;
   const STEP_SECONDS = Kick.CHAT_FETCH_STEP_SECONDS;
-  const STAGGER_MS = Kick.CHAT_FETCH_STAGGER_MS;
 
   // Snap base time to nearest 5-second floor
   const alignedStart = vodCreatedAt.second(Math.floor(vodCreatedAt.second() / 5) * 5);
@@ -43,26 +132,21 @@ export async function* paginateKickChatCommentsParallel(
     for (let i = 0; i < allOffsets.length; i += CHUNK_SIZE) {
       const offsetChunk = allOffsets.slice(i, i + CHUNK_SIZE);
 
-      const promises = offsetChunk.map((offset, index) =>
+      const promises = offsetChunk.map((offset) =>
         limit(async () => {
-          // Micro-stagger: threads spread over ~250ms (CONCURRENCY * STAGGER_MS)
-          await sleep((index % CONCURRENCY) * STAGGER_MS);
-
           // Build ISO timestamp for Kick API
-          const fetchTime = alignedStart.add(offset, 'second');
+          const fetchTime = alignedStart.add(offset, 'second').toISOString();
 
           try {
-            const rawPage = await client.fetchPage(channelId, fetchTime.toISOString());
-            return rawPage?.data?.messages ?? [];
+            return await fetchBucketWithRetry(client, channelId, offset, fetchTime, logger);
           } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-
-            if (msg.includes('429')) {
-              logger.warn({ offset }, 'Thread hit 429 Rate Limit. Sleeping for 30s...');
-              await sleep(30000);
-              return [];
+            if (err instanceof BucketRetriesExhaustedError) {
+              // Fail loudly — BullMQ retries the job and resumes from the last
+              // persisted offset, so no chat data is silently lost.
+              throw err;
             }
 
+            const msg = err instanceof Error ? err.message : String(err);
             logger.error({ offset, err: msg }, 'Failed to fetch parallel bucket');
             return [];
           }

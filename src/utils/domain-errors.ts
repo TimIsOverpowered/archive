@@ -115,3 +115,15 @@ export class CacheBackoffError extends DomainError {
     super('Cache fetch backoff — please retry later');
   }
 }
+
+/** Thrown when a remote API returns 429 Too Many Requests. Carries the parsed Retry-After when present. */
+export class RateLimitedError extends DomainError {
+  readonly code = 'RATE_LIMITED';
+  readonly statusCode = 429;
+  readonly retryAfterMs: number | undefined;
+
+  constructor(message: string, retryAfterMs?: number) {
+    super(message);
+    this.retryAfterMs = retryAfterMs;
+  }
+}

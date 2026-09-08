@@ -1,4 +1,5 @@
 import { Kick } from '../../constants.ts';
+import { RateLimitedError } from '../../utils/domain-errors.ts';
 import { extractErrorDetails } from '../../utils/error.ts';
 import { fetchUrl } from '../../utils/flaresolverr-client.ts';
 import { createSession, type ImpitSession } from '../../utils/impit-wrapper.ts';
@@ -79,11 +80,11 @@ export class KickChatWaterfallClient {
 
       return JSON.parse(response) as KickMessagesResponse;
     } catch (err: unknown) {
-      const msg = extractErrorDetails(err).message;
-
-      if (msg.includes('429')) {
+      if (err instanceof RateLimitedError) {
         throw err;
       }
+
+      const msg = extractErrorDetails(err).message;
 
       if (
         msg.includes('403') ||
