@@ -1,5 +1,6 @@
 import dayjs from 'dayjs';
 import pLimit from 'p-limit';
+import { RateLimiterRes } from 'rate-limiter-flexible';
 import { Kick } from '../../constants.ts';
 import { type KickChatMessage, KickChatWaterfallClient } from '../../services/kick/chat.ts';
 import { jitter, sleep } from '../../utils/delay.ts';
@@ -25,8 +26,9 @@ export function resetKickChatThrottleForTests(): void {
 function isRateLimitedError(err: unknown): boolean {
   if (err instanceof RateLimitedError) return true;
   // The FlareSolverr fallback surfaces 429s as plain errors ("FlareSolverr failed: HTTP 429").
+  // Word boundaries so unrelated numbers containing "429" (offsets, positions) never match.
   const msg = err instanceof Error ? err.message : String(err);
-  return msg.includes('429');
+  return /\b429\b/.test(msg);
 }
 
 /** Backoff delay for a given 429 attempt, honoring Retry-After when it exceeds the backoff. */
@@ -46,12 +48,28 @@ async function awaitThrottleWindow(log: AppLogger): Promise<void> {
   await sleep(waitMs);
 }
 
-async function acquireRequestSlot(): Promise<void> {
+async function acquireRequestSlot(log: AppLogger): Promise<void> {
   const limiter = RedisService.getLimiter(KICK_CHAT_LIMITER_KEY);
   if (limiter == null) return;
-  // consume() waits until a point from the global budget (shared across all worker
-  // instances via Redis) is available.
-  await limiter.consume(KICK_CHAT_LIMITER_KEY);
+
+  for (;;) {
+    try {
+      // consume() rejects with a RateLimiterRes when the window's points are
+      // exhausted (the rejected call has already burned a point). Wait until
+      // the window frees up and retry — never let this rejection reach the
+      // bucket, or its messages would be silently dropped.
+      await limiter.consume(KICK_CHAT_LIMITER_KEY);
+      return;
+    } catch (err: unknown) {
+      if (err instanceof RateLimiterRes) {
+        log.debug({ msBeforeNext: err.msBeforeNext }, 'Waiting for the global Kick chat rate limit window to free up');
+        // Floor the wait so a zero/absent msBeforeNext can never spin this loop against Redis.
+        await sleep(Math.max(err.msBeforeNext, 500));
+        continue;
+      }
+      throw err;
+    }
+  }
 }
 
 /** Thrown when a bucket exhausts all 429 retries; propagates to fail the job so it can be resumed. */
@@ -73,7 +91,7 @@ async function fetchBucketWithRetry(
 
   for (let attempt = 1; attempt <= Kick.CHAT_RETRY_MAX_ATTEMPTS; attempt++) {
     await awaitThrottleWindow(log);
-    await acquireRequestSlot();
+    await acquireRequestSlot(log);
 
     try {
       const rawPage = await client.fetchPage(channelId, fetchTime);

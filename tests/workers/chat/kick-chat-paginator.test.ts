@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { beforeEach, describe, it, mock } from 'node:test';
+import { RateLimiterRes } from 'rate-limiter-flexible';
 import { Kick } from '../../../src/constants.ts';
 import type { KickChatMessage } from '../../../src/services/kick/chat.ts';
 import dayjs from '../../../src/utils/dayjs.ts';
@@ -157,6 +158,69 @@ describe('paginateKickChatCommentsParallel', () => {
 
     // duration 10 → offsets 0, 5, 10 → exactly 3 requests
     assert.deepStrictEqual(consumeCalls, ['rate:kick:chat', 'rate:kick:chat', 'rate:kick:chat']);
+  });
+
+  it('waits out the limiter window when consume() rejects instead of dropping the bucket', async () => {
+    let attempts = 0;
+    limiterState.limiter = {
+      consume: async (_key: string) => {
+        attempts++;
+        if (attempts <= 2) {
+          // Mirrors rate-limiter-flexible: the window is exhausted and the
+          // rejected call has already burned a point.
+          throw new RateLimiterRes(0, 50, attempts);
+        }
+      },
+    };
+    behaviorsByStartTime.set(startTimeFor(0), [{ data: { messages: [messageAt('0-0', 0)] } }]);
+
+    const batches = await collectBatches();
+
+    // The rejected consumes must be retried after the wait — the bucket's
+    // messages must still come back, not be silently dropped.
+    assert.ok(attempts >= 5, `expected consume() retries after rejection, got ${attempts} attempts`);
+    assert.strictEqual(batches.length, 1);
+    assert.strictEqual(batches[0]?.[0]?.id, '0-0');
+    assert.strictEqual(getMockClient().closed, true);
+  });
+
+  it('applies a minimum wait when the limiter reports no next window', async () => {
+    let attempts = 0;
+    limiterState.limiter = {
+      consume: async () => {
+        attempts++;
+        if (attempts <= 2) {
+          throw new RateLimiterRes(0, 0, attempts);
+        }
+      },
+    };
+    behaviorsByStartTime.set(startTimeFor(0), [{ data: { messages: [messageAt('0-0', 0)] } }]);
+
+    // Single bucket (duration 4 → only offset 0) so the waits are sequential.
+    const startedAt = Date.now();
+    const batches: KickChatMessage[][] = [];
+    for await (const batch of paginateKickChatCommentsParallel('chan-1', VOD_CREATED_AT, 4, 0, fakeLogger)) {
+      batches.push(batch);
+    }
+
+    // Two zero msBeforeNext rejections must still wait at least 2 × 500ms.
+    assert.strictEqual(attempts, 3);
+    assert.ok(Date.now() - startedAt >= 1000, `expected >= 1000ms of minimum waits, got ${Date.now() - startedAt}ms`);
+    assert.strictEqual(batches.length, 1);
+    assert.strictEqual(batches[0]?.[0]?.id, '0-0');
+  });
+
+  it('does not treat a 429 substring in an unrelated error as a rate limit', async () => {
+    behaviorsByStartTime.set(startTimeFor(0), [new Error('Unexpected token in JSON at position 14290')]);
+
+    const batches = await collectBatches();
+
+    // Not a rate limit → no backoff retry; the bucket is skipped (existing behavior)
+    // and the job does not fail.
+    const client = getMockClient();
+    assert.strictEqual(client.calls.filter((c) => c.startTime === startTimeFor(0)).length, 1);
+    assert.strictEqual(batches.length, 0);
+    assert.strictEqual(client.closed, true);
   });
 
   it('retries a 429 bucket and recovers the messages', async () => {
