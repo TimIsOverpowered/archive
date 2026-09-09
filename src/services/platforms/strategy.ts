@@ -58,6 +58,8 @@ export interface PlatformStrategyContext extends Omit<TenantPlatformContext, 'db
 export interface PlatformStrategy<VodCreate = VodCreateData, VodUpdate = VodUpdateData> {
   checkStreamStatus(ctx: PlatformStrategyContext): Promise<PlatformStreamStatus | null>;
   fetchVodMetadata(vodId: string, ctx: PlatformStrategyContext): Promise<PlatformVodMetadata | null>;
+  /** List the channel's archived VODs, oldest-first (for backfill). */
+  listChannelVods(ctx: PlatformStrategyContext): Promise<PlatformVodMetadata[]>;
   createVodData(meta: PlatformVodMetadata): VodCreate;
   updateVodData(meta: PlatformVodMetadata): VodUpdate;
   finalizeChapters?(

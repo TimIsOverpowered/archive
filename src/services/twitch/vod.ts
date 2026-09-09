@@ -40,6 +40,41 @@ export async function getVodData(vodId: string, logContext?: Record<string, unkn
   return data.data[0] as VodData;
 }
 
+/**
+ * Fetch the full list of a broadcaster's archived VODs via the Helix /videos
+ * endpoint, following the `after` cursor across all pages.
+ * Returns VODs in the platform's native order (newest-first).
+ */
+export async function listAllTwitchVods(userId: string, logContext?: Record<string, unknown>): Promise<VodData[]> {
+  const client = getTwitchClient();
+  const all: VodData[] = [];
+
+  let after: string | undefined;
+  for (;;) {
+    const params = new URLSearchParams({
+      user_id: userId,
+      first: String(Twitch.VODS_PAGE_SIZE),
+    });
+    if (after) {
+      params.set('after', after);
+    }
+
+    const data = await client.helix.get<{
+      data: VodData[];
+      pagination?: { cursors?: { after?: string } };
+    }>(`/videos?${params.toString()}`, logContext);
+
+    const batch = data.data ?? [];
+    if (batch.length === 0) break;
+    all.push(...batch);
+
+    after = data.pagination?.cursors?.after;
+    if (!after) break;
+  }
+
+  return all;
+}
+
 export async function getVodTokenSig(
   vodId: string,
   tenantId?: string,

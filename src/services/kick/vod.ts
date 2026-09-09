@@ -87,6 +87,24 @@ function getKickParsedM3u8(m3u8: string, baseURL: string): string | null {
   }
 }
 
+/**
+ * Fetch a channel's full archived VOD list from the Kick videos endpoint.
+ * Returns the list in the platform's native order (newest-first).
+ */
+export async function listAllKickVods(channelName: string, sessionId?: string): Promise<KickVod[]> {
+  const result = await fetchUrl<KickVod[]>(`${Kick.API_BASE}/api/v2/channels/${channelName}/videos`, { sessionId });
+
+  if (!result.success) {
+    throw new Error('Failed to load Kick videos API after retries');
+  }
+
+  if (!Array.isArray(result.data)) {
+    return [];
+  }
+
+  return result.data;
+}
+
 export async function getVod(channelName: string, vodId: string, sessionId?: string): Promise<KickVod> {
   const result = await fetchUrl<KickVod[]>(`${Kick.API_BASE}/api/v2/channels/${channelName}/videos`, { sessionId });
 

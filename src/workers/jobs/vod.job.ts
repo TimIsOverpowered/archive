@@ -2,7 +2,7 @@ import { Jobs } from '../../constants.ts';
 import type { DownloadMethod, Platform } from '../../types/platforms.ts';
 import { extractErrorDetails } from '../../utils/error.ts';
 import { childLogger } from '../../utils/logger.ts';
-import { getStandardVodQueue } from '../queues/queue.ts';
+import { getTenantStandardVodQueue } from '../queues/queue.ts';
 import { enqueueJobWithLogging } from './enqueue.ts';
 import type { StandardVodJob } from './types.ts';
 
@@ -35,7 +35,7 @@ export async function triggerVodDownload(opts: TriggerVodOptions): Promise<strin
 
   try {
     const result = await enqueueJobWithLogging({
-      queue: getStandardVodQueue(),
+      queue: getTenantStandardVodQueue(tenantId),
       jobName: 'standard_vod_download',
       data: job,
       options: {

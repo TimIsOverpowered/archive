@@ -14,7 +14,7 @@ import type {
 import { getChapters, saveVodChapters } from './chapters.ts';
 import { getLatestTwitchVodObject, getTwitchStreamStatus } from './live.ts';
 import type { VodData } from './vod.ts';
-import { getVodData } from './vod.ts';
+import { getVodData, listAllTwitchVods } from './vod.ts';
 
 export const strategy: PlatformStrategy = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
@@ -55,6 +55,26 @@ export const strategy: PlatformStrategy = {
       duration: parseTwitchDuration(vodData.duration),
       streamId: vodData.stream_id ?? null,
     };
+  },
+
+  async listChannelVods(ctx): Promise<PlatformVodMetadata[]> {
+    const { tenantId, config, platform } = ctx;
+    const cfg = requirePlatformConfig(config, platform);
+    if (!cfg) return [];
+
+    const vods = await listAllTwitchVods(cfg.platformUserId, { tenantId });
+
+    // Helix returns newest-first; reverse so backfill starts from the oldest VOD.
+    return vods
+      .slice()
+      .reverse()
+      .map((vod) => ({
+        id: vod.id,
+        title: vod.title,
+        createdAt: vod.created_at,
+        duration: parseTwitchDuration(vod.duration),
+        streamId: vod.stream_id ?? null,
+      }));
   },
 
   async fetchVodObjectForLiveStream(streamId: string, ctx): Promise<PlatformVodMetadata | null> {

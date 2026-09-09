@@ -27,7 +27,7 @@ import type {
 } from './jobs/types.ts';
 import liveProcessor from './live.worker.ts';
 import monitorProcessor from './monitor/processor.ts';
-import { QUEUE_NAMES, type WorkerName } from './queues/queue.ts';
+import { QUEUE_NAMES, VOD_STANDARD_QUEUE_PREFIX, type WorkerName } from './queues/queue.ts';
 import { calcLiveConcurrency } from './utils/concurrency.ts';
 import standardVodProcessor from './vod.worker.ts';
 import youtubeProcessor from './youtube.worker.ts';
@@ -55,11 +55,6 @@ const workerDefs = {
     name: QUEUE_NAMES.VOD_LIVE,
     processor: liveProcessor,
   } satisfies WorkerDef<LiveDownloadJob, LiveDownloadResult>,
-
-  [QUEUE_NAMES.VOD_STANDARD]: {
-    name: QUEUE_NAMES.VOD_STANDARD,
-    processor: standardVodProcessor,
-  } satisfies WorkerDef<StandardVodJob, StandardVodResult>,
 
   [QUEUE_NAMES.CHAT_DOWNLOAD_TWITCH]: {
     name: QUEUE_NAMES.CHAT_DOWNLOAD_TWITCH,
@@ -106,7 +101,6 @@ export function registerWorkers(
   const workerConfig = getWorkersConfig();
 
   const concurrencyMap: Partial<Record<WorkerName, number>> = {
-    [QUEUE_NAMES.VOD_STANDARD]: workerConfig.VOD_STANDARD_CONCURRENCY,
     [QUEUE_NAMES.CHAT_DOWNLOAD_TWITCH]: 1,
     [QUEUE_NAMES.CHAT_DOWNLOAD_KICK]: 1,
     [QUEUE_NAMES.YOUTUBE_UPLOAD]: workerConfig.YOUTUBE_UPLOAD_CONCURRENCY,
@@ -126,5 +120,19 @@ export function registerWorkers(
       config.concurrency = concurrency;
     }
     createWorker<AllJobData>(config, workerRegistry);
+  }
+
+  // One standard-VOD worker per tenant (concurrency 1) so each streamer's VODs
+  // download strictly one-at-a-time in FIFO order, in isolation from other tenants.
+  for (const tenantConfig of tenantConfigs) {
+    createWorker<StandardVodJob, StandardVodResult>(
+      {
+        name: `${VOD_STANDARD_QUEUE_PREFIX}${tenantConfig.id}`,
+        processor: standardVodProcessor,
+        concurrency: 1,
+        connection,
+      },
+      workerRegistry
+    );
   }
 }

@@ -11,7 +11,7 @@ import type {
   VodCreateData,
   VodUpdateData,
 } from '../platforms/strategy.ts';
-import { finalizeKickChapters, getKickStreamStatus, getLatestKickVodObject, getVod } from './index.ts';
+import { finalizeKickChapters, getKickStreamStatus, getLatestKickVodObject, getVod, listAllKickVods } from './index.ts';
 export const strategy: PlatformStrategy<VodCreateData, VodUpdateData> = {
   async checkStreamStatus(ctx): Promise<PlatformStreamStatus | null> {
     const { config, platform } = ctx;
@@ -51,6 +51,28 @@ export const strategy: PlatformStrategy<VodCreateData, VodUpdateData> = {
       streamId: `${vodData.id}`,
       sourceUrl: vodData.source ?? undefined,
     };
+  },
+
+  async listChannelVods(ctx): Promise<PlatformVodMetadata[]> {
+    const { config, platform } = ctx;
+
+    const cfg = requirePlatformConfig(config, platform);
+    if (!cfg) return [];
+
+    const vods = await listAllKickVods(cfg.platformUsername, `kick-${cfg.platformUserId}`);
+
+    // Kick returns newest-first; reverse so backfill starts from the oldest VOD.
+    return vods
+      .slice()
+      .reverse()
+      .map((vod) => ({
+        id: `${vod.id}`,
+        title: vod.session_title ?? '',
+        createdAt: toUtcISO(vod.created_at),
+        duration: Math.floor(Number(vod.duration) / 1000),
+        streamId: `${vod.id}`,
+        sourceUrl: vod.source ?? undefined,
+      }));
   },
 
   async fetchVodObjectForLiveStream(streamId: string, ctx): Promise<PlatformVodMetadata | null> {

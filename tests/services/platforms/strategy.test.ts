@@ -9,6 +9,7 @@ function createMockStrategy(vodId: string): PlatformStrategy {
   return {
     checkStreamStatus: async () => null,
     fetchVodMetadata: async () => null,
+    listChannelVods: async () => [],
     createVodData: () => ({
       platform_vod_id: vodId,
       platform: PLATFORMS.TWITCH,

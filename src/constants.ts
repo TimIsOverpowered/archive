@@ -206,6 +206,8 @@ export const Twitch = {
   BACKUP_GQL_CLIENT_ID: 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',
   /** Max user_id query params per /streams request. */
   STREAMS_BATCH_SIZE: 100,
+  /** Max `first` value per Helix /videos request. */
+  VODS_PAGE_SIZE: 100,
   /** Redis key for shared app access token */
   REDIS_TOKEN_KEY: 'twitch:app_token',
   /** Redis lock key for distributed token refresh */

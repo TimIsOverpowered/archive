@@ -132,6 +132,7 @@ describe('Kick Strategy: registration', () => {
   it('should have all required methods', () => {
     assert.ok(typeof strategy.checkStreamStatus === 'function');
     assert.ok(typeof strategy.fetchVodMetadata === 'function');
+    assert.ok(typeof strategy.listChannelVods === 'function');
     assert.ok(typeof strategy.createVodData === 'function');
     assert.ok(typeof strategy.updateVodData === 'function');
     assert.ok(typeof strategy.finalizeChapters === 'function');

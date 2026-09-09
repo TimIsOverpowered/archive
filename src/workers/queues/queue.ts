@@ -33,6 +33,13 @@ export const QUEUE_NAMES = {
 
 export type WorkerName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 
+/**
+ * Prefix for per-tenant standard VOD download queues. Each tenant gets its own
+ * queue (`vod_standard_<tenantId>`) so that a streamer's VODs download strictly
+ * one-at-a-time in FIFO order while other streamers download in parallel.
+ */
+export const VOD_STANDARD_QUEUE_PREFIX = `${QUEUE_NAMES.VOD_STANDARD}_`;
+
 type JobOpts = NonNullable<QueueOptions['defaultJobOptions']>;
 
 export const defaultJobOptions: JobOpts = {
@@ -111,6 +118,10 @@ export function getLiveDownloadQueue(): Queue<LiveDownloadJob, LiveDownloadResul
 
 export function getStandardVodQueue(): Queue<StandardVodJob, StandardVodResult, string> {
   return getQueue(QUEUE_NAMES.VOD_STANDARD, defaultJobOptions);
+}
+
+export function getTenantStandardVodQueue(tenantId: string): Queue<StandardVodJob, StandardVodResult, string> {
+  return getQueue(`${VOD_STANDARD_QUEUE_PREFIX}${tenantId}`, defaultJobOptions);
 }
 
 export function getTwitchChatDownloadQueue(): Queue<ChatDownloadJob, ChatDownloadResult, string> {

@@ -11,4 +11,4 @@ export { finalizeKickChapters, updateChapterDuringDownload } from './chapters.ts
 export { KickChatWaterfallClient, type KickMessagesResponse } from './chat.ts';
 export { getKickStreamStatus, getLatestKickVodObject, type KickLiveStreamRaw } from './live.ts';
 // VOD
-export { getKickParsedM3u8ForFfmpeg, getVod, type KickVod } from './vod.ts';
+export { getKickParsedM3u8ForFfmpeg, getVod, listAllKickVods, type KickVod } from './vod.ts';

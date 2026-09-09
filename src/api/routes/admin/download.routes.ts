@@ -1,20 +1,20 @@
 import type { FastifyInstance } from 'fastify';
 import { findVodByPlatformId } from '../../../db/queries/vods.ts';
-import { saveVodChapters } from '../../../services/twitch/index.ts';
+import { hasCompletedUpload } from '../../../db/queries/vod-uploads.ts';
+import { getStrategy } from '../../../services/platforms/index.ts';
 import type { DownloadMethod, Platform, SourceType, UploadMode } from '../../../types/platforms.ts';
 import {
   DOWNLOAD_METHODS,
   DOWNLOAD_METHODS_VALUES,
   PLATFORM_VALUES,
-  PLATFORMS,
   SOURCE_TYPES,
   SOURCE_TYPES_VALUES,
   UPLOAD_MODE_VALUES,
   UPLOAD_MODES,
 } from '../../../types/platforms.ts';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.ts';
+import { extractErrorDetails } from '../../../utils/error.ts';
 import { badRequest, notFound } from '../../../utils/http-error.ts';
-import { queueYoutubeUploads } from '../../../workers/jobs/youtube.job.ts';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.ts';
 import {
   asTenantPlatformContext,
@@ -25,7 +25,7 @@ import {
 import { ok } from '../../response.ts';
 import { ensureVodDownload } from './utils/vod-downloads.ts';
 import { buildVodJobResponse } from './utils/vod-job-response.ts';
-import { findOrCreateVodRecord } from './utils/vod-records.ts';
+import { processVodDownloadAndUpload } from './utils/vod-pipeline.ts';
 
 /** Route params for download job endpoints. */
 interface Params {
@@ -47,6 +47,11 @@ interface UploadBody {
   platform: Platform;
   uploadMode: UploadMode;
   downloadMethod: DownloadMethod;
+}
+
+/** Body for the backfill endpoint (platform-driven bulk download). */
+interface BackfillBody {
+  platform: Platform;
 }
 
 /**
@@ -88,62 +93,24 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
       const { vodId, type, downloadMethod, uploadMode } = request.body;
       const log = createAutoLogger(tenantId);
 
-      const vodRecord = await findOrCreateVodRecord(tenantCtx, vodId, log);
+      const result = await processVodDownloadAndUpload(
+        tenantCtx,
+        vodId,
+        { type, uploadMode, downloadMethod, skipFinalize: true },
+        log
+      );
 
-      if (!vodRecord) {
+      if (result == null) {
         notFound(`VOD ${vodId} not found on ${platform}`);
       }
 
-      const dbId = vodRecord.id;
-
-      const { jobId, filePath, copyJobId, workDir, copiedFromStorage } = await ensureVodDownload({
-        ctx: tenantCtx,
-        dbId,
-        vodId,
-        type,
-        downloadMethod,
-        log,
-        skipFinalize: true,
-      });
-
-      if (platform === PLATFORMS.TWITCH) {
-        const existingChapters = await tenantCtx.db
-          .selectFrom('chapters')
-          .where('vod_id', '=', dbId)
-          .selectAll()
-          .execute();
-        if (existingChapters.length === 0) {
-          await saveVodChapters({
-            ctx: tenantCtx,
-            dbId,
-            vodId,
-            finalDurationSeconds: vodRecord.duration,
-            publishUpdate: false,
-          });
-        }
-      }
-
-      await queueYoutubeUploads({
-        ctx: tenantCtx,
-        dbId,
-        vodId,
-        filePath,
-        platform,
-        uploadMode,
-        downloadJobId: jobId ?? undefined,
-        copyJobId,
-        type,
-        workDir,
-        forceUpload: true,
-        copiedFromStorage,
-      });
       return buildVodJobResponse({
-        hasDownload: jobId != null,
-        filePath,
-        downstreamJobId: jobId ?? '',
+        hasDownload: result.jobId != null,
+        filePath: result.filePath,
+        downstreamJobId: result.jobId ?? '',
         downstreamLabel: 'YouTube upload',
-        copyJobId,
-        base: jobId != null ? { dbId: vodRecord.id, vodId: vodRecord.platform_vod_id, jobId } : {},
+        copyJobId: result.copyJobId,
+        base: result.jobId != null ? { dbId: result.dbId, vodId: result.platformVodId, jobId: result.jobId } : {},
       });
     }
   );
@@ -227,6 +194,79 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
       } else {
         badRequest(`File already exists at ${filePath}`);
       }
+    }
+  );
+
+  // Backfill: fetch the streamer's full VOD list from the platform (oldest first)
+  // and queue a download + YouTube upload for each VOD that isn't already
+  // downloaded and uploaded. Downloads run sequentially, oldest first.
+  fastify.post<{ Params: Params; Body: BackfillBody }>(
+    '/vods/backfill',
+    {
+      schema: {
+        tags: ['Admin'],
+        description: "Bulk-download a streamer's archived VODs (oldest first) and queue YouTube uploads",
+        params: {
+          type: 'object',
+          properties: { tenantId: { type: 'string', description: 'Tenant ID' } },
+          required: ['tenantId'],
+        },
+        body: {
+          type: 'object',
+          properties: {
+            platform: { type: 'string', enum: PLATFORM_VALUES, description: 'Source platform' },
+          },
+          required: ['platform'],
+        },
+        security: [{ apiKey: [] }],
+      },
+      onRequest: [adminApiKeyMiddleware, tenantMiddleware],
+      preValidation: [platformValidationMiddleware],
+    },
+    async (request) => {
+      const tenantCtx = asTenantPlatformContext(requireTenant(request));
+      const { tenantId, platform, db } = tenantCtx;
+      const log = createAutoLogger(tenantId);
+
+      const strategy = getStrategy(platform);
+      if (!strategy) {
+        badRequest(`Unsupported platform: ${platform}`);
+      }
+
+      const allVods = await strategy.listChannelVods(tenantCtx);
+
+      let enqueued = 0;
+      let skippedUploaded = 0;
+      let failed = 0;
+
+      for (const meta of allVods) {
+        const existing = await findVodByPlatformId(db, meta.id, platform);
+        if (existing != null && (await hasCompletedUpload(db, existing.id))) {
+          skippedUploaded += 1;
+          continue;
+        }
+
+        try {
+          const result = await processVodDownloadAndUpload(
+            tenantCtx,
+            meta.id,
+            { type: SOURCE_TYPES.VOD, uploadMode: UPLOAD_MODES.ALL, downloadMethod: DOWNLOAD_METHODS.HLS },
+            log
+          );
+          if (result != null) {
+            enqueued += 1;
+          } else {
+            failed += 1;
+          }
+        } catch (error) {
+          log.error({ vodId: meta.id, platform, error: extractErrorDetails(error).message }, 'Backfill item failed');
+          failed += 1;
+        }
+      }
+
+      log.info({ platform, total: allVods.length, enqueued, skippedUploaded, failed }, 'Backfill complete');
+
+      return ok({ platform, total: allVods.length, enqueued, skippedUploaded, failed });
     }
   );
 

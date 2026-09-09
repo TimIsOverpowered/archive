@@ -2,10 +2,9 @@ import { type BaseJobOptions, type ConnectionOptions, type Processor, Worker } f
 import type { Redis } from 'ioredis';
 import { extractErrorDetails } from '../utils/error.ts';
 import { getLogger } from '../utils/logger.ts';
-import type { WorkerName } from './queues/queue.ts';
 
 export interface WorkerConfig<TData, TResult = unknown> {
-  name: WorkerName;
+  name: string;
   processor: Processor<TData, TResult, string>;
   concurrency?: number;
   useWorkerThreads?: boolean;
@@ -13,17 +12,17 @@ export interface WorkerConfig<TData, TResult = unknown> {
 }
 
 export class WorkerRegistry {
-  private entries = new Map<WorkerName, { name: WorkerName; worker: Worker<unknown, unknown> }>();
+  private entries = new Map<string, { name: string; worker: Worker<unknown, unknown> }>();
 
-  register(name: WorkerName, worker: Worker<unknown, unknown>): void {
+  register(name: string, worker: Worker<unknown, unknown>): void {
     this.entries.set(name, { name, worker });
   }
 
-  get(name: WorkerName): Worker<unknown, unknown> | undefined {
+  get(name: string): Worker<unknown, unknown> | undefined {
     return this.entries.get(name)?.worker;
   }
 
-  getAll(): { name: WorkerName; worker: Worker<unknown, unknown> }[] {
+  getAll(): { name: string; worker: Worker<unknown, unknown> }[] {
     return Array.from(this.entries.values());
   }
 
