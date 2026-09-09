@@ -1,5 +1,6 @@
 import type { Job } from 'bullmq';
-import { DiscordAlert, Jobs, YouTube } from '../constants.ts';
+import { DiscordAlert, Jobs } from '../constants.ts';
+import { getEffectiveSplitDuration } from './youtube/validation.ts';
 import type { SelectableGames } from '../db/streamer-types.ts';
 import type { SourceType } from '../types/platforms.ts';
 import { createAutoLogger } from '../utils/auto-tenant-logger.ts';
@@ -166,7 +167,7 @@ export async function buildDmcaProcessorContext(job: Job<DmcaProcessingJob>): Pr
 
 export async function trimDmcaVideo(ctx: DmcaProcessorContext): Promise<void> {
   if (ctx.part != null && ctx.config.youtube != null) {
-    const splitDuration = ctx.config.youtube.splitDuration ?? YouTube.DEFAULT_SPLIT_DURATION;
+    const splitDuration = getEffectiveSplitDuration(ctx.config.youtube.splitDuration);
     const startOffset = splitDuration * (ctx.part - 1);
 
     ctx.log.info({ vodId: ctx.vodId, part: ctx.part }, 'Extracting part from VOD');
@@ -475,7 +476,9 @@ export async function queueDmcaUpload(ctx: DmcaProcessorContext): Promise<void> 
           {
             name: 'youtube_upload',
             queueName: youtubeQueue.name,
-            data: { ...job, workDir: ctx.workDir },
+            // processedPath was already trimmed to the exact game range by trimDmcaVideo,
+            // so the upload must not re-apply chapterStart (would drop the first gameStart seconds)
+            data: { ...job, workDir: ctx.workDir, skipTrim: true },
             opts: {
               jobId: `${Jobs.YOUTUBE_JOB_PREFIX}${ctx.vodId}_game_${job.chapterId}_${job.chapterStart}`,
               ...defaultJobOptions,

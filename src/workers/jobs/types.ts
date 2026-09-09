@@ -58,6 +58,11 @@ export interface YoutubeGameUploadJob extends BaseJobData {
   gameTitle?: string | undefined;
   workDir?: string | undefined;
   sourceType?: SourceType | undefined;
+  /**
+   * When true, filePath is already the exact game segment (e.g. pre-trimmed by
+   * the DMCA worker) and the upload must not re-trim it using chapterStart.
+   */
+  skipTrim?: boolean | undefined;
 }
 
 export type YoutubeUploadJob = YoutubeVodUploadJob | YoutubeGameUploadJob;

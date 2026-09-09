@@ -27,6 +27,8 @@ export interface GameUploadContext {
   chapterName: string;
   chapterGameId?: string | undefined;
   chapterImage?: string | null | undefined;
+  /** When true, filePath is already the exact game segment (pre-trimmed by the DMCA worker) — do not re-trim. */
+  skipTrim?: boolean | undefined;
   platform: Platform;
   epNumber: number;
   gameTitle?: string | undefined;
@@ -212,79 +214,97 @@ export async function processGameUpload(ctx: GameUploadContext): Promise<GameUpl
 
   const channelName = displayName;
 
-  const trimAlertMessageId = await initRichAlert({
-    title: `✂️ Trimming Game Clip`,
-    description: `${channelName} - Extracting "${chapterName}" from VOD ${vodId}`,
-    status: 'warning',
-    fields: [
-      { name: 'Game', value: chapterName, inline: true },
-      { name: 'VOD ID', value: vodId, inline: true },
-      { name: 'Start Time', value: toHHMMSS(chapterStart), inline: true },
-      { name: 'Duration', value: toHHMMSS(chapterDuration), inline: true },
-    ],
-    timestamp: new Date().toISOString(),
-  });
+  let trimmedPath: string;
 
-  let trimFfmpegCmd: string | undefined;
-  const startTime = Date.now();
-
-  const trimmedPath = await trimVideo(
-    filePath,
-    chapterStart,
-    chapterDuration,
-    `${ctx.vodId}-game-${ctx.chapterGameId ?? 'unknown'}`,
-    (percent: number) => {
-      if (trimAlertMessageId == null) return;
-
-      const elapsed = (Date.now() - startTime) / 1000;
-      const eta = percent > 0 ? Math.round((elapsed / percent) * (100 - percent)) : 0;
-
-      const alertFields: Array<{ name: string; value: string; inline: boolean }> = [
-        { name: 'Game', value: chapterName, inline: true },
-        { name: 'Progress', value: createProgressBar(percent), inline: false },
-      ];
-
-      if (trimFfmpegCmd != null) {
-        alertFields.push({ name: 'FFmpeg', value: `\`${trimFfmpegCmd.substring(0, 500)}\``, inline: false });
+  if (ctx.skipTrim === true) {
+    log.info({ vodId, filePath }, 'Skipping game trim: file is already the exact game segment (pre-trimmed)');
+    trimmedPath = filePath;
+  } else {
+    const sourceMeta = await getMetadata(filePath);
+    if (sourceMeta != null) {
+      const requestedEnd = chapterStart + chapterDuration;
+      if (requestedEnd > sourceMeta.duration) {
+        log.warn(
+          { vodId, chapterStart, requestedEnd, sourceDuration: sourceMeta.duration },
+          'Requested game trim range exceeds source file duration; output will be shorter than the requested duration'
+        );
       }
-
-      alertFields.push({ name: 'ETA', value: toHHMMSS(Math.max(0, eta)), inline: true });
-
-      safeUpdateAlert(
-        trimAlertMessageId,
-        {
-          title: `✂️ Trimming Game Clip`,
-          description: `${channelName} - Extracting "${chapterName}" from VOD ${vodId}`,
-          status: 'warning',
-          fields: alertFields,
-          timestamp: new Date().toISOString(),
-          updatedTimestamp: new Date().toISOString(),
-        },
-        log,
-        vodId
-      );
-    },
-    (cmd) => {
-      trimFfmpegCmd = cmd;
     }
-  );
 
-  safeUpdateAlert(
-    trimAlertMessageId,
-    {
-      title: `✅ Game Clip Trimmed`,
-      description: `${channelName} - Successfully trimmed "${chapterName}"`,
-      status: 'success',
+    const trimAlertMessageId = await initRichAlert({
+      title: `✂️ Trimming Game Clip`,
+      description: `${channelName} - Extracting "${chapterName}" from VOD ${vodId}`,
+      status: 'warning',
       fields: [
         { name: 'Game', value: chapterName, inline: true },
         { name: 'VOD ID', value: vodId, inline: true },
+        { name: 'Start Time', value: toHHMMSS(chapterStart), inline: true },
+        { name: 'Duration', value: toHHMMSS(chapterDuration), inline: true },
       ],
       timestamp: new Date().toISOString(),
-      updatedTimestamp: new Date().toISOString(),
-    },
-    log,
-    vodId
-  );
+    });
+
+    let trimFfmpegCmd: string | undefined;
+    const startTime = Date.now();
+
+    trimmedPath = await trimVideo(
+      filePath,
+      chapterStart,
+      chapterDuration,
+      `${ctx.vodId}-game-${ctx.chapterGameId ?? 'unknown'}`,
+      (percent: number) => {
+        if (trimAlertMessageId == null) return;
+
+        const elapsed = (Date.now() - startTime) / 1000;
+        const eta = percent > 0 ? Math.round((elapsed / percent) * (100 - percent)) : 0;
+
+        const alertFields: Array<{ name: string; value: string; inline: boolean }> = [
+          { name: 'Game', value: chapterName, inline: true },
+          { name: 'Progress', value: createProgressBar(percent), inline: false },
+        ];
+
+        if (trimFfmpegCmd != null) {
+          alertFields.push({ name: 'FFmpeg', value: `\`${trimFfmpegCmd.substring(0, 500)}\``, inline: false });
+        }
+
+        alertFields.push({ name: 'ETA', value: toHHMMSS(Math.max(0, eta)), inline: true });
+
+        safeUpdateAlert(
+          trimAlertMessageId,
+          {
+            title: `✂️ Trimming Game Clip`,
+            description: `${channelName} - Extracting "${chapterName}" from VOD ${vodId}`,
+            status: 'warning',
+            fields: alertFields,
+            timestamp: new Date().toISOString(),
+            updatedTimestamp: new Date().toISOString(),
+          },
+          log,
+          vodId
+        );
+      },
+      (cmd) => {
+        trimFfmpegCmd = cmd;
+      }
+    );
+
+    safeUpdateAlert(
+      trimAlertMessageId,
+      {
+        title: `✅ Game Clip Trimmed`,
+        description: `${channelName} - Successfully trimmed "${chapterName}"`,
+        status: 'success',
+        fields: [
+          { name: 'Game', value: chapterName, inline: true },
+          { name: 'VOD ID', value: vodId, inline: true },
+        ],
+        timestamp: new Date().toISOString(),
+        updatedTimestamp: new Date().toISOString(),
+      },
+      log,
+      vodId
+    );
+  }
 
   const metadata = await getMetadata(trimmedPath);
   if (!metadata) {
@@ -295,6 +315,29 @@ export async function processGameUpload(ctx: GameUploadContext): Promise<GameUpl
   const gameExceedsYoutubeMax = trimmedDuration > YouTube.MAX_DURATION;
 
   if (gameExceedsYoutubeMax === true) {
+    if (ctx.skipTrim === true) {
+      // Pre-trimmed game segment (DMCA flow): the nominal game duration is always
+      // <= MAX_DURATION (game rows are created by the split logic), so any
+      // overshoot is stream-copy keyframe rounding. Splitting here would publish
+      // a junk "part 2" video and insert an orphan games row that collides with
+      // the neighboring segment, so clamp the tail back under the limit instead.
+      log.warn(
+        { vodId, trimmedDuration, maxDuration: YouTube.MAX_DURATION },
+        'Pre-trimmed game file exceeds YouTube max; clamping tail instead of splitting'
+      );
+
+      const clampedPath = await trimVideo(
+        trimmedPath,
+        0,
+        YouTube.MAX_DURATION - 2,
+        `${ctx.vodId}-game-${ctx.chapterGameId ?? 'unknown'}-clamped`
+      );
+
+      await deleteFileIfExists(trimmedPath);
+
+      return await processSingleGameUpload({ ...ctx, displayName: channelName }, clampedPath);
+    }
+
     return await processSplitGameUpload({ ...ctx, displayName: channelName }, trimmedPath, trimmedDuration);
   } else {
     return await processSingleGameUpload({ ...ctx, displayName: channelName }, trimmedPath);
