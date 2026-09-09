@@ -8,6 +8,7 @@ import { PLATFORMS } from '../../types/platforms.ts';
 import { jitter, sleep } from '../../utils/delay.ts';
 import { extractErrorDetails } from '../../utils/error.ts';
 import { request, segmentDownloadAgent } from '../../utils/http-client.ts';
+import { HttpError } from '../../utils/http-error.ts';
 import { createSession, type ImpitSession } from '../../utils/impit-wrapper.ts';
 import type { AppLogger } from '../../utils/logger.ts';
 import { fileExists } from '../../utils/path.ts';
@@ -252,17 +253,40 @@ export async function fetchTwitchPlaylist(
     throw new Error('No variant URL found in master playlist');
   }
 
+  const candidates = buildTwitchVariantCandidates(variants);
+
+  return fetchFirstAvailableVariant(
+    candidates,
+    (url) => request(url, { responseType: 'text', retryOptions }),
+    log,
+    vodId
+  );
+}
+
+/**
+ * Build an ordered list of candidate variant playlist URLs, highest quality
+ * first. We only ever consider two: the chunked (1440p source) variant — used
+ * directly if listed, otherwise derived from the first variant — and the 1080p
+ * transcode. If both 403, the download fails as usual.
+ */
+export function buildTwitchVariantCandidates(variants: HLS.types.Variant[]): string[] {
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+
+  const push = (url: string | undefined) => {
+    if (url != null && url !== '' && !seen.has(url)) {
+      seen.add(url);
+      candidates.push(url);
+    }
+  };
+
   const firstVariant = variants[0];
-  if (firstVariant == null) {
-    log.error({ vodId }, 'No variant URL found in master playlist');
-    throw new Error('No variant URL found in master playlist');
-  }
 
-  let bestVariantUrl: string;
-
-  if (firstVariant.uri.includes('/chunked/')) {
-    bestVariantUrl = firstVariant.uri;
-  } else {
+  // Primary: the chunked (1440p source) variant.
+  const chunkedVariant = variants.find((v) => v.uri.includes('/chunked/'));
+  if (chunkedVariant != null) {
+    push(chunkedVariant.uri);
+  } else if (firstVariant != null) {
     const domain = (() => {
       try {
         return new URL(firstVariant.uri).origin;
@@ -273,17 +297,51 @@ export async function fetchTwitchPlaylist(
     const hashMatch = firstVariant.uri.match(/(?:https?:\/\/[^/]+)\/([^/]+)\/[^/]+\/index-/);
     const hash = hashMatch?.[1] ?? null;
     const suffix = firstVariant.uri.split('/').pop();
-    bestVariantUrl =
-      domain != null && hash != null && suffix != null ? `${domain}/${hash}/chunked/${suffix}` : firstVariant.uri;
+    push(domain != null && hash != null && suffix != null ? `${domain}/${hash}/chunked/${suffix}` : firstVariant.uri);
   }
 
-  let baseURL: string = '';
-  let variantM3u8String: string = '';
+  // Fallback: the 1080p transcode variant only.
+  const hdVariant = variants.find((v) => !v.uri.includes('/chunked/') && v.resolution?.height === 1080);
+  push(hdVariant?.uri);
 
-  baseURL = bestVariantUrl.substring(0, bestVariantUrl.lastIndexOf('/'));
-  variantM3u8String = await request(bestVariantUrl, { responseType: 'text', retryOptions });
+  return candidates;
+}
 
-  return { variantM3u8String, baseURL };
+/**
+ * Fetch the first candidate variant playlist that is available. A 403 (the
+ * variant has been deleted, e.g. Twitch removes the 1440p source after ~a week)
+ * falls through to the next (lower) candidate. Any other error is thrown as-is.
+ */
+export async function fetchFirstAvailableVariant(
+  candidates: string[],
+  fetchVariant: (url: string) => Promise<string>,
+  log: AppLogger,
+  vodId: string
+): Promise<FetchPlaylistResult> {
+  let lastUnavailable: unknown = null;
+
+  for (const url of candidates) {
+    try {
+      const variantM3u8String = await fetchVariant(url);
+      const baseURL = url.substring(0, url.lastIndexOf('/'));
+      return { variantM3u8String, baseURL };
+    } catch (error: unknown) {
+      if (error instanceof HttpError && error.statusCode === 403) {
+        log.warn(
+          { error: extractErrorDetails(error).message, vodId, url },
+          'Twitch variant unavailable (403), falling back to next variant'
+        );
+        lastUnavailable = error;
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  if (lastUnavailable != null) {
+    throw lastUnavailable;
+  }
+  throw new Error(`No available Twitch variant for vodId=${vodId}`);
 }
 
 export async function fetchKickPlaylist(
