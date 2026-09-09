@@ -47,6 +47,12 @@ export async function findVodByStreamId(
   );
 }
 
+/** Whether the VOD with the given DB id is currently marked live. */
+export async function isVodLiveById(db: Kysely<StreamerDB>, dbId: number): Promise<boolean> {
+  const row = await db.selectFrom('vods').select('is_live').where('id', '=', dbId).executeTakeFirst();
+  return row?.is_live ?? false;
+}
+
 export type ActiveLiveVodResult = Pick<
   SelectableVods,
   'id' | 'platform_vod_id' | 'platform_stream_id' | 'is_live' | 'started_at'

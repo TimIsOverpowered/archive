@@ -2,11 +2,13 @@ import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import HLS from 'hls-parser';
 import { Hls } from '../../constants.ts';
+import { isVodLiveById } from '../../db/queries/vods.ts';
 import { updateChapterDuringDownload } from '../../services/kick/index.ts';
 import type { TenantContext } from '../../types/context.ts';
 import { PLATFORMS, type Platform } from '../../types/platforms.ts';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.ts';
 import { getRetryDelay, sleep } from '../../utils/delay.ts';
+import { VodNotFoundError } from '../../utils/domain-errors.ts';
 import { extractErrorDetails } from '../../utils/error.ts';
 import { HttpError } from '../../utils/http-error.ts';
 import { createSession, type ImpitSession } from '../../utils/impit-wrapper.ts';
@@ -227,6 +229,27 @@ export function filterNewSegments(
   return { newSegments, isStreamEnd, newLastSegmentUri: currentLastUri, newNoChangeCount: noChangeCount };
 }
 
+/**
+ * Whether an error indicates the VOD no longer exists on the platform
+ * (e.g. deleted by the streamer mid-stream). These are terminal — polling
+ * the same VOD will never succeed.
+ */
+export function isVodGoneError(error: unknown): boolean {
+  if (error instanceof VodNotFoundError) return true;
+  if (error instanceof HttpError) return error.statusCode === 404 || error.statusCode === 410;
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    const statusMatch = message.match(/status (\d+)/);
+    if (statusMatch?.[1] != null) {
+      const status = parseInt(statusMatch[1], 10);
+      if (status === 404 || status === 410) return true;
+    }
+    // Twitch GQL returns "The requested content does not exist..." for deleted VODs
+    return message.includes('does not exist') || message.includes('not found');
+  }
+  return false;
+}
+
 interface LivePollingContext {
   ctx: TenantContext;
   vodId: string;
@@ -261,6 +284,15 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
   let streamEnded = false;
   while (!streamEnded) {
     try {
+      // Stop polling as soon as the VOD is no longer marked live (stream ended,
+      // or a deleted VOD was marked offline by the monitor/another worker).
+      const stillLive = await isVodLiveById(ctx.ctx.db, ctx.dbId);
+      if (!stillLive) {
+        log.info({ vodId }, 'VOD no longer marked live - stopping live polling');
+        streamEnded = true;
+        break;
+      }
+
       const playlist = await fetchPlaylist(ctx, {
         attempts: 3,
         baseDelayMs: 2000,
@@ -359,6 +391,15 @@ async function runLivePollingLoop(ctx: LivePollingContext): Promise<void> {
 
       await sleep(Hls.POLL_INTERVAL_MS);
     } catch (error) {
+      if (isVodGoneError(error)) {
+        // The VOD no longer exists on the platform — retrying this attempt or
+        // re-polling will never succeed. Fail fast so the worker can mark the
+        // VOD offline and stop.
+        const details = extractErrorDetails(error);
+        log.error({ ...details, vodId }, 'VOD no longer exists on platform - failing live poll fast');
+        throw new VodNotFoundError(vodId, 'live HLS polling');
+      }
+
       const details = extractErrorDetails(error);
 
       log.error({ ...details, vodId }, 'Poll cycle error');

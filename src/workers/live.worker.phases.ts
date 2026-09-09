@@ -1,10 +1,11 @@
-import type { Job } from 'bullmq';
+import { type Job, UnrecoverableError } from 'bullmq';
 import { getDisplayName } from '../config/types.ts';
 import { fetchAndSaveEmotes } from '../services/emotes.ts';
-import { finalizeVod } from '../services/vod-finalization.ts';
+import { finalizeVod, markVodOffline } from '../services/vod-finalization.ts';
 import { SOURCE_TYPES } from '../types/platforms.ts';
 import { createAutoLogger } from '../utils/auto-tenant-logger.ts';
 import { initRichAlert, updateAlert } from '../utils/discord-alerts.ts';
+import { VodNotFoundError } from '../utils/domain-errors.ts';
 import { extractErrorDetails } from '../utils/error.ts';
 import { fileExists, getTmpDirPath } from '../utils/path.ts';
 import { triggerChatDownload } from './jobs/chat.job.ts';
@@ -15,7 +16,7 @@ import type { LiveWorkerAlerts } from './utils/alert-factories.ts';
 import { createLiveWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.ts';
 import { getMetadata } from './utils/ffmpeg.ts';
 import { getJobContext } from './utils/job-context.ts';
-import { downloadHlsStream } from './vod/hls-orchestrator.ts';
+import { downloadHlsStream, type HlsDownloadResult } from './vod/hls-orchestrator.ts';
 import { cleanupOrphanedTmpFiles } from './vod/hls-utils.ts';
 
 export interface LivePhaseResult {
@@ -75,28 +76,50 @@ export async function prepareVodDirectory(ctx: LiveProcessorContext): Promise<vo
 }
 
 export async function runDownload(ctx: LiveProcessorContext): Promise<LivePhaseResult> {
-  const downloadResult = await downloadHlsStream({
-    ctx,
-    dbId: ctx.dbId,
-    vodId: ctx.vodId,
-    platform: ctx.platform,
-    platformUserId: ctx.platformUserId,
-    platformUsername: ctx.platformUsername,
-    startedAt: ctx.startedAt,
-    sourceUrl: ctx.sourceUrl,
-    isLive: true,
-    discordMessageId: ctx.messageId ?? undefined,
-    streamerName: ctx.streamerName,
-    onProgress: (segmentsDownloaded, duration) => {
-      void ctx.job.updateProgress(segmentsDownloaded).catch(() => {});
-      safeUpdateAlert(
-        ctx.messageId,
-        ctx.alerts.progress(ctx.vodId, ctx.platform, ctx.streamerName, segmentsDownloaded, duration),
-        ctx.log,
-        ctx.vodId
+  let downloadResult: HlsDownloadResult;
+  try {
+    downloadResult = await downloadHlsStream({
+      ctx,
+      dbId: ctx.dbId,
+      vodId: ctx.vodId,
+      platform: ctx.platform,
+      platformUserId: ctx.platformUserId,
+      platformUsername: ctx.platformUsername,
+      startedAt: ctx.startedAt,
+      sourceUrl: ctx.sourceUrl,
+      isLive: true,
+      discordMessageId: ctx.messageId ?? undefined,
+      streamerName: ctx.streamerName,
+      onProgress: (segmentsDownloaded, duration) => {
+        void ctx.job.updateProgress(segmentsDownloaded).catch(() => {});
+        safeUpdateAlert(
+          ctx.messageId,
+          ctx.alerts.progress(ctx.vodId, ctx.platform, ctx.streamerName, segmentsDownloaded, duration),
+          ctx.log,
+          ctx.vodId
+        );
+      },
+    });
+  } catch (error) {
+    if (error instanceof VodNotFoundError) {
+      // The VOD was deleted on the platform mid-stream. Mark it offline so the
+      // monitor stops treating it as live, then fail the job permanently.
+      ctx.log.error(
+        { vodId: ctx.vodId, err: extractErrorDetails(error) },
+        'VOD no longer exists on platform - marking offline'
       );
-    },
-  });
+      try {
+        await markVodOffline({ ctx, dbId: ctx.dbId, vodId: ctx.vodId, platform: ctx.platform });
+      } catch (offlineError) {
+        ctx.log.warn(
+          { vodId: ctx.vodId, err: extractErrorDetails(offlineError) },
+          'Failed to mark VOD offline after deletion detection'
+        );
+      }
+      throw new UnrecoverableError(`VOD no longer exists on platform: ${ctx.vodId}`);
+    }
+    throw error;
+  }
 
   await ctx.job.updateProgress(50);
 

@@ -68,6 +68,14 @@ export function createTwitchGqlClient(
       if (result != null && typeof result === 'object' && 'errors' in result) {
         const errors = (result as Record<string, unknown>).errors;
         if (Array.isArray(errors) && errors.length > 0) {
+          // Include the platform's error messages so callers can classify
+          // failures (e.g. "content does not exist" for a deleted VOD).
+          const messages = errors
+            .map((entry) => {
+              const message = (entry as { message?: unknown } | null)?.message;
+              return typeof message === 'string' ? message : JSON.stringify(entry);
+            })
+            .join('; ');
           getLogger().error(
             {
               tenantId,
@@ -76,7 +84,7 @@ export function createTwitchGqlClient(
             },
             'API returned errors'
           );
-          throw new Error(`GQL request failed with ${errors.length} error(s)`);
+          throw new Error(`GQL request failed with ${errors.length} error(s): ${messages}`);
         }
       }
 

@@ -187,6 +187,11 @@ export const Monitor = {
   TENANT_POLL_INTERVAL_MS: 60_000,
   TWITCH_BATCH_POLL_INTERVAL_MS: 60_000,
   POLL_JITTER_RANGE: 0.4,
+  /**
+   * A stream has been live this long and its VOD object is still unresolvable
+   * on the platform — treat the VOD as deleted and mark it offline.
+   */
+  LIVE_VOD_MISSING_GRACE_MS: 10 * 60_000,
 } as const;
 
 // ── Twitch API ───────────────────────────────────────────────────────────────

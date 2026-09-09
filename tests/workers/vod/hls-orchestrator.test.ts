@@ -3,8 +3,9 @@ import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import type HLS from 'hls-parser';
 import { Hls } from '../../../src/constants.ts';
 import { PLATFORMS } from '../../../src/types/platforms.ts';
-import { DownloadAbortedError } from '../../../src/utils/domain-errors.ts';
+import { DownloadAbortedError, VodNotFoundError } from '../../../src/utils/domain-errors.ts';
 import type { ImpitSession } from '../../../src/utils/impit-wrapper.ts';
+import { HttpError } from '../../../src/utils/http-error.ts';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
@@ -53,6 +54,7 @@ const mockGetVodDirPath: any = mock.fn(() => '/tmp/test-vods/test-tenant/vod-123
 const mockGetVodFilePath: any = mock.fn(() => '/tmp/test-vods/test-tenant/vod-123/vod-123.mp4');
 const mockUpdateChapterDuringDownload: any = mock.fn(async () => {});
 const mockUpdateVodDurationDuringDownload: any = mock.fn(async () => {});
+const mockIsVodLiveById: any = mock.fn(async () => true);
 
 let sessionCloseCalled = false;
 let logCalls: Array<{ level: string; args: unknown[] }> = [];
@@ -130,6 +132,12 @@ mock.module('../../../src/workers/vod/duration-updater.js', {
   },
 });
 
+mock.module('../../../src/db/queries/vods.js', {
+  namedExports: {
+    isVodLiveById: mockIsVodLiveById,
+  },
+});
+
 mock.module('../../../src/utils/auto-tenant-logger.js', {
   namedExports: {
     createAutoLogger: () => ({
@@ -144,7 +152,7 @@ mock.module('../../../src/utils/auto-tenant-logger.js', {
 // ============================================================================
 // System Under Test — Dynamically imported AFTER mock.module registrations
 // ============================================================================
-const { downloadHlsStream, filterNewSegments, fetchPlaylist } = await import(
+const { downloadHlsStream, filterNewSegments, fetchPlaylist, isVodGoneError } = await import(
   '../../../src/workers/vod/hls-orchestrator.ts'
 );
 
@@ -426,6 +434,49 @@ describe('fetchPlaylist', () => {
 });
 
 // ============================================================================
+// isVodGoneError — pure function unit tests
+// ============================================================================
+
+describe('isVodGoneError', () => {
+  it('should return true for VodNotFoundError', () => {
+    assert.strictEqual(isVodGoneError(new VodNotFoundError('vod-1')), true);
+  });
+
+  it('should return true for HttpError 404 and 410', () => {
+    assert.strictEqual(isVodGoneError(new HttpError(404, 'HTTP 404')), true);
+    assert.strictEqual(isVodGoneError(new HttpError(410, 'HTTP 410')), true);
+  });
+
+  it('should return false for HttpError 403 and 500', () => {
+    assert.strictEqual(isVodGoneError(new HttpError(403, 'HTTP 403')), false);
+    assert.strictEqual(isVodGoneError(new HttpError(500, 'HTTP 500')), false);
+  });
+
+  it('should return true for errors with status 404 or 410 in message (impit-style)', () => {
+    assert.strictEqual(isVodGoneError(new Error('Impit request failed with status 404')), true);
+    assert.strictEqual(isVodGoneError(new Error('Impit request failed with status 410')), true);
+  });
+
+  it('should return false for errors with other statuses in message', () => {
+    assert.strictEqual(isVodGoneError(new Error('Impit request failed with status 403')), false);
+    assert.strictEqual(isVodGoneError(new Error('Impit request failed with status 502')), false);
+  });
+
+  it('should return true for Twitch GQL "does not exist" errors', () => {
+    const gqlError = new Error(
+      'GQL request failed with 1 error(s): The requested content does not exist or is not currently available.'
+    );
+    assert.strictEqual(isVodGoneError(gqlError), true);
+  });
+
+  it('should return false for transient errors', () => {
+    assert.strictEqual(isVodGoneError(new Error('Transient error')), false);
+    assert.strictEqual(isVodGoneError(new Error('Network timeout')), false);
+    assert.strictEqual(isVodGoneError(new DownloadAbortedError()), false);
+  });
+});
+
+// ============================================================================
 // downloadHlsStream — integration tests
 // ============================================================================
 
@@ -478,6 +529,7 @@ describe('downloadHlsStream', () => {
     mockFetchKickPlaylist.mock.mockImplementation(async () => mockPlaylistResult);
     mockDownloadSegmentsParallel.mock.mockImplementation(async () => {});
     mockGetRetryDelay.mock.mockImplementation(() => 0);
+    mockIsVodLiveById.mock.mockImplementation(async () => true);
   });
 
   afterEach(() => {
@@ -498,6 +550,7 @@ describe('downloadHlsStream', () => {
     mockGetVodFilePath.mock.resetCalls();
     mockUpdateChapterDuringDownload.mock.resetCalls();
     mockUpdateVodDurationDuringDownload.mock.resetCalls();
+    mockIsVodLiveById.mock.resetCalls();
   });
 
   describe('archived VOD path', () => {
@@ -741,6 +794,58 @@ describe('downloadHlsStream', () => {
         downloadHlsStream(buildOptions({ platform: PLATFORMS.TWITCH, isLive: true })),
         /consecutive errors/
       );
+    });
+
+    it('should fail fast with VodNotFoundError when the playlist returns 404 (deleted VOD)', async () => {
+      mockFetchTwitchPlaylist.mock.mockImplementation(async () => {
+        throw new HttpError(404, 'HTTP 404: Not Found');
+      });
+
+      await assert.rejects(
+        downloadHlsStream(buildOptions({ platform: PLATFORMS.TWITCH, isLive: true })),
+        (err: unknown) => err instanceof VodNotFoundError
+      );
+
+      // Single poll only — no consecutive-error tallying
+      assert.strictEqual(mockFetchTwitchPlaylist.mock.callCount(), 1);
+      assert.strictEqual(mockSleep.mock.callCount(), 0);
+    });
+
+    it('should fail fast with VodNotFoundError on Twitch GQL "does not exist" errors', async () => {
+      mockFetchTwitchPlaylist.mock.mockImplementation(async () => {
+        throw new Error(
+          'GQL request failed with 1 error(s): The requested content does not exist or is not currently available.'
+        );
+      });
+
+      await assert.rejects(
+        downloadHlsStream(buildOptions({ platform: PLATFORMS.TWITCH, isLive: true })),
+        (err: unknown) => err instanceof VodNotFoundError
+      );
+    });
+
+    it('should fail fast with VodNotFoundError when Kick playlist returns status 404', async () => {
+      mockFetchKickPlaylist.mock.mockImplementation(async () => {
+        throw new Error('Impit request failed with status 404');
+      });
+
+      await assert.rejects(
+        downloadHlsStream(buildOptions({ platform: PLATFORMS.KICK, platformUserId: 'kick-123', isLive: true })),
+        (err: unknown) => err instanceof VodNotFoundError
+      );
+
+      assert.strictEqual(mockFetchKickPlaylist.mock.callCount(), 1);
+    });
+
+    it('should stop polling and convert when the VOD is no longer marked live', async () => {
+      mockIsVodLiveById.mock.mockImplementation(async () => false);
+
+      const result = await downloadHlsStream(buildOptions({ platform: PLATFORMS.TWITCH, isLive: true }));
+
+      assert.ok(result.success);
+      // Loop exited on the is_live check — no playlist polling happened
+      assert.strictEqual(mockFetchTwitchPlaylist.mock.callCount(), 0);
+      assert.strictEqual(mockConvertHlsToMp4.mock.callCount(), 1);
     });
 
     it('should log error and continue polling after transient error in live mode', async () => {

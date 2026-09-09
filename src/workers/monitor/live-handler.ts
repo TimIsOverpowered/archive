@@ -4,7 +4,7 @@ import type { Kysely } from 'kysely';
 import { getTmpPath } from '../../config/env.ts';
 import type { TenantConfig } from '../../config/types.ts';
 import { requirePlatformConfig } from '../../config/types.ts';
-import { Jobs } from '../../constants.ts';
+import { Jobs, Monitor } from '../../constants.ts';
 import type { ActiveLiveVodResult } from '../../db/queries/vods.ts';
 import { findVodByPlatformId, findVodByStreamId } from '../../db/queries/vods.ts';
 import type { InsertableVods, SelectableVods, StreamerDB } from '../../db/streamer-types.ts';
@@ -392,6 +392,26 @@ async function handleNewLiveStream(ctx: LiveStreamContext): Promise<void> {
 }
 
 async function handleExistingVodBecameLive(ctx: ExistingVodLiveContext): Promise<void> {
+  // Resolve the VOD object BEFORE flipping is_live: if the platform can no
+  // longer resolve it (e.g. deleted), the VOD must not be marked live. A
+  // brand-new platform VOD that is still missing from the listing is covered
+  // by the next monitor poll.
+  const vodMetadata = ctx.strategy.fetchVodObjectForLiveStream
+    ? await ctx.strategy.fetchVodObjectForLiveStream(ctx.streamStatus.id, {
+        tenantId: ctx.tenantId,
+        config: ctx.config,
+        platform: ctx.platform,
+      })
+    : null;
+
+  if (!vodMetadata) {
+    ctx.log.warn(
+      { component: 'monitor', dbId: ctx.existingVod.id, vodId: ctx.existingVod.platform_vod_id },
+      'Existing VOD became live but has no resolvable VOD object - not marking live'
+    );
+    return;
+  }
+
   ctx.log.info(
     { component: 'monitor', vodId: ctx.existingVod.platform_vod_id, streamId: ctx.existingVod.platform_stream_id },
     'Existing VOD is now active'
@@ -408,22 +428,6 @@ async function handleExistingVodBecameLive(ctx: ExistingVodLiveContext): Promise
 
   await publishVodUpdate(ctx.tenantId, ctx.existingVod.id);
 
-  const vodMetadata = ctx.strategy.fetchVodObjectForLiveStream
-    ? await ctx.strategy.fetchVodObjectForLiveStream(ctx.streamStatus.id, {
-        tenantId: ctx.tenantId,
-        config: ctx.config,
-        platform: ctx.platform,
-      })
-    : null;
-
-  if (!vodMetadata) {
-    ctx.log.warn(
-      { component: 'monitor', dbId: ctx.existingVod.id },
-      'Failed to fetch VOD metadata - skipping HLS download'
-    );
-    return;
-  }
-
   ctx.log.info({ vodId: vodMetadata.id }, '[Monitor]: Queuing HLS download');
 
   await enqueueLiveHlsDownload({
@@ -439,10 +443,19 @@ async function handleExistingVodBecameLive(ctx: ExistingVodLiveContext): Promise
 }
 
 async function handleAlreadyLiveStream(ctx: AlreadyLiveContext): Promise<void> {
-  ctx.log.debug(
-    { component: 'monitor', vodId: ctx.existingVod.platform_vod_id },
-    'VOD is live, ensuring download queued'
-  );
+  const vodId = ctx.existingVod.platform_vod_id;
+  ctx.log.debug({ component: 'monitor', vodId }, 'VOD is live, ensuring download queued');
+
+  const liveQueue = getLiveDownloadQueue();
+  const jobId = `${Jobs.LIVE_HLS_JOB_PREFIX}${ctx.tenantId}_${vodId}`;
+
+  // Never re-arm a permanently failed job: re-adding by id resets the attempt
+  // counter, which would retry a VOD the worker has already given up on forever.
+  const existingJob = await liveQueue.getJob(jobId);
+  if (existingJob != null && (await existingJob.getState()) === 'failed') {
+    ctx.log.debug({ component: 'monitor', vodId }, 'Skipping re-queue — live download job already failed');
+    return;
+  }
 
   const vodMetadata = ctx.strategy.fetchVodObjectForLiveStream
     ? await ctx.strategy.fetchVodObjectForLiveStream(ctx.streamStatus.id, {
@@ -453,6 +466,36 @@ async function handleAlreadyLiveStream(ctx: AlreadyLiveContext): Promise<void> {
     : null;
 
   if (!vodMetadata) {
+    // The VOD object cannot be resolved while the stream is live. Right after
+    // going live this is normal (the platform has not created the VOD yet);
+    // past the grace period it means the VOD was deleted mid-stream.
+    const startedAt = ctx.existingVod.started_at ?? new Date(ctx.streamStatus.startedAt);
+    if (Date.now() - startedAt.getTime() > Monitor.LIVE_VOD_MISSING_GRACE_MS) {
+      ctx.log.info(
+        { component: 'monitor', vodId, startedAt },
+        'VOD no longer resolvable on platform - marking offline'
+      );
+      const { db } = await getJobContext(ctx.tenantId);
+      await markVodOfflineService({
+        ctx: { tenantId: ctx.tenantId, config: ctx.config, db } satisfies TenantContext,
+        dbId: ctx.existingVod.id,
+        vodId: vodId ?? '',
+        platform: ctx.platform,
+      });
+      // Best-effort: an active job cannot be removed, but it will stop on its
+      // next poll once is_live is false.
+      const staleJob = await liveQueue.getJob(jobId);
+      if (staleJob != null) {
+        await staleJob.remove().catch((error) => {
+          ctx.log.debug(
+            { component: 'monitor', vodId, err: extractErrorDetails(error).message },
+            'Could not remove live HLS job (may be active)'
+          );
+        });
+      }
+      return;
+    }
+
     ctx.log.warn(
       { component: 'monitor', dbId: ctx.existingVod.id },
       'Failed to fetch VOD metadata - skipping HLS download'
