@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { Cache } from '../constants.ts';
 import { defaultCacheContext } from '../utils/cache.ts';
-import { simpleKeys } from '../utils/cache-keys.ts';
+import { simpleKeys, swrKeys } from '../utils/cache-keys.ts';
 import { extractErrorDetails } from '../utils/error.ts';
 import { getLogger } from '../utils/logger.ts';
 import { RedisService } from '../utils/redis-service.ts';
@@ -123,6 +123,74 @@ export async function publishGameUpdate(tenantId: string): Promise<void> {
     const details = extractErrorDetails(error);
     getLogger().warn({ err: details, tenantId }, 'Failed to publish game update event');
   }
+}
+
+/** Optional identity hints for `invalidateAllVodCaches`. */
+export interface VodCacheIdentity {
+  /** Current platform (after the change). */
+  platform?: string | undefined;
+  /** Current platform VOD ID (after the change). */
+  platformVodId?: string | undefined;
+  /** Previous platform (before the change), when the `platform` column changed. */
+  previousPlatform?: string | undefined;
+  /** Previous platform VOD ID (before the change), when `platform_vod_id` changed. */
+  previousPlatformVodId?: string | undefined;
+}
+
+/**
+ * Invalidate every cached endpoint that references a VOD.
+ *
+ * Covers: the detail-by-id entry (swr/simple `vodStatic`, via
+ * `invalidateVodStaticCache` which also clears tags, paginated list queries and
+ * the chapter library), the detail-by-platform entry (swr/simple
+ * `vodPlatform` — including the previous identity when the platform or
+ * platform VOD ID changed; this key is NOT covered by the SCAN-based list
+ * invalidation), the volatile (duration / is_live) entry, all game caches (the
+ * VOD detail embeds games and the games list/library), and the tenant stats
+ * key. Finally publishes a `VOD_UPDATED` event so worker processes and other
+ * API instances refresh their in-process caches.
+ */
+export async function invalidateAllVodCaches(
+  tenantId: string,
+  dbId: number,
+  identity: VodCacheIdentity = {}
+): Promise<void> {
+  await invalidateVodStaticCache(tenantId, dbId);
+  await invalidateVodVolatileCache(tenantId, dbId);
+  await invalidateGameTags(tenantId);
+
+  const client = RedisService.getActiveClient();
+  if (!client) {
+    await publishVodUpdate(tenantId, dbId);
+    return;
+  }
+
+  const platformKeys: string[] = [];
+  if (identity.platform && identity.platformVodId) {
+    platformKeys.push(swrKeys.vodPlatform(tenantId, identity.platform, identity.platformVodId));
+    platformKeys.push(simpleKeys.vodPlatform(tenantId, identity.platform, identity.platformVodId));
+  }
+  if (identity.previousPlatform && identity.previousPlatformVodId) {
+    platformKeys.push(swrKeys.vodPlatform(tenantId, identity.previousPlatform, identity.previousPlatformVodId));
+    platformKeys.push(simpleKeys.vodPlatform(tenantId, identity.previousPlatform, identity.previousPlatformVodId));
+  }
+
+  if (platformKeys.length > 0) {
+    try {
+      await client.unlink(...platformKeys);
+      for (const key of platformKeys) {
+        defaultCacheContext.invalidateKey(key);
+      }
+    } catch (error) {
+      getLogger().warn({ err: extractErrorDetails(error), tenantId, dbId }, 'Failed to unlink VOD platform cache keys');
+    }
+  }
+
+  const statsKey = simpleKeys.stats(tenantId);
+  await client.unlink(statsKey).catch(() => {});
+  defaultCacheContext.invalidateKey(statsKey);
+
+  await publishVodUpdate(tenantId, dbId);
 }
 
 /**

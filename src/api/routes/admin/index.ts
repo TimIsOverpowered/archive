@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import contentManagementRoutes from './content-management.routes.ts';
 import dmcaProcessingRoutes from './dmca.routes.ts';
 import downloadJobsRoutes from './download.routes.ts';
 import gameUploadRoutes from './game-upload.routes.ts';
@@ -27,6 +28,8 @@ export default async function adminRoutes(fastify: FastifyInstance, _options: Ad
   await fastify.register(metadataFetchingRoutes);
 
   await fastify.register(vodManagementRoutes);
+
+  await fastify.register(contentManagementRoutes);
 
   await fastify.register(liveCallbackRoutes);
 }

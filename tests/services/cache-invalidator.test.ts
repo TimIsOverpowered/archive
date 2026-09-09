@@ -1,7 +1,12 @@
 import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import { resetEnvConfig } from '../../src/config/env.ts';
-import { publishGameUpdate, publishVodDurationUpdate, publishVodUpdate } from '../../src/services/cache-invalidator.ts';
+import {
+  invalidateAllVodCaches,
+  publishGameUpdate,
+  publishVodDurationUpdate,
+  publishVodUpdate,
+} from '../../src/services/cache-invalidator.ts';
 import { RedisService } from '../../src/utils/redis-service.ts';
 
 const VALID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
@@ -216,5 +221,103 @@ describe('CacheInvalidator: publishGameUpdate', () => {
     assert.ok('tenantId' in event);
     assert.strictEqual(event.type, 'GAME_UPDATED');
     assert.strictEqual(event.tenantId, 'tenant-2');
+  });
+});
+
+describe('CacheInvalidator: invalidateAllVodCaches', () => {
+  interface MockState {
+    unlinkKeys: string[];
+    publishCalls: { channel: string; message: string }[];
+  }
+
+  let mockClient: any;
+  let state: MockState;
+
+  function allUnlinkKeys(): string[] {
+    return state.unlinkKeys;
+  }
+
+  function hasAnyKey(...candidates: string[]): boolean {
+    return candidates.some((c) => allUnlinkKeys().includes(c));
+  }
+
+  beforeEach(() => {
+    state = { unlinkKeys: [], publishCalls: [] };
+    mockClient = {
+      unlink: async (...keys: string[]) => {
+        state.unlinkKeys.push(...keys);
+      },
+      scan: async (_cursor: string, ..._args: any[]) => ['0', []],
+      sscan: async (_key: string, _cursor: string, ..._args: any[]) => ['0', []],
+      del: async (..._keys: string[]) => {},
+      publish: async (channel: string, message: string) => {
+        state.publishCalls.push({ channel, message });
+      },
+    };
+    (RedisService as any)._instance = {
+      client: mockClient,
+    };
+    resetEnvConfig();
+  });
+
+  afterEach(() => {
+    (RedisService as any)._instance = null;
+    resetEnvConfig();
+  });
+
+  it('should not touch Redis when the client is unavailable', async () => {
+    (RedisService as any)._instance = null;
+    await invalidateAllVodCaches('tenant-1', 42, { platform: 'twitch', platformVodId: 'abc' });
+    assert.strictEqual(state.unlinkKeys.length, 0);
+    assert.strictEqual(state.publishCalls.length, 0);
+  });
+
+  it('should unlink the detail-by-id, volatile and stats keys', async () => {
+    await invalidateAllVodCaches('tenant-1', 42);
+    assert.ok(hasAnyKey('swr:vod:{tenant-1}:42'), 'unlinks the swr detail key');
+    assert.ok(hasAnyKey('swr:vod:volatile:{tenant-1}:42'), 'unlinks the volatile key');
+    assert.ok(hasAnyKey('simple:stats:tenant-1'), 'unlinks the tenant stats key');
+  });
+
+  it('should unlink the detail-by-platform keys for the current identity', async () => {
+    await invalidateAllVodCaches('tenant-1', 42, { platform: 'twitch', platformVodId: 'abc' });
+    assert.ok(hasAnyKey('swr:vod:platform:{tenant-1}:twitch:abc'), 'unlinks the swr platform key');
+    assert.ok(hasAnyKey('simple:vod:platform:{tenant-1}:twitch:abc'), 'unlinks the simple platform key');
+  });
+
+  it('should also unlink the detail-by-platform keys for the previous identity', async () => {
+    await invalidateAllVodCaches('tenant-1', 42, {
+      platform: 'twitch',
+      platformVodId: 'new',
+      previousPlatform: 'twitch',
+      previousPlatformVodId: 'old',
+    });
+    assert.ok(hasAnyKey('swr:vod:platform:{tenant-1}:twitch:new'), 'unlinks the new platform key');
+    assert.ok(hasAnyKey('swr:vod:platform:{tenant-1}:twitch:old'), 'unlinks the previous platform key');
+  });
+
+  it('should not unlink platform keys when no identity is provided', async () => {
+    await invalidateAllVodCaches('tenant-1', 42);
+    assert.ok(!hasAnyKey('swr:vod:platform:{tenant-1}:twitch:abc'), 'no platform key unlinked');
+  });
+
+  it('should publish a VOD_UPDATED event for cross-process invalidation', async () => {
+    await invalidateAllVodCaches('tenant-1', 42, { platform: 'kick', platformVodId: 'xyz' });
+    assert.strictEqual(state.publishCalls.length, 1);
+    assert.strictEqual(state.publishCalls[0]?.channel, 'cache:vod');
+    const event = JSON.parse(state.publishCalls[0]?.message ?? '');
+    assert.strictEqual(event.type, 'VOD_UPDATED');
+    assert.strictEqual(event.tenantId, 'tenant-1');
+    assert.strictEqual(event.dbId, 42);
+  });
+
+  it('should handle Redis errors gracefully', async () => {
+    mockClient.unlink = async () => {
+      throw new Error('ECONNREFUSED');
+    };
+    mockClient.publish = async () => {
+      throw new Error('ECONNREFUSED');
+    };
+    await assert.doesNotReject(invalidateAllVodCaches('tenant-1', 42, { platform: 'twitch', platformVodId: 'abc' }));
   });
 });

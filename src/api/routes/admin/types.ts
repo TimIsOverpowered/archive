@@ -28,6 +28,26 @@ export interface DeleteVodBody {
   platform: Platform;
 }
 
+/** Params for the admin "update VOD" endpoint (tenant scoped). */
+export type UpdateVodParams = TenantParams;
+
+/**
+ * Body for the admin "update VOD" endpoint (partial update).
+ * Identify the target VOD with either `dbId` OR the `platform` + `vodId` pair.
+ */
+export interface UpdateVodBody {
+  dbId?: number;
+  platform?: Platform;
+  vodId?: string;
+  title?: string | null;
+  duration?: number;
+  created_at?: string;
+  is_live?: boolean;
+  started_at?: string | null;
+  platform_vod_id?: string | null;
+  platform_stream_id?: string | null;
+}
+
 /** Base VOD record shape used by download job helpers. */
 export interface VodRecordBase {
   id: number;

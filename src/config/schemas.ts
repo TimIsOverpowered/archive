@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { YouTube } from '../constants.ts';
+import { PLATFORM_VALUES } from '../types/platforms.ts';
 import { decryptObject, decryptScalar } from '../utils/encryption.ts';
 
 /**
@@ -247,4 +248,94 @@ export const EmoteUpsertSchema = z.object({
       })
     )
     .default([]),
+});
+
+// ── Admin Management Schemas ─────────────────────────────────────────────────
+// Schemas for the tenant-scoped admin content-management endpoints. Field names
+// match the underlying database columns so validated output maps 1:1 onto the
+// rows being written.
+
+/** Schema for the admin "update VOD" endpoint — a partial update of a `vods` row. */
+export const AdminVodUpdateSchema = z.object({
+  title: z.string().nullable().optional(),
+  duration: z.number().min(0).optional(),
+  created_at: z.coerce.date().optional(),
+  is_live: z.boolean().optional(),
+  started_at: z.coerce.date().nullable().optional(),
+  platform: z.enum(PLATFORM_VALUES as [string, ...string[]]).optional(),
+  platform_vod_id: z.string().nullable().optional(),
+  platform_stream_id: z.string().nullable().optional(),
+});
+
+export type AdminVodUpdate = z.infer<typeof AdminVodUpdateSchema>;
+
+/** Schema for creating a chapter row (full row — requires the owning VOD). */
+export const AdminChapterUpsertSchema = z.object({
+  vod_id: z.number().int().positive(),
+  game_id: z.string().nullable().default(null),
+  name: z.string().nullable().default(null),
+  image: z.string().nullable().default(null),
+  start: z.number().min(0),
+  duration: z.number().min(0).default(0),
+  end: z.number().nullable().default(null),
+});
+
+/** Schema for updating a chapter row (partial). */
+export const AdminChapterUpdateSchema = z.object({
+  game_id: z.string().nullable().optional(),
+  name: z.string().nullable().optional(),
+  image: z.string().nullable().optional(),
+  start: z.number().min(0).optional(),
+  duration: z.number().min(0).optional(),
+  end: z.number().nullable().optional(),
+});
+
+/** Schema for creating a game row (full row — requires the owning VOD). */
+export const AdminGameUpsertSchema = z.object({
+  vod_id: z.number().int().positive(),
+  start: z.number().min(0),
+  duration: z.number().min(0).default(0),
+  end: z.number().min(0),
+  video_provider: z.string().nullable().default(null),
+  video_id: z.string().nullable().default(null),
+  thumbnail_url: z.string().nullable().default(null),
+  game_id: z.string().nullable().default(null),
+  game_name: z.string().nullable().default(null),
+  title: z.string().nullable().default(null),
+  chapter_image: z.string().nullable().default(null),
+});
+
+/** Schema for updating a game row (partial). */
+export const AdminGameUpdateSchema = z.object({
+  start: z.number().min(0).optional(),
+  duration: z.number().min(0).optional(),
+  end: z.number().min(0).optional(),
+  video_provider: z.string().nullable().optional(),
+  video_id: z.string().nullable().optional(),
+  thumbnail_url: z.string().nullable().optional(),
+  game_id: z.string().nullable().optional(),
+  game_name: z.string().nullable().optional(),
+  title: z.string().nullable().optional(),
+  chapter_image: z.string().nullable().optional(),
+});
+
+/** Schema for creating a vod_upload row (full row — requires the owning VOD). */
+export const AdminVodUploadUpsertSchema = z.object({
+  vod_id: z.number().int().positive(),
+  upload_id: z.string().min(1),
+  type: z.string().nullable().default(null),
+  duration: z.number().min(0).default(0),
+  part: z.number().int().min(0).default(1),
+  status: z.string().default(''),
+  thumbnail_url: z.string().nullable().default(null),
+});
+
+/** Schema for updating a vod_upload row (partial). */
+export const AdminVodUploadUpdateSchema = z.object({
+  upload_id: z.string().min(1).optional(),
+  type: z.string().nullable().optional(),
+  duration: z.number().min(0).optional(),
+  part: z.number().int().min(0).optional(),
+  status: z.string().optional(),
+  thumbnail_url: z.string().nullable().optional(),
 });
