@@ -83,7 +83,8 @@ describe('atomicCopyFile', () => {
     });
 
     assert.ok(seen.length > 0, 'onProgress should be called');
-    const [lastBytes, lastTotal] = seen[seen.length - 1];
+    const lastBytes = seen[seen.length - 1]?.[0];
+    const lastTotal = seen[seen.length - 1]?.[1];
     assert.equal(lastTotal, payload.length);
     assert.equal(lastBytes, payload.length);
     assert.equal(await readFile(dest, 'utf8'), payload.toString('utf8'));
