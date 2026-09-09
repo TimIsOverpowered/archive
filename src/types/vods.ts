@@ -9,6 +9,7 @@ export type VodNeighbor = {
   thumbnail_url: string | null;
   created_at: Date;
   chapters: Array<{
+    id: number;
     name: string | null;
     image: string | null;
     duration: number;
@@ -52,6 +53,7 @@ export interface VodResponse {
     created_at: string;
   }>;
   chapters: Array<{
+    id: number;
     name: string | null;
     image: string | null;
     duration: string | null;

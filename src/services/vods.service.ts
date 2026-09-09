@@ -54,7 +54,7 @@ function selectVodRelations(eb: ExpressionBuilder<StreamerDB, 'vods'>) {
     jsonArrayFrom(
       eb
         .selectFrom('chapters')
-        .select(['name', 'image', 'start', 'duration', 'end'])
+        .select(['id', 'name', 'image', 'start', 'duration', 'end'])
         .whereRef('chapters.vod_id', '=', 'vods.id')
         .orderBy('chapters.start', 'asc')
     ).as('chapters'),
@@ -274,7 +274,7 @@ export async function getVodById(
           jsonArrayFrom(
             eb
               .selectFrom('chapters')
-              .select(['name', 'image', 'start', 'duration', 'end'])
+              .select(['id', 'name', 'image', 'start', 'duration', 'end'])
               .whereRef('chapters.vod_id', '=', 'vods.id')
           ).as('chapters')
         )
@@ -323,7 +323,7 @@ export async function getVodById(
           jsonArrayFrom(
             eb
               .selectFrom('chapters')
-              .select(['name', 'image', 'start', 'duration', 'end'])
+              .select(['id', 'name', 'image', 'start', 'duration', 'end'])
               .whereRef('chapters.vod_id', '=', 'vods.id')
           ).as('chapters')
         )
@@ -434,7 +434,7 @@ export async function getVodByPlatformId(
           jsonArrayFrom(
             eb
               .selectFrom('chapters')
-              .select(['name', 'image', 'start', 'duration', 'end'])
+              .select(['id', 'name', 'image', 'start', 'duration', 'end'])
               .whereRef('chapters.vod_id', '=', 'vods.id')
           ).as('chapters')
         )
@@ -483,7 +483,7 @@ export async function getVodByPlatformId(
           jsonArrayFrom(
             eb
               .selectFrom('chapters')
-              .select(['name', 'image', 'start', 'duration', 'end'])
+              .select(['id', 'name', 'image', 'start', 'duration', 'end'])
               .whereRef('chapters.vod_id', '=', 'vods.id')
           ).as('chapters')
         )

@@ -318,6 +318,7 @@ describe('VodService: VodResponse type', () => {
       ],
       chapters: [
         {
+          id: 1,
           name: 'Intro',
           image: null,
           duration: null,
