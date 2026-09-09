@@ -112,11 +112,11 @@ export const Kick = {
   SUBCATEGORIES_URL: 'https://kick.com/api/v1/subcategories',
   CHAT_BLOCK_DURATION_MS: 5 * 60 * 1000,
   CHAT_API_TIMEOUT_MS: 15_000,
-  CHAT_FETCH_CONCURRENCY: 2,
+  CHAT_FETCH_CONCURRENCY: 4,
   CHAT_FETCH_CHUNK_SIZE: 50, // Keep chunks manageable.
   CHAT_FETCH_STEP_SECONDS: 5,
   /** Global pace for Kick chat requests, shared across all worker instances via Redis. */
-  CHAT_FETCH_LIMIT_POINTS: 4,
+  CHAT_FETCH_LIMIT_POINTS: 40,
   CHAT_FETCH_LIMIT_DURATION_S: 10,
   /** Per-bucket 429 retry budget before the chat job fails (BullMQ then resumes from the last persisted offset). */
   CHAT_RETRY_MAX_ATTEMPTS: 6,
