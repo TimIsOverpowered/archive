@@ -1,6 +1,8 @@
 import 'dotenv/config';
+import fsPromises from 'node:fs/promises';
+import path from 'node:path';
 import { type ConnectionOptions, Queue } from 'bullmq';
-import { loadWorkersConfig } from '../config/env.ts';
+import { getLivePath, getTmpPath, getVodPath, loadWorkersConfig } from '../config/env.ts';
 import { configService } from '../config/tenant-config.ts';
 import type { TenantConfigSubscriber } from '../config/tenant-config-subscriber.ts';
 import { registerTenantConfigSubscriberWorker } from '../config/tenant-config-subscriber.ts';
@@ -15,9 +17,10 @@ import { registerProcessErrorHandlers } from '../utils/process-handlers.ts';
 import { registerShutdownHandlers as registerShutdown } from '../utils/shutdown.ts';
 import { waitForWorkersReady, workerRegistry } from './create-worker.ts';
 import { startMonitorService, stopMonitorService } from './monitor/index.ts';
-import { closeQueues, QUEUE_NAMES } from './queues/queue.ts';
+import { closeQueues, QUEUE_NAMES, VOD_STANDARD_QUEUE_PREFIX } from './queues/queue.ts';
 import { closeWorkersRedis, getRedisInstance, initWorkersRedis, waitForRedisReady } from './redis.ts';
 import { registerWorkers } from './worker-definitions.ts';
+import { PART_SUFFIX } from './utils/atomic-file.ts';
 
 interface AppContext {
   workerConfig: ReturnType<typeof loadWorkersConfig>;
@@ -27,7 +30,10 @@ interface AppContext {
 
 registerProcessErrorHandlers();
 
-async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkersConfig>) {
+async function clearAllJobsOnStartup(
+  workerConfig: ReturnType<typeof loadWorkersConfig>,
+  configs: Awaited<ReturnType<typeof configService.loadAll>>
+) {
   if (!workerConfig.CLEAR_QUEUES_ON_STARTUP) return;
 
   getLogger().warn(
@@ -35,7 +41,12 @@ async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkers
     'CLEAR_QUEUES_ON_STARTUP=true — all queued jobs will be permanently deleted'
   );
 
-  for (const name of Object.values(QUEUE_NAMES)) {
+  const queueNames = [
+    ...Object.values(QUEUE_NAMES),
+    ...configs.map((config) => `${VOD_STANDARD_QUEUE_PREFIX}${config.id}`),
+  ];
+
+  for (const name of queueNames) {
     const queue = new Queue(name, {
       connection: getRedisInstance() as unknown as ConnectionOptions,
     });
@@ -49,6 +60,78 @@ async function clearAllJobsOnStartup(workerConfig: ReturnType<typeof loadWorkers
   }
 
   getLogger().warn({ component: 'queues' }, 'All queues cleared and reset');
+}
+
+/**
+ * Deletes stray `*.part` files left behind by a copy/conversion that was
+ * interrupted by a crash or hard kill (so the in-process unlink never ran).
+ * Runs at startup, before any worker is registered, so no in-process writer is
+ * active — safe given the single-instance fork deployment. Because a final file
+ * is only ever produced via rename, any remaining `.part` is always stale.
+ */
+async function cleanupOrphanedPartFiles(): Promise<void> {
+  const roots: string[] = [];
+  const tmpPath = getTmpPath();
+  const vodPath = getVodPath();
+  const livePath = getLivePath();
+  if (tmpPath != null) roots.push(tmpPath);
+  if (vodPath != null) roots.push(vodPath);
+  if (livePath != null) roots.push(livePath);
+
+  let removed = 0;
+  for (const root of roots) {
+    removed += await removeOrphanedPartFilesUnderRoot(root);
+  }
+
+  if (removed > 0) {
+    getLogger().warn({ component: 'queues', removed }, 'Removed orphaned .part files from a prior run');
+  }
+}
+
+/**
+ * Removes `*.part` files two directory levels below `root`
+ * (`{root}/{tenantId}/{vodOrStreamId}/`). Never throws.
+ */
+async function removeOrphanedPartFilesUnderRoot(root: string): Promise<number> {
+  let tenants: string[];
+  try {
+    tenants = await fsPromises.readdir(root);
+  } catch {
+    return 0; // root does not exist yet
+  }
+
+  let removed = 0;
+  for (const tenant of tenants) {
+    const tenantDir = path.join(root, tenant);
+    let subDirs: string[];
+    try {
+      subDirs = await fsPromises.readdir(tenantDir);
+    } catch {
+      continue;
+    }
+
+    for (const subDir of subDirs) {
+      const dir = path.join(tenantDir, subDir);
+      let entries: string[];
+      try {
+        entries = await fsPromises.readdir(dir);
+      } catch {
+        continue;
+      }
+
+      for (const entry of entries) {
+        if (!entry.endsWith(PART_SUFFIX)) continue;
+        try {
+          await fsPromises.unlink(path.join(dir, entry));
+          removed++;
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+
+  return removed;
 }
 
 export async function bootstrap() {
@@ -105,7 +188,8 @@ async function initApplicationState() {
 async function initWorkers(ctx: AppContext) {
   getLogger().info({ component: 'workers' }, 'Initializing workers');
 
-  await clearAllJobsOnStartup(ctx.workerConfig);
+  await cleanupOrphanedPartFiles();
+  await clearAllJobsOnStartup(ctx.workerConfig, ctx.configs);
 
   registerWorkers(getRedisInstance(), ctx.configs, Vod.LIVE_HEADROOM, Vod.LIVE_MIN_CONCURRENCY);
 

@@ -3,6 +3,7 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import { extractErrorDetails } from '../../utils/error.ts';
 import type { AppLogger } from '../../utils/logger.ts';
+import { atomicCopyFile } from './atomic-file.ts';
 
 const CHUNK_SIZE = 1024 * 1024;
 
@@ -80,30 +81,9 @@ export async function finalizeFile(options: FinalizeFileOptions): Promise<void> 
   const { filePath, destPath, tmpDir, saveMP4 = true, saveHLS, hlsDestDir, excludedPath, log, onProgress } = options;
 
   if (saveMP4) {
-    const destDir = path.dirname(destPath);
-    await fsPromises.mkdir(destDir, { recursive: true });
-
-    const stat = await fsPromises.stat(filePath);
-    const fileSize = stat.size;
-
-    let bytesCopied = 0;
-
-    await new Promise<void>((resolve, reject) => {
-      const readStream = fs.createReadStream(filePath, { highWaterMark: CHUNK_SIZE });
-      const writeStream = fs.createWriteStream(destPath);
-
-      readStream.on('data', (chunk: Buffer) => {
-        bytesCopied += chunk.length;
-        if (onProgress) {
-          onProgress(bytesCopied, fileSize);
-        }
-      });
-
-      readStream.on('error', reject);
-      writeStream.on('error', reject);
-      writeStream.on('finish', resolve);
-
-      readStream.pipe(writeStream);
+    await atomicCopyFile(filePath, destPath, {
+      log,
+      ...(onProgress != null && { onProgress }),
     });
 
     log.info({ filePath, destPath }, 'Finalized MP4 to storage');

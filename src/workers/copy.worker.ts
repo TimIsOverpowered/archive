@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import type { Job } from 'bullmq';
@@ -8,6 +7,7 @@ import { getTmpDirPath } from '../utils/path.ts';
 import type { AppLogger } from '../utils/logger.ts';
 import type { CopyFileJob, CopyFileResult } from './jobs/types.ts';
 import { createCopyWorkerAlerts, safeUpdateAlert } from './utils/alert-factories.ts';
+import { atomicCopyFile } from './utils/atomic-file.ts';
 import { convertHlsToMp4, detectFmp4FromPlaylist } from './utils/ffmpeg.ts';
 import { wrapWorkerProcessor } from './utils/worker-wrapper.ts';
 import { reapWorkDir } from './utils/workdir.ts';
@@ -46,8 +46,6 @@ const errorMeta = (ctx: CopyFileProcessorContext, job: Job) => ({
   destPath: ctx.destPath,
 });
 
-const CHUNK_SIZE = 1024 * 1024;
-
 const copyFileProcessor = wrapWorkerProcessor<CopyFileJob, CopyFileProcessorContext, CopyFileResult>(
   buildCopyFileContext,
   async (ctx) => {
@@ -78,8 +76,6 @@ const copyFileProcessor = wrapWorkerProcessor<CopyFileJob, CopyFileProcessorCont
 
 async function copySingleFile(ctx: CopyFileProcessorContext): Promise<CopyFileResult> {
   const { job, log, vodId, sourcePath, destPath } = ctx;
-  const destDir = path.dirname(destPath);
-  await fsPromises.mkdir(destDir, { recursive: true });
 
   const stat = await fsPromises.stat(sourcePath);
   const fileSize = stat.size;
@@ -91,17 +87,11 @@ async function copySingleFile(ctx: CopyFileProcessorContext): Promise<CopyFileRe
   }
 
   const startTime = Date.now();
-  let bytesCopied = 0;
   let lastBucket = -1;
 
-  const readStream = fs.createReadStream(sourcePath, { highWaterMark: CHUNK_SIZE });
-  const writeStream = fs.createWriteStream(destPath);
-
-  await new Promise<void>((resolve, reject) => {
-    readStream.on('data', (chunk: Buffer) => {
-      const chunkLen = chunk.length;
-      bytesCopied += chunkLen;
-
+  await atomicCopyFile(sourcePath, destPath, {
+    log,
+    onProgress: (bytesCopied) => {
       const percent = Math.min(Math.round((bytesCopied / fileSize) * 100), 100);
       void job.updateProgress(percent).catch(() => {});
 
@@ -119,14 +109,7 @@ async function copySingleFile(ctx: CopyFileProcessorContext): Promise<CopyFileRe
           vodId
         );
       }
-    });
-
-    readStream.on('error', reject);
-    writeStream.on('error', reject);
-    writeStream.on('finish', () => {
-      resolve();
-    });
-    readStream.pipe(writeStream);
+    },
   });
 
   const elapsedSeconds = (Date.now() - startTime) / 1000;

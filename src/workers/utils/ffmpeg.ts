@@ -8,6 +8,7 @@ import { parseTimecode } from '../../utils/formatting.ts';
 import type { AppLogger } from '../../utils/logger.ts';
 import { childLogger } from '../../utils/logger.ts';
 import { deleteFileIfExists, fileExists } from '../../utils/path.ts';
+import { PART_SUFFIX, atomicReplaceFile } from './atomic-file.ts';
 
 const logger = childLogger({ module: 'ffmpeg' });
 
@@ -567,6 +568,10 @@ export async function convertHlsToMp4(source: string, outputPath: string, option
     baseOptions.push('-avoid_negative_ts', 'make_zero', '-fflags', '+genpts');
   }
 
+  // Write to a `.part` file and rename into place only after ffmpeg succeeds,
+  // so a killed conversion never leaves a truncated final MP4 behind.
+  const partPath = `${outputPath}${PART_SUFFIX}`;
+
   const args: string[] = [
     '-v',
     'info',
@@ -580,7 +585,7 @@ export async function convertHlsToMp4(source: string, outputPath: string, option
     'copy',
     ...baseOptions,
     '-y',
-    outputPath,
+    partPath,
   ];
 
   const ctx = options?.vodId != null ? `VOD ${options.vodId}` : source.substring(0, 40);
@@ -592,7 +597,13 @@ export async function convertHlsToMp4(source: string, outputPath: string, option
     }
   };
 
-  await runFfmpeg(args, knownDuration, options?.onProgress, customOnStart);
+  try {
+    await runFfmpeg(args, knownDuration, options?.onProgress, customOnStart);
+    await atomicReplaceFile(partPath, outputPath);
+  } catch (err) {
+    await deleteFileIfExists(partPath);
+    throw err;
+  }
 }
 
 /**
