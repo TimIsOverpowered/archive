@@ -31,7 +31,7 @@ const impitInstances = new Map<string, Impit>();
 function getImpit(key: string): Impit {
   let instance = impitInstances.get(key);
   if (!instance) {
-    instance = new Impit({ browser: 'chrome' });
+    instance = new Impit({ browser: 'chrome151' });
     impitInstances.set(key, instance);
   }
   return instance;
