@@ -584,6 +584,8 @@ export async function convertHlsToMp4(source: string, outputPath: string, option
     '-c',
     'copy',
     ...baseOptions,
+    '-f',
+    'mp4',
     '-y',
     partPath,
   ];
