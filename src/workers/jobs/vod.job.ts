@@ -41,11 +41,14 @@ export async function triggerVodDownload(opts: TriggerVodOptions): Promise<strin
       options: {
         jobId,
       },
-      logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
+      logger: { info: log.info.bind(log), debug: log.debug.bind(log), warn: log.warn.bind(log) },
       successMessage: 'VOD download job enqueued',
       extraContext: { tenantId, vodId, platform },
     });
-    return result.isNew ? result.jobId : null;
+    // Return the jobId even when the download is already in flight (active/waiting),
+    // so downstream flows chain to the in-progress download instead of running
+    // uploads before the file exists.
+    return result.jobId;
   } catch (error) {
     log.error({ jobId, tenantId, error: extractErrorDetails(error).message }, 'Failed to enqueue VOD job');
     return null;

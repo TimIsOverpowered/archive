@@ -31,7 +31,7 @@ async function enqueue(job: ChatDownloadJob): Promise<string | null> {
       options: {
         jobId,
       },
-      logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
+      logger: { info: log.info.bind(log), debug: log.debug.bind(log), warn: log.warn.bind(log) },
       successMessage: 'Chat download job enqueued',
       extraContext: { tenantId: job.tenantId, vodId: job.vodId, platform: job.platform },
     });

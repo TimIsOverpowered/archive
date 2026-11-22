@@ -8,7 +8,7 @@ import {
   getDmcaProcessingQueue,
   getFileCopyQueue,
   getFlowProducer,
-  getStandardVodQueue,
+  getStandardVodQueueName,
 } from '../queues/queue.ts';
 import { enqueueJobWithLogging } from './enqueue.ts';
 import type { DmcaProcessingJob } from './types.ts';
@@ -91,7 +91,7 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
       if (downloadJobId != null) {
         children.push({
           name: 'standard_vod_download',
-          queueName: getStandardVodQueue().name,
+          queueName: getStandardVodQueueName(tenantId),
           opts: { jobId: downloadJobId, failParentOnFailure: false },
         });
       }
@@ -130,7 +130,7 @@ export async function queueDmcaProcessing(options: QueueDmcaProcessingOptions): 
         jobId,
         ...defaultJobOptions,
       },
-      logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
+      logger: { info: log.info.bind(log), debug: log.debug.bind(log), warn: log.warn.bind(log) },
       successMessage: 'DMCA processing job queued (file exists)',
       extraContext: { vodId, part, gameId, chained: false, claimsCount: claims.length },
     });

@@ -1,4 +1,5 @@
 import { type ConnectionOptions, FlowProducer, Queue, type QueueOptions } from 'bullmq';
+import { Jobs } from '../../constants.ts';
 import type {
   ChatDownloadJob,
   ChatDownloadResult,
@@ -47,6 +48,16 @@ export const defaultJobOptions: JobOpts = {
   backoff: { type: 'exponential' as const, delay: 5000 },
   removeOnComplete: true,
   removeOnFail: true,
+};
+
+/**
+ * Job options for standard VOD download queues (per-tenant). Finished jobs are
+ * retained (bounded count) so failed/stuck pipelines can be inspected post-mortem.
+ */
+export const standardVodJobOptions: JobOpts = {
+  ...defaultJobOptions,
+  removeOnComplete: { count: Jobs.FINISHED_JOB_RETENTION_COUNT },
+  removeOnFail: { count: Jobs.FINISHED_JOB_RETENTION_COUNT },
 };
 
 function exponentialBackoff(delay: number, attempts: number): JobOpts {
@@ -116,12 +127,17 @@ export function getLiveDownloadQueue(): Queue<LiveDownloadJob, LiveDownloadResul
   return getQueue(QUEUE_NAMES.VOD_LIVE, defaultJobOptions);
 }
 
-export function getStandardVodQueue(): Queue<StandardVodJob, StandardVodResult, string> {
-  return getQueue(QUEUE_NAMES.VOD_STANDARD, defaultJobOptions);
+/**
+ * Queue name for a tenant's standard VOD download queue. FlowProducer children
+ * must reference this exact name — BullMQ matches flow dependencies by
+ * `queueName:jobId`, so a mismatch leaves parents stuck in waiting-children.
+ */
+export function getStandardVodQueueName(tenantId: string): string {
+  return `${VOD_STANDARD_QUEUE_PREFIX}${tenantId}`;
 }
 
 export function getTenantStandardVodQueue(tenantId: string): Queue<StandardVodJob, StandardVodResult, string> {
-  return getQueue(`${VOD_STANDARD_QUEUE_PREFIX}${tenantId}`, defaultJobOptions);
+  return getQueue(getStandardVodQueueName(tenantId), standardVodJobOptions);
 }
 
 export function getTwitchChatDownloadQueue(): Queue<ChatDownloadJob, ChatDownloadResult, string> {

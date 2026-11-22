@@ -4,6 +4,7 @@ import { getLogger } from '../../utils/logger.ts';
 export interface JobLogger {
   info: (context: Record<string, unknown>, message: string) => void;
   debug: (context: Record<string, unknown>, message: string) => void;
+  warn: (context: Record<string, unknown>, message: string) => void;
 }
 
 export interface JobEnqueueResult {
@@ -39,11 +40,21 @@ export async function enqueueJobWithLogging(opts: EnqueueJobWithLoggingOpts): Pr
         logger.debug({ jobId, state, ...extraContext }, `Job already exists in state ${state}, skipping`);
         return { jobId, isNew: false };
       }
+      // Queues that retain finished jobs (see standardVodJobOptions) keep completed/failed
+      // jobs in Redis. Re-adding the same jobId would only re-link the old job and never
+      // schedule new work, so remove the finished job to let a fresh run be scheduled.
+      if (state === 'completed' || state === 'failed') {
+        await existing.remove();
+        logger.debug({ jobId, state, ...extraContext }, `Removed existing ${state} job before re-enqueue`);
+      }
     }
   }
 
   if (await queue.isPaused()) {
-    logger.debug({ jobId, ...extraContext }, 'Queue is paused, skipping job enqueue');
+    logger.warn(
+      { jobId, ...extraContext },
+      'Queue is paused, skipping job enqueue — job will NOT be scheduled until the queue is resumed'
+    );
     return { jobId, isNew: false };
   }
 

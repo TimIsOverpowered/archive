@@ -18,7 +18,7 @@ import {
   defaultJobOptions,
   getFileCopyQueue,
   getFlowProducer,
-  getStandardVodQueue,
+  getStandardVodQueueName,
   getVodFinalizeFileQueue,
   getYoutubeUploadQueue,
 } from '../queues/queue.ts';
@@ -243,7 +243,7 @@ async function enqueueVodUpload(
       if (downloadJobId != null) {
         children.push({
           name: 'standard_vod_download',
-          queueName: getStandardVodQueue().name,
+          queueName: getStandardVodQueueName(job.tenantId),
           opts: { jobId: downloadJobId, failParentOnFailure: false, ...defaultJobOptions },
         });
       }
@@ -274,7 +274,7 @@ async function enqueueVodUpload(
       options: {
         jobId,
       },
-      logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
+      logger: { info: log.info.bind(log), debug: log.debug.bind(log), warn: log.warn.bind(log) },
       successMessage: 'YouTube VOD upload job enqueued',
       extraContext: { tenantId: job.tenantId, vodId: job.vodId, part: job.part },
     });
@@ -394,7 +394,7 @@ export async function enqueueFinalizeJob(
       options: {
         jobId,
       },
-      logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
+      logger: { info: log.info.bind(log), debug: log.debug.bind(log), warn: log.warn.bind(log) },
       successMessage: 'VOD finalize job enqueued',
       extraContext: { tenantId: ctx.tenantId, vodId },
     });
@@ -433,7 +433,7 @@ async function enqueueGameUpload(
       if (downloadJobId != null) {
         children.push({
           name: 'standard_vod_download',
-          queueName: getStandardVodQueue().name,
+          queueName: getStandardVodQueueName(job.tenantId),
           opts: { jobId: downloadJobId, failParentOnFailure: false, ...defaultJobOptions },
           data: {},
         });
@@ -465,7 +465,7 @@ async function enqueueGameUpload(
       options: {
         jobId,
       },
-      logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
+      logger: { info: log.info.bind(log), debug: log.debug.bind(log), warn: log.warn.bind(log) },
       successMessage: 'YouTube game upload job enqueued',
       extraContext: { tenantId: job.tenantId, vodId: job.vodId, chapterId: job.chapterId },
     });
@@ -674,6 +674,7 @@ function buildSequentialGameChain(
  * Builds children array for FlowProducer chains, including download and/or copy job dependencies.
  */
 function buildCopyChildren(
+  tenantId: string,
   downloadJobId: string | undefined,
   copyJobId: string | undefined
 ): Array<{ name: string; queueName: string; opts: { jobId: string; failParentOnFailure?: boolean } }> {
@@ -682,7 +683,7 @@ function buildCopyChildren(
   if (downloadJobId != null) {
     children.push({
       name: 'standard_vod_download',
-      queueName: getStandardVodQueue().name,
+      queueName: getStandardVodQueueName(tenantId),
       opts: { jobId: downloadJobId, ...defaultJobOptions, failParentOnFailure: false },
     });
   }
@@ -748,7 +749,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
       const timestamp = Date.now();
       const finalizeJobId = `finalize_${vodId}_1_${timestamp}`;
       const vodJobId = `youtube_${vodId}_vod_1_${timestamp}`;
-      const baseChildren = buildCopyChildren(downloadJobId, copyJobId);
+      const baseChildren = buildCopyChildren(ctx.tenantId, downloadJobId, copyJobId);
 
       const gameChainHead = buildSequentialGameChain(gameJobs, gameJobIds, youtubeQueue.name, baseChildren, workDir);
 
@@ -803,7 +804,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
 
         const timestamp = Date.now();
         const finalizeJobId = `finalize_${vodId}_1_${timestamp}`;
-        const baseChildren = buildCopyChildren(downloadJobId, copyJobId);
+        const baseChildren = buildCopyChildren(ctx.tenantId, downloadJobId, copyJobId);
 
         const gameChainHead = buildSequentialGameChain(gameJobs, gameJobIds, youtubeQueue.name, baseChildren, workDir);
 
@@ -850,7 +851,7 @@ export async function queueYoutubeUploads(options: QueueYoutubeUploadsOptions): 
         const finalizeJobId = `finalize_${vodId}_1_${timestamp}`;
         const vodJobId = `youtube_${vodId}_vod_1_${timestamp}`;
 
-        const vodChildBase = buildCopyChildren(downloadJobId, copyJobId);
+        const vodChildBase = buildCopyChildren(ctx.tenantId, downloadJobId, copyJobId);
 
         const vodChild = {
           name: 'youtube_upload',

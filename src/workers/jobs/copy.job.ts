@@ -2,7 +2,7 @@ import { Jobs } from '../../constants.ts';
 import type { Platform } from '../../types/platforms.ts';
 import { extractErrorDetails } from '../../utils/error.ts';
 import { childLogger } from '../../utils/logger.ts';
-import { defaultJobOptions, getFileCopyQueue, getFlowProducer, getStandardVodQueue } from '../queues/queue.ts';
+import { defaultJobOptions, getFileCopyQueue, getFlowProducer, getStandardVodQueueName } from '../queues/queue.ts';
 import { enqueueJobWithLogging } from './enqueue.ts';
 import type { CopyFileJob } from './types.ts';
 
@@ -47,7 +47,7 @@ export async function queueFileCopy(options: QueueFileCopyOptions): Promise<stri
         children: [
           {
             name: 'standard_vod_download',
-            queueName: getStandardVodQueue().name,
+            queueName: getStandardVodQueueName(tenantId),
             opts: { jobId: downloadJobId, failParentOnFailure: false },
           },
         ],
@@ -65,7 +65,7 @@ export async function queueFileCopy(options: QueueFileCopyOptions): Promise<stri
         deduplication: { id: jobId },
         ...defaultJobOptions,
       },
-      logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
+      logger: { info: log.info.bind(log), debug: log.debug.bind(log), warn: log.warn.bind(log) },
       successMessage: 'File copy job enqueued',
       extraContext: { tenantId, vodId },
     });

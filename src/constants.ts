@@ -300,4 +300,6 @@ export const Jobs = {
   DMCA_JOB_PREFIX: 'dmca_',
   FINALIZE_JOB_PREFIX: 'finalize_',
   COPY_JOB_PREFIX: 'copy_',
+  /** Number of most-recent finished jobs retained in standard VOD download queues for post-mortem debugging. */
+  FINISHED_JOB_RETENTION_COUNT: 100,
 } as const;

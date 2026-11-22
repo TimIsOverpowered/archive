@@ -588,7 +588,7 @@ async function enqueueLiveHlsDownload(params: {
         attempts: 10,
         deduplication: { id: `${Jobs.LIVE_HLS_JOB_PREFIX}${params.tenantId}_${params.vodId}` },
       },
-      logger: { info: log.info.bind(log), debug: log.debug.bind(log) },
+      logger: { info: log.info.bind(log), debug: log.debug.bind(log), warn: log.warn.bind(log) },
       successMessage: 'Live HLS download job enqueued successfully',
       extraContext: { dbId: params.dbId, vodId: params.vodId, platform: params.platform, queueName: 'vod_live' },
     });
