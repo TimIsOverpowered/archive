@@ -18,6 +18,7 @@ import { createVodWorkerAlerts, safeUpdateAlert } from '../utils/alert-factories
 import { convertHlsToMp4, detectFmp4FromPlaylist } from '../utils/ffmpeg.ts';
 import { updateVodDurationDuringDownload } from './duration-updater.ts';
 import {
+  type DownloadSegment,
   downloadSegmentsParallel,
   type FetchPlaylistResult,
   fetchKickPlaylist,
@@ -154,6 +155,16 @@ export async function downloadHlsStream(options: HlsDownloadOptions): Promise<Hl
   }
 }
 
+/**
+ * Candidate file names for a DMCA-muted segment line (`N-muted.ts`), in
+ * priority order: the plain name (`N.ts`, how index-muted-* playlists name
+ * the original), the `-unmuted` name (`N-unmuted.ts`, how index-dvr
+ * playlists name it), and finally the muted file itself.
+ */
+function mutedSegmentCandidates(mutedUri: string): string[] {
+  return [mutedUri.replace('-muted', ''), mutedUri.replace('-muted', '-unmuted'), mutedUri];
+}
+
 async function convertAndCleanup(
   m3u8Path: string,
   finalMp4Path: string,
@@ -172,15 +183,20 @@ async function convertAndCleanup(
     const line = lines[i];
 
     if (line != null && line !== '' && !line.startsWith('#') && line.includes('-muted')) {
-      const unmutedLine = line.replace('-muted', '');
-      const unmutedPath = join(vodDir, unmutedLine);
-
-      try {
-        await access(unmutedPath);
-        lines[i] = unmutedLine;
-        playlistModified = true;
-      } catch {
-        // unmuted file doesn't exist; leave the -muted line intact
+      // Prefer whichever original (non-muted) file actually exists on disk,
+      // matching the candidate order used at download time. If none exists,
+      // leave the -muted line intact (the muted file is what got downloaded).
+      for (const candidate of mutedSegmentCandidates(line)) {
+        try {
+          await access(join(vodDir, candidate));
+          if (candidate !== line) {
+            lines[i] = candidate;
+            playlistModified = true;
+          }
+          break;
+        } catch {
+          // candidate file doesn't exist; try the next name
+        }
       }
     }
   }
@@ -446,7 +462,7 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
     throw new Error('No segments found in HLS playlist');
   }
 
-  const segmentsToDownload: { uri: string }[] = [];
+  const segmentsToDownload: DownloadSegment[] = [];
   const seenUris = new Set<string>();
 
   for (const seg of rawSegments) {
@@ -457,7 +473,21 @@ async function downloadArchivedVod(ctx: ArchivedVodContext): Promise<void> {
     }
     if (!seenUris.has(seg.uri)) {
       seenUris.add(seg.uri);
-      segmentsToDownload.push(seg);
+
+      // Twitch DMCA-mutes specific VOD segments, referenced with a `-muted`
+      // suffix. The original (audio-bearing) segment often stays fetchable
+      // for a while after the stream ends, so prefer it under every known
+      // name over the muted file, and only use that if they all 403/404.
+      if (platform === PLATFORMS.TWITCH && seg.uri.includes('-muted')) {
+        const candidates = mutedSegmentCandidates(seg.uri);
+        const primary = candidates[0];
+        if (primary != null) {
+          for (const candidate of candidates) seenUris.add(candidate);
+          segmentsToDownload.push({ uri: primary, fallbackUris: candidates.slice(1) });
+        }
+      } else {
+        segmentsToDownload.push({ uri: seg.uri });
+      }
     }
   }
 

@@ -28,6 +28,13 @@ export interface RequestOptions<R extends ResponseType = 'json'> {
   signal?: AbortSignal | undefined;
   dispatcher?: Dispatcher | undefined;
   parseReviver?: (key: string, value: unknown) => unknown;
+  /**
+   * If provided and it returns true for the final error, the failure is
+   * logged at debug level instead of error level. Use for calls where the
+   * error is expected and handled by a caller fallback (e.g. probing
+   * segment variants that may be gone, 403/404).
+   */
+  suppressErrorLog?: ((error: unknown) => boolean) | undefined;
 }
 
 /** Type-level mapping from ResponseType to the corresponding JavaScript type. */
@@ -163,6 +170,7 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
     retryOptions,
     logContext = {},
     dispatcher,
+    suppressErrorLog,
   } = options ?? {};
 
   const urlStr = url.toString();
@@ -295,10 +303,20 @@ export async function request<T = unknown, R extends ResponseType = 'json'>(
     }
 
     const { message } = extractErrorDetails(error);
-    getLogger().error(
-      { component: 'http-client', method, url: scrubbedUrl, duration, error: message, ...logContext },
-      'FAILED'
-    );
+    const logContextWithDetails = {
+      component: 'http-client',
+      method,
+      url: scrubbedUrl,
+      duration,
+      error: message,
+      ...logContext,
+    };
+
+    if (suppressErrorLog?.(error)) {
+      getLogger().debug(logContextWithDetails, 'FAILED (suppressed)');
+    } else {
+      getLogger().error(logContextWithDetails, 'FAILED');
+    }
     throw error;
   }
 }

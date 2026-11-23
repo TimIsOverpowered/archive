@@ -24,6 +24,22 @@ mock.module('undici', {
   },
 });
 
+// Mock the logger so we can assert on log levels
+const mockLoggerError = mock.fn<(...args: unknown[]) => void>();
+const mockLoggerDebug = mock.fn<(...args: unknown[]) => void>();
+const mockLogger = {
+  error: mockLoggerError,
+  debug: mockLoggerDebug,
+  info: mock.fn<(...args: unknown[]) => void>(),
+  warn: mock.fn<(...args: unknown[]) => void>(),
+};
+
+mock.module('../../src/utils/logger.ts', {
+  namedExports: {
+    getLogger: () => mockLogger,
+  },
+});
+
 // 3. Dynamically import the system-under-test AFTER the mock is registered
 const { request } = await import('../../src/utils/http-client.ts');
 
@@ -490,6 +506,60 @@ describe('HTTP Client', () => {
       } catch (error) {
         assert.ok((error as Error).message.includes('422'));
       }
+    });
+  });
+
+  describe('suppressErrorLog', () => {
+    beforeEach(() => {
+      mockLoggerError.mock.resetCalls();
+      mockLoggerDebug.mock.resetCalls();
+    });
+
+    it('should log at debug instead of error when suppressErrorLog returns true', async () => {
+      mockUndiciRequest.mock.mockImplementation(() =>
+        Promise.resolve(makeMockResponse({ statusCode: 404, statusMessage: 'Not Found' }))
+      );
+
+      await assert.rejects(
+        request('https://api.example.com/segment', {
+          suppressErrorLog: (err) => err instanceof HttpError && err.statusCode === 404,
+        }),
+        (err: unknown) => err instanceof HttpError && err.statusCode === 404
+      );
+
+      assert.strictEqual(mockLoggerError.mock.callCount(), 0, 'error log should be suppressed');
+      assert.strictEqual(mockLoggerDebug.mock.callCount(), 1, 'debug log should be emitted instead');
+    });
+
+    it('should still log error when suppressErrorLog returns false', async () => {
+      mockUndiciRequest.mock.mockImplementation(() =>
+        Promise.resolve(makeMockResponse({ statusCode: 404, statusMessage: 'Not Found' }))
+      );
+
+      await assert.rejects(
+        request('https://api.example.com/segment', { suppressErrorLog: () => false }),
+        (err: unknown) => err instanceof HttpError && err.statusCode === 404
+      );
+
+      assert.strictEqual(mockLoggerError.mock.callCount(), 1);
+      assert.strictEqual(mockLoggerDebug.mock.callCount(), 0);
+    });
+
+    it('should still log error for other statuses when suppressErrorLog only allows 404', async () => {
+      mockUndiciRequest.mock.mockImplementation(() =>
+        Promise.resolve(makeMockResponse({ statusCode: 500, statusMessage: 'Internal Server Error' }))
+      );
+
+      await assert.rejects(
+        request('https://api.example.com/segment', {
+          retryOptions: { attempts: 1 },
+          suppressErrorLog: (err) => err instanceof HttpError && err.statusCode === 404,
+        }),
+        (err: unknown) => err instanceof HttpError && err.statusCode === 500
+      );
+
+      assert.strictEqual(mockLoggerError.mock.callCount(), 1);
+      assert.strictEqual(mockLoggerDebug.mock.callCount(), 0);
     });
   });
 

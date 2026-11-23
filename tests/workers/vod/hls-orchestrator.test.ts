@@ -33,6 +33,7 @@ const mockFsMkdir: any = mock.fn(async (_path: string, _opts: any) => {});
 const mockFsWriteFile: any = mock.fn(async (_path: string, _data: string) => {});
 const mockFsReadFile: any = mock.fn(async (_path: string) => mockPlaylistVariantM3u8);
 const mockFsReaddir: any = mock.fn(async (_path: string) => ['seg001.ts', 'seg002.ts', 'seg003.ts', 'vod.mp4']);
+const mockFsAccess: any = mock.fn(async (_path: string) => {});
 
 const mockFetchTwitchPlaylist: any = mock.fn(async () => mockPlaylistResult);
 const mockFetchKickPlaylist: any = mock.fn(async () => mockPlaylistResult);
@@ -72,7 +73,7 @@ mock.module('fs/promises', {
     writeFile: mockFsWriteFile,
     readFile: mockFsReadFile,
     readdir: mockFsReaddir,
-    access: mock.fn(async () => {}),
+    access: mockFsAccess,
   },
 });
 
@@ -530,6 +531,8 @@ describe('downloadHlsStream', () => {
     mockDownloadSegmentsParallel.mock.mockImplementation(async () => {});
     mockGetRetryDelay.mock.mockImplementation(() => 0);
     mockIsVodLiveById.mock.mockImplementation(async () => true);
+    mockFsReadFile.mock.mockImplementation(async () => mockPlaylistVariantM3u8);
+    mockFsAccess.mock.mockImplementation(async (_path: string) => {});
   });
 
   afterEach(() => {
@@ -537,6 +540,7 @@ describe('downloadHlsStream', () => {
     mockFsWriteFile.mock.resetCalls();
     mockFsReadFile.mock.resetCalls();
     mockFsReaddir.mock.resetCalls();
+    mockFsAccess.mock.resetCalls();
     mockFetchTwitchPlaylist.mock.resetCalls();
     mockFetchKickPlaylist.mock.resetCalls();
     mockDownloadSegmentsParallel.mock.resetCalls();
@@ -616,6 +620,81 @@ describe('downloadHlsStream', () => {
       await downloadHlsStream(buildOptions({ platform: PLATFORMS.KICK, platformUserId: 'user-1', isLive: false }));
 
       assert.strictEqual(mockCreateSession.mock.callCount(), 1);
+    });
+
+    it('should rewrite -muted Twitch segments to prefer the original names', async () => {
+      mockFetchTwitchPlaylist.mock.mockImplementation(async () => ({
+        variantM3u8String: `#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXTINF:10.0,\n2214.ts\n#EXTINF:10.0,\n2215-muted.ts\n#EXT-X-ENDLIST`,
+        baseURL: 'https://example.com/segments',
+      }));
+
+      await downloadHlsStream(buildOptions({ platform: PLATFORMS.TWITCH, isLive: false }));
+
+      const call = mockDownloadSegmentsParallel.mock.calls[0];
+      assert.ok(call);
+      const segments = call.arguments[0] as Array<{ uri: string; fallbackUris?: string[] }>;
+      assert.deepEqual(segments, [
+        { uri: '2214.ts' },
+        { uri: '2215.ts', fallbackUris: ['2215-unmuted.ts', '2215-muted.ts'] },
+      ]);
+    });
+
+    it('should rewrite -muted playlist lines to the -unmuted file when the plain file is absent', async () => {
+      const mutedPlaylist = `#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXTINF:10.0,\n2214-muted.ts\n`;
+      mockFetchTwitchPlaylist.mock.mockImplementation(async () => ({
+        variantM3u8String: mutedPlaylist,
+        baseURL: 'https://example.com/segments',
+      }));
+      mockFsReadFile.mock.mockImplementation(async () => mutedPlaylist);
+      // Only the -unmuted original exists on disk
+      mockFsAccess.mock.mockImplementation(async (p: string) => {
+        if (!p.endsWith('2214-unmuted.ts')) throw new Error(`ENOENT: ${p}`);
+      });
+
+      await downloadHlsStream(buildOptions({ platform: PLATFORMS.TWITCH, isLive: false }));
+
+      const writes = mockFsWriteFile.mock.calls.map((c: any) => String(c.arguments[1]));
+      const finalPlaylist = writes[writes.length - 1];
+      assert.ok(finalPlaylist != null);
+      assert.ok(finalPlaylist.includes('2214-unmuted.ts'), 'playlist should point at the -unmuted file');
+      assert.ok(!finalPlaylist.includes('2214-muted.ts'), 'playlist should no longer point at the muted file');
+    });
+
+    it('should prefer the plain file when multiple non-muted files exist', async () => {
+      const mutedPlaylist = `#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXTINF:10.0,\n2214-muted.ts\n`;
+      mockFetchTwitchPlaylist.mock.mockImplementation(async () => ({
+        variantM3u8String: mutedPlaylist,
+        baseURL: 'https://example.com/segments',
+      }));
+      mockFsReadFile.mock.mockImplementation(async () => mutedPlaylist);
+      // access succeeds by default: both 2214.ts and 2214-unmuted.ts "exist"
+
+      await downloadHlsStream(buildOptions({ platform: PLATFORMS.TWITCH, isLive: false }));
+
+      const writes = mockFsWriteFile.mock.calls.map((c: any) => String(c.arguments[1]));
+      const finalPlaylist = writes[writes.length - 1];
+      assert.ok(finalPlaylist != null);
+      assert.ok(finalPlaylist.includes('2214.ts'), 'playlist should point at the plain file first');
+      assert.ok(!finalPlaylist.includes('2214-unmuted.ts'));
+      assert.ok(!finalPlaylist.includes('2214-muted.ts'));
+    });
+
+    it('should keep the -muted line when no non-muted file exists on disk', async () => {
+      const mutedPlaylist = `#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXTINF:10.0,\n2214-muted.ts\n`;
+      mockFetchTwitchPlaylist.mock.mockImplementation(async () => ({
+        variantM3u8String: mutedPlaylist,
+        baseURL: 'https://example.com/segments',
+      }));
+      mockFsReadFile.mock.mockImplementation(async () => mutedPlaylist);
+      mockFsAccess.mock.mockImplementation(async (p: string) => {
+        throw new Error(`ENOENT: ${p}`);
+      });
+
+      await downloadHlsStream(buildOptions({ platform: PLATFORMS.TWITCH, isLive: false }));
+
+      const writes = mockFsWriteFile.mock.calls.map((c: any) => String(c.arguments[1]));
+      assert.strictEqual(writes.length, 1, 'no reconcile rewrite expected');
+      assert.ok(writes[0]?.includes('2214-muted.ts'), 'playlist should keep the muted line');
     });
   });
 

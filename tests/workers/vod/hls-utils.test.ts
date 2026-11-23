@@ -8,6 +8,8 @@ import {
   buildTwitchVariantCandidates,
   cleanupOrphanedTmpFiles,
   fetchFirstAvailableVariant,
+  isSegmentUnavailableError,
+  trySegmentCandidates,
 } from '../../../src/workers/vod/hls-utils.ts';
 
 describe('cleanupOrphanedTmpFiles', () => {
@@ -324,5 +326,91 @@ describe('fetchFirstAvailableVariant', () => {
       'https://cdn.example.com/vod/chunked/index.m3u8',
       'https://cdn.example.com/vod/1080p60/index.m3u8',
     ]);
+  });
+});
+
+describe('isSegmentUnavailableError', () => {
+  it('should return true for 403 and 404 HttpErrors', () => {
+    assert.ok(isSegmentUnavailableError(new HttpError(403, 'HTTP 403: ')));
+    assert.ok(isSegmentUnavailableError(new HttpError(404, 'HTTP 404: ')));
+  });
+
+  it('should return false for other HttpError statuses and non-HTTP errors', () => {
+    assert.ok(!isSegmentUnavailableError(new HttpError(500, 'HTTP 500: ')));
+    assert.ok(!isSegmentUnavailableError(new HttpError(429, 'HTTP 429: ')));
+    assert.ok(!isSegmentUnavailableError(new Error('network unreachable')));
+    assert.ok(!isSegmentUnavailableError('string error'));
+  });
+
+  it('should recognize status codes embedded in error messages', () => {
+    assert.ok(isSegmentUnavailableError(new Error('Request failed with status 403')));
+    assert.ok(isSegmentUnavailableError(new Error('Request failed with status 404')));
+    assert.ok(!isSegmentUnavailableError(new Error('Request failed with status 500')));
+  });
+});
+
+describe('trySegmentCandidates', () => {
+  it('should return the first URI when it succeeds', async () => {
+    const calls: string[] = [];
+
+    const result = await trySegmentCandidates(['2214.ts', '2214-muted.ts'], async (uri) => {
+      calls.push(uri);
+    });
+
+    assert.equal(result, '2214.ts');
+    assert.deepEqual(calls, ['2214.ts']);
+  });
+
+  it('should fall back to the muted URI when the unmuted one 403s', async () => {
+    const calls: string[] = [];
+    const unavailable: string[] = [];
+
+    const result = await trySegmentCandidates(
+      ['2214.ts', '2214-muted.ts'],
+      async (uri) => {
+        calls.push(uri);
+        if (uri === '2214.ts') throw new HttpError(403, 'HTTP 403: ');
+      },
+      (uri, error) => {
+        unavailable.push(uri);
+        assert.ok(error instanceof HttpError && error.statusCode === 403);
+      }
+    );
+
+    assert.equal(result, '2214-muted.ts');
+    assert.deepEqual(calls, ['2214.ts', '2214-muted.ts']);
+    assert.deepEqual(unavailable, ['2214.ts']);
+  });
+
+  it('should fall back when the unmuted one 404s', async () => {
+    const result = await trySegmentCandidates(['2214.ts', '2214-muted.ts'], async (uri) => {
+      if (uri === '2214.ts') throw new HttpError(404, 'HTTP 404: ');
+    });
+
+    assert.equal(result, '2214-muted.ts');
+  });
+
+  it('should not fall back on non-403/404 errors', async () => {
+    const calls: string[] = [];
+
+    await assert.rejects(
+      trySegmentCandidates(['2214.ts', '2214-muted.ts'], async (uri) => {
+        calls.push(uri);
+        if (uri === '2214.ts') throw new HttpError(500, 'HTTP 500: ');
+      }),
+      (err: unknown) => err instanceof HttpError && err.statusCode === 500
+    );
+
+    assert.deepEqual(calls, ['2214.ts']);
+  });
+
+  it('should throw the last error when every candidate is unavailable', async () => {
+    await assert.rejects(
+      trySegmentCandidates(['2214.ts', '2214-muted.ts'], async (uri) => {
+        if (uri === '2214.ts') throw new HttpError(403, 'HTTP 403: ');
+        throw new HttpError(404, 'HTTP 404: ');
+      }),
+      (err: unknown) => err instanceof HttpError && err.statusCode === 404
+    );
   });
 });

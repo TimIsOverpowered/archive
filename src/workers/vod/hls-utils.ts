@@ -18,6 +18,66 @@ export type DownloadStrategy =
   | { type: 'fetch'; signal?: AbortSignal; abort: () => void }
   | { type: 'impit'; session: ImpitSession; signal?: AbortSignal; abort: () => void };
 
+export interface DownloadSegment {
+  uri: string;
+  /**
+   * Alternative URIs tried in order when the primary fails with 403/404,
+   * e.g. the `-muted` counterpart of a non-muted Twitch segment.
+   */
+  fallbackUris?: string[];
+}
+
+/**
+ * Whether an error indicates the segment is gone from the CDN (403/404),
+ * i.e. that a fallback candidate should be tried instead of failing.
+ */
+export function isSegmentUnavailableError(error: unknown): boolean {
+  if (error instanceof HttpError) return error.statusCode === 403 || error.statusCode === 404;
+  if (error instanceof Error) {
+    const match = error.message.match(/status (\d+)/);
+    if (match?.[1] != null) {
+      const status = parseInt(match[1], 10);
+      return status === 403 || status === 404;
+    }
+  }
+  return false;
+}
+
+/**
+ * Try candidate segment URIs in order. The first fetch that succeeds (or
+ * fails with anything other than 403/404) decides the outcome: success
+ * returns the winning URI, any other failure propagates. When every
+ * candidate fails with 403/404, the last error is thrown.
+ */
+export async function trySegmentCandidates(
+  candidates: string[],
+  fetchSegment: (uri: string) => Promise<void>,
+  onUnavailable?: (uri: string, error: unknown) => void
+): Promise<string> {
+  let lastError: unknown = null;
+
+  for (let i = 0; i < candidates.length; i++) {
+    const uri = candidates[i];
+    if (uri == null) break;
+
+    try {
+      await fetchSegment(uri);
+      return uri;
+    } catch (error: unknown) {
+      const hasNext = i + 1 < candidates.length;
+      if (hasNext && isSegmentUnavailableError(error)) {
+        lastError = error;
+        onUnavailable?.(uri, error);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  if (lastError != null) throw lastError;
+  throw new Error('No segment candidates provided');
+}
+
 export function resolveDownloadStrategy(
   platform: typeof PLATFORMS.KICK | typeof PLATFORMS.TWITCH,
   impitSession: ImpitSession | null
@@ -54,9 +114,11 @@ export interface FetchPlaylistResult {
  * Universal function - works with both .ts and .mp4 (fMP4) segments
  * Supports both fetch (Twitch) and Impit (Kick) download strategies
  * Uses Promise.allSettled with abort-on-first-failure to stop in-flight downloads
+ * Segments may carry fallbackUris, tried in order when the primary 403s/404s
+ * (e.g. a `-muted` counterpart); the file is stored under the URI that won.
  */
 export async function downloadSegmentsParallel(
-  segments: { uri: string }[],
+  segments: DownloadSegment[],
   vodDir: string,
   baseURL: string,
   strategy: DownloadStrategy,
@@ -70,6 +132,7 @@ export async function downloadSegmentsParallel(
   let completedCount = 0;
   const totalSegments = segments.length;
   let lastBucket = -1;
+  let fallbackCount = 0;
 
   log.debug(
     { count: totalSegments, concurrency, retryAttempts, strategy: strategy.type },
@@ -92,12 +155,14 @@ export async function downloadSegmentsParallel(
         return;
       }
 
-      const outputPath = pathMod.join(vodDir, segment.uri);
-      const tempPath = `${outputPath}.tmp`;
+      const candidates = [segment.uri, ...(segment.fallbackUris ?? [])];
+      const tempPath = `${pathMod.join(vodDir, segment.uri)}.tmp`;
 
-      const exists = await fileExists(outputPath);
+      const candidateExists = (await Promise.all(candidates.map((uri) => fileExists(pathMod.join(vodDir, uri))))).some(
+        (found) => found
+      );
 
-      if (exists) {
+      if (candidateExists) {
         completedCount++;
         if (onProgress && totalSegments > 0) {
           const bucket = Math.floor(((completedCount / totalSegments) * 100) / 25) * 25;
@@ -109,6 +174,8 @@ export async function downloadSegmentsParallel(
         return;
       }
 
+      let succeededUri = segment.uri;
+
       try {
         await limit(async () => {
           if (isAborted() === true) {
@@ -117,29 +184,44 @@ export async function downloadSegmentsParallel(
 
           await sleep(jitter(5));
 
-          if (strategy.type === 'fetch') {
-            const response = await request(`${baseURL}/${segment.uri}`, {
-              responseType: 'response',
-              signal: strategy.signal,
-              timeoutMs: 30000,
-              dispatcher: segmentDownloadAgent,
-              retryOptions: {
-                attempts: retryAttempts,
-              },
-            });
+          const fetchSegment = async (uri: string): Promise<void> => {
+            if (strategy.type === 'fetch') {
+              const response = await request(`${baseURL}/${uri}`, {
+                responseType: 'response',
+                signal: strategy.signal,
+                timeoutMs: 30000,
+                dispatcher: segmentDownloadAgent,
+                retryOptions: {
+                  attempts: retryAttempts,
+                },
+                // A 403/404 on a segment is expected (deleted/purged segment)
+                // and either handled by a fallback candidate or surfaced by
+                // the caller — keep it out of the error log.
+                suppressErrorLog: (error) => isSegmentUnavailableError(error),
+              });
 
-            const writer = fs.createWriteStream(tempPath);
-            await pipeline(response.body, writer);
-          } else {
-            await strategy.session.streamToFile(`${baseURL}/${segment.uri}`, tempPath, {
-              timeoutMs: 30000,
-              attempts: retryAttempts,
-              ...(strategy.signal != null && { signal: strategy.signal }),
-            });
-          }
+              const writer = fs.createWriteStream(tempPath);
+              await pipeline(response.body, writer);
+            } else {
+              await strategy.session.streamToFile(`${baseURL}/${uri}`, tempPath, {
+                timeoutMs: 30000,
+                attempts: retryAttempts,
+                ...(strategy.signal != null && { signal: strategy.signal }),
+              });
+            }
+          };
+
+          succeededUri = await trySegmentCandidates(candidates, fetchSegment, (uri, error) => {
+            fallbackCount++;
+            log.debug(
+              { uri, error: extractErrorDetails(error).message },
+              'Segment candidate unavailable (403/404), trying fallback'
+            );
+            void fs.promises.unlink(tempPath).catch(() => {});
+          });
         });
 
-        await fs.promises.rename(tempPath, outputPath);
+        await fs.promises.rename(tempPath, pathMod.join(vodDir, succeededUri));
         completedCount++;
 
         if (onProgress && totalSegments > 0) {
@@ -176,6 +258,9 @@ export async function downloadSegmentsParallel(
   }
 
   if (abortRef.aborted !== true) {
+    if (fallbackCount > 0) {
+      log.info({ total: totalSegments, fallbackCount }, 'Segments downloaded via fallback candidates');
+    }
     log.debug({ total: totalSegments }, `All segments downloaded successfully`);
     if (onBatchComplete) {
       onBatchComplete(completedCount, totalSegments);
