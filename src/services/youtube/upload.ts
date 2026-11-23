@@ -15,11 +15,22 @@ export interface UploadedVideo {
   thumbnailUrl: string;
 }
 
+export interface SaveUploadResultOptions {
+  /**
+   * When true, the uploaded videos are the COMPLETE set of parts for this VOD and
+   * any stored rows for parts that no longer exist (e.g. after a splitDuration
+   * change or a full-VOD re-upload) are removed. Must not be set for partial
+   * re-uploads (e.g. a single-part DMCA re-upload).
+   */
+  removeStaleParts?: boolean | undefined;
+}
+
 export async function saveUploadResult(
   db: Kysely<StreamerDB>,
   vodId: number,
   type: string,
-  videos: UploadedVideo[]
+  videos: UploadedVideo[],
+  options: SaveUploadResultOptions = {}
 ): Promise<void> {
   for (const video of videos) {
     await db
@@ -41,6 +52,16 @@ export async function saveUploadResult(
           thumbnail_url: video.thumbnailUrl ?? null,
         })
       )
+      .execute();
+  }
+
+  if (options.removeStaleParts && videos.length > 0) {
+    const currentParts = videos.map((video) => video.part);
+    await db
+      .deleteFrom('vod_uploads')
+      .where((eb) => eb('vod_id', '=', vodId))
+      .where((eb) => eb('type', '=', type))
+      .where((eb) => eb('part', 'not in', currentParts))
       .execute();
   }
 }

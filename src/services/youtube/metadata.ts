@@ -1,13 +1,33 @@
 import type { Kysely } from 'kysely';
 import type { SelectableChapters, StreamerDB } from '../../db/streamer-types.ts';
+import { UPLOAD_TYPES } from '../../types/platforms.ts';
 import { createAutoLogger } from '../../utils/auto-tenant-logger.ts';
 import dayjs from '../../utils/dayjs.ts';
 import { createYoutubeClient } from './client.ts';
 
+/** A part of a VOD with its YouTube video ID. */
+export interface PartVideo {
+  id: string;
+  part: number;
+}
+
+/**
+ * Removes the generated part-navigation lines (e.g. `PART 2: https://youtube.com/watch?v=...`)
+ * from a description so re-linking stays idempotent.
+ */
+export function stripPartNavigationLinks(description: string): string {
+  const lines = description.split('\n');
+  const kept = lines.filter((line) => !PART_NAV_LINE_RE.test(line));
+  if (kept.length === lines.length) {
+    return description;
+  }
+  return kept.join('\n').replace(/^\n+/, '');
+}
+
 export async function saveChaptersAndLinkParts(
   tenantId: string,
   dbId: number,
-  uploadedVideos: { id: string; part: number }[],
+  uploadedVideos: PartVideo[],
   splitDuration: number,
   db: Kysely<StreamerDB>
 ): Promise<void> {
@@ -22,13 +42,38 @@ export async function saveChaptersAndLinkParts(
     .execute();
 
   const hasChapters = chapters.length > 0;
-  const needsLinking = uploadedVideos.length > 1;
+
+  // Merge the freshly uploaded parts with the stored parts so a single-part re-upload
+  // (e.g. a DMCA re-upload) can re-link ALL parts with the current video IDs.
+  // The DB rows were upserted before this call, so they are the source of truth.
+  const dbRows = await db
+    .selectFrom('vod_uploads')
+    .select(['upload_id', 'part', 'status'])
+    .where('vod_id', '=', dbId)
+    .where('type', '=', UPLOAD_TYPES.VOD)
+    .where('status', '=', 'COMPLETED')
+    .execute();
+
+  const videoIdByPart = new Map<number, string>();
+  for (const row of dbRows) {
+    videoIdByPart.set(row.part, row.upload_id);
+  }
+
+  const newParts = new Set<number>();
+  for (const video of uploadedVideos) {
+    videoIdByPart.set(video.part, video.id);
+    newParts.add(video.part);
+  }
+
+  const sortedParts: PartVideo[] = [...videoIdByPart.entries()]
+    .map(([part, id]) => ({ id, part }))
+    .sort((a, b) => a.part - b.part);
+
+  const needsLinking = sortedParts.length > 1;
 
   if (!hasChapters && !needsLinking) {
     return;
   }
-
-  const sortedParts = [...uploadedVideos].sort((a, b) => a.part - b.part);
 
   let videosWithChapters = 0;
   let videosWithLinks = 0;
@@ -38,6 +83,9 @@ export async function saveChaptersAndLinkParts(
     if (!videoPart) continue;
     const { id: videoId, part: partNum } = videoPart;
 
+    // Only append chapters for freshly uploaded parts; existing parts already have them.
+    const isNewPart = newParts.has(partNum);
+
     const currentVideo = await youtube.videos.list({
       id: [videoId],
       part: ['snippet'],
@@ -46,11 +94,12 @@ export async function saveChaptersAndLinkParts(
     const currentSnippet = currentVideo.data?.items?.[0]?.snippet ?? {};
     const currentDescription = currentSnippet.description ?? '';
 
-    let newDescription = currentDescription;
+    let newDescription = stripPartNavigationLinks(currentDescription);
 
-    if (hasChapters) {
+    if (hasChapters && isNewPart) {
       const chapterTimestamps = buildChapterTimestampsForPart(chapters, partNum, splitDuration);
-      if (chapterTimestamps != null && chapterTimestamps !== '') {
+      // Guard against a re-run of this flow duplicating the chapter block
+      if (chapterTimestamps != null && chapterTimestamps !== '' && !newDescription.includes(chapterTimestamps)) {
         newDescription += `\n\n${chapterTimestamps}`;
         videosWithChapters++;
       }
@@ -62,6 +111,10 @@ export async function saveChaptersAndLinkParts(
         newDescription = `${navLinks}\n${newDescription}`;
         videosWithLinks++;
       }
+    }
+
+    if (newDescription === currentDescription) {
+      continue;
     }
 
     await youtube.videos.update({
@@ -114,7 +167,10 @@ function buildChapterTimestampsForPart(chapters: SelectableChapters[], partNum: 
   return result.trim();
 }
 
-function buildPartNavigationLinks(sortedParts: { id: string; part: number }[], currentVideoId: string): string {
+/** Matches a generated part-navigation line, e.g. `PART 2: https://youtube.com/watch?v=abc`. */
+const PART_NAV_LINE_RE = /^PART \d+: https:\/\/youtube\.com\/watch\?v=\S+$/;
+
+function buildPartNavigationLinks(sortedParts: PartVideo[], currentVideoId: string): string {
   let result = '';
 
   for (let i = 0; i < sortedParts.length; i++) {

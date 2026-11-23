@@ -165,7 +165,13 @@ const youtubeProcessor = wrapWorkerProcessor<YoutubeUploadJob, YoutubeProcessorC
         skipFinalize: ctx.skipFinalize,
       });
 
-      await saveUploadResult(ctx.db, ctx.dbId, ctx.type, vodResult.uploadedVideos);
+      // A DMCA single-part re-upload replaces only that part; any full-VOD upload
+      // (including a DMCA re-upload without a part) is the complete part set, so
+      // stale rows for parts that no longer exist can be removed.
+      const isPartialReupload = ctx.dmcaProcessed === true && ctx.part != null;
+      await saveUploadResult(ctx.db, ctx.dbId, ctx.type, vodResult.uploadedVideos, {
+        removeStaleParts: !isPartialReupload,
+      });
       await publishVodUpdate(ctx.tenantId, ctx.dbId);
 
       const splitDuration = getEffectiveSplitDuration(ctx.config.youtube?.splitDuration);
