@@ -88,92 +88,199 @@ describe('computeGameLocalEpOffset', () => {
 });
 
 describe('computeGameEpNumber', () => {
-  interface CountDbCall {
+  interface EpDbRow {
+    start: number;
+    duration: number;
+    end: number | null;
+    vodId: number;
+    vodDuration: number;
+    vodCreatedAt: string;
+  }
+
+  interface EpDbCall {
     table: string;
+    joined: string | null;
     conditions: Array<[string, string, unknown]>;
   }
 
-  function buildCountDb(existingCount: number): { db: Kysely<StreamerDB>; calls: CountDbCall[] } {
-    const calls: CountDbCall[] = [];
+  function buildEpDb(rows: EpDbRow[]): { db: Kysely<StreamerDB>; calls: EpDbCall[] } {
+    const calls: EpDbCall[] = [];
     const db = {
       selectFrom(table: string) {
-        const conditions: CountDbCall['conditions'] = [];
-        calls.push({ table, conditions });
-        const whereable = {
-          select(_cb: (eb: unknown) => unknown) {
-            return whereable;
+        const call: EpDbCall = { table, joined: null, conditions: [] };
+        calls.push(call);
+        const builder = {
+          innerJoin(target: string) {
+            call.joined = target;
+            return builder;
+          },
+          select(_cols: unknown) {
+            return builder;
           },
           where(column: string, op: string, value: unknown) {
-            conditions.push([column, op, value]);
-            return whereable;
+            call.conditions.push([column, op, value]);
+            return builder;
           },
-          executeTakeFirst: async () => ({ cnt: existingCount }),
+          execute: async () => rows,
         };
-        return whereable;
+        return builder;
       },
     };
     return { db: db as unknown as Kysely<StreamerDB>, calls };
   }
 
-  it('returns game count + 1 with no local chapters', async () => {
-    const { db, calls } = buildCountDb(3);
+  // One Chess chapter per VOD, one VOD per day.
+  const row = (vodId: number, date: string, duration = 3600): EpDbRow => ({
+    start: 0,
+    duration,
+    end: null,
+    vodId,
+    vodDuration: duration + 600,
+    vodCreatedAt: date,
+  });
+
+  it('returns 1 when no other VODs have the game', async () => {
+    const { db, calls } = buildEpDb([]);
     const ep = await computeGameEpNumber(db, 5, [], {
       chapterName: 'Chess',
       chapterStart: 0,
       vodDuration: 3600,
+      vodCreatedAt: '2026-10-11T20:00:00Z',
       restrictedGames: [],
     });
-    assert.equal(ep, 4);
+    assert.equal(ep, 1);
     const call = calls[0];
     assert.ok(call != null);
-    assert.equal(call.table, 'games');
-    assert.ok(call.conditions.some(([col, op, val]) => col === 'game_name' && op === '=' && val === 'Chess'));
-    assert.ok(call.conditions.some(([col, op, val]) => col === 'vod_id' && op === '!=' && val === 5));
+    assert.equal(call.table, 'chapters');
+    assert.equal(call.joined, 'vods');
+    assert.ok(call.conditions.some(([col, op, val]) => col === 'chapters.name' && op === '=' && val === 'Chess'));
+    assert.ok(call.conditions.some(([col, op, val]) => col === 'vods.id' && op === '!=' && val === 5));
   });
 
-  it('combines existing count and local offset', async () => {
-    const { db } = buildCountDb(4);
+  it('counts chronologically earlier VODs plus the local offset', async () => {
+    const { db } = buildEpDb([row(1, '2026-10-11T20:00:00Z')]);
     const chapters = [ch('Chess', 0, 3600), ch('Chess', 3600, 3600)];
     const ep = await computeGameEpNumber(db, 5, chapters, {
       chapterName: 'Chess',
       chapterStart: 3600,
       vodDuration: 7200,
+      vodCreatedAt: '2026-10-12T20:00:00Z',
       restrictedGames: [],
     });
-    assert.equal(ep, 6);
+    assert.equal(ep, 3);
   });
 
-  it('returns 1 when no existing games', async () => {
-    const { db } = buildCountDb(0);
+  it('assigns EPs by stream date, not by the order uploads are processed', async () => {
+    // Four VODs (Oct 11-14) all queued together; the Oct 12 VOD's upload runs
+    // FIRST because its download finished first. Its EP must still be 2.
+    // Each row set is what the DB returns for that VOD (own VOD excluded by query).
+    const epOct12 = await computeGameEpNumber(
+      buildEpDb([row(1, '2026-10-11T20:00:00Z'), row(3, '2026-10-13T20:00:00Z'), row(4, '2026-10-14T20:00:00Z')]).db,
+      2,
+      [ch('Chess', 0, 3600)],
+      {
+        chapterName: 'Chess',
+        chapterStart: 0,
+        vodDuration: 3600,
+        vodCreatedAt: '2026-10-12T20:00:00Z',
+        restrictedGames: [],
+      }
+    );
+    assert.equal(epOct12, 2);
+
+    const epOct11 = await computeGameEpNumber(
+      buildEpDb([row(2, '2026-10-12T20:00:00Z'), row(3, '2026-10-13T20:00:00Z'), row(4, '2026-10-14T20:00:00Z')]).db,
+      1,
+      [ch('Chess', 0, 3600)],
+      {
+        chapterName: 'Chess',
+        chapterStart: 0,
+        vodDuration: 3600,
+        vodCreatedAt: '2026-10-11T20:00:00Z',
+        restrictedGames: [],
+      }
+    );
+    assert.equal(epOct11, 1);
+
+    const epOct13 = await computeGameEpNumber(
+      buildEpDb([row(1, '2026-10-11T20:00:00Z'), row(2, '2026-10-12T20:00:00Z'), row(4, '2026-10-14T20:00:00Z')]).db,
+      3,
+      [ch('Chess', 0, 3600)],
+      {
+        chapterName: 'Chess',
+        chapterStart: 0,
+        vodDuration: 3600,
+        vodCreatedAt: '2026-10-13T20:00:00Z',
+        restrictedGames: [],
+      }
+    );
+    assert.equal(epOct13, 3);
+
+    const epOct14 = await computeGameEpNumber(
+      buildEpDb([row(1, '2026-10-11T20:00:00Z'), row(2, '2026-10-12T20:00:00Z'), row(3, '2026-10-13T20:00:00Z')]).db,
+      4,
+      [ch('Chess', 0, 3600)],
+      {
+        chapterName: 'Chess',
+        chapterStart: 0,
+        vodDuration: 3600,
+        vodCreatedAt: '2026-10-14T20:00:00Z',
+        restrictedGames: [],
+      }
+    );
+    assert.equal(epOct14, 4);
+  });
+
+  it('skips earlier VODs whose only chapter of the game is too short', async () => {
+    const { db } = buildEpDb([row(1, '2026-10-11T20:00:00Z', 300)]);
     const ep = await computeGameEpNumber(db, 5, [ch('Chess', 0, 3600)], {
       chapterName: 'Chess',
       chapterStart: 0,
       vodDuration: 3600,
+      vodCreatedAt: '2026-10-12T20:00:00Z',
       restrictedGames: [],
     });
     assert.equal(ep, 1);
   });
 
-  it('assigns sequential EPs to two VODs queued back-to-back for the same game', async () => {
-    // Both VODs were queued against the same snapshot (4 existing games), but by the
-    // time VOD B's upload runs, VOD A's game row has been inserted (5 existing games).
-    const forVodA = buildCountDb(4);
-    const epA = await computeGameEpNumber(forVodA.db, 1, [ch('Chess', 0, 3600)], {
+  it('clamps earlier chapters to their VOD duration', async () => {
+    // Chapter nominally 7200s but its VOD is only 599s long -> not uploadable
+    const { db } = buildEpDb([
+      { start: 0, duration: 7200, end: null, vodId: 1, vodDuration: 599, vodCreatedAt: '2026-10-11T20:00:00Z' },
+    ]);
+    const ep = await computeGameEpNumber(db, 5, [ch('Chess', 0, 3600)], {
       chapterName: 'Chess',
       chapterStart: 0,
       vodDuration: 3600,
+      vodCreatedAt: '2026-10-12T20:00:00Z',
       restrictedGames: [],
     });
+    assert.equal(ep, 1);
+  });
 
-    const forVodB = buildCountDb(5);
-    const epB = await computeGameEpNumber(forVodB.db, 2, [ch('Chess', 0, 3600)], {
+  it('does not count earlier VODs for restricted games', async () => {
+    const { db } = buildEpDb([row(1, '2026-10-11T20:00:00Z')]);
+    const ep = await computeGameEpNumber(db, 5, [ch('Chess', 0, 3600)], {
       chapterName: 'Chess',
       chapterStart: 0,
       vodDuration: 3600,
+      vodCreatedAt: '2026-10-12T20:00:00Z',
+      restrictedGames: ['Chess'],
+    });
+    assert.equal(ep, 1);
+  });
+
+  it('breaks equal created_at ties by VOD id', async () => {
+    const sameInstant = '2026-10-11T20:00:00Z';
+    const { db } = buildEpDb([row(2, sameInstant), row(4, sameInstant)]);
+    // Current VOD 3 at the same instant: VOD 2 is earlier by id, VOD 4 is not
+    const ep = await computeGameEpNumber(db, 3, [ch('Chess', 0, 3600)], {
+      chapterName: 'Chess',
+      chapterStart: 0,
+      vodDuration: 3600,
+      vodCreatedAt: sameInstant,
       restrictedGames: [],
     });
-
-    assert.equal(epA, 5);
-    assert.equal(epB, 6);
+    assert.equal(ep, 2);
   });
 });

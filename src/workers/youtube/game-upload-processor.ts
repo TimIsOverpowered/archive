@@ -9,6 +9,7 @@ import { uploadVideo } from '../../services/youtube/index.ts';
 import type { Platform, SourceType } from '../../types/platforms.ts';
 import { createProgressBar, initRichAlert } from '../../utils/discord-alerts.ts';
 import { toHHMMSS } from '../../utils/formatting.ts';
+import dayjs from '../../utils/dayjs.ts';
 import type { AppLogger } from '../../utils/logger.ts';
 import { deleteFileIfExists } from '../../utils/path.ts';
 import { safeUpdateAlert } from '../utils/alert-factories.ts';
@@ -72,6 +73,17 @@ export type GameUploadResult =
 /** Chapter rows needed for EP number computation. */
 export type EpisodeChapter = Pick<SelectableChapters, 'name' | 'start' | 'duration' | 'end'>;
 
+/** Minimum uploadable game session length in seconds (matches the enqueue-time check). */
+const MIN_UPLOADABLE_DURATION = 600;
+
+/** Chapter duration clamped to the VOD length (chapters can extend past the VOD end). */
+function clampedChapterDuration(
+  c: { start: number; duration: number; end: number | null },
+  vodDuration: number
+): number {
+  return Math.min(c.end ?? c.start + c.duration, vodDuration) - c.start;
+}
+
 /**
  * Counts how many earlier uploadable chapters of the same game name exist in a
  * VOD before the chapter containing `chapterStart`.
@@ -90,10 +102,11 @@ export function computeGameLocalEpOffset(
   vodDuration: number,
   restrictedGames: Array<string | null>
 ): number {
-  const clampedDuration = (c: EpisodeChapter): number => Math.min(c.end ?? c.start + c.duration, vodDuration) - c.start;
-
   const isUploadable = (c: EpisodeChapter): boolean =>
-    c.name != null && c.name === chapterName && !restrictedGames.includes(c.name) && clampedDuration(c) >= 600;
+    c.name != null &&
+    c.name === chapterName &&
+    !restrictedGames.includes(c.name) &&
+    clampedChapterDuration(c, vodDuration) >= MIN_UPLOADABLE_DURATION;
 
   const sorted = [...chapters].sort((a, b) => a.start - b.start);
 
@@ -118,29 +131,64 @@ export function computeGameLocalEpOffset(
 /**
  * Computes the EP number for a game upload at execution time.
  *
- * The EP number is derived from how many games with the same name have already
- * been uploaded (existing `games` rows in other VODs) plus how many earlier
- * chapters of the same game exist in this VOD. It must be computed when the
- * upload actually runs, not when the job was queued: queue-time counts go stale
- * when multiple VODs are queued back-to-back (e.g. via the admin API), which
- * would give different VODs' games for the same game the same EP number.
+ * The EP number is the chronological position of this VOD in the per-game
+ * series: 1 + (number of chronologically earlier VODs with an uploadable
+ * chapter of the same game) + (number of earlier same-game chapters in this
+ * VOD).
  *
- * Own-VOD rows are excluded so re-uploading a VOD keeps its original EP numbers.
+ * It is derived only from `vods` and `chapters`, never from `games` upload
+ * state, so the numbering is deterministic and independent of the order in
+ * which VODs finish downloading/uploading. A games-table count would assign
+ * EPs to whichever VOD's upload runs first, breaking chronological order
+ * when multiple VODs are queued together (e.g. via the admin API).
+ *
+ * VODs are ordered by `created_at` (the stream start time, also used as the
+ * stream date in titles), with `id` as the tie-break for equal timestamps.
+ *
+ * "Uploadable" matches the enqueue-time eligibility filter: the chapter is
+ * not restricted and its duration clamped to the VOD length is >= 600s, so
+ * short or restricted sessions are skipped and do not create EP gaps.
  */
 export async function computeGameEpNumber(
   db: Kysely<StreamerDB>,
   dbId: number,
   chapters: EpisodeChapter[],
-  opts: { chapterName: string; chapterStart: number; vodDuration: number; restrictedGames: Array<string | null> }
+  opts: {
+    chapterName: string;
+    chapterStart: number;
+    vodDuration: number;
+    vodCreatedAt: Date | string | undefined;
+    restrictedGames: Array<string | null>;
+  }
 ): Promise<number> {
-  const row = await db
-    .selectFrom('games')
-    .select((eb) => eb.fn.count<number>('id').as('cnt'))
-    .where('game_name', '=', opts.chapterName)
-    .where('vod_id', '!=', dbId)
-    .executeTakeFirst();
+  const currentVodMs = opts.vodCreatedAt != null ? dayjs(opts.vodCreatedAt).valueOf() : 0;
+  const gameRestricted = opts.restrictedGames.includes(opts.chapterName);
 
-  const gameCount = Number(row?.cnt ?? 0);
+  const rows = await db
+    .selectFrom('chapters')
+    .innerJoin('vods', 'vods.id', 'chapters.vod_id')
+    .select([
+      'chapters.start',
+      'chapters.duration',
+      'chapters.end',
+      'vods.id as vodId',
+      'vods.duration as vodDuration',
+      'vods.created_at as vodCreatedAt',
+    ])
+    .where('chapters.name', '=', opts.chapterName)
+    .where('vods.id', '!=', dbId)
+    .execute();
+
+  const earlierVods = new Set<number>();
+  for (const row of rows) {
+    if (gameRestricted) break;
+    const rowMs = dayjs(row.vodCreatedAt).valueOf();
+    if (rowMs > currentVodMs) continue;
+    if (rowMs === currentVodMs && row.vodId >= dbId) continue;
+    if (clampedChapterDuration(row, row.vodDuration) < MIN_UPLOADABLE_DURATION) continue;
+    earlierVods.add(row.vodId);
+  }
+
   const localOffset = computeGameLocalEpOffset(
     chapters,
     opts.chapterName,
@@ -149,7 +197,7 @@ export async function computeGameEpNumber(
     opts.restrictedGames
   );
 
-  return gameCount + 1 + localOffset;
+  return earlierVods.size + 1 + localOffset;
 }
 
 async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{ videoId: string; gameId: string }> {
@@ -187,13 +235,14 @@ async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{
     .execute();
   const restricted = config.youtube?.restrictedGames ?? [];
 
-  // Compute the EP number at runtime: the queued value is a queue-time snapshot
-  // that goes stale when multiple VODs are queued back-to-back (e.g. admin API),
-  // which would give different VODs' games for the same game the same EP number.
+  // Compute the EP number at runtime from VOD chronology (not queued values or
+  // upload state), so EP order follows stream dates regardless of which of
+  // multiple queued VODs finishes downloading/uploading first.
   const epNumber = await computeGameEpNumber(db, dbId, chapters, {
     chapterName,
     chapterStart,
     vodDuration: vodRecord.duration,
+    vodCreatedAt: vodRecord.created_at,
     restrictedGames: restricted,
   });
 
