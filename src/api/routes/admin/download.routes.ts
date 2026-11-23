@@ -1,7 +1,5 @@
 import type { FastifyInstance } from 'fastify';
 import { findVodByPlatformId } from '../../../db/queries/vods.ts';
-import { hasCompletedUpload } from '../../../db/queries/vod-uploads.ts';
-import { getStrategy } from '../../../services/platforms/index.ts';
 import type { DownloadMethod, Platform, SourceType, UploadMode } from '../../../types/platforms.ts';
 import {
   DOWNLOAD_METHODS,
@@ -13,8 +11,8 @@ import {
   UPLOAD_MODES,
 } from '../../../types/platforms.ts';
 import { createAutoLogger } from '../../../utils/auto-tenant-logger.ts';
-import { extractErrorDetails } from '../../../utils/error.ts';
-import { badRequest, notFound } from '../../../utils/http-error.ts';
+import { badRequest, internalServerError, notFound } from '../../../utils/http-error.ts';
+import { triggerVodBackfill } from '../../../workers/jobs/backfill.job.ts';
 import adminApiKeyMiddleware from '../../middleware/admin-api-key.ts';
 import {
   asTenantPlatformContext,
@@ -197,15 +195,18 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
     }
   );
 
-  // Backfill: fetch the streamer's full VOD list from the platform (oldest first)
-  // and queue a download + YouTube upload for each VOD that isn't already
-  // downloaded and uploaded. Downloads run sequentially, oldest first.
+  // Backfill: enqueue a background job that fetches the streamer's full VOD list
+  // from the platform (oldest first) and queues a download + YouTube upload for
+  // each VOD that isn't already downloaded and uploaded. Downloads run
+  // sequentially, oldest first. Returns immediately so large libraries don't
+  // time out the request.
   fastify.post<{ Params: Params; Body: BackfillBody }>(
     '/vods/backfill',
     {
       schema: {
         tags: ['Admin'],
-        description: "Bulk-download a streamer's archived VODs (oldest first) and queue YouTube uploads",
+        description:
+          "Queue a bulk backfill of a streamer's archived VODs (oldest first) — downloads + YouTube uploads are queued by a background worker",
         params: {
           type: 'object',
           properties: { tenantId: { type: 'string', description: 'Tenant ID' } },
@@ -223,50 +224,22 @@ export default function downloadJobsRoutes(fastify: FastifyInstance, _options: R
       onRequest: [adminApiKeyMiddleware, tenantMiddleware],
       preValidation: [platformValidationMiddleware],
     },
-    async (request) => {
+    async (request, reply) => {
       const tenantCtx = asTenantPlatformContext(requireTenant(request));
-      const { tenantId, platform, db } = tenantCtx;
-      const log = createAutoLogger(tenantId);
+      const { tenantId, platform } = tenantCtx;
 
-      const strategy = getStrategy(platform);
-      if (!strategy) {
-        badRequest(`Unsupported platform: ${platform}`);
+      const result = await triggerVodBackfill({ tenantId, platform });
+      if (result == null) {
+        internalServerError('Failed to queue VOD backfill');
       }
 
-      const allVods = await strategy.listChannelVods(tenantCtx);
-
-      let enqueued = 0;
-      let skippedUploaded = 0;
-      let failed = 0;
-
-      for (const meta of allVods) {
-        const existing = await findVodByPlatformId(db, meta.id, platform);
-        if (existing != null && (await hasCompletedUpload(db, existing.id))) {
-          skippedUploaded += 1;
-          continue;
-        }
-
-        try {
-          const result = await processVodDownloadAndUpload(
-            tenantCtx,
-            meta.id,
-            { type: SOURCE_TYPES.VOD, uploadMode: UPLOAD_MODES.ALL, downloadMethod: DOWNLOAD_METHODS.HLS },
-            log
-          );
-          if (result != null) {
-            enqueued += 1;
-          } else {
-            failed += 1;
-          }
-        } catch (error) {
-          log.error({ vodId: meta.id, platform, error: extractErrorDetails(error).message }, 'Backfill item failed');
-          failed += 1;
-        }
-      }
-
-      log.info({ platform, total: allVods.length, enqueued, skippedUploaded, failed }, 'Backfill complete');
-
-      return ok({ platform, total: allVods.length, enqueued, skippedUploaded, failed });
+      reply.code(202);
+      return ok({
+        message: result.isNew ? 'VOD backfill queued' : 'VOD backfill already queued',
+        platform,
+        jobId: result.jobId,
+        alreadyQueued: !result.isNew,
+      });
     }
   );
 

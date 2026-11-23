@@ -105,6 +105,23 @@ export interface MonitorJob {
   platform?: Platform;
 }
 
+/**
+ * Bulk backfill job: list the tenant's archived VODs on the platform and queue
+ * a download + upload pipeline for each VOD not already completed.
+ */
+export interface BackfillJob {
+  tenantId: string;
+  platform: Platform;
+}
+
+export interface BackfillResult {
+  success: true;
+  total: number;
+  enqueued: number;
+  skippedUploaded: number;
+  failed: number;
+}
+
 export interface ChatDownloadResult {
   success: true;
   totalMessages?: number;

@@ -8,6 +8,8 @@ import { createWorker, workerRegistry } from './create-worker.ts';
 import dmcaProcessor from './dmca.worker.ts';
 import finalizeProcessor from './finalize.worker.ts';
 import type {
+  BackfillJob,
+  BackfillResult,
   ChatDownloadJob,
   ChatDownloadResult,
   CopyFileJob,
@@ -25,6 +27,7 @@ import type {
   YoutubeUploadJob,
   YoutubeUploadResult,
 } from './jobs/types.ts';
+import backfillProcessor from './backfill.worker.ts';
 import liveProcessor from './live.worker.ts';
 import monitorProcessor from './monitor/processor.ts';
 import { QUEUE_NAMES, VOD_STANDARD_QUEUE_PREFIX, type WorkerName } from './queues/queue.ts';
@@ -40,7 +43,8 @@ export type AllJobData =
   | VodFinalizeFileJob
   | DmcaProcessingJob
   | MonitorJob
-  | CopyFileJob;
+  | CopyFileJob
+  | BackfillJob;
 
 // Typed per-worker definition — no type erasure here
 interface WorkerDef<TData, TResult = unknown> {
@@ -90,6 +94,11 @@ const workerDefs = {
     name: QUEUE_NAMES.FILE_COPY,
     processor: copyFileProcessor,
   } satisfies WorkerDef<CopyFileJob, CopyFileResult>,
+
+  [QUEUE_NAMES.BACKFILL]: {
+    name: QUEUE_NAMES.BACKFILL,
+    processor: backfillProcessor,
+  } satisfies WorkerDef<BackfillJob, BackfillResult>,
 };
 
 export function registerWorkers(
@@ -101,6 +110,7 @@ export function registerWorkers(
   const workerConfig = getWorkersConfig();
 
   const concurrencyMap: Partial<Record<WorkerName, number>> = {
+    [QUEUE_NAMES.BACKFILL]: 1,
     [QUEUE_NAMES.CHAT_DOWNLOAD_TWITCH]: 1,
     [QUEUE_NAMES.CHAT_DOWNLOAD_KICK]: 1,
     [QUEUE_NAMES.YOUTUBE_UPLOAD]: workerConfig.YOUTUBE_UPLOAD_CONCURRENCY,

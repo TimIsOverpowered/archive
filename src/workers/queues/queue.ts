@@ -1,6 +1,8 @@
 import { type ConnectionOptions, FlowProducer, Queue, type QueueOptions } from 'bullmq';
 import { Jobs } from '../../constants.ts';
 import type {
+  BackfillJob,
+  BackfillResult,
   ChatDownloadJob,
   ChatDownloadResult,
   CopyFileJob,
@@ -30,6 +32,7 @@ export const QUEUE_NAMES = {
   DMCA_PROCESSING: 'dmca_processing',
   MONITOR: 'monitor',
   FILE_COPY: 'file_copy',
+  BACKFILL: 'backfill',
 } as const;
 
 export type WorkerName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -56,6 +59,19 @@ export const defaultJobOptions: JobOpts = {
  */
 export const standardVodJobOptions: JobOpts = {
   ...defaultJobOptions,
+  removeOnComplete: { count: Jobs.FINISHED_JOB_RETENTION_COUNT },
+  removeOnFail: { count: Jobs.FINISHED_JOB_RETENTION_COUNT },
+};
+
+/**
+ * Job options for the backfill queue. Retries are safe: the per-VOD pipeline is
+ * idempotent, so a stalled/failed backfill re-runs without duplicating work.
+ * Finished jobs are retained (bounded count) so the enqueued/skipped/failed
+ * counts can be inspected post-mortem.
+ */
+export const backfillJobOptions: JobOpts = {
+  ...defaultJobOptions,
+  attempts: 3,
   removeOnComplete: { count: Jobs.FINISHED_JOB_RETENTION_COUNT },
   removeOnFail: { count: Jobs.FINISHED_JOB_RETENTION_COUNT },
 };
@@ -166,6 +182,10 @@ export function getMonitorQueue(): Queue<MonitorJob, MonitorJobResult, string> {
 
 export function getFileCopyQueue(): Queue<CopyFileJob, CopyFileResult, string> {
   return getQueue(QUEUE_NAMES.FILE_COPY, exponentialBackoff(5_000, 5));
+}
+
+export function getBackfillQueue(): Queue<BackfillJob, BackfillResult, string> {
+  return getQueue(QUEUE_NAMES.BACKFILL, backfillJobOptions);
 }
 
 export async function closeQueues(): Promise<void> {

@@ -43,6 +43,8 @@ export async function getVodData(vodId: string, logContext?: Record<string, unkn
 /**
  * Fetch the full list of a broadcaster's archived VODs via the Helix /videos
  * endpoint, following the `after` cursor across all pages.
+ * Filters to `type=archive` — Helix defaults to `all`, which would include
+ * highlights and uploads.
  * Returns VODs in the platform's native order (newest-first).
  */
 export async function listAllTwitchVods(userId: string, logContext?: Record<string, unknown>): Promise<VodData[]> {
@@ -54,6 +56,7 @@ export async function listAllTwitchVods(userId: string, logContext?: Record<stri
     const params = new URLSearchParams({
       user_id: userId,
       first: String(Twitch.VODS_PAGE_SIZE),
+      type: Twitch.VIDEO_TYPE_ARCHIVE,
     });
     if (after) {
       params.set('after', after);
