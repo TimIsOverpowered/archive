@@ -39,7 +39,6 @@ interface YoutubeProcessorContext {
   chapterImage?: string | null | undefined;
   skipTrim?: boolean | undefined;
   platform?: Platform | undefined;
-  epNumber?: number | undefined;
   gameTitle?: string | undefined;
   sourceType?: SourceType | undefined;
   workDir?: string | undefined;
@@ -103,7 +102,6 @@ const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeP
       chapterImage,
       skipTrim,
       platform,
-      epNumber,
       gameTitle,
       sourceType,
       workDir,
@@ -118,7 +116,6 @@ const buildYoutubeContext = async (job: Job<YoutubeUploadJob>): Promise<YoutubeP
       chapterImage,
       skipTrim,
       platform,
-      epNumber,
       gameTitle,
       sourceType,
       workDir,
@@ -195,7 +192,6 @@ const youtubeProcessor = wrapWorkerProcessor<YoutubeUploadJob, YoutubeProcessorC
         chapterImage: ctx.chapterImage,
         skipTrim: ctx.skipTrim,
         platform: ctx.platform as Platform,
-        epNumber: ctx.epNumber as number,
         gameTitle: ctx.gameTitle,
         sourceType: ctx.sourceType,
         db: ctx.db,

@@ -3,7 +3,7 @@ import { GameUpsertSchema } from '../../config/schemas.ts';
 import type { TenantConfig } from '../../config/types.ts';
 import { getDisplayName } from '../../config/types.ts';
 import { YouTube } from '../../constants.ts';
-import type { StreamerDB } from '../../db/streamer-types.ts';
+import type { SelectableChapters, StreamerDB } from '../../db/streamer-types.ts';
 import { publishGameUpdate, publishVodUpdate } from '../../services/cache-invalidator.ts';
 import { uploadVideo } from '../../services/youtube/index.ts';
 import type { Platform, SourceType } from '../../types/platforms.ts';
@@ -30,7 +30,6 @@ export interface GameUploadContext {
   /** When true, filePath is already the exact game segment (pre-trimmed by the DMCA worker) — do not re-trim. */
   skipTrim?: boolean | undefined;
   platform: Platform;
-  epNumber: number;
   gameTitle?: string | undefined;
   sourceType?: SourceType | undefined;
   displayName: string;
@@ -51,7 +50,6 @@ export interface GameUploadAndUpsertParams {
   chapterGameId?: string | undefined;
   chapterImage?: string | null | undefined;
   platform: Platform;
-  epNumber: number;
   gameTitle?: string | undefined;
   sourceType?: SourceType | undefined;
   displayName: string;
@@ -71,6 +69,89 @@ export type GameUploadResult =
     }
   | { success: true; videoId: ''; gameId: ''; filePath: string };
 
+/** Chapter rows needed for EP number computation. */
+export type EpisodeChapter = Pick<SelectableChapters, 'name' | 'start' | 'duration' | 'end'>;
+
+/**
+ * Counts how many earlier uploadable chapters of the same game name exist in a
+ * VOD before the chapter containing `chapterStart`.
+ *
+ * Mirrors the eligibility filter applied at enqueue time in `createGameUploadJob`
+ * (not restricted, clamped duration >= 600s) so runtime EP numbering matches
+ * what a single-VOD enqueue would have produced.
+ *
+ * The chapter containing `chapterStart` is excluded so split parts of one
+ * chapter are not counted as separate occurrences.
+ */
+export function computeGameLocalEpOffset(
+  chapters: EpisodeChapter[],
+  chapterName: string,
+  chapterStart: number,
+  vodDuration: number,
+  restrictedGames: Array<string | null>
+): number {
+  const clampedDuration = (c: EpisodeChapter): number => Math.min(c.end ?? c.start + c.duration, vodDuration) - c.start;
+
+  const isUploadable = (c: EpisodeChapter): boolean =>
+    c.name != null && c.name === chapterName && !restrictedGames.includes(c.name) && clampedDuration(c) >= 600;
+
+  const sorted = [...chapters].sort((a, b) => a.start - b.start);
+
+  let currentChapterStart: number | null = null;
+  for (const c of sorted) {
+    if (c.start <= chapterStart && chapterStart < c.start + c.duration) {
+      currentChapterStart = c.start;
+      break;
+    }
+  }
+
+  let offset = 0;
+  for (const c of sorted) {
+    if (c.start >= chapterStart) break;
+    if (c.start === currentChapterStart) continue;
+    if (!isUploadable(c)) continue;
+    offset++;
+  }
+  return offset;
+}
+
+/**
+ * Computes the EP number for a game upload at execution time.
+ *
+ * The EP number is derived from how many games with the same name have already
+ * been uploaded (existing `games` rows in other VODs) plus how many earlier
+ * chapters of the same game exist in this VOD. It must be computed when the
+ * upload actually runs, not when the job was queued: queue-time counts go stale
+ * when multiple VODs are queued back-to-back (e.g. via the admin API), which
+ * would give different VODs' games for the same game the same EP number.
+ *
+ * Own-VOD rows are excluded so re-uploading a VOD keeps its original EP numbers.
+ */
+export async function computeGameEpNumber(
+  db: Kysely<StreamerDB>,
+  dbId: number,
+  chapters: EpisodeChapter[],
+  opts: { chapterName: string; chapterStart: number; vodDuration: number; restrictedGames: Array<string | null> }
+): Promise<number> {
+  const row = await db
+    .selectFrom('games')
+    .select((eb) => eb.fn.count<number>('id').as('cnt'))
+    .where('game_name', '=', opts.chapterName)
+    .where('vod_id', '!=', dbId)
+    .executeTakeFirst();
+
+  const gameCount = Number(row?.cnt ?? 0);
+  const localOffset = computeGameLocalEpOffset(
+    chapters,
+    opts.chapterName,
+    opts.chapterStart,
+    opts.vodDuration,
+    opts.restrictedGames
+  );
+
+  return gameCount + 1 + localOffset;
+}
+
 async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{ videoId: string; gameId: string }> {
   const {
     tenantId,
@@ -84,7 +165,6 @@ async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{
     chapterGameId,
     chapterImage,
     platform,
-    epNumber,
     gameTitle,
     sourceType,
     displayName,
@@ -96,18 +176,29 @@ async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{
   const channelName = getDisplayName(config);
   const currentPartNum = part ?? 1;
 
-  const dbTitle = gameTitle ?? `${chapterName} EP ${epNumber + (currentPartNum - 1)}`;
-
   const vodRecord = await db.selectFrom('vods').selectAll().where('id', '=', dbId).executeTakeFirst();
   if (!vodRecord) throw new Error(`VOD not found for dbId ${dbId}`);
 
   const chapters = await db
     .selectFrom('chapters')
-    .select(['name', 'start', 'duration'])
+    .select(['name', 'start', 'duration', 'end'])
     .where('vod_id', '=', dbId)
     .orderBy('start', 'asc')
     .execute();
   const restricted = config.youtube?.restrictedGames ?? [];
+
+  // Compute the EP number at runtime: the queued value is a queue-time snapshot
+  // that goes stale when multiple VODs are queued back-to-back (e.g. admin API),
+  // which would give different VODs' games for the same game the same EP number.
+  const epNumber = await computeGameEpNumber(db, dbId, chapters, {
+    chapterName,
+    chapterStart,
+    vodDuration: vodRecord.duration,
+    restrictedGames: restricted,
+  });
+
+  const dbTitle = gameTitle ?? `${chapterName} EP ${epNumber + (currentPartNum - 1)}`;
+
   const uploadable = chapters.filter((c) => (c.name == null || !restricted.includes(c.name)) && c.duration >= 600);
   const segmentPart = computeGameSegmentPart(uploadable, chapterStart, currentPartNum, YouTube.MAX_DURATION);
 
@@ -355,7 +446,6 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     chapterGameId,
     chapterImage,
     platform,
-    epNumber,
     gameTitle,
     sourceType,
     displayName,
@@ -377,7 +467,6 @@ async function processSingleGameUpload(ctx: GameUploadContext, trimmedPath: stri
     chapterGameId,
     chapterImage,
     platform,
-    epNumber,
     gameTitle,
     sourceType,
     displayName,
@@ -402,7 +491,6 @@ async function processSplitGameUpload(
     chapterImage,
     platform,
     chapterName,
-    epNumber,
     gameTitle,
     sourceType,
     displayName,
@@ -483,7 +571,6 @@ async function processSplitGameUpload(
       chapterGameId,
       chapterImage,
       platform,
-      epNumber,
       gameTitle,
       sourceType,
       displayName,
