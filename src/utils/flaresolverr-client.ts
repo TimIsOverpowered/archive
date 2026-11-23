@@ -54,8 +54,9 @@ interface FlareSolverrSessionResponse {
   status: string;
   message?: string;
   error?: string;
-  data?: { session?: string };
+  data?: { session?: string; sessions?: string[] };
   session?: string;
+  sessions?: string[];
 }
 
 async function callFlareSolverr(body: Record<string, unknown>): Promise<FlareSolverrSessionResponse> {
@@ -68,16 +69,32 @@ async function callFlareSolverr(body: Record<string, unknown>): Promise<FlareSol
   return (await response.json()) as FlareSolverrSessionResponse;
 }
 
-async function createFlareSolverrSession(): Promise<string> {
-  const result = await callFlareSolverr({ cmd: 'sessions.create' });
+// ── Session lifecycle ────────────────────────────────────────────────────────
+//
+// Session IDs are deterministic (`archive-<pool>-<index>`) and FlareSolverr's
+// `sessions.create` is idempotent, so a still-warm session (challenge already
+// solved) is reused across app restarts instead of launching a fresh browser
+// every time.
+
+interface CreatedSession {
+  id: string;
+  fresh: boolean;
+}
+
+function sanitizeSessionIdSegment(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, '-');
+}
+
+async function createFlareSolverrSession(sessionId: string): Promise<CreatedSession> {
+  const result = await callFlareSolverr({ cmd: 'sessions.create', session: sessionId });
   if (result.status === 'error' || result.error != null) {
-    throw new Error(result.error ?? result.message ?? 'Failed to create FlareSolverr session');
+    throw new Error(result.error ?? result.message ?? `Failed to create FlareSolverr session ${sessionId}`);
   }
-  const sessionId = result.session ?? result.data?.session;
-  if (sessionId == null) {
+  const id = result.session ?? result.data?.session;
+  if (id == null) {
     throw new Error('No session ID returned from FlareSolverr');
   }
-  return sessionId;
+  return { id, fresh: result.message !== 'Session already exists.' };
 }
 
 async function destroyFlareSolverrSession(sessionId: string): Promise<void> {
@@ -86,6 +103,12 @@ async function destroyFlareSolverrSession(sessionId: string): Promise<void> {
   } catch {
     // Best-effort — session may already be expired
   }
+}
+
+async function listFlareSolverrSessions(): Promise<string[]> {
+  const result = await callFlareSolverr({ cmd: 'sessions.list' });
+  const sessions = result.sessions ?? result.data?.sessions ?? [];
+  return sessions.filter((id): id is string => typeof id === 'string');
 }
 
 async function fetchFromFlareSolverr(
@@ -151,43 +174,84 @@ async function fetchFromFlareSolverr(
   };
 }
 
-// ── Shared Session Pool ──────────────────────────────────────────────────────
+// ── Session Pool ─────────────────────────────────────────────────────────────
 
 interface SessionPoolConfig {
   size: number;
   name: string;
 }
 
+/** Used when pool initialization fails; FlareSolverr creates it on demand, so init can be retried. */
+const FALLBACK_SESSION_ID = `${Flaresolverr.SESSION_ID_PREFIX}-fallback`;
+
 class SessionPool {
   private sessions: string[] = [];
   private index = 0;
-  private initialized = false;
-  private initializing = false;
+  private initPromise: Promise<void> | null = null;
 
-  constructor(private config: SessionPoolConfig) {}
+  /** Deterministic FlareSolverr session IDs owned by this pool. */
+  readonly ownedSessionIds: string[];
 
-  async ensureInitialized(): Promise<void> {
-    if (this.initialized || this.initializing) return;
-    this.initializing = true;
+  constructor(private config: SessionPoolConfig) {
+    const prefix = `${Flaresolverr.SESSION_ID_PREFIX}-${sanitizeSessionIdSegment(config.name)}`;
+    this.ownedSessionIds = Array.from({ length: config.size }, (_, i) => `${prefix}-${i}`);
+  }
 
-    try {
-      const sessionCount = this.config.size;
-      const results = await Promise.all(Array.from({ length: sessionCount }, () => createFlareSolverrSession()));
-      this.sessions = results;
-      this.initialized = true;
-      log.info({ pool: this.config.name, count: sessionCount }, 'Session pool initialized');
-    } catch (error) {
-      const details = extractErrorDetails(error);
-      log.error({ pool: this.config.name, ...details }, 'Failed to initialize session pool');
-      this.sessions = ['archive-session'];
-      this.initialized = true;
-    } finally {
-      this.initializing = false;
+  /**
+   * Creates (or reuses) the pool's sessions. Concurrent callers await the same
+   * promise; if nothing could be created (e.g. FlareSolverr is down) the pool
+   * is not marked initialized, so the next call retries.
+   */
+  ensureInitialized(): Promise<void> {
+    if (this.initPromise == null) {
+      this.initPromise = this.initialize().finally(() => {
+        if (this.sessions.length === 0) {
+          this.initPromise = null;
+        }
+      });
     }
+    return this.initPromise;
+  }
+
+  private async initialize(): Promise<void> {
+    const startedAt = Date.now();
+    const results = await Promise.allSettled(this.ownedSessionIds.map((id) => createFlareSolverrSession(id)));
+
+    const created: CreatedSession[] = [];
+    const errors: string[] = [];
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        created.push(result.value);
+      } else {
+        errors.push(extractErrorDetails(result.reason).message);
+      }
+    }
+
+    this.sessions = created.map((session) => session.id);
+    const reused = created.filter((session) => !session.fresh).length;
+
+    if (created.length === 0) {
+      log.error({ pool: this.config.name, errors }, 'Failed to initialize session pool (will retry on next use)');
+      return;
+    }
+
+    log.info(
+      {
+        pool: this.config.name,
+        count: created.length,
+        newSessions: created.length - reused,
+        reusedSessions: reused,
+        durationMs: Date.now() - startedAt,
+      },
+      'Session pool initialized'
+    );
   }
 
   async getSession(): Promise<string> {
     await this.ensureInitialized();
+    if (this.sessions.length === 0) {
+      return FALLBACK_SESSION_ID;
+    }
     const session = this.sessions[this.index % this.sessions.length];
     this.index++;
     if (session == null) {
@@ -196,15 +260,27 @@ class SessionPool {
     return session;
   }
 
+  /**
+   * Replaces a flagged session. The old session is destroyed *before* its
+   * deterministic ID is re-created so FlareSolverr launches a fresh browser.
+   */
   async replaceSession(failedSession: string): Promise<string> {
-    const newSession = await createFlareSolverrSession();
-    const idx = this.sessions.indexOf(failedSession);
-    if (idx !== -1) {
-      await destroyFlareSolverrSession(failedSession);
-      this.sessions[idx] = newSession;
-    }
-    log.info({ pool: this.config.name, oldSession: failedSession, newSession }, 'Replaced flagged session');
-    return newSession;
+    await destroyFlareSolverrSession(failedSession);
+    const { id } = await createFlareSolverrSession(failedSession);
+    log.info({ pool: this.config.name, sessionId: id }, 'Replaced flagged session');
+    return id;
+  }
+
+  /** Destroys every owned session (used on shutdown so browsers are not leaked). */
+  async destroyAll(): Promise<void> {
+    const ids = [...new Set([...this.sessions, ...this.ownedSessionIds])];
+    if (ids.length === 0) return;
+
+    await Promise.allSettled(ids.map((id) => destroyFlareSolverrSession(id)));
+    this.sessions = [];
+    this.index = 0;
+    this.initPromise = null;
+    log.info({ pool: this.config.name, count: ids.length }, 'Session pool destroyed');
   }
 }
 
@@ -214,19 +290,67 @@ const tenantPools = new Map<string, SessionPool>();
 
 function getOrCreateTenantPool(tenantId: string): SessionPool {
   const existing = tenantPools.get(tenantId);
-  if (existing) return existing;
+  if (existing != null) return existing;
 
-  let pool = tenantPools.get(tenantId);
-  if (pool) return pool;
-
-  pool = new SessionPool({ size: 3, name: `tenant:${tenantId}` });
+  const pool = new SessionPool({ size: Flaresolverr.SESSION_POOL_SIZE, name: `tenant:${tenantId}` });
   tenantPools.set(tenantId, pool);
   return pool;
 }
 
 // ── Shared Pool ──────────────────────────────────────────────────────────────
 
-const sharedPool = new SessionPool({ size: 3, name: 'shared' });
+const sharedPool = new SessionPool({ size: Flaresolverr.SESSION_POOL_SIZE, name: 'shared' });
+
+// ── Startup / Shutdown ───────────────────────────────────────────────────────
+
+/**
+ * Pre-warms the shared pool and (optionally) per-tenant pools after a restart.
+ * Pools initialize *sequentially* (their sessions in parallel within a pool),
+ * so a restart with N tenants does not launch N×3 headless browsers at once.
+ * Callers that need a session while a pool is initializing await the same
+ * promise, so this can be fired and forgotten at startup.
+ */
+export async function prewarmFlaresolverrPools(tenantSessionIds: string[] = []): Promise<void> {
+  const pools = [sharedPool, ...tenantSessionIds.map((id) => getOrCreateTenantPool(id))];
+  const expected = new Set(pools.flatMap((pool) => pool.ownedSessionIds));
+
+  await sweepStaleSessions(expected, tenantSessionIds.length > 0);
+
+  for (const pool of pools) {
+    await pool.ensureInitialized();
+  }
+}
+
+/**
+ * Destroys owned-but-unused sessions (e.g. tenants removed from the config).
+ * Only touches the pool families this process pre-warms, so it never destroys
+ * another process's tenant pools.
+ */
+async function sweepStaleSessions(expected: Set<string>, includeTenantFamilies: boolean): Promise<void> {
+  try {
+    const families = [`${Flaresolverr.SESSION_ID_PREFIX}-shared`];
+    if (includeTenantFamilies) {
+      families.push(`${Flaresolverr.SESSION_ID_PREFIX}-tenant`);
+    }
+
+    const active = await listFlareSolverrSessions();
+    const stale = active.filter((id) => families.some((family) => id.startsWith(family)) && !expected.has(id));
+    if (stale.length === 0) return;
+
+    await Promise.allSettled(stale.map((id) => destroyFlareSolverrSession(id)));
+    log.info({ count: stale.length, stale }, 'Destroyed stale FlareSolverr sessions');
+  } catch (error) {
+    const details = extractErrorDetails(error);
+    log.warn({ ...details }, 'Failed to sweep stale FlareSolverr sessions');
+  }
+}
+
+/** Destroys all pooled sessions (called on graceful shutdown). */
+export async function shutdownFlaresolverrPools(): Promise<void> {
+  const pools: SessionPool[] = [sharedPool, ...tenantPools.values()];
+  await Promise.allSettled(pools.map((pool) => pool.destroyAll()));
+  tenantPools.clear();
+}
 
 // ── fetchUrl ─────────────────────────────────────────────────────────────────
 

@@ -128,6 +128,10 @@ export const Kick = {
 export const Flaresolverr = {
   TIMEOUT_MS: 5 * 60 * 1_000,
   HEALTH_CACHE_TTL_MS: 30_000,
+  /** Sessions per pool (shared and per-tenant). */
+  SESSION_POOL_SIZE: 3,
+  /** Prefix for all deterministic FlareSolverr session IDs owned by archive. */
+  SESSION_ID_PREFIX: 'archive',
 } as const;
 
 // ── Encryption ───────────────────────────────────────────────────────────────

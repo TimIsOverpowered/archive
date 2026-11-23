@@ -9,6 +9,7 @@ import { closeAllClients, startClientCleanup, stopClientCleanup } from './db/str
 import { registerPlatformStrategies } from './services/platforms/index.ts';
 import { getCachedRangeInfo, getCloudflareIpRanges } from './utils/cloudflare-ip-validator.ts';
 import { extractErrorDetails } from './utils/error.ts';
+import { prewarmFlaresolverrPools, shutdownFlaresolverrPools } from './utils/flaresolverr-client.ts';
 import { getLogger, setLoggerConfig } from './utils/logger.ts';
 import { registerProcessErrorHandlers } from './utils/process-handlers.ts';
 import { registerShutdownHandlers } from './utils/shutdown.ts';
@@ -66,6 +67,13 @@ async function start() {
     } else {
       getLogger().info('Cloudflare IP range validation disabled (REQUIRE_CLOUDFLARE_IP=false)');
     }
+
+    // Pre-warm the shared FlareSolverr pool in the background (badges/chapter routes use it).
+    void prewarmFlaresolverrPools().catch((error) => {
+      const details = extractErrorDetails(error);
+      getLogger().warn({ ...details }, 'FlareSolverr pool pre-warm failed');
+    });
+    getLogger().info('FlareSolverr pool pre-warm started');
   } catch (error) {
     const details = extractErrorDetails(error);
     getLogger().fatal({ ...details }, 'Failed to start server');
@@ -85,6 +93,7 @@ registerShutdownHandlers([
         await server.close();
       },
     },
+    { name: 'flaresolverr', close: shutdownFlaresolverrPools },
   ],
   [
     { name: 'redis', close: closeRedisClient },

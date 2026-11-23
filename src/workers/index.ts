@@ -11,6 +11,7 @@ import { closeMetaClient } from '../db/meta-client.ts';
 import { closeAllClients, startClientCleanup, stopClientCleanup } from '../db/streamer-client.ts';
 import { registerPlatformStrategies } from '../services/platforms/index.ts';
 import { extractErrorDetails } from '../utils/error.ts';
+import { prewarmFlaresolverrPools, shutdownFlaresolverrPools } from '../utils/flaresolverr-client.ts';
 import { closeImpit, initImpit } from '../utils/impit-wrapper.ts';
 import { getLogger, setLoggerConfig } from '../utils/logger.ts';
 import { registerProcessErrorHandlers } from '../utils/process-handlers.ts';
@@ -150,7 +151,7 @@ export async function bootstrap() {
     };
 
     await initWorkers(ctx);
-    await initBackgroundServices();
+    await initBackgroundServices(ctx);
     registerShutdownHandlers(ctx);
 
     getLogger().info('All workers started successfully');
@@ -197,8 +198,24 @@ async function initWorkers(ctx: AppContext) {
   getLogger().info({ component: 'workers' }, 'All workers ready');
 }
 
-async function initBackgroundServices() {
+async function initBackgroundServices(ctx: AppContext) {
   getLogger().info({ component: 'background' }, 'Initializing background services');
+
+  // Fire-and-forget: pools initialize sequentially and jobs awaiting a session
+  // join the same promise, so nothing needs to block on this at startup.
+  const kickSessionIds: string[] = [];
+  for (const config of ctx.configs) {
+    const kick = config.kick;
+    if (kick?.enabled === true && kick.id != null) {
+      kickSessionIds.push(`kick-${kick.id}`);
+    }
+  }
+
+  void prewarmFlaresolverrPools(kickSessionIds).catch((error) => {
+    const details = extractErrorDetails(error);
+    getLogger().warn({ ...details }, 'FlareSolverr pool pre-warm failed');
+  });
+  getLogger().info({ component: 'flaresolverr', tenants: kickSessionIds.length }, 'FlareSolverr pool pre-warm started');
 
   await startMonitorService();
   getLogger().info({ component: 'monitor' }, 'Monitor service started');
@@ -230,6 +247,7 @@ function registerShutdownHandlers(ctx: AppContext) {
           return Promise.resolve();
         },
       },
+      { name: 'flaresolverr', close: shutdownFlaresolverrPools },
       {
         name: 'tenant-subscriber',
         close: async () => {
