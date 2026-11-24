@@ -85,8 +85,21 @@ function clampedChapterDuration(
 }
 
 /**
- * Counts how many earlier uploadable chapters of the same game name exist in a
- * VOD before the chapter containing `chapterStart`.
+ * Number of YouTube uploads (EP numbers) a chapter of the given duration consumes
+ * when split at `YouTube.MAX_DURATION` (matches `processSplitGameUpload`, which
+ * computes `Math.ceil(duration / MAX_DURATION)` parts).
+ */
+function segmentCountForDuration(duration: number): number {
+  return Math.max(1, Math.ceil(duration / YouTube.MAX_DURATION));
+}
+
+/**
+ * Counts how many uploaded segments are consumed by earlier uploadable chapters
+ * of the same game name in a VOD before the chapter containing `chapterStart`.
+ *
+ * Each chapter consumes one segment per `YouTube.MAX_DURATION` (see
+ * `segmentCountForDuration`), so a chapter that gets split into multiple parts
+ * consumes that many EP numbers.
  *
  * Mirrors the eligibility filter applied at enqueue time in `createGameUploadJob`
  * (not restricted, clamped duration >= 600s) so runtime EP numbering matches
@@ -123,7 +136,7 @@ export function computeGameLocalEpOffset(
     if (c.start >= chapterStart) break;
     if (c.start === currentChapterStart) continue;
     if (!isUploadable(c)) continue;
-    offset++;
+    offset += segmentCountForDuration(clampedChapterDuration(c, vodDuration));
   }
   return offset;
 }
@@ -131,10 +144,12 @@ export function computeGameLocalEpOffset(
 /**
  * Computes the EP number for a game upload at execution time.
  *
- * The EP number is the chronological position of this VOD in the per-game
- * series: 1 + (number of chronologically earlier VODs with an uploadable
- * chapter of the same game) + (number of earlier same-game chapters in this
- * VOD).
+ * The EP number is the chronological position of this upload segment in the
+ * per-game series: 1 + (segments consumed by uploadable chapters of the same
+ * game in chronologically earlier VODs) + (segments consumed by earlier
+ * same-game chapters in this VOD). A "segment" is one YouTube video, i.e. one
+ * EP number, so a chapter of N × `YouTube.MAX_DURATION` consumes N EPs and a
+ * VOD with two sessions of the same game consumes two EPs.
  *
  * It is derived only from `vods` and `chapters`, never from `games` upload
  * state, so the numbering is deterministic and independent of the order in
@@ -179,14 +194,18 @@ export async function computeGameEpNumber(
     .where('vods.id', '!=', dbId)
     .execute();
 
-  const earlierVods = new Set<number>();
+  // Count every uploaded segment consumed by qualifying chapters in earlier
+  // VODs: a VOD with two sessions of the same game consumes two EPs, and a
+  // session split into multiple parts consumes one EP per part.
+  let crossVodSegments = 0;
   for (const row of rows) {
     if (gameRestricted) break;
     const rowMs = dayjs(row.vodCreatedAt).valueOf();
     if (rowMs > currentVodMs) continue;
     if (rowMs === currentVodMs && row.vodId >= dbId) continue;
-    if (clampedChapterDuration(row, row.vodDuration) < MIN_UPLOADABLE_DURATION) continue;
-    earlierVods.add(row.vodId);
+    const duration = clampedChapterDuration(row, row.vodDuration);
+    if (duration < MIN_UPLOADABLE_DURATION) continue;
+    crossVodSegments += segmentCountForDuration(duration);
   }
 
   const localOffset = computeGameLocalEpOffset(
@@ -197,7 +216,7 @@ export async function computeGameEpNumber(
     opts.restrictedGames
   );
 
-  return earlierVods.size + 1 + localOffset;
+  return 1 + crossVodSegments + localOffset;
 }
 
 async function uploadAndUpsertGame(params: GameUploadAndUpsertParams): Promise<{ videoId: string; gameId: string }> {

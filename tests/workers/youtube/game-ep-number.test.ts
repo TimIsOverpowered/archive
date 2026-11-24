@@ -85,6 +85,14 @@ describe('computeGameLocalEpOffset', () => {
     const chapters = [ch('Chess', 4800, 3600), ch('Other', 3600, 1200), ch('Chess', 0, 3600)];
     assert.equal(computeGameLocalEpOffset(chapters, 'Chess', 4800, 8400, []), 1);
   });
+
+  it('counts segments consumed by earlier same-name chapters, not just chapters', () => {
+    // A 90000s chapter is split into 3 parts (43199s each), consuming EPs 1-3.
+    // The next same-game chapter in the VOD must start at EP 4, not EP 2.
+    const chapters = [ch('Chess', 0, 90000), ch('Chess', 90000, 3600)];
+    assert.equal(computeGameLocalEpOffset(chapters, 'Chess', 0, 93600, []), 0);
+    assert.equal(computeGameLocalEpOffset(chapters, 'Chess', 90000, 93600, []), 3);
+  });
 });
 
 describe('computeGameEpNumber', () => {
@@ -168,6 +176,36 @@ describe('computeGameEpNumber', () => {
       restrictedGames: [],
     });
     assert.equal(ep, 3);
+  });
+
+  it('counts each same-game chapter in earlier VODs, not just distinct VODs', async () => {
+    // Regression: an earlier VOD with two sessions of the same game consumes
+    // two EPs (1 and 2), so the next VOD must be EP 3, not EP 2.
+    const { db } = buildEpDb([row(1, '2026-10-11T20:00:00Z'), row(1, '2026-10-11T20:00:00Z')]);
+    const ep = await computeGameEpNumber(db, 5, [ch('Chess', 0, 3600)], {
+      chapterName: 'Chess',
+      chapterStart: 0,
+      vodDuration: 3600,
+      vodCreatedAt: '2026-10-12T20:00:00Z',
+      restrictedGames: [],
+    });
+    assert.equal(ep, 3);
+  });
+
+  it('counts split parts of same-game chapters in earlier VODs', async () => {
+    // A 90000s chapter in an earlier VOD is split into 3 parts (EPs 1-3),
+    // so the next VOD must be EP 4, not EP 2.
+    const { db } = buildEpDb([
+      { start: 0, duration: 90000, end: null, vodId: 1, vodDuration: 90000, vodCreatedAt: '2026-10-11T20:00:00Z' },
+    ]);
+    const ep = await computeGameEpNumber(db, 5, [ch('Chess', 0, 3600)], {
+      chapterName: 'Chess',
+      chapterStart: 0,
+      vodDuration: 3600,
+      vodCreatedAt: '2026-10-12T20:00:00Z',
+      restrictedGames: [],
+    });
+    assert.equal(ep, 4);
   });
 
   it('assigns EPs by stream date, not by the order uploads are processed', async () => {
